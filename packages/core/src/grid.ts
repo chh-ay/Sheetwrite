@@ -26,6 +26,7 @@ import type {
   SheetId,
   Store,
   Theme,
+  VisibleWindowView,
 } from "./types";
 import { computeWindow } from "./virtualization";
 import { WorkerRenderer } from "./worker-renderer";
@@ -33,6 +34,7 @@ import { WorkerRenderer } from "./worker-renderer";
 /** Chrome caps element height near here; beyond it the sizer is scaled. */
 const MAX_ELEMENT_HEIGHT = 33_000_000;
 const DEFAULT_OVERSCAN = 6;
+let ariaSeq = 0;
 
 export const DEFAULT_THEME: Theme = {
   font: "13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
@@ -113,6 +115,9 @@ export class GridImpl implements Grid {
   private readonly viewportEl: HTMLDivElement;
   private readonly merges = new Map<SheetId, SelRect[]>();
   private fillTarget: SelRect | null = null;
+  private readonly aria: HTMLDivElement;
+  private ariaKey = "";
+  private ariaVersion = 0;
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
@@ -195,6 +200,23 @@ export class GridImpl implements Grid {
     this.overlay.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;";
     this.viewportEl.appendChild(this.overlay);
 
+    this.aria = document.createElement("div");
+    this.aria.className = "sheetwrite-aria";
+    this.aria.id = `sheetwrite-grid-${++ariaSeq}`;
+    this.aria.setAttribute("role", "rowgroup");
+    this.aria.style.cssText =
+      "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;";
+    host.appendChild(this.aria);
+    host.setAttribute("role", "grid");
+    host.setAttribute("aria-multiselectable", "true");
+    host.setAttribute("aria-rowcount", String(sheet.rowCount + 1));
+    host.setAttribute("aria-colcount", String(this.colIndices.length));
+    if (this.readOnly) host.setAttribute("aria-readonly", "true");
+    if (!host.hasAttribute("aria-label")) host.setAttribute("aria-label", "Spreadsheet grid");
+    this.scroller.setAttribute("aria-hidden", "true");
+    this.overlay.setAttribute("aria-hidden", "true");
+    this.viewportEl.querySelector("canvas")?.setAttribute("aria-hidden", "true");
+
     if (this.tabBarHeight > 0) this.buildTabBar();
 
     this.editor = new EditController(this.viewportEl);
@@ -203,6 +225,7 @@ export class GridImpl implements Grid {
       for (const patch of event.transaction.patches) {
         if (patch.op === "addRows" || patch.op === "removeRows") this.rebuildIndex();
       }
+      this.ariaVersion++;
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
     });
@@ -419,6 +442,7 @@ export class GridImpl implements Grid {
       height: clientH,
     });
     this.renderer.paint(view);
+    this.updateAria(view);
 
     this.paintSelection(contentTop, scrollLeft, clientW, clientH);
     this.repositionEditor(contentTop, scrollLeft);
@@ -1231,6 +1255,57 @@ export class GridImpl implements Grid {
     this.render();
   }
 
+  private updateAria(view: VisibleWindowView): void {
+    const focus = this.selection.focusCell;
+    const focusId = focus ? `${this.aria.id}-${focus.row}-${focus.col}` : "";
+    const key = `${view.rows.start}:${view.rows.end}:${view.cols.length}:${focusId}:${this.ariaVersion}`;
+    if (key === this.ariaKey) {
+      this.host.setAttribute("aria-activedescendant", focusId);
+      return;
+    }
+    this.ariaKey = key;
+
+    const nCols = view.cols.length;
+    const frag = document.createDocumentFragment();
+
+    const headRow = document.createElement("div");
+    headRow.setAttribute("role", "row");
+    headRow.setAttribute("aria-rowindex", "1");
+    for (let cj = 0; cj < nCols; cj++) {
+      const cell = document.createElement("div");
+      cell.setAttribute("role", "columnheader");
+      cell.setAttribute("aria-colindex", String(cj + 1));
+      cell.textContent = colToA1(view.cols[cj]!);
+      headRow.appendChild(cell);
+    }
+    frag.appendChild(headRow);
+
+    const nRows = view.rows.end - view.rows.start;
+    for (let ri = 0; ri < nRows; ri++) {
+      const row = view.rows.start + ri;
+      const rowEl = document.createElement("div");
+      rowEl.setAttribute("role", "row");
+      rowEl.setAttribute("aria-rowindex", String(row + 2));
+      for (let cj = 0; cj < nCols; cj++) {
+        const col = view.cols[cj]!;
+        const cell = document.createElement("div");
+        cell.setAttribute("role", "gridcell");
+        cell.setAttribute("aria-colindex", String(cj + 1));
+        cell.id = `${this.aria.id}-${row}-${col}`;
+        const v = view.values[ri * nCols + cj] ?? null;
+        if (v !== null) cell.textContent = String(v);
+        if (focus && focus.row === row && focus.col === col) {
+          cell.setAttribute("aria-selected", "true");
+        }
+        rowEl.appendChild(cell);
+      }
+      frag.appendChild(rowEl);
+    }
+
+    this.aria.replaceChildren(frag);
+    this.host.setAttribute("aria-activedescendant", focusId);
+  }
+
   destroy(): void {
     if (this.frame) (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
     this.editor.destroy();
@@ -1246,6 +1321,17 @@ export class GridImpl implements Grid {
     this.tabBar?.remove();
     this.toolbar?.destroy();
     this.viewportEl.remove();
+    this.aria.remove();
+    for (const attr of [
+      "role",
+      "aria-multiselectable",
+      "aria-rowcount",
+      "aria-colcount",
+      "aria-readonly",
+      "aria-activedescendant",
+    ]) {
+      this.host.removeAttribute(attr);
+    }
     this.host.classList.remove("sheetwrite");
   }
 }
