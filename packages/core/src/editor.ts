@@ -33,6 +33,8 @@ export class EditController {
   private opts: BeginEditOptions | null = null;
   private composing = false;
   private tearingDown = false;
+  private refStart = -1;
+  private refEnd = -1;
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -81,6 +83,7 @@ export class EditController {
     ta.addEventListener("compositionend", this.onCompositionEnd);
     ta.addEventListener("keydown", this.onKeyDown);
     ta.addEventListener("blur", this.onBlur);
+    ta.addEventListener("input", this.onInput);
 
     ta.focus();
     if (opts.selectAll) {
@@ -100,6 +103,36 @@ export class EditController {
     ta.style.height = `${rect.h}px`;
     ta.style.lineHeight = `${Math.max(1, rect.h - 4)}px`;
   }
+
+  get value(): string {
+    return this.textarea?.value ?? "";
+  }
+
+  /**
+   * Insert (or, while dragging, replace) an A1 reference at the caret — the
+   * "point mode" a spreadsheet enters after you type `=`.
+   */
+  setReference(ref: string): void {
+    const ta = this.textarea;
+    if (!ta) return;
+    const start = this.refStart >= 0 ? this.refStart : (ta.selectionStart ?? ta.value.length);
+    const end = this.refStart >= 0 ? this.refEnd : (ta.selectionEnd ?? start);
+    ta.value = ta.value.slice(0, start) + ref + ta.value.slice(end);
+    this.refStart = start;
+    this.refEnd = start + ref.length;
+    ta.setSelectionRange(this.refEnd, this.refEnd);
+    ta.focus();
+  }
+
+  /** Finish a reference pick; the next pick inserts fresh at the caret. */
+  endReference(): void {
+    this.refStart = -1;
+    this.refEnd = -1;
+  }
+
+  private readonly onInput = (): void => {
+    this.refStart = -1;
+  };
 
   commit(navigate: EditNavigate): void {
     const opts = this.opts;
@@ -161,11 +194,14 @@ export class EditController {
     ta.removeEventListener("compositionend", this.onCompositionEnd);
     ta.removeEventListener("keydown", this.onKeyDown);
     ta.removeEventListener("blur", this.onBlur);
+    ta.removeEventListener("input", this.onInput);
     ta.remove();
     this.textarea = null;
     this.cell = null;
     this.opts = null;
     this.composing = false;
+    this.refStart = -1;
+    this.refEnd = -1;
     this.tearingDown = false;
   }
 }

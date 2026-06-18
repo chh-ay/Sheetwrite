@@ -50,7 +50,8 @@ await initSheetwrite(wasmUrl);
 const host = document.getElementById("app");
 if (!host) throw new Error("missing #app host element");
 
-const grid = createGrid(host, { workbook, datasource, renderer: "canvas" });
+const useWorker = new URLSearchParams(location.search).get("renderer") === "worker";
+const grid = createGrid(host, { workbook, datasource, renderer: useWorker ? "worker" : "canvas" });
 grid.on("selection", (e) => {
   if (e.selection) console.log("selection", e.selection);
 });

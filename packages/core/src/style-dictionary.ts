@@ -13,10 +13,11 @@ export class StyleDictionary {
 
   intern(style: CellStyle | undefined): number {
     if (!style) return 0;
+    const border = style.border ? JSON.stringify(style.border) : "";
     const key = `${style.bold ? 1 : 0}|${style.italic ? 1 : 0}|${style.fontSize ?? ""}|${
       style.color ?? ""
-    }|${style.backgroundColor ?? ""}|${style.align ?? ""}|${style.wrap ? 1 : 0}`;
-    if (key === "0|0|||||0") return 0;
+    }|${style.backgroundColor ?? ""}|${style.align ?? ""}|${style.wrap ? 1 : 0}|${border}`;
+    if (key === "0|0|||||0|") return 0;
     const existing = this.lookup.get(key);
     if (existing !== undefined) return existing;
     const id = this.styles.length;

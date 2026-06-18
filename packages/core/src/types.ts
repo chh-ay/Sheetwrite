@@ -5,6 +5,22 @@
 
 export type CellAlign = "left" | "center" | "right";
 
+export interface CellBorder {
+  /** hex color, e.g. "#111111" */
+  color?: string;
+  width?: number;
+  style?: "solid" | "dashed" | "dotted";
+}
+
+/** Per-side borders; `all` applies to any side not given its own border. */
+export interface CellBorders {
+  all?: CellBorder;
+  top?: CellBorder;
+  right?: CellBorder;
+  bottom?: CellBorder;
+  left?: CellBorder;
+}
+
 export interface CellStyle {
   bold?: boolean;
   italic?: boolean;
@@ -15,6 +31,7 @@ export interface CellStyle {
   backgroundColor?: string;
   align?: CellAlign;
   wrap?: boolean;
+  border?: CellBorders;
 }
 
 export type CellFormat = "text" | "number" | "date";
@@ -228,7 +245,14 @@ export interface GridOptions {
   workbook: Workbook;
   data?: ColumnarData;
   datasource?: DataSource;
-  renderer?: "canvas";
+  renderer?: "canvas" | "worker";
+  /**
+   * Bundler-resolved URL for the worker renderer (`renderer: "worker"`). Provide
+   * it the way your bundler expects (e.g. `new URL("@sheetwrite/core/worker", import.meta.url)`).
+   * If omitted or the worker can't be constructed, the grid falls back to the
+   * main-thread canvas renderer.
+   */
+  workerUrl?: string | URL;
   theme?: Partial<Theme>;
   readOnly?: boolean;
   /** Custom cell renderers registered up front; also see `Grid.defineCellRenderer`. */

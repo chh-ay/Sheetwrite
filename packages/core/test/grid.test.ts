@@ -158,4 +158,33 @@ describe("Grid editing (Layer 3)", () => {
     expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Edited!");
     grid.destroy();
   });
+
+  it("commits a typed formula, resolves it, and re-edits to its source", () => {
+    const workbook = makeWorkbook(20);
+    const store = new SheetwriteStore(workbook, makeColumnarData(20));
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet: "s1", row: 0, col: 1 }, value: { kind: "literal", value: 10 } },
+        { op: "set", addr: { sheet: "s1", row: 1, col: 1 }, value: { kind: "literal", value: 5 } },
+      ],
+    });
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const node = host.querySelector("textarea.sheetwrite-editor");
+    if (!(node instanceof HTMLTextAreaElement)) return;
+    node.value = "=B1+B2*2";
+    node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(20);
+
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "F2", bubbles: true }));
+    const node2 = host.querySelector("textarea.sheetwrite-editor");
+    if (!(node2 instanceof HTMLTextAreaElement)) return;
+    expect(node2.value).toBe("=B1+B2*2");
+
+    grid.destroy();
+  });
 });

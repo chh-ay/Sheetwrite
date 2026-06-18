@@ -22,6 +22,7 @@ import type {
 // Mirror of the WASM cell tags.
 const KIND_NUMBER = 1;
 const KIND_STRING = 2;
+const KIND_FORMULA = 4;
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
@@ -48,6 +49,7 @@ export class SheetwriteStore implements Store {
   private readonly refs = new ReferenceGraph();
   private readonly refIndex = new Map<SheetId, Map<number, Map<number, string>>>();
   private readonly viewOrder = new Map<SheetId, Uint32Array>();
+  private readonly formulaSrc = new Map<string, string>();
 
   constructor(workbook: Workbook, data?: ColumnarData) {
     this.workbook = workbook;
@@ -78,7 +80,7 @@ export class SheetwriteStore implements Store {
   private rawCell(addr: CellAddress): ResolvedCell {
     const cell = this.wasm.getCell(this.handleOf(addr.sheet), addr.row, addr.col);
     let resolved: CellScalar = null;
-    if (cell.kind === KIND_NUMBER) resolved = cell.num;
+    if (cell.kind === KIND_NUMBER || cell.kind === KIND_FORMULA) resolved = cell.num;
     else if (cell.kind === KIND_STRING) resolved = cell.string ?? null;
     const style = this.styles.get(cell.style);
     cell.free();
@@ -90,6 +92,11 @@ export class SheetwriteStore implements Store {
     const key = cellKey(addr);
     if (this.refs.isRef(key)) return { resolved: this.refs.resolved(key), style: raw.style };
     return raw;
+  }
+
+  /** The formula source at `addr`, or null if the cell isn't a formula. */
+  getFormula(addr: CellAddress): string | null {
+    return this.formulaSrc.get(cellKey(addr)) ?? null;
   }
 
   getVisibleWindow(
@@ -202,13 +209,17 @@ export class SheetwriteStore implements Store {
         const literalAt: LiteralLookup = (a) => this.rawCell(a).resolved;
 
         if (patch.value.kind === "formula") {
-          throw new Error("arithmetic formulas are not supported yet (calc tier)");
-        }
-
-        if (patch.value.kind === "ref") {
+          if (this.refs.isRef(key)) {
+            this.refs.removeRef(key);
+            this.clearRefIndex(sheet, row, col);
+          }
+          this.formulaSrc.set(key, patch.value.src);
+          this.wasm.setFormula(handle, row, col, patch.value.src, styleId);
+        } else if (patch.value.kind === "ref") {
           // ref cells hold no literal in WASM; keep the style, track the edge.
           this.wasm.clearCell(handle, row, col, styleId);
           this.setRefIndex(sheet, row, col, key);
+          this.formulaSrc.delete(key);
           this.refs.setRef(patch.addr, patch.value.target, literalAt);
         } else {
           if (this.refs.isRef(key)) {
@@ -219,6 +230,7 @@ export class SheetwriteStore implements Store {
           if (typeof value === "number") this.wasm.setNumber(handle, row, col, value, styleId);
           else if (typeof value === "string") this.wasm.setString(handle, row, col, value, styleId);
           else this.wasm.clearCell(handle, row, col, styleId);
+          this.formulaSrc.delete(key);
           this.refs.onLiteralChanged(key, literalAt);
         }
 

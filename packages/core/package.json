@@ -20,6 +20,7 @@
       "types": "./dist/xlsx-backend.d.ts",
       "default": "./dist/xlsx-backend.js"
     },
+    "./worker": "./dist/worker.js",
     "./styles.css": "./styles.css"
   },
   "files": [

@@ -17,6 +17,7 @@ import type {
   GridEvents,
   GridOptions,
   Patch,
+  Renderer,
   Selection,
   Sheet,
   SheetId,
@@ -24,6 +25,7 @@ import type {
   Theme,
 } from "./types";
 import { computeWindow } from "./virtualization";
+import { WorkerRenderer } from "./worker-renderer";
 
 /** Chrome caps element height near here; beyond it the sizer is scaled. */
 const MAX_ELEMENT_HEIGHT = 33_000_000;
@@ -95,7 +97,7 @@ export class GridImpl implements Grid {
   private readonly scroller: HTMLDivElement;
   private readonly sizer: HTMLDivElement;
   private readonly overlay: HTMLDivElement;
-  private readonly renderer: CanvasRenderer;
+  private readonly renderer: Renderer;
   private readonly editor: EditController;
   private readonly overscan: number;
   private readonly datasource: GridOptions["datasource"];
@@ -166,8 +168,7 @@ export class GridImpl implements Grid {
     this.scroller.appendChild(this.sizer);
     host.appendChild(this.scroller);
 
-    this.renderer = new CanvasRenderer();
-    this.renderer.mount(host, this.theme);
+    this.renderer = this.createRenderer(opts, host);
     this.renderer.setRenderers(this.customRenderers);
 
     this.overlay = document.createElement("div");
@@ -201,6 +202,21 @@ export class GridImpl implements Grid {
       this.resizeObserver.observe(host);
     }
     this.render();
+  }
+
+  private createRenderer(opts: GridOptions, host: HTMLElement): Renderer {
+    if (opts.renderer === "worker") {
+      try {
+        const worker = new WorkerRenderer(opts.workerUrl);
+        worker.mount(host, this.theme);
+        return worker;
+      } catch {
+        // worker unavailable (no OffscreenCanvas / bundling) — fall back to canvas
+      }
+    }
+    const canvas = new CanvasRenderer();
+    canvas.mount(host, this.theme);
+    return canvas;
   }
 
   // ── sheet / layout geometry ────────────────────────────────────────────────
@@ -490,6 +506,27 @@ export class GridImpl implements Grid {
 
   private readonly onMouseDown = (e: MouseEvent): void => {
     if (e.button !== 0) return;
+
+    // Formula point mode: while editing a "=" formula, clicks/drags pick A1
+    // references into the editor instead of moving the grid selection.
+    if (this.editor.isEditing && this.editor.value.startsWith("=")) {
+      e.preventDefault();
+      const start = this.cellAtPointer(e.clientX, e.clientY);
+      if (!start) return;
+      this.editor.setReference(cellA1(start.row, start.col));
+      const move = (ev: MouseEvent): void => {
+        const c = this.cellAtPointer(ev.clientX, ev.clientY);
+        if (c) this.editor.setReference(rangeA1(start, c));
+      };
+      const up = (): void => {
+        this.editor.endReference();
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+      return;
+    }
     const additive = e.ctrlKey || e.metaKey;
     const rect = this.host.getBoundingClientRect();
     const py = e.clientY - rect.top;
@@ -660,8 +697,9 @@ export class GridImpl implements Grid {
     const column = sheet.columns[col];
     if (!column) return;
 
+    const formula = this.loadable?.getFormula({ sheet: this.activeSheet, row, col }) ?? null;
     const current = this.store.getCell({ sheet: this.activeSheet, row, col }).resolved;
-    const text = initial ?? (current === null ? "" : String(current));
+    const text = initial ?? formula ?? (current === null ? "" : String(current));
     const contentTop = this.scaled.toContent(this.scroller.scrollTop);
 
     this.selection.selectCell(row, col);
@@ -962,6 +1000,30 @@ function visibleColumns(columns: readonly Column[]): number[] {
   return out;
 }
 
+function colToA1(col: number): string {
+  let c = col + 1;
+  let out = "";
+  while (c > 0) {
+    const rem = (c - 1) % 26;
+    out = String.fromCharCode(65 + rem) + out;
+    c = Math.floor((c - 1) / 26);
+  }
+  return out;
+}
+
+function cellA1(row: number, col: number): string {
+  return `${colToA1(col)}${row + 1}`;
+}
+
+function rangeA1(a: CellRef, b: CellRef): string {
+  if (a.row === b.row && a.col === b.col) return cellA1(a.row, a.col);
+  const r0 = Math.min(a.row, b.row);
+  const r1 = Math.max(a.row, b.row);
+  const c0 = Math.min(a.col, b.col);
+  const c1 = Math.max(a.col, b.col);
+  return `${cellA1(r0, c0)}:${cellA1(r1, c1)}`;
+}
+
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -969,6 +1031,7 @@ function clamp(v: number, lo: number, hi: number): number {
 function coerceInput(raw: string, type: Column["type"]): CellValue {
   const trimmed = raw.trim();
   if (trimmed === "") return { kind: "literal", value: null };
+  if (trimmed.length > 1 && trimmed.startsWith("=")) return { kind: "formula", src: trimmed };
   if (type === "number") {
     const n = Number(trimmed);
     if (Number.isFinite(n)) return { kind: "literal", value: n };

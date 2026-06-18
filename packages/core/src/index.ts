@@ -20,3 +20,4 @@ export { SheetwriteStore } from "./store";
 export { StyleDictionary } from "./style-dictionary";
 export type * from "./types";
 export { computeWindow, windowContains } from "./virtualization";
+export { WorkerRenderer } from "./worker-renderer";

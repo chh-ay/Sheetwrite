@@ -122,13 +122,23 @@ describe("SheetwriteStore", () => {
     expect(change.newValue).toEqual({ kind: "literal", value: "new" });
   });
 
-  it("refuses arithmetic formula values (calc tier)", () => {
+  it("evaluates arithmetic formulas and recomputes on dependency edits", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
-    expect(() =>
-      store.applyTransaction({
-        patches: [{ op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=A1*2" } }],
-      }),
-    ).toThrow(/not supported/);
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 10 } },
+        { op: "set", addr: addr(1, 1), value: { kind: "literal", value: 20 } },
+      ],
+    });
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(2, 1), value: { kind: "formula", src: "=B1+B2*2" } }],
+    });
+    expect(store.getCell(addr(2, 1)).resolved).toBe(50);
+
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 1), value: { kind: "literal", value: 100 } }],
+    });
+    expect(store.getCell(addr(2, 1)).resolved).toBe(140);
   });
 
   it("resolves plain references and propagates target edits across sheets", () => {

@@ -14,12 +14,17 @@
 //!   typed arrays plus the window's unique strings.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::cmp::Ordering;
 use wasm_bindgen::prelude::*;
+
+mod calc;
+use calc::{Ast, CmpOp, Func, Op, parse, shift_rows};
 
 const KIND_EMPTY: u8 = 0;
 const KIND_NUMBER: u8 = 1;
 const KIND_STRING: u8 = 2;
+const KIND_FORMULA: u8 = 4;
 
 const NO_STRING: u32 = u32::MAX;
 
@@ -35,6 +40,8 @@ struct SheetData {
     str_id: Vec<u32>,
     /// host style-dictionary id; `0` means "no explicit style"
     style: Vec<u32>,
+    /// arithmetic formulas keyed by (row, col); their result is cached in `num`
+    formulas: HashMap<(u32, u32), Ast>,
 }
 
 impl SheetData {
@@ -47,6 +54,7 @@ impl SheetData {
             num: vec![0.0; len],
             str_id: vec![NO_STRING; len],
             style: vec![0; len],
+            formulas: HashMap::new(),
         }
     }
 
@@ -116,6 +124,18 @@ impl SheetData {
                 self.style[i] = 0;
             }
         }
+
+        if !self.formulas.is_empty() {
+            let (at_u, count_u) = (at as u32, count as u32);
+            for (_, ast) in self.formulas.iter_mut() {
+                shift_rows(ast, at_u, i64::from(count_u));
+            }
+            let moved = std::mem::take(&mut self.formulas);
+            for ((r, c), ast) in moved {
+                let nr = if r >= at_u { r + count_u } else { r };
+                self.formulas.insert((nr, c), ast);
+            }
+        }
     }
 
     /// Delete `count` rows starting at `at`, closing the gap.
@@ -134,6 +154,19 @@ impl SheetData {
             self.num.copy_within(base + at + count..base + old, base + at);
             self.str_id.copy_within(base + at + count..base + old, base + at);
             self.style.copy_within(base + at + count..base + old, base + at);
+        }
+
+        if !self.formulas.is_empty() {
+            let (at_u, count_u) = (at as u32, count as u32);
+            let moved = std::mem::take(&mut self.formulas);
+            for ((r, c), mut ast) in moved {
+                if r >= at_u && r < at_u + count_u {
+                    continue;
+                }
+                shift_rows(&mut ast, at_u, -i64::from(count_u));
+                let nr = if r >= at_u + count_u { r - count_u } else { r };
+                self.formulas.insert((nr, c), ast);
+            }
         }
 
         self.resize_rows(old - count);
@@ -194,6 +227,8 @@ impl CellStore {
         s.num[i] = value;
         s.str_id[i] = NO_STRING;
         s.style[i] = style;
+        s.formulas.remove(&(row as u32, col as u32));
+        self.recompute_formulas(sheet);
     }
 
     #[wasm_bindgen(js_name = setString)]
@@ -204,6 +239,8 @@ impl CellStore {
         s.kind[i] = KIND_STRING;
         s.str_id[i] = id;
         s.style[i] = style;
+        s.formulas.remove(&(row as u32, col as u32));
+        self.recompute_formulas(sheet);
     }
 
     #[wasm_bindgen(js_name = clearCell)]
@@ -213,6 +250,8 @@ impl CellStore {
         s.kind[i] = KIND_EMPTY;
         s.str_id[i] = NO_STRING;
         s.style[i] = style;
+        s.formulas.remove(&(row as u32, col as u32));
+        self.recompute_formulas(sheet);
     }
 
     /// Bulk-load one column with numbers starting at `start_row` (datasource path).
@@ -238,6 +277,7 @@ impl CellStore {
             s.str_id[i] = NO_STRING;
             s.style[i] = style;
         }
+        self.recompute_formulas(sheet);
     }
 
     /// Bulk-load one column with strings starting at `start_row` (datasource path).
@@ -264,6 +304,7 @@ impl CellStore {
             s.str_id[i] = id;
             s.style[i] = style;
         }
+        self.recompute_formulas(sheet);
     }
 
     #[wasm_bindgen(js_name = addRows)]
@@ -345,6 +386,10 @@ impl CellStore {
                         });
                         str_local[dst] = local;
                     }
+                    KIND_FORMULA => {
+                        kind[dst] = KIND_NUMBER;
+                        num[dst] = s.num[src];
+                    }
                     _ => {}
                 }
             }
@@ -404,6 +449,10 @@ impl CellStore {
                             next
                         });
                         str_local[dst] = local;
+                    }
+                    KIND_FORMULA => {
+                        kind[dst] = KIND_NUMBER;
+                        num[dst] = s.num[src];
                     }
                     _ => {}
                 }
@@ -482,11 +531,186 @@ impl CellStore {
         }
         out
     }
+
+    /// Parse and store an arithmetic formula at (row, col). Returns the computed
+    /// value (NaN on parse error or cycle); the display tier reads the cache.
+    #[wasm_bindgen(js_name = setFormula)]
+    pub fn set_formula(&mut self, sheet: usize, row: usize, col: usize, src: &str, style: u32) -> f64 {
+        let Ok(ast) = parse(src) else {
+            return f64::NAN;
+        };
+        {
+            let s = &mut self.sheets[sheet];
+            let i = s.idx(row, col);
+            s.kind[i] = KIND_FORMULA;
+            s.str_id[i] = NO_STRING;
+            s.style[i] = style;
+            s.formulas.insert((row as u32, col as u32), ast);
+        }
+        self.recompute_formulas(sheet);
+        let i = self.sheets[sheet].idx(row, col);
+        self.sheets[sheet].num[i]
+    }
 }
 
 impl Default for CellStore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl CellStore {
+    /// Re-evaluate every formula on a sheet, caching results into `num`.
+    fn recompute_formulas(&mut self, sheet: usize) {
+        if self.sheets[sheet].formulas.is_empty() {
+            return;
+        }
+        let cells: Vec<(u32, u32)> = self.sheets[sheet].formulas.keys().copied().collect();
+        let mut results: Vec<(usize, f64)> = Vec::with_capacity(cells.len());
+        for (row, col) in &cells {
+            let mut visited = HashSet::new();
+            let v = self.eval_at(sheet, *row as usize, *col as usize, &mut visited);
+            let i = self.sheets[sheet].idx(*row as usize, *col as usize);
+            results.push((i, v));
+        }
+        let s = &mut self.sheets[sheet];
+        for (i, v) in results {
+            s.num[i] = v;
+        }
+    }
+
+    /// Value of a cell during evaluation: a formula evaluates its AST (cycle-safe
+    /// via `visited`); other cells yield their numeric literal (0 for empty/text).
+    fn eval_at(&self, sheet: usize, row: usize, col: usize, visited: &mut HashSet<usize>) -> f64 {
+        let s = &self.sheets[sheet];
+        if row >= s.row_count || col >= s.n_cols {
+            return 0.0;
+        }
+        let i = s.idx(row, col);
+        if let Some(ast) = s.formulas.get(&(row as u32, col as u32)) {
+            if !visited.insert(i) {
+                return f64::NAN;
+            }
+            let v = self.eval_ast(ast, sheet, visited);
+            visited.remove(&i);
+            v
+        } else if s.kind[i] == KIND_NUMBER {
+            s.num[i]
+        } else {
+            0.0
+        }
+    }
+
+    fn eval_ast(&self, ast: &Ast, sheet: usize, visited: &mut HashSet<usize>) -> f64 {
+        match ast {
+            Ast::Num(n) => *n,
+            Ast::Cell(r, c) => self.eval_at(sheet, *r as usize, *c as usize, visited),
+            Ast::Range(..) => f64::NAN,
+            Ast::Neg(e) => -self.eval_ast(e, sheet, visited),
+            Ast::Bin(op, l, r) => {
+                let a = self.eval_ast(l, sheet, visited);
+                let b = self.eval_ast(r, sheet, visited);
+                match op {
+                    Op::Add => a + b,
+                    Op::Sub => a - b,
+                    Op::Mul => a * b,
+                    Op::Div => a / b,
+                }
+            }
+            Ast::Cmp(op, l, r) => {
+                let a = self.eval_ast(l, sheet, visited);
+                let b = self.eval_ast(r, sheet, visited);
+                let ord = a.partial_cmp(&b);
+                let res = match op {
+                    CmpOp::Eq => ord == Some(Ordering::Equal),
+                    CmpOp::Ne => ord != Some(Ordering::Equal),
+                    CmpOp::Lt => ord == Some(Ordering::Less),
+                    CmpOp::Gt => ord == Some(Ordering::Greater),
+                    CmpOp::Le => matches!(ord, Some(Ordering::Less | Ordering::Equal)),
+                    CmpOp::Ge => matches!(ord, Some(Ordering::Greater | Ordering::Equal)),
+                };
+                if res { 1.0 } else { 0.0 }
+            }
+            Ast::Func(f, args) => {
+                let mut values: Vec<f64> = Vec::new();
+                for arg in args {
+                    if let Ast::Range(r0, c0, r1, c1) = arg {
+                        for r in *r0..=*r1 {
+                            for c in *c0..=*c1 {
+                                values.push(self.eval_at(sheet, r as usize, c as usize, visited));
+                            }
+                        }
+                    } else {
+                        values.push(self.eval_ast(arg, sheet, visited));
+                    }
+                }
+                apply_func(*f, &values)
+            }
+        }
+    }
+}
+
+fn apply_func(f: Func, values: &[f64]) -> f64 {
+    match f {
+        Func::Count => values.len() as f64,
+        Func::Sum => values.iter().sum(),
+        Func::Avg => {
+            if values.is_empty() {
+                0.0
+            } else {
+                values.iter().sum::<f64>() / values.len() as f64
+            }
+        }
+        Func::Min => values.iter().copied().fold(f64::INFINITY, f64::min),
+        Func::Max => values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+        Func::If => {
+            if values.first().copied().unwrap_or(0.0) != 0.0 {
+                values.get(1).copied().unwrap_or(0.0)
+            } else {
+                values.get(2).copied().unwrap_or(0.0)
+            }
+        }
+        Func::Abs => values.first().copied().unwrap_or(0.0).abs(),
+        Func::Sqrt => values.first().copied().unwrap_or(0.0).sqrt(),
+        Func::Round => {
+            let x = values.first().copied().unwrap_or(0.0);
+            let factor = 10f64.powf(values.get(1).copied().unwrap_or(0.0));
+            (x * factor).round() / factor
+        }
+        Func::Mod => {
+            let b = values.get(1).copied().unwrap_or(0.0);
+            if b == 0.0 {
+                f64::NAN
+            } else {
+                values.first().copied().unwrap_or(0.0) % b
+            }
+        }
+        Func::Pow => values
+            .first()
+            .copied()
+            .unwrap_or(0.0)
+            .powf(values.get(1).copied().unwrap_or(0.0)),
+        Func::And => {
+            if values.iter().all(|&v| v != 0.0) {
+                1.0
+            } else {
+                0.0
+            }
+        }
+        Func::Or => {
+            if values.iter().any(|&v| v != 0.0) {
+                1.0
+            } else {
+                0.0
+            }
+        }
+        Func::Not => {
+            if values.first().copied().unwrap_or(0.0) == 0.0 {
+                1.0
+            } else {
+                0.0
+            }
+        }
     }
 }
 
