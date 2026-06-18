@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { GridImpl } from "../src/grid";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { GridImpl, initSheetwrite } from "../src/grid";
+import { SheetwriteStore } from "../src/store";
 import type { CellScalar, Store, Workbook } from "../src/types";
-import { makeWorkbook } from "./fixtures";
+import { makeColumnarData, makeWorkbook } from "./fixtures";
 
 // jsdom has no 2D canvas context, so record draw calls against a stub.
 interface RecordingCtx {
@@ -126,6 +127,32 @@ describe("Grid render hot path", () => {
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
 
+    grid.destroy();
+  });
+});
+
+describe("Grid editing (Layer 3)", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("commits a typed edit through the editor into the store", () => {
+    const workbook = makeWorkbook(20);
+    const store = new SheetwriteStore(workbook, makeColumnarData(20));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    // editor textarea mounts synchronously; well-known DOM node, narrow then read
+    const node = host.querySelector("textarea.sheetwrite-editor");
+    expect(node).not.toBeNull();
+    if (!(node instanceof HTMLTextAreaElement)) return;
+    node.value = "Edited!";
+    node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Edited!");
     grid.destroy();
   });
 });

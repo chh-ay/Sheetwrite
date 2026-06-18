@@ -238,6 +238,8 @@ export interface GridEvents {
   change: ChangeEvent;
   selection: { selection: Selection | null };
   scroll: { scrollTop: number; firstRow: number; lastRow: number };
+  "edit-begin": { addr: CellAddress };
+  "edit-commit": { addr: CellAddress; value: CellValue };
 }
 
 export interface Grid {
