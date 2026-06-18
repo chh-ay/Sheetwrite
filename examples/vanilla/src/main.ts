@@ -4,8 +4,12 @@ import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import wasmUrl from "../../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm" with { type: "file" };
 import "@sheetwrite/core/styles.css";
 
-const ROWS = 100_000;
+const DATA_ROWS = 100_000;
 const CITIES = ["Phnom Penh", "Tokyo", "Berlin", "Lisbon", "Nairobi", "Lima", "Oslo"];
+
+// The column chrome shows spreadsheet letters (A, B, C, …). Named field headers
+// live in the first row — styled by the consumer, exactly as in a real sheet.
+const FIELD_HEADERS = ["ID", "Date", "Customer", "City", "Amount"];
 
 const workbook: Workbook = {
   activeSheet: "sales",
@@ -13,7 +17,7 @@ const workbook: Workbook = {
     {
       id: "sales",
       name: "Sales",
-      rowCount: ROWS,
+      rowCount: DATA_ROWS + 1,
       columns: [
         { key: "id", header: "ID", width: 90, type: "number" },
         { key: "date", header: "Date", width: 120, type: "text" },
@@ -25,22 +29,38 @@ const workbook: Workbook = {
   ],
 };
 
+let headerScheduled = false;
+
 // A mock server-paged datasource: rows are synthesized on demand for the
-// requested window, exactly as a real API client would page them in.
+// requested window, exactly as a real API client would page them in. Row 0 is
+// reserved for the field-name header (data records start at row 1).
 const datasource: DataSource = {
-  rowCount: () => ROWS,
+  rowCount: () => DATA_ROWS + 1,
   getRows: async (_sheet, start, end) => {
     const rows: RowData[] = [];
     for (let r = start; r < end; r++) {
-      const day = new Date(Date.UTC(2020, 0, 1 + (r % 1000)));
+      if (r === 0) {
+        rows.push({ id: 0, date: "", customer: "", city: "", amount: 0 });
+        continue;
+      }
+      const i = r - 1;
+      const day = new Date(Date.UTC(2020, 0, 1 + (i % 1000)));
       rows.push({
-        id: r + 1,
+        id: i + 1,
         date: day.toISOString().slice(0, 10),
-        customer: `Customer ${String(r + 1).padStart(6, "0")}`,
-        city: CITIES[r % CITIES.length] ?? "",
-        amount: Math.round((Math.sin(r) * 0.5 + 0.5) * 1_000_000) / 100,
+        customer: `Customer ${String(i + 1).padStart(6, "0")}`,
+        city: CITIES[i % CITIES.length] ?? "",
+        amount: Math.round((Math.sin(i) * 0.5 + 0.5) * 1_000_000) / 100,
       });
     }
+
+    // Row 0 is loaded exactly once; assert the styled header over it after the
+    // initial load settles so it is not clobbered by the bulk row write.
+    if (start === 0 && !headerScheduled) {
+      headerScheduled = true;
+      setTimeout(applyFieldHeader, 0);
+    }
+
     return rows;
   },
 };
@@ -57,6 +77,18 @@ const grid = createGrid(host, {
   renderer: useWorker ? "worker" : "canvas",
   config: { toolbar: true },
 });
+
+function applyFieldHeader(): void {
+  grid.store.applyTransaction({
+    patches: FIELD_HEADERS.map((label, col) => ({
+      op: "set",
+      addr: { sheet: "sales", row: 0, col },
+      value: { kind: "literal", value: label },
+      style: { bold: true, align: "center", backgroundColor: "#eef1f5" },
+    })),
+  });
+}
+
 grid.on("selection", (e) => {
   if (e.selection) console.log("selection", e.selection);
 });
