@@ -1,5 +1,5 @@
 import { load } from "@sheetwrite/wasm";
-import { cellA1, rangeA1, shiftA1Refs } from "./a1";
+import { cellA1, colToA1, rangeA1, shiftA1Refs } from "./a1";
 import { CanvasRenderer } from "./canvas-renderer";
 import { neutralizeInjection, parseTsv, toTsv } from "./clipboard";
 import { EditController, type EditNavigate } from "./editor";
@@ -352,7 +352,7 @@ export class GridImpl implements Grid {
   private applyLayout(): void {
     const sheet = this.sheet();
     this.renderer.setLayout({
-      columns: this.colIndices.map((c) => sheet.columns[c]!),
+      columns: this.colIndices.map((c) => ({ ...sheet.columns[c]!, header: colToA1(c) })),
       rowHeight: this.theme.rowHeight,
       headerHeight: this.theme.headerHeight,
       totalRows: sheet.rowCount,
