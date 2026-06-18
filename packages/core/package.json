@@ -5,7 +5,8 @@
   "description": "Framework-agnostic, canvas-rendered spreadsheet grid core.",
   "license": "MIT",
   "sideEffects": [
-    "*.css"
+    "*.css",
+    "./dist/xlsx-backend.js"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -14,6 +15,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./xlsx": {
+      "types": "./dist/xlsx-backend.d.ts",
+      "default": "./dist/xlsx-backend.js"
     },
     "./styles.css": "./styles.css"
   },
@@ -26,6 +31,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@sheetwrite/wasm": "workspace:*"
+    "@sheetwrite/wasm": "workspace:*",
+    "write-excel-file": "^4.1.1"
   }
 }

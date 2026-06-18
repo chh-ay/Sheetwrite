@@ -1,7 +1,8 @@
-import { CellStore } from "@sheetwrite/wasm";
+import { CellStore, type WindowView } from "@sheetwrite/wasm";
 import { cellKey, type LiteralLookup, ReferenceGraph } from "./reference";
 import { StyleDictionary } from "./style-dictionary";
 import type {
+  AggregateOp,
   CellAddress,
   CellScalar,
   CellValue,
@@ -21,6 +22,8 @@ import type {
 // Mirror of the WASM cell tags.
 const KIND_NUMBER = 1;
 const KIND_STRING = 2;
+
+const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
 type ChangeListener = (event: ChangeEvent) => void;
 
@@ -44,6 +47,7 @@ export class SheetwriteStore implements Store {
   private epoch = 0;
   private readonly refs = new ReferenceGraph();
   private readonly refIndex = new Map<SheetId, Map<number, Map<number, string>>>();
+  private readonly viewOrder = new Map<SheetId, Uint32Array>();
 
   constructor(workbook: Workbook, data?: ColumnarData) {
     this.workbook = workbook;
@@ -93,12 +97,19 @@ export class SheetwriteStore implements Store {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
-    const view = this.wasm.getWindow(
-      this.handleOf(sheet),
-      rows.start,
-      rows.end,
-      Uint32Array.from(cols),
-    );
+    const handle = this.handleOf(sheet);
+    const colsU32 = Uint32Array.from(cols);
+    const order = this.viewOrder.get(sheet);
+
+    let view: WindowView;
+    let dataRows: Uint32Array | null = null;
+    if (order) {
+      dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
+      view = this.wasm.getWindowRows(handle, dataRows, colsU32);
+    } else {
+      view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32);
+    }
+
     const kinds = view.kinds;
     const numbers = view.numbers;
     const stringIndex = view.stringIndex;
@@ -106,6 +117,7 @@ export class SheetwriteStore implements Store {
     const strings = view.strings;
     view.free();
 
+    const nCols = cols.length;
     const values: CellScalar[] = new Array(kinds.length);
     for (let i = 0; i < kinds.length; i++) {
       if (kinds[i] === KIND_NUMBER) values[i] = numbers[i]!;
@@ -113,16 +125,17 @@ export class SheetwriteStore implements Store {
       else values[i] = null;
     }
 
-    // Overlay plain references with their cached resolved values.
+    // Overlay plain references (keyed by DATA row) with cached resolved values.
     const sheetRefs = this.refIndex.get(sheet);
-    if (sheetRefs) {
-      const nCols = cols.length;
-      for (let r = rows.start; r < rows.end; r++) {
-        const rowRefs = sheetRefs.get(r);
+    if (sheetRefs && nCols > 0) {
+      const nRows = kinds.length / nCols;
+      for (let ri = 0; ri < nRows; ri++) {
+        const dataRow = dataRows ? dataRows[ri]! : rows.start + ri;
+        const rowRefs = sheetRefs.get(dataRow);
         if (!rowRefs) continue;
         for (let cj = 0; cj < nCols; cj++) {
           const key = rowRefs.get(cols[cj]!);
-          if (key) values[(r - rows.start) * nCols + cj] = this.refs.resolved(key);
+          if (key) values[ri * nCols + cj] = this.refs.resolved(key);
         }
       }
     }
@@ -135,6 +148,26 @@ export class SheetwriteStore implements Store {
       styleIds,
       styles: this.styles.table,
     };
+  }
+
+  aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
+    return this.wasm.aggregate(this.handleOf(sheet), col, AGG_OP[op]);
+  }
+
+  sortBy(sheet: SheetId, col: number, ascending: boolean): void {
+    this.viewOrder.set(sheet, this.wasm.sortRows(this.handleOf(sheet), col, ascending));
+  }
+
+  filterBy(sheet: SheetId, col: number, needle: string): void {
+    this.viewOrder.set(sheet, this.wasm.filterRows(this.handleOf(sheet), col, needle));
+  }
+
+  clearView(sheet: SheetId): void {
+    this.viewOrder.delete(sheet);
+  }
+
+  viewRowCount(sheet: SheetId): number {
+    return this.viewOrder.get(sheet)?.length ?? this.sheetMeta(sheet).rowCount;
   }
 
   applyTransaction(tx: Transaction): void {

@@ -14,6 +14,7 @@
 //!   typed arrays plus the window's unique strings.
 
 use std::collections::HashMap;
+use std::cmp::Ordering;
 use wasm_bindgen::prelude::*;
 
 const KIND_EMPTY: u8 = 0;
@@ -359,11 +360,157 @@ impl CellStore {
             strings,
         }
     }
+
+    /// Bulk read of an explicit row list (sorted/filtered views) — same output
+    /// shape as `get_window`, rows taken from `rows` rather than a range.
+    #[wasm_bindgen(js_name = getWindowRows)]
+    pub fn get_window_rows(&self, sheet: usize, rows: &[u32], cols: &[u32]) -> WindowView {
+        let s = &self.sheets[sheet];
+        let n_rows = rows.len();
+        let n_cols = cols.len();
+        let cells = n_rows * n_cols;
+
+        let mut kind = vec![KIND_EMPTY; cells];
+        let mut num = vec![0.0f64; cells];
+        let mut str_local = vec![-1i32; cells];
+        let mut style = vec![0u32; cells];
+
+        let mut local_lookup: HashMap<u32, i32> = HashMap::new();
+        let mut strings: Vec<String> = Vec::new();
+
+        for (cj, &col_u) in cols.iter().enumerate() {
+            let col = col_u as usize;
+            if col >= s.n_cols {
+                continue;
+            }
+            let base = col * s.row_count;
+            for (ri, &row_u) in rows.iter().enumerate() {
+                let row = row_u as usize;
+                if row >= s.row_count {
+                    continue;
+                }
+                let src = base + row;
+                let dst = ri * n_cols + cj;
+                let k = s.kind[src];
+                kind[dst] = k;
+                style[dst] = s.style[src];
+                match k {
+                    KIND_NUMBER => num[dst] = s.num[src],
+                    KIND_STRING => {
+                        let pool_id = s.str_id[src];
+                        let local = *local_lookup.entry(pool_id).or_insert_with(|| {
+                            let next = strings.len() as i32;
+                            strings.push(self.strings[pool_id as usize].clone());
+                            next
+                        });
+                        str_local[dst] = local;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        WindowView {
+            n_rows: n_rows as u32,
+            n_cols: n_cols as u32,
+            kind,
+            num,
+            str_local,
+            style,
+            strings,
+        }
+    }
+
+    /// Column aggregate over numeric cells. op: 0 sum, 1 avg, 2 min, 3 max, 4 count.
+    #[wasm_bindgen(js_name = aggregate)]
+    pub fn aggregate(&self, sheet: usize, col: usize, op: u8) -> f64 {
+        let s = &self.sheets[sheet];
+        let base = col * s.row_count;
+        let mut sum = 0.0;
+        let mut count = 0u32;
+        let mut min = f64::INFINITY;
+        let mut max = f64::NEG_INFINITY;
+        for r in 0..s.row_count {
+            let i = base + r;
+            if s.kind[i] == KIND_NUMBER {
+                let v = s.num[i];
+                sum += v;
+                count += 1;
+                min = min.min(v);
+                max = max.max(v);
+            }
+        }
+        match op {
+            0 => sum,
+            1 => if count > 0 { sum / f64::from(count) } else { 0.0 },
+            2 => if count > 0 { min } else { 0.0 },
+            3 => if count > 0 { max } else { 0.0 },
+            _ => f64::from(count),
+        }
+    }
+
+    /// Stable row order sorted by a column. Returns a data-row permutation.
+    #[wasm_bindgen(js_name = sortRows)]
+    pub fn sort_rows(&self, sheet: usize, col: usize, ascending: bool) -> Vec<u32> {
+        let s = &self.sheets[sheet];
+        let base = col * s.row_count;
+        let mut order: Vec<u32> = (0..s.row_count as u32).collect();
+        order.sort_by(|&a, &b| {
+            let ord = compare_cells(s, &self.strings, base + a as usize, base + b as usize);
+            if ascending { ord } else { ord.reverse() }
+        });
+        order
+    }
+
+    /// Data-row indices whose column text contains `needle` (case-insensitive).
+    #[wasm_bindgen(js_name = filterRows)]
+    pub fn filter_rows(&self, sheet: usize, col: usize, needle: &str) -> Vec<u32> {
+        let s = &self.sheets[sheet];
+        let base = col * s.row_count;
+        let needle = needle.to_lowercase();
+        let mut out: Vec<u32> = Vec::new();
+        for r in 0..s.row_count {
+            let i = base + r;
+            let hay = match s.kind[i] {
+                KIND_NUMBER => s.num[i].to_string(),
+                KIND_STRING => self.strings[s.str_id[i] as usize].clone(),
+                _ => String::new(),
+            };
+            if hay.to_lowercase().contains(&needle) {
+                out.push(r as u32);
+            }
+        }
+        out
+    }
 }
 
 impl Default for CellStore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn compare_cells(s: &SheetData, strings: &[String], ia: usize, ib: usize) -> Ordering {
+    let (ka, kb) = (s.kind[ia], s.kind[ib]);
+    if ka == KIND_EMPTY && kb == KIND_EMPTY {
+        return Ordering::Equal;
+    }
+    if ka == KIND_EMPTY {
+        return Ordering::Greater;
+    }
+    if kb == KIND_EMPTY {
+        return Ordering::Less;
+    }
+    if ka == KIND_NUMBER && kb == KIND_NUMBER {
+        return s.num[ia].partial_cmp(&s.num[ib]).unwrap_or(Ordering::Equal);
+    }
+    if ka == KIND_STRING && kb == KIND_STRING {
+        return strings[s.str_id[ia] as usize].cmp(&strings[s.str_id[ib] as usize]);
+    }
+    if ka == KIND_NUMBER {
+        Ordering::Less
+    } else {
+        Ordering::Greater
     }
 }
 

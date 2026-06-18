@@ -1,3 +1,4 @@
+import { formatNumber } from "./number-format";
 import type {
   CellRenderer,
   CellScalar,
@@ -169,7 +170,7 @@ export class CanvasRenderer implements Renderer {
     }
 
     if (value === null || value === "") return;
-    const text = typeof value === "number" ? value.toLocaleString() : value;
+    const text = typeof value === "number" ? formatNumber(value, column?.numberFormat) : value;
 
     ctx.font =
       style.bold || style.italic

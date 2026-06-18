@@ -2,10 +2,12 @@ import { load } from "@sheetwrite/wasm";
 import { CanvasRenderer } from "./canvas-renderer";
 import { neutralizeInjection, parseTsv, toTsv } from "./clipboard";
 import { EditController, type EditNavigate } from "./editor";
+import { downloadBytes, toCsv, toXlsx } from "./export";
 import { OffsetIndex, ScaledScroll } from "./fenwick";
 import { type CellRef, SelectionModel, type SelRect } from "./selection";
 import { SheetwriteStore } from "./store";
 import type {
+  AggregateOp,
   CellAddress,
   CellRenderer,
   CellScalar,
@@ -636,8 +638,7 @@ export class GridImpl implements Grid {
     extend: boolean,
     _axis: "row" | "col" | "both",
   ): void {
-    const sheet = this.sheet();
-    const r = clamp(row ?? focus?.row ?? 0, 0, Math.max(0, sheet.rowCount - 1));
+    const r = clamp(row ?? focus?.row ?? 0, 0, Math.max(0, this.index.count - 1));
     const c = clamp(col ?? focus?.col ?? this.firstCol(), this.firstCol(), this.lastCol());
     if (extend) this.selection.extendTo(r, c);
     else this.selection.selectCell(r, c);
@@ -884,6 +885,50 @@ export class GridImpl implements Grid {
   }
 
   refresh(): void {
+    this.render();
+  }
+
+  aggregate(col: number, op: AggregateOp): number {
+    return this.loadable ? this.loadable.aggregate(this.activeSheet, col, op) : 0;
+  }
+
+  sortBy(col: number, ascending = true): void {
+    this.loadable?.sortBy(this.activeSheet, col, ascending);
+    this.applyView();
+  }
+
+  filterBy(col: number, needle: string): void {
+    this.loadable?.filterBy(this.activeSheet, col, needle);
+    this.applyView();
+  }
+
+  clearView(): void {
+    this.loadable?.clearView(this.activeSheet);
+    this.applyView();
+  }
+
+  exportCsv(filename: string): void {
+    downloadBytes(toCsv(this.sheet(), this.store), filename, "text/csv;charset=utf-8");
+  }
+
+  async exportXlsx(filename: string): Promise<void> {
+    const bytes = await toXlsx(this.store.getWorkbook(), this.store);
+    downloadBytes(
+      bytes,
+      filename,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+  }
+
+  private applyView(): void {
+    const count = this.loadable
+      ? this.loadable.viewRowCount(this.activeSheet)
+      : this.sheet().rowCount;
+    this.index = new OffsetIndex(count, this.theme.rowHeight);
+    this.selection.clear();
+    this.selection.setBounds(count, this.firstCol(), this.lastCol());
+    this.scroller.scrollTop = 0;
+    this.syncSizer();
     this.render();
   }
 

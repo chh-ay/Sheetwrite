@@ -1,4 +1,12 @@
 export { CanvasRenderer } from "./canvas-renderer";
+export {
+  downloadBytes,
+  setXlsxBackend,
+  toCsv,
+  toTsv,
+  toXlsx,
+  type XlsxBackend,
+} from "./export";
 export { OffsetIndex, ScaledScroll } from "./fenwick";
 export {
   createGrid,
@@ -6,6 +14,7 @@ export {
   initSheetwrite,
   resolveThemeFromCss,
 } from "./grid";
+export { formatNumber } from "./number-format";
 export { REF_CYCLE } from "./reference";
 export { SheetwriteStore } from "./store";
 export { StyleDictionary } from "./style-dictionary";

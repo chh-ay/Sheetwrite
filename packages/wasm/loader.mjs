@@ -30,6 +30,7 @@ export async function load(source) {
   if (source !== undefined) {
     await init({ module_or_path: source });
   } else if (isNode()) {
+    // Dynamic: node:fs/promises is Node-only; a static import would break the browser bundle.
     const { readFile } = await import("node:fs/promises");
     const url = new URL("./pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
     initSync({ module: await readFile(url) });

@@ -204,6 +204,9 @@ export type Selection =
   | { kind: "column"; sheet: SheetId; col: number }
   | { kind: "multi"; ranges: Range[] };
 
+/** Column aggregate operation for `Grid.aggregate` / `Store` data ops. */
+export type AggregateOp = "sum" | "avg" | "min" | "max" | "count";
+
 // ── Data input ───────────────────────────────────────────────────────────────
 
 export type RowData = Record<string, CellScalar | CellValue>;
@@ -250,6 +253,16 @@ export interface Grid {
   setSelection(sel: Selection | null): void;
   setTheme(theme: Partial<Theme>): void;
   defineCellRenderer(name: string, renderer: CellRenderer): void;
+  /** Column aggregate over the active sheet's data. */
+  aggregate(col: number, op: AggregateOp): number;
+  /** Sort the displayed rows by a column (does not mutate stored data). */
+  sortBy(col: number, ascending?: boolean): void;
+  /** Filter the displayed rows to those whose column text contains `needle`. */
+  filterBy(col: number, needle: string): void;
+  /** Clear any active sort/filter view. */
+  clearView(): void;
+  exportCsv(filename: string): void;
+  exportXlsx(filename: string): Promise<void>;
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
   refresh(): void;
   destroy(): void;

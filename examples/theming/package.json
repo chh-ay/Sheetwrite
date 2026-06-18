@@ -1,0 +1,14 @@
+{
+  "name": "@sheetwrite/example-theming",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun ./index.html",
+    "build": "bun build ./index.html --outdir dist",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sheetwrite/core": "workspace:*"
+  }
+}

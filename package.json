@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build:wasm": "cd packages/wasm && bun run build",
-    "build": "bun run build:wasm && cd packages/core && bun run build",
+    "build": "bun run build:wasm && bun run --filter '@sheetwrite/core' build && bun run --filter '@sheetwrite/react' build && bun run --filter '@sheetwrite/vue' build",
     "typecheck": "bun run --filter '@sheetwrite/*' typecheck",
     "lint": "biome check .",
     "format": "biome format --write .",
