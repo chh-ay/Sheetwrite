@@ -1,0 +1,31 @@
+{
+  "name": "@sheetwrite/wasm",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Sheetwrite columnar store and data engine (Rust/WASM).",
+  "license": "MIT",
+  "main": "./loader.mjs",
+  "module": "./loader.mjs",
+  "types": "./loader.d.ts",
+  "exports": {
+    ".": {
+      "types": "./loader.d.ts",
+      "default": "./loader.mjs"
+    },
+    "./wasm": "./pkg/sheetwrite_wasm_bg.wasm"
+  },
+  "files": [
+    "loader.mjs",
+    "loader.d.ts",
+    "pkg/sheetwrite_wasm.js",
+    "pkg/sheetwrite_wasm.d.ts",
+    "pkg/sheetwrite_wasm_bg.wasm",
+    "pkg/sheetwrite_wasm_bg.wasm.d.ts"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf pkg target"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "sheetwrite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Framework-agnostic, high-performance spreadsheet grid.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "scripts": {
+    "build:wasm": "cd packages/wasm && bun run build",
+    "build": "bun run build:wasm && cd packages/core && bun run build",
+    "typecheck": "bun run --filter '@sheetwrite/*' typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "@happy-dom/global-registrator": "^20.10.6",
+    "@types/bun": "^1.3.14",
+    "typescript": "^6.0.3"
+  },
+  "trustedDependencies": [
+    "@biomejs/biome"
+  ]
+}

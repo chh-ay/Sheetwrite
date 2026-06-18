@@ -1,0 +1,38 @@
+.sheetwrite {
+  --sheetwrite-font: 13px / 1.4 system-ui, sans-serif;
+  --sheetwrite-bg: #ffffff;
+  --sheetwrite-fg: #111111;
+  --sheetwrite-grid-line: #eeeeee;
+  --sheetwrite-header-bg: #f4ede1;
+  --sheetwrite-header-fg: #6b4a1f;
+  --sheetwrite-selection: #2563eb33;
+  --sheetwrite-selection-border: #2563eb;
+  --sheetwrite-row-height: 28;
+
+  position: relative;
+  overflow: hidden;
+  font: var(--sheetwrite-font);
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  outline: none;
+}
+
+[data-theme="dark"] .sheetwrite {
+  --sheetwrite-bg: #0b0b0c;
+  --sheetwrite-fg: #e7e7e7;
+  --sheetwrite-grid-line: #26262a;
+  --sheetwrite-header-bg: #1a160f;
+  --sheetwrite-header-fg: #e8c98a;
+}
+
+.sheetwrite-scroller {
+  scrollbar-width: thin;
+}
+
+.sheetwrite-canvas {
+  display: block;
+}
+
+.sheetwrite-overlay {
+  z-index: 1;
+}

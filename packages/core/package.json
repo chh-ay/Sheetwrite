@@ -1,0 +1,31 @@
+{
+  "name": "@sheetwrite/core",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Framework-agnostic, canvas-rendered spreadsheet grid core.",
+  "license": "MIT",
+  "sideEffects": [
+    "*.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./styles.css"
+  },
+  "files": [
+    "dist",
+    "styles.css"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sheetwrite/wasm": "workspace:*"
+  }
+}

@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Rust / WASM
+target/
+packages/wasm/pkg/
+
+# Coverage
+coverage/
+
+# Editor / OS
+.DS_Store
+*.log
