@@ -128,13 +128,13 @@ export function paintFrame(
     ctx.fillRect(0, 0, g, height);
     ctx.fillStyle = theme.headerFg;
     ctx.font = theme.font;
-    ctx.textAlign = "right";
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (let ri = 0; ri < nRows; ri++) {
       const row = view.rows.start + ri;
       const cy = headerHeight + row * rowHeight - scrollTop + rowHeight / 2;
       if (cy < headerHeight || cy > height) continue;
-      ctx.fillText(String(row + 1), g - 6, cy);
+      ctx.fillText(String(row + 1), g / 2, cy);
     }
     ctx.strokeStyle = theme.gridLine;
     ctx.lineWidth = 1;
@@ -242,12 +242,12 @@ function paintHeader(
 
   ctx.fillStyle = theme.headerFg;
   ctx.font = `bold ${theme.font}`;
-  ctx.textAlign = "left";
+  ctx.textAlign = "center";
   for (let c = 0; c < layout.columns.length; c++) {
     const x = colX[c]! - scrollLeft + g;
     const w = colX[c + 1]! - colX[c]!;
     if (x + w <= g || x >= width) continue;
-    ctx.fillText(layout.columns[c]!.header, x + CELL_PAD, h / 2, Math.max(1, w - CELL_PAD * 2));
+    ctx.fillText(layout.columns[c]!.header, x + w / 2, h / 2, Math.max(1, w - CELL_PAD * 2));
   }
 
   ctx.strokeStyle = theme.gridLine;
