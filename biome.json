@@ -6,7 +6,15 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/pkg", "!**/target", "!**/node_modules", "!**/*.d.ts"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/pkg",
+      "!**/target",
+      "!**/node_modules",
+      "!**/*.d.ts",
+      "!**/*.svelte"
+    ]
   },
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "formatter": {
