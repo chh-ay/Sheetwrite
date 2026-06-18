@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { initSheetwrite } from "../src/grid";
 import { SheetwriteStore } from "../src/store";
-import type { ChangeEvent } from "../src/types";
+import type { ChangeEvent, Workbook } from "../src/types";
 import { makeColumnarData, makeWorkbook } from "./fixtures";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
@@ -93,7 +93,11 @@ describe("SheetwriteStore", () => {
 
   it("tracks dirty patches and clears them on markClean", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
-    const patch = { op: "set", addr: addr(0, 0), value: { kind: "literal", value: 1 } } as const;
+    const patch = {
+      op: "set",
+      addr: addr(0, 0),
+      value: { kind: "literal", value: 1 },
+    } as const;
     store.applyTransaction({ patches: [patch] });
     expect(store.getDirty()).toHaveLength(1);
     store.markClean([patch]);
@@ -118,12 +122,64 @@ describe("SheetwriteStore", () => {
     expect(change.newValue).toEqual({ kind: "literal", value: "new" });
   });
 
-  it("refuses unsupported reference/formula values", () => {
+  it("refuses arithmetic formula values (calc tier)", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     expect(() =>
       store.applyTransaction({
-        patches: [{ op: "set", addr: addr(0, 0), value: { kind: "ref", target: addr(1, 0) } }],
+        patches: [{ op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=A1*2" } }],
       }),
     ).toThrow(/not supported/);
+  });
+
+  it("resolves plain references and propagates target edits across sheets", () => {
+    const workbook: Workbook = {
+      activeSheet: "A",
+      sheets: [
+        {
+          id: "A",
+          name: "A",
+          rowCount: 5,
+          columns: [{ key: "v", header: "V", width: 80, type: "text" }],
+        },
+        {
+          id: "B",
+          name: "B",
+          rowCount: 5,
+          columns: [{ key: "v", header: "V", width: 80, type: "text" }],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "A", row: 0, col: 0 },
+          value: { kind: "literal", value: "hello" },
+        },
+      ],
+    });
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "B", row: 0, col: 0 },
+          value: { kind: "ref", target: { sheet: "A", row: 0, col: 0 } },
+        },
+      ],
+    });
+    expect(store.getCell({ sheet: "B", row: 0, col: 0 }).resolved).toBe("hello");
+
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "A", row: 0, col: 0 },
+          value: { kind: "literal", value: "world" },
+        },
+      ],
+    });
+    expect(store.getCell({ sheet: "B", row: 0, col: 0 }).resolved).toBe("world");
+    expect(store.getVisibleWindow("B", { start: 0, end: 1 }, [0]).values[0]).toBe("world");
   });
 });

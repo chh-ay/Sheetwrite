@@ -6,6 +6,7 @@ export {
   initSheetwrite,
   resolveThemeFromCss,
 } from "./grid";
+export { REF_CYCLE } from "./reference";
 export { SheetwriteStore } from "./store";
 export { StyleDictionary } from "./style-dictionary";
 export type * from "./types";

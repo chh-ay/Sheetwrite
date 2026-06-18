@@ -125,7 +125,10 @@ describe("Grid render hot path", () => {
     const grid = new GridImpl(host, { workbook }, makeFakeStore(workbook));
 
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
-    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
+    expect(grid.getSelection()).toEqual({
+      kind: "cell",
+      addr: { sheet: "s1", row: 4, col: 1 },
+    });
 
     grid.destroy();
   });

@@ -1,4 +1,5 @@
 import { CellStore } from "@sheetwrite/wasm";
+import { cellKey, type LiteralLookup, ReferenceGraph } from "./reference";
 import { StyleDictionary } from "./style-dictionary";
 import type {
   CellAddress,
@@ -41,6 +42,8 @@ export class SheetwriteStore implements Store {
   private readonly listeners = new Set<ChangeListener>();
   private dirty: Patch[] = [];
   private epoch = 0;
+  private readonly refs = new ReferenceGraph();
+  private readonly refIndex = new Map<SheetId, Map<number, Map<number, string>>>();
 
   constructor(workbook: Workbook, data?: ColumnarData) {
     this.workbook = workbook;
@@ -68,7 +71,7 @@ export class SheetwriteStore implements Store {
     return this.workbook;
   }
 
-  getCell(addr: CellAddress): ResolvedCell {
+  private rawCell(addr: CellAddress): ResolvedCell {
     const cell = this.wasm.getCell(this.handleOf(addr.sheet), addr.row, addr.col);
     let resolved: CellScalar = null;
     if (cell.kind === KIND_NUMBER) resolved = cell.num;
@@ -76,6 +79,13 @@ export class SheetwriteStore implements Store {
     const style = this.styles.get(cell.style);
     cell.free();
     return { resolved, style };
+  }
+
+  getCell(addr: CellAddress): ResolvedCell {
+    const raw = this.rawCell(addr);
+    const key = cellKey(addr);
+    if (this.refs.isRef(key)) return { resolved: this.refs.resolved(key), style: raw.style };
+    return raw;
   }
 
   getVisibleWindow(
@@ -101,6 +111,20 @@ export class SheetwriteStore implements Store {
       if (kinds[i] === KIND_NUMBER) values[i] = numbers[i]!;
       else if (kinds[i] === KIND_STRING) values[i] = strings[stringIndex[i]!] ?? null;
       else values[i] = null;
+    }
+
+    // Overlay plain references with their cached resolved values.
+    const sheetRefs = this.refIndex.get(sheet);
+    if (sheetRefs) {
+      const nCols = cols.length;
+      for (let r = rows.start; r < rows.end; r++) {
+        const rowRefs = sheetRefs.get(r);
+        if (!rowRefs) continue;
+        for (let cj = 0; cj < nCols; cj++) {
+          const key = rowRefs.get(cols[cj]!);
+          if (key) values[(r - rows.start) * nCols + cj] = this.refs.resolved(key);
+        }
+      }
     }
 
     return {
@@ -140,15 +164,30 @@ export class SheetwriteStore implements Store {
         const before = this.getCell(patch.addr);
         const styleId = this.styles.intern(patch.style);
         const handle = this.handleOf(patch.addr.sheet);
-        const { row, col } = patch.addr;
-        if (patch.value.kind !== "literal") {
-          throw new Error("references and formulas are not supported yet (later milestone)");
+        const { sheet, row, col } = patch.addr;
+        const key = cellKey(patch.addr);
+        const literalAt: LiteralLookup = (a) => this.rawCell(a).resolved;
+
+        if (patch.value.kind === "formula") {
+          throw new Error("arithmetic formulas are not supported yet (calc tier)");
         }
 
-        const value = patch.value.value;
-        if (typeof value === "number") this.wasm.setNumber(handle, row, col, value, styleId);
-        else if (typeof value === "string") this.wasm.setString(handle, row, col, value, styleId);
-        else this.wasm.clearCell(handle, row, col, styleId);
+        if (patch.value.kind === "ref") {
+          // ref cells hold no literal in WASM; keep the style, track the edge.
+          this.wasm.clearCell(handle, row, col, styleId);
+          this.setRefIndex(sheet, row, col, key);
+          this.refs.setRef(patch.addr, patch.value.target, literalAt);
+        } else {
+          if (this.refs.isRef(key)) {
+            this.refs.removeRef(key);
+            this.clearRefIndex(sheet, row, col);
+          }
+          const value = patch.value.value;
+          if (typeof value === "number") this.wasm.setNumber(handle, row, col, value, styleId);
+          else if (typeof value === "string") this.wasm.setString(handle, row, col, value, styleId);
+          else this.wasm.clearCell(handle, row, col, styleId);
+          this.refs.onLiteralChanged(key, literalAt);
+        }
 
         changes.push({
           addr: patch.addr,
@@ -177,6 +216,24 @@ export class SheetwriteStore implements Store {
         break;
       }
     }
+  }
+
+  private setRefIndex(sheet: SheetId, row: number, col: number, key: string): void {
+    let bySheet = this.refIndex.get(sheet);
+    if (!bySheet) {
+      bySheet = new Map();
+      this.refIndex.set(sheet, bySheet);
+    }
+    let byRow = bySheet.get(row);
+    if (!byRow) {
+      byRow = new Map();
+      bySheet.set(row, byRow);
+    }
+    byRow.set(col, key);
+  }
+
+  private clearRefIndex(sheet: SheetId, row: number, col: number): void {
+    this.refIndex.get(sheet)?.get(row)?.delete(col);
   }
 
   on(_evt: "change", fn: ChangeListener): () => void {

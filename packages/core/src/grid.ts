@@ -98,6 +98,8 @@ export class GridImpl implements Grid {
   private readonly overscan: number;
   private readonly datasource: GridOptions["datasource"];
   private readonly readOnly: boolean;
+  private tabBar: HTMLDivElement | null = null;
+  private tabBarHeight = 0;
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
@@ -129,6 +131,7 @@ export class GridImpl implements Grid {
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
     this.theme = { ...DEFAULT_THEME, ...resolveThemeFromCss(host), ...opts.theme };
     this.activeSheet = opts.workbook.activeSheet;
+    this.tabBarHeight = opts.workbook.sheets.length > 1 ? 28 : 0;
 
     for (const [name, r] of Object.entries(opts.renderers ?? {})) {
       this.customRenderers.set(name, r);
@@ -137,9 +140,10 @@ export class GridImpl implements Grid {
     const sheet = this.sheet();
     this.colIndices = visibleColumns(sheet.columns);
     this.index = new OffsetIndex(sheet.rowCount, this.theme.rowHeight);
+    this.applyRowHeights(sheet);
     this.scaled = new ScaledScroll(
       this.index.totalHeight + this.theme.headerHeight,
-      host.clientHeight,
+      host.clientHeight - this.tabBarHeight,
       MAX_ELEMENT_HEIGHT,
     );
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
@@ -169,6 +173,12 @@ export class GridImpl implements Grid {
     this.overlay.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;";
     host.appendChild(this.overlay);
 
+    if (this.tabBarHeight > 0) {
+      this.scroller.style.bottom = `${this.tabBarHeight}px`;
+      this.overlay.style.bottom = `${this.tabBarHeight}px`;
+      this.buildTabBar();
+    }
+
     this.editor = new EditController(host);
 
     this.disposeStore = this.store.on("change", (event) => {
@@ -197,6 +207,56 @@ export class GridImpl implements Grid {
     const s = this.store.getWorkbook().sheets.find((sh) => sh.id === id);
     if (!s) throw new Error(`Sheetwrite: unknown sheet ${id}`);
     return s;
+  }
+
+  private viewportH(): number {
+    return this.host.clientHeight - this.tabBarHeight;
+  }
+
+  private buildTabBar(): void {
+    const bar = document.createElement("div");
+    bar.className = "sheetwrite-tabbar";
+    bar.style.cssText = [
+      "position:absolute",
+      "left:0",
+      "right:0",
+      "bottom:0",
+      `height:${this.tabBarHeight}px`,
+      "display:flex",
+      "align-items:stretch",
+      `border-top:1px solid ${this.theme.gridLine}`,
+      `background:${this.theme.headerBg}`,
+      "overflow-x:auto",
+    ].join(";");
+    this.host.appendChild(bar);
+    this.tabBar = bar;
+    this.renderTabs();
+  }
+
+  private renderTabs(): void {
+    const bar = this.tabBar;
+    if (!bar) return;
+    bar.replaceChildren();
+    for (const sheet of this.store.getWorkbook().sheets) {
+      const active = sheet.id === this.activeSheet;
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "sheetwrite-tab";
+      tab.textContent = sheet.name;
+      tab.style.cssText = [
+        "border:none",
+        "padding:0 14px",
+        "cursor:pointer",
+        "white-space:nowrap",
+        `font:${this.theme.font}`,
+        `background:${active ? this.theme.bg : "transparent"}`,
+        `color:${active ? this.theme.fg : this.theme.headerFg}`,
+        `border-right:1px solid ${this.theme.gridLine}`,
+        active ? `box-shadow:inset 0 2px 0 ${this.theme.selectionBorder}` : "",
+      ].join(";");
+      tab.addEventListener("click", () => this.setActiveSheet(sheet.id));
+      bar.appendChild(tab);
+    }
   }
 
   private firstCol(): number {
@@ -269,7 +329,7 @@ export class GridImpl implements Grid {
   }
 
   private syncSizer(): void {
-    this.scaled.update(this.index.totalHeight + this.theme.headerHeight, this.host.clientHeight);
+    this.scaled.update(this.index.totalHeight + this.theme.headerHeight, this.viewportH());
     const sheet = this.sheet();
 
     let width = 0;
@@ -305,7 +365,7 @@ export class GridImpl implements Grid {
   }
 
   private render(): void {
-    const clientH = this.host.clientHeight;
+    const clientH = this.viewportH();
     const clientW = this.host.clientWidth;
     const headerHeight = this.theme.headerHeight;
     const bodyHeight = Math.max(0, clientH - headerHeight);
@@ -328,7 +388,11 @@ export class GridImpl implements Grid {
     this.repositionEditor(contentTop, scrollLeft);
 
     for (const fn of this.listeners.scroll) {
-      fn({ scrollTop: contentTop, firstRow: win.start, lastRow: Math.max(win.start, win.end - 1) });
+      fn({
+        scrollTop: contentTop,
+        firstRow: win.start,
+        lastRow: Math.max(win.start, win.end - 1),
+      });
     }
   }
 
@@ -499,7 +563,7 @@ export class GridImpl implements Grid {
     const sheet = this.sheet();
     const pageRows = Math.max(
       1,
-      Math.floor((this.host.clientHeight - this.theme.headerHeight) / this.theme.rowHeight),
+      Math.floor((this.viewportH() - this.theme.headerHeight) / this.theme.rowHeight),
     );
 
     switch (e.key) {
@@ -757,6 +821,7 @@ export class GridImpl implements Grid {
     this.scroller.scrollLeft = 0;
 
     this.applyLayout();
+    this.renderTabs();
     this.emitSelection();
     this.render();
   }
@@ -766,7 +831,7 @@ export class GridImpl implements Grid {
 
     const top = this.index.offsetOf(addr.row);
     const bottom = top + this.index.heightOf(addr.row);
-    const bodyHeight = Math.max(0, this.host.clientHeight - this.theme.headerHeight);
+    const bodyHeight = Math.max(0, this.viewportH() - this.theme.headerHeight);
     const contentTop = this.scaled.toContent(this.scroller.scrollTop);
 
     let target = contentTop;
@@ -839,6 +904,7 @@ export class GridImpl implements Grid {
     this.renderer.destroy();
     this.scroller.remove();
     this.overlay.remove();
+    this.tabBar?.remove();
     this.host.classList.remove("sheetwrite");
   }
 }
