@@ -51,7 +51,12 @@ const host = document.getElementById("app");
 if (!host) throw new Error("missing #app host element");
 
 const useWorker = new URLSearchParams(location.search).get("renderer") === "worker";
-const grid = createGrid(host, { workbook, datasource, renderer: useWorker ? "worker" : "canvas" });
+const grid = createGrid(host, {
+  workbook,
+  datasource,
+  renderer: useWorker ? "worker" : "canvas",
+  config: { toolbar: true },
+});
 grid.on("selection", (e) => {
   if (e.selection) console.log("selection", e.selection);
 });

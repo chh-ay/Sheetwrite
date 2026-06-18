@@ -187,6 +187,8 @@ export interface Theme {
   selectionBorder: string;
   rowHeight: number;
   headerHeight: number;
+  /** Width of the left row-number gutter (0 hides it). */
+  rowHeaderWidth: number;
 }
 
 // ── Custom cell renderers ────────────────────────────────────────────────────
@@ -241,6 +243,23 @@ export interface DataSource {
 
 // ── Grid options, events, instance ───────────────────────────────────────────
 
+/**
+ * Toolbar / feature configuration. When `config` is set the built-in toolbar is
+ * shown; each flag toggles one control (all default to `true`).
+ */
+export interface GridConfig {
+  toolbar?: boolean;
+  bold?: boolean;
+  italic?: boolean;
+  align?: boolean;
+  textColor?: boolean;
+  fillColor?: boolean;
+  border?: boolean;
+  clearFormat?: boolean;
+  merge?: boolean;
+  sort?: boolean;
+}
+
 export interface GridOptions {
   workbook: Workbook;
   data?: ColumnarData;
@@ -259,6 +278,7 @@ export interface GridOptions {
   renderers?: Record<string, CellRenderer>;
   /** Rows rendered above/below the viewport to absorb fast scrolls. */
   overscan?: number;
+  config?: GridConfig;
 }
 
 export interface GridEvents {
@@ -299,6 +319,8 @@ export interface RenderLayout {
   rowHeight: number;
   headerHeight: number;
   totalRows: number;
+  /** Merged cell regions in display-row space (empty under sort/filter). */
+  merges?: ReadonlyArray<{ r0: number; c0: number; r1: number; c1: number }>;
 }
 
 export interface Viewport {

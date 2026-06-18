@@ -177,6 +177,10 @@ export class SheetwriteStore implements Store {
     return this.viewOrder.get(sheet)?.length ?? this.sheetMeta(sheet).rowCount;
   }
 
+  hasView(sheet: SheetId): boolean {
+    return this.viewOrder.has(sheet);
+  }
+
   applyTransaction(tx: Transaction): void {
     // Non-reentrant barrier: a stale epoch is rejected outright (the app
     // rebases on the change stream and resubmits).

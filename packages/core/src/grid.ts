@@ -6,11 +6,13 @@ import { downloadBytes, toCsv, toXlsx } from "./export";
 import { OffsetIndex, ScaledScroll } from "./fenwick";
 import { type CellRef, SelectionModel, type SelRect } from "./selection";
 import { SheetwriteStore } from "./store";
+import { Toolbar, type ToolbarActions } from "./toolbar";
 import type {
   AggregateOp,
   CellAddress,
   CellRenderer,
   CellScalar,
+  CellStyle,
   CellValue,
   Column,
   Grid,
@@ -42,6 +44,7 @@ export const DEFAULT_THEME: Theme = {
   selectionBorder: "#2563eb",
   rowHeight: 28,
   headerHeight: 32,
+  rowHeaderWidth: 48,
 };
 
 let wasmReady = false;
@@ -104,6 +107,10 @@ export class GridImpl implements Grid {
   private readonly readOnly: boolean;
   private tabBar: HTMLDivElement | null = null;
   private tabBarHeight = 0;
+  private toolbar: Toolbar | null = null;
+  private toolbarHeight = 0;
+  private readonly viewportEl: HTMLDivElement;
+  private readonly merges = new Map<SheetId, SelRect[]>();
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
@@ -153,12 +160,22 @@ export class GridImpl implements Grid {
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
     this.loaded = new Uint8Array(sheet.rowCount);
 
-    // DOM layers: scroller+sizer (L0), canvas (L1, via renderer), overlay (L2),
-    // editor textarea (L3, mounted on demand by EditController).
+    // host chrome: optional toolbar (top) + viewport (cells) + optional tab bar.
     host.classList.add("sheetwrite");
     host.style.position = host.style.position || "relative";
     host.style.overflow = "hidden";
     if (!host.hasAttribute("tabindex")) host.tabIndex = 0;
+
+    const config = opts.config;
+    if (config && config.toolbar !== false) {
+      this.toolbar = new Toolbar(host, config, this.theme, this.toolbarActions());
+      this.toolbarHeight = Toolbar.height;
+    }
+
+    this.viewportEl = document.createElement("div");
+    this.viewportEl.className = "sheetwrite-viewport";
+    this.viewportEl.style.cssText = `position:absolute;left:0;right:0;top:${this.toolbarHeight}px;bottom:${this.tabBarHeight}px;`;
+    host.appendChild(this.viewportEl);
 
     this.scroller = document.createElement("div");
     this.scroller.className = "sheetwrite-scroller";
@@ -166,23 +183,19 @@ export class GridImpl implements Grid {
     this.sizer = document.createElement("div");
     this.sizer.className = "sheetwrite-sizer";
     this.scroller.appendChild(this.sizer);
-    host.appendChild(this.scroller);
+    this.viewportEl.appendChild(this.scroller);
 
-    this.renderer = this.createRenderer(opts, host);
+    this.renderer = this.createRenderer(opts, this.viewportEl);
     this.renderer.setRenderers(this.customRenderers);
 
     this.overlay = document.createElement("div");
     this.overlay.className = "sheetwrite-overlay";
     this.overlay.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;";
-    host.appendChild(this.overlay);
+    this.viewportEl.appendChild(this.overlay);
 
-    if (this.tabBarHeight > 0) {
-      this.scroller.style.bottom = `${this.tabBarHeight}px`;
-      this.overlay.style.bottom = `${this.tabBarHeight}px`;
-      this.buildTabBar();
-    }
+    if (this.tabBarHeight > 0) this.buildTabBar();
 
-    this.editor = new EditController(host);
+    this.editor = new EditController(this.viewportEl);
 
     this.disposeStore = this.store.on("change", (event) => {
       for (const patch of event.transaction.patches) {
@@ -228,7 +241,7 @@ export class GridImpl implements Grid {
   }
 
   private viewportH(): number {
-    return this.host.clientHeight - this.tabBarHeight;
+    return this.viewportEl.clientHeight;
   }
 
   private buildTabBar(): void {
@@ -327,7 +340,7 @@ export class GridImpl implements Grid {
   } {
     const sheet = this.sheet();
     return {
-      x: this.colLeftOf(col) - scrollLeft,
+      x: this.colLeftOf(col) - scrollLeft + this.theme.rowHeaderWidth,
       y: this.theme.headerHeight + this.index.offsetOf(row) - contentTop,
       w: sheet.columns[col]?.width ?? 0,
       h: this.index.heightOf(row),
@@ -341,6 +354,9 @@ export class GridImpl implements Grid {
       rowHeight: this.theme.rowHeight,
       headerHeight: this.theme.headerHeight,
       totalRows: sheet.rowCount,
+      merges: this.loadable?.hasView(this.activeSheet)
+        ? []
+        : (this.merges.get(this.activeSheet) ?? []),
     });
     this.selection.setBounds(sheet.rowCount, this.firstCol(), this.lastCol());
     this.syncSizer();
@@ -353,7 +369,7 @@ export class GridImpl implements Grid {
     let width = 0;
     for (const c of this.colIndices) width += sheet.columns[c]!.width;
 
-    this.sizer.style.width = `${width}px`;
+    this.sizer.style.width = `${width + this.theme.rowHeaderWidth}px`;
     this.sizer.style.height = `${this.scaled.sizerHeight}px`;
   }
 
@@ -384,7 +400,7 @@ export class GridImpl implements Grid {
 
   private render(): void {
     const clientH = this.viewportH();
-    const clientW = this.host.clientWidth;
+    const clientW = this.viewportEl.clientWidth;
     const headerHeight = this.theme.headerHeight;
     const bodyHeight = Math.max(0, clientH - headerHeight);
     const contentTop = this.scaled.toContent(this.scroller.scrollTop);
@@ -457,8 +473,8 @@ export class GridImpl implements Grid {
       this.colLeftOf(col) + (this.sheet().columns[col]?.width ?? 0);
 
     this.selection.forEachRect((rect) => {
-      const left = this.colLeftOf(rect.c0) - scrollLeft;
-      const right = colRight(rect.c1) - scrollLeft;
+      const left = this.colLeftOf(rect.c0) - scrollLeft + this.theme.rowHeaderWidth;
+      const right = colRight(rect.c1) - scrollLeft + this.theme.rowHeaderWidth;
       const top = headerHeight + this.index.offsetOf(rect.r0) - contentTop;
       const bottom = headerHeight + this.index.offsetOf(rect.r1 + 1) - contentTop;
       const clippedTop = Math.max(headerHeight, top);
@@ -528,9 +544,9 @@ export class GridImpl implements Grid {
       return;
     }
     const additive = e.ctrlKey || e.metaKey;
-    const rect = this.host.getBoundingClientRect();
+    const rect = this.viewportEl.getBoundingClientRect();
     const py = e.clientY - rect.top;
-    const contentX = e.clientX - rect.left + this.scroller.scrollLeft;
+    const contentX = e.clientX - rect.left + this.scroller.scrollLeft - this.theme.rowHeaderWidth;
 
     // header row → column selection
     if (py < this.theme.headerHeight) {
@@ -574,12 +590,12 @@ export class GridImpl implements Grid {
   };
 
   private cellAtPointer(clientX: number, clientY: number): CellRef | null {
-    const rect = this.host.getBoundingClientRect();
+    const rect = this.viewportEl.getBoundingClientRect();
     const py = clientY - rect.top;
     if (py < this.theme.headerHeight) return null;
 
     const contentTop = this.scaled.toContent(this.scroller.scrollTop);
-    const contentX = clientX - rect.left + this.scroller.scrollLeft;
+    const contentX = clientX - rect.left + this.scroller.scrollLeft - this.theme.rowHeaderWidth;
     const contentY = contentTop + (py - this.theme.headerHeight);
 
     const row = this.index.rowAtOffset(contentY).row;
@@ -886,10 +902,10 @@ export class GridImpl implements Grid {
     const left = this.colLeftOf(col);
     const width = this.sheet().columns[col]?.width ?? 0;
     const viewLeft = this.scroller.scrollLeft;
-    const viewRight = viewLeft + this.host.clientWidth;
+    const cellWidth = Math.max(0, this.viewportEl.clientWidth - this.theme.rowHeaderWidth);
+    const viewRight = viewLeft + cellWidth;
     if (left < viewLeft) this.scroller.scrollLeft = left;
-    else if (left + width > viewRight)
-      this.scroller.scrollLeft = left + width - this.host.clientWidth;
+    else if (left + width > viewRight) this.scroller.scrollLeft = left + width - cellWidth;
   }
 
   getSelection(): Selection | null {
@@ -915,6 +931,89 @@ export class GridImpl implements Grid {
     this.customRenderers.set(name, renderer);
     this.renderer.setRenderers(this.customRenderers);
     this.scheduleRender();
+  }
+
+  // ── toolbar actions (operate on the current selection) ──────────────────────
+
+  private toolbarActions(): ToolbarActions {
+    return {
+      toggleBold: () => this.toggleStyle("bold"),
+      toggleItalic: () => this.toggleStyle("italic"),
+      setAlign: (align) => this.applyStyle({ align }),
+      setTextColor: (color) => this.applyStyle({ color }),
+      setFillColor: (color) => this.applyStyle({ backgroundColor: color }),
+      setBorder: () => this.applyStyle({ border: { all: { color: this.theme.fg, width: 1 } } }),
+      clearFormat: () => this.applyStyle(null),
+      merge: () => this.mergeSelection(),
+      unmerge: () => this.unmergeSelection(),
+      sort: (ascending) => {
+        const f = this.selection.focusCell;
+        if (f) this.sortBy(f.col, ascending);
+      },
+    };
+  }
+
+  private toggleStyle(prop: "bold" | "italic"): void {
+    const f = this.selection.focusCell;
+    const on = f
+      ? this.store.getCell({ sheet: this.activeSheet, row: f.row, col: f.col }).style[prop]
+      : false;
+    this.applyStyle({ [prop]: !on });
+  }
+
+  /** Re-set selected cells, preserving each value, with `patch` merged into the
+   *  style (cleared when `patch` is null). */
+  private applyStyle(patch: Partial<CellStyle> | null): void {
+    if (this.readOnly || this.selection.isEmpty) return;
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((r) => rects.push(r));
+
+    const patches: Patch[] = [];
+    for (const rect of rects) {
+      for (let r = rect.r0; r <= rect.r1; r++) {
+        for (let c = rect.c0; c <= rect.c1; c++) {
+          const addr = { sheet: this.activeSheet, row: r, col: c };
+          const formula = this.loadable?.getFormula(addr) ?? null;
+          const cell = this.store.getCell(addr);
+          const value: CellValue = formula
+            ? { kind: "formula", src: formula }
+            : { kind: "literal", value: cell.resolved };
+          patches.push({
+            op: "set",
+            addr,
+            value,
+            style: patch ? { ...cell.style, ...patch } : undefined,
+          });
+        }
+      }
+    }
+    if (patches.length > 0) this.store.applyTransaction({ patches });
+  }
+
+  private mergeSelection(): void {
+    const sel = this.selection.toSelection(this.activeSheet);
+    if (sel?.kind !== "range") return;
+    const { start, end } = sel.range;
+    const list = this.merges.get(this.activeSheet) ?? [];
+    list.push({
+      r0: Math.min(start.row, end.row),
+      c0: Math.min(start.col, end.col),
+      r1: Math.max(start.row, end.row),
+      c1: Math.max(start.col, end.col),
+    });
+    this.merges.set(this.activeSheet, list);
+    this.applyLayout();
+  }
+
+  private unmergeSelection(): void {
+    const f = this.selection.focusCell;
+    const list = this.merges.get(this.activeSheet);
+    if (!f || !list) return;
+    this.merges.set(
+      this.activeSheet,
+      list.filter((m) => !(f.row >= m.r0 && f.row <= m.r1 && f.col >= m.c0 && f.col <= m.c1)),
+    );
+    this.applyLayout();
   }
 
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void {
@@ -988,6 +1087,8 @@ export class GridImpl implements Grid {
     this.scroller.remove();
     this.overlay.remove();
     this.tabBar?.remove();
+    this.toolbar?.destroy();
+    this.viewportEl.remove();
     this.host.classList.remove("sheetwrite");
   }
 }

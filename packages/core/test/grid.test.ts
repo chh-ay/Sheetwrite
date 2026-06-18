@@ -74,6 +74,8 @@ function makeFakeStore(
 
 let recording: RecordingCtx;
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
+const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
 
 beforeEach(() => {
   recording = makeRecordingCtx();
@@ -81,10 +83,22 @@ beforeEach(() => {
   const stub = (): CanvasRenderingContext2D => recording as unknown as CanvasRenderingContext2D;
   HTMLCanvasElement.prototype.getContext =
     stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  // happy-dom has no layout; give every element a viewport size for the grid.
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+    configurable: true,
+    get: () => 800,
+  });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+    configurable: true,
+    get: () => 400,
+  });
 });
 
 afterEach(() => {
   HTMLCanvasElement.prototype.getContext = originalGetContext;
+  if (origClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth);
+  if (origClientHeight)
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight);
 });
 
 function mountHost(): HTMLDivElement {

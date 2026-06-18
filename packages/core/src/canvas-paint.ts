@@ -15,6 +15,20 @@ const CELL_PAD = 6;
 /** Works against a main-thread or worker (OffscreenCanvas) 2D context. */
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
+type MergeRect = { r0: number; c0: number; r1: number; c1: number };
+
+function mergeAt(
+  merges: ReadonlyArray<MergeRect> | undefined,
+  row: number,
+  col: number,
+): MergeRect | undefined {
+  if (!merges) return undefined;
+  for (const m of merges) {
+    if (row >= m.r0 && row <= m.r1 && col >= m.c0 && col <= m.c1) return m;
+  }
+  return undefined;
+}
+
 /** Cumulative left edges per visible column; `colX[c+1] - colX[c]` is its width. */
 export function columnEdges(layout: RenderLayout): number[] {
   const colX: number[] = new Array(layout.columns.length + 1);
@@ -42,6 +56,7 @@ export function paintFrame(
   const { width, height, scrollTop, scrollLeft } = viewport;
   const { rowHeight, headerHeight } = theme;
   const colX = columnEdges(layout);
+  const g = theme.rowHeaderWidth;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.textBaseline = "middle";
@@ -56,7 +71,7 @@ export function paintFrame(
   // Cell body, clipped below the sticky header.
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, headerHeight, width, Math.max(0, height - headerHeight));
+  ctx.rect(g, headerHeight, Math.max(0, width - g), Math.max(0, height - headerHeight));
   ctx.clip();
   for (let ri = 0; ri < nRows; ri++) {
     const row = view.rows.start + ri;
@@ -64,13 +79,17 @@ export function paintFrame(
     if (y + rowHeight <= headerHeight || y >= height) continue;
     for (let cj = 0; cj < nCols; cj++) {
       const col = view.cols[cj]!;
-      const x = colX[col]! - scrollLeft;
+      const x = colX[col]! - scrollLeft + g;
       const w = colX[col + 1]! - colX[col]!;
-      if (x + w <= 0 || x >= width) continue;
+      if (x + w <= g || x >= width) continue;
+      const merge = mergeAt(layout.merges, row, col);
+      if (merge && (merge.r0 !== row || merge.c0 !== col)) continue; // covered by a merge
+      const cw = merge ? colX[merge.c1 + 1]! - colX[merge.c0]! : w;
+      const ch = merge ? (merge.r1 - merge.r0 + 1) * rowHeight : rowHeight;
       const i = ri * nCols + cj;
       const value = view.values[i] ?? null;
       const style = view.styles[view.styleIds[i]!] ?? {};
-      paintCell(ctx, theme, layout, col, value, style, x, y, w, rowHeight, renderers);
+      paintCell(ctx, theme, layout, col, value, style, x, y, cw, ch, renderers);
     }
   }
 
@@ -81,7 +100,7 @@ export function paintFrame(
     const row = view.rows.start + ri;
     const lineY = Math.round(headerHeight + (row + 1) * rowHeight - scrollTop) - 0.5;
     if (lineY < headerHeight || lineY > height) continue;
-    ctx.moveTo(0, lineY);
+    ctx.moveTo(g, lineY);
     ctx.lineTo(width, lineY);
   }
   ctx.stroke();
@@ -91,14 +110,40 @@ export function paintFrame(
   ctx.strokeStyle = theme.gridLine;
   ctx.beginPath();
   for (let c = 0; c < colX.length; c++) {
-    const lineX = Math.round(colX[c]! - scrollLeft) - 0.5;
-    if (lineX < 0 || lineX > width) continue;
+    const lineX = Math.round(colX[c]! - scrollLeft + g) - 0.5;
+    if (lineX < g || lineX > width) continue;
     ctx.moveTo(lineX, 0);
     ctx.lineTo(lineX, height);
   }
   ctx.stroke();
 
-  paintHeader(ctx, theme, layout, colX, width, scrollLeft);
+  paintHeader(ctx, theme, layout, colX, width, scrollLeft, g);
+
+  if (g > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, g, height);
+    ctx.clip();
+    ctx.fillStyle = theme.headerBg;
+    ctx.fillRect(0, 0, g, height);
+    ctx.fillStyle = theme.headerFg;
+    ctx.font = theme.font;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (let ri = 0; ri < nRows; ri++) {
+      const row = view.rows.start + ri;
+      const cy = headerHeight + row * rowHeight - scrollTop + rowHeight / 2;
+      if (cy < headerHeight || cy > height) continue;
+      ctx.fillText(String(row + 1), g - 6, cy);
+    }
+    ctx.strokeStyle = theme.gridLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(g - 0.5, 0);
+    ctx.lineTo(g - 0.5, height);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function paintCell(
@@ -189,6 +234,7 @@ function paintHeader(
   colX: number[],
   width: number,
   scrollLeft: number,
+  g: number,
 ): void {
   const h = theme.headerHeight;
   ctx.fillStyle = theme.headerBg;
@@ -198,9 +244,9 @@ function paintHeader(
   ctx.font = `bold ${theme.font}`;
   ctx.textAlign = "left";
   for (let c = 0; c < layout.columns.length; c++) {
-    const x = colX[c]! - scrollLeft;
+    const x = colX[c]! - scrollLeft + g;
     const w = colX[c + 1]! - colX[c]!;
-    if (x + w <= 0 || x >= width) continue;
+    if (x + w <= g || x >= width) continue;
     ctx.fillText(layout.columns[c]!.header, x + CELL_PAD, h / 2, Math.max(1, w - CELL_PAD * 2));
   }
 
