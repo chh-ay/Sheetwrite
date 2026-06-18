@@ -1,3 +1,4 @@
+export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1";
 export { CanvasRenderer } from "./canvas-renderer";
 export {
   downloadBytes,

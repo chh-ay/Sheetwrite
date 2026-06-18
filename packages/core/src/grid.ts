@@ -1,4 +1,5 @@
 import { load } from "@sheetwrite/wasm";
+import { cellA1, rangeA1, shiftA1Refs } from "./a1";
 import { CanvasRenderer } from "./canvas-renderer";
 import { neutralizeInjection, parseTsv, toTsv } from "./clipboard";
 import { EditController, type EditNavigate } from "./editor";
@@ -111,6 +112,7 @@ export class GridImpl implements Grid {
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
   private readonly merges = new Map<SheetId, SelRect[]>();
+  private fillTarget: SelRect | null = null;
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
@@ -509,6 +511,38 @@ export class GridImpl implements Grid {
         this.overlay.appendChild(ring);
       }
     }
+
+    if (this.fillTarget) {
+      const fLeft = this.colLeftOf(this.fillTarget.c0) - scrollLeft + this.theme.rowHeaderWidth;
+      const fRight = colRight(this.fillTarget.c1) - scrollLeft + this.theme.rowHeaderWidth;
+      const fTop = headerHeight + this.index.offsetOf(this.fillTarget.r0) - contentTop;
+      const fBottom = headerHeight + this.index.offsetOf(this.fillTarget.r1 + 1) - contentTop;
+      const clipTop = Math.max(headerHeight, fTop);
+      const preview = rectDiv(
+        fLeft,
+        clipTop,
+        fRight - fLeft,
+        fBottom - clipTop,
+        "transparent",
+        this.theme.selectionBorder,
+      );
+      preview.style.outlineStyle = "dashed";
+      this.overlay.appendChild(preview);
+    }
+
+    const fillHandle = this.fillHandleScreen(contentTop, scrollLeft);
+    if (fillHandle && !this.editor.isEditing) {
+      const sq = rectDiv(
+        fillHandle.x - 3,
+        fillHandle.y - 3,
+        6,
+        6,
+        this.theme.selectionBorder,
+        this.theme.selectionBorder,
+      );
+      sq.style.cursor = "crosshair";
+      this.overlay.appendChild(sq);
+    }
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
@@ -542,6 +576,21 @@ export class GridImpl implements Grid {
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
       return;
+    }
+
+    const hostRect = this.viewportEl.getBoundingClientRect();
+    const fillHandle = this.fillHandleScreen(
+      this.scaled.toContent(this.scroller.scrollTop),
+      this.scroller.scrollLeft,
+    );
+    if (fillHandle && !this.editor.isEditing) {
+      const hx = e.clientX - hostRect.left;
+      const hy = e.clientY - hostRect.top;
+      if (Math.abs(hx - fillHandle.x) <= 5 && Math.abs(hy - fillHandle.y) <= 5) {
+        e.preventDefault();
+        this.startFillDrag();
+        return;
+      }
     }
     const additive = e.ctrlKey || e.metaKey;
     const rect = this.viewportEl.getBoundingClientRect();
@@ -784,6 +833,114 @@ export class GridImpl implements Grid {
       }
     });
     if (patches.length > 0) this.store.applyTransaction({ patches });
+  }
+
+  private fillSourceRect(): SelRect | null {
+    const focus = this.selection.focusCell;
+    if (!focus) return null;
+    let found: SelRect | null = null;
+    this.selection.forEachRect((r) => {
+      if (r.r0 <= focus.row && focus.row <= r.r1 && r.c0 <= focus.col && focus.col <= r.c1) {
+        found = r;
+      }
+    });
+    return found;
+  }
+
+  private fillCellAt(clientX: number, clientY: number): CellRef {
+    const rect = this.viewportEl.getBoundingClientRect();
+    const contentTop = this.scaled.toContent(this.scroller.scrollTop);
+    const contentX = clientX - rect.left + this.scroller.scrollLeft - this.theme.rowHeaderWidth;
+    const contentY = contentTop + (clientY - rect.top - this.theme.headerHeight);
+    const rowCount = this.sheet().rowCount;
+    const row = clamp(this.index.rowAtOffset(Math.max(0, contentY)).row, 0, rowCount - 1);
+    let col = this.colAtX(contentX);
+    if (col === -1) {
+      const cols = this.colIndices;
+      col = contentX < 0 ? (cols[0] ?? 0) : (cols[cols.length - 1] ?? 0);
+    }
+    return { row, col };
+  }
+
+  private fillHandleScreen(
+    contentTop: number,
+    scrollLeft: number,
+  ): { x: number; y: number } | null {
+    if (this.loadable?.hasView(this.activeSheet)) return null;
+    const src = this.fillSourceRect();
+    if (!src) return null;
+    const r = this.screenRect(src.r1, src.c1, contentTop, scrollLeft);
+    const y = r.y + r.h;
+    if (y < this.theme.headerHeight) return null;
+    return { x: r.x + r.w, y };
+  }
+
+  private startFillDrag(): void {
+    const source = this.fillSourceRect();
+    if (!source) return;
+    const move = (ev: MouseEvent): void => {
+      const c = this.fillCellAt(ev.clientX, ev.clientY);
+      this.fillTarget = this.extendFill(source, c);
+      this.scheduleRender();
+    };
+    const up = (): void => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      const target = this.fillTarget;
+      this.fillTarget = null;
+      if (target) {
+        this.commitFill(source, target);
+        this.selection.selectCell(target.r0, target.c0);
+        this.selection.extendTo(target.r1, target.c1);
+        this.emitSelection();
+      }
+      this.scheduleRender();
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
+
+  private extendFill(source: SelRect, c: CellRef): SelRect {
+    const down = Math.max(c.row - source.r1, 0);
+    const up = Math.max(source.r0 - c.row, 0);
+    const right = Math.max(c.col - source.c1, 0);
+    const left = Math.max(source.c0 - c.col, 0);
+    const vert = Math.max(down, up);
+    const horiz = Math.max(right, left);
+    if (vert === 0 && horiz === 0) return { ...source };
+    if (vert >= horiz) {
+      if (down >= up) return { r0: source.r0, c0: source.c0, r1: c.row, c1: source.c1 };
+      return { r0: c.row, c0: source.c0, r1: source.r1, c1: source.c1 };
+    }
+    if (right >= left) return { r0: source.r0, c0: source.c0, r1: source.r1, c1: c.col };
+    return { r0: source.r0, c0: c.col, r1: source.r1, c1: source.c1 };
+  }
+
+  private commitFill(source: SelRect, target: SelRect): void {
+    if (this.readOnly) return;
+    const srcRows = source.r1 - source.r0 + 1;
+    const srcCols = source.c1 - source.c0 + 1;
+    const patches: Patch[] = [];
+    for (let r = target.r0; r <= target.r1; r++) {
+      for (let c = target.c0; c <= target.c1; c++) {
+        if (r >= source.r0 && r <= source.r1 && c >= source.c0 && c <= source.c1) continue;
+        const sr = source.r0 + ((((r - source.r0) % srcRows) + srcRows) % srcRows);
+        const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
+        patches.push({
+          op: "set",
+          addr: { sheet: this.activeSheet, row: r, col: c },
+          value: this.fillValueFrom(sr, sc, r - sr, c - sc),
+        });
+      }
+    }
+    if (patches.length > 0) this.store.applyTransaction({ patches });
+  }
+
+  private fillValueFrom(sr: number, sc: number, dRow: number, dCol: number): CellValue {
+    const addr = { sheet: this.activeSheet, row: sr, col: sc };
+    const formula = this.loadable?.getFormula(addr) ?? null;
+    if (formula) return { kind: "formula", src: shiftA1Refs(formula, dRow, dCol) };
+    return { kind: "literal", value: this.store.getCell(addr).resolved };
   }
 
   // ── clipboard ──────────────────────────────────────────────────────────────
@@ -1099,30 +1256,6 @@ function visibleColumns(columns: readonly Column[]): number[] {
     if (columns[c]!.visible !== false) out.push(c);
   }
   return out;
-}
-
-function colToA1(col: number): string {
-  let c = col + 1;
-  let out = "";
-  while (c > 0) {
-    const rem = (c - 1) % 26;
-    out = String.fromCharCode(65 + rem) + out;
-    c = Math.floor((c - 1) / 26);
-  }
-  return out;
-}
-
-function cellA1(row: number, col: number): string {
-  return `${colToA1(col)}${row + 1}`;
-}
-
-function rangeA1(a: CellRef, b: CellRef): string {
-  if (a.row === b.row && a.col === b.col) return cellA1(a.row, a.col);
-  const r0 = Math.min(a.row, b.row);
-  const r1 = Math.max(a.row, b.row);
-  const c0 = Math.min(a.col, b.col);
-  const c1 = Math.max(a.col, b.col);
-  return `${cellA1(r0, c0)}:${cellA1(r1, c1)}`;
 }
 
 function clamp(v: number, lo: number, hi: number): number {
