@@ -15,6 +15,7 @@ interface Props {
   renderer?: GridOptions["renderer"];
   theme?: GridOptions["theme"];
   readOnly?: GridOptions["readOnly"];
+  config?: GridOptions["config"];
   onChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
 }
@@ -26,6 +27,7 @@ let {
   renderer = "canvas",
   theme,
   readOnly,
+  config,
   onChange,
   onSelectionChange,
 }: Props = $props();
@@ -37,7 +39,7 @@ let grid: Grid | undefined;
 // events, and tears it down on unmount. It renders no cells. Call
 // `await initSheetwrite(wasmUrl)` once before mounting (WASM must be ready).
 onMount(() => {
-  grid = createGrid(host, { workbook, data, datasource, renderer, theme, readOnly });
+  grid = createGrid(host, { workbook, data, datasource, renderer, theme, readOnly, config });
   const offs = [
     grid.on("change", (e) => onChange?.(e)),
     grid.on("selection", (e) => onSelectionChange?.(e.selection)),

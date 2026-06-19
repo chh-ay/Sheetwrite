@@ -28,6 +28,7 @@ export const SheetwriteGrid = defineComponent({
     readOnly: { type: Boolean, default: undefined },
     renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
     overscan: { type: Number, default: undefined },
+    config: { type: Object as PropType<GridOptions["config"]>, default: undefined },
   },
   emits: ["change", "selection"],
   setup(props, { emit }) {
@@ -48,6 +49,7 @@ export const SheetwriteGrid = defineComponent({
         readOnly: props.readOnly,
         renderers: props.renderers,
         overscan: props.overscan,
+        config: props.config,
       };
       grid = createGrid(el, options);
       offs = [
