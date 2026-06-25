@@ -935,11 +935,12 @@ impl CellStore {
         let base = col * s.row_count;
         let needle = needle.to_lowercase();
         let mut out: Vec<u32> = Vec::new();
+        let mut cache = MatchCache::new();
         // 2026-06 release harness: unchecked text scanning was 1.11x here,
         // below the 2x threshold; keep the safe indexing.
         for row in 0..s.row_count {
             let i = base + row;
-            if cell_matches_text(s, &self.strings, i, &needle, true, false) {
+            if cell_matches_text(s, &self.strings, i, &needle, true, false, &mut cache) {
                 out.push(row as u32);
             }
         }
@@ -971,6 +972,7 @@ impl CellStore {
             return Vec::new();
         };
         let mut pairs: Vec<(u32, u32)> = Vec::new();
+        let mut cache = MatchCache::new();
 
         for &col_u in cols {
             let col = col_u as usize;
@@ -983,7 +985,7 @@ impl CellStore {
             let base = col * s.row_count;
             for row in 0..s.row_count {
                 let i = base + row;
-                if cell_matches_text(s, &self.strings, i, &needle, case_insensitive, whole_cell) {
+                if cell_matches_text(s, &self.strings, i, &needle, case_insensitive, whole_cell, &mut cache) {
                     pairs.push((row as u32, col_u));
                 }
             }
@@ -2280,21 +2282,147 @@ fn local_error_index(
     })
 }
 
-/// Substring/whole-cell match. `needle` is already lowercased when requested.
+/// Substring/whole-cell match. `needle` is already lowercased by callers when
+/// `case_insensitive`.
+///
+/// The case-insensitive path is allocation-free for ASCII haystacks — the
+/// overwhelmingly common case for sheet text and formatted numbers — folding
+/// case byte-by-byte in place. It falls back to a heap `to_lowercase` only for
+/// non-ASCII Unicode, where the lowercase mapping can change length and a byte
+/// comparison would be unsound.
 fn matches_needle(hay: &str, needle: &str, case_insensitive: bool, whole_cell: bool) -> bool {
-    if case_insensitive {
-        let lower = hay.to_lowercase();
+    if !case_insensitive {
+        return if whole_cell { hay == needle } else { hay.contains(needle) };
+    }
+
+    if hay.is_ascii() && needle.is_ascii() {
+        let hay = hay.as_bytes();
+        let needle = needle.as_bytes();
         return if whole_cell {
-            lower == needle
+            hay.eq_ignore_ascii_case(needle)
         } else {
-            lower.contains(needle)
+            ascii_contains_ignore_case(hay, needle)
         };
     }
 
+    let lower = hay.to_lowercase();
     if whole_cell {
-        hay == needle
+        lower == needle
     } else {
-        hay.contains(needle)
+        lower.contains(needle)
+    }
+}
+
+/// Case-insensitive ASCII substring test that never allocates. Anchors on the
+/// first needle byte so most positions are rejected with a single comparison.
+fn ascii_contains_ignore_case(hay: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    if needle.len() > hay.len() {
+        return false;
+    }
+
+    let first = needle[0].to_ascii_lowercase();
+    let last_start = hay.len() - needle.len();
+    (0..=last_start).any(|i| {
+        hay[i].to_ascii_lowercase() == first
+            && hay[i..i + needle.len()].eq_ignore_ascii_case(needle)
+    })
+}
+
+/// Match a numeric cell's textual form against `needle` without the per-cell
+/// `f64::to_string` heap allocation. An `f64`'s `Display` output fits the stack
+/// buffer for every magnitude a sheet realistically holds; a pathological
+/// exponent overflows it and falls back to an owned string so results stay
+/// correct.
+fn number_matches_text(value: f64, needle: &str, case_insensitive: bool, whole_cell: bool) -> bool {
+    use std::fmt::Write as _;
+
+    let mut buf = NumBuf::new();
+    if write!(buf, "{value}").is_ok() {
+        matches_needle(buf.as_str(), needle, case_insensitive, whole_cell)
+    } else {
+        matches_needle(&value.to_string(), needle, case_insensitive, whole_cell)
+    }
+}
+
+/// Fixed stack buffer implementing [`std::fmt::Write`], used to format an `f64`
+/// off the heap. Overflow (only very large magnitudes) reports an error so the
+/// caller can fall back to an owned string.
+struct NumBuf {
+    buf: [u8; 32],
+    len: usize,
+}
+
+impl NumBuf {
+    fn new() -> Self {
+        Self { buf: [0; 32], len: 0 }
+    }
+
+    fn as_str(&self) -> &str {
+        // `write_str` only appends ASCII float text, so the bytes are valid UTF-8.
+        std::str::from_utf8(&self.buf[..self.len]).unwrap_or("")
+    }
+}
+
+impl std::fmt::Write for NumBuf {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        let bytes = s.as_bytes();
+        let end = self.len + bytes.len();
+        if end > self.buf.len() {
+            return Err(std::fmt::Error);
+        }
+        self.buf[self.len..end].copy_from_slice(bytes);
+        self.len = end;
+        Ok(())
+    }
+}
+
+/// Number of direct-mapped slots in [`MatchCache`]. A power of two so the slot
+/// index is a mask; sized to stay L1-resident while covering the distinct-value
+/// count of any realistic categorical column in one scan.
+const MATCH_CACHE_SLOTS: usize = 1024;
+
+/// Direct-mapped cache of string-pool match results for one scan.
+///
+/// Cells are dictionary-encoded (`str_id` into a shared pool), so a
+/// low-cardinality column — the common filter target: status, category, city —
+/// matches each *distinct* value once instead of once per row. The table is
+/// fixed-size and L1-resident: high-cardinality columns simply keep missing and
+/// fall through to a direct match, paying only a tag check, so it never
+/// allocates per scan nor degrades a unique-valued column into an O(pool) table.
+struct MatchCache {
+    tag: [u32; MATCH_CACHE_SLOTS],
+    hit: [bool; MATCH_CACHE_SLOTS],
+}
+
+impl MatchCache {
+    fn new() -> Self {
+        // `NO_STRING` (u32::MAX) is the empty sentinel: a real pool id never
+        // reaches it, so an untouched slot never spuriously reports a hit.
+        Self { tag: [NO_STRING; MATCH_CACHE_SLOTS], hit: [false; MATCH_CACHE_SLOTS] }
+    }
+
+    /// Match the interned string `id`, reusing a cached result when the slot
+    /// still holds this id. `needle`/flags are constant for a given scan.
+    fn matches(
+        &mut self,
+        strings: &[String],
+        id: u32,
+        needle: &str,
+        case_insensitive: bool,
+        whole_cell: bool,
+    ) -> bool {
+        let slot = (id as usize) & (MATCH_CACHE_SLOTS - 1);
+        if self.tag[slot] == id {
+            return self.hit[slot];
+        }
+        let matched = string_from_pool_ref(strings, id)
+            .is_some_and(|text| matches_needle(text, needle, case_insensitive, whole_cell));
+        self.tag[slot] = id;
+        self.hit[slot] = matched;
+        matched
     }
 }
 
@@ -2305,27 +2433,25 @@ fn cell_matches_text(
     needle: &str,
     case_insensitive: bool,
     whole_cell: bool,
+    cache: &mut MatchCache,
 ) -> bool {
     match sheet.kind[index] {
-        KIND_NUMBER => {
-            let text = sheet.num[index].to_string();
-            matches_needle(&text, needle, case_insensitive, whole_cell)
-        }
+        KIND_NUMBER => number_matches_text(sheet.num[index], needle, case_insensitive, whole_cell),
         KIND_FORMULA => {
             let Some(key) = key_for_index(sheet, index) else {
                 return false;
             };
             if let Some(error) = formula_error_at(sheet, key) {
                 matches_needle(error.sentinel(), needle, case_insensitive, whole_cell)
-            } else if let Some(text) = string_from_pool_ref(strings, sheet.str_id[index]) {
-                matches_needle(text, needle, case_insensitive, whole_cell)
+            } else if sheet.str_id[index] != NO_STRING {
+                cache.matches(strings, sheet.str_id[index], needle, case_insensitive, whole_cell)
             } else {
-                let text = sheet.num[index].to_string();
-                matches_needle(&text, needle, case_insensitive, whole_cell)
+                number_matches_text(sheet.num[index], needle, case_insensitive, whole_cell)
             }
         }
-        KIND_STRING => string_from_pool_ref(strings, sheet.str_id[index])
-            .is_some_and(|text| matches_needle(text, needle, case_insensitive, whole_cell)),
+        KIND_STRING => {
+            cache.matches(strings, sheet.str_id[index], needle, case_insensitive, whole_cell)
+        }
         _ => false,
     }
 }
@@ -2866,8 +2992,9 @@ mod tests {
         fn text_scan_safe(sheet: &SheetData, strings: &[String], col: usize, needle: &str) -> u64 {
             let base = col * sheet.row_count;
             let mut checksum = 0;
+            let mut cache = MatchCache::new();
             for row in 0..sheet.row_count {
-                if cell_matches_text(sheet, strings, base + row, needle, true, false) {
+                if cell_matches_text(sheet, strings, base + row, needle, true, false, &mut cache) {
                     checksum = mix(checksum, row as u64);
                 }
             }
@@ -2905,6 +3032,7 @@ mod tests {
 
         fn search_safe(sheet: &SheetData, strings: &[String], cols: &[u32], needle: &str) -> u64 {
             let mut checksum = 0;
+            let mut cache = MatchCache::new();
             for &col_u in cols {
                 let col = col_u as usize;
                 if col >= sheet.n_cols {
@@ -2912,7 +3040,7 @@ mod tests {
                 }
                 let base = col * sheet.row_count;
                 for row in 0..sheet.row_count {
-                    if cell_matches_text(sheet, strings, base + row, needle, true, false) {
+                    if cell_matches_text(sheet, strings, base + row, needle, true, false, &mut cache) {
                         checksum = mix(checksum, ((row as u64) << 8) ^ u64::from(col_u));
                     }
                 }
@@ -3560,5 +3688,72 @@ mod tests {
         assert_eq!(strings[string_index[0] as usize], "hello");
         assert_eq!(strings[string_index[1] as usize], "#DIV/0!");
         assert!(view.take_kinds().is_empty());
+    }
+
+    #[test]
+    fn text_match_case_insensitive_ascii_path_and_unicode_fallback() {
+        // ASCII fast path (allocation-free): case-insensitive substring + whole-cell.
+        assert!(matches_needle("Tokyo", "tokyo", true, false));
+        assert!(matches_needle("Tokyo", "tokyo", true, true));
+        assert!(matches_needle("New Tokyo City", "tokyo", true, false));
+        assert!(!matches_needle("Berlin", "tokyo", true, false));
+        assert!(!matches_needle("Tok", "tokyo", true, false));
+        assert!(matches_needle("anything", "", true, false));
+
+        // Case-sensitive path is unchanged.
+        assert!(matches_needle("Tokyo", "Tok", false, false));
+        assert!(!matches_needle("Tokyo", "tok", false, false));
+
+        // Unicode fallback matches `to_lowercase` semantics (needle pre-lowercased).
+        assert!(matches_needle("CAFÉ", "café", true, false));
+        assert!(matches_needle("Straße", "straße", true, true));
+        assert!(!matches_needle("Straße", "strasse", true, false));
+    }
+
+    #[test]
+    fn filter_and_search_match_strings_and_numbers() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 3);
+        store.set_string(sheet, 0, 0, "Tokyo", 0);
+        store.set_string(sheet, 1, 0, "Berlin", 0);
+        store.set_string(sheet, 2, 0, "New Tokyo", 0);
+        store.set_number(sheet, 0, 1, 1234.5, 0);
+        store.set_number(sheet, 1, 1, 42.0, 0);
+
+        // Case-insensitive substring filter over a string column.
+        assert_eq!(store.filter_rows(sheet, 0, "tokyo"), vec![0, 2]);
+        assert_eq!(store.filter_rows(sheet, 0, "BERLIN"), vec![1]);
+        assert!(store.filter_rows(sheet, 0, "paris").is_empty());
+
+        // Numeric cells match on their textual form (no per-cell allocation).
+        assert_eq!(store.filter_rows(sheet, 1, "234"), vec![0]);
+        assert_eq!(store.filter_rows(sheet, 1, "42"), vec![1]);
+
+        // search returns flat [row, col, ...] sorted row-major.
+        assert_eq!(store.search(sheet, &[0, 1], "tokyo", true, false), vec![0, 0, 2, 0]);
+    }
+
+    #[test]
+    fn match_cache_handles_repeats_eviction_and_collisions() {
+        let mut store = CellStore::new();
+        // More distinct values than MATCH_CACHE_SLOTS (1024) so str_ids collide
+        // mod slot count and evict each other mid-scan.
+        let rows = 3000usize;
+        let sheet = store.add_sheet(2, rows);
+        for r in 0..rows {
+            store.set_string(sheet, r, 0, &format!("item{r}"), 0);
+            store.set_string(sheet, r, 1, if r % 3 == 0 { "Tokyo" } else { "Berlin" }, 0);
+        }
+
+        // Unique column: a colliding/evicting cache must still equal a brute scan.
+        let expected: Vec<u32> = (0..rows)
+            .filter(|r| format!("item{r}").contains('7'))
+            .map(|r| r as u32)
+            .collect();
+        assert_eq!(store.filter_rows(sheet, 0, "7"), expected);
+
+        // Low-cardinality column: heavy cache reuse, every third row matches.
+        let tokyo: Vec<u32> = (0..rows).step_by(3).map(|r| r as u32).collect();
+        assert_eq!(store.filter_rows(sheet, 1, "tokyo"), tokyo);
     }
 }
