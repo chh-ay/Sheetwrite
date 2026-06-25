@@ -75,6 +75,18 @@ const data: ColumnarData = {
 - `workbook` (required), `data`, `datasource`, `renderer`, `theme`, `readOnly`, `config` (toolbar/feature flags).
 - `onChange(event)` — committed edits (`ChangeEvent`).
 - `onSelectionChange(selection)` — the new selection (`Selection | null`).
+- `onReady(grid)` — fired once with the core `Grid` after creation.
+- `bind:grid` — two-way binds the core `Grid` handle for imperative control.
+
+```svelte
+<script lang="ts">
+import type { Grid } from "@sheetwrite/core";
+let grid: Grid | undefined = $state();
+</script>
+
+<SheetwriteGrid bind:grid {workbook} {data} />
+<button onclick={() => grid?.search("foo")}>Find</button>
+```
 
 ## Documentation
 

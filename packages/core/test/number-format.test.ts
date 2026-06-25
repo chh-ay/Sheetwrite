@@ -20,5 +20,27 @@ describe("formatNumber", () => {
   it("falls back to a locale default without a code, and blanks non-finite", () => {
     expect(formatNumber(1000)).toBe((1000).toLocaleString());
     expect(formatNumber(Number.NaN, "0.00")).toBe("");
+    expect(formatNumber(Number.POSITIVE_INFINITY, "#,##0.00")).toBe("");
+    expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("");
+  });
+
+  it("produces identical output across repeated calls with the same code", () => {
+    // Memoization (descriptor + Intl formatter caches) must not change output:
+    // every representative code must be byte-stable call over call.
+    const cases: Array<{ code: string | undefined; value: number; expected: string }> = [
+      { code: "#,##0.00", value: 1234.5, expected: "1,234.50" },
+      { code: "0.0%", value: 0.123, expected: "12.3%" },
+      { code: "$#,##0", value: 1234.5, expected: "$1,235" },
+      { code: "0", value: 1234.567, expected: "1235" },
+      { code: undefined, value: 1000, expected: (1000).toLocaleString() },
+    ];
+
+    for (const { code, value, expected } of cases) {
+      const first = formatNumber(value, code);
+      const second = formatNumber(value, code);
+
+      expect(first).toBe(expected);
+      expect(second).toBe(expected);
+    }
   });
 });

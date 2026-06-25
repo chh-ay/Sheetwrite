@@ -71,9 +71,19 @@ createRoot(host).render(
 - `className`, `style` — applied to the host `<div>`.
 - `onChange(event)` — fired on committed edits (`ChangeEvent`).
 - `onSelectionChange(selection)` — fired when the selection changes (`Selection | null`).
+- `onReady(grid)` — fired once with the core `Grid` after it is created.
 
 The grid is rebuilt when `workbook` identity changes and re-applies `theme` when
 it changes; the `onChange`/`onSelectionChange` callbacks are read live.
+
+The component is a `forwardRef<Grid>`: its `ref` resolves to the core `Grid`
+(also delivered via `onReady`) so consumers can drive it imperatively.
+
+```tsx
+const gridRef = useRef<Grid>(null);
+// <SheetwriteGrid ref={gridRef} workbook={workbook} data={data} />
+gridRef.current?.search("foo");
+```
 
 ## Documentation
 

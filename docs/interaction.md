@@ -61,6 +61,9 @@ When the grid is focused and not editing:
 | Delete / Backspace | Clear the selected cells. |
 | A printable character | Start editing, replacing the cell's content. |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |
+| Ctrl/Cmd + Z | Undo the last edit. |
+| Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
+| Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
 
 ## Inline editing
 

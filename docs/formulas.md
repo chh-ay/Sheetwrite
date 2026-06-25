@@ -29,10 +29,21 @@ The result is computed in WASM and cached, so the render path reads a plain numb
 
 - A **cell reference** is an A1 token: `A1`, `B12`, `AA3` (columns are
   1–3 letters; rows are 1-based).
+- A reference may be **absolute** on either axis: `$A$1`, `$A1`, and `A$1` are all
+  valid tokens, and the engine evaluates each to the same cell as the bare `A1`.
+  The `$` markers only matter to [drag-to-fill](#reference-rewriting) — they pin
+  the column and/or row when the formula is copied — and are otherwise transparent
+  to the calc engine.
 - A **range** is two corners joined by `:` — `A1:B3` — and is normalized, so
   `B3:A1` means the same rectangle.
 - A bare range only makes sense **inside a function** that consumes it
   (`SUM(A1:A9)`). Using a range as a plain operand yields a non-finite result.
+- A **cross-sheet formula reference** is written as `=Sales!E2` (quote names with
+  spaces as `='Sales 2026'!E2`). Sheetwrite evaluates these in the Rust formula
+  engine, so arithmetic and range formulas work too:
+  `=Sales!E2 * 2`, `=SUM(Sales!E2:E10)`, and `=IF('Sales 2026'!B2 > 0, 1, 0)`.
+  A bare cross-sheet cell link still works; it is stored as a formula source, so
+  the formula bar shows the same string the user typed.
 
 During evaluation a referenced non-formula cell contributes its numeric value;
 empty or text cells count as `0`.

@@ -54,13 +54,6 @@ export interface CellAddress {
   col: number;
 }
 
-export interface Cell {
-  value: CellValue;
-  style?: CellStyle;
-  merge?: { rows: number; cols: number };
-  covered?: boolean;
-}
-
 export interface Column {
   key: string;
   header: string;
@@ -159,6 +152,8 @@ export interface Store {
    * NOT for the render hot path — renderers use `getVisibleWindow`.
    */
   getCell(addr: CellAddress): ResolvedCell;
+  /** Formula source at `addr`, or null when the cell is not a formula. */
+  getFormula(addr: CellAddress): string | null;
   /** Bulk read of a visible window; the only read a renderer should use per frame. */
   getVisibleWindow(
     sheet: SheetId,
@@ -189,6 +184,12 @@ export interface Theme {
   headerHeight: number;
   /** Width of the left row-number gutter (0 hides it). */
   rowHeaderWidth: number;
+  /** Fill behind a search match. */
+  searchMatch: string;
+  /** Fill/outline for the active (current) search match. */
+  searchActiveMatch: string;
+  /** Fill for cells highlighted via Grid.highlightCells. */
+  highlight: string;
 }
 
 // ── Custom cell renderers ────────────────────────────────────────────────────
@@ -236,7 +237,6 @@ export interface ColumnarData {
 }
 
 export interface DataSource {
-  rowCount(sheet: SheetId): number | Promise<number>;
   /** Rows in `[start, end)`. Placeholders are shown until this resolves. */
   getRows(sheet: SheetId, start: number, end: number): Promise<RowData[]>;
 }
@@ -247,8 +247,83 @@ export interface DataSource {
  * Toolbar / feature configuration. When `config` is set the built-in toolbar is
  * shown; each flag toggles one control (all default to `true`).
  */
+/** Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`. */
+export interface GridActions {
+  toggleBold(): void;
+  toggleItalic(): void;
+  setAlign(align: CellAlign): void;
+  setTextColor(color: string): void;
+  setFillColor(color: string): void;
+  toggleBorder(): void;
+  clearFormat(): void;
+  merge(): void;
+  unmerge(): void;
+  sort(ascending: boolean): void;
+  copy(): void;
+  cut(): void;
+  paste(): void;
+  clearContents(): void;
+  exportCsv(filename?: string): void;
+  exportXlsx(filename?: string): void;
+  undo(): void;
+  redo(): void;
+}
+
+export type ToolbarActionName =
+  | "bold"
+  | "italic"
+  | "alignLeft"
+  | "alignCenter"
+  | "alignRight"
+  | "textColor"
+  | "fillColor"
+  | "border"
+  | "clearFormat"
+  | "merge"
+  | "unmerge"
+  | "sortAsc"
+  | "sortDesc"
+  | "exportCsv"
+  | "exportXlsx"
+  | "undo"
+  | "redo"
+  | "separator";
+
+export interface ToolbarItem {
+  /** Built-in action to bind (or "separator"). Omit when supplying `onClick`. */
+  action?: ToolbarActionName;
+  /** Custom click handler; receives the grid handle. Overrides `action`. */
+  onClick?: (grid: Grid) => void;
+  /** Button content: text, emoji, or inline HTML/SVG markup. Defaults per action. */
+  icon?: string;
+  /** Accessible tooltip. */
+  title?: string;
+}
+
+export type ContextMenuActionName =
+  | "cut"
+  | "copy"
+  | "paste"
+  | "clearContents"
+  | "merge"
+  | "unmerge"
+  | "exportCsv"
+  | "exportXlsx"
+  | "separator";
+
+export interface ContextMenuItem {
+  /** Built-in action to bind (or "separator"). Omit when supplying `onClick`. */
+  action?: ContextMenuActionName;
+  /** Custom click handler; receives the grid and the right-clicked cell (null if none). */
+  onClick?: (grid: Grid, cell: CellAddress | null) => void;
+  /** Menu row text. Defaults per action. */
+  label?: string;
+}
+
 export interface GridConfig {
-  toolbar?: boolean;
+  /** Show the built-in toolbar (true), hide it (false), or supply a custom item list. */
+  toolbar?: boolean | ToolbarItem[];
+  /** Per-control toggles for the built-in toolbar (ignored when `toolbar` is a custom list). */
   bold?: boolean;
   italic?: boolean;
   align?: boolean;
@@ -258,6 +333,16 @@ export interface GridConfig {
   clearFormat?: boolean;
   merge?: boolean;
   sort?: boolean;
+  /** Add CSV/XLSX export controls to the built-in toolbar. */
+  export?: boolean;
+  /** Override built-in toolbar icons by action name. */
+  icons?: Partial<Record<ToolbarActionName, string>>;
+  /** Right-click cell context menu: enabled (true), disabled (false), or a custom item list. */
+  contextMenu?: boolean | ContextMenuItem[];
+  /** Show undo/redo controls in the built-in toolbar (default true). */
+  undo?: boolean;
+  /** Built-in Ctrl+F find widget: enabled (true, default) or disabled (false). */
+  find?: boolean;
 }
 
 export interface GridOptions {
@@ -278,7 +363,28 @@ export interface GridOptions {
   renderers?: Record<string, CellRenderer>;
   /** Rows rendered above/below the viewport to absorb fast scrolls. */
   overscan?: number;
+  /** Render at least this many columns (empty padding columns past the data, like a spreadsheet). */
+  minColumns?: number;
   config?: GridConfig;
+}
+
+export interface SearchOptions {
+  /** Case-sensitive match (default false). */
+  matchCase?: boolean;
+  /** Match only when the whole cell text equals the query (default false: substring). */
+  wholeCell?: boolean;
+  /** Restrict to a sheet (defaults to the active sheet). */
+  sheet?: SheetId;
+  /** Restrict to these column indices (defaults to all columns). */
+  columns?: number[];
+}
+
+export interface SearchResult {
+  query: string;
+  /** Matching cells in row-major order. */
+  matches: CellAddress[];
+  /** Index of the active match within `matches`, or -1 when there are none. */
+  active: number;
 }
 
 export interface GridEvents {
@@ -287,10 +393,13 @@ export interface GridEvents {
   scroll: { scrollTop: number; firstRow: number; lastRow: number };
   "edit-begin": { addr: CellAddress };
   "edit-commit": { addr: CellAddress; value: CellValue };
+  search: SearchResult;
 }
 
 export interface Grid {
   readonly store: Store;
+  /** Imperative action surface for binding custom toolbars/menus. */
+  readonly actions: GridActions;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   getSelection(): Selection | null;
@@ -305,8 +414,22 @@ export interface Grid {
   filterBy(col: number, needle: string): void;
   /** Clear any active sort/filter view. */
   clearView(): void;
+  /** Undo the last recorded cell edit. */
+  undo(): void;
+  /** Redo the last undone cell edit. */
+  redo(): void;
   exportCsv(filename: string): void;
   exportXlsx(filename: string): Promise<void>;
+  /** Find cells matching `query`; highlights matches, emits `search`, returns the result. */
+  search(query: string, opts?: SearchOptions): SearchResult;
+  /** Move the active match to the next match and scroll it into view. */
+  findNext(): SearchResult;
+  /** Move the active match to the previous match and scroll it into view. */
+  findPrev(): SearchResult;
+  /** Clear the current search and its highlights. */
+  clearSearch(): void;
+  /** Highlight arbitrary cell ranges (null clears). `color` overrides the theme highlight. */
+  highlightCells(ranges: Range[] | null, color?: string): void;
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
   refresh(): void;
   destroy(): void;
@@ -328,6 +451,15 @@ export interface Viewport {
   scrollLeft: number;
   width: number;
   height: number;
+  /**
+   * Per-row geometry for the rows currently painted, aligned to the window's
+   * row range (index 0 is the window's first row). Tops are in content space
+   * (sheet coordinates, before subtracting `scrollTop`); heights are per row.
+   * Present when row heights are non-uniform; when omitted the renderer falls
+   * back to the uniform `Theme.rowHeight`.
+   */
+  rowTops?: Float64Array;
+  rowHeights?: Float64Array;
 }
 
 export interface Renderer {

@@ -1,53 +1,77 @@
 import {
   type ChangeEvent,
-  createGrid,
+  createGridController,
   type Grid,
+  type GridController,
+  type GridControllerHandlers,
   type GridOptions,
   type Selection,
 } from "@sheetwrite/core";
-import { type CSSProperties, type ReactElement, useEffect, useRef } from "react";
+import {
+  type CSSProperties,
+  forwardRef,
+  type ReactElement,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from "react";
 
 export interface SheetwriteGridProps extends GridOptions {
   className?: string;
   style?: CSSProperties;
   onChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
+  /** Fired once with the imperative core grid after it is created. */
+  onReady?: (grid: Grid) => void;
 }
 
 /**
- * Thin React wrapper: it owns a host `<div>`, creates the imperative core grid
- * in an effect, forwards events, and tears down on unmount. It renders no cells.
- * Call `await initSheetwrite(wasmUrl)` once before mounting (WASM must be ready).
+ * Thin React wrapper: it owns a host `<div>`, drives the imperative core grid
+ * through a {@link createGridController}, forwards events, recreates the grid
+ * when the `workbook` identity changes, and tears down on unmount. It renders
+ * no cells. Call `await initSheetwrite(wasmUrl)` once before mounting (WASM
+ * must be ready).
+ *
+ * The created grid is exposed through `ref` and the `onReady` callback so
+ * consumers can drive it imperatively — `grid.actions.*`, `grid.search(...)`.
  */
-export function SheetwriteGrid(props: SheetwriteGridProps): ReactElement {
-  const { className, style, onChange, onSelectionChange, ...options } = props;
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const gridRef = useRef<Grid | null>(null);
-  const callbacks = useRef({ onChange, onSelectionChange });
-  callbacks.current = { onChange, onSelectionChange };
+export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
+  function SheetwriteGrid(props, ref): ReactElement {
+    const { className, style, onChange, onSelectionChange, onReady, ...options } = props;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: rebuild only on workbook identity; live callbacks are read via ref.
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
+    const hostRef = useRef<HTMLDivElement | null>(null);
+    const gridRef = useRef<Grid | null>(null);
+    const controllerRef = useRef<GridController | null>(null);
 
-    const grid = createGrid(host, options);
-    gridRef.current = grid;
-    const offs = [
-      grid.on("change", (e) => callbacks.current.onChange?.(e)),
-      grid.on("selection", (e) => callbacks.current.onSelectionChange?.(e.selection)),
-    ];
+    // Live-callback bag: the controller reads these fields on every event, so we
+    // mutate the SAME object each render instead of recreating the grid.
+    const handlers = useRef<GridControllerHandlers>({});
+    handlers.current.onChange = onChange;
+    handlers.current.onSelectionChange = onSelectionChange;
+    handlers.current.onReady = onReady;
 
-    return () => {
-      for (const off of offs) off();
-      grid.destroy();
-      gridRef.current = null;
-    };
-  }, [options.workbook]);
+    useImperativeHandle(ref, () => gridRef.current!, []);
 
-  useEffect(() => {
-    if (options.theme) gridRef.current?.setTheme(options.theme);
-  }, [options.theme]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: rebuild only on workbook identity; live callbacks are read via the handlers ref.
+    useEffect(() => {
+      const host = hostRef.current;
+      if (!host) return;
 
-  return <div ref={hostRef} className={className} style={style} />;
-}
+      const controller = createGridController(host, options, handlers.current);
+      controllerRef.current = controller;
+      gridRef.current = controller.grid;
+
+      return () => {
+        controller.destroy();
+        controllerRef.current = null;
+        gridRef.current = null;
+      };
+    }, [options.workbook]);
+
+    useEffect(() => {
+      if (options.theme) controllerRef.current?.setTheme(options.theme);
+    }, [options.theme]);
+
+    return <div ref={hostRef} className={className} style={style} />;
+  },
+);

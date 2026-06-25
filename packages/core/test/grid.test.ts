@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { GridImpl, initSheetwrite } from "../src/grid";
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid";
 import { SheetwriteStore } from "../src/store";
 import type { CellScalar, Store, Workbook } from "../src/types";
 import { makeColumnarData, makeWorkbook } from "./fixtures";
@@ -58,6 +58,7 @@ function makeFakeStore(
       hooks.onGetCell?.();
       throw new Error("Store.getCell must not be called in the render hot path");
     },
+    getFormula: () => null,
     getVisibleWindow: (sheet, rows, cols) => {
       hooks.onWindow?.();
       const n = Math.max(0, (rows.end - rows.start) * cols.length);
@@ -107,6 +108,52 @@ function mountHost(): HTMLDivElement {
   Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
   document.body.appendChild(host);
   return host;
+}
+
+function expectEditor(host: HTMLElement): HTMLTextAreaElement {
+  const node = host.querySelector("textarea.sheetwrite-editor");
+  expect(node).toBeInstanceOf(HTMLTextAreaElement);
+  if (!(node instanceof HTMLTextAreaElement)) {
+    throw new Error("expected grid editor textarea");
+  }
+
+  return node;
+}
+
+function typeIntoFocusedCell(host: HTMLElement, value: string, key = "Enter"): void {
+  host.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+
+  const editor = expectEditor(host);
+  editor.value = value;
+  editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+}
+
+function scrollerOf(host: HTMLElement): HTMLDivElement {
+  const node = host.querySelector(".sheetwrite-scroller");
+  expect(node).toBeInstanceOf(HTMLDivElement);
+  if (!(node instanceof HTMLDivElement)) {
+    throw new Error("expected grid scroller");
+  }
+
+  return node;
+}
+
+function cellPoint(
+  row: number,
+  col: number,
+  workbook: Workbook,
+): { clientX: number; clientY: number } {
+  const sheet = workbook.sheets[0];
+  if (!sheet) throw new Error("expected fixture sheet");
+
+  let x = DEFAULT_THEME.rowHeaderWidth;
+  for (let c = 0; c < col; c++) x += sheet.columns[c]?.width ?? 0;
+  x += (sheet.columns[col]?.width ?? DEFAULT_THEME.rowHeight) / 2;
+
+  const y =
+    DEFAULT_THEME.headerHeight + row * DEFAULT_THEME.rowHeight + DEFAULT_THEME.rowHeight / 2;
+
+  return { clientX: x, clientY: y };
 }
 
 describe("Grid render hot path", () => {
@@ -198,6 +245,205 @@ describe("Grid editing (Layer 3)", () => {
     const node2 = host.querySelector("textarea.sheetwrite-editor");
     if (!(node2 instanceof HTMLTextAreaElement)) return;
     expect(node2.value).toBe("=B1+B2*2");
+
+    grid.destroy();
+  });
+
+  it("edits the displayed data row under a sorted view", () => {
+    const workbook = makeWorkbook(5);
+    const store = new SheetwriteStore(workbook, makeColumnarData(5));
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "literal", value: 30 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 1 },
+          value: { kind: "literal", value: 10 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 1 },
+          value: { kind: "literal", value: 20 },
+        },
+      ],
+    });
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+
+    grid.sortBy(1, true);
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    typeIntoFocusedCell(host, "Sorted edit");
+
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("Sorted edit");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
+
+    grid.destroy();
+  });
+
+  it("retries datasource bands after a rejected load", async () => {
+    const workbook = makeWorkbook(50);
+    let requests = 0;
+    const host = mountHost();
+    const grid = new GridImpl(host, {
+      workbook,
+      datasource: {
+        getRows: () => {
+          requests++;
+          return Promise.reject(new Error("load failed"));
+        },
+      },
+    });
+
+    expect(requests).toBe(1);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    grid.refresh();
+    expect(requests).toBe(2);
+
+    grid.destroy();
+  });
+
+  it("uses merged-cell anchors for pointer selection and editing", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+
+    grid.setSelection({
+      kind: "range",
+      range: {
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 1, col: 1 },
+      },
+    });
+    grid.actions.merge();
+
+    const scroller = scrollerOf(host);
+    const covered = cellPoint(1, 1, workbook);
+    scroller.dispatchEvent(new MouseEvent("mousedown", { ...covered, button: 0, bubbles: true }));
+    window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+    expect(grid.getSelection()).toEqual({
+      kind: "cell",
+      addr: { sheet: "s1", row: 0, col: 0 },
+    });
+
+    scroller.dispatchEvent(new MouseEvent("dblclick", { ...covered, button: 0, bubbles: true }));
+    const editor = expectEditor(host);
+    editor.value = "Merged anchor";
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Merged anchor");
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(10.5);
+
+    grid.destroy();
+  });
+
+  it("opens the built-in find bar with Ctrl+F unless find is disabled", () => {
+    const workbook = makeWorkbook(10);
+    const host = mountHost();
+    const grid = new GridImpl(
+      host,
+      { workbook },
+      new SheetwriteStore(workbook, makeColumnarData(10)),
+    );
+
+    const event = new KeyboardEvent("keydown", {
+      key: "f",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    host.dispatchEvent(event);
+
+    const find = host.querySelector(".sheetwrite-find");
+    expect(event.defaultPrevented).toBe(true);
+    expect(find).toBeInstanceOf(HTMLDivElement);
+    expect((find as HTMLDivElement | null)?.style.display).toBe("flex");
+
+    grid.destroy();
+
+    const disabledHost = mountHost();
+    const disabledWorkbook = makeWorkbook(10);
+    const disabled = new GridImpl(
+      disabledHost,
+      { workbook: disabledWorkbook, config: { find: false, toolbar: false } },
+      new SheetwriteStore(disabledWorkbook, makeColumnarData(10)),
+    );
+
+    expect(disabledHost.querySelector(".sheetwrite-find")).toBeNull();
+
+    disabled.destroy();
+  });
+
+  it("undoes and redoes literal edits, and a fresh edit clears redo", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const addr = { sheet: "s1", row: 2, col: 0 };
+
+    grid.setSelection({ kind: "cell", addr });
+    typeIntoFocusedCell(host, "First edit");
+    expect(store.getCell(addr).resolved).toBe("First edit");
+
+    grid.undo();
+    expect(store.getCell(addr).resolved).toBe("Customer 2");
+
+    grid.redo();
+    expect(store.getCell(addr).resolved).toBe("First edit");
+
+    grid.undo();
+    grid.setSelection({ kind: "cell", addr });
+    typeIntoFocusedCell(host, "Second edit");
+    grid.redo();
+
+    expect(store.getCell(addr).resolved).toBe("Second edit");
+
+    grid.destroy();
+  });
+
+  it("undo restores a formula source instead of only its resolved value", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "literal", value: 10 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 1 },
+          value: { kind: "literal", value: 5 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 1 },
+          value: { kind: "formula", src: "=B1+B2*2" },
+        },
+      ],
+    });
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const addr = { sheet: "s1", row: 2, col: 1 };
+
+    grid.setSelection({ kind: "cell", addr });
+    typeIntoFocusedCell(host, "7");
+    expect(store.getFormula(addr)).toBeNull();
+    expect(store.getCell(addr).resolved).toBe(7);
+
+    grid.undo();
+
+    expect(store.getFormula(addr)).toBe("=B1+B2*2");
+    expect(store.getCell(addr).resolved).toBe(20);
 
     grid.destroy();
   });

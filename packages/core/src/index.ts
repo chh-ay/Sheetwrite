@@ -1,7 +1,10 @@
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1";
 export { CanvasRenderer } from "./canvas-renderer";
+export { parseCellInput } from "./cell-input";
 export {
   downloadBytes,
+  fromCsv,
+  parseCsv,
   setXlsxBackend,
   toCsv,
   toTsv,
@@ -9,12 +12,18 @@ export {
   type XlsxBackend,
 } from "./export";
 export { OffsetIndex, ScaledScroll } from "./fenwick";
+export { FindBar } from "./find-bar";
 export {
   createGrid,
   DEFAULT_THEME,
   initSheetwrite,
   resolveThemeFromCss,
 } from "./grid";
+export {
+  createGridController,
+  type GridController,
+  type GridControllerHandlers,
+} from "./grid-controller";
 export { formatNumber } from "./number-format";
 export { REF_CYCLE } from "./reference";
 export { SheetwriteStore } from "./store";

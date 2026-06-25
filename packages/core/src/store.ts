@@ -28,6 +28,19 @@ const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, co
 
 type ChangeListener = (event: ChangeEvent) => void;
 
+type RecomputingCellStore = CellStore & {
+  recompute(sheet: number): void;
+  setSheetName(sheet: number, id: string, name: string): void;
+};
+
+type ConsumingWindowView = WindowView & {
+  takeKinds(): Uint8Array;
+  takeNumbers(): Float64Array;
+  takeStringIndex(): Int32Array;
+  takeStyleIds(): Uint32Array;
+  takeStrings(): string[];
+};
+
 function literalOf(value: CellScalar): CellValue {
   return { kind: "literal", value };
 }
@@ -39,7 +52,7 @@ function literalOf(value: CellScalar): CellValue {
  * `getVisibleWindow` (one bulk read), never `getCell`.
  */
 export class SheetwriteStore implements Store {
-  private readonly wasm: CellStore;
+  private readonly wasm: RecomputingCellStore;
   private readonly workbook: Workbook;
   private readonly handles = new Map<SheetId, number>();
   private readonly styles = new StyleDictionary();
@@ -49,13 +62,17 @@ export class SheetwriteStore implements Store {
   private readonly refs = new ReferenceGraph();
   private readonly refIndex = new Map<SheetId, Map<number, Map<number, string>>>();
   private readonly viewOrder = new Map<SheetId, Uint32Array>();
+  private readonly viewRowIndex = new Map<SheetId, Map<number, number>>();
+  private readonly colsU32Cache = new WeakMap<ReadonlyArray<number>, Uint32Array>();
+  private windowValuesScratch: CellScalar[] = [];
   private readonly formulaSrc = new Map<string, string>();
 
   constructor(workbook: Workbook, data?: ColumnarData) {
     this.workbook = workbook;
-    this.wasm = new CellStore();
+    this.wasm = new CellStore() as RecomputingCellStore;
     for (const sheet of workbook.sheets) {
       const handle = this.wasm.addSheet(sheet.columns.length, sheet.rowCount);
+      this.wasm.setSheetName(handle, sheet.id, sheet.name);
       this.handles.set(sheet.id, handle);
     }
     if (data) this.loadColumnar(workbook.activeSheet, data);
@@ -71,6 +88,53 @@ export class SheetwriteStore implements Store {
     const meta = this.workbook.sheets.find((s) => s.id === sheet);
     if (!meta) throw new Error(`unknown sheet: ${sheet}`);
     return meta;
+  }
+
+  /** True when a set patch can affect an existing cell in workbook metadata. */
+  private isCellInBounds(addr: CellAddress): boolean {
+    const meta = this.workbook.sheets.find((s) => s.id === addr.sheet);
+    return (
+      meta !== undefined &&
+      Number.isInteger(addr.row) &&
+      Number.isInteger(addr.col) &&
+      addr.row >= 0 &&
+      addr.row < meta.rowCount &&
+      addr.col >= 0 &&
+      addr.col < meta.columns.length
+    );
+  }
+
+  /** Replace a sheet's view order and drop its stale inverse lookup. */
+  private setViewOrder(sheet: SheetId, order: Uint32Array): void {
+    this.viewOrder.set(sheet, order);
+    this.viewRowIndex.delete(sheet);
+  }
+
+  /** Convert column indices once per stable column-array reference. */
+  private colsU32For(cols: readonly number[]): Uint32Array {
+    const cached = this.colsU32Cache.get(cols);
+    if (cached && cached.length === cols.length) {
+      let sameColumns = true;
+      for (let i = 0; i < cols.length; i++) {
+        if (cached[i] !== cols[i]) {
+          sameColumns = false;
+          break;
+        }
+      }
+      if (sameColumns) return cached;
+    }
+
+    const fresh = Uint32Array.from(cols);
+    this.colsU32Cache.set(cols, fresh);
+    return fresh;
+  }
+
+  /** Reuse the render-window value buffer whenever the cell count is unchanged. */
+  private windowValuesFor(cellCount: number): CellScalar[] {
+    if (this.windowValuesScratch.length !== cellCount) {
+      this.windowValuesScratch = new Array<CellScalar>(cellCount);
+    }
+    return this.windowValuesScratch;
   }
 
   getWorkbook(): Workbook {
@@ -99,37 +163,70 @@ export class SheetwriteStore implements Store {
     return this.formulaSrc.get(cellKey(addr)) ?? null;
   }
 
+  /** Map a displayed row position to the backing data row under sort/filter. */
+  dataRowAt(sheet: SheetId, viewRow: number): number {
+    const order = this.viewOrder.get(sheet);
+    return order ? (order[viewRow] ?? viewRow) : viewRow;
+  }
+
+  /** Map a backing data row to its displayed position, or null when filtered out. */
+  viewRowOf(sheet: SheetId, dataRow: number): number | null {
+    const order = this.viewOrder.get(sheet);
+    if (!order) {
+      const meta = this.workbook.sheets.find((s) => s.id === sheet);
+      const inBounds =
+        meta !== undefined && Number.isInteger(dataRow) && dataRow >= 0 && dataRow < meta.rowCount;
+      return inBounds ? dataRow : null;
+    }
+
+    let index = this.viewRowIndex.get(sheet);
+    if (!index) {
+      index = new Map();
+      for (let viewRow = 0; viewRow < order.length; viewRow++) {
+        index.set(order[viewRow]!, viewRow);
+      }
+      this.viewRowIndex.set(sheet, index);
+    }
+
+    return index.get(dataRow) ?? null;
+  }
+
   getVisibleWindow(
     sheet: SheetId,
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
     const handle = this.handleOf(sheet);
-    const colsU32 = Uint32Array.from(cols);
+    const colsU32 = this.colsU32For(cols);
     const order = this.viewOrder.get(sheet);
 
-    let view: WindowView;
+    let view: ConsumingWindowView;
     let dataRows: Uint32Array | null = null;
     if (order) {
       dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
-      view = this.wasm.getWindowRows(handle, dataRows, colsU32);
+      view = this.wasm.getWindowRows(handle, dataRows, colsU32) as ConsumingWindowView;
     } else {
-      view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32);
+      view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32) as ConsumingWindowView;
     }
 
-    const kinds = view.kinds;
-    const numbers = view.numbers;
-    const stringIndex = view.stringIndex;
-    const styleIds = view.styleIds;
-    const strings = view.strings;
+    const kinds = view.takeKinds();
+    const numbers = view.takeNumbers();
+    const stringIndex = view.takeStringIndex();
+    const styleIds = view.takeStyleIds();
+    const strings = view.takeStrings();
     view.free();
 
     const nCols = cols.length;
-    const values: CellScalar[] = new Array(kinds.length);
+    const values = this.windowValuesFor(kinds.length);
     for (let i = 0; i < kinds.length; i++) {
-      if (kinds[i] === KIND_NUMBER) values[i] = numbers[i]!;
-      else if (kinds[i] === KIND_STRING) values[i] = strings[stringIndex[i]!] ?? null;
-      else values[i] = null;
+      if (kinds[i] === KIND_NUMBER) {
+        values[i] = numbers[i] ?? null;
+      } else if (kinds[i] === KIND_STRING) {
+        const stringSlot = stringIndex[i] ?? -1;
+        values[i] = stringSlot >= 0 ? (strings[stringSlot] ?? null) : null;
+      } else {
+        values[i] = null;
+      }
     }
 
     // Overlay plain references (keyed by DATA row) with cached resolved values.
@@ -162,15 +259,39 @@ export class SheetwriteStore implements Store {
   }
 
   sortBy(sheet: SheetId, col: number, ascending: boolean): void {
-    this.viewOrder.set(sheet, this.wasm.sortRows(this.handleOf(sheet), col, ascending));
+    this.setViewOrder(sheet, this.wasm.sortRows(this.handleOf(sheet), col, ascending));
   }
 
   filterBy(sheet: SheetId, col: number, needle: string): void {
-    this.viewOrder.set(sheet, this.wasm.filterRows(this.handleOf(sheet), col, needle));
+    this.setViewOrder(sheet, this.wasm.filterRows(this.handleOf(sheet), col, needle));
+  }
+
+  /** Cells whose text matches `query`, scanned in WASM and returned row-major. */
+  searchCells(
+    sheet: SheetId,
+    query: string,
+    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+  ): CellAddress[] {
+    const handle = this.handleOf(sheet);
+    const columns = opts.columns ?? this.sheetMeta(sheet).columns.map((_, i) => i);
+    const flat = this.wasm.search(
+      handle,
+      Uint32Array.from(columns),
+      query,
+      !opts.matchCase,
+      opts.wholeCell ?? false,
+    );
+
+    const out: CellAddress[] = [];
+    for (let i = 0; i + 1 < flat.length; i += 2) {
+      out.push({ sheet, row: flat[i]!, col: flat[i + 1]! });
+    }
+    return out;
   }
 
   clearView(sheet: SheetId): void {
     this.viewOrder.delete(sheet);
+    this.viewRowIndex.delete(sheet);
   }
 
   viewRowCount(sheet: SheetId): number {
@@ -187,14 +308,36 @@ export class SheetwriteStore implements Store {
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) return;
 
     const changes: ChangeEvent["changes"] = [];
+    const appliedPatches: Patch[] = [];
+    const touchedSheets = new Set<SheetId>();
+
     for (const patch of tx.patches) {
+      if (patch.op === "set" && !this.isCellInBounds(patch.addr)) continue;
+
       this.applyPatch(patch, changes);
+      appliedPatches.push(patch);
+
+      if (patch.op === "set") {
+        touchedSheets.add(patch.addr.sheet);
+      } else if (patch.op === "addRows" || patch.op === "removeRows") {
+        touchedSheets.add(patch.sheet);
+      }
     }
-    this.dirty.push(...tx.patches);
+
+    if (appliedPatches.length === 0) return;
+
+    for (const sheet of touchedSheets) {
+      this.wasm.recompute(this.handleOf(sheet));
+    }
+
+    this.dirty.push(...appliedPatches);
     this.epoch += 1;
 
+    const transaction =
+      appliedPatches.length === tx.patches.length ? tx : { ...tx, patches: appliedPatches };
+
     const event: ChangeEvent = {
-      transaction: tx,
+      transaction,
       changes,
       dirty: [...this.dirty],
       epoch: this.epoch,

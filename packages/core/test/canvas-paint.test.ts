@@ -1,0 +1,313 @@
+import { describe, expect, it } from "bun:test";
+import { paintFrame } from "../src/canvas-paint";
+import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types";
+
+// jsdom/happy-dom has no 2D canvas context, so paint against a recording stub
+// (modelled on the one in grid.test.ts, extended to capture the geometry of each
+// draw call) and read back the rectangles/text/lines `paintFrame` emitted.
+interface FillRectCall {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  fillStyle: string;
+}
+
+interface FillTextCall {
+  text: string;
+  x: number;
+  y: number;
+  fillStyle: string;
+}
+
+interface MoveToCall {
+  x: number;
+  y: number;
+}
+
+interface RecordingCtx {
+  fillStyle: string;
+  strokeStyle: string;
+  font: string;
+  textAlign: string;
+  textBaseline: string;
+  lineWidth: number;
+  fillRects: FillRectCall[];
+  fillTexts: FillTextCall[];
+  moveTos: MoveToCall[];
+  [op: string]: unknown;
+}
+
+function makeRecordingCtx(): RecordingCtx {
+  const ctx: RecordingCtx = {
+    fillStyle: "",
+    strokeStyle: "",
+    font: "",
+    textAlign: "",
+    textBaseline: "",
+    lineWidth: 1,
+    fillRects: [],
+    fillTexts: [],
+    moveTos: [],
+  };
+
+  // Capture the live `fillStyle` at call time, since it mutates between draws.
+  ctx.fillRect = (x: number, y: number, w: number, h: number) => {
+    ctx.fillRects.push({ x, y, w, h, fillStyle: ctx.fillStyle });
+  };
+  ctx.fillText = (text: string, x: number, y: number) => {
+    ctx.fillTexts.push({ text, x, y, fillStyle: ctx.fillStyle });
+  };
+  ctx.moveTo = (x: number, y: number) => {
+    ctx.moveTos.push({ x, y });
+  };
+
+  for (const op of [
+    "setTransform",
+    "beginPath",
+    "rect",
+    "clip",
+    "save",
+    "restore",
+    "lineTo",
+    "stroke",
+    "setLineDash",
+  ]) {
+    ctx[op] = () => {};
+  }
+
+  return ctx;
+}
+
+// Custom (function) renderers are never exercised here; `paintFrame` takes a
+// `ReadonlyMap`, so an empty map (not a lookup record) is the right shape.
+const NO_RENDERERS = new Map<string, never>();
+
+const ROW_HEIGHT = 24;
+const HEADER_HEIGHT = 20;
+
+function makeTheme(overrides: Partial<Theme> = {}): Theme {
+  return {
+    font: "12px sans-serif",
+    bg: "#ffffff",
+    fg: "#000000",
+    gridLine: "#dddddd",
+    headerBg: "#f0f0f0",
+    headerFg: "#333333",
+    selection: "#cceeff",
+    selectionBorder: "#3388ff",
+    rowHeight: ROW_HEIGHT,
+    headerHeight: HEADER_HEIGHT,
+    rowHeaderWidth: 0,
+    searchMatch: "#ffff00",
+    searchActiveMatch: "#ffaa00",
+    highlight: "#ccffcc",
+    ...overrides,
+  };
+}
+
+function makeLayout(
+  columns: RenderLayout["columns"],
+  merges?: RenderLayout["merges"],
+): RenderLayout {
+  return { columns, rowHeight: ROW_HEIGHT, headerHeight: HEADER_HEIGHT, totalRows: 3, merges };
+}
+
+function makeView(
+  styleIds: Uint32Array,
+  styles: readonly CellStyle[],
+  cols: readonly number[] = [0, 1],
+): VisibleWindowView {
+  const rows = { start: 0, end: 3 };
+  const cellCount = (rows.end - rows.start) * cols.length;
+  const values = new Array<string>(cellCount).fill("x");
+  return { sheet: "s1", rows, cols, values, styleIds, styles };
+}
+
+/** Paint `view` against a fresh recording context and return it for inspection. */
+function render(
+  view: VisibleWindowView,
+  layout: RenderLayout,
+  viewport: Viewport,
+  theme: Theme = makeTheme(),
+): RecordingCtx {
+  const ctx = makeRecordingCtx();
+  paintFrame(
+    ctx as unknown as CanvasRenderingContext2D,
+    view,
+    layout,
+    theme,
+    viewport,
+    1,
+    NO_RENDERERS,
+  );
+  return ctx;
+}
+
+// Shared viewports. `paintFrame` only reads them, so the constants are reusable.
+const UNIFORM_VIEWPORT: Viewport = { scrollTop: 0, scrollLeft: 0, width: 400, height: 300 };
+
+// Non-uniform window geometry: row 0 is tall, row 1 short, row 2 medium.
+const GEOMETRY_VIEWPORT: Viewport = {
+  ...UNIFORM_VIEWPORT,
+  rowTops: Float64Array.from([0, 40, 50]),
+  rowHeights: Float64Array.from([40, 10, 25]),
+};
+
+describe("paintFrame variable row heights", () => {
+  it("positions a cell using the supplied per-row geometry", () => {
+    const layout = makeLayout([
+      { key: "a", header: "A", width: 100, type: "text" },
+      { key: "b", header: "B", width: 80, type: "text" },
+    ]);
+
+    // Target cell at view-row 1, column 0 (i = 1 * 2 + 0) gets a unique fill.
+    const CELL_FILL = "#abcdef";
+    const styleIds = new Uint32Array(6);
+    styleIds[2] = 1;
+    const view = makeView(styleIds, [{}, { backgroundColor: CELL_FILL }]);
+
+    const ctx = render(view, layout, GEOMETRY_VIEWPORT);
+
+    const rect = ctx.fillRects.find((r) => r.fillStyle === CELL_FILL);
+    expect(rect).toBeDefined();
+    // y = headerHeight(20) + rowTops[1](40) - scrollTop(0); h = rowHeights[1](10).
+    expect(rect?.y).toBe(60);
+    expect(rect?.h).toBe(10);
+    // The uniform layout would have produced y = 44, h = 24 instead.
+    expect(rect?.y).not.toBe(44);
+    expect(rect?.h).not.toBe(24);
+  });
+
+  it("falls back to uniform row geometry when none is supplied", () => {
+    const layout = makeLayout([
+      { key: "a", header: "A", width: 100, type: "text" },
+      { key: "b", header: "B", width: 80, type: "text" },
+    ]);
+
+    const CELL_FILL = "#abcdef";
+    const styleIds = new Uint32Array(6);
+    styleIds[2] = 1;
+    const view = makeView(styleIds, [{}, { backgroundColor: CELL_FILL }]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    const rect = ctx.fillRects.find((r) => r.fillStyle === CELL_FILL);
+    expect(rect).toBeDefined();
+    // Uniform: y = headerHeight(20) + row(1) * rowHeight(24) = 44; h = rowHeight(24).
+    expect(rect?.y).toBe(44);
+    expect(rect?.h).toBe(24);
+    expect(rect?.x).toBe(0);
+    expect(rect?.w).toBe(100);
+  });
+
+  it("sums per-row heights across a merged region", () => {
+    const layout = makeLayout(
+      [
+        { key: "a", header: "A", width: 100, type: "text" },
+        { key: "b", header: "B", width: 80, type: "text" },
+      ],
+      [{ r0: 0, c0: 0, r1: 1, c1: 0 }],
+    );
+
+    // Fill the merge origin (row 0, col 0) so its painted height is observable.
+    const MERGE_FILL = "#fe01dc";
+    const styleIds = new Uint32Array(6);
+    styleIds[0] = 1;
+    const view = makeView(styleIds, [{}, { backgroundColor: MERGE_FILL }]);
+
+    const ctx = render(view, layout, GEOMETRY_VIEWPORT);
+
+    const rect = ctx.fillRects.find((r) => r.fillStyle === MERGE_FILL);
+    expect(rect).toBeDefined();
+    // Spanned rows 0..1 → rowHeights[0] + rowHeights[1] = 40 + 10 = 50.
+    expect(rect?.h).toBe(50);
+    // Uniform would have summed to (2) * 24 = 48.
+    expect(rect?.h).not.toBe(48);
+  });
+
+  it("draws the horizontal gridline at each row's geometric bottom", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+
+    const ctx = render(view, layout, GEOMETRY_VIEWPORT);
+
+    // Row 0's bottom: headerHeight(20) + rowTops[0](0) + rowHeights[0](40) = 60,
+    // snapped to a crisp half-pixel line → round(60) - 0.5 = 59.5.
+    expect(ctx.moveTos.some((m) => m.y === 59.5)).toBe(true);
+    // Uniform would have placed it at round(20 + 24) - 0.5 = 43.5.
+    expect(ctx.moveTos.some((m) => m.y === 43.5)).toBe(false);
+  });
+});
+
+describe("paintFrame column styles", () => {
+  it("applies Column.cellStyle as the cell background base", () => {
+    const COL_FILL = "#00ff00";
+    const layout = makeLayout([
+      { key: "a", header: "A", width: 100, type: "text" },
+      { key: "b", header: "B", width: 80, type: "text", cellStyle: { backgroundColor: COL_FILL } },
+    ]);
+
+    // Every cell uses the default (empty) per-cell style.
+    const view = makeView(new Uint32Array(6), [{}]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    const colFills = ctx.fillRects.filter((r) => r.fillStyle === COL_FILL);
+    // Column B's cellStyle paints behind all three visible rows.
+    expect(colFills.length).toBe(3);
+    // Column B starts at x = 100 (column A's width) and is 80 wide.
+    expect(colFills.every((r) => r.x === 100 && r.w === 80)).toBe(true);
+  });
+
+  it("lets a per-cell style override the column cellStyle", () => {
+    const COL_FILL = "#ff0000";
+    const CELL_FILL = "#0000ff";
+    const layout = makeLayout([
+      { key: "a", header: "A", width: 100, type: "text", cellStyle: { backgroundColor: COL_FILL } },
+    ]);
+
+    // View-row 0 overrides the column fill with its own background.
+    const styleIds = new Uint32Array(3);
+    styleIds[0] = 1;
+    const view = makeView(styleIds, [{}, { backgroundColor: CELL_FILL }], [0]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    // Row 0 (y = 20) wins with its per-cell blue; rows 1-2 keep the column red.
+    const row0 = ctx.fillRects.find((r) => r.y === 20);
+    expect(row0?.fillStyle).toBe(CELL_FILL);
+    expect(ctx.fillRects.filter((r) => r.fillStyle === COL_FILL).length).toBe(2);
+  });
+
+  it("applies Column.headerStyle over the header defaults", () => {
+    const HEADER_BG = "#112233";
+    const HEADER_FG = "#ffcc00";
+    const theme = makeTheme();
+    const layout = makeLayout([
+      { key: "a", header: "A", width: 100, type: "text" },
+      {
+        key: "b",
+        header: "B",
+        width: 80,
+        type: "text",
+        headerStyle: { backgroundColor: HEADER_BG, color: HEADER_FG },
+      },
+    ]);
+
+    const view = makeView(new Uint32Array(6), [{}]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT, theme);
+
+    // Column B's header gets its own background fill at the column's position.
+    const bg = ctx.fillRects.find((r) => r.fillStyle === HEADER_BG);
+    expect(bg).toBeDefined();
+    expect(bg?.x).toBe(100);
+    expect(bg?.w).toBe(80);
+    expect(bg?.h).toBe(theme.headerHeight);
+
+    // Column B's label uses the headerStyle foreground; column A keeps the theme's.
+    expect(ctx.fillTexts.find((t) => t.text === "B")?.fillStyle).toBe(HEADER_FG);
+    expect(ctx.fillTexts.find((t) => t.text === "A")?.fillStyle).toBe(theme.headerFg);
+  });
+});

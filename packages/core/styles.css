@@ -7,6 +7,9 @@
   --sheetwrite-header-fg: #6b4a1f;
   --sheetwrite-selection: #2563eb33;
   --sheetwrite-selection-border: #2563eb;
+  --sheetwrite-search-match: #fff47580;
+  --sheetwrite-search-active: #fbbc04;
+  --sheetwrite-highlight: #e8f0fe99;
   --sheetwrite-row-height: 28;
 
   position: relative;

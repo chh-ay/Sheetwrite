@@ -62,11 +62,28 @@ createGrid(host, { workbook });                            // no toolbar (config
 | `clearFormat` | `boolean` | `true` | Clear formatting. |
 | `merge` | `boolean` | `true` | Merge / unmerge selection. |
 | `sort` | `boolean` | `true` | Sort the selected column. |
+| `export` | `boolean` | `true` | CSV / XLSX export buttons. |
+| `undo` | `boolean` | `true` | Undo / redo buttons (also bound to Ctrl+Z / Ctrl+Shift+Z). |
 
 ¹ "Default `true`" means: when you supply a `config` object at all. With no
 `config` there is no toolbar.
 
 Every control acts on the current selection — see [Interaction](./interaction.md).
+
+### Feature flags
+
+Three `GridConfig` fields enable behavior that lives outside the toolbar button
+row. The two booleans default to enabled and stay active even with `toolbar: false`:
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `find` | `boolean` | `true` | Built-in **Ctrl+F** find widget (a search box with next / previous and a live match count). Set `false` to remove the shortcut and the widget. |
+| `contextMenu` | `boolean \| ContextMenuItem[]` | `true` | Right-click cell context menu (cut / copy / paste, clear, merge, export). Pass an array to supply a custom item list. |
+| `icons` | `Partial<Record<ToolbarActionName, string>>` | `undefined` | Override the built-in toolbar icon for any action by name, e.g. `{ bold: "𝐁", undo: "↶" }`. |
+
+Undo/redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z**
+undoes the last edit, **Ctrl+Shift+Z** redoes it, and **Ctrl+F** opens the find
+widget (unless `find: false`).
 
 ## Grid instance
 
@@ -75,6 +92,7 @@ Every control acts on the current selection — see [Interaction](./interaction.
 ```ts
 interface Grid {
   readonly store: Store;
+  readonly actions: GridActions;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   getSelection(): Selection | null;
@@ -85,8 +103,15 @@ interface Grid {
   sortBy(col: number, ascending?: boolean): void;
   filterBy(col: number, needle: string): void;
   clearView(): void;
+  undo(): void;
+  redo(): void;
   exportCsv(filename: string): void;
   exportXlsx(filename: string): Promise<void>;
+  search(query: string, opts?: SearchOptions): SearchResult;
+  findNext(): SearchResult;
+  findPrev(): SearchResult;
+  clearSearch(): void;
+  highlightCells(ranges: Range[] | null, color?: string): void;
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
   refresh(): void;
   destroy(): void;
@@ -96,6 +121,7 @@ interface Grid {
 | Method | Purpose |
 | --- | --- |
 | `store` | The underlying [`Store`](./concepts.md#the-store-contract) — apply transactions, read cells, subscribe. |
+| `actions` | Imperative action surface (`toggleBold()`, `merge()`, `undo()`, `exportCsv()`, …) the toolbar and context menu bind to — use it to wire custom controls. |
 | `setActiveSheet(id)` | Switch the visible sheet. |
 | `scrollToCell(addr)` | Scroll a cell into view. |
 | `getSelection()` / `setSelection(sel)` | Read or set the current [`Selection`](./interaction.md#selection-model) (`null` clears it). |
@@ -103,10 +129,47 @@ interface Grid {
 | `defineCellRenderer(name, r)` | Register a custom renderer after construction. |
 | `aggregate(col, op)` | Column aggregate; see [Data operations](./data-operations.md#aggregate). |
 | `sortBy` / `filterBy` / `clearView` | Non-mutating display views; see [Data operations](./data-operations.md#sort-filter-views). |
+| `undo()` / `redo()` | Undo or redo the last recorded cell edit (also bound to Ctrl+Z / Ctrl+Shift+Z). |
 | `exportCsv` / `exportXlsx` | Download the active data; see [Data operations](./data-operations.md#export). |
+| `search(query, opts?)` | Find matching cells; highlights them, emits `search`, returns a [`SearchResult`](#search). |
+| `findNext()` / `findPrev()` | Step the active match forward / backward and scroll it into view. |
+| `clearSearch()` | Drop the current search and clear its highlights. |
+| `highlightCells(ranges, color?)` | Highlight arbitrary ranges (`null` clears); `color` overrides the theme highlight. |
 | `on(evt, fn)` | Subscribe to an event; returns an unsubscribe function. |
 | `refresh()` | Force a re-render (e.g. after mutating the workbook directly). |
 | `destroy()` | Tear down listeners, DOM, and ARIA attributes. |
+
+## Search
+
+`grid.search(query, opts?)` scans cells, highlights every match, scrolls the first
+match into view, and emits a [`search`](#events) event. `findNext()` / `findPrev()`
+move the active match; `clearSearch()` clears the highlights. The built-in **Ctrl+F**
+find widget (gated by `config.find`, on by default) drives this same API.
+
+```ts
+interface SearchOptions {
+  matchCase?: boolean; // case-sensitive match (default false)
+  wholeCell?: boolean; // match the whole cell, not a substring (default false)
+  sheet?: SheetId;     // restrict to one sheet (default: the active sheet)
+  columns?: number[];  // restrict to these column indices (default: all)
+}
+
+interface SearchResult {
+  query: string;
+  matches: CellAddress[]; // matching cells, in row-major order
+  active: number;         // index of the active match, or -1 when there are none
+}
+```
+
+```ts
+const result = grid.search("error");
+console.log(`${result.matches.length} match(es)`);
+grid.findNext();    // advance the active match and scroll to it
+grid.clearSearch(); // remove the highlights when done
+```
+
+`highlightCells(ranges, color?)` highlights arbitrary ranges independently of
+search (pass `null` to clear); `color` overrides the theme highlight color.
 
 ## Events
 
@@ -119,6 +182,7 @@ interface Grid {
 | `scroll` | `{ scrollTop: number; firstRow: number; lastRow: number }` |
 | `edit-begin` | `{ addr: CellAddress }` |
 | `edit-commit` | `{ addr: CellAddress; value: CellValue }` |
+| `search` | `SearchResult` — `{ query: string; matches: CellAddress[]; active: number }` |
 
 ```ts
 const off = grid.on("change", (e) => {

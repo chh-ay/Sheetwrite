@@ -30,7 +30,6 @@ const workbook: Workbook = {
 // A mock server-paged datasource: rows are synthesized on demand for the
 // requested window, exactly as a real API client would page them in.
 const datasource: DataSource = {
-  rowCount: () => ROWS,
   getRows: async (_sheet, start, end) => {
     const rows: RowData[] = [];
     for (let r = start; r < end; r++) {
@@ -55,6 +54,7 @@ createApp({
       workbook,
       datasource,
       renderer: "canvas",
+      config: { toolbar: true },
       style: "height: 100%",
       onSelection: (selection) => {
         if (selection) console.log("selection", selection);

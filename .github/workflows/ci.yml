@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
@@ -52,6 +54,10 @@ jobs:
       - name: Build WASM
         run: bun run build:wasm
 
+      - name: Test Rust crate
+        working-directory: packages/wasm
+        run: cargo test
+
       - name: Build packages
         run: bun run build
 
@@ -63,3 +69,6 @@ jobs:
 
       - name: Test
         run: bun test
+
+      - name: Changeset status
+        run: bunx @changesets/cli status --since=origin/develop

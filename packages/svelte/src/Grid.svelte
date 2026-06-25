@@ -1,12 +1,14 @@
 <script lang="ts">
 import {
   type ChangeEvent,
-  createGrid,
+  createGridController,
   type Grid,
+  type GridController,
+  type GridControllerHandlers,
   type GridOptions,
   type Selection,
 } from "@sheetwrite/core";
-import { onMount } from "svelte";
+import { untrack } from "svelte";
 
 interface Props {
   workbook: GridOptions["workbook"];
@@ -18,6 +20,10 @@ interface Props {
   config?: GridOptions["config"];
   onChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
+  /** Bound to the imperative core grid after creation (`bind:grid`). */
+  grid?: Grid;
+  /** Fired once with the grid after it is created. */
+  onReady?: (grid: Grid) => void;
 }
 
 let {
@@ -30,29 +36,51 @@ let {
   config,
   onChange,
   onSelectionChange,
+  grid = $bindable(),
+  onReady,
 }: Props = $props();
 
 let host: HTMLDivElement;
-let grid: Grid | undefined;
 
-// Owns the host div: creates the imperative core grid on mount, forwards
-// events, and tears it down on unmount. It renders no cells. Call
+// The controller owns the imperative core grid. Kept in reactive state so the
+// theme effect re-targets the new grid after a workbook-driven recreation.
+let controller: GridController | undefined = $state();
+
+// Read live on every event, so swapped prop callbacks are honored without
+// recreating the grid.
+const handlers: GridControllerHandlers = {
+  onChange: (event) => onChange?.(event),
+  onSelectionChange: (selection) => onSelectionChange?.(selection),
+  onReady: (created) => onReady?.(created),
+};
+
+// Owns the host div: creates the imperative core grid through the shared
+// controller, forwards events, recreates it whenever the workbook identity
+// changes, and tears it down on unmount. It renders no cells. Call
 // `await initSheetwrite(wasmUrl)` once before mounting (WASM must be ready).
-onMount(() => {
-  grid = createGrid(host, { workbook, data, datasource, renderer, theme, readOnly, config });
-  const offs = [
-    grid.on("change", (e) => onChange?.(e)),
-    grid.on("selection", (e) => onSelectionChange?.(e.selection)),
-  ];
+$effect(() => {
+  // Track only the workbook identity; the remaining options are read untracked
+  // so theme/data updates never rebuild the grid.
+  const activeWorkbook = workbook;
+  const active = untrack(() =>
+    createGridController(
+      host,
+      { workbook: activeWorkbook, data, datasource, renderer, theme, readOnly, config },
+      handlers,
+    ),
+  );
+  controller = active;
+  grid = active.grid;
+
   return () => {
-    for (const off of offs) off();
-    grid?.destroy();
+    active.destroy();
+    controller = undefined;
     grid = undefined;
   };
 });
 
 $effect(() => {
-  if (theme) grid?.setTheme(theme);
+  if (theme) controller?.setTheme(theme);
 });
 </script>
 

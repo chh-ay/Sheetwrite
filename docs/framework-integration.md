@@ -12,6 +12,110 @@ The adapters expose different subsets of [`GridOptions`](./configuration.md#grid
 React forwards all of them, while Vue and Svelte forward a curated set. The tables
 below list exactly what each accepts.
 
+## Binding columns to API fields
+
+Use each `Column.key` as the stable backend field name. The visible header can
+change without breaking API submission:
+
+```ts
+const workbook = {
+  activeSheet: "orders",
+  sheets: [
+    {
+      id: "orders",
+      name: "Orders",
+      rowCount,
+      columns: [
+        { key: "customer_name", header: "Customer", width: 240, type: "text" },
+        { key: "amount_cents", header: "Amount", width: 120, type: "number" },
+      ],
+    },
+  ],
+};
+```
+
+`ChangeEvent.changes[]` carries cell addresses by row/column index. Map the
+column index through the workbook before sending the edit to your API:
+
+```ts
+import type { CellValue, ChangeEvent, Workbook } from "@sheetwrite/core";
+
+function apiValue(value: CellValue): unknown {
+  if (value.kind === "literal") return value.value;
+  if (value.kind === "formula") return { kind: "formula", src: value.src };
+  return { kind: "ref", target: value.target };
+}
+
+function apiPatches(event: ChangeEvent, workbook: Workbook) {
+  const sheets = new Map(workbook.sheets.map((sheet) => [sheet.id, sheet]));
+
+  return event.changes.flatMap((change) => {
+    const column = sheets.get(change.addr.sheet)?.columns[change.addr.col];
+    if (!column) return [];
+
+    return [
+      {
+        row: change.addr.row,
+        field: column.key,
+        value: apiValue(change.newValue),
+      },
+    ];
+  });
+}
+```
+
+Column keys solve field identity; row identity is still your application's
+contract. Use an immutable ID column, or keep an external map from Sheetwrite's
+data row index to your backend record ID.
+
+## Submitting committed edits
+
+Persist the grid's `change` event, not a DOM `blur` event. Blur is one way an
+inline edit commits, so it already produces a `change`; Enter, Tab, paste, clear,
+and drag-to-fill also produce committed changes and should usually go through the
+same backend path.
+
+```tsx
+import type { ChangeEvent, Grid } from "@sheetwrite/core";
+
+let grid: Grid | null = null;
+
+async function submitChange(event: ChangeEvent): Promise<void> {
+  const patches = apiPatches(event, workbook);
+  await fetch("/api/orders/cells", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ patches }),
+  });
+
+  grid?.store.markClean(event.transaction.patches);
+}
+
+<SheetwriteGrid
+  workbook={workbook}
+  datasource={datasource}
+  onReady={(created) => {
+    grid = created;
+  }}
+  onChange={submitChange}
+/>;
+```
+
+The same handler shape applies to Vue's `@change` emit and Svelte's `onChange`
+prop.
+
+Current integration limits:
+
+- Sheetwrite does not ship a backend sync client, retry queue, validation layer,
+  rollback UI, or conflict resolver. The host app owns API policy and calls
+  `grid.store.markClean(...)` only after the server confirms the edit.
+- `markClean` removes the confirmed patch objects from the dirty list. Pass the
+  patch objects from `event.transaction.patches` or `grid.store.getDirty()`;
+  do not reconstruct equivalent-looking objects.
+- `change` events do not currently identify the input gesture that caused the
+  commit. If an app must submit only blur-caused commits, the core event model
+  needs a future `commitReason` field such as `"blur" | "enter" | "tab" | "paste"`.
+
 ## React — `@sheetwrite/react`
 
 `SheetwriteGrid`'s props extend `GridOptions`, plus presentation and event props:

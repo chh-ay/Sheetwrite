@@ -1,5 +1,14 @@
 import { neutralizeInjection } from "./clipboard";
-import type { CellScalar, Range, Sheet, Store, Workbook } from "./types";
+import type {
+  CellFormat,
+  CellScalar,
+  Column,
+  ColumnarData,
+  Range,
+  Sheet,
+  Store,
+  Workbook,
+} from "./types";
 
 function scalarToText(value: CellScalar): string {
   if (value === null) return "";
@@ -11,9 +20,23 @@ function csvField(text: string): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function tsvField(value: CellScalar): string {
-  const s = scalarToText(value);
-  return /[\t\n\r"]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+function tsvField(text: string): string {
+  return /[\t\n\r"]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/**
+ * Neutralize a TEXT field before it is quoted: a string beginning with one of
+ * `= + - @ \t \r` is prefixed with `'` so it cannot execute as a formula when the
+ * file is reopened in Excel/Sheets. Numeric values are legitimate data and pass
+ * through untouched — a negative number is a number, not an attack vector.
+ */
+export function safeText(value: CellScalar): string {
+  return typeof value === "string" ? neutralizeInjection(value) : scalarToText(value);
+}
+
+/** Harden a column header (always text) exactly as a text cell value. */
+export function safeHeader(header: string): string {
+  return neutralizeInjection(header);
 }
 
 function visibleColumns(sheet: Sheet): number[] {
@@ -34,13 +57,13 @@ export function toCsv(sheet: Sheet, store: Store): string {
   const n = cols.length;
   const view = store.getVisibleWindow(sheet.id, { start: 0, end: sheet.rowCount }, cols);
 
-  const lines: string[] = [cols.map((c) => csvField(sheet.columns[c]!.header)).join(",")];
+  const headerLine = cols.map((c) => csvField(safeHeader(sheet.columns[c]!.header))).join(",");
+  const lines: string[] = [headerLine];
   for (let r = 0; r < sheet.rowCount; r++) {
     const row: string[] = new Array(n);
     for (let cj = 0; cj < n; cj++) {
       const value = view.values[r * n + cj] ?? null;
-      const text = typeof value === "string" ? neutralizeInjection(value) : scalarToText(value);
-      row[cj] = csvField(text);
+      row[cj] = csvField(safeText(value));
     }
     lines.push(row.join(","));
   }
@@ -62,10 +85,128 @@ export function toTsv(range: Range, store: Store): string {
   const rows: string[] = [];
   for (let r = 0; r < nRows; r++) {
     const cells: string[] = new Array(n);
-    for (let cj = 0; cj < n; cj++) cells[cj] = tsvField(view.values[r * n + cj] ?? null);
+    for (let cj = 0; cj < n; cj++) cells[cj] = tsvField(safeText(view.values[r * n + cj] ?? null));
     rows.push(cells.join("\t"));
   }
   return rows.join("\r\n");
+}
+
+// ── CSV / TSV import ─────────────────────────────────────────────────────────
+
+/**
+ * Parse RFC-4180-style CSV into a grid of raw strings: comma-delimited, with
+ * `"`-quoted fields that may embed commas, newlines, and doubled quotes, plus
+ * CR / LF / CRLF row breaks. A leading UTF-8 BOM is stripped. This mirrors
+ * `parseTsv` from clipboard.ts exactly, but splits on commas instead of tabs.
+ */
+export function parseCsv(text: string): string[][] {
+  // Drop a leading UTF-8 BOM so the first header cell is not "\ufeffName".
+  const input = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  let i = 0;
+
+  const endField = () => {
+    row.push(field);
+    field = "";
+  };
+  const endRow = () => {
+    endField();
+    rows.push(row);
+    row = [];
+  };
+
+  while (i < input.length) {
+    const ch = input[i]!;
+    if (quoted) {
+      if (ch === '"') {
+        if (input[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        quoted = false;
+        i++;
+        continue;
+      }
+      field += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"' && field === "") {
+      quoted = true;
+      i++;
+    } else if (ch === ",") {
+      endField();
+      i++;
+    } else if (ch === "\r") {
+      // swallow CRLF as one row break
+      if (input[i + 1] === "\n") i++;
+      endRow();
+      i++;
+    } else if (ch === "\n") {
+      endRow();
+      i++;
+    } else {
+      field += ch;
+      i++;
+    }
+  }
+
+  // trailing field/row unless the text ended exactly on a row break
+  if (field !== "" || row.length > 0) endRow();
+  return rows;
+}
+
+/**
+ * Coerce one raw CSV field into a `CellScalar` for a column of the given type.
+ * A missing or empty field becomes `null`; a `number` column parses a finite
+ * number (non-numeric text falls back to `null`); every other type keeps the
+ * raw string.
+ */
+function coerceField(raw: string | undefined, type: CellFormat): CellScalar {
+  if (raw === undefined || raw === "") return null;
+
+  if (type === "number") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return raw;
+}
+
+/**
+ * Parse CSV `text` into `ColumnarData` keyed by `columns[i].key` — the symmetric
+ * counterpart to `toCsv`. The first parsed row is treated as the header and
+ * consumed; each remaining row maps positionally onto `columns`. CSV columns
+ * beyond `columns.length` are ignored, missing trailing cells become `null`, and
+ * `number` columns coerce their fields to finite numbers.
+ */
+export function fromCsv(text: string, columns: readonly Column[]): ColumnarData {
+  const grid = parseCsv(text);
+
+  // The first parsed row is the header; the body is everything after it.
+  const body = grid.slice(1);
+  const rowCount = body.length;
+
+  // One output array per declared column, sized to the body up front.
+  const result: Record<string, CellScalar[]> = {};
+  for (const column of columns) {
+    result[column.key] = new Array<CellScalar>(rowCount);
+  }
+
+  for (let r = 0; r < rowCount; r++) {
+    const cells = body[r]!;
+    for (let c = 0; c < columns.length; c++) {
+      const column = columns[c]!;
+      result[column.key]![r] = coerceField(cells[c], column.type);
+    }
+  }
+
+  return { rowCount, columns: result };
 }
 
 /** Framework/runtime-agnostic save (separate from "produce bytes"). */

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sheetwrite vs Handsontable — render benchmark</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: system-ui, sans-serif;
+        color: #111;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 8px 12px;
+        border-bottom: 1px solid #e5e5e5;
+        font: 13px/1.5 system-ui, sans-serif;
+      }
+      header strong {
+        font-weight: 700;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e5e5e5;
+        flex-wrap: wrap;
+        font: 13px system-ui, sans-serif;
+      }
+      .controls select,
+      .controls button {
+        padding: 5px 10px;
+        border: 1px solid #cfcfcf;
+        border-radius: 4px;
+        background: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      .controls button.primary {
+        background: #0f766e;
+        color: #fff;
+        border-color: #0f766e;
+      }
+      #status {
+        color: #555;
+        font-variant-numeric: tabular-nums;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+      /* Both grids mount into an identically sized stage for parity. */
+      #stage {
+        width: 1000px;
+        height: 600px;
+        box-sizing: border-box;
+        border-right: 1px solid #e5e5e5;
+        position: relative;
+        overflow: hidden;
+        flex: 0 0 auto;
+      }
+      #results {
+        flex: 1;
+        min-width: 0;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        font: 12px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+        background: #0b0f14;
+        color: #d6e2ee;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Sheetwrite vs Handsontable — browser render benchmark.</strong>
+      Mirrors Handsontable's <code>performance-lab</code> scenarios (view-scrolling,
+      editing, altering, arrow-keys-navigation) on both grids at large row counts.
+      Results are printed here and exposed on <code>window.__benchResults</code>.
+    </header>
+    <div class="controls">
+      <label>Grid <select id="grid">
+        <option value="sheetwrite">Sheetwrite</option>
+        <option value="handsontable">Handsontable</option>
+      </select></label>
+      <label>Rows <select id="rows">
+        <option value="100000">100,000</option>
+        <option value="500000">500,000</option>
+        <option value="1000000">1,000,000</option>
+      </select></label>
+      <label>Samples <select id="samples">
+        <option value="100">100</option>
+        <option value="60">60</option>
+        <option value="30">30</option>
+      </select></label>
+      <button id="run" class="primary" type="button">Run</button>
+      <span id="status">idle</span>
+    </div>
+    <main>
+      <div id="stage"></div>
+      <pre id="results">Pick a grid + row count and press Run, or load with ?grid=sheetwrite&amp;rows=100000&amp;auto=1</pre>
+    </main>
+    <script type="module" src="./render-bench.ts"></script>
+  </body>
+</html>

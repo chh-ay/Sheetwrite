@@ -111,9 +111,16 @@ darkBtn.addEventListener("click", () => {
 
 ## CellStyle
 
-`CellStyle` formats individual cells. It appears in three places: as the `style`
-on a `set` patch, and as `Column.cellStyle` / `Column.headerStyle` for column-wide
-defaults.
+`CellStyle` formats individual cells. It appears in three places:
+
+- as the `style` on a `set` patch — formatting for that one specific cell;
+- as `Column.cellStyle` — a column-wide default the renderer paints under every
+  body cell of the column;
+- as `Column.headerStyle` — the style applied to that column's header cell.
+
+`Column.cellStyle` is a default, not a lock: a per-cell `set` style overrides the
+column default for that cell, so a cell paints with its column's `cellStyle` until
+its own patch supplies styling.
 
 ```ts
 interface CellStyle {

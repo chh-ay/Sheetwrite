@@ -1,32 +1,44 @@
 import { load } from "@sheetwrite/wasm";
-import { cellA1, colToA1, rangeA1, shiftA1Refs } from "./a1";
+import { colToA1 } from "./a1";
+import { AriaMirror } from "./aria-mirror";
 import { CanvasRenderer } from "./canvas-renderer";
-import { neutralizeInjection, parseTsv, toTsv } from "./clipboard";
+import { parseCellInput } from "./cell-input";
+import { ClipboardController } from "./clipboard-controller";
+import { ContextMenu } from "./context-menu";
 import { EditController, type EditNavigate } from "./editor";
 import { downloadBytes, toCsv, toXlsx } from "./export";
 import { OffsetIndex, ScaledScroll } from "./fenwick";
+import { FindBar } from "./find-bar";
+import { UndoManager } from "./history";
+import { InputController } from "./input-controller";
+import { OverlayPainter } from "./overlay-painter";
+import { SearchController } from "./search-controller";
 import { type CellRef, SelectionModel, type SelRect } from "./selection";
 import { SheetwriteStore } from "./store";
-import { Toolbar, type ToolbarActions } from "./toolbar";
+import { StyleActions } from "./style-actions";
+import { Toolbar } from "./toolbar";
 import type {
   AggregateOp,
   CellAddress,
   CellRenderer,
-  CellScalar,
-  CellStyle,
   CellValue,
   Column,
   Grid,
+  GridActions,
   GridEvents,
   GridOptions,
   Patch,
+  Range,
   Renderer,
+  SearchOptions,
+  SearchResult,
   Selection,
   Sheet,
   SheetId,
   Store,
   Theme,
-  VisibleWindowView,
+  Viewport,
+  Workbook,
 } from "./types";
 import { computeWindow } from "./virtualization";
 import { WorkerRenderer } from "./worker-renderer";
@@ -34,7 +46,7 @@ import { WorkerRenderer } from "./worker-renderer";
 /** Chrome caps element height near here; beyond it the sizer is scaled. */
 const MAX_ELEMENT_HEIGHT = 33_000_000;
 const DEFAULT_OVERSCAN = 6;
-let ariaSeq = 0;
+const DEFAULT_COL_WIDTH = 100;
 
 export const DEFAULT_THEME: Theme = {
   font: "13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
@@ -48,6 +60,9 @@ export const DEFAULT_THEME: Theme = {
   rowHeight: 28,
   headerHeight: 32,
   rowHeaderWidth: 48,
+  searchMatch: "#ffd54f80",
+  searchActiveMatch: "#f59e0b",
+  highlight: "#a7f3d080",
 };
 
 let wasmReady = false;
@@ -76,6 +91,9 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
     ["headerFg", "--sheetwrite-header-fg"],
     ["selection", "--sheetwrite-selection"],
     ["selectionBorder", "--sheetwrite-selection-border"],
+    ["searchMatch", "--sheetwrite-search-match"],
+    ["searchActiveMatch", "--sheetwrite-search-active"],
+    ["highlight", "--sheetwrite-highlight"],
   ];
   for (const [key, prop] of map) {
     const value = read(prop);
@@ -87,8 +105,6 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
   return theme;
 }
 
-const PRINTABLE = /^.$/u;
-
 export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
   if (!wasmReady) {
     throw new Error("Sheetwrite: await initSheetwrite() before createGrid()");
@@ -98,26 +114,51 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
 
 export class GridImpl implements Grid {
   readonly store: Store;
+  readonly actions: GridActions;
   private readonly loadable: SheetwriteStore | null;
   private readonly host: HTMLElement;
   private readonly scroller: HTMLDivElement;
   private readonly sizer: HTMLDivElement;
-  private readonly overlay: HTMLDivElement;
   private readonly renderer: Renderer;
   private readonly editor: EditController;
+  private readonly input: InputController;
+  private readonly ariaMirror: AriaMirror;
+  private readonly searchController: SearchController;
+  private readonly clipboard: ClipboardController;
+  private readonly styleActions: StyleActions;
+  private readonly overlayPainter: OverlayPainter;
   private readonly overscan: number;
   private readonly datasource: GridOptions["datasource"];
   private readonly readOnly: boolean;
   private tabBar: HTMLDivElement | null = null;
   private tabBarHeight = 0;
   private toolbar: Toolbar | null = null;
+  private contextMenu: ContextMenu | null = null;
+  private findBar: FindBar | null = null;
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
   private readonly merges = new Map<SheetId, SelRect[]>();
-  private fillTarget: SelRect | null = null;
-  private readonly aria: HTMLDivElement;
-  private ariaKey = "";
-  private ariaVersion = 0;
+  private readonly history = new UndoManager();
+  private applyingHistory = false;
+  private rowTopsScratch = new Float64Array(0);
+  private rowHeightsScratch = new Float64Array(0);
+  private rowTopsView = this.rowTopsScratch;
+  private rowHeightsView = this.rowHeightsScratch;
+  private rowGeometryLength = 0;
+  private readonly onContextMenu = (e: MouseEvent): void => {
+    if (!this.contextMenu) return;
+    e.preventDefault();
+
+    const cell = this.input.cellAtPointer(e.clientX, e.clientY);
+    if (cell && !this.selection.contains(cell.row, cell.col)) {
+      this.selection.selectCell(cell.row, cell.col);
+      this.emitSelection();
+      this.scheduleRender();
+    }
+
+    const addr = cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
+    this.contextMenu.open(e.clientX, e.clientY, addr);
+  };
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
@@ -125,6 +166,7 @@ export class GridImpl implements Grid {
     scroll: new Set(),
     "edit-begin": new Set(),
     "edit-commit": new Set(),
+    search: new Set(),
   };
 
   private theme: Theme;
@@ -142,7 +184,8 @@ export class GridImpl implements Grid {
 
   constructor(host: HTMLElement, opts: GridOptions, store?: Store) {
     this.host = host;
-    this.store = store ?? new SheetwriteStore(opts.workbook, opts.data);
+    const workbook = store ? opts.workbook : padColumns(opts.workbook, opts, host);
+    this.store = store ?? new SheetwriteStore(workbook, opts.data);
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.datasource = opts.datasource;
     this.readOnly = opts.readOnly ?? false;
@@ -166,6 +209,46 @@ export class GridImpl implements Grid {
     );
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
     this.loaded = new Uint8Array(sheet.rowCount);
+    this.searchController = new SearchController({
+      store: this.store,
+      loadable: this.loadable,
+      activeSheet: () => this.activeSheet,
+      sheet: (id) => this.sheet(id),
+      toViewRow: (dataRow) => this.toViewRow(dataRow),
+      scrollToCell: (addr) => this.scrollToCell(addr),
+      scheduleRender: () => this.scheduleRender(),
+      emit: (result) => {
+        for (const fn of this.listeners.search) fn(result);
+      },
+    });
+    this.clipboard = new ClipboardController({
+      store: this.store,
+      selection: () => this.selection,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      colIndices: () => this.colIndices,
+      readOnly: () => this.readOnly,
+      mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
+      toDataRow: (viewRow) => this.toDataRow(viewRow),
+      clearSelection: () => this.clearSelection(),
+      commit: (patches) => this.commit(patches),
+    });
+    this.styleActions = new StyleActions({
+      store: this.store,
+      loadable: this.loadable,
+      selection: () => this.selection,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      readOnly: () => this.readOnly,
+      theme: () => this.theme,
+      merges: this.merges,
+      anchorCell: (row, col) => this.anchorCell(row, col),
+      toDataRow: (viewRow) => this.toDataRow(viewRow),
+      commit: (patches) => this.commit(patches),
+      applyLayout: () => this.applyLayout(),
+    });
+
+    this.actions = this.buildActions();
 
     // host chrome: optional toolbar (top) + viewport (cells) + optional tab bar.
     host.classList.add("sheetwrite");
@@ -175,8 +258,16 @@ export class GridImpl implements Grid {
 
     const config = opts.config;
     if (config && config.toolbar !== false) {
-      this.toolbar = new Toolbar(host, config, this.theme, this.toolbarActions());
+      this.toolbar = new Toolbar(host, config, this.theme, this.actions, this);
       this.toolbarHeight = Toolbar.height;
+    }
+
+    if (config?.contextMenu !== false) {
+      this.contextMenu = new ContextMenu(host, config ?? {}, this.theme, this.actions, this);
+    }
+
+    if (config?.find !== false) {
+      this.findBar = new FindBar(host, this.theme, this);
     }
 
     this.viewportEl = document.createElement("div");
@@ -195,46 +286,90 @@ export class GridImpl implements Grid {
     this.renderer = this.createRenderer(opts, this.viewportEl);
     this.renderer.setRenderers(this.customRenderers);
 
-    this.overlay = document.createElement("div");
-    this.overlay.className = "sheetwrite-overlay";
-    this.overlay.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;";
-    this.viewportEl.appendChild(this.overlay);
+    this.editor = new EditController(this.viewportEl);
+    this.input = new InputController({
+      host,
+      scroller: this.scroller,
+      viewportEl: this.viewportEl,
+      editor: this.editor,
+      findBar: () => this.findBar,
+      store: this.store,
+      loadable: this.loadable,
+      selection: () => this.selection,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      theme: () => this.theme,
+      colIndices: () => this.colIndices,
+      firstCol: () => this.firstCol(),
+      lastCol: () => this.lastCol(),
+      nextVisibleCol: (col, dir) => this.nextVisibleCol(col, dir),
+      colAtX: (contentX) => this.colAtX(contentX),
+      rowAtOffset: (contentY) => this.index.rowAtOffset(contentY).row,
+      rowCount: () => this.index.count,
+      contentTop: () => this.scaled.toContent(this.scroller.scrollTop),
+      viewportH: () => this.viewportH(),
+      screenRect: (row, col, contentTop, scrollLeft) =>
+        this.screenRect(row, col, contentTop, scrollLeft),
+      anchorCell: (row, col) => this.anchorCell(row, col),
+      toDataRow: (viewRow) => this.toDataRow(viewRow),
+      beginEdit: (row, col, initial, selectAll) => this.beginEdit(row, col, initial, selectAll),
+      clearSelection: () => this.clearSelection(),
+      emitSelection: () => this.emitSelection(),
+      scrollToCell: (addr) => this.scrollToCell(addr),
+      scheduleRender: () => this.scheduleRender(),
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+      copy: () => this.clipboard.copy(),
+      cut: () => this.clipboard.cut(),
+      paste: () => void this.clipboard.paste(),
+      commit: (patches) => this.commit(patches),
+      readOnly: () => this.readOnly,
+    });
 
-    this.aria = document.createElement("div");
-    this.aria.className = "sheetwrite-aria";
-    this.aria.id = `sheetwrite-grid-${++ariaSeq}`;
-    this.aria.setAttribute("role", "rowgroup");
-    this.aria.style.cssText =
-      "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;";
-    host.appendChild(this.aria);
-    host.setAttribute("role", "grid");
-    host.setAttribute("aria-multiselectable", "true");
-    host.setAttribute("aria-rowcount", String(sheet.rowCount + 1));
-    host.setAttribute("aria-colcount", String(this.colIndices.length));
-    if (this.readOnly) host.setAttribute("aria-readonly", "true");
-    if (!host.hasAttribute("aria-label")) host.setAttribute("aria-label", "Spreadsheet grid");
-    this.scroller.setAttribute("aria-hidden", "true");
-    this.overlay.setAttribute("aria-hidden", "true");
-    this.viewportEl.querySelector("canvas")?.setAttribute("aria-hidden", "true");
+    this.overlayPainter = new OverlayPainter(this.viewportEl, {
+      theme: () => this.theme,
+      activeSheet: () => this.activeSheet,
+      sheet: () => this.sheet(),
+      selection: () => this.selection,
+      rowOffsetOf: (row) => this.index.offsetOf(row),
+      colLeftOf: (col) => this.colLeftOf(col),
+      screenRect: (row, col, contentTop, scrollLeft) =>
+        this.screenRect(row, col, contentTop, scrollLeft),
+      toViewRow: (dataRow) => this.toViewRow(dataRow),
+      isEditing: () => this.editor.isEditing,
+      fillTarget: () => this.input.fillPreview,
+      fillHandleScreen: (contentTop, scrollLeft) =>
+        this.input.fillHandleScreen(contentTop, scrollLeft),
+      searchMatches: () => this.searchController.matches,
+      searchActive: () => this.searchController.active,
+      scheduleRender: () => this.scheduleRender(),
+    });
+
+    this.ariaMirror = new AriaMirror({
+      host,
+      scroller: this.scroller,
+      overlay: this.overlayPainter.element,
+      viewport: this.viewportEl,
+      rowCount: sheet.rowCount,
+      colCount: this.colIndices.length,
+      readOnly: this.readOnly,
+      focusCell: () => this.selection.focusCell,
+    });
 
     if (this.tabBarHeight > 0) this.buildTabBar();
-
-    this.editor = new EditController(this.viewportEl);
 
     this.disposeStore = this.store.on("change", (event) => {
       for (const patch of event.transaction.patches) {
         if (patch.op === "addRows" || patch.op === "removeRows") this.rebuildIndex();
       }
-      this.ariaVersion++;
+      this.ariaMirror.bumpVersion();
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
     });
 
     this.applyLayout();
     this.scroller.addEventListener("scroll", this.onScroll, { passive: true });
-    this.scroller.addEventListener("mousedown", this.onMouseDown);
-    this.scroller.addEventListener("dblclick", this.onDblClick);
-    host.addEventListener("keydown", this.onKeyDown);
+    this.scroller.addEventListener("contextmenu", this.onContextMenu);
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => this.onResize());
       this.resizeObserver.observe(host);
@@ -279,11 +414,16 @@ export class GridImpl implements Grid {
       "bottom:0",
       `height:${this.tabBarHeight}px`,
       "display:flex",
-      "align-items:stretch",
+      "align-items:center",
+      "gap:4px",
+      "padding:0 8px",
+      "box-sizing:border-box",
       `border-top:1px solid ${this.theme.gridLine}`,
-      `background:${this.theme.headerBg}`,
+      `background:${this.theme.bg}`,
       "overflow-x:auto",
     ].join(";");
+    bar.setAttribute("role", "tablist");
+    bar.setAttribute("aria-label", "Sheets");
     this.host.appendChild(bar);
     this.tabBar = bar;
     this.renderTabs();
@@ -297,19 +437,28 @@ export class GridImpl implements Grid {
       const active = sheet.id === this.activeSheet;
       const tab = document.createElement("button");
       tab.type = "button";
-      tab.className = "sheetwrite-tab";
+      tab.className = active ? "sheetwrite-tab sheetwrite-tab-active" : "sheetwrite-tab";
       tab.textContent = sheet.name;
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", active ? "true" : "false");
       tab.style.cssText = [
+        "height:100%",
         "border:none",
-        "padding:0 14px",
+        "padding:0 16px",
         "cursor:pointer",
         "white-space:nowrap",
+        "border-radius:4px 4px 0 0",
         `font:${this.theme.font}`,
-        `background:${active ? this.theme.bg : "transparent"}`,
-        `color:${active ? this.theme.fg : this.theme.headerFg}`,
-        `border-right:1px solid ${this.theme.gridLine}`,
-        active ? `box-shadow:inset 0 2px 0 ${this.theme.selectionBorder}` : "",
+        `background:${active ? this.theme.selection : "transparent"}`,
+        `color:${active ? this.theme.selectionBorder : this.theme.headerFg}`,
+        active ? `box-shadow:inset 0 -2px 0 ${this.theme.selectionBorder}` : "",
       ].join(";");
+      tab.addEventListener("mouseenter", () => {
+        if (sheet.id !== this.activeSheet) tab.style.background = this.theme.headerBg;
+      });
+      tab.addEventListener("mouseleave", () => {
+        if (sheet.id !== this.activeSheet) tab.style.background = "transparent";
+      });
       tab.addEventListener("click", () => this.setActiveSheet(sheet.id));
       bar.appendChild(tab);
     }
@@ -411,6 +560,36 @@ export class GridImpl implements Grid {
     for (const [row, h] of sheet.rowHeights) this.index.setHeight(row, h);
   }
 
+  private toDataRow(viewRow: number): number {
+    return this.loadable?.dataRowAt(this.activeSheet, viewRow) ?? viewRow;
+  }
+
+  private toViewRow(dataRow: number): number | null {
+    if (!this.loadable) return dataRow;
+
+    return this.loadable.viewRowOf(this.activeSheet, dataRow);
+  }
+
+  private mergeAnchorAt(row: number, col: number): SelRect | null {
+    if (this.loadable?.hasView(this.activeSheet)) return null;
+
+    const merges = this.merges.get(this.activeSheet);
+    if (!merges) return null;
+
+    for (const merge of merges) {
+      const insideRows = merge.r0 <= row && row <= merge.r1;
+      const insideCols = merge.c0 <= col && col <= merge.c1;
+      if (insideRows && insideCols) return merge;
+    }
+
+    return null;
+  }
+
+  private anchorCell(row: number, col: number): CellRef {
+    const merge = this.mergeAnchorAt(row, col);
+    return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
+  }
+
   // ── render loop ──────────────────────────────────────────────────────────--
 
   private scheduleRender(): void {
@@ -432,19 +611,27 @@ export class GridImpl implements Grid {
     const scrollLeft = this.scroller.scrollLeft;
 
     const win = computeWindow(this.index, contentTop, bodyHeight, this.overscan);
+    const rowGeometry = this.rowGeometryForWindow(win);
     if (this.datasource) this.ensureLoaded(win.start, win.end);
 
     const view = this.store.getVisibleWindow(this.activeSheet, win, this.colIndices);
-    this.renderer.setViewport({
+    const viewport: Viewport = {
       scrollTop: contentTop,
       scrollLeft,
       width: clientW,
       height: clientH,
-    });
-    this.renderer.paint(view);
-    this.updateAria(view);
+    };
 
-    this.paintSelection(contentTop, scrollLeft, clientW, clientH);
+    if (rowGeometry) {
+      viewport.rowTops = rowGeometry.rowTops;
+      viewport.rowHeights = rowGeometry.rowHeights;
+    }
+
+    this.renderer.setViewport(viewport);
+    this.renderer.paint(view);
+    this.ariaMirror.update(view);
+
+    this.overlayPainter.paint(contentTop, scrollLeft, clientW, clientH);
     this.repositionEditor(contentTop, scrollLeft);
 
     for (const fn of this.listeners.scroll) {
@@ -456,6 +643,38 @@ export class GridImpl implements Grid {
     }
   }
 
+  private rowGeometryForWindow(win: {
+    start: number;
+    end: number;
+  }): { rowTops: Float64Array; rowHeights: Float64Array } | null {
+    const rowHeights = this.sheet().rowHeights;
+    if (!rowHeights || rowHeights.size === 0) return null;
+
+    const count = Math.max(0, win.end - win.start);
+    if (this.rowTopsScratch.length < count) {
+      this.rowTopsScratch = new Float64Array(count);
+      this.rowHeightsScratch = new Float64Array(count);
+    }
+
+    if (this.rowGeometryLength !== count) {
+      this.rowTopsView = this.rowTopsScratch.subarray(0, count);
+      this.rowHeightsView = this.rowHeightsScratch.subarray(0, count);
+      this.rowGeometryLength = count;
+    }
+
+    for (let i = 0; i < count; i++) {
+      const row = win.start + i;
+      this.rowTopsScratch[i] = this.index.offsetOf(row);
+      this.rowHeightsScratch[i] = this.index.heightOf(row);
+    }
+
+    return { rowTops: this.rowTopsView, rowHeights: this.rowHeightsView };
+  }
+
+  private clearInFlight(a: number, b: number): void {
+    for (let r = a; r < b; r++) this.inFlight.delete(r);
+  }
+
   private ensureLoaded(start: number, end: number): void {
     let lo = -1;
     let hi = -1;
@@ -465,108 +684,39 @@ export class GridImpl implements Grid {
         hi = r;
       }
     }
-    if (lo === -1 || !this.datasource || !this.loadable) return;
+    const datasource = this.datasource;
+    const loadable = this.loadable;
+    if (lo === -1 || !datasource || !loadable) return;
 
     const a = lo;
     const b = hi + 1;
     for (let r = a; r < b; r++) this.inFlight.add(r);
 
     const sheetId = this.activeSheet;
-    Promise.resolve(this.datasource.getRows(sheetId, a, b)).then((rows) => {
-      if (sheetId !== this.activeSheet) return;
-      this.loadable!.loadRows(sheetId, a, rows);
-      for (let r = a; r < b; r++) {
-        this.loaded[r] = 1;
-        this.inFlight.delete(r);
-      }
-      this.scheduleRender();
-    });
-  }
+    let pending: ReturnType<NonNullable<GridOptions["datasource"]>["getRows"]>;
 
-  // ── selection overlay (Layer 2) ────────────────────────────────────────────
-
-  private paintSelection(
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
-  ): void {
-    this.overlay.replaceChildren();
-    if (this.selection.isEmpty) return;
-
-    const headerHeight = this.theme.headerHeight;
-    const colRight = (col: number): number =>
-      this.colLeftOf(col) + (this.sheet().columns[col]?.width ?? 0);
-
-    this.selection.forEachRect((rect) => {
-      const left = this.colLeftOf(rect.c0) - scrollLeft + this.theme.rowHeaderWidth;
-      const right = colRight(rect.c1) - scrollLeft + this.theme.rowHeaderWidth;
-      const top = headerHeight + this.index.offsetOf(rect.r0) - contentTop;
-      const bottom = headerHeight + this.index.offsetOf(rect.r1 + 1) - contentTop;
-      const clippedTop = Math.max(headerHeight, top);
-      if (bottom <= headerHeight || top >= clientH || right <= 0 || left >= clientW) return;
-
-      this.overlay.appendChild(
-        rectDiv(
-          left,
-          clippedTop,
-          right - left,
-          bottom - clippedTop,
-          this.theme.selection,
-          this.theme.selectionBorder,
-        ),
-      );
-    });
-
-    // distinct ring on the focus cell
-    const focus = this.selection.focusCell;
-    if (focus && !this.editor.isEditing) {
-      const r = this.screenRect(focus.row, focus.col, contentTop, scrollLeft);
-      if (r.y + r.h > headerHeight && r.y < clientH && r.x + r.w > 0 && r.x < clientW) {
-        const ring = rectDiv(
-          r.x,
-          Math.max(headerHeight, r.y),
-          r.w,
-          r.h,
-          "transparent",
-          this.theme.selectionBorder,
-        );
-        ring.style.outlineWidth = "2px";
-        this.overlay.appendChild(ring);
-      }
+    try {
+      pending = datasource.getRows(sheetId, a, b);
+    } catch {
+      this.clearInFlight(a, b);
+      return;
     }
 
-    if (this.fillTarget) {
-      const fLeft = this.colLeftOf(this.fillTarget.c0) - scrollLeft + this.theme.rowHeaderWidth;
-      const fRight = colRight(this.fillTarget.c1) - scrollLeft + this.theme.rowHeaderWidth;
-      const fTop = headerHeight + this.index.offsetOf(this.fillTarget.r0) - contentTop;
-      const fBottom = headerHeight + this.index.offsetOf(this.fillTarget.r1 + 1) - contentTop;
-      const clipTop = Math.max(headerHeight, fTop);
-      const preview = rectDiv(
-        fLeft,
-        clipTop,
-        fRight - fLeft,
-        fBottom - clipTop,
-        "transparent",
-        this.theme.selectionBorder,
-      );
-      preview.style.outlineStyle = "dashed";
-      this.overlay.appendChild(preview);
-    }
+    Promise.resolve(pending)
+      .then((rows) => {
+        if (sheetId !== this.activeSheet) {
+          this.clearInFlight(a, b);
+          return;
+        }
 
-    const fillHandle = this.fillHandleScreen(contentTop, scrollLeft);
-    if (fillHandle && !this.editor.isEditing) {
-      const sq = rectDiv(
-        fillHandle.x - 3,
-        fillHandle.y - 3,
-        6,
-        6,
-        this.theme.selectionBorder,
-        this.theme.selectionBorder,
-      );
-      sq.style.cursor = "crosshair";
-      this.overlay.appendChild(sq);
-    }
+        loadable.loadRows(sheetId, a, rows);
+        for (let r = a; r < b; r++) this.loaded[r] = 1;
+        this.clearInFlight(a, b);
+        this.scheduleRender();
+      })
+      .catch(() => {
+        this.clearInFlight(a, b);
+      });
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
@@ -574,203 +724,6 @@ export class GridImpl implements Grid {
     const cell = this.editor.editingCell;
     if (!cell) return;
     this.editor.position(this.screenRect(cell.row, cell.col, contentTop, scrollLeft));
-  }
-
-  // ── pointer ────────────────────────────────────────────────────────────────
-
-  private readonly onMouseDown = (e: MouseEvent): void => {
-    if (e.button !== 0) return;
-
-    // Formula point mode: while editing a "=" formula, clicks/drags pick A1
-    // references into the editor instead of moving the grid selection.
-    if (this.editor.isEditing && this.editor.value.startsWith("=")) {
-      e.preventDefault();
-      const start = this.cellAtPointer(e.clientX, e.clientY);
-      if (!start) return;
-      this.editor.setReference(cellA1(start.row, start.col));
-      const move = (ev: MouseEvent): void => {
-        const c = this.cellAtPointer(ev.clientX, ev.clientY);
-        if (c) this.editor.setReference(rangeA1(start, c));
-      };
-      const up = (): void => {
-        this.editor.endReference();
-        window.removeEventListener("mousemove", move);
-        window.removeEventListener("mouseup", up);
-      };
-      window.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", up);
-      return;
-    }
-
-    const hostRect = this.viewportEl.getBoundingClientRect();
-    const fillHandle = this.fillHandleScreen(
-      this.scaled.toContent(this.scroller.scrollTop),
-      this.scroller.scrollLeft,
-    );
-    if (fillHandle && !this.editor.isEditing) {
-      const hx = e.clientX - hostRect.left;
-      const hy = e.clientY - hostRect.top;
-      if (Math.abs(hx - fillHandle.x) <= 5 && Math.abs(hy - fillHandle.y) <= 5) {
-        e.preventDefault();
-        this.startFillDrag();
-        return;
-      }
-    }
-    const additive = e.ctrlKey || e.metaKey;
-    const rect = this.viewportEl.getBoundingClientRect();
-    const py = e.clientY - rect.top;
-    const contentX = e.clientX - rect.left + this.scroller.scrollLeft - this.theme.rowHeaderWidth;
-
-    // header row → column selection
-    if (py < this.theme.headerHeight) {
-      const col = this.colAtX(contentX);
-      if (col !== -1) {
-        if (e.shiftKey) this.selection.extendTo(0, col);
-        else this.selection.selectColumn(col, additive);
-        this.emitSelection();
-        this.scheduleRender();
-      }
-      return;
-    }
-
-    const cell = this.cellAtPointer(e.clientX, e.clientY);
-    if (!cell) return;
-
-    if (e.shiftKey) this.selection.extendTo(cell.row, cell.col);
-    else this.selection.selectCell(cell.row, cell.col, additive);
-    this.emitSelection();
-    this.scheduleRender();
-
-    const move = (ev: MouseEvent): void => {
-      const c = this.cellAtPointer(ev.clientX, ev.clientY);
-      if (!c) return;
-      this.selection.extendTo(c.row, c.col);
-      this.emitSelection();
-      this.scheduleRender();
-    };
-    const up = (): void => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-  };
-
-  private readonly onDblClick = (e: MouseEvent): void => {
-    const cell = this.cellAtPointer(e.clientX, e.clientY);
-    if (!cell) return;
-    this.beginEdit(cell.row, cell.col, undefined, true);
-  };
-
-  private cellAtPointer(clientX: number, clientY: number): CellRef | null {
-    const rect = this.viewportEl.getBoundingClientRect();
-    const py = clientY - rect.top;
-    if (py < this.theme.headerHeight) return null;
-
-    const contentTop = this.scaled.toContent(this.scroller.scrollTop);
-    const contentX = clientX - rect.left + this.scroller.scrollLeft - this.theme.rowHeaderWidth;
-    const contentY = contentTop + (py - this.theme.headerHeight);
-
-    const row = this.index.rowAtOffset(contentY).row;
-    const col = this.colAtX(contentX);
-    if (col === -1 || row < 0 || row >= this.sheet().rowCount) return null;
-    return { row, col };
-  }
-
-  // ── keyboard ───────────────────────────────────────────────────────────────
-
-  private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (this.editor.isEditing) return;
-    const mod = e.ctrlKey || e.metaKey;
-
-    if (mod && (e.key === "c" || e.key === "C")) return void this.copy();
-    if (mod && (e.key === "x" || e.key === "X")) return void this.cut();
-    if (mod && (e.key === "v" || e.key === "V")) return void this.paste();
-
-    const focus = this.selection.focusCell;
-    const sheet = this.sheet();
-    const pageRows = Math.max(
-      1,
-      Math.floor((this.viewportH() - this.theme.headerHeight) / this.theme.rowHeight),
-    );
-
-    switch (e.key) {
-      case "ArrowDown":
-        this.navigate(
-          focus,
-          mod ? sheet.rowCount - 1 : (focus?.row ?? 0) + 1,
-          undefined,
-          e.shiftKey,
-          "row",
-        );
-        break;
-      case "ArrowUp":
-        this.navigate(focus, mod ? 0 : (focus?.row ?? 0) - 1, undefined, e.shiftKey, "row");
-        break;
-      case "ArrowRight":
-        this.navigate(
-          focus,
-          undefined,
-          mod ? this.lastCol() : this.nextVisibleCol(focus?.col ?? this.firstCol(), 1),
-          e.shiftKey,
-          "col",
-        );
-        break;
-      case "ArrowLeft":
-        this.navigate(
-          focus,
-          undefined,
-          mod ? this.firstCol() : this.nextVisibleCol(focus?.col ?? this.firstCol(), -1),
-          e.shiftKey,
-          "col",
-        );
-        break;
-      case "PageDown":
-        this.navigate(focus, (focus?.row ?? 0) + pageRows, undefined, e.shiftKey, "row");
-        break;
-      case "PageUp":
-        this.navigate(focus, (focus?.row ?? 0) - pageRows, undefined, e.shiftKey, "row");
-        break;
-      case "Home":
-        if (mod) this.navigate(focus, 0, this.firstCol(), e.shiftKey, "both");
-        else this.navigate(focus, undefined, this.firstCol(), e.shiftKey, "col");
-        break;
-      case "End":
-        if (mod) this.navigate(focus, sheet.rowCount - 1, this.lastCol(), e.shiftKey, "both");
-        else this.navigate(focus, undefined, this.lastCol(), e.shiftKey, "col");
-        break;
-      case "Enter":
-      case "F2":
-        if (focus) this.beginEdit(focus.row, focus.col, undefined, e.key === "F2");
-        break;
-      case "Delete":
-      case "Backspace":
-        this.clearSelection();
-        break;
-      default:
-        if (!mod && !e.altKey && focus && PRINTABLE.test(e.key)) {
-          this.beginEdit(focus.row, focus.col, e.key, false);
-        } else {
-          return;
-        }
-    }
-    e.preventDefault();
-  };
-
-  private navigate(
-    focus: CellRef | null,
-    row: number | undefined,
-    col: number | undefined,
-    extend: boolean,
-    _axis: "row" | "col" | "both",
-  ): void {
-    const r = clamp(row ?? focus?.row ?? 0, 0, Math.max(0, this.index.count - 1));
-    const c = clamp(col ?? focus?.col ?? this.firstCol(), this.firstCol(), this.lastCol());
-    if (extend) this.selection.extendTo(r, c);
-    else this.selection.selectCell(r, c);
-    this.emitSelection();
-    this.scrollToCell({ sheet: this.activeSheet, row: r, col: c });
-    this.scheduleRender();
   }
 
   // ── editing ──────────────────────────────────────────────────────────────--
@@ -782,31 +735,38 @@ export class GridImpl implements Grid {
     selectAll: boolean,
   ): void {
     if (this.readOnly) return;
+
+    const editCell = this.anchorCell(row, col);
     const sheet = this.sheet();
-    const column = sheet.columns[col];
+    const column = sheet.columns[editCell.col];
     if (!column) return;
 
-    const formula = this.loadable?.getFormula({ sheet: this.activeSheet, row, col }) ?? null;
-    const current = this.store.getCell({ sheet: this.activeSheet, row, col }).resolved;
+    const dataAddr = {
+      sheet: this.activeSheet,
+      row: this.toDataRow(editCell.row),
+      col: editCell.col,
+    };
+    const formula = this.loadable?.getFormula(dataAddr) ?? null;
+    const current = this.store.getCell(dataAddr).resolved;
     const text = initial ?? formula ?? (current === null ? "" : String(current));
     const contentTop = this.scaled.toContent(this.scroller.scrollTop);
 
-    this.selection.selectCell(row, col);
+    this.selection.selectCell(editCell.row, editCell.col);
     this.scheduleRender();
 
     for (const fn of this.listeners["edit-begin"]) {
-      fn({ addr: { sheet: this.activeSheet, row, col } });
+      fn({ addr: { sheet: this.activeSheet, row: editCell.row, col: editCell.col } });
     }
 
     this.editor.begin({
-      row,
-      col,
+      row: editCell.row,
+      col: editCell.col,
       type: column.type,
       initial: text,
       selectAll: selectAll || initial === undefined,
-      rect: this.screenRect(row, col, contentTop, this.scroller.scrollLeft),
+      rect: this.screenRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
       theme: this.theme,
-      onCommit: (value, navigate) => this.commitEdit(row, col, value, navigate),
+      onCommit: (value, navigate) => this.commitEdit(editCell.row, editCell.col, value, navigate),
       onCancel: () => {
         this.host.focus();
         this.scheduleRender();
@@ -816,11 +776,17 @@ export class GridImpl implements Grid {
 
   private commitEdit(row: number, col: number, raw: string, navigate: EditNavigate): void {
     const column = this.sheet().columns[col];
-    const value = coerceInput(raw, column?.type ?? "text");
+    const value = parseCellInput(raw, column?.type ?? "text");
+    const dataRow = this.toDataRow(row);
 
-    this.store.applyTransaction({
-      patches: [{ op: "set", addr: { sheet: this.activeSheet, row, col }, value }],
-    });
+    this.commit([
+      {
+        op: "set",
+        addr: { sheet: this.activeSheet, row: dataRow, col },
+        value,
+      },
+    ]);
+
     for (const fn of this.listeners["edit-commit"]) {
       fn({ addr: { sheet: this.activeSheet, row, col }, value });
     }
@@ -828,6 +794,57 @@ export class GridImpl implements Grid {
     this.host.focus();
     this.moveAfterCommit(row, col, navigate);
     this.scheduleRender();
+  }
+
+  private commit(patches: Patch[]): void {
+    if (patches.length === 0) return;
+
+    if (this.applyingHistory) {
+      this.store.applyTransaction({ patches });
+      return;
+    }
+
+    const inverse: Patch[] = [];
+    for (const patch of patches) {
+      // Grid-originated mutations are cell writes; structural changes are not recorded here.
+      if (patch.op === "set") inverse.push(this.inverseSetPatch(patch));
+    }
+
+    this.store.applyTransaction({ patches });
+    this.history.push(inverse, patches);
+  }
+
+  private inverseSetPatch(patch: Extract<Patch, { op: "set" }>): Patch {
+    const formula = this.loadable?.getFormula(patch.addr) ?? this.store.getFormula(patch.addr);
+    const cell = this.store.getCell(patch.addr);
+    const value: CellValue = formula
+      ? { kind: "formula", src: formula }
+      : { kind: "literal", value: cell.resolved };
+
+    return {
+      op: "set",
+      addr: patch.addr,
+      value,
+      style: cell.style,
+    };
+  }
+
+  private applyHistoryPatches(patches: Patch[]): void {
+    if (patches.length === 0) return;
+
+    this.applyingHistory = true;
+    try {
+      this.store.applyTransaction({ patches });
+    } finally {
+      this.applyingHistory = false;
+    }
+
+    this.emitSelection();
+    if (this.frame) {
+      (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
+      this.frame = 0;
+    }
+    this.render();
   }
 
   private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {
@@ -843,201 +860,55 @@ export class GridImpl implements Grid {
 
   private clearSelection(): void {
     if (this.readOnly || this.selection.isEmpty) return;
+
+    const sheet = this.sheet();
+    const seen = new Set<number>();
     const patches: Patch[] = [];
     const nullValue: CellValue = { kind: "literal", value: null };
+
     this.selection.forEachRect((rect) => {
       for (let r = rect.r0; r <= rect.r1; r++) {
         for (let c = rect.c0; c <= rect.c1; c++) {
+          const cell = this.anchorCell(r, c);
+          const key = cell.row * sheet.columns.length + cell.col;
+          if (seen.has(key)) continue;
+          seen.add(key);
+
           patches.push({
             op: "set",
-            addr: { sheet: this.activeSheet, row: r, col: c },
+            addr: { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
             value: nullValue,
           });
         }
       }
     });
-    if (patches.length > 0) this.store.applyTransaction({ patches });
-  }
 
-  private fillSourceRect(): SelRect | null {
-    const focus = this.selection.focusCell;
-    if (!focus) return null;
-    let found: SelRect | null = null;
-    this.selection.forEachRect((r) => {
-      if (r.r0 <= focus.row && focus.row <= r.r1 && r.c0 <= focus.col && focus.col <= r.c1) {
-        found = r;
-      }
-    });
-    return found;
-  }
-
-  private fillCellAt(clientX: number, clientY: number): CellRef {
-    const rect = this.viewportEl.getBoundingClientRect();
-    const contentTop = this.scaled.toContent(this.scroller.scrollTop);
-    const contentX = clientX - rect.left + this.scroller.scrollLeft - this.theme.rowHeaderWidth;
-    const contentY = contentTop + (clientY - rect.top - this.theme.headerHeight);
-    const rowCount = this.sheet().rowCount;
-    const row = clamp(this.index.rowAtOffset(Math.max(0, contentY)).row, 0, rowCount - 1);
-    let col = this.colAtX(contentX);
-    if (col === -1) {
-      const cols = this.colIndices;
-      col = contentX < 0 ? (cols[0] ?? 0) : (cols[cols.length - 1] ?? 0);
-    }
-    return { row, col };
-  }
-
-  private fillHandleScreen(
-    contentTop: number,
-    scrollLeft: number,
-  ): { x: number; y: number } | null {
-    if (this.loadable?.hasView(this.activeSheet)) return null;
-    const src = this.fillSourceRect();
-    if (!src) return null;
-    const r = this.screenRect(src.r1, src.c1, contentTop, scrollLeft);
-    const y = r.y + r.h;
-    if (y < this.theme.headerHeight) return null;
-    return { x: r.x + r.w, y };
-  }
-
-  private startFillDrag(): void {
-    const source = this.fillSourceRect();
-    if (!source) return;
-    const move = (ev: MouseEvent): void => {
-      const c = this.fillCellAt(ev.clientX, ev.clientY);
-      this.fillTarget = this.extendFill(source, c);
-      this.scheduleRender();
-    };
-    const up = (): void => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-      const target = this.fillTarget;
-      this.fillTarget = null;
-      if (target) {
-        this.commitFill(source, target);
-        this.selection.selectCell(target.r0, target.c0);
-        this.selection.extendTo(target.r1, target.c1);
-        this.emitSelection();
-      }
-      this.scheduleRender();
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-  }
-
-  private extendFill(source: SelRect, c: CellRef): SelRect {
-    const down = Math.max(c.row - source.r1, 0);
-    const up = Math.max(source.r0 - c.row, 0);
-    const right = Math.max(c.col - source.c1, 0);
-    const left = Math.max(source.c0 - c.col, 0);
-    const vert = Math.max(down, up);
-    const horiz = Math.max(right, left);
-    if (vert === 0 && horiz === 0) return { ...source };
-    if (vert >= horiz) {
-      if (down >= up) return { r0: source.r0, c0: source.c0, r1: c.row, c1: source.c1 };
-      return { r0: c.row, c0: source.c0, r1: source.r1, c1: source.c1 };
-    }
-    if (right >= left) return { r0: source.r0, c0: source.c0, r1: source.r1, c1: c.col };
-    return { r0: source.r0, c0: c.col, r1: source.r1, c1: source.c1 };
-  }
-
-  private commitFill(source: SelRect, target: SelRect): void {
-    if (this.readOnly) return;
-    const srcRows = source.r1 - source.r0 + 1;
-    const srcCols = source.c1 - source.c0 + 1;
-    const patches: Patch[] = [];
-    for (let r = target.r0; r <= target.r1; r++) {
-      for (let c = target.c0; c <= target.c1; c++) {
-        if (r >= source.r0 && r <= source.r1 && c >= source.c0 && c <= source.c1) continue;
-        const sr = source.r0 + ((((r - source.r0) % srcRows) + srcRows) % srcRows);
-        const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
-        patches.push({
-          op: "set",
-          addr: { sheet: this.activeSheet, row: r, col: c },
-          value: this.fillValueFrom(sr, sc, r - sr, c - sc),
-        });
-      }
-    }
-    if (patches.length > 0) this.store.applyTransaction({ patches });
-  }
-
-  private fillValueFrom(sr: number, sc: number, dRow: number, dCol: number): CellValue {
-    const addr = { sheet: this.activeSheet, row: sr, col: sc };
-    const formula = this.loadable?.getFormula(addr) ?? null;
-    if (formula) return { kind: "formula", src: shiftA1Refs(formula, dRow, dCol) };
-    return { kind: "literal", value: this.store.getCell(addr).resolved };
-  }
-
-  // ── clipboard ──────────────────────────────────────────────────────────────
-
-  private selectionMatrix(): { rect: SelRect; values: CellScalar[][] } | null {
-    const focus = this.selection.focusCell;
-    if (!focus) return null;
-    const rects: SelRect[] = [];
-    this.selection.forEachRect((r) => rects.push(r));
-    const rect = rects.find(
-      (r) => r.r0 <= focus.row && focus.row <= r.r1 && r.c0 <= focus.col && focus.col <= r.c1,
-    );
-    if (!rect) return null;
-
-    const values: CellScalar[][] = [];
-    for (let r = rect.r0; r <= rect.r1; r++) {
-      const line: CellScalar[] = [];
-      for (let c = rect.c0; c <= rect.c1; c++) {
-        line.push(this.store.getCell({ sheet: this.activeSheet, row: r, col: c }).resolved);
-      }
-      values.push(line);
-    }
-    return { rect, values };
-  }
-
-  private copy(): void {
-    const m = this.selectionMatrix();
-    if (!m || !navigator.clipboard?.writeText) return;
-    void navigator.clipboard.writeText(toTsv(m.values));
-  }
-
-  private cut(): void {
-    const m = this.selectionMatrix();
-    if (!m || !navigator.clipboard?.writeText) return;
-    void navigator.clipboard.writeText(toTsv(m.values));
-    this.clearSelection();
-  }
-
-  private async paste(): Promise<void> {
-    if (this.readOnly) return;
-    const focus = this.selection.focusCell;
-    if (!focus || !navigator.clipboard?.readText) return;
-
-    const text = await navigator.clipboard.readText();
-    const grid = parseTsv(text);
-    if (grid.length === 0) return;
-
-    const sheet = this.sheet();
-    const startPos = this.colIndices.indexOf(focus.col);
-    const patches: Patch[] = [];
-    for (let r = 0; r < grid.length; r++) {
-      const line = grid[r]!;
-      for (let c = 0; c < line.length; c++) {
-        const targetRow = focus.row + r;
-        const targetCol = this.colIndices[startPos + c];
-        if (targetRow >= sheet.rowCount || targetCol === undefined) continue;
-        const value = coerceInput(
-          neutralizeInjection(line[c]!),
-          sheet.columns[targetCol]?.type ?? "text",
-        );
-        patches.push({
-          op: "set",
-          addr: { sheet: this.activeSheet, row: targetRow, col: targetCol },
-          value,
-        });
-      }
-    }
-    if (patches.length > 0) this.store.applyTransaction({ patches });
+    this.commit(patches);
   }
 
   private emitSelection(): void {
     const sel = this.getSelection();
     for (const fn of this.listeners.selection) fn({ selection: sel });
+  }
+
+  search(query: string, opts: SearchOptions = {}): SearchResult {
+    return this.searchController.search(query, opts);
+  }
+
+  findNext(): SearchResult {
+    return this.searchController.findNext();
+  }
+
+  findPrev(): SearchResult {
+    return this.searchController.findPrev();
+  }
+
+  clearSearch(): void {
+    this.searchController.clearSearch();
+  }
+
+  highlightCells(ranges: Range[] | null, color?: string): void {
+    this.overlayPainter.highlightCells(ranges, color);
   }
 
   // ── public API ─────────────────────────────────────────────────────────────
@@ -1116,85 +987,30 @@ export class GridImpl implements Grid {
 
   // ── toolbar actions (operate on the current selection) ──────────────────────
 
-  private toolbarActions(): ToolbarActions {
+  private buildActions(): GridActions {
     return {
-      toggleBold: () => this.toggleStyle("bold"),
-      toggleItalic: () => this.toggleStyle("italic"),
-      setAlign: (align) => this.applyStyle({ align }),
-      setTextColor: (color) => this.applyStyle({ color }),
-      setFillColor: (color) => this.applyStyle({ backgroundColor: color }),
-      setBorder: () => this.applyStyle({ border: { all: { color: this.theme.fg, width: 1 } } }),
-      clearFormat: () => this.applyStyle(null),
-      merge: () => this.mergeSelection(),
-      unmerge: () => this.unmergeSelection(),
+      toggleBold: () => this.styleActions.toggleStyle("bold"),
+      toggleItalic: () => this.styleActions.toggleStyle("italic"),
+      setAlign: (align) => this.styleActions.applyStyle({ align }),
+      setTextColor: (color) => this.styleActions.applyStyle({ color }),
+      setFillColor: (color) => this.styleActions.applyStyle({ backgroundColor: color }),
+      toggleBorder: () => this.styleActions.toggleBorder(),
+      clearFormat: () => this.styleActions.applyStyle(null),
+      merge: () => this.styleActions.mergeSelection(),
+      unmerge: () => this.styleActions.unmergeSelection(),
       sort: (ascending) => {
         const f = this.selection.focusCell;
         if (f) this.sortBy(f.col, ascending);
       },
+      copy: () => void this.clipboard.copy(),
+      cut: () => void this.clipboard.cut(),
+      paste: () => void this.clipboard.paste(),
+      clearContents: () => this.clearSelection(),
+      exportCsv: (filename) => this.exportCsv(filename ?? "sheetwrite.csv"),
+      exportXlsx: (filename) => void this.exportXlsx(filename ?? "sheetwrite.xlsx"),
+      undo: () => this.undo(),
+      redo: () => this.redo(),
     };
-  }
-
-  private toggleStyle(prop: "bold" | "italic"): void {
-    const f = this.selection.focusCell;
-    const on = f
-      ? this.store.getCell({ sheet: this.activeSheet, row: f.row, col: f.col }).style[prop]
-      : false;
-    this.applyStyle({ [prop]: !on });
-  }
-
-  /** Re-set selected cells, preserving each value, with `patch` merged into the
-   *  style (cleared when `patch` is null). */
-  private applyStyle(patch: Partial<CellStyle> | null): void {
-    if (this.readOnly || this.selection.isEmpty) return;
-    const rects: SelRect[] = [];
-    this.selection.forEachRect((r) => rects.push(r));
-
-    const patches: Patch[] = [];
-    for (const rect of rects) {
-      for (let r = rect.r0; r <= rect.r1; r++) {
-        for (let c = rect.c0; c <= rect.c1; c++) {
-          const addr = { sheet: this.activeSheet, row: r, col: c };
-          const formula = this.loadable?.getFormula(addr) ?? null;
-          const cell = this.store.getCell(addr);
-          const value: CellValue = formula
-            ? { kind: "formula", src: formula }
-            : { kind: "literal", value: cell.resolved };
-          patches.push({
-            op: "set",
-            addr,
-            value,
-            style: patch ? { ...cell.style, ...patch } : undefined,
-          });
-        }
-      }
-    }
-    if (patches.length > 0) this.store.applyTransaction({ patches });
-  }
-
-  private mergeSelection(): void {
-    const sel = this.selection.toSelection(this.activeSheet);
-    if (sel?.kind !== "range") return;
-    const { start, end } = sel.range;
-    const list = this.merges.get(this.activeSheet) ?? [];
-    list.push({
-      r0: Math.min(start.row, end.row),
-      c0: Math.min(start.col, end.col),
-      r1: Math.max(start.row, end.row),
-      c1: Math.max(start.col, end.col),
-    });
-    this.merges.set(this.activeSheet, list);
-    this.applyLayout();
-  }
-
-  private unmergeSelection(): void {
-    const f = this.selection.focusCell;
-    const list = this.merges.get(this.activeSheet);
-    if (!f || !list) return;
-    this.merges.set(
-      this.activeSheet,
-      list.filter((m) => !(f.row >= m.r0 && f.row <= m.r1 && f.col >= m.c0 && f.col <= m.c1)),
-    );
-    this.applyLayout();
   }
 
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void {
@@ -1223,6 +1039,20 @@ export class GridImpl implements Grid {
   clearView(): void {
     this.loadable?.clearView(this.activeSheet);
     this.applyView();
+  }
+
+  undo(): void {
+    const patches = this.history.undo();
+    if (!patches) return;
+
+    this.applyHistoryPatches(patches);
+  }
+
+  redo(): void {
+    const patches = this.history.redo();
+    if (!patches) return;
+
+    this.applyHistoryPatches(patches);
   }
 
   exportCsv(filename: string): void {
@@ -1255,83 +1085,23 @@ export class GridImpl implements Grid {
     this.render();
   }
 
-  private updateAria(view: VisibleWindowView): void {
-    const focus = this.selection.focusCell;
-    const focusId = focus ? `${this.aria.id}-${focus.row}-${focus.col}` : "";
-    const key = `${view.rows.start}:${view.rows.end}:${view.cols.length}:${focusId}:${this.ariaVersion}`;
-    if (key === this.ariaKey) {
-      this.host.setAttribute("aria-activedescendant", focusId);
-      return;
-    }
-    this.ariaKey = key;
-
-    const nCols = view.cols.length;
-    const frag = document.createDocumentFragment();
-
-    const headRow = document.createElement("div");
-    headRow.setAttribute("role", "row");
-    headRow.setAttribute("aria-rowindex", "1");
-    for (let cj = 0; cj < nCols; cj++) {
-      const cell = document.createElement("div");
-      cell.setAttribute("role", "columnheader");
-      cell.setAttribute("aria-colindex", String(cj + 1));
-      cell.textContent = colToA1(view.cols[cj]!);
-      headRow.appendChild(cell);
-    }
-    frag.appendChild(headRow);
-
-    const nRows = view.rows.end - view.rows.start;
-    for (let ri = 0; ri < nRows; ri++) {
-      const row = view.rows.start + ri;
-      const rowEl = document.createElement("div");
-      rowEl.setAttribute("role", "row");
-      rowEl.setAttribute("aria-rowindex", String(row + 2));
-      for (let cj = 0; cj < nCols; cj++) {
-        const col = view.cols[cj]!;
-        const cell = document.createElement("div");
-        cell.setAttribute("role", "gridcell");
-        cell.setAttribute("aria-colindex", String(cj + 1));
-        cell.id = `${this.aria.id}-${row}-${col}`;
-        const v = view.values[ri * nCols + cj] ?? null;
-        if (v !== null) cell.textContent = String(v);
-        if (focus && focus.row === row && focus.col === col) {
-          cell.setAttribute("aria-selected", "true");
-        }
-        rowEl.appendChild(cell);
-      }
-      frag.appendChild(rowEl);
-    }
-
-    this.aria.replaceChildren(frag);
-    this.host.setAttribute("aria-activedescendant", focusId);
-  }
-
   destroy(): void {
     if (this.frame) (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
     this.editor.destroy();
+    this.input.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
-    this.scroller.removeEventListener("mousedown", this.onMouseDown);
-    this.scroller.removeEventListener("dblclick", this.onDblClick);
-    this.host.removeEventListener("keydown", this.onKeyDown);
+    this.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.resizeObserver?.disconnect();
     this.disposeStore();
     this.renderer.destroy();
     this.scroller.remove();
-    this.overlay.remove();
+    this.overlayPainter.destroy();
     this.tabBar?.remove();
     this.toolbar?.destroy();
+    this.contextMenu?.destroy();
+    this.findBar?.destroy();
     this.viewportEl.remove();
-    this.aria.remove();
-    for (const attr of [
-      "role",
-      "aria-multiselectable",
-      "aria-rowcount",
-      "aria-colcount",
-      "aria-readonly",
-      "aria-activedescendant",
-    ]) {
-      this.host.removeAttribute(attr);
-    }
+    this.ariaMirror.destroy();
     this.host.classList.remove("sheetwrite");
   }
 }
@@ -1344,40 +1114,24 @@ function visibleColumns(columns: readonly Column[]): number[] {
   return out;
 }
 
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
+function padColumns(workbook: Workbook, opts: GridOptions, host: HTMLElement): Workbook {
+  const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
+  const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
+  const target = Math.max(opts.minColumns ?? 0, fillCols);
+  if (target <= 0) return workbook;
 
-function coerceInput(raw: string, type: Column["type"]): CellValue {
-  const trimmed = raw.trim();
-  if (trimmed === "") return { kind: "literal", value: null };
-  if (trimmed.length > 1 && trimmed.startsWith("=")) return { kind: "formula", src: trimmed };
-  if (type === "number") {
-    const n = Number(trimmed);
-    if (Number.isFinite(n)) return { kind: "literal", value: n };
-  }
-  return { kind: "literal", value: raw };
-}
+  let changed = false;
+  const sheets = workbook.sheets.map((sheet) => {
+    if (sheet.columns.length >= target) return sheet;
 
-function rectDiv(
-  left: number,
-  top: number,
-  width: number,
-  height: number,
-  background: string,
-  border: string,
-): HTMLDivElement {
-  const el = document.createElement("div");
-  el.style.cssText = [
-    "position:absolute",
-    `left:${left}px`,
-    `top:${top}px`,
-    `width:${Math.max(0, width)}px`,
-    `height:${Math.max(0, height)}px`,
-    `background:${background}`,
-    `outline:1.5px solid ${border}`,
-    "outline-offset:-1px",
-    "box-sizing:border-box",
-  ].join(";");
-  return el;
+    changed = true;
+    const columns = sheet.columns.slice();
+    for (let c = columns.length; c < target; c++) {
+      columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "text" });
+    }
+
+    return { ...sheet, columns };
+  });
+
+  return changed ? { ...workbook, sheets } : workbook;
 }

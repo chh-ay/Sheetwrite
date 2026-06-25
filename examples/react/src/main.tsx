@@ -26,7 +26,6 @@ const workbook: Workbook = {
 };
 
 const datasource: DataSource = {
-  rowCount: () => ROWS,
   getRows: async (_sheet, start, end) => {
     const rows: RowData[] = [];
     for (let r = start; r < end; r++) {
@@ -53,6 +52,7 @@ createRoot(host).render(
     workbook={workbook}
     datasource={datasource}
     renderer="canvas"
+    config={{ toolbar: true }}
     style={{ height: "100%" }}
     onChange={(e) => console.log("change", e.changes.length)}
   />,
