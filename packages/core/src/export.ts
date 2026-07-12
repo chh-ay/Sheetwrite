@@ -209,16 +209,30 @@ export function fromCsv(text: string, columns: readonly Column[]): ColumnarData 
   return { rowCount, columns: result };
 }
 
-/** Framework/runtime-agnostic save (separate from "produce bytes"). */
+/** Browser-only download helper; throws in non-DOM runtimes. */
 export function downloadBytes(bytes: Uint8Array | string, filename: string, mime: string): void {
-  const part: BlobPart = typeof bytes === "string" ? bytes : new Uint8Array(bytes);
+  if (typeof document === "undefined") {
+    throw new Error("Sheetwrite: downloadBytes requires a browser environment");
+  }
+
+  // A view over a SharedArrayBuffer is rejected by Blob; copy only then.
+  const needsCopy =
+    typeof bytes !== "string" &&
+    typeof SharedArrayBuffer !== "undefined" &&
+    bytes.buffer instanceof SharedArrayBuffer;
+  const part: BlobPart = needsCopy ? new Uint8Array(bytes) : (bytes as BlobPart);
   const blob = new Blob([part], { type: mime });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+
+  // A synchronous revoke can race the download navigation in some engines.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**

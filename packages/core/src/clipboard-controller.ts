@@ -8,7 +8,16 @@ import {
   toTsv,
 } from "./clipboard.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
-import type { CellScalar, CellStyle, CellValue, Patch, Sheet, SheetId, Store } from "./types.js";
+import type {
+  CellScalar,
+  CellStyle,
+  CellValue,
+  ClipboardOutcome,
+  Patch,
+  Sheet,
+  SheetId,
+  Store,
+} from "./types.js";
 
 export interface ClipboardControllerDeps {
   store: Store;
@@ -59,27 +68,38 @@ export class ClipboardController {
     this.deps = deps;
   }
 
-  copy(): void {
+  async copy(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(false);
-    if (!snapshot || !navigator.clipboard?.writeText) return;
-    this.snapshot = snapshot;
-    void navigator.clipboard.writeText(snapshot.tsv);
-  }
-
-  async cut(): Promise<void> {
-    const snapshot = this.capture(true);
-    if (!snapshot || !navigator.clipboard?.writeText) return;
+    if (!snapshot) return "empty";
+    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return "unsupported";
 
     try {
       await navigator.clipboard.writeText(snapshot.tsv);
     } catch {
-      return;
+      return "blocked";
     }
 
-    if (this.deps.readOnly()) return;
+    // Only a clipboard the system accepted may become the paste-match snapshot.
+    this.snapshot = snapshot;
+    return "done";
+  }
+
+  async cut(): Promise<ClipboardOutcome> {
+    const snapshot = this.capture(true);
+    if (!snapshot) return "empty";
+    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return "unsupported";
+
+    try {
+      await navigator.clipboard.writeText(snapshot.tsv);
+    } catch {
+      return "blocked";
+    }
+
+    if (this.deps.readOnly()) return "done";
 
     this.snapshot = snapshot;
     this.deps.commit(snapshot.clearPatches);
+    return "done";
   }
 
   /**
@@ -88,30 +108,39 @@ export class ClipboardController {
    * them verbatim; styles carried either way); otherwise parses external TSV as
    * neutralized literals.
    */
-  async paste(): Promise<void> {
-    await this.pasteFrom(false);
+  paste(): Promise<ClipboardOutcome> {
+    return this.pasteFrom(false);
   }
 
   /**
    * Like {@link paste} but writes only resolved literals — never formulas or
    * styles. For external text this is identical to {@link paste}.
    */
-  async pasteValues(): Promise<void> {
-    await this.pasteFrom(true);
+  pasteValues(): Promise<ClipboardOutcome> {
+    return this.pasteFrom(true);
   }
 
-  private async pasteFrom(valuesOnly: boolean): Promise<void> {
-    if (this.deps.readOnly()) return;
+  private async pasteFrom(valuesOnly: boolean): Promise<ClipboardOutcome> {
+    if (this.deps.readOnly()) return "empty";
     const focus = this.deps.selection().focusCell;
-    if (!focus || !navigator.clipboard?.readText) return;
+    if (!focus) return "empty";
+    if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return "unsupported";
 
-    const text = await navigator.clipboard.readText();
+    let text: string;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      return "blocked";
+    }
+    if (text.length === 0) return "empty";
+
     const snapshot = this.snapshot;
     if (snapshot && text === snapshot.tsv) {
       this.pasteInternal(snapshot, focus, valuesOnly);
-      return;
+      return "done";
     }
     this.pasteExternal(text, focus);
+    return "done";
   }
 
   // ── Rich paste ─────────────────────────────────────────────────────────────

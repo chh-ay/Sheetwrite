@@ -149,7 +149,7 @@ describe("ClipboardController", () => {
     // Formula at B2 (row 1, col 1); copy, paste two rows down to B4 (row 3).
     h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
     h.select(1, 1);
-    h.controller.copy();
+    await h.controller.copy();
 
     h.select(3, 1);
     await h.controller.paste();
@@ -286,7 +286,7 @@ describe("ClipboardController", () => {
     h.store.seed(1, 0, { kind: "formula", src: "=B2" }, 0);
     h.selection.selectCell(0, 0);
     h.selection.extendTo(1, 0);
-    h.controller.copy();
+    await h.controller.copy();
 
     h.select(2, 0);
     await h.controller.paste();
@@ -294,5 +294,70 @@ describe("ClipboardController", () => {
     // Both shift +2 rows uniformly: A3 <- =B3, A4 <- =B4.
     expect(h.store.getFormula({ sheet: "s1", row: 2, col: 0 })).toBe("=B3");
     expect(h.store.getFormula({ sheet: "s1", row: 3, col: 0 })).toBe("=B4");
+  });
+
+  it("resolves 'blocked' when writeText rejects, without an unhandled rejection", async () => {
+    h.store.seed(1, 1, { kind: "literal", value: "x" }, "x");
+    h.select(1, 1);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: () => Promise.reject(new Error("clipboard denied")),
+        readText: () => Promise.resolve(""),
+      },
+    });
+
+    await expect(h.controller.copy()).resolves.toBe("blocked");
+  });
+
+  it("resolves 'unsupported' when the Clipboard API is absent", async () => {
+    h.store.seed(1, 1, { kind: "literal", value: "x" }, "x");
+    h.select(1, 1);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+
+    await expect(h.controller.copy()).resolves.toBe("unsupported");
+    await expect(h.controller.paste()).resolves.toBe("unsupported");
+  });
+
+  it("resolves 'blocked' on a rejected readText and leaves the store unchanged", async () => {
+    h.store.seed(1, 1, { kind: "literal", value: "keep" }, "keep");
+    h.select(1, 1);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: () => Promise.resolve(),
+        readText: () => Promise.reject(new Error("read denied")),
+      },
+    });
+
+    await expect(h.controller.paste()).resolves.toBe("blocked");
+    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("keep");
+  });
+
+  it("resolves 'empty' with no focused selection and 'done' on a round-trip", async () => {
+    await expect(h.controller.copy()).resolves.toBe("empty");
+
+    h.store.seed(1, 1, { kind: "literal", value: "hello" }, "hello");
+    h.select(1, 1);
+    await expect(h.controller.copy()).resolves.toBe("done");
+
+    h.select(3, 1);
+    await expect(h.controller.paste()).resolves.toBe("done");
+    expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBe("hello");
+  });
+
+  it("resolves 'unsupported' when the navigator global itself is absent (SSR)", async () => {
+    h.store.seed(1, 1, { kind: "literal", value: "x" }, "x");
+    h.select(1, 1);
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    // @ts-expect-error — deliberately removing the global for the SSR branch
+    delete globalThis.navigator;
+
+    try {
+      await expect(h.controller.copy()).resolves.toBe("unsupported");
+      await expect(h.controller.paste()).resolves.toBe("unsupported");
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);
+    }
   });
 });

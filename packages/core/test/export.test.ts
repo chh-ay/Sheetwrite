@@ -1,5 +1,13 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { fromCsv, parseCsv, safeHeader, toCsv, toTsv, toXlsx } from "../src/export.js";
+import {
+  downloadBytes,
+  fromCsv,
+  parseCsv,
+  safeHeader,
+  toCsv,
+  toTsv,
+  toXlsx,
+} from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { Workbook } from "../src/types.js";
@@ -213,5 +221,64 @@ describe("export", () => {
     expect(data.rowCount).toBe(3);
     expect(Array.from(data.columns.a!)).toEqual(["hello", "a,b", "multi\nline"]);
     expect(Array.from(data.columns.b!)).toEqual([42, -5, 0]);
+  });
+});
+
+describe("downloadBytes", () => {
+  it("appends+removes the anchor and defers the object-URL revoke", () => {
+    const created: string[] = [];
+    const revoked: string[] = [];
+    const clicks: HTMLAnchorElement[] = [];
+    const appended: HTMLAnchorElement[] = [];
+    const deferred: Array<() => void> = [];
+
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const originalClick = HTMLAnchorElement.prototype.click;
+    const originalAppend = document.body.appendChild.bind(document.body);
+    const originalSetTimeout = globalThis.setTimeout;
+
+    URL.createObjectURL = (() => {
+      created.push("blob:sheetwrite-test");
+      return "blob:sheetwrite-test";
+    }) as typeof URL.createObjectURL;
+    URL.revokeObjectURL = ((url: string) => {
+      revoked.push(url);
+    }) as typeof URL.revokeObjectURL;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      clicks.push(this);
+      // The anchor must be in the document when clicked.
+      expect(this.isConnected).toBe(true);
+    };
+    document.body.appendChild = ((node: Node) => {
+      if (node instanceof HTMLAnchorElement) appended.push(node);
+      return originalAppend(node);
+    }) as typeof document.body.appendChild;
+    // Deterministic deferral: capture the timeout callback instead of waiting.
+    globalThis.setTimeout = ((fn: () => void) => {
+      deferred.push(fn);
+      return 0;
+    }) as unknown as typeof globalThis.setTimeout;
+
+    try {
+      downloadBytes(new Uint8Array([1, 2, 3]), "t.bin", "application/octet-stream");
+
+      expect(created).toEqual(["blob:sheetwrite-test"]);
+      expect(appended).toHaveLength(1);
+      expect(clicks).toHaveLength(1);
+      expect(appended[0]!.isConnected).toBe(false); // removed after click
+      expect(appended[0]!.download).toBe("t.bin");
+
+      // Revoke is deferred, never synchronous with the click.
+      expect(revoked).toEqual([]);
+      for (const fn of deferred) fn();
+      expect(revoked).toEqual(["blob:sheetwrite-test"]);
+    } finally {
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+      HTMLAnchorElement.prototype.click = originalClick;
+      document.body.appendChild = originalAppend as typeof document.body.appendChild;
+      globalThis.setTimeout = originalSetTimeout;
+    }
   });
 });

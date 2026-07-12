@@ -96,8 +96,16 @@ Paste reads TSV from the clipboard, parses it (handling quoted, multi-line
 fields), and writes a block anchored at the focused cell. Pasted strings are
 **injection-hardened**: a value beginning with `=`, `+`, `-`, `@`, tab, or CR is
 prefixed with a single quote so a pasted `=cmd|...` can not become an executable
-formula. Copy/cut/paste use the async Clipboard API (`navigator.clipboard`) and
-are no-ops where it is unavailable; paste is disabled when `readOnly`.
+formula. Copy/cut/paste use the async Clipboard API (`navigator.clipboard`);
+paste is disabled when `readOnly`.
+
+`grid.actions.copy/cut/paste/pasteValues` return
+`Promise<ClipboardOutcome>` — `"done" | "unsupported" | "blocked" | "empty"` —
+and **never reject**: a missing API resolves `"unsupported"`, a
+permission/user-activation rejection resolves `"blocked"`, so a custom toolbar
+can show a "clipboard blocked" hint instead of tripping global error
+monitoring. Cut clears its source only after the system clipboard accepted the
+payload.
 
 ## Toolbar actions
 

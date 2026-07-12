@@ -1783,10 +1783,10 @@ export class GridImpl implements Grid {
         const f = this.selection.focusCell;
         if (f) this.removeColumns(f.col);
       },
-      copy: () => void this.clipboard.copy(),
-      cut: () => void this.clipboard.cut(),
-      paste: () => void this.clipboard.paste(),
-      pasteValues: () => void this.clipboard.pasteValues(),
+      copy: () => this.clipboard.copy(),
+      cut: () => this.clipboard.cut(),
+      paste: () => this.clipboard.paste(),
+      pasteValues: () => this.clipboard.pasteValues(),
       clearContents: () => this.clearSelection(),
       exportCsv: (filename) => this.exportCsv(filename ?? "sheetwrite.csv"),
       exportXlsx: (filename) => void this.exportXlsx(filename ?? "sheetwrite.xlsx"),

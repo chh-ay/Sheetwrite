@@ -349,9 +349,18 @@ export interface DataSource {
 // ── Grid options, events, instance ───────────────────────────────────────────
 
 /**
- * Toolbar / feature configuration. When `config` is set the built-in toolbar is
- * shown; each flag toggles one control (all default to `true`).
+ * How a clipboard action ended. Permission failures are OUTCOMES, not
+ * exceptions: the returned promise never rejects.
+ * - `"done"` — the action completed.
+ * - `"unsupported"` — the Clipboard API (or the needed method) is absent,
+ *   e.g. a non-secure context or Firefox `readText`.
+ * - `"blocked"` — the browser rejected the request, typically a permissions
+ *   policy or missing user activation.
+ * - `"empty"` — nothing to act on (no focused selection, empty clipboard, or
+ *   a read-only grid on paste).
  */
+export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
+
 /** Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`. */
 export interface GridActions {
   toggleBold(): void;
@@ -372,11 +381,14 @@ export interface GridActions {
   insertColumnLeft(): void;
   insertColumnRight(): void;
   deleteColumn(): void;
-  copy(): void;
-  cut(): void;
-  paste(): void;
-  /** Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). */
-  pasteValues(): void;
+  /** Copy the focused rectangle to the system clipboard. Never rejects. */
+  copy(): Promise<ClipboardOutcome>;
+  /** Copy + clear the source (after the clipboard accepted). Never rejects. */
+  cut(): Promise<ClipboardOutcome>;
+  /** Paste at the focus cell. Never rejects. */
+  paste(): Promise<ClipboardOutcome>;
+  /** Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects. */
+  pasteValues(): Promise<ClipboardOutcome>;
   clearContents(): void;
   exportCsv(filename?: string): void;
   exportXlsx(filename?: string): void;
@@ -448,6 +460,10 @@ export interface ContextMenuItem {
   label?: string;
 }
 
+/**
+ * Toolbar / feature configuration. When `config` is set the built-in toolbar is
+ * shown; each flag toggles one control (all default to `true`).
+ */
 export interface GridConfig {
   /** Show the built-in toolbar (true), hide it (false), or supply a custom item list. */
   toolbar?: boolean | ToolbarItem[];
