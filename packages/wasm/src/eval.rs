@@ -901,7 +901,7 @@ pub(crate) fn value_rank(value: &Value) -> u8 {
     }
 }
 
-pub(crate) fn number_arg(values: &FuncAccumulator, index: usize, default: f64) -> Result<f64, FormulaError> {
+fn number_arg(values: &FuncAccumulator, index: usize, default: f64) -> Result<f64, FormulaError> {
     if index >= values.len() {
         Ok(default)
     } else {
@@ -909,11 +909,11 @@ pub(crate) fn number_arg(values: &FuncAccumulator, index: usize, default: f64) -
     }
 }
 
-pub(crate) fn text_arg(values: &FuncAccumulator, index: usize) -> Result<String, FormulaError> {
+fn text_arg(values: &FuncAccumulator, index: usize) -> Result<String, FormulaError> {
     text_from_value(&values.first(index))
 }
 
-pub(crate) fn text_count_arg(
+fn text_count_arg(
     values: &FuncAccumulator,
     index: usize,
     default: f64,
@@ -926,7 +926,7 @@ pub(crate) fn text_count_arg(
     }
 }
 
-pub(crate) fn aggregate_numbers(values: &FuncAccumulator) -> Result<NumericAggregate, FormulaError> {
+fn aggregate_numbers(values: &FuncAccumulator) -> Result<NumericAggregate, FormulaError> {
     let mut stats = NumericAggregate {
         count: 0,
         sum: 0.0,
@@ -952,7 +952,7 @@ pub(crate) fn aggregate_numbers(values: &FuncAccumulator) -> Result<NumericAggre
     Ok(stats)
 }
 
-pub(crate) fn count_numeric(values: &FuncAccumulator) -> u64 {
+fn count_numeric(values: &FuncAccumulator) -> u64 {
     values
         .values
         .iter()
@@ -965,7 +965,7 @@ pub(crate) fn count_numeric(values: &FuncAccumulator) -> u64 {
         .count() as u64
 }
 
-pub(crate) fn count_present(values: &FuncAccumulator) -> u64 {
+fn count_present(values: &FuncAccumulator) -> u64 {
     values.len() as u64
 }
 

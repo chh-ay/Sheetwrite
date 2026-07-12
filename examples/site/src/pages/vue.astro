@@ -1,144 +1,178 @@
 ---
-import Nav from "../components/Nav.astro";
+import DemoHeader from "../components/DemoHeader.astro";
 import VueConsole from "../components/VueConsole";
+import Layout from "../layouts/Layout.astro";
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sheetwrite — Vue streaming console</title>
-  </head>
-  <body>
-    <Nav active="vue" />
-    <header>
-      <strong>Sheetwrite</strong> — Vue streaming console.
-      <p>
-        1,000,000 virtual rows behind a paged <code>DataSource</code> with simulated network latency
-        — scroll fast and watch placeholder pages resolve. The right panel is the live event
-        pipeline (<code>scroll</code>, <code>edit-begin</code>, <code>edit-commit</code>,
-        <code>change</code>); committed edits queue in the store's dirty list until you acknowledge
-        them like a server (<code>getDirty</code> / <code>markClean</code>).
-        <br />
-        APIs exercised: <code>DataSource</code>, <code>grid.search()</code>,
-        <code>grid.findNext()</code>, <code>grid.findPrev()</code>, <code>search</code> emit,
-        <code>grid.setActiveSheet()</code>, and <code>active-sheet</code> emit.
-      </p>
-    </header>
-    <div id="app">
-      <VueConsole client:only="vue" />
-    </div>
+<Layout
+  title="Sheetwrite — Vue streaming console"
+  description="One million virtual rows behind a paged DataSource with simulated latency, a live grid-event pipeline, and the getDirty/markClean sync flow."
+  active="vue"
+>
+  <DemoHeader
+    accent="var(--color-fw-vue)"
+    kicker="Vue adapter"
+    title="Streaming data, visible rows only"
+  >
+    One million rows stay behind a paged <code>DataSource</code>; only the visible window and
+    overscan are cached. Scroll to trigger delayed page requests, then use the numbered event
+    steps to edit, search, and acknowledge changes.
+  </DemoHeader>
+  <div id="app">
+    <VueConsole client:only="vue" />
+  </div>
 
-    <style is:global>
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        font-family: system-ui, sans-serif;
-      }
-      body {
-        display: flex;
-        flex-direction: column;
-      }
-      header {
-        padding: 8px 12px;
-        border-bottom: 1px solid #e5e5e5;
-        font: 13px/1.4 system-ui, sans-serif;
-      }
-      header p {
-        margin: 2px 0 0;
-        opacity: 0.75;
-      }
-      #app {
-        flex: 1;
-        min-height: 0;
-      }
-      #app > astro-island,
-      #app > astro-island > .example-shell,
-      #app > .example-shell {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-      }
+  <style is:global>
+    #app {
+      flex: 1;
+      min-height: 0;
+    }
+    #app > astro-island,
+    #app > astro-island > .example-shell,
+    #app > .example-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .example-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+    }
+
+    .example-grid {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stream-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 28px;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--chrome-border);
+      background: var(--chrome-raised);
+      color: var(--chrome-muted);
+      font: 10.5px var(--font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .stream-strip output {
+      color: var(--chrome-accent);
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    .example-grid > .sheetwrite {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Event pipeline side panel. */
+    .example-log {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border-left: 1px solid var(--chrome-border);
+      padding: 12px 14px;
+      overflow-y: auto;
+      background: var(--chrome-raised);
+      color: var(--chrome-fg);
+      font: 12px/1.6 var(--font-mono);
+    }
+    .example-log h2 {
+      margin: 0 0 4px;
+      font: 600 13px var(--font-display);
+      color: var(--chrome-fg);
+    }
+    .example-hint {
+      margin: 0 0 8px;
+      font: 12px/1.5 var(--font-sans);
+      color: var(--chrome-muted);
+    }
+    .example-sync {
+      display: block;
+      margin: 10px 0 7px;
+      padding: 6px 0;
+      border-top: 1px solid var(--chrome-border);
+      border-bottom: 1px solid var(--chrome-border);
+      color: var(--chrome-accent);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-actions {
+      display: grid;
+      gap: 6px;
+      margin-top: 5px;
+    }
+
+    .event-actions button,
+    .example-log .acknowledge {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 5px 9px;
+      border: 1px solid var(--chrome-border);
+      border-radius: 2px;
+      background: var(--chrome-bg);
+      color: var(--chrome-fg);
+      font: 12px var(--font-mono);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .event-actions button:hover,
+    .example-log .acknowledge:hover:not(:disabled) {
+      border-color: var(--chrome-accent);
+    }
+
+    .event-actions svg,
+    .example-log .acknowledge svg {
+      width: 16px;
+      height: 16px;
+      color: var(--chrome-accent);
+    }
+
+    .event-actions b,
+    .example-log .acknowledge b {
+      margin-right: 6px;
+      color: var(--chrome-accent);
+      font-weight: 600;
+    }
+
+    .example-log .acknowledge:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .example-log ul {
+      list-style: none;
+      margin: 12px 0 0;
+      padding: 0;
+      white-space: nowrap;
+    }
+    .example-log li {
+      padding: 2px 0;
+      border-bottom: 1px dashed var(--chrome-border);
+      color: var(--chrome-muted);
+    }
+    .example-log li:first-child {
+      color: var(--chrome-accent);
+    }
+
+    @media (max-width: 860px) {
       .example-body {
-        flex: 1;
-        min-height: 0;
-        display: grid;
-        grid-template-columns: 1fr 300px;
-      }
-      .example-grid {
-        min-width: 0;
-        min-height: 0;
+        grid-template-columns: 1fr;
       }
       .example-log {
-        border-left: 1px solid #d1d5db;
-        padding: 10px 12px;
-        overflow-y: auto;
-        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-        background: #f8fafc;
-        color: #1f2937;
+        display: none;
       }
-      .example-log h2 {
-        margin: 0 0 4px;
-        font: 600 13px/1.3 system-ui, sans-serif;
-      }
-      .example-hint {
-        font: 12px/1.4 system-ui, sans-serif;
-        opacity: 0.75;
-      }
-      .example-sync {
-        display: block;
-        margin: 6px 0;
-        font-weight: 600;
-      }
-      .example-log button {
-        font: inherit;
-        padding: 0.25rem 0.5rem;
-      }
-      .example-log ul {
-        list-style: none;
-        margin: 10px 0 0;
-        padding: 0;
-        white-space: nowrap;
-      }
-      .example-controls {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.6rem;
-        padding: 0.45rem 0.75rem;
-        border-top: 1px solid #d1d5db;
-        background: #f8fafc;
-        color: #1f2937;
-        font: 13px/1.4 system-ui, sans-serif;
-      }
-      [data-theme="dark"] .example-controls,
-      [data-theme="dark"] .example-log {
-        border-color: #374151;
-        background: #0f172a;
-        color: #e2e8f0;
-      }
-      .example-controls button {
-        padding: 0.25rem 0.5rem;
-        font: inherit;
-      }
-      .example-controls button[aria-pressed="true"] {
-        outline: 2px solid #0ea5e9;
-      }
-      .example-controls input {
-        box-sizing: border-box;
-        max-width: 10rem;
-        padding: 0.25rem 0.4rem;
-        font: inherit;
-      }
-      .example-controls output {
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
-      }
-      .example-divider {
-        flex: 1;
-      }
-    </style>
-  </body>
-</html>
+    }
+  </style>
+</Layout>

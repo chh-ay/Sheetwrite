@@ -302,6 +302,8 @@ impl StringPool {
         }
     }
 
+    /// Interned-string count; only test assertions read it today.
+    #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.spans.len()
     }

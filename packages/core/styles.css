@@ -207,6 +207,14 @@
   font: inherit;
 }
 
+.sheetwrite-tb-button > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+  pointer-events: none;
+}
+
 .sheetwrite-tb-color {
   width: 26px;
   height: 26px;

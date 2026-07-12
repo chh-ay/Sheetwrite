@@ -1,376 +1,458 @@
 ---
-import Nav from "../components/Nav.astro";
+// Google-Sheets-style workbook over the headless imperative API.
+// Wiring contract with src/lib/vanilla.ts: every #t-* button id, #namebox,
+// #formula, #status, #csvfile, #app, and the .gs-zoom class must survive.
+import Layout from "../layouts/Layout.astro";
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sheetwrite — Google-Sheets-style workbook demo (100k rows)</title>
-  </head>
-  <body>
-    <Nav active="vanilla" />
-
-    <!-- Title + menu -->
-    <div class="gs-title">
-      <div class="gs-logo" aria-hidden="true">⊞</div>
-      <div class="gs-titlewrap">
-        <div class="gs-docname">Sales workbook — Sheetwrite</div>
-        <nav class="gs-menu">
-          <span>File</span><span>Edit</span><span>View</span><span>Insert</span>
-          <span>Format</span><span>Data</span><span>Tools</span><span>Help</span>
-        </nav>
-      </div>
-      <button class="gs-share" type="button">🔒 Share</button>
+<Layout
+  title="Sheetwrite — Google-Sheets-style workbook (100k rows)"
+  description="A full spreadsheet shell built on Sheetwrite's headless imperative API: toolbar, formula bar, cross-sheet formulas, frozen panes, CSV import/export."
+  active="vanilla"
+>
+  <!-- Title + menu -->
+  <div class="gs-title">
+    <div class="gs-logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="20" height="20">
+        <path
+          d="M6 11h20M6 16h20M6 21h20M12 6v20M19 6v20"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          fill="none"></path>
+      </svg>
     </div>
-
-    <!-- Toolbar -->
-    <div class="gs-toolbar">
-      <button id="t-undo" type="button" title="Undo (Ctrl+Z)">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path
-            d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
-          ></path></svg
-        >
-      </button>
-      <button id="t-redo" type="button" title="Redo (Ctrl+Shift+Z)">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path
-            d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"
-          ></path></svg
-        >
-      </button>
-      <span class="gs-div"></span>
-      <button class="gs-zoom" type="button" title="Zoom">100%</button>
-      <span class="gs-div"></span>
-      <button id="t-bold" class="b" type="button" title="Bold (Ctrl+B)">B</button>
-      <button id="t-italic" class="i" type="button" title="Italic (Ctrl+I)">I</button>
-      <span class="gs-color" title="Text color">
-        <span class="glyph">A</span>
-        <span class="bar" id="t-textcolor-bar" style="background:#1a73e8"></span>
-        <input id="t-textcolor" type="color" value="#1a73e8" aria-label="Text color" />
-      </span>
-      <span class="gs-color" title="Fill color">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path
-            d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21z"
-          ></path></svg
-        >
-        <span class="bar" id="t-fillcolor-bar" style="background:#fff7e0"></span>
-        <input id="t-fillcolor" type="color" value="#fff7e0" aria-label="Fill color" />
-      </span>
-      <span class="gs-div"></span>
-      <button id="t-border" type="button" title="Borders">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path
-            d="M3 3v18h18V3H3zm8 16H5v-6h6v6zm0-8H5V5h6v6zm8 8h-6v-6h6v6zm0-8h-6V5h6v6z"
-          ></path></svg
-        >
-      </button>
-      <button id="t-merge" type="button" title="Merge cells">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path
-            d="M3 3v18h18V3H3zm16 16H5V5h14v14zM7.5 12l2.5-2.5v1.8h4V9.5L16.5 12 14 14.5v-1.8h-4v1.8z"
-          ></path></svg
-        >
-      </button>
-      <span class="gs-div"></span>
-      <button id="t-alignl" type="button" title="Align left">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path d="M3 5h18v2H3V5zm0 4h12v2H3V9zm0 4h18v2H3v-2zm0 4h12v2H3v-2z"></path></svg
-        >
-      </button>
-      <button id="t-alignc" type="button" title="Align center">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path d="M3 5h18v2H3V5zm3 4h12v2H6V9zm-3 4h18v2H3v-2zm3 4h12v2H6v-2z"></path></svg
-        >
-      </button>
-      <button id="t-alignr" type="button" title="Align right">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path d="M3 5h18v2H3V5zm6 4h12v2H9V9zm-6 4h18v2H3v-2zm6 4h12v2H9v-2z"></path></svg
-        >
-      </button>
-      <span class="gs-div"></span>
-      <button id="t-sort" type="button" title="Sort sheet by column (A→Z)">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"></path></svg
-        >
-      </button>
-      <button id="t-export" type="button" title="Download as CSV">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg
-        >
-      </button>
-      <button id="t-import" type="button" title="Import CSV">
-        <svg aria-hidden="true" viewBox="0 0 24 24"
-          ><path d="M5 15h4v6h6v-6h4l-7-7-7 7zM5 6V4h14v2H5z"></path></svg
-        >
-      </button>
-      <input id="csvfile" type="file" accept=".csv" hidden />
+    <div class="gs-titlewrap">
+      <div class="gs-overline">Vanilla API</div>
+      <div class="gs-docname">Sales workbook</div>
+      <nav class="gs-menu">
+        <span>File</span><span>Edit</span><span>View</span><span>Insert</span>
+        <span>Format</span><span>Data</span><span>Tools</span><span>Help</span>
+      </nav>
     </div>
+    <span class="gs-rowcount">100,000 rows</span>
+  </div>
 
-    <!-- Formula bar -->
-    <div class="gs-formula">
-      <input
-        id="namebox"
-        class="gs-namebox"
-        value="A1"
-        aria-label="Name box"
-        title="Name box — type a cell (e.g. C12) and press Enter"
-      />
-      <span class="gs-fx">fx</span>
-      <input id="formula" class="gs-input" aria-label="Formula bar" placeholder="" />
-    </div>
+  <!-- Toolbar -->
+  <div class="gs-toolbar">
+    <button id="t-undo" type="button" title="Undo (Ctrl+Z)">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path
+          d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
+        ></path></svg
+      >
+    </button>
+    <button id="t-redo" type="button" title="Redo (Ctrl+Shift+Z)">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path
+          d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"
+        ></path></svg
+      >
+    </button>
+    <span class="gs-div"></span>
+    <button class="gs-zoom" type="button" title="Zoom">100%</button>
+    <span class="gs-div"></span>
+    <button id="t-bold" class="b" type="button" title="Bold (Ctrl+B)">B</button>
+    <button id="t-italic" class="i" type="button" title="Italic (Ctrl+I)">I</button>
+    <span class="gs-color" title="Text color">
+      <span class="glyph">A</span>
+      <span class="bar" id="t-textcolor-bar" style="background:#34d399"></span>
+      <input id="t-textcolor" type="color" value="#34d399" aria-label="Text color" />
+    </span>
+    <span class="gs-color" title="Fill color">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path
+          d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21z"
+        ></path></svg
+      >
+      <span class="bar" id="t-fillcolor-bar" style="background:#fff7e0"></span>
+      <input id="t-fillcolor" type="color" value="#fff7e0" aria-label="Fill color" />
+    </span>
+    <span class="gs-div"></span>
+    <button id="t-border" type="button" title="Borders">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path
+          d="M3 3v18h18V3H3zm8 16H5v-6h6v6zm0-8H5V5h6v6zm8 8h-6v-6h6v6zm0-8h-6V5h6v6z"
+        ></path></svg
+      >
+    </button>
+    <button id="t-merge" type="button" title="Merge cells">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path
+          d="M3 3v18h18V3H3zm16 16H5V5h14v14zM7.5 12l2.5-2.5v1.8h4V9.5L16.5 12 14 14.5v-1.8h-4v1.8z"
+        ></path></svg
+      >
+    </button>
+    <span class="gs-div"></span>
+    <button id="t-alignl" type="button" title="Align left">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path d="M3 5h18v2H3V5zm0 4h12v2H3V9zm0 4h18v2H3v-2zm0 4h12v2H3v-2z"></path></svg
+      >
+    </button>
+    <button id="t-alignc" type="button" title="Align center">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path d="M3 5h18v2H3V5zm3 4h12v2H6V9zm-3 4h18v2H3v-2zm3 4h12v2H6v-2z"></path></svg
+      >
+    </button>
+    <button id="t-alignr" type="button" title="Align right">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path d="M3 5h18v2H3V5zm6 4h12v2H9V9zm-6 4h18v2H3v-2zm6 4h12v2H9v-2z"></path></svg
+      >
+    </button>
+    <span class="gs-div"></span>
+    <button id="t-sort" type="button" title="Sort sheet by column (A→Z)">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"></path></svg
+      >
+    </button>
+    <button id="t-export" type="button" title="Download as CSV">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg
+      >
+    </button>
+    <button id="t-import" type="button" title="Import CSV">
+      <svg aria-hidden="true" viewBox="0 0 24 24"
+        ><path d="M5 15h4v6h6v-6h4l-7-7-7 7zM5 6V4h14v2H5z"></path></svg
+      >
+    </button>
+    <input id="csvfile" type="file" accept=".csv" hidden />
+  </div>
 
-    <!-- Grid -->
-    <div id="app"></div>
+  <!-- Formula bar -->
+  <div class="gs-formula">
+    <input
+      id="namebox"
+      class="gs-namebox"
+      value="A1"
+      aria-label="Name box"
+      title="Name box — type a cell (e.g. C12) and press Enter"
+    />
+    <span class="gs-fx">fx</span>
+    <input id="formula" class="gs-input" aria-label="Formula bar" placeholder="" />
+  </div>
 
-    <!-- Bottom bar: selection stats (sheet tabs live inside the grid). -->
-    <div class="gs-bottom">
-      <div class="gs-status" id="status"></div>
-    </div>
+  <!-- Grid -->
+  <div id="app"></div>
 
-    <script>
-      import "../lib/vanilla";
-    </script>
+  <!-- Bottom bar: selection stats (sheet tabs live inside the grid). -->
+  <div class="gs-bottom">
+    <span class="gs-hint">Try the Summary tab — it holds live cross-sheet formulas into Sales</span>
+    <div class="gs-status" id="status"></div>
+  </div>
 
-    <style is:global>
-      :root {
-        --gs-blue: #1a73e8;
-        --gs-green: #188038;
-        --gs-text: #202124;
-        --gs-muted: #5f6368;
-        --gs-border: #dadce0;
-        --gs-hover: #f1f3f4;
-        --gs-bar: #ffffff;
-        --gs-toolbar: #edf2fa;
-        --gs-chip: #e8f0fe;
-        --gs-font: "Roboto", Arial, "Helvetica Neue", sans-serif;
-      }
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        font-family: var(--gs-font);
-        color: var(--gs-text);
-        background: #f9fbfd;
-      }
-      body {
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
+  <script>
+    import "../lib/vanilla";
+  </script>
 
-      /* ── Title row ─────────────────────────────────────────────── */
-      .gs-title {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 6px 12px;
-        background: var(--gs-bar);
-      }
-      .gs-logo {
-        width: 30px;
-        height: 38px;
-        display: grid;
-        place-items: center;
-        color: #fff;
-        font-weight: 700;
-        font-size: 15px;
-        background: var(--gs-green);
-        border-radius: 4px;
-      }
-      .gs-titlewrap {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.25;
-        flex: 1;
-        min-width: 0;
-      }
-      .gs-docname {
-        font-size: 18px;
-        font-weight: 400;
-      }
-      .gs-menu {
-        display: flex;
-        gap: 2px;
-        font-size: 13px;
-        color: var(--gs-muted);
-      }
-      .gs-menu span {
-        padding: 1px 7px;
-        border-radius: 4px;
-        cursor: default;
-      }
-      .gs-menu span:hover {
-        background: var(--gs-hover);
-      }
-      .gs-share {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        height: 36px;
-        padding: 0 18px 0 16px;
-        border: none;
-        border-radius: 18px;
-        background: #c2e7ff;
-        color: #001d35;
-        font: 500 14px var(--gs-font);
-        cursor: pointer;
-      }
-      .gs-share:hover {
-        box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3);
-      }
+  <style is:global>
+    body {
+      overflow: hidden;
+    }
 
-      /* ── Toolbar row ───────────────────────────────────────────── */
+    /* ── Workbook masthead ─────────────────────────────────────── */
+    .gs-title {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: none;
+      min-height: 64px;
+      padding: 9px 16px;
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--color-fw-vanilla) 7%, transparent), transparent 35%),
+        #080b12;
+      border-bottom: 1px solid #20283a;
+    }
+    .gs-title::after {
+      position: absolute;
+      right: 0;
+      bottom: -1px;
+      left: 0;
+      height: 1px;
+      background: linear-gradient(90deg, var(--color-fw-vanilla), transparent 28%);
+      content: "";
+    }
+    .gs-logo {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      flex: none;
+      place-items: center;
+      color: #090b10;
+      background: var(--color-fw-vanilla);
+      border: 1px solid #ffd667;
+      border-radius: 3px;
+      box-shadow: 4px 4px 0 #362d15;
+    }
+    .gs-titlewrap {
+      display: flex;
+      min-width: 0;
+      flex: 1;
+      flex-direction: column;
+      line-height: 1.25;
+    }
+    .gs-overline {
+      margin-bottom: 1px;
+      color: #877c61;
+      font: 10.5px var(--font-mono);
+      letter-spacing: 0.14em;
+    }
+    .gs-docname {
+      color: #f4f1e9;
+      font: 650 16px var(--font-display);
+      letter-spacing: -0.01em;
+    }
+    .gs-menu {
+      display: flex;
+      gap: 1px;
+      margin-top: 2px;
+      color: #6f788b;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .gs-menu span {
+      padding: 1px 6px;
+      border-radius: 2px;
+      cursor: default;
+    }
+    .gs-menu span:hover {
+      background: #171d29;
+      color: var(--color-fw-vanilla);
+    }
+    .gs-rowcount {
+      padding-left: 14px;
+      border-left: 1px solid #2a3140;
+      color: #9f9579;
+      font: 11px var(--font-mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ── Headless API toolbar ──────────────────────────────────── */
+    .gs-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex: none;
+      min-height: 38px;
+      margin: 0;
+      padding: 4px 12px;
+      background: #0e131d;
+      border-bottom: 1px solid #252d3d;
+      box-shadow: inset 0 1px 0 #171e2b;
+    }
+    .gs-toolbar button {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      background: transparent;
+      color: #9ca7b9;
+      cursor: pointer;
+      font: 500 14px var(--font-sans);
+      padding: 0;
+      transition:
+        border-color 100ms,
+        background 100ms;
+    }
+    .gs-toolbar button:hover {
+      border-color: #3b4559;
+      background: #1a2230;
+      color: var(--color-fw-vanilla);
+    }
+    .gs-toolbar button svg {
+      width: 17px;
+      height: 17px;
+      fill: currentColor;
+    }
+    .gs-toolbar .b {
+      font-weight: 700;
+    }
+    .gs-toolbar .i {
+      font-style: italic;
+      font-family: Georgia, serif;
+    }
+    .gs-div {
+      width: 1px;
+      height: 19px;
+      margin: 0 6px;
+      background: #30394a;
+    }
+    .gs-toolbar button.gs-zoom {
+      width: auto;
+      padding: 0 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-fw-vanilla);
+    }
+    .gs-color {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      cursor: pointer;
+      color: #9ca7b9;
+    }
+    .gs-color:hover {
+      border-color: #3b4559;
+      background: #1a2230;
+      color: var(--color-fw-vanilla);
+    }
+    .gs-toolbar .gs-color svg {
+      width: 17px;
+      height: 17px;
+      fill: currentColor;
+    }
+    .gs-color input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .gs-color .glyph {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .gs-color .bar {
+      position: absolute;
+      bottom: 4px;
+      width: 15px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    /* ── Formula bar ───────────────────────────────────────────── */
+    .gs-formula {
+      display: flex;
+      align-items: center;
+      flex: none;
+      height: 35px;
+      border-bottom: 1px solid #242c3a;
+      background: #090d14;
+    }
+    .gs-namebox {
+      width: 96px;
+      height: 100%;
+      border: none;
+      border-right: 1px solid #242c3a;
+      background: #0d121c;
+      text-align: center;
+      font: 600 12px var(--font-mono);
+      color: var(--color-fw-vanilla);
+      outline: none;
+    }
+    .gs-namebox:focus {
+      background: #171e2b;
+      box-shadow: inset 0 -2px 0 var(--color-fw-vanilla);
+    }
+    .gs-fx {
+      padding: 0 14px 0 12px;
+      color: #5f6b80;
+      font: italic 600 13px Georgia, serif;
+    }
+    .gs-input {
+      flex: 1;
+      height: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      font: 12.5px var(--font-mono);
+      color: #d8deea;
+    }
+
+    /* ── Grid ──────────────────────────────────────────────────── */
+    #app {
+      flex: 1;
+      min-height: 0;
+      background: #0a0d14;
+    }
+
+    /* ── Telemetry footer ──────────────────────────────────────── */
+    .gs-bottom {
+      display: flex;
+      align-items: center;
+      flex: none;
+      height: 31px;
+      padding: 0 14px;
+      background: #080b11;
+      border-top: 1px solid #20283a;
+      color: #626d80;
+      font: 11px var(--font-mono);
+      letter-spacing: 0.02em;
+    }
+    .gs-hint {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .gs-hint::before {
+      margin-right: 8px;
+      color: var(--color-fw-vanilla);
+      content: "→";
+    }
+    .gs-status {
+      margin-left: auto;
+      display: flex;
+      gap: 18px;
+      padding-left: 16px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .gs-status b {
+      color: var(--color-fw-vanilla);
+      font-weight: 600;
+    }
+
+    /* ── In-grid widgets: the core shell joins the operator console ── */
+    #app .sheetwrite-tabbar {
+      border-color: #242c3a;
+      background: #0e131d;
+      color: #8994a8;
+      font: 12.5px var(--font-sans);
+    }
+    #app .sheetwrite-tab-active {
+      background: color-mix(in srgb, var(--color-fw-vanilla) 11%, #0e131d);
+      color: var(--color-fw-vanilla);
+      box-shadow: inset 0 -2px 0 var(--color-fw-vanilla);
+    }
+    #app .sheetwrite-tab:hover:not(.sheetwrite-tab-active) {
+      background: #171e2b;
+    }
+    #app .sheetwrite-find,
+    #app .sheetwrite-context-menu {
+      border-color: #30394a;
+      border-radius: 3px;
+      background: #111722;
+      color: #d8deea;
+      font: 12.5px var(--font-sans);
+      box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.28);
+    }
+    #app .sheetwrite-find-btn {
+      color: var(--color-fw-vanilla);
+    }
+    #app .sheetwrite-context-menu-item:hover {
+      background: color-mix(in srgb, var(--color-fw-vanilla) 12%, #111722);
+    }
+
+    @media (max-width: 760px) {
+      .gs-rowcount {
+        display: none;
+      }
+      .gs-menu span:nth-child(n + 5),
+      .gs-hint {
+        display: none;
+      }
       .gs-toolbar {
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        margin: 2px 12px 6px;
-        padding: 3px 8px;
-        background: var(--gs-toolbar);
-        border-radius: 20px;
+        overflow-x: auto;
       }
-      .gs-toolbar button {
-        width: 28px;
-        height: 28px;
-        display: grid;
-        place-items: center;
-        border: none;
-        border-radius: 4px;
-        background: transparent;
-        color: #444746;
-        cursor: pointer;
-        font: 500 14px var(--gs-font);
-        padding: 0;
-      }
-      .gs-toolbar button:hover {
-        background: #e1e8f2;
-      }
-      .gs-toolbar button svg {
-        width: 18px;
-        height: 18px;
-        fill: currentColor;
-      }
-      .gs-toolbar .b {
-        font-weight: 700;
-      }
-      .gs-toolbar .i {
-        font-style: italic;
-        font-family: Georgia, serif;
-      }
-      .gs-div {
-        width: 1px;
-        height: 20px;
-        margin: 0 6px;
-        background: #c7cdd6;
-      }
-      .gs-toolbar button.gs-zoom {
-        width: auto;
-        padding: 0 8px;
-        font-size: 13px;
-      }
-      .gs-color {
-        position: relative;
-        display: grid;
-        place-items: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      .gs-color:hover {
-        background: #e1e8f2;
-      }
-      .gs-toolbar .gs-color svg {
-        width: 18px;
-        height: 18px;
-        fill: #444746;
-      }
-      .gs-color input {
-        position: absolute;
-        inset: 0;
-        opacity: 0;
-        cursor: pointer;
-      }
-      .gs-color .glyph {
-        font-weight: 700;
-        font-size: 14px;
-        line-height: 1;
-        color: #444746;
-      }
-      .gs-color .bar {
-        position: absolute;
-        bottom: 4px;
-        width: 16px;
-        height: 3px;
-        border-radius: 1px;
-      }
-
-      /* ── Formula bar ───────────────────────────────────────────── */
-      .gs-formula {
-        display: flex;
-        align-items: center;
-        height: 30px;
-        border-top: 1px solid var(--gs-border);
-        border-bottom: 1px solid var(--gs-border);
-        background: var(--gs-bar);
-      }
-      .gs-namebox {
-        width: 96px;
-        height: 100%;
-        border: none;
-        border-right: 1px solid var(--gs-border);
-        text-align: center;
-        font: 500 13px var(--gs-font);
-        color: var(--gs-text);
-        outline: none;
-      }
-      .gs-fx {
-        padding: 0 14px 0 12px;
-        color: var(--gs-muted);
-        font: italic 14px Georgia, serif;
-      }
-      .gs-input {
-        flex: 1;
-        height: 100%;
-        border: none;
-        outline: none;
-        font: 13px var(--gs-font);
-        color: var(--gs-text);
-      }
-
-      /* ── Grid ──────────────────────────────────────────────────── */
-      #app {
-        flex: 1;
-        min-height: 0;
-        background: #fff;
-      }
-
-      /* ── Bottom bar ────────────────────────────────────────────── */
-      .gs-bottom {
-        display: flex;
-        align-items: center;
-        height: 37px;
-        padding: 0 8px;
-        background: var(--gs-bar);
-        border-top: 1px solid var(--gs-border);
-        font-size: 13px;
-        color: var(--gs-muted);
-      }
-      .gs-status {
-        margin-left: auto;
-        display: flex;
-        gap: 18px;
-        padding: 0 10px;
-        font-variant-numeric: tabular-nums;
-      }
-      .gs-status b {
-        font-weight: 500;
-        color: var(--gs-text);
-      }
-    </style>
-  </body>
-</html>
+    }
+  </style>
+</Layout>

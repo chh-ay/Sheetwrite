@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Renderer, Viewport } from "../src/types.js";
+import type { Renderer, RenderLayout, RowData, Viewport } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
@@ -94,15 +94,20 @@ describe("find-bar keystroke isolation", () => {
 
 interface PaintRecorder extends Renderer {
   readonly paints: Array<{ rowHeights: number[] | null }>;
+  readonly layouts: Array<RenderLayout["merges"]>;
 }
 
 function makePaintRecorder(): PaintRecorder {
   let lastViewport: Viewport | null = null;
   const paints: Array<{ rowHeights: number[] | null }> = [];
+  const layouts: Array<RenderLayout["merges"]> = [];
   return {
     paints,
+    layouts,
     mount() {},
-    setLayout() {},
+    setLayout(layout) {
+      layouts.push(layout.merges?.map((merge) => ({ ...merge })));
+    },
     setViewport(viewport: Viewport) {
       lastViewport = viewport;
     },
@@ -163,6 +168,89 @@ describe("row-resize repaint invalidation", () => {
     // The forced repaint carried the resized geometry into the frame.
     expect(recorder.paints.at(-1)?.rowHeights?.[0]).toBe(58);
 
+    grid.destroy();
+  });
+});
+
+describe("merge repaint invalidation", () => {
+  it("repaints immediately after merge and unmerge actions", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const recorder = makePaintRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
+    });
+    recorder.layouts.length = 0;
+    recorder.paints.length = 0;
+    const focusRect = (): HTMLDivElement => {
+      const overlay = host.querySelector(".sheetwrite-overlay");
+      const rect = Array.from(overlay?.querySelectorAll("div") ?? []).find(
+        (element) => element.style.outlineWidth === "2px" && element.style.display !== "none",
+      );
+      if (!(rect instanceof HTMLDivElement)) throw new Error("focus ring not painted");
+      return rect;
+    };
+    const selectionRect = (): HTMLDivElement => {
+      const overlay = host.querySelector(".sheetwrite-overlay");
+      const rect = Array.from(overlay?.querySelectorAll("div") ?? []).find(
+        (element) =>
+          element.style.outlineWidth === "1.5px" &&
+          element.style.width !== "6px" &&
+          element.style.display !== "none",
+      );
+      if (!(rect instanceof HTMLDivElement)) throw new Error("selection fill not painted");
+      return rect;
+    };
+
+    grid.actions.merge();
+
+    expect(recorder.layouts.at(-1)).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
+    expect(recorder.paints).toHaveLength(1);
+    expect(focusRect().style.width).toBe("280px");
+    expect(focusRect().style.height).toBe("56px");
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+    expect(selectionRect().style.width).toBe("280px");
+    expect(selectionRect().style.height).toBe("56px");
+
+    recorder.layouts.length = 0;
+    recorder.paints.length = 0;
+    grid.actions.unmerge();
+
+    expect(recorder.layouts.at(-1)).toEqual([]);
+    expect(recorder.paints).toHaveLength(1);
+    expect(focusRect().style.width).toBe("120px");
+    expect(focusRect().style.height).toBe("28px");
+    grid.destroy();
+  });
+});
+describe("datasource repaint invalidation", () => {
+  it("repaints when an async page resolves without another interaction", async () => {
+    const { promise, resolve } = Promise.withResolvers<RowData[]>();
+    const workbook = makeWorkbook(20);
+    const host = mountHost();
+    const grid = new GridImpl(host, {
+      workbook,
+      datasource: { getRows: () => promise },
+    });
+    const recorder = makePaintRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+
+    resolve(
+      Array.from({ length: 20 }, (_, row) => ({
+        name: `Loaded ${row}`,
+        amount: row,
+        city: "Tokyo",
+      })),
+    );
+    await promise;
+    await Promise.resolve();
+
+    expect(recorder.paints).toHaveLength(1);
     grid.destroy();
   });
 });

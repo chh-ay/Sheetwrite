@@ -36,7 +36,6 @@ const workbook: Workbook = {
           header: "Account",
           width: 200,
           type: "text",
-          headerStyle: { bold: true, color: "#1d4ed8" },
         },
         { key: "status", header: "Status", width: 140, type: "text", renderer: "badge" },
         {
@@ -64,72 +63,81 @@ const data: ColumnarData = {
   columns: { id: ids, name: names, status: statuses, amount: amounts, score: scores },
 };
 
-// ── Custom canvas cell renderer: a colored status pill ───────────────────────
-const BADGE_PALETTE: Record<string, { bg: string; fg: string }> = {
-  active: { bg: "#16a34a", fg: "#ffffff" },
-  trial: { bg: "#d97706", fg: "#ffffff" },
-  churned: { bg: "#9ca3af", fg: "#1f2937" },
+// ── Custom canvas cell renderer: compact status tags ─────────────────────────
+interface TagPalette {
+  fill: string;
+  fg: string;
+  edge: string;
+}
+
+const LIGHT_TAGS: Record<string, TagPalette> = {
+  active: { fill: "#dcfce7", fg: "#166534", edge: "#22c55e" },
+  trial: { fill: "#ffedd5", fg: "#9a3412", edge: "#f97316" },
+  churned: { fill: "#e2e8f0", fg: "#475569", edge: "#94a3b8" },
 };
-const BADGE_FALLBACK = { bg: "#e5e7eb", fg: "#374151" };
+const DARK_TAGS: Record<string, TagPalette> = {
+  active: { fill: "#12372a", fg: "#86efac", edge: "#34d399" },
+  trial: { fill: "#422a16", fg: "#fdba74", edge: "#fb923c" },
+  churned: { fill: "#273244", fg: "#cbd5e1", edge: "#64748b" },
+};
+const TAG_FALLBACK: TagPalette = { fill: "#e2e8f0", fg: "#475569", edge: "#94a3b8" };
 
 const badge: CellRenderer = {
   canvas(ctx, c) {
     const label = c.value == null ? "" : String(c.value);
     if (label === "") return;
 
-    const palette = BADGE_PALETTE[label] ?? BADGE_FALLBACK;
+    const palettes = c.theme.bg === "#0b1020" ? DARK_TAGS : LIGHT_TAGS;
+    const palette = palettes[label] ?? TAG_FALLBACK;
     const padX = 8;
-    const pillH = Math.min(c.h - 8, 18);
-    const pillX = c.x + padX;
-    const pillY = c.y + (c.h - pillH) / 2;
-    const radius = pillH / 2;
+    const tagH = Math.min(c.h - 8, 18);
+    const tagX = c.x + 7;
+    const tagY = c.y + (c.h - tagH) / 2;
 
     ctx.font = c.theme.font;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
 
     const textW = ctx.measureText(label).width;
-    const pillW = Math.max(radius * 2, Math.min(textW + padX * 2, c.w - padX * 2));
-
-    ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillW, pillH, radius);
-    ctx.fillStyle = palette.bg;
-    ctx.fill();
-
+    const tagW = Math.min(textW + padX * 2 + 3, c.w - 14);
+    ctx.fillStyle = palette.fill;
+    ctx.fillRect(tagX, tagY, tagW, tagH);
+    ctx.fillStyle = palette.edge;
+    ctx.fillRect(tagX, tagY, 3, tagH);
     ctx.fillStyle = palette.fg;
-    ctx.fillText(label, pillX + padX, pillY + pillH / 2, Math.max(1, pillW - padX * 2));
+    ctx.fillText(label, tagX + padX + 3, tagY + tagH / 2);
   },
 };
 
 // ── Theme palettes wired to the toolbar ──────────────────────────────────────
 const LIGHT: Partial<Theme> = {
-  bg: "#ffffff",
-  fg: "#111111",
-  gridLine: "#eeeeee",
-  headerBg: "#f4ede1",
-  headerFg: "#6b4a1f",
-  selection: "#2563eb22",
-  selectionBorder: "#2563eb",
+  bg: "#f7f8fb",
+  fg: "#1e293b",
+  gridLine: "#d9e0ea",
+  headerBg: "#111827",
+  headerFg: "#e5e7eb",
+  selection: "#10b98124",
+  selectionBorder: "#059669",
 };
 
 const DARK: Partial<Theme> = {
-  bg: "#0b0b0c",
-  fg: "#e7e7e7",
-  gridLine: "#26262a",
-  headerBg: "#1a160f",
-  headerFg: "#e8c98a",
-  selection: "#e8c98a22",
-  selectionBorder: "#e8c98a",
+  bg: "#0b1020",
+  fg: "#dce3f0",
+  gridLine: "#202a40",
+  headerBg: "#12192a",
+  headerFg: "#93c5fd",
+  selection: "#38bdf824",
+  selectionBorder: "#38bdf8",
 };
 
 const BRAND: Partial<Theme> = {
-  bg: "#fff8f0",
-  fg: "#3b2410",
-  gridLine: "#f0dcc4",
-  headerBg: "#d2691e",
-  headerFg: "#fff8f0",
-  selection: "#d2691e22",
-  selectionBorder: "#d2691e",
+  bg: "#fffafc",
+  fg: "#392f3a",
+  gridLine: "#eadde6",
+  headerBg: "#5b214e",
+  headerFg: "#fff5fb",
+  selection: "#d946ef1f",
+  selectionBorder: "#c026d3",
 };
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
@@ -158,6 +166,18 @@ const lightBtn = document.getElementById("theme-light") as HTMLButtonElement | n
 const darkBtn = document.getElementById("theme-dark") as HTMLButtonElement | null;
 const brandBtn = document.getElementById("theme-brand") as HTMLButtonElement | null;
 
+const themeJson = document.getElementById("theme-json");
+
+function showTheme(theme: Partial<Theme>): void {
+  if (!themeJson) return;
+  const body = Object.entries(theme)
+    .map(([key, value]) => `  ${key}: ${JSON.stringify(value)},`)
+    .join("\n");
+  themeJson.textContent = `grid.setTheme({\n${body}\n})`;
+}
+
+showTheme(LIGHT);
+
 function selectThemeButton(active: HTMLButtonElement | null): void {
   for (const btn of [lightBtn, darkBtn, brandBtn]) {
     if (btn) btn.setAttribute("aria-pressed", String(btn === active));
@@ -168,16 +188,19 @@ lightBtn?.addEventListener("click", () => {
   grid.setTheme(LIGHT);
   stage?.removeAttribute("data-theme");
   selectThemeButton(lightBtn);
+  showTheme(LIGHT);
 });
 darkBtn?.addEventListener("click", () => {
   grid.setTheme(DARK);
   stage?.setAttribute("data-theme", "dark");
   selectThemeButton(darkBtn);
+  showTheme(DARK);
 });
 brandBtn?.addEventListener("click", () => {
   grid.setTheme(BRAND);
   stage?.removeAttribute("data-theme");
   selectThemeButton(brandBtn);
+  showTheme(BRAND);
 });
 
 // ── Toolbar: per-cell fill on the selected cell ──────────────────────────────

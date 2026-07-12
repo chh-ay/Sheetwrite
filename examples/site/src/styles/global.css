@@ -1,0 +1,363 @@
+/* Sheetwrite examples — design system.
+   Tailwind v4 tokens + the shared chrome for the framework islands.
+   Grid theming stays canvas-side (Theme objects) and --sheetwrite-* vars;
+   NOTHING here may set data-theme/.dark on an ancestor of .sheetwrite. */
+
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Ink — the blue-black chrome scale the whole site sits on. */
+  --color-ink-950: #05070d;
+  --color-ink-900: #0a101e;
+  --color-ink-850: #0e1526;
+  --color-ink-800: #131b2e;
+  --color-ink-700: #1d2740;
+  --color-ink-600: #2a3654;
+  --color-ink-500: #3e4c6e;
+  --color-ink-400: #5c6b8a;
+  --color-ink-300: #8b99b5;
+  --color-ink-200: #c3ccde;
+  --color-ink-100: #e4e9f2;
+  --color-ink-50: #f4f6fa;
+
+  /* Brand — spreadsheet green, with cyan as the gradient partner. */
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+
+  /* Per-demo accents. */
+  --color-fw-vanilla: #f0b429;
+  --color-fw-lab: #a78bfa;
+  --color-fw-react: #61dafb;
+  --color-fw-vue: #42b883;
+  --color-fw-svelte: #ff3e00;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand-500) 35%, transparent);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-600) transparent;
+  }
+}
+
+@utility grid-paper {
+  /* Graph-paper texture: the product IS a grid. */
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-ink-100) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-ink-100) 4%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 44px 44px;
+}
+
+@layer components {
+  /* ── Shared chrome tokens for the framework islands ─────────────────────
+     Each island toggles data-theme="dark" on its own .example-shell; the
+     grid canvas repaints from its Theme object, and this chrome follows. */
+  .example-shell {
+    --chrome-bg: #ffffff;
+    --chrome-raised: var(--color-ink-50);
+    --chrome-fg: var(--color-ink-800);
+    --chrome-muted: var(--color-ink-400);
+    --chrome-border: #dfe5ef;
+    --chrome-accent: var(--color-brand-600);
+    --chrome-accent-soft: color-mix(in srgb, var(--color-brand-500) 12%, transparent);
+    background: var(--chrome-bg);
+    color: var(--chrome-fg);
+  }
+
+  .example-shell[data-theme="dark"] {
+    --chrome-bg: var(--color-ink-900);
+    --chrome-raised: var(--color-ink-850);
+    --chrome-fg: var(--color-ink-100);
+    --chrome-muted: var(--color-ink-300);
+    --chrome-border: var(--color-ink-700);
+    --chrome-accent: var(--color-brand-400);
+    --chrome-accent-soft: color-mix(in srgb, var(--color-brand-400) 16%, transparent);
+  }
+
+  .example-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.75rem;
+    padding: 0.5rem 0.85rem;
+    border-bottom: 1px solid var(--chrome-border);
+    background: var(--chrome-raised);
+    color: var(--chrome-fg);
+    font-size: 12.5px;
+  }
+
+  .example-footer {
+    border-bottom: none;
+    border-top: 1px solid var(--chrome-border);
+  }
+
+  .example-controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--chrome-muted);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .example-controls button,
+  .example-log button {
+    padding: 0.28rem 0.65rem;
+    border: 1px solid var(--chrome-border);
+    border-radius: 3px;
+    background: var(--chrome-bg);
+    color: var(--chrome-fg);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      border-color 120ms,
+      background 120ms;
+  }
+
+  .example-controls button:hover:not(:disabled),
+  .example-log button:hover:not(:disabled) {
+    border-color: var(--chrome-accent);
+  }
+
+  .example-controls button:disabled,
+  .example-log button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .example-controls button[aria-pressed="true"],
+  .example-log button[aria-pressed="true"] {
+    border-color: var(--chrome-accent);
+    background: var(--chrome-accent-soft);
+    color: var(--chrome-accent);
+  }
+
+  .example-controls select,
+  .example-controls input[type="search"],
+  .example-controls input[type="number"],
+  .example-controls input[type="text"] {
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--chrome-border);
+    border-radius: 3px;
+    background: var(--chrome-bg);
+    color: var(--chrome-fg);
+    font: inherit;
+  }
+
+  .example-controls input[type="number"] {
+    width: 4.5rem;
+  }
+
+  .example-controls input[type="search"] {
+    width: 11rem;
+  }
+
+  .example-controls select:focus-visible,
+  .example-controls input:focus-visible,
+  .example-controls button:focus-visible,
+  .example-log button:focus-visible {
+    outline: 2px solid var(--chrome-accent);
+    outline-offset: 1px;
+  }
+
+  .example-controls output {
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--chrome-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .example-divider {
+    flex: 1;
+  }
+
+  .example-grid {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  /* The data-first <Sheetwrite> bonus demo each island appends — collapsed
+     behind a <details> so it never competes with the main grid. */
+  .example-simple {
+    flex: none;
+    border-top: 1px solid var(--chrome-border);
+    background: var(--chrome-raised);
+  }
+
+  .example-simple > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--chrome-muted);
+  }
+
+  .example-simple > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .example-simple > summary::before {
+    content: "▸";
+    font-size: 11px;
+    transition: transform 120ms;
+  }
+
+  .example-simple[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  .example-simple > summary:hover {
+    color: var(--chrome-accent);
+  }
+
+  /* Quick-start body: the literal source next to the grid it produces. */
+  .example-simple-body {
+    display: grid;
+    grid-template-columns: minmax(300px, 420px) 1fr;
+    gap: 12px;
+    padding: 0 0.85rem 0.85rem;
+  }
+
+  .example-simple-code {
+    margin: 0;
+    padding: 10px 14px;
+    overflow: auto;
+    border: 1px solid var(--chrome-border);
+    border-radius: 3px;
+    background: var(--chrome-bg);
+    font: 12px / 1.65 var(--font-mono);
+    color: var(--chrome-fg);
+  }
+
+  .example-simple .sheetwrite {
+    border: 1px solid var(--chrome-border);
+    border-radius: 3px;
+  }
+
+  @media (max-width: 900px) {
+    .example-simple-body {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* The grid's built-in widgets (toolbar, sheet tabs, find bar, context menu)
+     restyled onto the shared chrome tokens; host rules win over styles.css
+     without !important by design, and follow the island's dark toggle. */
+  .example-shell .sheetwrite-toolbar {
+    gap: 3px;
+    padding: 4px 8px;
+    background: var(--chrome-raised);
+    color: var(--chrome-fg);
+    border-bottom: 1px solid var(--chrome-border);
+    font: 12.5px var(--font-sans);
+  }
+
+  .example-shell .sheetwrite-tb-button {
+    border-radius: 2px;
+  }
+
+  .example-shell .sheetwrite-tb-button:hover {
+    background: var(--chrome-accent-soft);
+    color: var(--chrome-accent);
+  }
+
+  .example-shell .sheetwrite-tb-separator {
+    background: var(--chrome-border);
+  }
+
+  .example-shell .sheetwrite-tb-color {
+    width: 24px;
+    height: 22px;
+    padding: 1px;
+    border: 1px solid var(--chrome-border);
+    border-radius: 2px;
+    background: var(--chrome-bg);
+  }
+
+  .example-shell .sheetwrite-tabbar {
+    background: var(--chrome-raised);
+    border-top: 1px solid var(--chrome-border);
+    font: 12.5px var(--font-sans);
+  }
+
+  .example-shell .sheetwrite-tab {
+    color: var(--chrome-muted);
+  }
+
+  .example-shell .sheetwrite-tab:hover:not(.sheetwrite-tab-active) {
+    background: var(--chrome-accent-soft);
+  }
+
+  .example-shell .sheetwrite-tab-active {
+    background: var(--chrome-accent-soft);
+    color: var(--chrome-accent);
+    box-shadow: inset 0 -2px 0 var(--chrome-accent);
+  }
+
+  .example-shell .sheetwrite-find,
+  .example-shell .sheetwrite-context-menu {
+    background: var(--chrome-raised);
+    color: var(--chrome-fg);
+    border-color: var(--chrome-border);
+    font: 12.5px var(--font-sans);
+  }
+
+  .example-shell .sheetwrite-find-input,
+  .example-shell .sheetwrite-find-replace-input {
+    background: transparent;
+    color: var(--chrome-fg);
+    border-bottom-color: var(--chrome-border);
+  }
+
+  .example-shell .sheetwrite-find-btn {
+    color: var(--chrome-accent);
+  }
+
+  .example-shell .sheetwrite-context-menu-item:hover {
+    background: var(--chrome-accent-soft);
+  }
+}

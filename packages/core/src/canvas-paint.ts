@@ -185,6 +185,9 @@ function paintTextDecoration(
 interface PaintState {
   lastFont: string;
   lastFill: string;
+  measuredFont: string;
+  digitWidth: number;
+  hashWidth: number;
 }
 
 function applyFont(ctx: Ctx, state: PaintState, font: string): void {
@@ -305,7 +308,13 @@ export function paintFrame(
   const colX = columnEdges(layout);
   const g = theme.rowHeaderWidth;
 
-  const state: PaintState = { lastFont: "", lastFill: "" };
+  const state: PaintState = {
+    lastFont: "",
+    lastFill: "",
+    measuredFont: "",
+    digitWidth: 0,
+    hashWidth: 0,
+  };
   const styleCache = new Map<number, CellStyle>();
   const styleStride = view.styles.length || 1;
   const merges = layout.merges;
@@ -313,6 +322,10 @@ export function paintFrame(
     merges !== undefined
       ? buildMergeMap(merges, view.rows.start, view.rows.end, view.cols)
       : undefined;
+  const mergesByColumn =
+    merges && merges.length > 0 ? [...merges].sort((a, b) => a.c0 - b.c0) : undefined;
+  const mergesByRow =
+    merges && merges.length > 0 ? [...merges].sort((a, b) => a.r0 - b.r0) : undefined;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.save();
@@ -371,6 +384,29 @@ export function paintFrame(
       const styleId = view.styleIds[i]!;
       const style = view.styles[styleId] ?? EMPTY_STYLE;
       const styleKey = col * styleStride + styleId;
+
+      // Sheets lets text spill through adjacent empty cells, but never through
+      // occupied cells. Compute the contiguous empty run around this cell; the
+      // painter chooses the relevant side after resolving alignment. Numbers
+      // and custom renderers deliberately keep their own cell bounds.
+      let spillX = x;
+      let spillRight = x + cw;
+      if (!merge && typeof value === "string" && value !== "") {
+        for (let k = cj - 1; k >= 0; k--) {
+          const adjacent = view.cols[k]! + 1 === view.cols[k + 1]!;
+          const neighbour = view.values[ri * nCols + k];
+          if (!adjacent || (neighbour !== null && neighbour !== "" && neighbour !== undefined))
+            break;
+          spillX = colX[view.cols[k]!]! - scrollLeft + g;
+        }
+        for (let k = cj + 1; k < nCols; k++) {
+          const adjacent = view.cols[k - 1]! + 1 === view.cols[k]!;
+          const neighbour = view.values[ri * nCols + k];
+          if (!adjacent || (neighbour !== null && neighbour !== "" && neighbour !== undefined))
+            break;
+          spillRight = colX[view.cols[k]! + 1]! - scrollLeft + g;
+        }
+      }
       paintCell(
         ctx,
         theme,
@@ -382,6 +418,8 @@ export function paintFrame(
         y,
         cw,
         ch,
+        spillX,
+        spillRight - spillX,
         renderers,
         state,
         styleKey,
@@ -401,8 +439,24 @@ export function paintFrame(
         : (row + 1) * rowHeight;
     const lineY = Math.round(headerHeight + rowBottom - scrollTop) - 0.5;
     if (lineY < paintTop || lineY > paintBottom) continue;
-    ctx.moveTo(g, lineY);
-    ctx.lineTo(width, lineY);
+    let cursorX = g;
+    if (mergesByColumn) {
+      for (const merge of mergesByColumn) {
+        if (merge.r0 > row || row >= merge.r1) continue;
+        const gapStart = Math.max(g, colX[merge.c0]! - scrollLeft + g);
+        const gapEnd = Math.min(width, colX[merge.c1 + 1]! - scrollLeft + g);
+        if (gapEnd <= cursorX || gapStart >= width) continue;
+        if (gapStart > cursorX) {
+          ctx.moveTo(cursorX, lineY);
+          ctx.lineTo(gapStart, lineY);
+        }
+        cursorX = Math.max(cursorX, gapEnd);
+      }
+    }
+    if (cursorX < width) {
+      ctx.moveTo(cursorX, lineY);
+      ctx.lineTo(width, lineY);
+    }
   }
   ctx.stroke();
   ctx.restore();
@@ -412,20 +466,44 @@ export function paintFrame(
   // Vertical gridlines through header + body.
   ctx.strokeStyle = theme.gridLine;
   ctx.beginPath();
+  const appendVerticalGridline = (c: number, lineX: number): void => {
+    if (lineX < g || lineX > width) return;
+    let cursorY = 0;
+    if (mergesByRow) {
+      for (const merge of mergesByRow) {
+        if (merge.c0 >= c || c > merge.c1) continue;
+        const mergeIndex = merge.r0 - view.rows.start;
+        const mergeContentTop =
+          rowTops !== undefined && mergeIndex >= 0 && mergeIndex < nRows
+            ? rowTops[mergeIndex]!
+            : merge.r0 * rowHeight;
+        const mergeTop = headerHeight + mergeContentTop - scrollTop;
+        const gapStart = Math.max(0, mergeTop);
+        const gapEnd = Math.min(
+          height,
+          mergeTop + mergeRowSpanHeight(merge, view.rows.start, nRows, rowHeights, rowHeight),
+        );
+        if (gapEnd <= cursorY || gapStart >= height) continue;
+        if (gapStart > cursorY) {
+          ctx.moveTo(lineX, cursorY);
+          ctx.lineTo(lineX, gapStart);
+        }
+        cursorY = Math.max(cursorY, gapEnd);
+      }
+    }
+    if (cursorY < height) {
+      ctx.moveTo(lineX, cursorY);
+      ctx.lineTo(lineX, height);
+    }
+  };
+
   for (let cj = 0; cj < nCols; cj++) {
     const c = view.cols[cj]!;
-    const lineX = Math.round(colX[c]! - scrollLeft + g) - 0.5;
-    if (lineX < g || lineX > width) continue;
-    ctx.moveTo(lineX, 0);
-    ctx.lineTo(lineX, height);
+    appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
   }
   if (nCols > 0) {
     const c = view.cols[nCols - 1]! + 1;
-    const lineX = Math.round(colX[c]! - scrollLeft + g) - 0.5;
-    if (lineX >= g && lineX <= width) {
-      ctx.moveTo(lineX, 0);
-      ctx.lineTo(lineX, height);
-    }
+    appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
   }
   ctx.stroke();
 
@@ -462,6 +540,17 @@ export function paintFrame(
   ctx.restore();
 }
 
+/**
+ * Clip cell content without using fillText's `maxWidth`, which scales and
+ * visibly squeezes glyphs. Text may receive a wider Sheets-style spill rect;
+ * its height always remains locked to the owning row.
+ */
+function clipCell(ctx: Ctx, x: number, y: number, w: number, h: number): void {
+  ctx.beginPath();
+  ctx.rect(x, y, Math.max(0, w), Math.max(0, h));
+  ctx.clip();
+}
+
 function paintCell(
   ctx: Ctx,
   theme: Theme,
@@ -473,6 +562,8 @@ function paintCell(
   y: number,
   w: number,
   h: number,
+  spillX: number,
+  spillW: number,
   renderers: ReadonlyMap<string, CellRenderer>,
   state: PaintState,
   styleKey: number,
@@ -505,16 +596,14 @@ function paintCell(
 
   const custom = column?.renderer ? renderers.get(column.renderer) : undefined;
   if (custom?.canvas) {
+    ctx.save();
+    clipCell(ctx, x, y, w, h);
     custom.canvas(ctx as CanvasRenderingContext2D, { value, x, y, w, h, theme, style: effective });
-    // A custom renderer may set any font/fill; invalidate the guards so the next
-    // cell re-applies its own (painted font/color strings are never empty).
-    state.lastFont = "";
-    state.lastFill = "";
+    ctx.restore();
     return;
   }
 
   if (value === null || value === "") return;
-  const text = typeof value === "number" ? formatNumber(value, column?.numberFormat) : value;
 
   applyFont(ctx, state, fontFor(theme, effective.bold, effective.italic));
   applyFill(ctx, state, effective.color ?? theme.fg);
@@ -522,11 +611,48 @@ function paintCell(
   const align =
     effective.align ??
     (column?.type === "number" || column?.type === "currency" ? "right" : "left");
+  const numeric = typeof value === "number";
+  let text = numeric ? formatNumber(value, column?.numberFormat) : value;
+  const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
+  if (numeric) {
+    if (state.measuredFont !== state.lastFont) {
+      state.measuredFont = state.lastFont;
+      state.digitWidth = ctx.measureText("0").width;
+      state.hashWidth = ctx.measureText("#").width || 1;
+    }
+    // Most numeric cells are comfortably wider than their formatted value.
+    // Only pay for exact measurement when a cached digit-width estimate says
+    // the run is close enough to the edge to plausibly overflow.
+    const mayOverflow = text.length * state.digitWidth > availableTextWidth * 0.8;
+    const exactWidth = mayOverflow ? ctx.measureText(text).width : 0;
+    if (exactWidth > availableTextWidth) {
+      text = "#".repeat(Math.max(1, Math.floor(availableTextWidth / state.hashWidth)));
+    }
+  }
+
+  // Left-aligned strings spill right, right-aligned strings spill left, and
+  // centered strings can use both sides. Numeric output never spills.
+  let textClipX = x;
+  let textClipW = w;
+  if (!numeric) {
+    if (align === "left") textClipW = spillX + spillW - x;
+    else if (align === "right") {
+      textClipX = spillX;
+      textClipW = x + w - spillX;
+    } else {
+      textClipX = spillX;
+      textClipW = spillW;
+    }
+  }
+
   const cy = y + h / 2;
+  ctx.save();
+  clipCell(ctx, textClipX, y, textClipW, h);
   fillAlignedText(ctx, text, align, x, w, cy);
   if (effective.underline || effective.strikethrough) {
     paintTextDecoration(ctx, effective, text, align, x, w, cy, theme);
   }
+  ctx.restore();
 }
 
 function paintBorders(
@@ -597,7 +723,10 @@ function paintHeader(
     applyFill(ctx, state, headerStyle?.color ?? theme.headerFg);
 
     const align = headerStyle?.align ?? "center";
+    ctx.save();
+    clipCell(ctx, x, 0, w, h);
     fillAlignedText(ctx, column.header, align, x, w, cy);
+    ctx.restore();
   }
 
   ctx.strokeStyle = theme.gridLine;

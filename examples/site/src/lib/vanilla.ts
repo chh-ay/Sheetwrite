@@ -20,23 +20,23 @@ const CITIES = ["Phnom Penh", "Tokyo", "Berlin", "Lisbon", "Nairobi", "Lima", "O
 const SALES_HEADERS = ["ID", "Date", "Customer", "City", "Amount"] as const;
 const SUMMARY_HEADERS = ["Metric", "Source", "Linked Text", "Linked Amount"] as const;
 
-// Canvas theme tuned to look like Google Sheets: gray header chrome, light
-// gridlines, the Google-blue active-cell ring, and compact 21–22px rows.
+// A dark operator-console palette makes the headless demo feel intentionally
+// distinct from the framework examples while keeping spreadsheet semantics.
 const SHEETS_THEME: Partial<Theme> = {
-  font: "13px Arial, Roboto, 'Helvetica Neue', sans-serif",
-  bg: "#ffffff",
-  fg: "#202124",
-  gridLine: "#e0e0e0",
-  headerBg: "#f8f9fa",
-  headerFg: "#5f6368",
-  selection: "#1a73e81a",
-  selectionBorder: "#1a73e8",
-  rowHeight: 22,
-  headerHeight: 24,
+  font: "12.5px 'Inter Variable', Arial, 'Helvetica Neue', sans-serif",
+  bg: "#0a0d14",
+  fg: "#e8ebf2",
+  gridLine: "#20283a",
+  headerBg: "#111722",
+  headerFg: "#8d98ad",
+  selection: "#f0b42924",
+  selectionBorder: "#f0b429",
+  rowHeight: 24,
+  headerHeight: 26,
   rowHeaderWidth: 46,
-  searchMatch: "#fff47580",
-  searchActiveMatch: "#fbbc04",
-  highlight: "#e8f0fe99",
+  searchMatch: "#f0b4294d",
+  searchActiveMatch: "#fbbf24",
+  highlight: "#10b98138",
 };
 
 const workbook: Workbook = {
@@ -135,11 +135,11 @@ function initialPatches(): Patch[] {
   const headerStyle: CellStyle = {
     bold: true,
     align: "center",
-    backgroundColor: "#f1f3f4",
-    color: "#202124",
+    backgroundColor: "#171e2b",
+    color: "#f0b429",
   };
-  const labelStyle: CellStyle = { bold: true, color: "#202124" };
-  const sourceStyle: CellStyle = { color: "#5f6368" };
+  const labelStyle: CellStyle = { bold: true, color: "#f1f3f8" };
+  const sourceStyle: CellStyle = { color: "#8994a8" };
 
   return [
     ...SALES_HEADERS.map((label, col) => setPatch("sales", 0, col, literal(label), headerStyle)),

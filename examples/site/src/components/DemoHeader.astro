@@ -1,0 +1,59 @@
+---
+// Shared compact masthead for the framework demos.
+interface Props {
+  accent: string;
+  kicker: string;
+  title: string;
+}
+
+const { accent, kicker, title } = Astro.props;
+---
+
+<header class="demo-header" style={`--accent: ${accent}`}>
+  <div class="demo-header-lead">
+    <p class="demo-kicker">{kicker}</p>
+    <h1 class="demo-title">{title}</h1>
+    <p class="demo-copy"><slot /></p>
+  </div>
+</header>
+
+<style>
+  .demo-header {
+    flex: none;
+    padding: 14px 20px 13px;
+    border-bottom: 1px solid var(--color-ink-800);
+    border-left: 3px solid var(--accent);
+    background: #080b12;
+  }
+
+  .demo-header-lead {
+    max-width: 960px;
+  }
+
+  .demo-kicker {
+    margin: 0 0 3px;
+    color: var(--accent);
+    font: 600 11px var(--font-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .demo-title {
+    margin: 0;
+    color: var(--color-ink-50);
+    font: 610 22px var(--font-display);
+    letter-spacing: -0.025em;
+  }
+
+  .demo-copy {
+    margin: 5px 0 0;
+    color: var(--color-ink-300);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  .demo-copy :global(code) {
+    color: var(--color-brand-300);
+    font: 12px var(--font-mono);
+  }
+</style>

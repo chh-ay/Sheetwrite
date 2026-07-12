@@ -44,8 +44,10 @@ function makeRecordingContext(canvas: HTMLCanvasElement): RecordingContext2D {
       if (property in object) return Reflect.get(object, property);
       if (typeof property !== "string") return undefined;
       return (...args: unknown[]) => {
-        void args;
         calls[property] = (calls[property] ?? 0) + 1;
+        if (property === "measureText") {
+          return { width: String(args[0] ?? "").length * 7 };
+        }
       };
     },
     set(object, property, value) {

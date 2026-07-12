@@ -1,5 +1,7 @@
 ---
-// Shared example switcher, rendered at the top of every page.
+// Shared example switcher. Deliberately restrained: one rail, no status pills,
+// fake formula controls, or dashboard decoration competing with the demos.
+// Test contract: `.sw-nav`, stable demo hrefs, and bare framework names in links.
 interface Props {
   active: string;
 }
@@ -7,64 +9,153 @@ interface Props {
 const { active } = Astro.props;
 
 const links = [
-  { slug: "vanilla", name: "Vanilla", tagline: "Google-Sheets-style shell, cross-sheet formulas" },
-  { slug: "theming", name: "Theming", tagline: "Custom renderers, runtime themes" },
-  { slug: "react", name: "React", tagline: "100k-row analytics: search, filters, aggregates" },
-  { slug: "vue", name: "Vue", tagline: "1M-row streaming datasource, event/sync pipeline" },
-  { slug: "svelte", name: "Svelte", tagline: "Formula workbook + composable shell pieces" },
+  { slug: "vanilla", name: "Vanilla", accent: "var(--color-fw-vanilla)" },
+  { slug: "theming", name: "Theming", accent: "var(--color-fw-lab)" },
+  { slug: "react", name: "React", accent: "var(--color-fw-react)" },
+  { slug: "vue", name: "Vue", accent: "var(--color-fw-vue)" },
+  { slug: "svelte", name: "Svelte", accent: "var(--color-fw-svelte)" },
 ];
-
-const current = links.find((link) => link.slug === active);
 ---
 
 <nav class="sw-nav" aria-label="Sheetwrite examples">
-  <a class="sw-brand" href="/">Sheetwrite</a>
-  {
-    links.map((link) => (
-      <a href={`/${link.slug}/`} aria-current={link.slug === active ? "page" : "false"} title={link.tagline}>
-        {link.name}
-      </a>
-    ))
-  }
-  <span class="sw-tagline">{current?.tagline}</span>
+  <a class="sw-brand" href="/" aria-label="Sheetwrite home">
+    <svg class="sw-mark" viewBox="0 0 28 28" aria-hidden="true">
+      <rect x="1" y="1" width="26" height="26"></rect>
+      <path d="M1 10h26M1 18h26M10 1v26M18 1v26"></path>
+      <rect class="sw-active-cell" x="10" y="10" width="8" height="8"></rect>
+    </svg>
+    <span>Sheetwrite</span>
+  </a>
+  <span class="sw-rule" aria-hidden="true"></span>
+  <div class="sw-links">
+    {
+      links.map((link) => (
+        <a
+          class="sw-tab"
+          href={`/${link.slug}/`}
+          aria-current={link.slug === active ? "page" : "false"}
+          style={`--accent: ${link.accent}`}
+        >
+          {link.name}
+        </a>
+      ))
+    }
+  </div>
 </nav>
 
 <style>
   .sw-nav {
+    position: relative;
+    z-index: 20;
     display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 10px;
-    background: #0f172a;
-    color: #e2e8f0;
-    font: 13px/1.4 system-ui, sans-serif;
     flex: none;
+    align-items: stretch;
+    height: 54px;
+    padding: 0 18px;
+    border-bottom: 1px solid #20283a;
+    background: #080b12;
+    color: var(--color-ink-200);
   }
+
   .sw-brand {
-    font-weight: 700;
-    margin-right: 10px;
-    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #f4f6fa;
+    font: 650 14px var(--font-display);
+    letter-spacing: -0.01em;
     text-decoration: none;
   }
-  .sw-nav a:not(.sw-brand) {
-    padding: 4px 12px;
-    border-radius: 6px;
-    color: inherit;
+
+  .sw-mark {
+    width: 25px;
+    height: 25px;
+    fill: #0f1520;
+    stroke: #526078;
+    stroke-width: 1;
+  }
+
+  .sw-mark .sw-active-cell {
+    fill: var(--color-brand-500);
+    stroke: var(--color-brand-300);
+  }
+
+  .sw-rule {
+    width: 1px;
+    margin: 15px 17px;
+    background: #293247;
+  }
+
+  .sw-links {
+    display: flex;
+    align-items: stretch;
+  }
+
+  .sw-tab {
+    position: relative;
+    display: grid;
+    min-width: 82px;
+    place-items: center;
+    padding: 0 14px;
+    color: #758198;
+    font: 520 12.5px var(--font-sans);
     text-decoration: none;
+    transition:
+      color 120ms,
+      background 120ms;
   }
-  .sw-nav a:not(.sw-brand):hover {
-    background: #1e293b;
+
+  .sw-tab::after {
+    position: absolute;
+    right: 14px;
+    bottom: -1px;
+    left: 14px;
+    height: 2px;
+    background: var(--accent);
+    content: "";
+    opacity: 0;
   }
-  .sw-nav a[aria-current="page"] {
-    background: #e2e8f0;
-    color: #0f172a;
-    font-weight: 600;
+
+  .sw-tab:hover {
+    background: #0d131e;
+    color: #dce2ec;
   }
-  .sw-tagline {
-    margin-left: auto;
-    opacity: 0.7;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+
+  .sw-tab[aria-current="page"] {
+    background: #101722;
+    color: #f4f6fa;
+  }
+
+  .sw-tab[aria-current="page"]::after {
+    opacity: 1;
+  }
+
+
+  @media (max-width: 780px) {
+    .sw-nav {
+      height: auto;
+      min-height: 52px;
+      padding-right: 0;
+    }
+    .sw-rule {
+      display: none;
+    }
+    .sw-brand {
+      padding-right: 14px;
+    }
+    .sw-links {
+      flex: 1;
+      overflow-x: auto;
+    }
+    .sw-tab {
+      min-width: 70px;
+      padding: 0 10px;
+    }
+  }
+
+  @media (max-width: 510px) {
+    .sw-brand span {
+      display: none;
+    }
   }
 </style>

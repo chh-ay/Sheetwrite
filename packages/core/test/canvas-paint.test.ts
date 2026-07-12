@@ -25,6 +25,19 @@ interface MoveToCall {
   x: number;
   y: number;
 }
+interface LineSegment {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+interface ClipRectCall {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 interface RecordingCtx {
   fillStyle: string;
@@ -36,6 +49,8 @@ interface RecordingCtx {
   fillRects: FillRectCall[];
   fillTexts: FillTextCall[];
   moveTos: MoveToCall[];
+  clipRects: ClipRectCall[];
+  segments: LineSegment[];
   [op: string]: unknown;
 }
 
@@ -49,7 +64,9 @@ function makeRecordingCtx(): RecordingCtx {
     lineWidth: 1,
     fillRects: [],
     fillTexts: [],
+    clipRects: [],
     moveTos: [],
+    segments: [],
   };
 
   // Capture the live `fillStyle` at call time, since it mutates between draws.
@@ -59,24 +76,30 @@ function makeRecordingCtx(): RecordingCtx {
   ctx.fillText = (text: string, x: number, y: number, maxWidth?: number) => {
     ctx.fillTexts.push({ text, x, y, maxWidth, fillStyle: ctx.fillStyle });
   };
+  let segmentStart: MoveToCall | undefined;
   ctx.moveTo = (x: number, y: number) => {
-    ctx.moveTos.push({ x, y });
+    segmentStart = { x, y };
+    ctx.moveTos.push(segmentStart);
+  };
+  ctx.lineTo = (x: number, y: number) => {
+    if (segmentStart) {
+      ctx.segments.push({ x0: segmentStart.x, y0: segmentStart.y, x1: x, y1: y });
+      segmentStart = { x, y };
+    }
   };
   // paintFrame measures the drawn run to size text decorations; approximate a
   // monospace-ish width so the recording ctx has a deterministic run length.
   ctx.measureText = (text: string) => ({ width: text.length * 7 });
 
-  for (const op of [
-    "setTransform",
-    "beginPath",
-    "rect",
-    "clip",
-    "save",
-    "restore",
-    "lineTo",
-    "stroke",
-    "setLineDash",
-  ]) {
+  let pendingRect: ClipRectCall | undefined;
+  ctx.rect = (x: number, y: number, w: number, h: number) => {
+    pendingRect = { x, y, w, h };
+  };
+  ctx.clip = () => {
+    if (pendingRect) ctx.clipRects.push(pendingRect);
+  };
+
+  for (const op of ["setTransform", "beginPath", "save", "restore", "stroke", "setLineDash"]) {
     ctx[op] = () => {};
   }
 
@@ -232,6 +255,36 @@ describe("paintFrame variable row heights", () => {
     expect(rect?.h).not.toBe(48);
   });
 
+  it("removes internal gridlines from a merged rectangle", () => {
+    const layout = makeLayout(
+      [
+        { key: "a", header: "A", width: 100, type: "text" },
+        { key: "b", header: "B", width: 100, type: "text" },
+      ],
+      [{ r0: 0, c0: 0, r1: 1, c1: 1 }],
+    );
+    const view = makeView(new Uint32Array(6), [{}]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    const internalRowY = HEADER_HEIGHT + ROW_HEIGHT - 0.5;
+    const internalColX = 100 - 0.5;
+
+    expect(
+      ctx.segments.some(
+        (line) => line.y0 === internalRowY && line.y1 === internalRowY && line.x0 < 200,
+      ),
+    ).toBe(false);
+    expect(
+      ctx.segments.some(
+        (line) =>
+          line.x0 === internalColX &&
+          line.x1 === internalColX &&
+          line.y0 < HEADER_HEIGHT + ROW_HEIGHT * 2 &&
+          line.y1 > HEADER_HEIGHT,
+      ),
+    ).toBe(false);
+  });
+
   it("draws the horizontal gridline at each row's geometric bottom", () => {
     const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
     const view = makeView(new Uint32Array(3), [{}], [0]);
@@ -341,6 +394,56 @@ describe("paintFrame column styles", () => {
 
     expect(ctx.fillTexts.find((call) => call.text === "Long header")?.maxWidth).toBeUndefined();
     expect(ctx.fillTexts.find((call) => call.text === "Long cell value")?.maxWidth).toBeUndefined();
+  });
+
+  it("clips narrow headers and cell text to their own row and column", () => {
+    const layout = makeLayout([
+      { key: "a", header: "Long header", width: 18, type: "text" },
+      { key: "b", header: "B", width: 22, type: "text" },
+    ]);
+    const view = makeView(new Uint32Array(6), [{}]);
+    (view.values as string[])[0] = "Long cell value";
+    const viewport: Viewport = {
+      ...UNIFORM_VIEWPORT,
+      rowTops: Float64Array.from([0, 9, 33]),
+      rowHeights: Float64Array.from([9, 24, 24]),
+    };
+
+    const ctx = render(view, layout, viewport);
+
+    expect(ctx.clipRects).toContainEqual({ x: 0, y: 0, w: 18, h: HEADER_HEIGHT });
+    expect(ctx.clipRects).toContainEqual({ x: 0, y: HEADER_HEIGHT, w: 18, h: 9 });
+    expect(ctx.fillTexts.find((call) => call.text === "Long cell value")?.maxWidth).toBeUndefined();
+  });
+
+  it("lets text spill through empty cells but stops before occupied neighbours", () => {
+    const layout = makeLayout([
+      { key: "a", header: "A", width: 20, type: "text" },
+      { key: "b", header: "B", width: 24, type: "text" },
+      { key: "c", header: "C", width: 30, type: "text" },
+    ]);
+    const view = makeView(new Uint32Array(9), [{}], [0, 1, 2]);
+    (view.values as string[]).splice(0, 3, "Long label", "", "occupied");
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    expect(ctx.clipRects).toContainEqual({
+      x: 0,
+      y: HEADER_HEIGHT,
+      w: 44,
+      h: ROW_HEIGHT,
+    });
+  });
+
+  it("renders hashes instead of a misleading truncated number", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 18, type: "number" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+    (view.values as Array<string | number>)[0] = 12345;
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    expect(ctx.fillTexts.some((call) => call.text === "#")).toBe(true);
+    expect(ctx.fillTexts.some((call) => call.text === "12345")).toBe(false);
   });
 });
 

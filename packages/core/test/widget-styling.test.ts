@@ -191,6 +191,25 @@ describe("built-in widget styling", () => {
       expect(getComputedStyle(findEl).display).toBe("flex");
     }
   });
+  it("uses SVG glyphs for built-in actions and distinct export labels", () => {
+    const { host } = makeGrid({
+      toolbar: [
+        { action: "undo" },
+        { action: "bold" },
+        { action: "exportCsv" },
+        { action: "exportXlsx" },
+      ],
+    });
+
+    const undo = mustFind<HTMLButtonElement>(host, ".sheetwrite-tb-undo");
+    const bold = mustFind<HTMLButtonElement>(host, ".sheetwrite-tb-bold");
+    expect(undo.querySelector("svg[aria-hidden=true]")).not.toBeNull();
+    expect(bold.querySelector("svg[aria-hidden=true]")).not.toBeNull();
+    expect(undo.getAttribute("aria-label")).toBe("Undo");
+    expect(mustFind(host, ".sheetwrite-tb-exportCsv").textContent).toBe("CSV");
+    expect(mustFind(host, ".sheetwrite-tb-exportXlsx").textContent).toBe("XLSX");
+  });
+
   it("renders icon strings as text and supports reusable SVG nodes and factories", () => {
     const shared = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     shared.setAttribute("data-icon", "shared");

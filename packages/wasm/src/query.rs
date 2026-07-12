@@ -718,18 +718,6 @@ pub(crate) fn cell_matches_text(
     }
 }
 
-#[cfg(test)]
-pub(crate) fn compare_cells(
-    sheet: &SheetData,
-    strings: &StringPool,
-    ia: usize,
-    ib: usize,
-) -> Ordering {
-    let a = ComparableCell::from_cell(sheet, strings, ia);
-    let b = ComparableCell::from_cell(sheet, strings, ib);
-    a.cmp(&b)
-}
-
 const MIN_RADIX_SORT_ROWS: usize = 4096;
 
 type NumericSortPair = (u64, u32);

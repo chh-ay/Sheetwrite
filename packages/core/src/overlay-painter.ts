@@ -363,11 +363,33 @@ export class OverlayPainter {
     const sheet = this.paintSheet;
     if (!theme || !sheet) return;
 
+    let { r0, c0, r1, c1 } = rect;
+    const merges = sheet.merges;
+    if (merges) {
+      let expanded: boolean;
+      do {
+        expanded = false;
+        for (const merge of merges) {
+          if (merge.r1 < r0 || merge.r0 > r1 || merge.c1 < c0 || merge.c0 > c1) continue;
+          const nextR0 = Math.min(r0, merge.r0);
+          const nextC0 = Math.min(c0, merge.c0);
+          const nextR1 = Math.max(r1, merge.r1);
+          const nextC1 = Math.max(c1, merge.c1);
+          if (nextR0 === r0 && nextC0 === c0 && nextR1 === r1 && nextC1 === c1) continue;
+          r0 = nextR0;
+          c0 = nextC0;
+          r1 = nextR1;
+          c1 = nextC1;
+          expanded = true;
+        }
+      } while (expanded);
+    }
+
     this.appendClampedRange(
-      rect.r0,
-      rect.c0,
-      rect.r1,
-      rect.c1,
+      r0,
+      c0,
+      r1,
+      c1,
       theme.selection,
       theme.selectionBorder,
       theme,

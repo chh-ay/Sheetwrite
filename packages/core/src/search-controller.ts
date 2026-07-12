@@ -19,6 +19,7 @@ export interface SearchControllerDeps {
   activeSheet: () => SheetId;
   sheet: (id?: SheetId) => Sheet;
   toViewRow: (dataRow: number) => number | null;
+  viewportAnchor: () => { row: number; col: number };
   scrollToCell: (addr: CellAddress) => void;
   scheduleRender: () => void;
   emit: (result: SearchResult) => void;
@@ -114,7 +115,10 @@ export class SearchController {
     this.searchQuery = query;
     this.searchOpts = opts;
     this.searchMatches = query ? this.scanMatches(query, opts) : EMPTY_MATCHES;
-    this.searchActive = this.searchMatches.length > 0 ? 0 : -1;
+    this.searchActive =
+      this.searchMatches.length > 0
+        ? this.activeFromViewport(this.searchMatches, this.deps.viewportAnchor())
+        : -1;
     this.revision += 1;
     this.revealActiveMatch();
     this.deps.scheduleRender();
@@ -230,6 +234,41 @@ export class SearchController {
       if (row > prev.row || (row === prev.row && col > prev.col)) return i;
     }
     return 0;
+  }
+
+  /**
+   * Pick the first match at or after the viewport's top-left cell in current
+   * view order. If no later match exists, wrap to the earliest visible-order
+   * match. Search results stay in data space; sorted views are mapped here.
+   */
+  private activeFromViewport(
+    matches: SearchMatchSet,
+    anchor: { row: number; col: number },
+  ): number {
+    let firstIndex = -1;
+    let firstRow = Number.MAX_SAFE_INTEGER;
+    let firstCol = Number.MAX_SAFE_INTEGER;
+    let afterIndex = -1;
+    let afterRow = Number.MAX_SAFE_INTEGER;
+    let afterCol = Number.MAX_SAFE_INTEGER;
+
+    for (let i = 0; i < matches.length; i++) {
+      const viewRow = this.deps.toViewRow(matches.rowAt(i));
+      if (viewRow === null) continue;
+      const col = matches.colAt(i);
+      if (viewRow < firstRow || (viewRow === firstRow && col < firstCol)) {
+        firstIndex = i;
+        firstRow = viewRow;
+        firstCol = col;
+      }
+      const atOrAfter = viewRow > anchor.row || (viewRow === anchor.row && col >= anchor.col);
+      if (atOrAfter && (viewRow < afterRow || (viewRow === afterRow && col < afterCol))) {
+        afterIndex = i;
+        afterRow = viewRow;
+        afterCol = col;
+      }
+    }
+    return afterIndex >= 0 ? afterIndex : firstIndex;
   }
 
   private scanMatches(query: string, opts: SearchOptions): SearchMatchSet {

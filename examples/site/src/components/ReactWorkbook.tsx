@@ -10,7 +10,7 @@ import workerUrl from "@sheetwrite/core/worker?worker&url";
 import "@sheetwrite/core/xlsx";
 import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── 100,000 rows of eager columnar data ──────────────────────────────────────
 // Loaded into the Rust/WASM store in one bulk pass; every sort, filter,
@@ -42,68 +42,79 @@ function buildData(): ColumnarData {
 const AMOUNT_COL = 5;
 const CITY_COL = 3;
 
-const workbook: Workbook = {
-  activeSheet: "sales",
-  sheets: [
-    {
-      id: "sales",
-      name: "Sales",
-      rowCount: ROWS,
-      columns: [
-        { key: "id", header: "ID", width: 70, type: "number" },
-        { key: "date", header: "Date", width: 110, type: "text" },
-        { key: "customer", header: "Customer", width: 200, type: "text" },
-        { key: "city", header: "City", width: 130, type: "text" },
-        { key: "rep", header: "Rep", width: 90, type: "text" },
-        // Excel-style number format painted by the canvas renderer.
-        {
-          key: "amount",
-          header: "Amount",
-          width: 130,
-          type: "currency",
-          numberFormat: "$#,##0.00",
-        },
-      ],
-      // Conditional formats fold into the bulk render window in Rust.
-      conditionalFormats: [
-        {
-          range: {
-            sheet: "sales",
-            start: { row: 0, col: AMOUNT_COL },
-            end: { row: ROWS - 1, col: AMOUNT_COL },
+/** Conditional formats are plain data on the workbook — the Highlight control
+ *  builds a new workbook and lets the documented reset re-ingest all 100k rows. */
+function buildWorkbook(highlightAbove: number): Workbook {
+  const amountRange = {
+    sheet: "sales",
+    start: { row: 0, col: AMOUNT_COL },
+    end: { row: ROWS - 1, col: AMOUNT_COL },
+  };
+  return {
+    activeSheet: "sales",
+    sheets: [
+      {
+        id: "sales",
+        name: "Sales",
+        rowCount: ROWS,
+        columns: [
+          { key: "id", header: "ID", width: 70, type: "number" },
+          { key: "date", header: "Date", width: 110, type: "text" },
+          { key: "customer", header: "Customer", width: 200, type: "text" },
+          { key: "city", header: "City", width: 130, type: "text" },
+          { key: "rep", header: "Rep", width: 90, type: "text" },
+          // Excel-style number format painted by the canvas renderer.
+          {
+            key: "amount",
+            header: "Amount",
+            width: 130,
+            type: "currency",
+            numberFormat: "$#,##0.00",
           },
-          when: { kind: "greaterThan", value: 9_500 },
-          style: { backgroundColor: "#dcfce7", bold: true },
-        },
-        {
-          range: {
-            sheet: "sales",
-            start: { row: 0, col: AMOUNT_COL },
-            end: { row: ROWS - 1, col: AMOUNT_COL },
+        ],
+        // Conditional formats fold into the bulk render window in Rust.
+        conditionalFormats: [
+          ...(highlightAbove > 0
+            ? [
+                {
+                  range: amountRange,
+                  when: { kind: "greaterThan", value: highlightAbove } as const,
+                  // Translucent emerald reads on both the light and dark canvas.
+                  style: { backgroundColor: "#10b98130", bold: true },
+                },
+              ]
+            : []),
+          {
+            range: amountRange,
+            when: { kind: "lessThan", value: 500 },
+            style: { color: "#ef4444" },
           },
-          when: { kind: "lessThan", value: 500 },
-          style: { color: "#dc2626" },
-        },
-      ],
-    },
-  ],
-};
+        ],
+      },
+    ],
+  };
+}
 
 const data = buildData();
 
 const LIGHT_THEME: Partial<Theme> = {
   bg: "#ffffff",
-  fg: "#202124",
-  gridLine: "#e5e7eb",
-  headerBg: "#f8fafc",
-  headerFg: "#334155",
+  fg: "#1c2333",
+  gridLine: "#e3e8f0",
+  headerBg: "#f4f6fa",
+  headerFg: "#5c6b8a",
+  selection: "#10b9811f",
+  selectionBorder: "#059669",
 };
+// Sits on the site's ink scale so the grid blends into the page chrome.
 const DARK_THEME: Partial<Theme> = {
-  bg: "#111827",
-  fg: "#e5e7eb",
-  gridLine: "#374151",
-  headerBg: "#1f2937",
-  headerFg: "#f9fafb",
+  bg: "#0e1526",
+  fg: "#e4e9f2",
+  gridLine: "#1d2740",
+  headerBg: "#0a101e",
+  headerFg: "#8b99b5",
+  selection: "#34d39922",
+  selectionBorder: "#34d399",
 };
 
 /** Hoisted: a stable identity means the adapter never reconfigures chrome per render. */
@@ -148,7 +159,7 @@ const SIMPLE_COLUMNS = [
 
 function App() {
   const gridRef = useRef<Grid>(null);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(true);
   const [readOnly, setReadOnly] = useState(false);
   const [selection, setSelection] = useState("none");
   const [visibleRows, setVisibleRows] = useState(ROWS);
@@ -161,7 +172,16 @@ function App() {
   const [useWorker, setUseWorker] = useState(false);
   const [activeRenderer, setActiveRenderer] = useState<"canvas" | "worker" | null>(null);
   const [overscan, setOverscan] = useState(2);
+  const [highlight, setHighlight] = useState(9_500);
+  // Conditional-format rules ride on the workbook, a documented reset boundary:
+  // a new rule set recreates the grid and bulk re-ingests all 100k rows.
+  const workbook = useMemo(() => buildWorkbook(highlight), [highlight]);
   const rendererFallbackCleanup = useRef<(() => void) | null>(null);
+  // Current view settings, readable from onReady without stale closures so a
+  // workbook reset (Highlight control) can re-apply filters, sort, and search.
+  const searchQuery = useRef("");
+  const viewRef = useRef({ city, minAmount, sortKey });
+  viewRef.current = { city, minAmount, sortKey };
 
   /** Refresh the Rust-scanned footer numbers after any view/data change. */
   const refreshStats = useCallback((ready?: Grid) => {
@@ -182,6 +202,17 @@ function App() {
     ({ grid }: { grid: Grid }) => {
       // The published ref and readiness event reference the same generation.
       grid.setFrozen(0, 1);
+      // A fresh generation starts with a clean view; restore the active one.
+      const view = viewRef.current;
+      const keys = SORTS[view.sortKey]?.keys ?? [];
+      if (keys.length > 0) grid.sortByMulti(keys);
+      if (view.city !== "all") {
+        grid.setColumnFilter(CITY_COL, { kind: "values", values: [view.city] });
+      }
+      if (view.minAmount > 0) {
+        grid.setColumnFilter(AMOUNT_COL, { kind: "compare", op: "gte", value: view.minAmount });
+      }
+      if (searchQuery.current.length > 0) setMatches(grid.search(searchQuery.current));
       refreshStats(grid);
       setActiveRenderer(grid.rendererKind());
       rendererFallbackCleanup.current?.();
@@ -228,6 +259,7 @@ function App() {
   }
 
   function runSearch(query: string): void {
+    searchQuery.current = query;
     const grid = gridRef.current;
     if (!grid) return;
     if (query.length === 0) {
@@ -289,6 +321,18 @@ function App() {
                 {sort.label}
               </option>
             ))}
+          </select>
+        </label>
+        <label>
+          Highlight{" "}
+          <select
+            value={highlight}
+            onChange={(event) => setHighlight(Number(event.target.value))}
+            title="Conditional-format rule on the Amount column; changing it swaps the workbook and re-ingests all 100k rows"
+          >
+            <option value={0}>Off</option>
+            <option value={7_500}>Amount &gt; $7,500</option>
+            <option value={9_500}>Amount &gt; $9,500</option>
           </select>
         </label>
         <output data-testid="visible">
@@ -386,9 +430,33 @@ function App() {
           XLSX
         </button>
       </div>
-      <section aria-label="Data-first Sheetwrite example">
-        <Sheetwrite columns={SIMPLE_COLUMNS} defaultRows={SIMPLE_ROWS} height={180} />
-      </section>
+      <details className="example-simple" aria-label="Quick-start Sheetwrite example">
+        <summary>
+          Quick start: everything above is the advanced grid — a basic one is 6 lines
+        </summary>
+        <div className="example-simple-body">
+          <pre className="example-simple-code">{`import { Sheetwrite } from "@sheetwrite/react";
+import "@sheetwrite/react/styles.css";
+
+<Sheetwrite
+  columns={[
+    { key: "name", title: "Product" },
+    { key: "price", title: "Price", type: "currency" },
+  ]}
+  defaultRows={[
+    { name: "Notebook", price: 12.5 },
+    { name: "Pen", price: 2.25 },
+  ]}
+  height={180}
+/>`}</pre>
+          <Sheetwrite
+            columns={SIMPLE_COLUMNS}
+            defaultRows={SIMPLE_ROWS}
+            height={180}
+            theme={dark ? DARK_THEME : LIGHT_THEME}
+          />
+        </div>
+      </details>
     </main>
   );
 }

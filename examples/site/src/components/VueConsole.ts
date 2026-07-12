@@ -62,15 +62,15 @@ const workbook: Workbook = {
       name: "Orders",
       rowCount: ROWS,
       columns: [
-        { key: "id", header: "Order", width: 100, type: "number" },
-        { key: "date", header: "Date", width: 110, type: "text" },
-        { key: "customer", header: "Customer", width: 220, type: "text" },
-        { key: "city", header: "City", width: 140, type: "text" },
-        { key: "status", header: "Status", width: 110, type: "text" },
+        { key: "id", header: "Order", width: 110, type: "number" },
+        { key: "date", header: "Date", width: 140, type: "text" },
+        { key: "customer", header: "Customer", width: 280, type: "text" },
+        { key: "city", header: "City", width: 210, type: "text" },
+        { key: "status", header: "Status", width: 170, type: "text" },
         {
           key: "amount",
           header: "Amount",
-          width: 130,
+          width: 190,
           type: "currency",
           numberFormat: "$#,##0.00",
         },
@@ -81,15 +81,15 @@ const workbook: Workbook = {
       name: "Review queue",
       rowCount: 12,
       columns: [
-        { key: "id", header: "Order", width: 100, type: "number" },
-        { key: "date", header: "Date", width: 110, type: "text" },
-        { key: "customer", header: "Customer", width: 220, type: "text" },
-        { key: "city", header: "City", width: 140, type: "text" },
-        { key: "status", header: "Status", width: 110, type: "text" },
+        { key: "id", header: "Order", width: 110, type: "number" },
+        { key: "date", header: "Date", width: 140, type: "text" },
+        { key: "customer", header: "Customer", width: 280, type: "text" },
+        { key: "city", header: "City", width: 210, type: "text" },
+        { key: "status", header: "Status", width: 170, type: "text" },
         {
           key: "amount",
           header: "Amount",
-          width: 130,
+          width: 190,
           type: "currency",
           numberFormat: "$#,##0.00",
         },
@@ -106,7 +106,7 @@ const integer = new Intl.NumberFormat("en-US");
 const App = defineComponent({
   setup() {
     const gridComponent = shallowRef<VueGridHandle | null>(null);
-    const dark = ref(false);
+    const dark = ref(true);
     const readOnly = ref(false);
     const frozen = ref(true);
     const viewWindow = ref({ first: 0, last: 0 });
@@ -118,11 +118,14 @@ const App = defineComponent({
 
     const gridOf = () => gridComponent.value?.grid ?? null;
 
-    // Paged source with visible latency: scroll fast and watch placeholders
-    // resolve. Each call serves one contiguous [start, end) block.
+    // Paint the first page immediately so navigation never lands on an empty
+    // canvas. Later page requests retain visible latency for the streaming demo.
+    let firstRequest = true;
     const datasource: DataSource = {
       getRows: async (_sheet, start, end) => {
         const { promise, resolve } = Promise.withResolvers<RowData[]>();
+        const latency = firstRequest ? 0 : PAGE_LATENCY_MS;
+        firstRequest = false;
         setTimeout(() => {
           const rows: RowData[] = [];
           for (let r = start; r < end; r++) {
@@ -138,7 +141,7 @@ const App = defineComponent({
           }
           pagesLoaded.value += 1;
           resolve(rows);
-        }, PAGE_LATENCY_MS);
+        }, latency);
         return promise;
       },
     };
@@ -162,6 +165,46 @@ const App = defineComponent({
       pushLog(`server ack: ${patches.length} patch(es) confirmed`);
     }
 
+    function simulateEdit(): void {
+      const grid = gridOf();
+      if (!grid) return;
+      const row = Math.max(0, viewWindow.value.first - 1);
+      const addr = { sheet: "orders", row, col: 4 };
+      grid.setActiveSheet("orders");
+      grid.setSelection({ kind: "cell", addr });
+      grid.scrollToCell(addr);
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr,
+            value: { kind: "literal", value: row % 9 === 0 ? "confirmed" : "review" },
+          },
+        ],
+      });
+      refreshDirty();
+    }
+
+    function simulateSearch(): void {
+      searchQuery.value = "Tokyo";
+      gridOf()?.search("Tokyo");
+    }
+
+    const actionIcon = (path: string) =>
+      h(
+        "svg",
+        {
+          viewBox: "0 0 24 24",
+          "aria-hidden": "true",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": "1.8",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        },
+        [h("path", { d: path })],
+      );
+
     const syncLabel = computed(() =>
       dirtyCount.value === 0 ? "All changes synced" : `${dirtyCount.value} unsynced patch(es)`,
     );
@@ -175,6 +218,13 @@ const App = defineComponent({
         : h("main", { class: "example-shell", "data-theme": dark.value ? "dark" : undefined }, [
             h("div", { class: "example-body" }, [
               h("div", { class: "example-grid" }, [
+                h("div", { class: "stream-strip" }, [
+                  h("span", "Visible-window rendering"),
+                  h(
+                    "output",
+                    `cache rows ${integer.format(viewWindow.value.first)}–${integer.format(viewWindow.value.last)} (includes overscan) · ${pagesLoaded.value} requests`,
+                  ),
+                ]),
                 h(SheetwriteGrid, {
                   ref: gridComponent,
                   workbook,
@@ -182,7 +232,7 @@ const App = defineComponent({
                   theme: dark.value ? DARK_THEME : LIGHT_THEME,
                   readOnly: readOnly.value,
                   config: GRID_CONFIG,
-                  style: "height: 100%",
+                  style: "flex: 1; min-height: 0",
                   onReady: ({ grid }: { grid: Grid }) => {
                     grid.setFrozen(0, 1);
                     pushLog(`grid ready — ${integer.format(ROWS)} virtual rows`);
@@ -220,15 +270,31 @@ const App = defineComponent({
               ]),
               h("aside", { class: "example-log", "aria-label": "Event pipeline" }, [
                 h("h2", "Event pipeline"),
-                h("p", { class: "example-hint" }, [
-                  "Every keystroke below is a grid event. Edit a cell (double-click or type), ",
-                  "then acknowledge the dirty queue like a server would.",
+                h(
+                  "p",
+                  { class: "example-hint" },
+                  "Run the sequence below. Each action hits the real grid API and appears in the log.",
+                ),
+                h("div", { class: "event-actions" }, [
+                  h("button", { type: "button", onClick: simulateEdit }, [
+                    actionIcon("M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"),
+                    h("span", [h("b", "1"), " Edit visible row"]),
+                  ]),
+                  h("button", { type: "button", onClick: simulateSearch }, [
+                    actionIcon("m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0"),
+                    h("span", [h("b", "2"), " Search Tokyo"]),
+                  ]),
                 ]),
                 h("output", { "data-testid": "sync", class: "example-sync" }, syncLabel.value),
                 h(
                   "button",
-                  { type: "button", disabled: dirtyCount.value === 0, onClick: acknowledge },
-                  "Acknowledge (markClean)",
+                  {
+                    type: "button",
+                    class: "acknowledge",
+                    disabled: dirtyCount.value === 0,
+                    onClick: acknowledge,
+                  },
+                  [actionIcon("m5 12 4 4L19 6"), h("span", [h("b", "3"), " Acknowledge changes"])],
                 ),
                 h(
                   "ul",
@@ -236,20 +302,51 @@ const App = defineComponent({
                 ),
               ]),
             ]),
-            h("section", { "aria-label": "Data-first Sheetwrite example" }, [
-              h(Sheetwrite, {
-                columns: SIMPLE_COLUMNS,
-                defaultRows: SIMPLE_ROWS,
-                height: 180,
-              }),
-            ]),
+            h(
+              "details",
+              { class: "example-simple", "aria-label": "Quick-start Sheetwrite example" },
+              [
+                h(
+                  "summary",
+                  "Quick start: everything above is the advanced grid — a basic one is 6 lines",
+                ),
+                h("div", { class: "example-simple-body" }, [
+                  h(
+                    "pre",
+                    { class: "example-simple-code" },
+                    `<script setup>
+import { Sheetwrite } from "@sheetwrite/vue";
+import "@sheetwrite/vue/styles.css";
+</script>
+
+<Sheetwrite
+  :columns="[
+    { key: 'name', title: 'Product' },
+    { key: 'price', title: 'Price', type: 'currency' },
+  ]"
+  :default-rows="[
+    { name: 'Notebook', price: 12.5 },
+    { name: 'Pen', price: 2.25 },
+  ]"
+  :height="180"
+/>`,
+                  ),
+                  h(Sheetwrite, {
+                    columns: SIMPLE_COLUMNS,
+                    defaultRows: SIMPLE_ROWS,
+                    height: 180,
+                    theme: dark.value ? DARK_THEME : LIGHT_THEME,
+                  }),
+                ]),
+              ],
+            ),
             h(
               "div",
               { class: "example-controls example-footer", role: "toolbar", "aria-label": "Status" },
               [
                 h("output", { "data-testid": "window" }, [
-                  `Painting rows ${integer.format(viewWindow.value.first)}–${integer.format(viewWindow.value.last)} `,
-                  `of ${integer.format(ROWS)} · ${pagesLoaded.value} pages fetched`,
+                  `Cached rows ${integer.format(viewWindow.value.first)}–${integer.format(viewWindow.value.last)} `,
+                  `of ${integer.format(ROWS)} (including overscan) · ${pagesLoaded.value} pages fetched`,
                 ]),
                 h("output", {}, `Selection: ${selection.value}`),
                 h("label", [
@@ -273,7 +370,7 @@ const App = defineComponent({
                       gridOf()?.findPrev();
                     },
                   },
-                  "Previous match",
+                  "◀ Prev",
                 ),
                 h(
                   "button",
@@ -283,7 +380,7 @@ const App = defineComponent({
                       gridOf()?.findNext();
                     },
                   },
-                  "Next match",
+                  "Next ▶",
                 ),
                 h(
                   "button",
@@ -316,7 +413,7 @@ const App = defineComponent({
                       gridOf()?.setFrozen(0, frozen.value ? 1 : 0);
                     },
                   },
-                  "Freeze Order column",
+                  "Freeze Order col",
                 ),
                 h(
                   "button",

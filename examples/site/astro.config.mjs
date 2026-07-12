@@ -2,6 +2,7 @@
 import react from "@astrojs/react";
 import svelte from "@astrojs/svelte";
 import vue from "@astrojs/vue";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
 // One site, every Sheetwrite example: vanilla + theming as plain pages,
@@ -9,4 +10,7 @@ import { defineConfig } from "astro/config";
 export default defineConfig({
   integrations: [react(), vue(), svelte()],
   devToolbar: { enabled: false },
+  vite: {
+    plugins: [tailwindcss()],
+  },
 });

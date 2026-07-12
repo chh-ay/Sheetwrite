@@ -289,6 +289,13 @@ export class GridImpl implements Grid {
       activeSheet: () => this.activeSheet,
       sheet: (id) => this.sheet(id),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
+      viewportAnchor: () => {
+        const contentTop = this.scaled.toContent(this.scroller.scrollTop) + this.frozenHeight();
+        return {
+          row: this.index.rowAtOffset(contentTop).row,
+          col: this.colAtX(this.scroller.scrollLeft + this.frozenWidth()),
+        };
+      },
       scrollToCell: (addr) => this.scrollToCell(addr),
       scheduleRender: () => this.scheduleRender(),
       emit: (result) => {
@@ -323,7 +330,10 @@ export class GridImpl implements Grid {
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches) => this.commit(patches, "style"),
-      applyLayout: () => this.applyLayout(),
+      applyLayout: () => {
+        this.applyLayout();
+        this.scheduleRender();
+      },
     });
 
     this.actions = this.buildActions();
@@ -672,12 +682,16 @@ export class GridImpl implements Grid {
     w: number;
     h: number;
   } {
-    const sheet = this.sheet();
+    const merge = this.mergeAnchorAt(row, col);
+    const r0 = merge?.r0 ?? row;
+    const c0 = merge?.c0 ?? col;
+    const r1 = merge?.r1 ?? row;
+    const c1 = merge?.c1 ?? col;
     return {
-      x: this.xOfCol(col, scrollLeft),
-      y: this.yOfRow(row, contentTop),
-      w: (sheet.columns[col]?.width ?? 0) * this.zoom,
-      h: this.index.heightOf(row),
+      x: this.xOfCol(c0, scrollLeft),
+      y: this.yOfRow(r0, contentTop),
+      w: this.colLeftOf(c1 + 1) - this.colLeftOf(c0),
+      h: this.index.offsetOf(r1 + 1) - this.index.offsetOf(r0),
     };
   }
 
@@ -1067,6 +1081,11 @@ export class GridImpl implements Grid {
         if (this.destroyed || generation !== this.loadGeneration) return;
 
         loadable.loadRows(sheetId, a, rows);
+        // Datasource loads bypass Store.change because they are not user edits.
+        // They still change pixels, so invalidate the paint signature before
+        // the scheduled render; otherwise a fast scroll can leave placeholders
+        // visible until the next pointer or scroll interaction.
+        this.storeEpoch += 1;
         for (let r = a; r < b; r++) this.loaded[r] = 1;
         this.clearInFlight(a, b);
         this.scheduleRender();

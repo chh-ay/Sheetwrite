@@ -21,14 +21,6 @@ fn put_number(sheet: &mut SheetData, row: usize, col: usize, value: f64) {
     sheet.set_num(i, value);
 }
 
-#[derive(Clone, Copy)]
-struct LoopMeasurement {
-    name: &'static str,
-    safe_ms: f64,
-    unchecked_ms: f64,
-    ratio: f64,
-}
-
 #[test]
 fn sheet_insert_rows_moves_cells_and_shifts_formulas() {
     let mut sheet = SheetData::new(2, 3);

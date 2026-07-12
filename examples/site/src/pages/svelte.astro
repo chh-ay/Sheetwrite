@@ -1,74 +1,41 @@
 ---
-import Nav from "../components/Nav.astro";
+import DemoHeader from "../components/DemoHeader.astro";
 import SvelteWorkbook from "../components/SvelteWorkbook.svelte";
+import Layout from "../layouts/Layout.astro";
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sheetwrite — Svelte formula workbook</title>
-  </head>
-  <body>
-    <Nav active="svelte" />
-    <header>
-      <strong>Sheetwrite</strong> — Svelte 5 formula workbook.
-      <p>
-        500 <code>=SUM(B:E)</code> row formulas plus a Summary tab of cross-sheet
-        <code>=SUM(Model!…)</code> aggregates, recalculated live by the Rust engine as you type.
-        The formula bar, name box, toolbar, and status line are framework-neutral pieces from
-        <code>@sheetwrite/core/shell</code>, attached to the adapter's grid with
-        <code>bind:grid</code> + <code>$effect</code> (Svelte 5 runes). Try “＋ Row” / “− Row”:
-        structural edits rewrite every affected formula — deleted references become
-        <code>#REF!</code>.
-        <br />
-        APIs exercised: <code>renderers</code> / <code>CellRenderer.canvas</code> and
-        <code>onChange</code> / <code>ChangeEvent.commitReason</code>.
-      </p>
-    </header>
-    <div id="app">
-      <SvelteWorkbook client:only="svelte" />
-    </div>
+<Layout
+  title="Sheetwrite — Svelte formula workbook"
+  description="500 =SUM row formulas plus cross-sheet Summary aggregates, edited through the composable @sheetwrite/core/shell pieces with Svelte 5 runes."
+  active="svelte"
+>
+  <DemoHeader
+    accent="var(--color-fw-svelte)"
+    kicker="Svelte 5 adapter"
+    title="Formula workbook + composable shell"
+  >
+    Edit 500 live <code>=SUM(B:E)</code> formulas and cross-sheet Summary totals through the same
+    grid. The formula bar and toolbar come from framework-neutral <code>core/shell</code>; row
+    insertions rewrite affected formulas automatically.
+  </DemoHeader>
+  <div id="app">
+    <SvelteWorkbook client:only="svelte" />
+  </div>
 
-    <style is:global>
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        font-family: system-ui, sans-serif;
-      }
-      body {
-        display: flex;
-        flex-direction: column;
-      }
-      header {
-        padding: 8px 12px;
-        border-bottom: 1px solid #e5e5e5;
-        font: 13px/1.4 system-ui, sans-serif;
-        color: #333;
-      }
-      header strong {
-        color: #111;
-      }
-      header p {
-        margin: 2px 0 0;
-        opacity: 0.75;
-      }
-      #app {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-      }
-      #app > astro-island {
-        display: flex;
-        flex: 1;
-        min-width: 0;
-      }
-      #app main {
-        flex: 1;
-        min-width: 0;
-      }
-    </style>
-  </body>
-</html>
+  <style is:global>
+    #app {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+    #app > astro-island {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+    }
+    #app main {
+      flex: 1;
+      min-width: 0;
+    }
+  </style>
+</Layout>

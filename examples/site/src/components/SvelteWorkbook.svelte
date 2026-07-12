@@ -51,6 +51,30 @@ const DARK_THEME: Partial<Theme> = {
   selectionBorder: "#fbbf24",
 };
 
+function strokeIcon(paths: readonly string[]): () => SVGSVGElement {
+  return () => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.8");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    for (const d of paths) {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      svg.appendChild(path);
+    }
+    return svg;
+  };
+}
+
+const UNDO_ICON = strokeIcon(["M9 7 4 12l5 5", "M4 12h9a7 7 0 0 1 7 7"]);
+const REDO_ICON = strokeIcon(["m15 7 5 5-5 5", "M20 12h-9a7 7 0 0 0-7 7"]);
+const ROW_ADD_ICON = strokeIcon(["M3 6h18M3 12h10M3 18h18", "M18 9v6M15 12h6"]);
+const ROW_REMOVE_ICON = strokeIcon(["M3 6h18M3 12h10M3 18h18", "M15 12h6"]);
+
 const workbook: Workbook = {
   activeSheet: "model",
   sheets: [
@@ -155,7 +179,7 @@ const renderers: Record<string, CellRenderer> = {
 const data = buildModelData();
 
 let grid = $state<Grid>();
-let dark = $state(false);
+let dark = $state(true);
 let changeLog = $state<ChangeEvent[]>([]);
 let chromeHost = $state<HTMLDivElement>();
 
@@ -185,14 +209,14 @@ $effect(() => {
   const pieces = [
     createToolbar(bar, active, {
       items: [
-        { action: "undo" },
-        { action: "redo" },
+        { action: "undo", icon: UNDO_ICON },
+        { action: "redo", icon: REDO_ICON },
         { action: "separator" },
         { action: "bold" },
         { action: "italic" },
         { action: "separator" },
         {
-          icon: "＋ Row",
+          icon: ROW_ADD_ICON,
           title: "Insert a row above the selection — every =SUM below shifts",
           onClick: (g) => {
             const selection = g.getSelection();
@@ -201,7 +225,7 @@ $effect(() => {
           },
         },
         {
-          icon: "− Row",
+          icon: ROW_REMOVE_ICON,
           title: "Delete the selected row — refs to it become #REF!",
           onClick: (g) => {
             const selection = g.getSelection();
@@ -214,6 +238,10 @@ $effect(() => {
     createFormulaBar(chrome, active, { focusGrid }),
     createSelectionStatus(chrome, active),
   ];
+  chrome.querySelector<HTMLInputElement>(".sheetwrite-shell-namebox")?.setAttribute("placeholder", "A1");
+  chrome
+    .querySelector<HTMLInputElement>(".sheetwrite-shell-formula")
+    ?.setAttribute("placeholder", "Select a cell or enter a formula");
 
   return () => {
     for (const piece of pieces) piece.destroy();
@@ -222,7 +250,8 @@ $effect(() => {
 </script>
 
 <main class="example-shell" data-theme={dark ? "dark" : undefined}>
-  <div class="example-chrome" bind:this={toolbarHost}>
+  <div class="example-chrome example-toolbar-row" bind:this={toolbarHost}>
+    <span class="example-section-label">MODEL / EDIT</span>
     <button
       type="button"
       class="example-theme"
@@ -258,9 +287,28 @@ $effect(() => {
       </ol>
     {/if}
   </section>
-  <section aria-label="Data-first Sheetwrite example">
-    <Sheetwrite columns={SIMPLE_COLUMNS} defaultRows={SIMPLE_ROWS} height={180} />
-  </section>
+  <details class="example-simple" aria-label="Quick-start Sheetwrite example">
+    <summary>Quick start: everything above is the advanced grid — a basic one is 6 lines</summary>
+    <div class="example-simple-body">
+      <pre class="example-simple-code">{`<script>
+  import { Sheetwrite } from "@sheetwrite/svelte";
+  import "@sheetwrite/svelte/styles.css";
+</` + `script>
+
+<Sheetwrite
+  columns={[
+    { key: "name", title: "Product" },
+    { key: "price", title: "Price", type: "currency" },
+  ]}
+  defaultRows={[
+    { name: "Notebook", price: 12.5 },
+    { name: "Pen", price: 2.25 },
+  ]}
+  height={180}
+/>`}</pre>
+      <Sheetwrite columns={SIMPLE_COLUMNS} defaultRows={SIMPLE_ROWS} height={180} {theme} />
+    </div>
+  </details>
 </main>
 
 <style>
@@ -271,60 +319,113 @@ $effect(() => {
     min-width: 0;
   }
 
+  /* Chrome colors come from the shared --chrome-* tokens on .example-shell
+     (src/styles/global.css); the island's dark toggle flips them via
+     data-theme on the shell. */
   .example-chrome {
+    /* The core/shell pieces read widget tokens from their ancestor. */
+    --sheetwrite-widget-bg: var(--chrome-bg);
+    --sheetwrite-widget-fg: var(--chrome-fg);
+    --sheetwrite-widget-border: var(--chrome-border);
+    --sheetwrite-widget-selection: var(--chrome-accent-soft);
+    --sheetwrite-widget-accent: var(--chrome-accent);
+    --sheetwrite-toolbar-bg: var(--chrome-raised);
+    --sheetwrite-toolbar-fg: var(--chrome-fg);
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px;
-    border-bottom: 1px solid #d6d3d1;
-    background: #fafaf9;
+    min-height: 34px;
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--chrome-border);
+    background: var(--chrome-raised);
+    color: var(--chrome-fg);
   }
 
-  [data-theme="dark"] .example-chrome {
-    border-color: #44403c;
-    background: #292524;
-    color: #e7e5e4;
+  .example-section-label {
+    padding: 0 9px 0 2px;
+    border-right: 1px solid var(--chrome-border);
+    color: var(--chrome-muted);
+    font: 10.5px var(--font-mono);
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  .example-toolbar-row :global(.sheetwrite-shell-toolbar) {
+    flex: 1;
+  }
+
+  .example-toolbar-row :global(.sheetwrite-tb-button svg) {
+    width: 15px;
+    height: 15px;
   }
 
   .example-theme {
-    margin-left: auto;
-    font: 13px/1.4 system-ui, sans-serif;
-    padding: 0.25rem 0.55rem;
+    order: 2;
+    height: 26px;
+    margin-left: 8px;
+    padding: 0 9px;
+    border: 0;
+    border-left: 1px solid var(--chrome-border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--chrome-muted);
+    font: 500 11.5px var(--font-mono);
+    cursor: pointer;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .example-theme:hover {
+    color: var(--chrome-accent);
   }
 
   .example-formula-row {
-    /* The shell pieces read the widget tokens; seed them from the page here. */
-    font: 13px/1.4 system-ui, sans-serif;
+    padding: 4px 8px;
+    font: 12px/1.4 var(--font-sans);
+  }
+
+  .example-formula-row::before {
+    color: var(--chrome-muted);
+    font: 10.5px var(--font-mono);
+    letter-spacing: 0.08em;
+    content: "CELL";
   }
 
   .example-grid {
     flex: 1;
     min-height: 0;
   }
+
   .example-log {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 28px;
-    padding: 4px 8px;
+    min-height: 30px;
+    padding: 5px 10px;
     overflow-x: auto;
-    border-top: 1px solid #d6d3d1;
-    background: #fafaf9;
-    font: 12px/1.4 system-ui, sans-serif;
+    border-top: 1px solid var(--chrome-border);
+    background: var(--chrome-raised);
+    color: var(--chrome-muted);
+    font: 12px/1.4 var(--font-sans);
     white-space: nowrap;
+  }
+
+  .example-log strong {
+    color: var(--chrome-fg);
+    font-weight: 600;
+  }
+
+  .example-log code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--chrome-accent);
   }
 
   .example-log ol {
     display: flex;
-    gap: 12px;
+    gap: 14px;
     margin: 0;
     padding-left: 20px;
   }
-
-  [data-theme="dark"] .example-log {
-    border-color: #44403c;
-    background: #292524;
-    color: #e7e5e4;
-  }
-
 </style>

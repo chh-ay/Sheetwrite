@@ -252,6 +252,23 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
+  it("starts a new search at the current viewport and wraps when needed", () => {
+    const workbook = makeWorkbook(100);
+    const store = new SheetwriteStore(workbook, makeColumnarData(100));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const scroller = scrollerOf(host);
+
+    scroller.scrollTop = 50 * DEFAULT_THEME.rowHeight;
+    const middle = grid.search("Tokyo");
+    expect(middle.matches[middle.active]?.row).toBe(52);
+
+    scroller.scrollTop = 99 * DEFAULT_THEME.rowHeight;
+    const wrapped = grid.search("Tokyo");
+    expect(wrapped.matches[wrapped.active]?.row).toBe(1);
+    grid.destroy();
+  });
+
   it("uses merged-cell anchors for pointer selection and editing", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
