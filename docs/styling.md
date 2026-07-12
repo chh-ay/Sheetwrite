@@ -110,7 +110,8 @@ grid.setTheme(DARK);
 
 Import the stylesheet once. It styles the host container (the grid adds the
 `.sheetwrite` class to your host element), declares the `--sheetwrite-*` defaults,
-and ships a dark variant under `[data-theme="dark"]`:
+and ships a dark variant under `[data-theme="dark"]` or a `.dark` ancestor class
+(the Tailwind convention):
 
 ```ts
 import "@sheetwrite/core/styles.css";
@@ -131,10 +132,12 @@ import "@sheetwrite/core/styles.css";
 | `--sheetwrite-search-match` | `searchMatch` |
 | `--sheetwrite-search-active` | `searchActiveMatch` |
 | `--sheetwrite-highlight` | `highlight` |
+| `--sheetwrite-font` | `font` (a `/ line-height` segment is stripped for the canvas) |
 
 `headerHeight` and `rowHeaderWidth` have no CSS variable — set them through the
-`theme` option. The stylesheet's `--sheetwrite-font` styles the container font but
-is not mapped to `Theme.font`.
+`theme` option. An explicit `--sheetwrite-*` value set on the `.sheetwrite`
+element itself still wins over either dark selector (same-element beats
+ancestor).
 
 The recommended runtime-theming pattern (from the theming example page) drives both
 layers together: toggle `data-theme` on a wrapper so the surrounding

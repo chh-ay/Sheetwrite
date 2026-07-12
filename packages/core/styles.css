@@ -20,7 +20,8 @@
   outline: none;
 }
 
-[data-theme="dark"] .sheetwrite {
+[data-theme="dark"] .sheetwrite,
+.dark .sheetwrite {
   --sheetwrite-bg: #0b0b0c;
   --sheetwrite-fg: #e7e7e7;
   --sheetwrite-grid-line: #26262a;
@@ -33,6 +34,22 @@
   /* Allow native panning but suppress double-tap zoom so captured drags
      (fill/resize/selection-extend) keep receiving pointermove. */
   touch-action: pan-x pan-y;
+}
+
+.sheetwrite-editor {
+  position: absolute;
+  margin: 0;
+  border: 2px solid var(--sheetwrite-selection-border);
+  outline: none;
+  resize: none;
+  font: var(--sheetwrite-font);
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  padding: 0 4px;
+  box-sizing: border-box;
+  z-index: 3;
+  overflow: hidden;
+  white-space: pre;
 }
 
 .sheetwrite-canvas {

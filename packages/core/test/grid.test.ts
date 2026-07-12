@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
+import { DEFAULT_THEME, GridImpl, initSheetwrite, resolveThemeFromCss } from "../src/grid.js";
 import { createGridController } from "../src/grid-controller.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellScalar, RowData, Store, Workbook } from "../src/types.js";
@@ -722,5 +722,37 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     expect(theme.fg).toBe("#123456");
 
     grid.destroy();
+  });
+
+  it("maps --sheetwrite-font into Theme.font with the line-height stripped", () => {
+    const host = mountHost();
+    host.style.setProperty("--sheetwrite-font", "15px / 1.6 serif");
+
+    const resolved = resolveThemeFromCss(host);
+
+    expect(resolved.font).toContain("15px");
+    expect(resolved.font).toContain("serif");
+    expect(resolved.font).not.toContain("/");
+  });
+
+  it("editor cosmetics come from the stylesheet; the theme rides inline CSS variables", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, theme: { selectionBorder: "#123456" } }, store);
+
+    grid.beginEdit(0, 0);
+    const editor = expectEditor(host);
+
+    // No raw inline cosmetic properties — host CSS can override the rule.
+    expect(editor.style.font).toBe("");
+    expect(editor.style.color).toBe("");
+
+    // The effective theme is bridged as inline variables for the rule to use.
+    expect(editor.style.getPropertyValue("--sheetwrite-selection-border")).toBe("#123456");
+    expect(editor.style.getPropertyValue("--sheetwrite-font")).toBe(DEFAULT_THEME.font);
+
+    grid.destroy();
+    store.dispose();
   });
 });

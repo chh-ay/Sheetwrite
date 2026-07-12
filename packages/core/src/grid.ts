@@ -126,6 +126,16 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
 
   const rh = read("--sheetwrite-row-height");
   if (rh) theme.rowHeight = Number.parseFloat(rh);
+
+  // `--sheetwrite-font` may be a full CSS font shorthand including a
+  // line-height (`13px / 1.4 system-ui`); canvas `ctx.font` and the px
+  // parsers reject that segment, so strip it before mapping.
+  const font = read("--sheetwrite-font");
+  if (font)
+    theme.font = font
+      .replace(/\/\s*[\d.]+/, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
   return theme;
 }
 

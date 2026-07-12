@@ -196,10 +196,9 @@ The primitive surface the stock layers are built on (all on `Grid`):
   `grid.store.getDirty()`/`markClean()` for backend sync, `change` events.
 
 Built-in chrome (toolbar, find bar, context menu, tab bar, formula-assist
-popup) is styled through CSS classes + `--sheetwrite-*` custom properties
-seeded from the theme — override them from host CSS without forking. The one
-remaining inline-styled widget is the cell editor's textarea; treat it as
-internal until it migrates.
+popup, and the cell editor's textarea) is styled through CSS classes +
+`--sheetwrite-*` custom properties seeded from the theme — override them from
+host CSS without forking.
 
 ## Worker renderer shared memory
 

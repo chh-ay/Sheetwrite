@@ -63,21 +63,14 @@ export class EditController {
     ta.spellcheck = false;
     ta.wrap = "off";
     if (opts.type === "date") ta.placeholder = "yyyy-mm-dd";
-    ta.style.cssText = [
-      "position:absolute",
-      "margin:0",
-      `border:2px solid ${opts.theme.selectionBorder}`,
-      "outline:none",
-      "resize:none",
-      `font:${opts.theme.font}`,
-      `color:${opts.theme.fg}`,
-      `background:${opts.theme.bg}`,
-      "padding:0 4px",
-      "box-sizing:border-box",
-      "z-index:3",
-      "overflow:hidden",
-      "white-space:pre",
-    ].join(";");
+    // Cosmetics live in styles.css (`.sheetwrite-editor`). The effective theme
+    // (which may come from the `theme` option, not host CSS) is bridged as
+    // inline CSS VARIABLES: the stylesheet rule resolves them, and host CSS can
+    // still override the rule without `!important`.
+    ta.style.setProperty("--sheetwrite-selection-border", opts.theme.selectionBorder);
+    ta.style.setProperty("--sheetwrite-font", opts.theme.font);
+    ta.style.setProperty("--sheetwrite-fg", opts.theme.fg);
+    ta.style.setProperty("--sheetwrite-bg", opts.theme.bg);
 
     this.host.appendChild(ta);
     this.textarea = ta;
