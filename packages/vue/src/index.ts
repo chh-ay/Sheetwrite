@@ -108,7 +108,7 @@ const SheetwriteGridComponent = defineComponent({
     onBeforeUnmount(teardownGrid);
 
     // Recreate only when a construction-bound option changes. Theme,
-    // read-only, and config are applied live below.
+    // read-only, config, and overscan are applied live below.
     watch(
       () => [
         props.workbook,
@@ -117,7 +117,6 @@ const SheetwriteGridComponent = defineComponent({
         props.renderer,
         props.workerUrl,
         props.renderers,
-        props.overscan,
         props.minColumns,
       ],
       () => {
@@ -139,6 +138,11 @@ const SheetwriteGridComponent = defineComponent({
     watch(
       () => props.theme,
       (theme) => controller?.setTheme(theme),
+    );
+
+    watch(
+      () => props.overscan,
+      (overscan) => controller?.setOverscan(overscan),
     );
 
     expose({ getGrid: () => controller?.grid ?? null });

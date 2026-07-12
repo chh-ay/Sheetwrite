@@ -63,6 +63,12 @@ export interface GridController {
   /** Update built-in chrome and keyboard configuration without replacing the grid. */
   setConfig(config: GridConfig | undefined): void;
 
+  /**
+   * Live-update the render overscan without replacing the grid; `undefined`
+   * restores the default.
+   */
+  setOverscan(overscan: number | undefined): void;
+
   /** Detach every event subscription and destroy the grid. Call exactly once. */
   destroy(): void;
 }
@@ -141,6 +147,10 @@ export function createGridController(
 
     setConfig(config) {
       grid.setConfig(config);
+    },
+
+    setOverscan(overscan) {
+      grid.setOverscan(overscan);
     },
 
     destroy,

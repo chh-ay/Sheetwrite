@@ -724,6 +724,11 @@ export interface Grid {
   removeRows(at: number, count?: number): void;
   insertColumns(at: number, count?: number): void;
   removeColumns(at: number, count?: number): void;
+  /**
+   * Live-update the render window overscan (rows/cols painted beyond the
+   * viewport); `undefined` restores the default.
+   */
+  setOverscan(overscan?: number): void;
   /** Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color. */
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
   /**

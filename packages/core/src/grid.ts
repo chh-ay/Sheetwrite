@@ -169,7 +169,7 @@ export class GridImpl implements Grid {
   private readonly clipboard: ClipboardController;
   private readonly styleActions: StyleActions;
   private readonly overlayPainter: OverlayPainter;
-  private readonly overscan: number;
+  private overscan: number;
   private readonly datasource: GridOptions["datasource"];
   private readOnly: boolean;
   private tabBar: HTMLDivElement | null = null;
@@ -1451,6 +1451,20 @@ export class GridImpl implements Grid {
     );
   }
 
+  // NOTE: a live `setMinColumns` was evaluated and rejected: column count is
+  // baked into the WASM sheet geometry at construction (padColumns runs before
+  // the store exists), and the only public re-derivation (`addColumns`
+  // patches) would emit change events and dirty-list entries for a
+  // presentation knob. `minColumns` stays a reset boundary.
+  setOverscan(overscan?: number): void {
+    const next = overscan === undefined ? DEFAULT_OVERSCAN : Math.max(0, Math.floor(overscan));
+    if (next === this.overscan) return;
+    this.overscan = next;
+    // Read per frame by the window calculations; a repaint picks it up.
+    this.paintEpoch += 1;
+    this.scheduleRender();
+  }
+
   // ── public API ─────────────────────────────────────────────────────────────
 
   setActiveSheet(id: SheetId): void {
@@ -2000,9 +2014,7 @@ function buildColumnIndex(sheet: Sheet, colIndices: readonly number[], zoom: num
 }
 
 function padColumns(workbook: Workbook, opts: GridOptions, host: HTMLElement): Workbook {
-  const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
-  const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
-  const target = Math.max(opts.minColumns ?? 0, fillCols);
+  const target = padTarget(host, opts.minColumns);
   if (target <= 0) return workbook;
 
   let changed = false;
@@ -2019,6 +2031,13 @@ function padColumns(workbook: Workbook, opts: GridOptions, host: HTMLElement): W
   });
 
   return changed ? { ...workbook, sheets } : workbook;
+}
+
+/** Columns needed to satisfy `minColumns` and fill the host width. */
+function padTarget(host: HTMLElement, minColumns: number | undefined): number {
+  const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
+  const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
+  return Math.max(minColumns ?? 0, fillCols);
 }
 
 /**

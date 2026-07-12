@@ -753,3 +753,37 @@ describe("ChangeEvent.commitReason", () => {
     store.dispose();
   });
 });
+
+describe("Grid.setOverscan", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("live-widens the render window on the next frame", () => {
+    const workbook = makeWorkbook(200);
+    const store = new SheetwriteStore(workbook, makeColumnarData(200));
+    const grid = new GridImpl(mountHost(), { workbook, overscan: 0 }, store);
+    const windows: Array<{ firstRow: number; lastRow: number }> = [];
+    grid.on("scroll", (event) =>
+      windows.push({ firstRow: event.firstRow, lastRow: event.lastRow }),
+    );
+
+    grid.refresh();
+    const before = windows.at(-1)!;
+
+    grid.setOverscan(40);
+    grid.refresh();
+    const after = windows.at(-1)!;
+
+    // 40 extra rows painted beyond the viewport (bottom edge; top clamps at 0).
+    expect(after.lastRow).toBe(before.lastRow + 40);
+
+    // `undefined` restores the DEFAULT_OVERSCAN-based window.
+    grid.setOverscan();
+    grid.refresh();
+    expect(windows.at(-1)!.lastRow).toBeLessThan(after.lastRow);
+
+    grid.destroy();
+    store.dispose();
+  });
+});

@@ -124,6 +124,24 @@ Current integration limits:
   patch objects from `event.transaction.patches` or `grid.store.getDirty()`;
   do not reconstruct equivalent-looking objects.
 
+## Which prop changes reset the grid
+
+Every adapter applies props in one of two ways. **Live** props update the
+existing grid; **reset** props destroy it and create a fresh one — and a
+fresh grid means a fresh store: **committed edits, undo history, selection,
+scroll position, search state, and the active sheet are all lost**. Edits
+live in the grid, not in your `data` object — read them back via `change`
+events or `grid.store.getDirty()` before swapping a reset-bound input.
+
+| Prop | On change | Why |
+| --- | --- | --- |
+| `workbook`, `data`, `datasource` | **reset** | New document: the store is rebuilt from the new inputs. Identity comparison — nested mutation is not watched. |
+| `renderer`, `workerUrl`, `renderers` | **reset** | The paint backend is constructed once; swapping it live is a deferred design. |
+| `minColumns` | **reset** | Column padding is baked into the store's sheet geometry at construction. |
+| `theme`, `readOnly`, `config`, `overscan` | live | Applied to the existing grid (`replaceTheme` / `setReadOnly` / `setConfig` / `setOverscan`). |
+| Event callbacks (`onChange`, …) | live | Read through the live handler bag on every event. |
+
+The same table applies to all three adapters.
 
 ## Headless integration
 

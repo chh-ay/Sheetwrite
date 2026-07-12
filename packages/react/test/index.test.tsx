@@ -390,4 +390,39 @@ describe("SheetwriteGrid React lifecycle", () => {
       console.error = originalError;
     }
   });
+
+  it("keeps the grid AND committed edits when overscan changes (live option)", async () => {
+    const workbook = makeWorkbook();
+    const data = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const gridRef = createRef<Grid>();
+
+    await act(async () => {
+      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} data={data} overscan={2} />);
+    });
+    const first = gridRef.current!;
+
+    // Commit a user edit that lives only in the grid's store.
+    first.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "sheet", row: 0, col: 0 },
+          value: { kind: "literal", value: "edited" },
+        },
+      ],
+    });
+
+    await act(async () => {
+      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} data={data} overscan={9} />);
+    });
+
+    // No recreate: same grid, and the committed edit survived.
+    expect(gridRef.current).toBe(first);
+    expect(first.store.getCell({ sheet: "sheet", row: 0, col: 0 }).resolved).toBe("edited");
+
+    await act(async () => root.unmount());
+  });
 });

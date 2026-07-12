@@ -102,6 +102,7 @@ function mountGrid(
   const state = reactive({
     data: makeData(workbook.sheets[0]?.rowCount ?? 5) as ColumnarData,
     theme: undefined as Record<string, string> | undefined,
+    overscan: undefined as number | undefined,
   });
   const cmp = ref<SheetwriteGridExpose | null>(null);
 
@@ -113,6 +114,7 @@ function mountGrid(
           workbook,
           data: state.data,
           theme: state.theme,
+          overscan: state.overscan,
           ...listeners,
         });
     },
@@ -239,5 +241,30 @@ describe("SheetwriteGrid Vue lifecycle", () => {
     harness.unmount();
 
     expect(harness.host.childElementCount).toBe(0);
+  });
+
+  it("keeps the grid AND committed edits when overscan changes (live option)", async () => {
+    const harness = mountGrid(makeWorkbook());
+    const first = harness.getGrid()!;
+
+    // Commit a user edit that lives only in the grid's store.
+    first.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: "edited" },
+        },
+      ],
+    });
+
+    harness.state.overscan = 9;
+    await nextTick();
+
+    // No recreate: same grid, and the committed edit survived.
+    expect(harness.getGrid()).toBe(first);
+    expect(first.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("edited");
+
+    harness.unmount();
   });
 });

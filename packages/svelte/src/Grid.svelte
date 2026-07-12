@@ -96,7 +96,7 @@ $effect(() => {
   const activeRenderer = renderer;
   const activeWorkerUrl = workerUrl;
   const activeRenderers = renderers;
-  const activeOverscan = overscan;
+  const activeOverscan = untrack(() => overscan);
   const activeMinColumns = minColumns;
   const activeReadOnly = untrack(() => readOnly);
   const activeConfig = untrack(() => config);
@@ -147,6 +147,10 @@ $effect(() => {
 
 $effect(() => {
   controller?.setTheme(theme);
+});
+
+$effect(() => {
+  controller?.setOverscan(overscan);
 });
 </script>
 
