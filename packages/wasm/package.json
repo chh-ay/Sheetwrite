@@ -17,12 +17,17 @@
   "exports": {
     ".": {
       "types": "./loader.d.ts",
-      "default": "./loader.mjs"
+      "browser": "./loader-browser.mjs",
+      "node": "./loader-node.mjs",
+      "default": "./loader-browser.mjs"
     },
     "./wasm": "./pkg/sheetwrite_wasm_bg.wasm"
   },
   "files": [
     "loader.mjs",
+    "loader-browser.mjs",
+    "loader-node.mjs",
+    "loader-state.mjs",
     "loader.d.ts",
     "pkg/sheetwrite_wasm.js",
     "pkg/sheetwrite_wasm.d.ts",
