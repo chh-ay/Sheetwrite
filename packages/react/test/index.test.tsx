@@ -3,7 +3,7 @@ import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
 import { DEFAULT_THEME, initSheetwrite } from "@sheetwrite/core";
 import { act, createRef, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { SheetwriteGrid } from "../src/index.js";
+import { Sheetwrite, SheetwriteGrid } from "../src/index.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -92,7 +92,7 @@ describe("SheetwriteGrid React lifecycle", () => {
     };
     const firstData = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
     const secondData = { rowCount: 3, columns: { value: ["x", "y", "z"] } };
-    const onReady = (grid: Grid): void => {
+    const onReady = ({ grid }: { grid: Grid }): void => {
       created.push(grid);
     };
 
@@ -146,7 +146,7 @@ describe("SheetwriteGrid React lifecycle", () => {
           config={{ toolbar: true }}
           className="initial"
           style={{ height: 200 }}
-          onScroll={() => calls.push("old-scroll")}
+          onViewportChange={() => calls.push("old-scroll")}
         />,
       );
     });
@@ -169,7 +169,7 @@ describe("SheetwriteGrid React lifecycle", () => {
           config={{ toolbar: false }}
           className="updated"
           style={{ height: 240 }}
-          onScroll={() => calls.push("new-scroll")}
+          onViewportChange={() => calls.push("new-scroll")}
         />,
       );
     });
@@ -240,7 +240,11 @@ describe("SheetwriteGrid React lifecycle", () => {
     await act(async () => {
       root.render(
         <StrictMode>
-          <SheetwriteGrid ref={gridRef} workbook={workbook} onReady={(grid) => ready.push(grid)} />
+          <SheetwriteGrid
+            ref={gridRef}
+            workbook={workbook}
+            onReady={({ grid }) => ready.push(grid)}
+          />
         </StrictMode>,
       );
     });
@@ -321,28 +325,29 @@ describe("SheetwriteGrid React lifecycle", () => {
     await act(async () => root.unmount());
   });
 
-  it("keeps grid semantics for DOM-named props: a DOM change event never reaches onChange", async () => {
+  it("keeps native scroll available while grid changes use onGridChange", async () => {
     const workbook = makeWorkbook();
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
     const gridRef = createRef<Grid>();
     const changes: unknown[] = [];
+    const nativeScrolls: unknown[] = [];
 
     await act(async () => {
       root.render(
         <SheetwriteGrid
           ref={gridRef}
           workbook={workbook}
-          onChange={(event) => changes.push(event)}
+          onGridChange={(event) => changes.push(event)}
+          onScroll={(event) => nativeScrolls.push(event)}
         />,
       );
     });
 
-    // A bubbling DOM "change" event on the host must NOT hit the grid callback
-    // (onChange was consumed by the adapter, never attached as a DOM handler).
     const div = host.firstElementChild as HTMLDivElement;
-    div.dispatchEvent(new Event("change", { bubbles: true }));
+    div.dispatchEvent(new Event("scroll", { bubbles: true }));
+    expect(nativeScrolls).toHaveLength(1);
     expect(changes).toHaveLength(0);
 
     // The grid `change` event still reaches the callback (grid semantics).
@@ -432,6 +437,62 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(first.store.getCell({ sheet: "sheet", row: 0, col: 0 }).resolved).toBe("edited");
     expect(host.querySelector("[role=grid]")?.getAttribute("aria-colcount")).toBe("12");
 
+    await act(async () => root.unmount());
+  });
+  it("builds an uncontrolled data-first grid and resets on defaultRows identity", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const gridRef = createRef<Grid>();
+    const columns = [
+      { key: "name", title: "Name" },
+      { key: "price", title: "Price", type: "currency" as const },
+    ] as const;
+    const firstRows = [{ name: "Notebook", price: 12.5 }];
+    const ready: Array<{ generation: number; reason: string }> = [];
+
+    await act(async () => {
+      root.render(
+        <Sheetwrite
+          ref={gridRef}
+          columns={columns}
+          defaultRows={firstRows}
+          height={200}
+          onReady={({ generation, reason }) => ready.push({ generation, reason })}
+        />,
+      );
+    });
+    const first = gridRef.current!;
+    first.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "sheet1", row: 0, col: 0 },
+          value: { kind: "literal", value: "Edited" },
+        },
+      ],
+    });
+    expect(firstRows[0]?.name).toBe("Notebook");
+
+    await act(async () => {
+      root.render(
+        <Sheetwrite
+          ref={gridRef}
+          columns={columns}
+          defaultRows={[{ name: "Pen", price: 2.25 }]}
+          height={200}
+          onReady={({ generation, reason }) => ready.push({ generation, reason })}
+        />,
+      );
+    });
+    expect(gridRef.current).not.toBe(first);
+    expect(gridRef.current?.store.getCell({ sheet: "sheet1", row: 0, col: 0 }).resolved).toBe(
+      "Pen",
+    );
+    expect(ready).toEqual([
+      { generation: 1, reason: "initial" },
+      { generation: 2, reason: "input-reset" },
+    ]);
     await act(async () => root.unmount());
   });
 });

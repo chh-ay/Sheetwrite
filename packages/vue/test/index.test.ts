@@ -128,13 +128,13 @@ function mountGrid(
   return {
     host,
     state,
-    getGrid: () => cmp.value?.getGrid() ?? null,
+    getGrid: () => cmp.value?.grid ?? null,
     unmount: () => app.unmount(),
   };
 }
 
 describe("SheetwriteGrid Vue lifecycle", () => {
-  it("mounts a grid reachable through the exposed getGrid()", () => {
+  it("mounts a grid reachable through the exposed grid handle", () => {
     const harness = mountGrid(makeWorkbook());
 
     const grid = harness.getGrid();
@@ -145,20 +145,27 @@ describe("SheetwriteGrid Vue lifecycle", () => {
     harness.unmount();
   });
 
-  it("calls the onReady prop exactly once with the created grid", () => {
-    const ready: Grid[] = [];
-    const harness = mountGrid(makeWorkbook(), { onReady: (grid: Grid) => ready.push(grid) });
-
-    expect(ready).toHaveLength(1);
-    expect(ready[0]).toBe(harness.getGrid()!);
-
-    harness.unmount();
+  it("emits ready once after publishing generation one", async () => {
+    const probe = new URL("./ready-probe.ts", import.meta.url).pathname;
+    const process = Bun.spawn(["bun", probe], { stdout: "pipe", stderr: "pipe" });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+      process.exited,
+    ]);
+    expect(exitCode, stderr).toBe(0);
+    expect(JSON.parse(stdout.trim())).toEqual({
+      emitted: true,
+      publishedBeforeReady: true,
+      generation: 1,
+      reason: "initial",
+    });
   });
 
   it("emits change after a scripted store transaction", () => {
     const changes: unknown[] = [];
     const harness = mountGrid(makeWorkbook(), {
-      onChange: (event: unknown) => changes.push(event),
+      onGridChange: (event: unknown) => changes.push(event),
     });
 
     harness.getGrid()!.store.applyTransaction({
@@ -178,7 +185,7 @@ describe("SheetwriteGrid Vue lifecycle", () => {
   it("emits selection after setSelection", () => {
     const selections: unknown[] = [];
     const harness = mountGrid(makeWorkbook(), {
-      onSelection: (selection: unknown) => selections.push(selection),
+      onSelectionChange: (selection: unknown) => selections.push(selection),
     });
 
     harness.getGrid()!.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
@@ -191,7 +198,7 @@ describe("SheetwriteGrid Vue lifecycle", () => {
   it("emits active-sheet with the sheet id on setActiveSheet", () => {
     const events: Array<GridEvents["active-sheet"]> = [];
     const harness = mountGrid(makeWorkbook(5, true), {
-      onActiveSheet: (event: GridEvents["active-sheet"]) => events.push(event),
+      onActiveSheetChange: (event: GridEvents["active-sheet"]) => events.push(event),
     });
 
     harness.getGrid()!.setActiveSheet("s2");

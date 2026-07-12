@@ -1,104 +1,43 @@
 # @sheetwrite/svelte
 
-Svelte 5 adapter for Sheetwrite. It wraps the imperative core grid in a
-`<SheetwriteGrid>` component that owns a host `<div>`, forwards events, and tears
-the grid down on unmount. The package ships its source via the `svelte` export
-condition (no prebuilt `dist`); your Svelte tooling compiles it.
+Svelte 5 components for Sheetwrite.
 
 ## Install
 
 ```sh
-bun add @sheetwrite/svelte @sheetwrite/core @sheetwrite/wasm
+bun add @sheetwrite/svelte
 ```
 
-Peer dependency: `svelte >= 5`.
+Svelte 5 is a peer dependency. Core and WASM arrive transitively.
 
-## Usage
-
-Initialize WASM once at your app entry before any grid mounts (the adapter does
-not initialize WASM for you):
-
-```ts
-// main.ts
-import { initSheetwrite } from "@sheetwrite/core";
-import "@sheetwrite/core/styles.css";
-import { mount } from "svelte";
-import wasmUrl from "@sheetwrite/wasm/wasm?url";
-import App from "./App.svelte";
-
-await initSheetwrite(wasmUrl);
-
-const target = document.getElementById("app");
-if (!target) throw new Error("missing #app host element");
-
-mount(App, { target });
-```
-
-Then render the grid from a component:
+## Data-first component
 
 ```svelte
 <script lang="ts">
-import type { ColumnarData, Workbook } from "@sheetwrite/core";
-import { SheetwriteGrid } from "@sheetwrite/svelte";
-
-const workbook: Workbook = {
-  activeSheet: "sheet1",
-  sheets: [
-    {
-      id: "sheet1",
-      name: "Sheet 1",
-      rowCount: 3,
-      columns: [
-        { key: "item", header: "Item", width: 200, type: "text" },
-        { key: "qty", header: "Qty", width: 100, type: "number" },
-      ],
-    },
-  ],
-};
-
-const data: ColumnarData = {
-  rowCount: 3,
-  columns: { item: ["Cable", "Adapter", "Mount"], qty: [3, 2, 5] },
-};
+import { Sheetwrite } from "@sheetwrite/svelte";
+import "@sheetwrite/svelte/styles.css";
 </script>
 
-<SheetwriteGrid
-  {workbook}
-  {data}
-  onChange={(event) => console.log("changed", event.changes.length)}
-  onSelectionChange={(selection) => console.log("selection", selection)}
+<Sheetwrite
+  {columns}
+  defaultRows={products}
+  height="500px"
+  onGridChange={({ changes }) => save(changes)}
 />
 ```
 
-## Props
+`defaultRows` seeds an uncontrolled grid and is never mutated. Changing its identity intentionally creates a new generation. Use `height` or `fill`; `fill` requires an already-sized ancestor.
 
-- `workbook` (required), `data`, `datasource`, `renderer`, `workerUrl`, `theme`, `readOnly`, `renderers`, `overscan`, `minColumns`, `config` (toolbar/feature flags).
-- `onChange(event)` — committed edits (`ChangeEvent`).
-- `onSelectionChange(selection)` — the new selection (`Selection | null`).
-- `onScroll(event)` — the visible row window on scroll.
-- `onEditBegin(event)` — a cell editor opened.
-- `onEditCommit(event)` — a cell editor committed.
-- `onSearch(result)` — the active search result changed.
-- `onActiveSheetChange(event)` — fired after the visible sheet changes (`{ sheet: SheetId }`).
-- `onReady(grid)` — fired once with the core `Grid` after creation.
-- `bind:grid` — two-way binds the core `Grid` handle for imperative control.
+WASM initializes on client mount. A `fallback` snippet renders while loading, `onInitializationError` observes failure, and `wasmSource` is the explicit-source escape hatch.
+
+## Advanced component
 
 ```svelte
-<script lang="ts">
-import type { Grid } from "@sheetwrite/core";
-let grid: Grid | undefined = $state();
-</script>
-
-<SheetwriteGrid bind:grid {workbook} {data} />
-<button onclick={() => grid?.search("foo")}>Find</button>
+<SheetwriteGrid bind:grid {workbook} {data} fill />
 ```
 
-The bound `Grid` handle exposes the core data-view and geometry API:
-`sortByMulti`, `setColumnFilter`, `distinctValues`, `hideRows`/`showRows`, row
-groups, `setFrozen`, and `setZoom`. Views are non-mutating; `clearView()` clears
-sort/filter state but preserves explicitly hidden rows and collapsed groups. See
-[Data operations](../../docs/data-operations.md).
+The bindable `grid` is published before `onReady({ grid, generation, reason })` and clears during replacement/unmount. Reset-bound inputs are `workbook`, `data`, `datasource`, `renderer`, `workerUrl`, and `renderers`; `theme`, `readOnly`, `config`, `overscan`, and `minColumns` update live.
 
-## Documentation
+Grid events are `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, and `onActiveSheetChange`. Native host change/scroll handlers remain available.
 
-See the [project README](../../README.md) and [docs/](../../docs/) for the full guide.
+For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See the repository getting-started guide for explicit WASM-source recipes.

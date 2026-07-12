@@ -1,40 +1,14 @@
 <script lang="ts">
-import type {
-  ChangeEvent,
-  Grid,
-  GridEvents,
-  GridOptions,
-  Selection,
-} from "@sheetwrite/core";
-import { createGridController } from "@sheetwrite/core/adapter";
-import type { GridController, GridControllerHandlers } from "@sheetwrite/core/adapter";
+import { initSheetwrite, isSheetwriteReady, type GridOptions } from "@sheetwrite/core";
+import {
+  createGridController,
+  getGridResetReason,
+  gridSizeStyle,
+} from "@sheetwrite/core/adapter";
+import type { GridController, GridReadyReason } from "@sheetwrite/core/adapter";
 import { untrack } from "svelte";
-import type { HTMLAttributes } from "svelte/elements";
+import type { SheetwriteGridProps as Props } from "./props.js";
 
-interface Props extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
-  workbook: GridOptions["workbook"];
-  data?: GridOptions["data"];
-  datasource?: GridOptions["datasource"];
-  renderer?: GridOptions["renderer"];
-  workerUrl?: GridOptions["workerUrl"];
-  theme?: GridOptions["theme"];
-  readOnly?: GridOptions["readOnly"];
-  renderers?: GridOptions["renderers"];
-  overscan?: GridOptions["overscan"];
-  minColumns?: GridOptions["minColumns"];
-  config?: GridOptions["config"];
-  onChange?: (event: ChangeEvent) => void;
-  onSelectionChange?: (selection: Selection | null) => void;
-  onScroll?: (event: GridEvents["scroll"]) => void;
-  onEditBegin?: (event: GridEvents["edit-begin"]) => void;
-  onEditCommit?: (event: GridEvents["edit-commit"]) => void;
-  onSearch?: (result: GridEvents["search"]) => void;
-  onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
-  /** Bound to the imperative core grid after creation (`bind:grid`). */
-  grid?: Grid;
-  /** Fired once with the grid after it is created. */
-  onReady?: (grid: Grid) => void;
-}
 
 let {
   workbook,
@@ -48,111 +22,110 @@ let {
   overscan,
   minColumns,
   config,
-  onChange,
+  wasmSource,
+  height,
+  fill,
+  fallback,
+  onGridChange,
   onSelectionChange,
-  onScroll,
+  onViewportChange,
   onEditBegin,
   onEditCommit,
   onSearch,
   onActiveSheetChange,
-  grid = $bindable(),
   onReady,
+  onInitializationError,
+  grid = $bindable(),
   ...hostAttributes
 }: Props = $props();
 
 let host: HTMLDivElement;
-
-// The controller owns the imperative core grid. Kept in reactive state so
-// live-option effects re-target a replacement grid.
 let controller: GridController | undefined = $state();
+let loading = $state(!isSheetwriteReady());
+let generation = 0;
 
-// Read live on every event, so swapped prop callbacks are honored without
-// recreating the grid.
-const handlers: GridControllerHandlers = {
-  onChange: (event) => onChange?.(event),
-  onSelectionChange: (selection) => onSelectionChange?.(selection),
-  onScroll: (event) => onScroll?.(event),
-  onEditBegin: (event) => onEditBegin?.(event),
-  onEditCommit: (event) => onEditCommit?.(event),
-  onSearch: (result) => onSearch?.(result),
-  onActiveSheetChange: (event) => onActiveSheetChange?.(event),
-  onReady: (created) => onReady?.(created),
+const handlers = {
+  onGridChange: (event: Parameters<NonNullable<typeof onGridChange>>[0]) => onGridChange?.(event),
+  onSelectionChange: (event: Parameters<NonNullable<typeof onSelectionChange>>[0]) =>
+    onSelectionChange?.(event),
+  onViewportChange: (event: Parameters<NonNullable<typeof onViewportChange>>[0]) =>
+    onViewportChange?.(event),
+  onEditBegin: (event: Parameters<NonNullable<typeof onEditBegin>>[0]) => onEditBegin?.(event),
+  onEditCommit: (event: Parameters<NonNullable<typeof onEditCommit>>[0]) => onEditCommit?.(event),
+  onSearch: (event: Parameters<NonNullable<typeof onSearch>>[0]) => onSearch?.(event),
+  onActiveSheetChange: (event: Parameters<NonNullable<typeof onActiveSheetChange>>[0]) =>
+    onActiveSheetChange?.(event),
 };
 
-// Owns the host div: creates the imperative core grid through the shared
-// controller, forwards every core event, replaces it only when a
-// construction-bound option changes, and tears it down on unmount. Theme,
-// read-only, config, overscan, minColumns, callbacks, and host attributes update live. It renders no
-// cells. Call `await initSheetwrite(wasmUrl)` once before mounting.
+let previousOptions: GridOptions | null = null;
+
 $effect(() => {
-  // Track construction-bound option identities. Live options are read
-  // untracked and applied by the effects below.
-  const activeWorkbook = workbook;
-  const activeData = data;
-  const activeDatasource = datasource;
-  const activeRenderer = renderer;
-  const activeWorkerUrl = workerUrl;
-  const activeRenderers = renderers;
-  const activeOverscan = untrack(() => overscan);
-  const activeMinColumns = untrack(() => minColumns);
-  const activeReadOnly = untrack(() => readOnly);
-  const activeConfig = untrack(() => config);
-  const activeTheme = untrack(() => theme);
-  // `createGridController` runs synchronously and calls `onReady`, which may
-  // read or write arbitrary consumer state; the bindable `grid` write also
-  // round-trips through the parent's setter. Both must stay OUT of this
-  // effect's dependency set or the effect re-triggers itself (Svelte
-  // effect_update_depth_exceeded).
-  const active = untrack(() =>
-    createGridController(
-      host,
-      {
-        workbook: activeWorkbook,
-        data: activeData,
-        datasource: activeDatasource,
-        renderer: activeRenderer,
-        workerUrl: activeWorkerUrl,
-        theme: activeTheme,
-        readOnly: activeReadOnly,
-        renderers: activeRenderers,
-        overscan: activeOverscan,
-        minColumns: activeMinColumns,
-        config: activeConfig,
-      },
-      handlers,
-    ),
-  );
-  untrack(() => {
-    controller = active;
-    grid = active.grid;
-  });
+  const resetInputs = { workbook, data, datasource, renderer, workerUrl, renderers, wasmSource };
+  let current = true;
+  let active: GridController | undefined;
+  loading = !isSheetwriteReady();
+
+  void (async () => {
+    try {
+      if (!isSheetwriteReady()) await initSheetwrite(resetInputs.wasmSource);
+      if (!current) return;
+      const options: GridOptions = {
+        workbook: resetInputs.workbook,
+        data: resetInputs.data,
+        datasource: resetInputs.datasource,
+        renderer: resetInputs.renderer,
+        workerUrl: resetInputs.workerUrl,
+        renderers: resetInputs.renderers,
+        theme,
+        readOnly,
+        overscan,
+        minColumns,
+        config,
+      };
+      active = untrack(() => createGridController(host, options, handlers));
+      const reason: GridReadyReason =
+        generation === 0
+          ? "initial"
+          : (previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset";
+      previousOptions = options;
+      generation += 1;
+      untrack(() => {
+        controller = active;
+        grid = active?.grid;
+        loading = false;
+        if (active) onReady?.({ grid: active.grid, generation, reason });
+      });
+    } catch (error) {
+      if (!current) return;
+      loading = true;
+      onInitializationError?.(error);
+    }
+  })();
 
   return () => {
-    active.destroy();
-    controller = undefined;
+    current = false;
     grid = undefined;
+    controller = undefined;
+    active?.destroy();
   };
 });
 
-$effect(() => {
-  controller?.setReadOnly(readOnly ?? false);
-});
+$effect(() => controller?.setReadOnly(readOnly ?? false));
+$effect(() => controller?.setConfig(config));
+$effect(() => controller?.setTheme(theme));
+$effect(() => controller?.setOverscan(overscan));
+$effect(() => controller?.setMinColumns(minColumns));
 
-$effect(() => {
-  controller?.setConfig(config);
-});
-
-$effect(() => {
-  controller?.setTheme(theme);
-});
-
-$effect(() => {
-  controller?.setOverscan(overscan);
-});
-
-$effect(() => {
-  controller?.setMinColumns(minColumns);
-});
+let sizing = $derived(gridSizeStyle({ height, fill }));
 </script>
 
-<div bind:this={host} {...hostAttributes}></div>
+<div
+  {...hostAttributes}
+  bind:this={host}
+  class={["sheetwrite", hostAttributes.class]}
+  style:width={sizing.width}
+  style:height={sizing.height}
+  style:min-height={sizing.minHeight}
+>
+  {#if loading && fallback}{@render fallback()}{/if}
+</div>

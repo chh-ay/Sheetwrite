@@ -16,10 +16,12 @@
       "svelte": "./src/index.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./styles.css": "./styles.css"
   },
   "files": [
-    "src"
+    "src",
+    "styles.css"
   ],
   "publishConfig": {
     "access": "public",

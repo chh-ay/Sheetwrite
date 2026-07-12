@@ -1,8 +1,21 @@
-import type { ChangeEvent, Grid, GridEvents, GridOptions, Selection } from "@sheetwrite/core";
+import {
+  type CellScalar,
+  type Grid,
+  type GridOptions,
+  initSheetwrite,
+  isSheetwriteReady,
+} from "@sheetwrite/core";
 import {
   createGridController,
+  createSimpleGridInput,
+  type GridAdapterEventHandlers,
   type GridController,
-  type GridControllerHandlers,
+  type GridReadyReason,
+  type GridSizeProps,
+  getGridResetReason,
+  gridSizeStyle,
+  type SheetwriteInitializationProps,
+  type SimpleColumn,
 } from "@sheetwrite/core/adapter";
 import {
   type CSSProperties,
@@ -10,9 +23,12 @@ import {
   forwardRef,
   type HTMLAttributes,
   type ReactElement,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
+  useState,
 } from "react";
 
 function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
@@ -22,41 +38,27 @@ function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
 
 export interface SheetwriteGridProps
   extends GridOptions,
-    Omit<HTMLAttributes<HTMLDivElement>, "onChange" | "onScroll" | "children"> {
+    GridAdapterEventHandlers,
+    SheetwriteInitializationProps,
+    Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | "children"> {
   className?: string;
   style?: CSSProperties;
-  /** Grid semantics (committed transaction) — shadows the DOM `onChange`. */
-  onChange?: (event: ChangeEvent) => void;
-  onSelectionChange?: (selection: Selection | null) => void;
-  /** Grid semantics (visible row window) — shadows the DOM `onScroll`. */
-  onScroll?: (event: GridEvents["scroll"]) => void;
-  onEditBegin?: (event: GridEvents["edit-begin"]) => void;
-  onEditCommit?: (event: GridEvents["edit-commit"]) => void;
-  onSearch?: (result: GridEvents["search"]) => void;
-  onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
-  /** Fired once with the imperative core grid after it is created. */
-  onReady?: (grid: Grid) => void;
+  fallback?: ReactNode;
+  height?: number | string;
+  fill?: true;
 }
 
-/**
- * Thin React wrapper: it owns a host `<div>`, drives the imperative core grid
- * through a {@link createGridController}, forwards events, replaces the grid
- * only when a construction-bound option changes, and tears down on unmount.
- * Theme, read-only, and UI configuration update the existing grid. It renders
- * no cells. Call `await initSheetwrite(wasmUrl)` once before mounting (WASM
- * must be ready).
- *
- * The created grid is exposed through `ref` and the `onReady` callback so
- * consumers can drive it imperatively — `grid.actions.*`, `grid.search(...)`.
- */
 export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
   function SheetwriteGrid(props, ref): ReactElement {
     const {
       className,
       style,
-      onChange,
+      fallback,
+      wasmSource,
+      onInitializationError,
+      onGridChange,
       onSelectionChange,
-      onScroll,
+      onViewportChange,
       onEditBegin,
       onEditCommit,
       onSearch,
@@ -73,43 +75,47 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       overscan,
       minColumns,
       config,
+      height,
+      fill,
       ...hostAttributes
     } = props;
 
     const hostRef = useRef<HTMLDivElement | null>(null);
-    const gridRef = useRef<Grid | null>(null);
     const controllerRef = useRef<GridController | null>(null);
     const publishedRef = useRef<ForwardedRef<Grid> | null>(null);
-    const themeRef = useRef<GridOptions["theme"]>(theme);
-    themeRef.current = theme;
-    const readOnlyRef = useRef<GridOptions["readOnly"]>(readOnly);
-    const configRef = useRef<GridOptions["config"]>(config);
-    const overscanRef = useRef<GridOptions["overscan"]>(overscan);
-    const minColumnsRef = useRef<GridOptions["minColumns"]>(minColumns);
-    readOnlyRef.current = readOnly;
-    configRef.current = config;
-    overscanRef.current = overscan;
-    minColumnsRef.current = minColumns;
+    const generationRef = useRef(0);
+    const initializedRef = useRef(isSheetwriteReady());
+    const [initializationState, setInitializationState] = useState<"loading" | "ready" | "error">(
+      initializedRef.current ? "ready" : "loading",
+    );
+    const previousOptionsRef = useRef<GridOptions | null>(null);
+    const liveOptionsRef = useRef({
+      theme,
+      readOnly,
+      overscan,
+      minColumns,
+      config,
+    });
+    liveOptionsRef.current = { theme, readOnly, overscan, minColumns, config };
 
-    // Live-callback bag: the controller reads these fields on every event, so we
-    // mutate the SAME object each render instead of recreating the grid.
-    const handlers = useRef<GridControllerHandlers>({});
-    handlers.current.onChange = onChange;
-    handlers.current.onSelectionChange = onSelectionChange;
-    handlers.current.onScroll = onScroll;
-    handlers.current.onEditBegin = onEditBegin;
-    handlers.current.onEditCommit = onEditCommit;
-    handlers.current.onSearch = onSearch;
-    handlers.current.onActiveSheetChange = onActiveSheetChange;
-    handlers.current.onReady = onReady;
+    const handlers = useRef<GridAdapterEventHandlers>({});
+    Object.assign(handlers.current, {
+      onGridChange,
+      onSelectionChange,
+      onViewportChange,
+      onEditBegin,
+      onEditCommit,
+      onSearch,
+      onActiveSheetChange,
+      onReady,
+      onInitializationError,
+    });
 
     useLayoutEffect(() => {
       const previous = publishedRef.current;
       if (previous && previous !== ref) publishGrid(previous, null);
-
       publishedRef.current = ref;
-      publishGrid(ref, gridRef.current);
-
+      publishGrid(ref, controllerRef.current?.grid ?? null);
       return () => {
         if (publishedRef.current !== ref) return;
         publishGrid(ref, null);
@@ -117,64 +123,116 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       };
     }, [ref]);
 
-    // Rebuild only when a construction-bound option changes. Live options and
-    // callbacks are read through refs/the stable handler bag.
     useEffect(() => {
+      let current = true;
+      if (isSheetwriteReady()) {
+        initializedRef.current = true;
+        setInitializationState("ready");
+        return;
+      }
+      setInitializationState("loading");
+      void initSheetwrite(wasmSource).then(
+        () => {
+          if (!current) return;
+          initializedRef.current = true;
+          setInitializationState("ready");
+        },
+        (error: unknown) => {
+          if (!current) return;
+          initializedRef.current = false;
+          setInitializationState("error");
+          handlers.current.onInitializationError?.(error);
+        },
+      );
+      return () => {
+        current = false;
+      };
+    }, [wasmSource]);
+
+    useEffect(() => {
+      if (initializationState !== "ready") return;
       const host = hostRef.current;
       if (!host) return;
-
-      const controller = createGridController(
-        host,
-        {
-          workbook,
-          data,
-          datasource,
-          renderer,
-          workerUrl,
-          theme: themeRef.current,
-          readOnly: readOnlyRef.current,
-          renderers,
-          overscan: overscanRef.current,
-          minColumns: minColumnsRef.current,
-          config: configRef.current,
-        },
-        handlers.current,
-      );
+      const options: GridOptions = {
+        workbook,
+        data,
+        datasource,
+        renderer,
+        workerUrl,
+        renderers,
+        ...liveOptionsRef.current,
+      };
+      const previousOptions = previousOptionsRef.current;
+      const reason: GridReadyReason =
+        generationRef.current === 0
+          ? "initial"
+          : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
+      const controller = createGridController(host, options, {
+        onGridChange: (event) => handlers.current.onGridChange?.(event),
+        onSelectionChange: (selection) => handlers.current.onSelectionChange?.(selection),
+        onViewportChange: (event) => handlers.current.onViewportChange?.(event),
+        onEditBegin: (event) => handlers.current.onEditBegin?.(event),
+        onEditCommit: (event) => handlers.current.onEditCommit?.(event),
+        onSearch: (result) => handlers.current.onSearch?.(result),
+        onActiveSheetChange: (event) => handlers.current.onActiveSheetChange?.(event),
+      });
       controllerRef.current = controller;
-      gridRef.current = controller.grid;
+      generationRef.current += 1;
       publishGrid(publishedRef.current, controller.grid);
+      handlers.current.onReady?.({
+        grid: controller.grid,
+        generation: generationRef.current,
+        reason,
+      });
+      previousOptionsRef.current = options;
 
       return () => {
-        controller.destroy();
+        publishGrid(publishedRef.current, null);
         if (controllerRef.current === controller) controllerRef.current = null;
-        if (gridRef.current === controller.grid) {
-          gridRef.current = null;
-          publishGrid(publishedRef.current, null);
-        }
+        controller.destroy();
       };
-    }, [workbook, data, datasource, renderer, workerUrl, renderers]);
+    }, [initializationState, workbook, data, datasource, renderer, workerUrl, renderers]);
 
-    useEffect(() => {
-      controllerRef.current?.setReadOnly(readOnly ?? false);
-    }, [readOnly]);
+    useEffect(() => controllerRef.current?.setReadOnly(readOnly ?? false), [readOnly]);
+    useEffect(() => controllerRef.current?.setConfig(config), [config]);
+    useEffect(() => controllerRef.current?.setTheme(theme), [theme]);
+    useEffect(() => controllerRef.current?.setOverscan(overscan), [overscan]);
+    useEffect(() => controllerRef.current?.setMinColumns(minColumns), [minColumns]);
 
-    useEffect(() => {
-      controllerRef.current?.setConfig(config);
-    }, [config]);
-    useEffect(() => {
-      controllerRef.current?.setTheme(theme);
-    }, [theme]);
-    useEffect(() => {
-      controllerRef.current?.setOverscan(overscan);
-    }, [overscan]);
-    useEffect(() => {
-      controllerRef.current?.setMinColumns(minColumns);
-    }, [minColumns]);
-
-    // The grid adds `.sheetwrite` (the CSS-variable chrome) to this div; keep
-    // it in the React-owned class so Tailwind-style `cn()` className churn
-    // cannot reconcile it away. Spread first: adapter-owned props win.
     const hostClassName = className ? `sheetwrite ${className}` : "sheetwrite";
-    return <div {...hostAttributes} ref={hostRef} className={hostClassName} style={style} />;
+    const sizing = gridSizeStyle({ height, fill });
+    const hostStyle = { ...style, ...sizing };
+    return (
+      <div {...hostAttributes} ref={hostRef} className={hostClassName} style={hostStyle}>
+        {initializationState === "ready" ? null : fallback}
+      </div>
+    );
   },
 );
+
+export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
+  SheetwriteGridProps,
+  "workbook" | "data" | "datasource" | "height" | "fill"
+> &
+  GridSizeProps & {
+    columns: readonly SimpleColumn<Row>[];
+    defaultRows: readonly Row[];
+    sheetName?: string;
+  };
+
+const SheetwriteComponent = forwardRef<Grid, SheetwriteProps<Record<string, CellScalar>>>(
+  function Sheetwrite({ columns, defaultRows, sheetName, ...props }, ref): ReactElement {
+    const input = useMemo(
+      () => createSimpleGridInput({ columns, defaultRows, sheetName }),
+      [columns, defaultRows, sheetName],
+    );
+    return <SheetwriteGrid {...props} {...input} ref={ref} />;
+  },
+);
+
+export const Sheetwrite = SheetwriteComponent as <Row extends Record<string, CellScalar>>(
+  props: SheetwriteProps<Row> & { ref?: ForwardedRef<Grid> },
+) => ReactElement;
+
+export type { CellScalar, Grid } from "@sheetwrite/core";
+export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";

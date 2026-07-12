@@ -1,85 +1,104 @@
-import type {
-  CellRenderer,
-  ChangeEvent,
-  ColumnarData,
-  DataSource,
-  Grid,
-  GridEvents,
-  GridOptions,
-  Selection,
-  Theme,
-  Workbook,
+import {
+  type CellRenderer,
+  type CellScalar,
+  type ChangeEvent,
+  type ColumnarData,
+  type DataSource,
+  type Grid,
+  type GridEvents,
+  type GridOptions,
+  initSheetwrite,
+  isSheetwriteReady,
+  type Selection,
+  type Theme,
+  type Workbook,
 } from "@sheetwrite/core";
 import {
   createGridController,
+  createSimpleGridInput,
   type GridController,
   type GridControllerHandlers,
+  type GridReadyEvent,
+  type GridReadyReason,
+  getGridResetReason,
+  gridSizeStyle,
+  type SimpleGridInput,
 } from "@sheetwrite/core/adapter";
-import { defineComponent, h, onBeforeUnmount, onMounted, type PropType, ref, watch } from "vue";
+import {
+  defineComponent,
+  h,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  type PropType,
+  ref,
+  shallowRef,
+  watch,
+} from "vue";
 
 export interface SheetwriteGridExpose {
-  getGrid(): Grid | null;
+  grid: Grid | null;
 }
 
-/**
- * Thin Vue 3 wrapper: it owns a host `<div>`, drives the imperative core grid
- * through a {@link createGridController}, forwards every core event, replaces
- * the grid only when a construction-bound option changes, and tears down on
- * unmount. Theme, read-only, and UI configuration update the existing grid. It
- * renders no cells. `class`/`style` and ordinary attributes fall through to the
- * host div. Call `await initSheetwrite(wasmUrl)` once before mounting (WASM must
- * be ready).
- */
+const gridProps = {
+  workbook: { type: Object as PropType<Workbook>, required: true as const },
+  data: { type: Object as PropType<ColumnarData>, default: undefined },
+  datasource: { type: Object as PropType<DataSource>, default: undefined },
+  renderer: { type: String as PropType<GridOptions["renderer"]>, default: undefined },
+  workerUrl: {
+    type: [String, URL] as unknown as PropType<GridOptions["workerUrl"]>,
+    default: undefined,
+  },
+  theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
+  readOnly: { type: Boolean, default: undefined },
+  renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
+  overscan: { type: Number, default: undefined },
+  minColumns: { type: Number, default: undefined },
+  config: { type: Object as PropType<GridOptions["config"]>, default: undefined },
+  wasmSource: { type: [Object, String] as PropType<GridOptions extends never ? never : unknown> },
+  height: { type: [Number, String], default: undefined },
+  fill: { type: Boolean, default: undefined },
+};
+
+const gridEmits = {
+  "grid-change": (_event: ChangeEvent) => true,
+  "selection-change": (_selection: Selection | null) => true,
+  "viewport-change": (_event: GridEvents["scroll"]) => true,
+  "edit-begin": (_event: GridEvents["edit-begin"]) => true,
+  "edit-commit": (_event: GridEvents["edit-commit"]) => true,
+  search: (_result: GridEvents["search"]) => true,
+  "active-sheet-change": (_event: GridEvents["active-sheet"]) => true,
+  ready: (_event: GridReadyEvent) => true,
+  "initialization-error": (_error: unknown) => true,
+};
+
 const SheetwriteGridComponent = defineComponent({
   name: "SheetwriteGrid",
-  props: {
-    workbook: { type: Object as PropType<Workbook>, required: true },
-    data: { type: Object as PropType<ColumnarData>, default: undefined },
-    datasource: { type: Object as PropType<DataSource>, default: undefined },
-    renderer: { type: String as PropType<GridOptions["renderer"]>, default: undefined },
-    workerUrl: {
-      type: [String, URL] as unknown as PropType<GridOptions["workerUrl"]>,
-      default: undefined,
-    },
-    theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
-    readOnly: { type: Boolean, default: undefined },
-    renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
-    overscan: { type: Number, default: undefined },
-    minColumns: { type: Number, default: undefined },
-    config: { type: Object as PropType<GridOptions["config"]>, default: undefined },
-    onReady: { type: Function as PropType<(grid: Grid) => void>, default: undefined },
-  },
-  emits: {
-    change: (_event: ChangeEvent) => true,
-    selection: (_selection: Selection | null) => true,
-    scroll: (_event: GridEvents["scroll"]) => true,
-    "edit-begin": (_event: GridEvents["edit-begin"]) => true,
-    "edit-commit": (_event: GridEvents["edit-commit"]) => true,
-    search: (_result: GridEvents["search"]) => true,
-    "active-sheet": (_event: GridEvents["active-sheet"]) => true,
-  },
-  setup(props, { emit, expose }) {
+  inheritAttrs: false,
+  props: gridProps,
+  emits: gridEmits,
+  setup(props, { attrs, emit, expose, slots }) {
     const host = ref<HTMLDivElement | null>(null);
-
-    // Non-reactive: the controller wraps an imperative handle, not view state.
+    const exposedGrid = shallowRef<Grid | null>(null);
     let controller: GridController | null = null;
+    let generation = 0;
+    let previousOptions: GridOptions | null = null;
+    let mounted = false;
+    let initializationToken = 0;
 
-    // Read live on every event. The emit callbacks are stable, and `onReady` is
-    // read through `props` so a swapped handler is still picked up.
     const handlers: GridControllerHandlers = {
-      onChange: (event) => emit("change", event),
-      onSelectionChange: (selection) => emit("selection", selection),
-      onScroll: (event) => emit("scroll", event),
+      onGridChange: (event) => emit("grid-change", event),
+      onSelectionChange: (selection) => emit("selection-change", selection),
+      onViewportChange: (event) => emit("viewport-change", event),
       onEditBegin: (event) => emit("edit-begin", event),
       onEditCommit: (event) => emit("edit-commit", event),
       onSearch: (result) => emit("search", result),
-      onActiveSheetChange: (event) => emit("active-sheet", event),
-      onReady: (grid) => props.onReady?.(grid),
+      onActiveSheetChange: (event) => emit("active-sheet-change", event),
     };
 
     function currentOptions(): GridOptions {
       return {
-        workbook: props.workbook,
+        workbook: props.workbook!,
         data: props.data,
         datasource: props.datasource,
         renderer: props.renderer,
@@ -93,22 +112,57 @@ const SheetwriteGridComponent = defineComponent({
       };
     }
 
-    function mountGrid(): void {
-      const el = host.value;
-      if (!el) return;
-      controller = createGridController(el, currentOptions(), handlers);
-    }
-
     function teardownGrid(): void {
+      exposedGrid.value = null;
       controller?.destroy();
       controller = null;
     }
 
-    onMounted(mountGrid);
-    onBeforeUnmount(teardownGrid);
+    async function createCurrentGrid(): Promise<void> {
+      if (!mounted || !host.value) return;
+      const options = currentOptions();
+      const reason: GridReadyReason =
+        generation === 0
+          ? "initial"
+          : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
+      teardownGrid();
+      const created = createGridController(host.value, options, handlers);
+      controller = created;
+      generation += 1;
+      previousOptions = options;
+      exposedGrid.value = created.grid;
+      await nextTick();
+      if (controller !== created) return;
+      emit("ready", { grid: created.grid, generation, reason });
+    }
 
-    // Recreate only when a construction-bound option changes. Theme,
-    // read-only, config, overscan, and minColumns are applied live below.
+    async function initialize(): Promise<void> {
+      const token = ++initializationToken;
+      try {
+        if (!isSheetwriteReady()) await initSheetwrite(props.wasmSource as never);
+        if (mounted && token === initializationToken) await createCurrentGrid();
+      } catch (error) {
+        if (mounted && token === initializationToken) emit("initialization-error", error);
+      }
+    }
+
+    onMounted(() => {
+      mounted = true;
+      void initialize();
+    });
+    onBeforeUnmount(() => {
+      mounted = false;
+      initializationToken += 1;
+      teardownGrid();
+    });
+
+    watch(
+      () => props.wasmSource,
+      () => {
+        teardownGrid();
+        void initialize();
+      },
+    );
     watch(
       () => [
         props.workbook,
@@ -119,40 +173,92 @@ const SheetwriteGridComponent = defineComponent({
         props.renderers,
       ],
       () => {
-        teardownGrid();
-        mountGrid();
+        if (isSheetwriteReady()) void createCurrentGrid();
       },
     );
-
     watch(
       () => props.readOnly,
-      (readOnly) => controller?.setReadOnly(readOnly ?? false),
+      (value) => controller?.setReadOnly(value ?? false),
     );
-
     watch(
       () => props.config,
-      (config) => controller?.setConfig(config),
+      (value) => controller?.setConfig(value),
     );
-
     watch(
       () => props.theme,
-      (theme) => controller?.setTheme(theme),
+      (value) => controller?.setTheme(value),
     );
-
     watch(
       () => props.overscan,
-      (overscan) => controller?.setOverscan(overscan),
+      (value) => controller?.setOverscan(value),
     );
     watch(
       () => props.minColumns,
-      (minColumns) => controller?.setMinColumns(minColumns),
+      (value) => controller?.setMinColumns(value),
     );
 
-    expose({ getGrid: () => controller?.grid ?? null });
+    expose({ grid: exposedGrid });
 
-    return () => h("div", { ref: host });
+    return () => {
+      const style = [
+        attrs.style,
+        gridSizeStyle({ height: props.height, fill: props.fill || undefined }),
+      ];
+      return h(
+        "div",
+        { ...attrs, ref: host, class: ["sheetwrite", attrs.class], style },
+        exposedGrid.value ? undefined : slots.fallback?.(),
+      );
+    };
   },
 });
+
 export const SheetwriteGrid = SheetwriteGridComponent as typeof SheetwriteGridComponent & {
   new (): InstanceType<typeof SheetwriteGridComponent> & SheetwriteGridExpose;
 };
+
+export const Sheetwrite = defineComponent({
+  name: "SheetwriteComponent",
+  inheritAttrs: false,
+  props: {
+    columns: { type: Array as PropType<readonly { key: string; title: string }[]>, required: true },
+    defaultRows: { type: Array as PropType<readonly Record<string, CellScalar>[]>, required: true },
+    sheetName: { type: String, default: undefined },
+    height: { type: [Number, String], default: undefined },
+    fill: { type: Boolean, default: undefined },
+  },
+  setup(props, { attrs, slots }) {
+    let input: SimpleGridInput | null = null;
+    let inputColumns: typeof props.columns | null = null;
+    let inputRows: typeof props.defaultRows | null = null;
+    let inputSheetName: string | undefined;
+
+    return () => {
+      if (
+        (props.height === undefined && !props.fill) ||
+        (props.height !== undefined && props.fill)
+      ) {
+        throw new Error("Sheetwrite: provide exactly one of height or fill");
+      }
+      if (
+        input === null ||
+        inputColumns !== props.columns ||
+        inputRows !== props.defaultRows ||
+        inputSheetName !== props.sheetName
+      ) {
+        input = createSimpleGridInput({
+          columns: props.columns,
+          defaultRows: props.defaultRows,
+          sheetName: props.sheetName,
+        });
+        inputColumns = props.columns;
+        inputRows = props.defaultRows;
+        inputSheetName = props.sheetName;
+      }
+      return h(SheetwriteGrid, { ...attrs, ...props, ...input }, slots);
+    };
+  },
+});
+
+export type { CellScalar, Grid } from "@sheetwrite/core";
+export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";
