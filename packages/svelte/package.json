@@ -1,9 +1,15 @@
 {
   "name": "@sheetwrite/svelte",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Svelte adapter for Sheetwrite.",
   "license": "MIT",
+  "keywords": [
+    "spreadsheet",
+    "data-grid",
+    "svelte",
+    "canvas"
+  ],
   "svelte": "./src/index.ts",
   "exports": {
     ".": {
@@ -15,13 +21,22 @@
   "files": [
     "src"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "prepublishOnly": "bun run typecheck",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "peerDependencies": {
     "svelte": ">=5"
   },
   "dependencies": {
     "@sheetwrite/core": "workspace:*"
+  },
+  "devDependencies": {
+    "svelte-check": "^4.7.2",
+    "typescript": "^6"
   }
 }
