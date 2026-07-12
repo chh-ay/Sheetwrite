@@ -1043,3 +1043,70 @@ fn malformed_query_and_window_inputs_fail_closed_without_panicking() {
 
     assert!(result.is_ok());
 }
+
+#[test]
+fn conditional_format_window_masks_match_numeric_text_and_bounds() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 3);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_number(sheet, 1, 0, 10.0, 0);
+    store.set_number(sheet, 2, 0, 20.0, 0);
+    store.set_string(sheet, 0, 1, "Tokyo", 0);
+    store.set_string(sheet, 1, 1, "Kyoto", 0);
+    store.set_string(sheet, 2, 1, "TOKYO", 0);
+    store.set_conditional_rules(
+        sheet,
+        &[0, 5],
+        &[0, 0, 1, 0, 0, 1, 2, 1],
+        &[7.0, 0.0],
+        vec![String::new(), "tokyo".to_string()],
+        &[0, 0],
+    );
+
+    let mut view = store.get_window(sheet, 0, 3, &[0, 1]);
+    assert_eq!(view.take_cond_matches(), vec![0, 2, 1, 0, 0, 2]);
+    assert!(view.take_cond_matches().is_empty());
+}
+
+#[test]
+fn multi_query_entry_points_preserve_order_filters_distinctness_and_edges() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 5);
+    for (row, value) in [2.0, 1.0, 2.0, 1.0, 3.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+    for (row, value) in ["x", "x", "y", "x", "y"].into_iter().enumerate() {
+        store.set_string(sheet, row, 1, value, 0);
+    }
+    for (row, value) in [9.0, 8.0, 7.0, 6.0, 5.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 2, value, 0);
+    }
+
+    assert_eq!(
+        store.sort_rows_multi(sheet, &[0, 2], &[1, 0], &[]),
+        vec![1, 3, 0, 2, 4]
+    );
+    assert_eq!(
+        store.filter_rows_multi(
+            sheet,
+            &[1],
+            &[1],
+            &[0],
+            &[0.0],
+            &[0],
+            &[1],
+            &[],
+            vec!["x".to_string()],
+        ),
+        vec![0, 1, 3]
+    );
+
+    let mut distinct = store.distinct_values(sheet, 0, 2);
+    assert_eq!(distinct.take_kinds(), vec![1, 1]);
+    assert_eq!(distinct.take_numbers(), vec![2.0, 1.0]);
+    assert!(distinct.take_texts().is_empty());
+
+    let order = [1, 3, 0, 2, 4];
+    assert_eq!(store.data_edge_ordered(sheet, &order, 0, 0, 1, 0), 4);
+    assert_eq!(store.data_edge_ordered(sheet, &order, 4, 0, -1, 0), 0);
+}
