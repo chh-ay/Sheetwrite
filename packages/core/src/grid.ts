@@ -1,4 +1,4 @@
-import { load } from "@sheetwrite/wasm";
+import { isLoaded, load } from "@sheetwrite/wasm";
 import { colToA1 } from "./a1.js";
 import { AriaMirror } from "./aria-mirror.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
@@ -87,14 +87,16 @@ export const DEFAULT_THEME: Theme = {
   highlight: "#a7f3d080",
 };
 
-let wasmReady = false;
-
 /** Load the WASM data engine once. Must be awaited before `createGrid`. */
 export async function initSheetwrite(
   source?: BufferSource | URL | string | Request | WebAssembly.Module,
 ): Promise<void> {
   await load(source);
-  wasmReady = true;
+}
+
+/** Whether `initSheetwrite` has completed — the single readiness source. */
+export function isSheetwriteReady(): boolean {
+  return isLoaded();
 }
 
 /** Read `--sheetwrite-*` CSS custom properties into a partial theme. */
@@ -128,7 +130,7 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
 }
 
 export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
-  if (!wasmReady) {
+  if (!isLoaded()) {
     throw new Error("Sheetwrite: await initSheetwrite() before createGrid()");
   }
   return new GridImpl(host, opts);

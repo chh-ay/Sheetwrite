@@ -40,6 +40,12 @@ the loader does:
 initSheetwrite(source?: BufferSource | URL | string | Request | WebAssembly.Module): Promise<void>
 ```
 
+`initSheetwrite` is re-entrant: concurrent same-source calls share one
+initialization, repeat calls after success are no-ops, a concurrent call with a
+*different* source rejects (it's a config bug), and a failed init is retryable
+with a corrected source. `isSheetwriteReady(): boolean` reports whether
+initialization has completed — useful for SSR guards and suspense-style UIs.
+
 In a bundler, import the `.wasm` file as an asset and hand the resulting URL to
 `initSheetwrite`. The published binary is exposed at the `@sheetwrite/wasm/wasm`
 subpath. The asset-import syntax is bundler-specific:

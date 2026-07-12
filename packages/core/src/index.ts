@@ -18,6 +18,7 @@ export {
   createGrid,
   DEFAULT_THEME,
   initSheetwrite,
+  isSheetwriteReady,
   resolveThemeFromCss,
 } from "./grid.js";
 export { formatNumber } from "./number-format.js";

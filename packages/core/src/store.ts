@@ -1,4 +1,4 @@
-import { CellStore, type WindowView } from "@sheetwrite/wasm";
+import { CellStore, isLoaded, type WindowView } from "@sheetwrite/wasm";
 import { cellKey, type LiteralLookup, parseCellKey, ReferenceGraph } from "./reference.js";
 import { StyleDictionary } from "./style-dictionary.js";
 import type {
@@ -159,6 +159,9 @@ export class SheetwriteStore implements Store {
   private readonly condRulesSynced = new Map<SheetId, string>();
 
   constructor(workbook: Workbook, data?: ColumnarData) {
+    if (!isLoaded()) {
+      throw new Error("Sheetwrite: await initSheetwrite() before constructing SheetwriteStore");
+    }
     this.workbook = workbook;
     this.wasm = new CellStore() as RecomputingCellStore;
     for (const sheet of workbook.sheets) {
