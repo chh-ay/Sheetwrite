@@ -30,6 +30,9 @@
 
 .sheetwrite-scroller {
   scrollbar-width: thin;
+  /* Allow native panning but suppress double-tap zoom so captured drags
+     (fill/resize/selection-extend) keep receiving pointermove. */
+  touch-action: pan-x pan-y;
 }
 
 .sheetwrite-canvas {
@@ -38,4 +41,237 @@
 
 .sheetwrite-overlay {
   z-index: 1;
+}
+
+/* ── Formula assist (autocomplete popup) ──────────────────────────────────── */
+/* Owned by FormulaAssist (packages/core/src/formula-assist.ts). Colors come from
+   --sheetwrite-assist-* custom properties, seeded from the active theme at
+   runtime and falling back to the base grid vars — override either layer to
+   restyle without forking the component. */
+
+.sheetwrite-assist {
+  position: absolute;
+  z-index: 4;
+  max-height: 220px;
+  min-width: 160px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  font: var(--sheetwrite-font);
+  color: var(--sheetwrite-assist-fg, var(--sheetwrite-fg, #111));
+  background: var(--sheetwrite-assist-bg, var(--sheetwrite-bg, #fff));
+  border: 1px solid var(--sheetwrite-assist-border, var(--sheetwrite-selection-border, #2563eb));
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+.sheetwrite-assist-item {
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheetwrite-assist-item:hover,
+.sheetwrite-assist-item[aria-selected="true"] {
+  background: var(--sheetwrite-assist-selected, var(--sheetwrite-selection, #2563eb22));
+}
+
+.sheetwrite-assist-item[aria-selected="true"] {
+  font-weight: 600;
+}
+
+/* ── Built-in widgets (find bar / toolbar / context menu) ─────────────────── */
+/* Owned by WidgetCss (src/find-bar.ts, toolbar.ts, context-menu.ts). Every
+   cosmetic property reads a --sheetwrite-widget-* (or -toolbar-* / -menu-*)
+   custom property, seeded from the active Theme at construction
+   (src/widget-theme.ts) and falling back to the base grid vars / literal
+   defaults, so the default look is identical to the old inline styles. Only
+   positioning + visibility stay inline on the elements (behavior); everything
+   here is restylable. Because these declarations live in the stylesheet — not
+   inline — a host rule like `.sheetwrite-find { background: … }` wins without
+   !important; and because the tokens are seeded on the grid root (an ancestor),
+   `.sheetwrite-find { --sheetwrite-widget-bg: … }` wins too. */
+
+/* Find / replace bar */
+.sheetwrite-find {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 8px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-find-shadow, 0 2px 6px rgba(60, 64, 67, 0.3));
+  box-sizing: border-box;
+  z-index: 1000;
+}
+
+.sheetwrite-find-row,
+.sheetwrite-find-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheetwrite-find-input,
+.sheetwrite-find-replace-input {
+  width: 220px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 0;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.sheetwrite-find-count {
+  min-width: 72px;
+  text-align: right;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+
+.sheetwrite-find-btn {
+  border: none;
+  background: transparent;
+  color: var(--sheetwrite-widget-accent, var(--sheetwrite-header-fg, #6b4a1f));
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sheetwrite-find-btn:hover {
+  background: var(--sheetwrite-widget-selection, var(--sheetwrite-selection, #2563eb22));
+}
+
+.sheetwrite-find-icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.sheetwrite-find-text-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+}
+
+/* Toolbar */
+.sheetwrite-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-toolbar-bg, var(--sheetwrite-header-bg, #f4ede1));
+  color: var(--sheetwrite-toolbar-fg, var(--sheetwrite-header-fg, #6b4a1f));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-sizing: border-box;
+  overflow-x: auto;
+}
+
+.sheetwrite-tb-button {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.sheetwrite-tb-color {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sheetwrite-tb-separator {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+/* Context menu */
+.sheetwrite-context-menu {
+  min-width: 160px;
+  padding: 4px 0;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 6px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+  box-sizing: border-box;
+  user-select: none;
+  z-index: 1000;
+}
+
+.sheetwrite-context-menu-item {
+  padding: 5px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  background: transparent;
+}
+
+.sheetwrite-context-menu-item:hover {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-context-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+/* ── Sheet tab bar ────────────────────────────────────────────────────────── */
+/* Owned by grid.ts (buildTabBar seeds the --sheetwrite-tab-* custom properties
+   from the active Theme; positioning stays inline because the bar reserves
+   layout height). Override any rule from host CSS to restyle. */
+.sheetwrite-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  overflow-x: auto;
+  font: var(--sheetwrite-tab-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
+  border-top: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-tab {
+  height: 100%;
+  border: none;
+  padding: 0 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 4px 4px 0 0;
+  font: inherit;
+  background: transparent;
+  color: var(--sheetwrite-tab-fg, #5f6368);
+}
+
+.sheetwrite-tab:hover:not(.sheetwrite-tab-active) {
+  background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
+}
+
+.sheetwrite-tab-active {
+  background: var(--sheetwrite-tab-active-bg, #e8f0fe);
+  color: var(--sheetwrite-tab-active-fg, #1a73e8);
+  box-shadow: inset 0 -2px 0 var(--sheetwrite-tab-active-fg, #1a73e8);
 }

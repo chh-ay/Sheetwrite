@@ -154,9 +154,11 @@ describe("config.keyboard: false (headless key policy)", () => {
     // 32px header, second 28px row); clientX 100 -> col 0 (past the 48px gutter).
     const scroller = scrollerOf(host);
     scroller.dispatchEvent(
-      new MouseEvent("mousedown", { clientX: 100, clientY: 70, button: 0, bubbles: true }),
+      new PointerEvent("pointerdown", { clientX: 100, clientY: 70, button: 0, bubbles: true }),
     );
-    window.dispatchEvent(new MouseEvent("mouseup", { clientX: 100, clientY: 70, bubbles: true }));
+    scroller.dispatchEvent(
+      new PointerEvent("pointerup", { clientX: 100, clientY: 70, bubbles: true }),
+    );
 
     const sel = grid.getSelection();
     expect(sel?.kind).toBe("cell");

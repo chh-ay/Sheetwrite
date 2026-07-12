@@ -182,14 +182,19 @@ describe("row-resize repaint invalidation", () => {
     // row-header gutter (x < rowHeaderWidth).
     const boundaryY = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
     scroller.dispatchEvent(
-      new MouseEvent("mousedown", { clientX: 10, clientY: boundaryY, button: 0, bubbles: true }),
+      new PointerEvent("pointerdown", {
+        clientX: 10,
+        clientY: boundaryY,
+        button: 0,
+        bubbles: true,
+      }),
     );
     // Drag down 30px: row 0 grows 28 -> 58.
-    window.dispatchEvent(
-      new MouseEvent("mousemove", { clientX: 10, clientY: boundaryY + 30, bubbles: true }),
+    scroller.dispatchEvent(
+      new PointerEvent("pointermove", { clientX: 10, clientY: boundaryY + 30, bubbles: true }),
     );
-    window.dispatchEvent(
-      new MouseEvent("mouseup", { clientX: 10, clientY: boundaryY + 30, bubbles: true }),
+    scroller.dispatchEvent(
+      new PointerEvent("pointerup", { clientX: 10, clientY: boundaryY + 30, bubbles: true }),
     );
 
     // Pre-fix: no signature component changed, so paint() was skipped entirely.

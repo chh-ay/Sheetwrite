@@ -92,16 +92,19 @@ export interface InputControllerDeps {
 export class InputController {
   private readonly deps: InputControllerDeps;
   private fillTarget: SelRect | null = null;
-  private dragMove: ((ev: MouseEvent) => void) | null = null;
-  private dragUp: ((ev: MouseEvent) => void) | null = null;
+  private dragMove: ((ev: PointerEvent) => void) | null = null;
+  private dragUp: ((ev: PointerEvent) => void) | null = null;
+  private dragCancel: ((ev: PointerEvent) => void) | null = null;
+  /** Pointer that owns the active drag; other pointers' events are ignored. */
+  private activePointerId: number | null = null;
   /** Detached 2D context for autofit text measurement; lazily created. */
   private measureCtx: CanvasRenderingContext2D | null = null;
 
   constructor(deps: InputControllerDeps) {
     this.deps = deps;
-    deps.scroller.addEventListener("mousedown", this.onMouseDown);
+    deps.scroller.addEventListener("pointerdown", this.onPointerDown);
     deps.scroller.addEventListener("dblclick", this.onDblClick);
-    deps.scroller.addEventListener("mousemove", this.onHover);
+    deps.scroller.addEventListener("pointermove", this.onHover);
     deps.host.addEventListener("keydown", this.onKeyDown);
   }
 
@@ -137,14 +140,17 @@ export class InputController {
 
   destroy(): void {
     this.detachDrag();
-    this.deps.scroller.removeEventListener("mousedown", this.onMouseDown);
+    this.deps.scroller.removeEventListener("pointerdown", this.onPointerDown);
     this.deps.scroller.removeEventListener("dblclick", this.onDblClick);
-    this.deps.scroller.removeEventListener("mousemove", this.onHover);
+    this.deps.scroller.removeEventListener("pointermove", this.onHover);
     this.deps.host.removeEventListener("keydown", this.onKeyDown);
   }
 
-  private readonly onMouseDown = (e: MouseEvent): void => {
-    if (e.button !== 0) return;
+  private readonly onPointerDown = (e: PointerEvent): void => {
+    // Primary button only. Touch contacts always report button 0; a pen barrel
+    // button (non-zero) must not select, so the guard covers mouse AND pen.
+    if (e.pointerType !== "touch" && e.button !== 0) return;
+    const isTouch = e.pointerType === "touch";
 
     const editor = this.deps.editor;
     // Formula point mode: while editing a "=" formula, clicks/drags pick A1
@@ -154,7 +160,7 @@ export class InputController {
       const start = this.cellAtPointer(e.clientX, e.clientY);
       if (!start) return;
       editor.setReference(cellA1(start.row, start.col));
-      const move = (ev: MouseEvent): void => {
+      const move = (ev: PointerEvent): void => {
         const c = this.cellAtPointer(ev.clientX, ev.clientY);
         if (c) editor.setReference(rangeA1(start, c));
       };
@@ -162,7 +168,7 @@ export class InputController {
         editor.endReference();
         this.detachDrag();
       };
-      this.attachDrag(move, up);
+      this.attachDrag(e, move, up);
       return;
     }
 
@@ -173,7 +179,7 @@ export class InputController {
       const hy = e.clientY - viewportRect.top;
       if (Math.abs(hx - fillHandle.x) <= 5 && Math.abs(hy - fillHandle.y) <= 5) {
         e.preventDefault();
-        this.startFillDrag();
+        this.startFillDrag(e);
         return;
       }
     }
@@ -184,8 +190,8 @@ export class InputController {
       const resize = this.resizeAt(e);
       if (resize) {
         e.preventDefault();
-        if (resize.kind === "col") this.startColumnResize(resize.index, e.clientX);
-        else this.startRowResize(resize.index, e.clientY);
+        if (resize.kind === "col") this.startColumnResize(e, resize.index, e.clientX);
+        else this.startRowResize(e, resize.index, e.clientY);
         return;
       }
     }
@@ -212,20 +218,65 @@ export class InputController {
     if (!cell) return;
 
     const selection = this.deps.selection();
+
+    // Touch policy: a tap selects, but a drag that starts on a plain cell
+    // belongs to native scrolling — no capture, no preventDefault, no drag
+    // listeners. Only a drag starting on the current multi-cell selection's
+    // border extends the selection under touch.
+    if (isTouch && !e.shiftKey && !this.touchExtendHit(e)) {
+      selection.selectCell(cell.row, cell.col, additive);
+      this.deps.emitSelection();
+      this.deps.scheduleRender();
+      return;
+    }
+
     if (e.shiftKey) selection.extendTo(cell.row, cell.col);
-    else selection.selectCell(cell.row, cell.col, additive);
+    else if (!isTouch) selection.selectCell(cell.row, cell.col, additive);
     this.deps.emitSelection();
     this.deps.scheduleRender();
 
-    const move = (ev: MouseEvent): void => {
+    if (isTouch) e.preventDefault();
+    const move = (ev: PointerEvent): void => {
       const c = this.cellAtPointer(ev.clientX, ev.clientY);
       if (!c) return;
       this.deps.selection().extendTo(c.row, c.col);
       this.deps.emitSelection();
       this.deps.scheduleRender();
     };
-    this.attachDrag(move, () => this.detachDrag());
+    this.attachDrag(e, move, () => this.detachDrag());
   };
+
+  /**
+   * Touch extend-drag hit: the contact lands within a narrow band (±6px)
+   * around the rendered border of a current multi-cell selection rectangle.
+   * Anywhere else (single cells, rect interiors) stays native-scroll.
+   */
+  private touchExtendHit(e: PointerEvent): boolean {
+    const viewportRect = this.deps.viewportEl.getBoundingClientRect();
+    const px = e.clientX - viewportRect.left;
+    const py = e.clientY - viewportRect.top;
+    const contentTop = this.deps.contentTop();
+    const scrollLeft = this.deps.scroller.scrollLeft;
+    const band = 6;
+
+    let hit = false;
+    this.deps.selection().forEachRect((r) => {
+      if (r.r0 === r.r1 && r.c0 === r.c1) return;
+      const tl = this.deps.screenRect(r.r0, r.c0, contentTop, scrollLeft);
+      const br = this.deps.screenRect(r.r1, r.c1, contentTop, scrollLeft);
+      const left = tl.x;
+      const top = tl.y;
+      const right = br.x + br.w;
+      const bottom = br.y + br.h;
+      const withinX = px >= left - band && px <= right + band;
+      const withinY = py >= top - band && py <= bottom + band;
+      if (!withinX || !withinY) return;
+      const onVertical = Math.abs(px - left) <= band || Math.abs(px - right) <= band;
+      const onHorizontal = Math.abs(py - top) <= band || Math.abs(py - bottom) <= band;
+      if (onVertical || onHorizontal) hit = true;
+    });
+    return hit;
+  }
 
   private readonly onDblClick = (e: MouseEvent): void => {
     // Double-click a column boundary → autofit that column.
@@ -240,7 +291,8 @@ export class InputController {
     this.deps.beginEdit(cell.row, cell.col, undefined, true);
   };
 
-  private readonly onHover = (e: MouseEvent): void => {
+  private readonly onHover = (e: PointerEvent): void => {
+    if (e.pointerType === "touch") return; // no hover cursors for touch
     const resize = this.deps.readOnly() ? null : this.resizeAt(e);
     this.deps.scroller.style.cursor =
       resize?.kind === "col" ? "col-resize" : resize?.kind === "row" ? "row-resize" : "";
@@ -284,11 +336,11 @@ export class InputController {
     return null;
   }
 
-  private startColumnResize(col: number, startX: number): void {
+  private startColumnResize(e: PointerEvent, col: number, startX: number): void {
     const startWidth = this.deps.sheet().columns[col]?.width ?? MIN_COLUMN_WIDTH;
     let finalWidth = startWidth;
 
-    const move = (ev: MouseEvent): void => {
+    const move = (ev: PointerEvent): void => {
       // Pointer deltas are screen px; widths persist in base (unzoomed) units.
       const delta = (ev.clientX - startX) / this.deps.zoom();
       finalWidth = Math.max(MIN_COLUMN_WIDTH, Math.round(startWidth + delta));
@@ -305,16 +357,16 @@ export class InputController {
         },
       ]);
     };
-    this.attachDrag(move, up);
+    this.attachDrag(e, move, up);
   }
 
-  private startRowResize(row: number, startY: number): void {
+  private startRowResize(e: PointerEvent, row: number, startY: number): void {
     const startHeight = this.deps.rowHeight(row);
-    const move = (ev: MouseEvent): void => {
+    const move = (ev: PointerEvent): void => {
       const height = Math.max(MIN_ROW_HEIGHT, Math.round(startHeight + ev.clientY - startY));
       this.deps.setRowHeight(row, height);
     };
-    this.attachDrag(move, () => this.detachDrag());
+    this.attachDrag(e, move, () => this.detachDrag());
   }
 
   private autofitColumn(col: number): void {
@@ -554,10 +606,10 @@ export class InputController {
     return { row, col };
   }
 
-  private startFillDrag(): void {
+  private startFillDrag(e: PointerEvent): void {
     const source = this.fillSourceRect();
     if (!source) return;
-    const move = (ev: MouseEvent): void => {
+    const move = (ev: PointerEvent): void => {
       const c = this.fillCellAt(ev.clientX, ev.clientY);
       this.fillTarget = this.extendFill(source, c);
       this.deps.scheduleRender();
@@ -575,7 +627,13 @@ export class InputController {
       }
       this.deps.scheduleRender();
     };
-    this.attachDrag(move, up);
+    const cancel = (): void => {
+      // A cancelled fill-drag (browser reclaimed the pointer) commits nothing.
+      this.fillTarget = null;
+      this.detachDrag();
+      this.deps.scheduleRender();
+    };
+    this.attachDrag(e, move, up, cancel);
   }
 
   private extendFill(source: SelRect, c: CellRef): SelRect {
@@ -649,20 +707,64 @@ export class InputController {
     return { kind: "literal", value: this.deps.store.getCell(addr).resolved };
   }
 
-  private attachDrag(move: (ev: MouseEvent) => void, up: (ev: MouseEvent) => void): void {
+  /**
+   * Window-drag replacement: capture the initiating pointer on the scroller and
+   * track it until `pointerup` (commit) or `pointercancel` (abandon, never
+   * commit). Events from other pointers are ignored for the drag's lifetime.
+   */
+  private attachDrag(
+    e: PointerEvent,
+    move: (ev: PointerEvent) => void,
+    up: (ev: PointerEvent) => void,
+    cancel?: (ev: PointerEvent) => void,
+  ): void {
     this.detachDrag();
-    this.dragMove = move;
-    this.dragUp = up;
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
+    const scroller = this.deps.scroller;
+    this.activePointerId = e.pointerId;
+
+    const own = (ev: PointerEvent): boolean => ev.pointerId === this.activePointerId;
+    this.dragMove = (ev) => {
+      if (own(ev)) move(ev);
+    };
+    this.dragUp = (ev) => {
+      if (own(ev)) up(ev);
+    };
+    this.dragCancel = (ev) => {
+      if (!own(ev)) return;
+      if (cancel) cancel(ev);
+      else this.detachDrag();
+    };
+
+    scroller.addEventListener("pointermove", this.dragMove);
+    scroller.addEventListener("pointerup", this.dragUp);
+    scroller.addEventListener("pointercancel", this.dragCancel);
+    if (typeof scroller.setPointerCapture === "function") {
+      try {
+        scroller.setPointerCapture(e.pointerId);
+      } catch {
+        // happy-dom / detached elements: capture is a UA nicety, not required.
+      }
+    }
   }
 
   private detachDrag(): void {
-    const move = this.dragMove;
-    const up = this.dragUp;
-    if (move) window.removeEventListener("mousemove", move);
-    if (up) window.removeEventListener("mouseup", up);
+    const scroller = this.deps.scroller;
+    if (this.dragMove) scroller.removeEventListener("pointermove", this.dragMove);
+    if (this.dragUp) scroller.removeEventListener("pointerup", this.dragUp);
+    if (this.dragCancel) scroller.removeEventListener("pointercancel", this.dragCancel);
     this.dragMove = null;
     this.dragUp = null;
+    this.dragCancel = null;
+
+    const pointerId = this.activePointerId;
+    this.activePointerId = null;
+    if (
+      pointerId !== null &&
+      typeof scroller.hasPointerCapture === "function" &&
+      typeof scroller.releasePointerCapture === "function" &&
+      scroller.hasPointerCapture(pointerId)
+    ) {
+      scroller.releasePointerCapture(pointerId);
+    }
   }
 }

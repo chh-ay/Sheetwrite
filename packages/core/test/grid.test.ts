@@ -329,8 +329,10 @@ describe("Grid editing (Layer 3)", () => {
 
     const scroller = scrollerOf(host);
     const covered = cellPoint(1, 1, workbook);
-    scroller.dispatchEvent(new MouseEvent("mousedown", { ...covered, button: 0, bubbles: true }));
-    window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    scroller.dispatchEvent(
+      new PointerEvent("pointerdown", { ...covered, button: 0, bubbles: true }),
+    );
+    scroller.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
 
     expect(grid.getSelection()).toEqual({
       kind: "cell",

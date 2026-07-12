@@ -139,3 +139,26 @@ yields `=B1 + $B$1`. See [Formulas → Reference rewriting](./formulas.md#refere
 
 Drag-to-fill is unavailable while a sort/filter view is active (the handle is
 hidden) and when `readOnly`.
+
+## Touch
+
+Grid input runs on Pointer Events, so mouse, touch, and pen share one code
+path. For `pointerType: "touch"` the policy is:
+
+| Gesture | Behavior |
+| --- | --- |
+| Tap on a cell | select the cell (same as a click) |
+| Tap on a column header | select the column |
+| Drag starting on a plain cell | **native scroll** — the grid neither captures the pointer nor calls `preventDefault` |
+| Drag starting on the fill handle | drag-to-fill (pointer captured) |
+| Drag starting on a row/column resize boundary | resize (pointer captured) |
+| Drag starting on the border of a multi-cell selection (±6px band) | extend the selection (pointer captured) |
+| Double-tap on a cell | begin editing (the browser's synthesized `dblclick`) |
+
+Mouse and pen behave classically: any drag from a cell extends the selection,
+and hovering a resize boundary shows the resize cursor. A `pointercancel`
+(e.g. the browser reclaims the gesture) abandons the drag without committing.
+The scroller sets `touch-action: pan-x pan-y`, which keeps native panning but
+disables double-tap zoom so captured drags keep receiving `pointermove`.
+Long-press → context menu on touch is deferred; when added it must cancel on
+move to respect the native-scroll rule.
