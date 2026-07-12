@@ -13,8 +13,9 @@ React, Vue, and Svelte adapters wrap the same imperative engine.
 - Multi-sheet workbooks with a tab bar and variable row heights.
 - Selection (cell/range/row/column/multi), keyboard navigation, and IME-safe inline editing.
 - Clipboard as TSV (formula-injection hardened).
-- Non-mutating data views: `sortBy`, `filterBy`, `clearView`, and `aggregate` (sum/avg/min/max/count).
-- Export to CSV, TSV, and XLSX (pluggable backend).
+- Non-mutating data views: single/multi-column sort, column filters, distinct-value scans, hidden rows, row groups, and aggregates.
+- Frozen panes and zoom without mutating workbook row heights or column widths.
+- Import/export: CSV, TSV, and XLSX with pluggable XLSX import/export backends.
 - Per-side cell borders and Excel-style number formats (e.g. `#,##0.00`).
 - Opt-in formatting toolbar (bold, italic, align, text/fill color, border, clear-format, merge, sort).
 - Merged cells and a drag-to-fill handle (relative A1 refs shift by the delta; absolute `$A$1` parts preserved).
@@ -31,14 +32,18 @@ bun add @sheetwrite/core @sheetwrite/wasm
 
 Add a framework adapter if you use one, e.g. `bun add @sheetwrite/react`.
 
+All packages are **ESM-only**: they ship ES modules exposed through a single
+`default` export condition, with no CommonJS `require` build. Consume them from
+an ESM context or through a bundler.
+
 ## Quick start (vanilla)
 
 ```ts
 import { createGrid, initSheetwrite, type ColumnarData, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
-// Resolve the WASM binary as an asset URL. Bun/esbuild use the import attribute
-// below; with Vite use `import wasmUrl from "@sheetwrite/wasm/wasm?url"`.
-import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
+// Vite-family bundlers; Bun uses `... with { type: "file" }` — the full
+// per-bundler matrix lives in docs/getting-started.md#load-the-wasm-engine.
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 const workbook: Workbook = {
   activeSheet: "sheet1",
@@ -94,11 +99,23 @@ bun run build          # build wasm, then core, react, and vue
 bun run typecheck
 bun run lint
 bun test
+bun run examples       # build packages, then serve every demo at one URL (Astro)
 ```
 
 `bun run build:wasm` (and the `build` step that wraps it) requires `wasm-pack`
 and the Rust toolchain pinned in `rust-toolchain.toml`. `bun run build` runs the
 WASM build first, so a one-shot `bun run build` covers everything.
+
+`bun run examples` starts the examples site (`examples/site`) — one Astro app
+with a tab per demo: the vanilla Google-Sheets-style workbook, the theming lab,
+and the React, Vue, and Svelte showcases.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture rules, local checks,
+Changesets, and the release process. See [SECURITY.md](SECURITY.md) for private
+vulnerability-reporting guidance; do not disclose security issues in public
+issues.
 
 ## Documentation
 

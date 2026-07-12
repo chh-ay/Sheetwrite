@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle": "webpack --config webpack.config.js",
+    "build": "npm install --ignore-scripts --no-audit --no-fund --package-lock=false && npm run bundle && node check.mjs"
+  },
+  "dependencies": {
+    "@sheetwrite/core": "file:../.packed/sheetwrite-core.tgz",
+    "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm.tgz",
+    "webpack": "5.102.1",
+    "webpack-cli": "6.0.1"
+  }
+}

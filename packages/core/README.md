@@ -14,8 +14,9 @@ bun add @sheetwrite/core @sheetwrite/wasm
 ```ts
 import { createGrid, initSheetwrite, type ColumnarData, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
-// Resolve the WASM binary as an asset URL (Vite users use `@sheetwrite/wasm/wasm?url`).
-import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
+// Vite-family bundlers; Bun uses `... with { type: "file" }` — full matrix in
+// docs/getting-started.md#load-the-wasm-engine.
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 const workbook: Workbook = {
   activeSheet: "sheet1",

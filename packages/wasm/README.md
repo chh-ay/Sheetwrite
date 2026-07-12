@@ -24,8 +24,9 @@ in app code you normally only call `initSheetwrite`. To use the loader directly:
 
 ```ts
 import { load } from "@sheetwrite/wasm";
-// In a browser bundle, resolve the binary as an asset URL and pass it in.
-import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
+// Vite-family bundlers; Bun uses `... with { type: "file" }` — full matrix in
+// docs/getting-started.md#load-the-wasm-engine.
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 await load(wasmUrl);
 ```

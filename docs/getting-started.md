@@ -4,24 +4,29 @@
 
 ## Install
 
-Sheetwrite uses [bun](https://bun.sh) as its package manager (and test runner and
-bundler driver). Add the engine and the WASM data store:
+Install the engine and the WASM data store with your package manager:
 
 ```sh
-bun add @sheetwrite/core @sheetwrite/wasm
+npm install @sheetwrite/core @sheetwrite/wasm
+pnpm add    @sheetwrite/core @sheetwrite/wasm
+yarn add    @sheetwrite/core @sheetwrite/wasm
+bun add     @sheetwrite/core @sheetwrite/wasm
 ```
 
-Add a framework adapter only if you use one:
+Add a framework adapter only if you use one (same command shape with your
+package manager):
 
 ```sh
-bun add @sheetwrite/react   # peer: react >= 18
-bun add @sheetwrite/vue     # peer: vue >= 3.4
-bun add @sheetwrite/svelte  # peer: svelte >= 5
+npm install @sheetwrite/react   # peer: react >= 18
+npm install @sheetwrite/vue     # peer: vue >= 3.4
+npm install @sheetwrite/svelte  # peer: svelte >= 5
 ```
 
-Inside this repository the packages are wired together as bun workspaces; run
-`bun install` at the root, then `bun run build` to build the WASM binary and the
-TypeScript libraries before running an example.
+[Bun](https://bun.sh) is this repository's toolchain (workspaces, tests,
+builds) — it is NOT a consumer requirement; any package manager and bundler
+work. Inside this repository run `bun install` at the root, then
+`bun run build` to build the WASM binary and the TypeScript libraries before
+running an example.
 
 ## Load the WASM engine
 
@@ -46,24 +51,53 @@ initialization, repeat calls after success are no-ops, a concurrent call with a
 with a corrected source. `isSheetwriteReady(): boolean` reports whether
 initialization has completed — useful for SSR guards and suspense-style UIs.
 
-In a bundler, import the `.wasm` file as an asset and hand the resulting URL to
-`initSheetwrite`. The published binary is exposed at the `@sheetwrite/wasm/wasm`
-subpath. The asset-import syntax is bundler-specific:
+In a bundler, resolve the two published assets — the `.wasm` binary
+(`@sheetwrite/wasm/wasm` subpath) and, if you use the worker renderer, the
+worker module (`@sheetwrite/core/worker` subpath, see
+[Worker rendering](./worker-rendering.md)) — and hand the URLs to Sheetwrite.
+The canonical per-bundler matrix:
+
+| Bundler / runtime | WASM URL | Worker URL |
+|---|---|---|
+| Vite / Astro / SvelteKit / Nuxt (vite) | `import wasmUrl from "@sheetwrite/wasm/wasm?url"` ¹ | `import workerUrl from "@sheetwrite/core/worker?worker&url"` ¹ |
+| Bun bundler | `import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" }` ² | public-copy of the whole `dist/` ⁴ (see [Worker rendering](./worker-rendering.md#enabling-it)) |
+| webpack 5 / Next.js | `new URL("@sheetwrite/wasm/wasm", import.meta.url)` ¹ ³ | public-copy of the whole `dist/` ⁴ (see [Worker rendering](./worker-rendering.md#enabling-it)) |
+| Any (portable) | copy `node_modules/@sheetwrite/wasm/pkg/sheetwrite_wasm_bg.wasm` to your public assets; pass its served URL string ⁴ | copy `node_modules/@sheetwrite/core/dist/` to your public assets; pass the served `…/worker.js` URL ⁴ |
+
+¹ Machine-verified by the fixture builds in `test/bundler-fixtures/`
+(`bun run verify:bundlers`).
+² Bun is the repo toolchain; the form is Bun-specific import-attribute syntax.
+³ webpack (and therefore Next.js) needs the WASM loader's Node-only,
+runtime-guarded `node:fs/promises` import excluded from browser bundles:
+`new webpack.IgnorePlugin({ resourceRegExp: /^node:fs\/promises$/ })` — without
+it the build fails with `UnhandledSchemeError: Reading from "node:fs/promises"`.
+The ignored branch only executes under Node, so browser bundles are unaffected.
+⁴ Reasoned, not fixture-verified: static copies aren't exercised by the
+compile fixtures. The whole-`dist/` worker copy is required because
+`dist/worker.js` is an ES module with relative sibling imports.
 
 ```ts
-// bun (import attribute)
+// Vite / Astro / SvelteKit — used by the in-repo examples site (examples/site)
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
+
+// Bun bundler (import attribute) — Bun-specific syntax
 import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
 
-// Vite / Astro — used by the in-repo examples site (`examples/site`)
-import wasmUrl from "@sheetwrite/wasm/wasm?url";
+// webpack 5 / Next.js (asset module; webpack rewrites the bare specifier)
+const wasmUrl = new URL("@sheetwrite/wasm/wasm", import.meta.url);
+
+// Portable: copy the binary into public assets at build time…
+//   cp node_modules/@sheetwrite/wasm/pkg/sheetwrite_wasm_bg.wasm public/
+// …and pass the served path:
+const wasmUrl = "/sheetwrite_wasm_bg.wasm";
 
 await initSheetwrite(wasmUrl);
 ```
 
-Both forms resolve `wasmUrl` to a string the browser can fetch. The in-repo
-examples site does exactly this — `examples/site/src/lib/sheetwrite.ts` imports
-`@sheetwrite/wasm/wasm?url` and is the Vite/Astro reference for wiring
-`initSheetwrite`.
+All forms resolve to something `initSheetwrite` accepts. The in-repo examples
+site is the verified Vite reference (`examples/site/src/lib/sheetwrite.ts`).
+Verification status per row lives in `test/bundler-fixtures/README.md` —
+rows are machine-verified by those fixture builds unless footnoted otherwise.
 
 ## A minimal grid
 
@@ -74,7 +108,8 @@ properties.
 ```ts
 import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
-import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
+// Vite-family form; see the per-bundler matrix above for Bun/webpack/portable.
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 await initSheetwrite(wasmUrl);
 

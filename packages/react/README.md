@@ -22,8 +22,9 @@ import { initSheetwrite, type ColumnarData, type Workbook } from "@sheetwrite/co
 import "@sheetwrite/core/styles.css";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { createRoot } from "react-dom/client";
-// Vite users use `@sheetwrite/wasm/wasm?url`.
-import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
+// Vite-family bundlers; Bun uses `... with { type: "file" }` — full matrix in
+// docs/getting-started.md#load-the-wasm-engine.
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 const workbook: Workbook = {
   activeSheet: "sheet1",

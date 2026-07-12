@@ -16,13 +16,20 @@ but the platform `Worker`/`URL` constructors do not consult package exports —
 specifier as a relative path and produces a 404 URL unless your bundler
 happens to rewrite that exact form. Two reliable recipes:
 
-**Universal (any bundler, no bundler):** copy
-`node_modules/@sheetwrite/core/dist/worker.js` into your public/static assets
-and pass its served URL:
+**Universal (any bundler, no bundler):** the worker entry is an ES module with
+relative imports (`./canvas-paint.js`, …), so a single-file copy breaks — copy
+the package's whole `dist/` directory into your public/static assets and pass
+the served `worker.js` URL (a module worker fetches its sibling imports over
+HTTP):
+
+```sh
+cp -r node_modules/@sheetwrite/core/dist public/sheetwrite
+```
 
 ```ts
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
-import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
+// Vite-family form; per-bundler matrix: getting-started.md#load-the-wasm-engine
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 await initSheetwrite(wasmUrl);
 
@@ -30,18 +37,23 @@ const grid = createGrid(host, {
   workbook,
   datasource,
   renderer: "worker",
-  workerUrl: "/assets/sheetwrite-worker.js",
+  workerUrl: "/sheetwrite/worker.js",
 });
 ```
 
-**Bundler dependency-worker import (verify against your bundler version):**
-Vite supports importing a worker URL from a dependency with the
-`?worker&url` query — verify against your Vite version (plan is to pin this
-recipe once the bundler fixtures exercise it):
+**Vite dependency-worker import (machine-verified):** Vite bundles the whole
+worker graph into one chunk and returns its URL via the `?worker&url` query —
+verified by the fixture build in `test/bundler-fixtures/vite`
+(`bun run verify:bundlers`):
 
 ```ts
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 ```
+
+webpack 5 / Next.js have no equivalent URL-returning dependency-worker import
+(webpack only bundles a worker graph for a literal
+`new Worker(new URL(...))` expression, which Sheetwrite constructs internally)
+— use the public-copy recipe above there.
 
 `workerUrl` accepts a `string | URL`. If you omit it, the worker renderer
 resolves `./worker.js` relative to its own module — that only works when your

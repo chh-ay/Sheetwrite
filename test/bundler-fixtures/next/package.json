@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "scripts": {
+    "bundle": "next build",
+    "build": "npm install --ignore-scripts --no-audit --no-fund --package-lock=false && npm run bundle && node check.mjs"
+  },
+  "dependencies": {
+    "@sheetwrite/core": "file:../.packed/sheetwrite-core.tgz",
+    "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm.tgz",
+    "next": "15.5.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

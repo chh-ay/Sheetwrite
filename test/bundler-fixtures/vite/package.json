@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle": "vite build",
+    "build": "npm install --ignore-scripts --no-audit --no-fund --package-lock=false && npm run bundle && node check.mjs"
+  },
+  "dependencies": {
+    "@sheetwrite/core": "file:../.packed/sheetwrite-core.tgz",
+    "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm.tgz",
+    "vite": "7.2.2"
+  }
+}

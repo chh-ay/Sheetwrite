@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.next/
+out/
+.packed/
+.staging/
+package-lock.json

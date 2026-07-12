@@ -245,7 +245,8 @@ through React.
 import { initSheetwrite } from "@sheetwrite/core";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { createRoot } from "react-dom/client";
-import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
+// Vite-family form; per-bundler matrix: getting-started.md#load-the-wasm-engine
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 await initSheetwrite(wasmUrl);
 
@@ -395,9 +396,10 @@ import { initSheetwrite } from "@sheetwrite/core";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { workbook, datasource } from "./data";
 
-// Serve the binary from /public and pass its URL, or use your bundler's
-// asset import (see Getting started). A public path is the most portable.
-const wasmUrl = "/sheetwrite_wasm_bg.wasm";
+// Next.js's webpack rewrites this bare specifier into an emitted asset URL;
+// alternatively copy the binary into /public at build time (see below) and
+// pass "/sheetwrite_wasm_bg.wasm".
+const wasmUrl = new URL("@sheetwrite/wasm/wasm", import.meta.url);
 
 export default function Grid() {
   const [ready, setReady] = useState(false);
@@ -425,6 +427,13 @@ export default function Page() {
 }
 ```
 
+For the public-path alternative, put the copy step in your build (or
+`postinstall`) script so the binary actually exists under `/public`:
+
+```sh
+cp node_modules/@sheetwrite/wasm/pkg/sheetwrite_wasm_bg.wasm public/
+```
+
 ### Nuxt
 
 Wrap the grid in `<ClientOnly>`, or give the component a `.client.vue` suffix so
@@ -440,6 +449,10 @@ import { workbook, datasource } from "../data";
 
 const ready = ref(false);
 onMounted(async () => {
+  // Copy the binary into public/ at build time (see the Next.js note above):
+  //   cp node_modules/@sheetwrite/wasm/pkg/sheetwrite_wasm_bg.wasm public/
+  // Nuxt runs on Vite, so the asset-import form also works:
+  //   import wasmUrl from "@sheetwrite/wasm/wasm?url";
   await initSheetwrite("/sheetwrite_wasm_bg.wasm");
   ready.value = true;
 });

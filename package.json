@@ -26,6 +26,7 @@
     "verify:examples": "bun run build:examples && bun run typecheck:examples",
     "examples": "bun run build:packages && bun run --filter '@sheetwrite/example-site' dev",
     "verify:packed": "bun scripts/verify-packed-consumer.ts",
+    "verify:bundlers": "node test/bundler-fixtures/run.mjs",
     "verify:node-esm": "node scripts/verify-node-esm.mjs",
     "verify:nodenext-types": "tsc --noEmit -p test/consumer-nodenext",
     "test:browser": "playwright test --config test/browser/playwright.config.ts",
