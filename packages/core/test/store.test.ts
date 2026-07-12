@@ -727,3 +727,38 @@ describe("SheetwriteStore", () => {
     expect(store.viewRowCount("s1")).toBe(0);
   });
 });
+
+describe("datasource row hydration", () => {
+  it("preserves rich cells without producing dirty changes", () => {
+    const store = new SheetwriteStore(makeWorkbook(5));
+    let changes = 0;
+    store.on("change", () => {
+      changes += 1;
+    });
+
+    store.loadRows("s1", 0, [
+      {
+        name: { kind: "literal", value: "rich" },
+        amount: {
+          value: { kind: "formula", src: "=1+2" },
+          style: { bold: true, fontSize: 18 },
+        },
+        city: { kind: "ref", target: addr(1, 0) },
+      },
+    ]);
+
+    expect(store.getCell(addr(0, 0)).resolved).toBe("rich");
+    expect(store.getFormula(addr(0, 1))).toBe("=1+2");
+    expect(store.getCell(addr(0, 1))).toMatchObject({
+      resolved: 3,
+      style: { bold: true, fontSize: 18 },
+    });
+    expect(store.getRefTarget(addr(0, 2))).toEqual(addr(1, 0));
+    expect(store.getCell(addr(0, 2)).resolved).toBeNull();
+    store.loadRows("s1", 1, [{ name: "later source" }]);
+    expect(store.getCell(addr(0, 2)).resolved).toBe("later source");
+    expect(store.getDirty()).toEqual([]);
+    expect(changes).toBe(0);
+    store.dispose();
+  });
+});

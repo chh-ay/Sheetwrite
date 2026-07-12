@@ -381,15 +381,35 @@ export type AggregateOp = "sum" | "avg" | "min" | "max" | "count";
 
 // ── Data input ───────────────────────────────────────────────────────────────
 
-export type RowData = Record<string, CellScalar | CellValue>;
+export type DataCell = CellScalar | CellValue | { value: CellValue; style?: CellStyle };
+
+export type RowData = Record<string, DataCell>;
 
 export interface ColumnarData {
   rowCount: number;
   columns: Record<string, ArrayLike<CellScalar | CellValue>>;
 }
 
+export interface DataSourceRequest {
+  sheet: SheetId;
+  start: number;
+  end: number;
+  signal: AbortSignal;
+  revision: number;
+}
+
+export interface DataSourcePage {
+  start: number;
+  rows: RowData[];
+  revision?: string | number;
+}
+
 export interface DataSource {
-  /** Rows in `[start, end)`. Placeholders are shown until this resolves. */
+  getRows(request: DataSourceRequest): Promise<DataSourcePage>;
+}
+
+/** Supported compatibility input, normalized once by Grid construction. */
+export interface LegacyDataSource {
   getRows(sheet: SheetId, start: number, end: number): Promise<RowData[]>;
 }
 
@@ -550,7 +570,7 @@ export interface GridConfig {
 export interface GridOptions {
   workbook: Workbook;
   data?: ColumnarData;
-  datasource?: DataSource;
+  datasource?: DataSource | LegacyDataSource;
   renderer?: "canvas" | "worker";
   /**
    * URL of the worker renderer module (`renderer: "worker"`), as served to the
@@ -631,6 +651,7 @@ export interface GridEvents {
    * grid fell back to the main-thread canvas renderer.
    */
   "renderer-fallback": { requested: "worker"; error: unknown };
+  "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: unknown };
 }
 
 export interface Grid {

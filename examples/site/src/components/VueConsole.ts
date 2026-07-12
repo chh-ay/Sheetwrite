@@ -1,6 +1,7 @@
 import type {
   ChangeEvent,
   DataSource,
+  DataSourcePage,
   Grid,
   GridEvents,
   RowData,
@@ -122,11 +123,11 @@ const App = defineComponent({
     // canvas. Later page requests retain visible latency for the streaming demo.
     let firstRequest = true;
     const datasource: DataSource = {
-      getRows: async (_sheet, start, end) => {
-        const { promise, resolve } = Promise.withResolvers<RowData[]>();
+      getRows: ({ start, end, signal, revision }) => {
+        const { promise, resolve, reject } = Promise.withResolvers<DataSourcePage>();
         const latency = firstRequest ? 0 : PAGE_LATENCY_MS;
         firstRequest = false;
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           const rows: RowData[] = [];
           for (let r = start; r < end; r++) {
             const day = new Date(Date.UTC(2020, 0, 1 + (r % 1461)));
@@ -140,8 +141,16 @@ const App = defineComponent({
             });
           }
           pagesLoaded.value += 1;
-          resolve(rows);
+          resolve({ start, rows, revision });
         }, latency);
+        signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new DOMException("Datasource request aborted", "AbortError"));
+          },
+          { once: true },
+        );
         return promise;
       },
     };

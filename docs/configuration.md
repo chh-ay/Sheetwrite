@@ -34,6 +34,29 @@ Framework adapters classify every `GridOptions` field centrally. `workbook`,
 and `minColumns` update the existing grid live. Readiness includes the resulting
 generation and reset reason.
 
+### Datasource pages
+
+The cancellable request API owns one visible-window generation:
+
+```ts
+const datasource: DataSource = {
+  async getRows({ sheet, start, end, signal, revision }) {
+    const response = await fetch(`/sheets/${sheet}?start=${start}&end=${end}`, { signal });
+    return { start, rows: await response.json(), revision };
+  },
+};
+```
+
+`rows` may contain scalars, `CellValue` objects, or
+`{ value: CellValue, style?: CellStyle }` wrappers. Hydrated formulas,
+references, and styles do not become dirty user edits. Short pages mark only
+the returned rows loaded; malformed ranges emit `datasource-error` and remain
+retryable. Resetting or destroying the grid aborts outstanding requests, and a
+late page never overwrites a cell edited after that request began.
+
+The legacy `getRows(sheet, start, end): Promise<RowData[]>` shape remains
+accepted and is normalized once when the grid is constructed.
+
 A `CellRenderer` paints (or returns a DOM node for) a single cell:
 
 ```ts

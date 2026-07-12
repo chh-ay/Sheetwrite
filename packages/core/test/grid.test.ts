@@ -3,7 +3,7 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite, resolveThemeFromCss } from "..
 import { createGridController } from "../src/grid-controller.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.js";
-import type { CellScalar, RowData, Store, Workbook } from "../src/types.js";
+import type { CellScalar, DataSourceRequest, RowData, Store, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
@@ -232,6 +232,7 @@ describe("Grid editing (Layer 3)", () => {
     const workbook = makeWorkbook(50);
     let requests = 0;
     const host = mountHost();
+    const failed = Promise.withResolvers<void>();
     const grid = new GridImpl(host, {
       workbook,
       datasource: {
@@ -241,15 +242,104 @@ describe("Grid editing (Layer 3)", () => {
         },
       },
     });
+    grid.on("datasource-error", () => failed.resolve());
 
     expect(requests).toBe(1);
-    await Promise.resolve();
-    await Promise.resolve();
+    await failed.promise;
 
     grid.refresh();
     expect(requests).toBe(2);
 
     grid.destroy();
+  });
+
+  it("marks only validated partial datasource rows loaded and retries the remainder", async () => {
+    const workbook = makeWorkbook(50);
+    const starts: number[] = [];
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      datasource: {
+        getRows: async (request: DataSourceRequest) => {
+          starts.push(request.start);
+          return { start: request.start, rows: [{ name: `row ${request.start}` }] };
+        },
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    grid.refresh();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(starts.slice(0, 2)).toEqual([0, 1]);
+    grid.destroy();
+  });
+
+  it("reports malformed datasource pages and keeps them retryable", async () => {
+    const workbook = makeWorkbook(50);
+    let requests = 0;
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      datasource: {
+        getRows: async (request: DataSourceRequest) => {
+          requests += 1;
+          return { start: request.start + 1, rows: [{ name: "wrong range" }] };
+        },
+      },
+    });
+    const errors: unknown[] = [];
+    grid.on("datasource-error", (event) => errors.push(event.error));
+
+    await Promise.resolve();
+    await Promise.resolve();
+    grid.refresh();
+
+    expect(errors[0]).toBeInstanceOf(RangeError);
+    expect(requests).toBe(2);
+    grid.destroy();
+  });
+
+  it("preserves a newer local literal edit when a stale page resolves", async () => {
+    const workbook = makeWorkbook(20);
+    const { promise, resolve } = Promise.withResolvers<{
+      start: number;
+      rows: RowData[];
+    }>();
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      datasource: {
+        getRows: () => promise,
+      },
+    });
+    const addr = { sheet: "s1", row: 0, col: 0 };
+    grid.store.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "local" } }],
+    });
+    resolve({ start: 0, rows: [{ name: "stale server" }] });
+    await promise;
+    await Promise.resolve();
+
+    expect(grid.store.getCell(addr).resolved).toBe("local");
+    grid.destroy();
+  });
+
+  it("aborts an outstanding datasource request on destroy", () => {
+    const { promise } = Promise.withResolvers<{ start: number; rows: RowData[] }>();
+    let signal: AbortSignal | undefined;
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(20),
+      datasource: {
+        getRows: (request: DataSourceRequest) => {
+          signal = request.signal;
+          return promise;
+        },
+      },
+    });
+
+    grid.destroy();
+
+    expect(signal?.aborted).toBe(true);
   });
 
   it("starts a new search at the current viewport and wraps when needed", () => {

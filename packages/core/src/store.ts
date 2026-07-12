@@ -14,6 +14,7 @@ import type {
   ColumnFilter,
   CommitReason,
   ConditionalFormatRule,
+  DataCell,
   Patch,
   ResolvedCell,
   RowData,
@@ -1232,21 +1233,71 @@ export class SheetwriteStore implements Store {
     this.dirty = this.dirty.filter((p) => !clean.has(p));
   }
 
-  /** Bulk-load datasource/in-memory rows into a sheet. Not an edit; emits nothing. */
-  loadRows(sheet: SheetId, start: number, rows: readonly RowData[]): void {
+  /** Bulk-load datasource rows into a sheet. Hydration emits nothing and never becomes dirty. */
+  loadRows(
+    sheet: SheetId,
+    start: number,
+    rows: readonly RowData[],
+    protect?: (addr: CellAddress) => boolean,
+  ): void {
     if (rows.length === 0) return;
     const handle = this.handleOf(sheet);
     const columns = this.sheetMeta(sheet).columns;
+    const exceptions: Patch[] = [];
+    const protectedCells: Patch[] = [];
+    const loadedLiteralKeys: string[] = [];
+
     for (let c = 0; c < columns.length; c++) {
-      this.loadColumnBlock(handle, columns[c]!, c, start, rows);
+      const column = columns[c]!;
+      for (let offset = 0; offset < rows.length; offset++) {
+        const addr = { sheet, row: start + offset, col: c };
+        if (protect?.(addr)) {
+          const formula = this.getFormula(addr);
+          const target = this.getRefTarget(addr);
+          const cell = this.getCell(addr);
+          const value: CellValue = formula
+            ? { kind: "formula", src: formula }
+            : target
+              ? { kind: "ref", target }
+              : { kind: "literal", value: cell.resolved };
+          protectedCells.push({ op: "set", addr, value, style: cell.style });
+          continue;
+        }
+        const dataCell = rows[offset]![column.key];
+        const wrapped =
+          dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
+            ? dataCell
+            : undefined;
+        const value: CellScalar | CellValue | undefined = wrapped
+          ? wrapped.value
+          : (dataCell as CellScalar | CellValue | undefined);
+        if (
+          wrapped?.style !== undefined ||
+          (value && typeof value === "object" && (value.kind === "formula" || value.kind === "ref"))
+        ) {
+          exceptions.push({
+            op: "set",
+            addr,
+            value: value as CellValue,
+            style: wrapped?.style,
+          });
+        } else {
+          loadedLiteralKeys.push(cellKey(addr));
+        }
+      }
+      this.loadColumnBlock(handle, column, c, start, rows);
     }
+
+    for (const patch of exceptions) this.applyPatch(patch, null);
+    for (const patch of protectedCells) this.applyPatch(patch, null);
+    if (loadedLiteralKeys.length > 0 && this.refs.hasRefs()) {
+      const literalAt: LiteralLookup = (addr) => this.rawCell(addr).resolved;
+      for (const key of loadedLiteralKeys) this.refs.onLiteralChanged(key, literalAt);
+    }
+    this.wasm.recompute(handle);
   }
-  /**
-   * Release the WASM-side cell store immediately. Linear memory backing cell
-   * data is freed for reuse without waiting on GC finalization — required when
-   * a host creates and discards many stores (imports, tests, benchmarks).
-   * The store must not be used after disposal.
-   */
+
+  /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
   dispose(): void {
     this.wasm.free();
   }
@@ -1364,19 +1415,32 @@ function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): str
   return signature;
 }
 
-function toNumber(value: CellScalar | CellValue | undefined): number {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") {
-    const n = Number(value);
+function dataCellValue(value: DataCell | undefined): CellScalar | CellValue | undefined {
+  if (value && typeof value === "object" && !("kind" in value) && "value" in value) {
+    return value.value;
+  }
+  return value;
+}
+
+function toNumber(value: DataCell | undefined): number {
+  const unwrapped = dataCellValue(value);
+  if (typeof unwrapped === "number") return unwrapped;
+  if (typeof unwrapped === "string") {
+    const n = Number(unwrapped);
     return Number.isFinite(n) ? n : Number.NaN;
   }
-  if (value && typeof value === "object" && value.kind === "literal") return toNumber(value.value);
+  if (unwrapped && typeof unwrapped === "object" && unwrapped.kind === "literal") {
+    return toNumber(unwrapped.value);
+  }
   return Number.NaN;
 }
 
-function toText(value: CellScalar | CellValue | undefined): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  if (value && typeof value === "object" && value.kind === "literal") return toText(value.value);
+function toText(value: DataCell | undefined): string {
+  const unwrapped = dataCellValue(value);
+  if (typeof unwrapped === "string") return unwrapped;
+  if (typeof unwrapped === "number") return String(unwrapped);
+  if (unwrapped && typeof unwrapped === "object" && unwrapped.kind === "literal") {
+    return toText(unwrapped.value);
+  }
   return "";
 }

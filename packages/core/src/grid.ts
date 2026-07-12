@@ -31,6 +31,8 @@ import type {
   Column,
   ColumnFilter,
   CommitReason,
+  DataSourcePage,
+  DataSourceRequest,
   Grid,
   GridActions,
   GridConfig,
@@ -43,6 +45,7 @@ import type {
   Range,
   Renderer,
   ReplaceResult,
+  RowData,
   RowGroup,
   SearchOptions,
   SearchResult,
@@ -171,7 +174,7 @@ export class GridImpl implements Grid {
   private readonly styleActions: StyleActions;
   private readonly overlayPainter: OverlayPainter;
   private overscan: number;
-  private readonly datasource: GridOptions["datasource"];
+  private readonly datasource?: (request: DataSourceRequest) => Promise<DataSourcePage>;
   private readOnly: boolean;
   private tabBar: HTMLDivElement | null = null;
   private sheetTabs: SheetTabs | null = null;
@@ -216,6 +219,7 @@ export class GridImpl implements Grid {
     search: new Set(),
     "active-sheet": new Set(),
     "renderer-fallback": new Set(),
+    "datasource-error": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -233,6 +237,8 @@ export class GridImpl implements Grid {
   private loaded: Uint8Array;
   private inFlight = new Set<number>();
   private loadGeneration = 0;
+  private readonly loadControllers = new Set<AbortController>();
+  private readonly cellRevisions = new Map<string, number>();
   private destroyed = false;
   private frame = 0;
   private columnWindowStart = -1;
@@ -253,7 +259,20 @@ export class GridImpl implements Grid {
     this.store = store ?? new SheetwriteStore(workbook, opts.data);
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.ownsStore = store === undefined;
-    this.datasource = opts.datasource;
+    const getRows = opts.datasource?.getRows;
+    this.datasource = getRows
+      ? async (request) => {
+          const result =
+            getRows.length >= 2
+              ? await (
+                  getRows as (sheet: SheetId, start: number, end: number) => Promise<RowData[]>
+                )(request.sheet, request.start, request.end)
+              : await (
+                  getRows as (request: DataSourceRequest) => Promise<DataSourcePage | RowData[]>
+                )(request);
+          return Array.isArray(result) ? { start: request.start, rows: result } : result;
+        }
+      : undefined;
     this.readOnly = opts.readOnly ?? false;
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
@@ -490,6 +509,12 @@ export class GridImpl implements Grid {
       let shouldRebuildRows = false;
       let shouldRebuildColumns = false;
       for (const patch of event.transaction.patches) {
+        if (patch.op === "set") {
+          this.cellRevisions.set(
+            `${patch.addr.sheet}:${patch.addr.row}:${patch.addr.col}`,
+            this.storeEpoch,
+          );
+        }
         if (patch.op === "addRows" || patch.op === "removeRows") {
           shouldRebuildRows = true;
         } else if (
@@ -1069,32 +1094,63 @@ export class GridImpl implements Grid {
 
     const sheetId = this.activeSheet;
     const generation = this.loadGeneration;
-    let pending: ReturnType<NonNullable<GridOptions["datasource"]>["getRows"]>;
+    const revision = this.storeEpoch;
+    const controller = new AbortController();
+    this.loadControllers.add(controller);
+    const request = { sheet: sheetId, start: a, end: b, signal: controller.signal, revision };
+    let pending: Promise<DataSourcePage>;
 
     try {
-      pending = datasource.getRows(sheetId, a, b);
-    } catch {
+      pending = datasource(request);
+    } catch (error) {
+      this.loadControllers.delete(controller);
       this.clearInFlight(a, b);
+      for (const fn of this.listeners["datasource-error"]) {
+        fn({ request: { sheet: sheetId, start: a, end: b, revision }, error });
+      }
       return;
     }
 
     Promise.resolve(pending)
-      .then((rows) => {
-        if (this.destroyed || generation !== this.loadGeneration) return;
+      .then((page) => {
+        this.loadControllers.delete(controller);
+        if (this.destroyed || generation !== this.loadGeneration || controller.signal.aborted)
+          return;
+        const rows = page.rows;
+        const valid =
+          page.start === a &&
+          Array.isArray(rows) &&
+          rows.length <= b - a &&
+          page.start + rows.length <= this.sheet().rowCount;
+        if (!valid) {
+          this.clearInFlight(a, b);
+          const error = new RangeError("Datasource page does not match the requested range");
+          for (const fn of this.listeners["datasource-error"]) {
+            fn({ request: { sheet: sheetId, start: a, end: b, revision }, error });
+          }
+          return;
+        }
 
-        loadable.loadRows(sheetId, a, rows);
-        // Datasource loads bypass Store.change because they are not user edits.
-        // They still change pixels, so invalidate the paint signature before
-        // the scheduled render; otherwise a fast scroll can leave placeholders
-        // visible until the next pointer or scroll interaction.
+        loadable.loadRows(
+          sheetId,
+          page.start,
+          rows,
+          (addr) =>
+            (this.cellRevisions.get(`${addr.sheet}:${addr.row}:${addr.col}`) ?? -1) > revision,
+        );
         this.storeEpoch += 1;
-        for (let r = a; r < b; r++) this.loaded[r] = 1;
+        for (let r = page.start; r < page.start + rows.length; r++) this.loaded[r] = 1;
         this.clearInFlight(a, b);
         this.scheduleRender();
       })
-      .catch(() => {
-        if (this.destroyed || generation !== this.loadGeneration) return;
+      .catch((error) => {
+        this.loadControllers.delete(controller);
+        if (this.destroyed || generation !== this.loadGeneration || controller.signal.aborted)
+          return;
         this.clearInFlight(a, b);
+        for (const fn of this.listeners["datasource-error"]) {
+          fn({ request: { sheet: sheetId, start: a, end: b, revision }, error });
+        }
       });
   }
 
@@ -1603,6 +1659,8 @@ export class GridImpl implements Grid {
     if (!this.store.getWorkbook().sheets.some((sheet) => sheet.id === id)) return;
 
     this.loadGeneration += 1;
+    for (const controller of this.loadControllers) controller.abort();
+    this.loadControllers.clear();
     this.editor.cancel();
     this.activeSheet = id;
     this.activeSheetCache = null;
@@ -2101,6 +2159,8 @@ export class GridImpl implements Grid {
     this.destroyed = true;
     this.loadGeneration += 1;
     this.inFlight.clear();
+    for (const controller of this.loadControllers) controller.abort();
+    this.loadControllers.clear();
     if (this.frame) (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
     this.editor.destroy();
     this.input.destroy();

@@ -175,9 +175,12 @@ function applyFieldHeader(): void {
 }
 ```
 
-When backing the sheet with a `DataSource`, reserve row 0 there too (return an
-empty record for `r === 0`) so the bulk row load does not clobber the styled
-title row.
+Datasource pages can carry the same authoritative `CellValue` shapes as eager
+data, plus `{ value, style }` wrappers. Formula sources, references, and styles
+hydrate without entering dirty history. If row 0 is styled locally while a
+page is outstanding, the local edit wins over that stale response; reserving an
+empty row 0 in the source remains useful when the source itself should never
+provide a title row.
 
 ## See also
 
