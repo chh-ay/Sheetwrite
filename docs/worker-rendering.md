@@ -28,10 +28,8 @@ cp -r node_modules/@sheetwrite/core/dist public/sheetwrite
 
 ```ts
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
-// Vite-family form; per-bundler matrix: getting-started.md#load-the-wasm-engine
-import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
-await initSheetwrite(wasmUrl);
+await initSheetwrite();
 
 const grid = createGrid(host, {
   workbook,

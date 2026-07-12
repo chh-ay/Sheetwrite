@@ -7,7 +7,13 @@ const fixturesRoot = fileURLToPath(new URL(".", import.meta.url));
 const repositoryRoot = resolve(fixturesRoot, "../..");
 const stagingRoot = join(fixturesRoot, ".staging");
 const tarballRoot = join(fixturesRoot, ".packed");
-const packageDirectories = ["packages/wasm", "packages/core"];
+const packageDirectories = [
+  "packages/wasm",
+  "packages/core",
+  "packages/react",
+  "packages/vue",
+  "packages/svelte",
+];
 const sourceManifests = await Promise.all(
   packageDirectories.map(async (directory) =>
     JSON.parse(await readFile(join(repositoryRoot, directory, "package.json"), "utf8")),
@@ -39,11 +45,12 @@ async function stageAndPack(packageDirectory, filename) {
   const sourceRoot = join(repositoryRoot, packageDirectory);
   const packageRoot = join(stagingRoot, basename(packageDirectory));
   const manifest = JSON.parse(await readFile(join(sourceRoot, "package.json"), "utf8"));
-  const publishFiles = [...(manifest.files ?? []), "LICENSE", "README.md"];
+  const publishFiles = [...(manifest.files ?? []), "README.md"];
   await mkdir(packageRoot, { recursive: true });
   for (const path of publishFiles) {
     await cp(join(sourceRoot, path), join(packageRoot, path), { recursive: true });
   }
+  await cp(join(repositoryRoot, "LICENSE"), join(packageRoot, "LICENSE"));
   if (manifest.dependencies) {
     manifest.dependencies = Object.fromEntries(
       Object.entries(manifest.dependencies).map(([name, range]) => {
@@ -67,10 +74,14 @@ await rm(tarballRoot, { recursive: true, force: true });
 await mkdir(tarballRoot, { recursive: true });
 await stageAndPack("packages/wasm", "sheetwrite-wasm.tgz");
 await stageAndPack("packages/core", "sheetwrite-core.tgz");
+await stageAndPack("packages/react", "sheetwrite-react.tgz");
+await stageAndPack("packages/vue", "sheetwrite-vue.tgz");
+await stageAndPack("packages/svelte", "sheetwrite-svelte.tgz");
 await rm(stagingRoot, { recursive: true, force: true });
 
 for (const fixture of ["vite", "webpack", "next"]) {
   const cwd = join(fixturesRoot, fixture);
+  await rm(join(cwd, "node_modules"), { recursive: true, force: true });
   console.log(`\n=== ${fixture} bundler fixture ===`);
   await run("npm", ["run", "build"], cwd);
 }

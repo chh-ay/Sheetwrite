@@ -8,10 +8,18 @@ import type {
   Theme,
   Workbook,
 } from "@sheetwrite/core";
-import { SheetwriteGrid } from "@sheetwrite/vue";
+import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/vue";
 import { computed, defineComponent, h, ref, shallowRef } from "vue";
-import { ensureSheetwrite } from "../lib/sheetwrite";
-import "@sheetwrite/core/styles.css";
+import "@sheetwrite/vue/styles.css";
+
+const SIMPLE_ROWS = [
+  { name: "Notebook", price: 12.5 },
+  { name: "Pen", price: 2.25 },
+];
+const SIMPLE_COLUMNS = [
+  { key: "name", title: "Product" },
+  { key: "price", title: "Price", type: "currency" as const },
+];
 
 // ── Showcase: streaming datasource + transaction/sync pipeline ────────────────
 // One million rows are NEVER materialized up front: the grid asks a paged
@@ -20,7 +28,7 @@ import "@sheetwrite/core/styles.css";
 // store's dirty queue until the "server" acknowledges it with `markClean`.
 
 interface VueGridHandle {
-  getGrid(): Grid | null;
+  grid: Grid | null;
 }
 
 const ROWS = 1_000_000;
@@ -108,7 +116,7 @@ const App = defineComponent({
     const log = ref<string[]>([]);
     const searchQuery = ref("");
 
-    const gridOf = () => gridComponent.value?.getGrid() ?? null;
+    const gridOf = () => gridComponent.value?.grid ?? null;
 
     // Paged source with visible latency: scroll fast and watch placeholders
     // resolve. Each call serves one contiguous [start, end) block.
@@ -158,11 +166,8 @@ const App = defineComponent({
       dirtyCount.value === 0 ? "All changes synced" : `${dirtyCount.value} unsynced patch(es)`,
     );
 
-    // Client-only island: gate grid creation on the shared WASM init.
-    const ready = ref(false);
-    void ensureSheetwrite().then(() => {
-      ready.value = true;
-    });
+    // The adapter owns client-side WASM initialization.
+    const ready = ref(true);
 
     return () =>
       !ready.value
@@ -178,17 +183,17 @@ const App = defineComponent({
                   readOnly: readOnly.value,
                   config: GRID_CONFIG,
                   style: "height: 100%",
-                  onReady: (grid: Grid) => {
+                  onReady: ({ grid }: { grid: Grid }) => {
                     grid.setFrozen(0, 1);
                     pushLog(`grid ready — ${integer.format(ROWS)} virtual rows`);
                   },
-                  onSelection: (value: Selection | null) => {
+                  onSelectionChange: (value: Selection | null) => {
                     selection.value =
                       value?.kind === "cell"
                         ? `R${value.addr.row + 1} C${value.addr.col + 1}`
                         : (value?.kind ?? "none");
                   },
-                  onScroll: (event: GridEvents["scroll"]) => {
+                  onViewportChange: (event: GridEvents["scroll"]) => {
                     viewWindow.value = { first: event.firstRow + 1, last: event.lastRow + 1 };
                   },
                   "onEdit-begin": (event: GridEvents["edit-begin"]) => {
@@ -197,7 +202,7 @@ const App = defineComponent({
                   "onEdit-commit": (event: GridEvents["edit-commit"]) => {
                     pushLog(`edit-commit R${event.addr.row + 1} C${event.addr.col + 1}`);
                   },
-                  onChange: (event: ChangeEvent) => {
+                  onGridChange: (event: ChangeEvent) => {
                     pushLog(
                       `change      ${event.changes.length} cell(s), epoch ${event.epoch ?? "-"}`,
                     );
@@ -208,7 +213,7 @@ const App = defineComponent({
                       `search      "${result.query}" ${result.matches.length} match(es), active ${result.active < 0 ? "none" : result.active + 1}`,
                     );
                   },
-                  onActiveSheet: (event: GridEvents["active-sheet"]) => {
+                  onActiveSheetChange: (event: GridEvents["active-sheet"]) => {
                     pushLog(`active-sheet ${String(event.sheet)}`);
                   },
                 }),
@@ -230,6 +235,13 @@ const App = defineComponent({
                   log.value.map((line, index) => h("li", { key: `${index}-${line}` }, line)),
                 ),
               ]),
+            ]),
+            h("section", { "aria-label": "Data-first Sheetwrite example" }, [
+              h(Sheetwrite, {
+                columns: SIMPLE_COLUMNS,
+                defaultRows: SIMPLE_ROWS,
+                height: 180,
+              }),
             ]),
             h(
               "div",

@@ -8,10 +8,9 @@ import type {
 } from "@sheetwrite/core";
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 import "@sheetwrite/core/xlsx";
-import { SheetwriteGrid } from "@sheetwrite/react";
+import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/react";
+import "@sheetwrite/react/styles.css";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ensureSheetwrite } from "../lib/sheetwrite";
-import "@sheetwrite/core/styles.css";
 
 // ── 100,000 rows of eager columnar data ──────────────────────────────────────
 // Loaded into the Rust/WASM store in one bulk pass; every sort, filter,
@@ -138,6 +137,15 @@ function describeSelection(selection: Selection | null): string {
   return selection.kind;
 }
 
+const SIMPLE_ROWS = [
+  { name: "Notebook", price: 12.5 },
+  { name: "Pen", price: 2.25 },
+] as const;
+const SIMPLE_COLUMNS = [
+  { key: "name", title: "Product" },
+  { key: "price", title: "Price", type: "currency" as const },
+] as const;
+
 function App() {
   const gridRef = useRef<Grid>(null);
   const [dark, setDark] = useState(false);
@@ -171,9 +179,8 @@ function App() {
   );
 
   const onReady = useCallback(
-    (grid: Grid) => {
-      // Frozen ID column, Sheets-style, without mutating the workbook. The
-      // grid argument is used directly: onReady fires before the ref publishes.
+    ({ grid }: { grid: Grid }) => {
+      // The published ref and readiness event reference the same generation.
       grid.setFrozen(0, 1);
       refreshStats(grid);
       setActiveRenderer(grid.rendererKind());
@@ -329,8 +336,8 @@ function App() {
           style={{ height: "100%" }}
           onReady={onReady}
           onSelectionChange={(value) => setSelection(describeSelection(value))}
-          onChange={() => refreshStats()}
-          onScroll={(event) => console.log("scroll", event)}
+          onGridChange={() => refreshStats()}
+          onViewportChange={(event) => console.log("viewport", event)}
           onEditBegin={(event) => console.log("edit-begin", event)}
           onEditCommit={(event) => console.log("edit-commit", event)}
         />
@@ -379,24 +386,14 @@ function App() {
           XLSX
         </button>
       </div>
+      <section aria-label="Data-first Sheetwrite example">
+        <Sheetwrite columns={SIMPLE_COLUMNS} defaultRows={SIMPLE_ROWS} height={180} />
+      </section>
     </main>
   );
 }
 
-/** Client-only island: waits for the shared WASM init before mounting the grid. */
+/** Client-only island; the adapter initializes WASM on mount. */
 export default function ReactWorkbook() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    void ensureSheetwrite().then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  if (!ready) return <p role="status">Loading the WASM engine…</p>;
   return <App />;
 }

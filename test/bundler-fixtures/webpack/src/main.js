@@ -1,5 +1,5 @@
-import "@sheetwrite/core";
+import { initSheetwrite } from "@sheetwrite/core";
 
-const wasmUrl = new URL("@sheetwrite/wasm/wasm", import.meta.url);
+await initSheetwrite();
 const worker = new Worker(new URL("@sheetwrite/core/worker", import.meta.url), { type: "module" });
-console.log(wasmUrl.href, worker);
+console.log(worker);

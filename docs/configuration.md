@@ -23,7 +23,16 @@ createGrid(host: HTMLElement, opts: GridOptions): Grid
 | `readOnly` | `boolean` | `false` | When `true`, all mutating interactions (edit, clear, fill, paste, restyle) are disabled and the host gets `aria-readonly="true"`. |
 | `renderers` | `Record<string, CellRenderer>` | `{}` | Custom cell renderers registered up front; reference one by name via `Column.renderer`. Also see `defineCellRenderer`. |
 | `overscan` | `number` | `6` | Rows rendered above and below the viewport to absorb fast scrolls. |
+| `minColumns` | `number` | workbook width | Minimum rendered/store column count, including empty spreadsheet padding columns. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar (see below). Omit for no toolbar. |
+
+### Framework adapter update policy
+
+Framework adapters classify every `GridOptions` field centrally. `workbook`,
+`data`, and `datasource` create an `input-reset`; `renderer`, `workerUrl`, and
+`renderers` create a `renderer-reset`. `theme`, `readOnly`, `config`, `overscan`,
+and `minColumns` update the existing grid live. Readiness includes the resulting
+generation and reset reason.
 
 A `CellRenderer` paints (or returns a DOM node for) a single cell:
 

@@ -1,126 +1,96 @@
 # Sheetwrite
 
-Framework-agnostic, high-performance canvas spreadsheet grid.
+A canvas spreadsheet and data grid backed by a Rust/WASM columnar engine, with imperative core and React, Vue, and Svelte adapters.
 
-Sheetwrite renders to a `<canvas>` and keeps its cells in a Rust→WASM columnar
-store, so it stays fast at 100k+ rows. The core is framework-agnostic; thin
-React, Vue, and Svelte adapters wrap the same imperative engine.
+## Framework lane
 
-## Features
-
-- Canvas rendering backed by a Rust→WASM columnar store, virtualized for 100k+ rows (scaled scroll past the browser element-height cap).
-- Formulas: A1 references and ranges (`A1:B3`), arithmetic and comparisons, `SUM`/`AVG`/`MIN`/`MAX`/`COUNT`/`IF`/`ABS`/`ROUND`/`SQRT`/`MOD`/`POW`/`AND`/`OR`/`NOT`, cycle detection, and point-mode entry.
-- Multi-sheet workbooks with a tab bar and variable row heights.
-- Selection (cell/range/row/column/multi), keyboard navigation, and IME-safe inline editing.
-- Clipboard as TSV (formula-injection hardened).
-- Non-mutating data views: single/multi-column sort, column filters, distinct-value scans, hidden rows, row groups, and aggregates.
-- Frozen panes and zoom without mutating workbook row heights or column widths.
-- Import/export: CSV, TSV, and XLSX with pluggable XLSX import/export backends.
-- Per-side cell borders and Excel-style number formats (e.g. `#,##0.00`).
-- Opt-in formatting toolbar (bold, italic, align, text/fill color, border, clear-format, merge, sort).
-- Merged cells and a drag-to-fill handle (relative A1 refs shift by the delta; absolute `$A$1` parts preserved).
-- Theming via a typed theme object and CSS custom properties.
-- Accessibility: an ARIA grid shadow tree mirrors the visible window.
-- Optional off-thread worker renderer (OffscreenCanvas) with main-thread fallback.
-- React, Vue, and Svelte adapters.
-
-## Install
+Install one adapter. Core and WASM arrive transitively.
 
 ```sh
-bun add @sheetwrite/core @sheetwrite/wasm
+bun add @sheetwrite/react
 ```
 
-Add a framework adapter if you use one, e.g. `bun add @sheetwrite/react`.
+```tsx
+import { Sheetwrite } from "@sheetwrite/react";
+import "@sheetwrite/react/styles.css";
 
-All packages are **ESM-only**: they ship ES modules exposed through a single
-`default` export condition, with no CommonJS `require` build. Consume them from
-an ESM context or through a bundler.
+<Sheetwrite
+  columns={[
+    { key: "name", title: "Name" },
+    { key: "price", title: "Price", type: "currency" },
+  ]}
+  defaultRows={products}
+  height={500}
+  onGridChange={({ changes }) => save(changes)}
+/>;
+```
 
-## Quick start (vanilla)
+Use the equivalent `Sheetwrite` export and package-local `styles.css` from `@sheetwrite/vue` or `@sheetwrite/svelte`. Framework components initialize WASM automatically on client mount.
+
+`defaultRows` is an uncontrolled seed. Sheetwrite never mutates it; edits live in the grid. Changing its identity deliberately replaces the grid and creates a new readiness generation. Use `height` for fixed sizing or `fill` inside an ancestor that already has available height.
+
+`SheetwriteGrid` remains the advanced component for explicit `workbook` plus `data`/`datasource`. Reset-bound inputs are `workbook`, `data`, `datasource`, `renderer`, `workerUrl`, and `renderers`. Live inputs are `theme`, `readOnly`, `config`, `overscan`, and `minColumns`.
+
+Readiness reports `{ grid, generation, reason }`, where reason is `initial`, `input-reset`, or `renderer-reset`. Grid events use collision-free names: `onGridChange`/`grid-change`, `onViewportChange`/`viewport-change`, selection, edit, search, and active-sheet variants. Native host change and scroll events remain available.
+
+## Engine lane
+
+```sh
+bun add @sheetwrite/core
+```
 
 ```ts
-import { createGrid, initSheetwrite, type ColumnarData, type Workbook } from "@sheetwrite/core";
+import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
-// Vite-family bundlers; Bun uses `... with { type: "file" }` — the full
-// per-bundler matrix lives in docs/getting-started.md#load-the-wasm-engine.
-import wasmUrl from "@sheetwrite/wasm/wasm?url";
+
+await initSheetwrite();
 
 const workbook: Workbook = {
   activeSheet: "sheet1",
   sheets: [
     {
       id: "sheet1",
-      name: "Sheet 1",
-      rowCount: 3,
+      name: "Products",
+      rowCount: 2,
       columns: [
-        { key: "item", header: "Item", width: 200, type: "text" },
-        { key: "qty", header: "Qty", width: 100, type: "number" },
+        { key: "name", header: "Name", width: 180, type: "text" },
+        { key: "price", header: "Price", width: 100, type: "currency" },
       ],
     },
   ],
 };
 
-// Eager columnar input. For large sheets pass a paged `datasource` instead.
-const data: ColumnarData = {
-  rowCount: 3,
-  columns: {
-    item: ["Cable", "Adapter", "Mount"],
-    qty: [3, 2, 5],
+const grid = createGrid(document.querySelector("#grid")!, {
+  workbook,
+  data: {
+    rowCount: 2,
+    columns: { name: ["Notebook", "Pen"], price: [12.5, 2.25] },
   },
-};
-
-// WASM must be ready before createGrid (which is synchronous).
-await initSheetwrite(wasmUrl);
-
-const host = document.getElementById("app");
-if (!host) throw new Error("missing #app host element");
-
-const grid = createGrid(host, { workbook, data, config: { toolbar: true } });
+});
 ```
 
-The host element needs an explicit size (for example a `height`); the grid fills its container.
+Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Getting started](docs/getting-started.md).
 
 ## Packages
 
-| Package | Description |
-| --- | --- |
-| `@sheetwrite/core` | The engine: canvas grid, columnar store, formulas, data views, export, and theming. |
-| `@sheetwrite/wasm` | Rust→WASM columnar store and calc engine (consumed by core). |
-| `@sheetwrite/react` | React `<SheetwriteGrid>` adapter. |
-| `@sheetwrite/vue` | Vue 3 `<SheetwriteGrid>` adapter. |
-| `@sheetwrite/svelte` | Svelte 5 `<SheetwriteGrid>` adapter. |
+| Package | Purpose |
+|---|---|
+| `@sheetwrite/core` | Imperative grid, store, formulas, views, export, theming |
+| `@sheetwrite/react` | React `Sheetwrite` and `SheetwriteGrid` |
+| `@sheetwrite/vue` | Vue `Sheetwrite` and `SheetwriteGrid` |
+| `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |
+| `@sheetwrite/wasm` | Internal Rust/WASM engine; normally transitive |
 
 ## Development
 
 ```sh
-bun install            # install workspace dependencies
-bun run build:wasm     # compile the Rust crate (wasm-pack build --target web)
-bun run build          # build wasm, then core, react, and vue
+bun install
+bun run build:wasm
 bun run typecheck
-bun run lint
 bun test
-bun run examples       # build packages, then serve every demo at one URL (Astro)
+bun run build
+bun run lint
+bun run verify:bundlers
 ```
 
-`bun run build:wasm` (and the `build` step that wraps it) requires `wasm-pack`
-and the Rust toolchain pinned in `rust-toolchain.toml`. `bun run build` runs the
-WASM build first, so a one-shot `bun run build` covers everything.
-
-`bun run examples` starts the examples site (`examples/site`) — one Astro app
-with a tab per demo: the vanilla Google-Sheets-style workbook, the theming lab,
-and the React, Vue, and Svelte showcases.
-
-## Contributing and security
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture rules, local checks,
-Changesets, and the release process. See [SECURITY.md](SECURITY.md) for private
-vulnerability-reporting guidance; do not disclose security issues in public
-issues.
-
-## Documentation
-
-See [docs/](docs/) for guides and the API reference.
-
-## License
-
-Sheetwrite is MIT licensed.
+See `docs/` for configuration, framework integration, worker rendering, export, accessibility, and performance guidance.

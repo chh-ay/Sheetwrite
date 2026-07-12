@@ -1,9 +1,12 @@
 "use client";
 
-import "@sheetwrite/core";
-
-const wasmUrl = new URL("@sheetwrite/wasm/wasm", import.meta.url);
+import { initSheetwrite } from "@sheetwrite/core";
+import { useEffect, useState } from "react";
 
 export default function Page() {
-  return <output>{wasmUrl.href}</output>;
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    void initSheetwrite().then(() => setReady(true));
+  }, []);
+  return <output>{ready ? "ready" : "loading"}</output>;
 }

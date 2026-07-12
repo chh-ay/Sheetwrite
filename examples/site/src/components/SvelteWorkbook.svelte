@@ -18,12 +18,19 @@ import {
   createSelectionStatus,
   createToolbar,
 } from "@sheetwrite/core/shell";
-import { SheetwriteGrid } from "@sheetwrite/svelte";
-import "@sheetwrite/core/styles.css";
+import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/svelte";
+import "@sheetwrite/svelte/styles.css";
 import "@sheetwrite/core/shell.css";
-import { ensureSheetwrite } from "../lib/sheetwrite";
 
 const ROWS = 500;
+const SIMPLE_ROWS = [
+  { name: "Notebook", price: 12.5 },
+  { name: "Pen", price: 2.25 },
+];
+const SIMPLE_COLUMNS = [
+  { key: "name" as const, title: "Product" },
+  { key: "price" as const, title: "Price", type: "currency" as const },
+];
 
 const LIGHT_THEME: Partial<Theme> = {
   bg: "#fffdf7",
@@ -99,7 +106,7 @@ function buildModelData(): ColumnarData {
 }
 
 /** Cross-sheet summary formulas — watch them update live as you edit Model. */
-function seedSummary(grid: Grid): void {
+function seedSummary({ grid }: { grid: Grid }): void {
   const label = (text: string): CellValue => ({ kind: "literal", value: text });
   const formula = (src: string): CellValue => ({ kind: "formula", src });
   const rows: Array<[string, string]> = [
@@ -227,19 +234,17 @@ $effect(() => {
   </div>
   <div class="example-chrome example-formula-row" bind:this={chromeHost}></div>
   <div class="example-grid" bind:this={gridWrap}>
-    {#await ensureSheetwrite() then}
-      <SheetwriteGrid
-        bind:grid
-        {workbook}
-        {data}
-        {theme}
-        {renderers}
-        onChange={logChange}
-        config={GRID_CONFIG}
-        onReady={seedSummary}
-        style="height: 100%"
-      />
-    {/await}
+    <SheetwriteGrid
+      bind:grid
+      {workbook}
+      {data}
+      {theme}
+      {renderers}
+      onGridChange={logChange}
+      config={GRID_CONFIG}
+      onReady={seedSummary}
+      fill
+    />
   </div>
   <section class="example-log" aria-live="polite">
     <strong>Recent changes</strong>
@@ -252,6 +257,9 @@ $effect(() => {
         {/each}
       </ol>
     {/if}
+  </section>
+  <section aria-label="Data-first Sheetwrite example">
+    <Sheetwrite columns={SIMPLE_COLUMNS} defaultRows={SIMPLE_ROWS} height={180} />
   </section>
 </main>
 
