@@ -234,6 +234,7 @@ main thread or overwriting data the worker may still be painting.
 | `onSearch` | `(result: GridEvents["search"]) => void` | Forwards the `search` event. |
 | `onActiveSheetChange` | `(event: { sheet: SheetId }) => void` | Forwards the `active-sheet` event. |
 | `onReady` | `(grid: Grid) => void` | Called once with the core `Grid` after creation. |
+| …all other `div` attributes | `HTMLAttributes<HTMLDivElement>` | `id`, `data-*`, `aria-*`, `tabIndex`, and event handlers not claimed by the grid fall through to the host div. |
 
 The grid is rebuilt when the `workbook` identity changes; changing the `theme`
 prop calls `setTheme`. Because the props include all of `GridOptions`, the

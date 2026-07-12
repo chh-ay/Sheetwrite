@@ -281,4 +281,113 @@ describe("SheetwriteGrid React lifecycle", () => {
 
     await act(async () => root.unmount());
   });
+
+  it("forwards ordinary div attributes to the host and keeps .sheetwrite through className churn", async () => {
+    const workbook = makeWorkbook();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+
+    await act(async () => {
+      root.render(
+        <SheetwriteGrid
+          workbook={workbook}
+          data-testid="grid"
+          id="g1"
+          tabIndex={0}
+          className="p-2 initial"
+        />,
+      );
+    });
+
+    const div = host.firstElementChild as HTMLDivElement;
+    expect(div.getAttribute("data-testid")).toBe("grid");
+    expect(div.id).toBe("g1");
+    expect(div.tabIndex).toBe(0);
+    expect(div.classList.contains("sheetwrite")).toBe(true);
+    expect(div.classList.contains("initial")).toBe(true);
+
+    // Tailwind-style cn() churn: a changed className must not reconcile the
+    // grid's own .sheetwrite (CSS-variable chrome) away.
+    await act(async () => {
+      root.render(
+        <SheetwriteGrid workbook={workbook} data-testid="grid" className="p-4 updated" />,
+      );
+    });
+    expect(div.classList.contains("sheetwrite")).toBe(true);
+    expect(div.classList.contains("updated")).toBe(true);
+    expect(div.classList.contains("initial")).toBe(false);
+
+    await act(async () => root.unmount());
+  });
+
+  it("keeps grid semantics for DOM-named props: a DOM change event never reaches onChange", async () => {
+    const workbook = makeWorkbook();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const gridRef = createRef<Grid>();
+    const changes: unknown[] = [];
+
+    await act(async () => {
+      root.render(
+        <SheetwriteGrid
+          ref={gridRef}
+          workbook={workbook}
+          onChange={(event) => changes.push(event)}
+        />,
+      );
+    });
+
+    // A bubbling DOM "change" event on the host must NOT hit the grid callback
+    // (onChange was consumed by the adapter, never attached as a DOM handler).
+    const div = host.firstElementChild as HTMLDivElement;
+    div.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(changes).toHaveLength(0);
+
+    // The grid `change` event still reaches the callback (grid semantics).
+    gridRef.current!.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "sheet", row: 0, col: 0 },
+          value: { kind: "literal", value: "x" },
+        },
+      ],
+    });
+    expect(changes).toHaveLength(1);
+
+    await act(async () => root.unmount());
+  });
+
+  it("never leaks GridOptions members to the DOM and triggers no unknown-prop warning", async () => {
+    const workbook = makeWorkbook();
+    const data = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const warnings: unknown[][] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      warnings.push(args);
+    };
+
+    try {
+      await act(async () => {
+        root.render(<SheetwriteGrid workbook={workbook} data={data} overscan={4} />);
+      });
+
+      const div = host.firstElementChild as HTMLDivElement;
+      expect(div.getAttribute("workbook")).toBeNull();
+      expect(div.getAttribute("data")).toBeNull();
+      expect(div.getAttribute("overscan")).toBeNull();
+
+      // No React unknown-prop warnings surfaced.
+      expect(warnings).toHaveLength(0);
+
+      await act(async () => root.unmount());
+    } finally {
+      console.error = originalError;
+    }
+  });
 });

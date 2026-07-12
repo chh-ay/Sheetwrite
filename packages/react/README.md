@@ -68,7 +68,8 @@ createRoot(host).render(
 - `workbook` (required) — the workbook model.
 - `data` / `datasource` — eager columnar data, or a paged datasource.
 - `renderer`, `workerUrl`, `theme`, `readOnly`, `renderers`, `overscan`, `minColumns`, `config` — forwarded `GridOptions` fields.
-- `className`, `style` — applied to the host `<div>`.
+- `className`, `style` — applied to the host `<div>` (the grid's own `sheetwrite` class is always preserved).
+- All other standard `div` props (`id`, `data-*`, `aria-*`, `tabIndex`, event handlers not claimed by the grid) fall through to the host element.
 - `onChange(event)` — fired on committed edits (`ChangeEvent`).
 - `onSelectionChange(selection)` — fired when the selection changes (`Selection | null`).
 - `onScroll(event)` — fired on scroll (visible row window).

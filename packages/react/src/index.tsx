@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type ForwardedRef,
   forwardRef,
+  type HTMLAttributes,
   type ReactElement,
   useEffect,
   useLayoutEffect,
@@ -19,11 +20,15 @@ function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
   else if (ref) ref.current = grid;
 }
 
-export interface SheetwriteGridProps extends GridOptions {
+export interface SheetwriteGridProps
+  extends GridOptions,
+    Omit<HTMLAttributes<HTMLDivElement>, "onChange" | "onScroll" | "children"> {
   className?: string;
   style?: CSSProperties;
+  /** Grid semantics (committed transaction) — shadows the DOM `onChange`. */
   onChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
+  /** Grid semantics (visible row window) — shadows the DOM `onScroll`. */
   onScroll?: (event: GridEvents["scroll"]) => void;
   onEditBegin?: (event: GridEvents["edit-begin"]) => void;
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
@@ -68,6 +73,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       overscan,
       minColumns,
       config,
+      ...hostAttributes
     } = props;
 
     const hostRef = useRef<HTMLDivElement | null>(null);
@@ -155,6 +161,10 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       controllerRef.current?.setTheme(theme);
     }, [theme]);
 
-    return <div ref={hostRef} className={className} style={style} />;
+    // The grid adds `.sheetwrite` (the CSS-variable chrome) to this div; keep
+    // it in the React-owned class so Tailwind-style `cn()` className churn
+    // cannot reconcile it away. Spread first: adapter-owned props win.
+    const hostClassName = className ? `sheetwrite ${className}` : "sheetwrite";
+    return <div {...hostAttributes} ref={hostRef} className={hostClassName} style={style} />;
   },
 );
