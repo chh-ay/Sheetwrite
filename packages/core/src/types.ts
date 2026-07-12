@@ -180,11 +180,38 @@ export interface CellChange {
   newStyle?: CellStyle;
 }
 
+/**
+ * The gesture/operation that produced a committed transaction. Consumers
+ * switching on reasons MUST keep a default branch — the union grows with new
+ * mutation features.
+ */
+export type CommitReason =
+  | "edit-blur"
+  | "edit-enter"
+  | "edit-tab"
+  | "edit-programmatic"
+  | "paste"
+  | "cut"
+  | "clear"
+  | "fill"
+  /** Row/column insert/delete/resize. */
+  | "structure"
+  /** Style, merge, and format actions. */
+  | "style"
+  /** Find-and-replace. */
+  | "replace"
+  | "undo"
+  | "redo"
+  /** `store.applyTransaction` from host code / unclassified. */
+  | "api";
+
 /** Payload of the `change` event; flows OUT for API submission/reconcile. */
 export interface ChangeEvent {
   transaction: Transaction;
   changes: CellChange[];
   dirty: Patch[];
+  /** What produced this commit — see {@link CommitReason}. */
+  commitReason: CommitReason;
   epoch?: number;
 }
 

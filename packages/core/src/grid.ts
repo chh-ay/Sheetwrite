@@ -29,6 +29,7 @@ import type {
   CellValue,
   Column,
   ColumnFilter,
+  CommitReason,
   Grid,
   GridActions,
   GridConfig,
@@ -295,7 +296,7 @@ export class GridImpl implements Grid {
         for (const fn of this.listeners.search) fn(result);
       },
       readOnly: () => this.readOnly,
-      commit: (patches) => this.commit(patches),
+      commit: (patches) => this.commit(patches, "replace"),
     });
     this.clipboard = new ClipboardController({
       store: this.store,
@@ -306,7 +307,7 @@ export class GridImpl implements Grid {
       readOnly: () => this.readOnly,
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
-      commit: (patches) => this.commit(patches),
+      commit: (patches, reason) => this.commit(patches, reason),
     });
     this.styleActions = new StyleActions({
       store: this.store,
@@ -319,7 +320,7 @@ export class GridImpl implements Grid {
       merges: this.merges,
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
-      commit: (patches) => this.commit(patches),
+      commit: (patches) => this.commit(patches, "style"),
       applyLayout: () => this.applyLayout(),
     });
 
@@ -425,7 +426,7 @@ export class GridImpl implements Grid {
       cut: () => this.clipboard.cut(),
       paste: () => void this.clipboard.paste(),
       pasteValues: () => void this.clipboard.pasteValues(),
-      commit: (patches) => this.commit(patches),
+      commit: (patches, reason) => this.commit(patches, reason),
       readOnly: () => this.readOnly,
     });
 
@@ -1130,13 +1131,19 @@ export class GridImpl implements Grid {
     const value = parseCellInput(raw, column?.type ?? "text");
     const dataRow = this.toDataRow(row);
 
-    this.commit([
-      {
-        op: "set",
-        addr: { sheet: this.activeSheet, row: dataRow, col },
-        value,
-      },
-    ]);
+    // Enter commits "down", Tab commits sideways, blur commits "none".
+    const reason: CommitReason =
+      navigate === "down" ? "edit-enter" : navigate === "none" ? "edit-blur" : "edit-tab";
+    this.commit(
+      [
+        {
+          op: "set",
+          addr: { sheet: this.activeSheet, row: dataRow, col },
+          value,
+        },
+      ],
+      reason,
+    );
 
     for (const fn of this.listeners["edit-commit"]) {
       fn({ addr: { sheet: this.activeSheet, row, col }, value });
@@ -1147,21 +1154,27 @@ export class GridImpl implements Grid {
     this.scheduleRender();
   }
 
-  private commit(patches: Patch[]): void {
+  private commit(patches: Patch[], reason: CommitReason): void {
     if (this.readOnly) return;
     if (patches.length === 0) return;
 
     if (this.applyingHistory) {
-      this.store.applyTransaction({ patches });
+      this.storeApply(patches, reason);
       return;
     }
 
     const inverse: Patch[] = [];
     for (const patch of patches) inverse.push(...this.inversePatch(patch));
 
-    this.store.applyTransaction({ patches });
+    this.storeApply(patches, reason);
     for (const patch of patches) this.rebaseHistoryFor(patch);
     this.history.push(inverse, patches);
+  }
+
+  /** Thread the reason when the store is ours; injected stores stay 1-arg. */
+  private storeApply(patches: Patch[], reason: CommitReason): void {
+    if (this.loadable) this.loadable.applyTransaction({ patches }, reason);
+    else this.store.applyTransaction({ patches });
   }
 
   private inversePatch(patch: Patch): Patch[] {
@@ -1289,12 +1302,12 @@ export class GridImpl implements Grid {
     return this.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
   }
 
-  private applyHistoryPatches(patches: Patch[]): void {
+  private applyHistoryPatches(patches: Patch[], reason: "undo" | "redo"): void {
     if (patches.length === 0) return;
 
     this.applyingHistory = true;
     try {
-      this.store.applyTransaction({ patches });
+      this.storeApply(patches, reason);
     } finally {
       this.applyingHistory = false;
     }
@@ -1344,7 +1357,7 @@ export class GridImpl implements Grid {
       }
     });
 
-    this.commit(patches);
+    this.commit(patches, "clear");
   }
 
   private emitSelection(): void {
@@ -1405,7 +1418,7 @@ export class GridImpl implements Grid {
         });
       }
     }
-    this.commit(patches);
+    this.commit(patches, "style");
   }
 
   dataEdge(row: number, col: number, dRow: number, dCol: number): number | null {
@@ -1432,9 +1445,10 @@ export class GridImpl implements Grid {
   }
 
   setColumnWidth(col: number, width: number): void {
-    this.commit([
-      { op: "setColumn", sheet: this.activeSheet, col, patch: { width: Math.max(1, width) } },
-    ]);
+    this.commit(
+      [{ op: "setColumn", sheet: this.activeSheet, col, patch: { width: Math.max(1, width) } }],
+      "structure",
+    );
   }
 
   // ── public API ─────────────────────────────────────────────────────────────
@@ -1625,7 +1639,7 @@ export class GridImpl implements Grid {
   }
 
   applyTransaction(transaction: GridTransaction): void {
-    this.commit(transaction.patches.slice());
+    this.commit(transaction.patches.slice(), "api");
   }
 
   setZoom(zoom: number): void {
@@ -1682,47 +1696,59 @@ export class GridImpl implements Grid {
 
   insertRows(at: number, count = 1): void {
     if (count <= 0) return;
-    this.commit([{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }]);
+    this.commit(
+      [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
+      "structure",
+    );
   }
 
   removeRows(at: number, count = 1): void {
     const sheet = this.sheet();
     if (count <= 0 || at >= sheet.rowCount) return;
-    this.commit([
-      {
-        op: "removeRows",
-        sheet: this.activeSheet,
-        at: Math.max(0, at),
-        count: Math.min(count, sheet.rowCount - Math.max(0, at)),
-      },
-    ]);
+    this.commit(
+      [
+        {
+          op: "removeRows",
+          sheet: this.activeSheet,
+          at: Math.max(0, at),
+          count: Math.min(count, sheet.rowCount - Math.max(0, at)),
+        },
+      ],
+      "structure",
+    );
   }
 
   insertColumns(at: number, count = 1): void {
     if (count <= 0) return;
     const insertAt = Math.max(0, Math.min(at, this.sheet().columns.length));
-    this.commit([
-      {
-        op: "addColumns",
-        sheet: this.activeSheet,
-        at: insertAt,
-        columns: this.makeBlankColumns(insertAt, count),
-      },
-    ]);
+    this.commit(
+      [
+        {
+          op: "addColumns",
+          sheet: this.activeSheet,
+          at: insertAt,
+          columns: this.makeBlankColumns(insertAt, count),
+        },
+      ],
+      "structure",
+    );
   }
 
   removeColumns(at: number, count = 1): void {
     const sheet = this.sheet();
     if (count <= 0 || at >= sheet.columns.length || sheet.columns.length <= 1) return;
     const removeAt = Math.max(0, at);
-    this.commit([
-      {
-        op: "removeColumns",
-        sheet: this.activeSheet,
-        at: removeAt,
-        count: Math.min(count, sheet.columns.length - removeAt, sheet.columns.length - 1),
-      },
-    ]);
+    this.commit(
+      [
+        {
+          op: "removeColumns",
+          sheet: this.activeSheet,
+          at: removeAt,
+          count: Math.min(count, sheet.columns.length - removeAt, sheet.columns.length - 1),
+        },
+      ],
+      "structure",
+    );
   }
 
   private makeBlankColumns(at: number, count: number): Column[] {
@@ -1879,7 +1905,7 @@ export class GridImpl implements Grid {
     const patches = this.history.undo();
     if (!patches) return;
 
-    this.applyHistoryPatches(patches);
+    this.applyHistoryPatches(patches, "undo");
   }
 
   redo(): void {
@@ -1887,7 +1913,7 @@ export class GridImpl implements Grid {
     const patches = this.history.redo();
     if (!patches) return;
 
-    this.applyHistoryPatches(patches);
+    this.applyHistoryPatches(patches, "redo");
   }
 
   exportCsv(filename: string): void {

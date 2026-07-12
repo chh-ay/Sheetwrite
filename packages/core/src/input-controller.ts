@@ -6,7 +6,16 @@ import { formatNumber } from "./number-format.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
-import type { CellAddress, CellValue, Patch, Sheet, SheetId, Store, Theme } from "./types.js";
+import type {
+  CellAddress,
+  CellValue,
+  CommitReason,
+  Patch,
+  Sheet,
+  SheetId,
+  Store,
+  Theme,
+} from "./types.js";
 
 const PRINTABLE = /^.$/u;
 
@@ -81,7 +90,7 @@ export interface InputControllerDeps {
   cut: () => void;
   paste: () => void;
   pasteValues: () => void;
-  commit: (patches: Patch[]) => void;
+  commit: (patches: Patch[], reason: CommitReason) => void;
   readOnly: () => boolean;
 }
 
@@ -348,14 +357,17 @@ export class InputController {
     };
     const up = (): void => {
       this.detachDrag();
-      this.deps.commit([
-        {
-          op: "setColumn",
-          sheet: this.deps.activeSheet(),
-          col,
-          patch: { width: finalWidth },
-        },
-      ]);
+      this.deps.commit(
+        [
+          {
+            op: "setColumn",
+            sheet: this.deps.activeSheet(),
+            col,
+            patch: { width: finalWidth },
+          },
+        ],
+        "structure",
+      );
     };
     this.attachDrag(e, move, up);
   }
@@ -385,15 +397,18 @@ export class InputController {
     }
 
     const width = autofitColumnWidth((text) => this.measureText(text), texts, column.header);
-    this.deps.commit([
-      {
-        op: "setColumn",
-        sheet: this.deps.activeSheet(),
-        col,
-        // measureText ran under the zoomed font; persist base units.
-        patch: { width: Math.max(MIN_COLUMN_WIDTH, Math.round(width / this.deps.zoom())) },
-      },
-    ]);
+    this.deps.commit(
+      [
+        {
+          op: "setColumn",
+          sheet: this.deps.activeSheet(),
+          col,
+          // measureText ran under the zoomed font; persist base units.
+          patch: { width: Math.max(MIN_COLUMN_WIDTH, Math.round(width / this.deps.zoom())) },
+        },
+      ],
+      "structure",
+    );
   }
 
   private measureText(text: string): number {
@@ -685,7 +700,7 @@ export class InputController {
         });
       }
     }
-    this.deps.commit(patches);
+    this.deps.commit(patches, "fill");
   }
 
   private seriesForColumn(source: SelRect, col: number): FillSeries {

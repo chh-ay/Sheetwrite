@@ -696,3 +696,60 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     store.dispose();
   });
 });
+
+describe("ChangeEvent.commitReason", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  function reasonsOf(grid: GridImpl): string[] {
+    const reasons: string[] = [];
+    grid.on("change", (event) => reasons.push(event.commitReason));
+    return reasons;
+  }
+
+  it("classifies editor commits by gesture: Enter vs blur", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const reasons = reasonsOf(grid);
+
+    grid.beginEdit(0, 0);
+    let editor = expectEditor(host);
+    editor.value = "by enter";
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    grid.beginEdit(1, 0);
+    editor = expectEditor(host);
+    editor.value = "by blur";
+    editor.dispatchEvent(new FocusEvent("blur"));
+
+    expect(reasons).toEqual(["edit-enter", "edit-blur"]);
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("classifies undo and public applyTransaction", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const reasons = reasonsOf(grid);
+    const addr = { sheet: "s1", row: 0, col: 0 };
+
+    // Grid-level transaction → "api"; store-level directly → "api" default.
+    grid.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "x" } }],
+    });
+    grid.store.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "y" } }],
+    });
+    grid.undo();
+    grid.redo();
+
+    expect(reasons).toEqual(["api", "api", "undo", "redo"]);
+    grid.destroy();
+    store.dispose();
+  });
+});

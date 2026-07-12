@@ -104,6 +104,17 @@ async function submitChange(event: ChangeEvent): Promise<void> {
 The same handler shape applies to Vue's `@change` emit and Svelte's `onChange`
 prop.
 
+Every `ChangeEvent` carries `commitReason` — the gesture/operation that
+produced the commit: `"edit-blur" | "edit-enter" | "edit-tab" |
+"edit-programmatic" | "paste" | "cut" | "clear" | "fill" | "structure" |
+"style" | "replace" | "undo" | "redo" | "api"`. Switch on it with a default
+branch (the union grows with new mutation features):
+
+```ts
+if (event.commitReason === "paste") debouncedSubmit(event);
+else submitChange(event);
+```
+
 Current integration limits:
 
 - Sheetwrite does not ship a backend sync client, retry queue, validation layer,
@@ -112,9 +123,6 @@ Current integration limits:
 - `markClean` removes the confirmed patch objects from the dirty list. Pass the
   patch objects from `event.transaction.patches` or `grid.store.getDirty()`;
   do not reconstruct equivalent-looking objects.
-- `change` events do not currently identify the input gesture that caused the
-  commit. If an app must submit only blur-caused commits, the core event model
-  needs a future `commitReason` field such as `"blur" | "enter" | "tab" | "paste"`.
 
 
 ## Headless integration

@@ -184,6 +184,8 @@ describe("pointer input: touch policy", () => {
   it("touch drag on the fill handle captures, previews, and commits the fill", () => {
     const { grid, store, scroller, workbook, capture } = makeGrid();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    const reasons: string[] = [];
+    grid.on("change", (event) => reasons.push(event.commitReason));
 
     const handle = fillHandlePoint(0, 1, workbook);
     const down = pointer("pointerdown", { ...handle, pointerType: "touch" });
@@ -203,6 +205,7 @@ describe("pointer input: touch policy", () => {
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(source);
     expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(source);
     expect(capture.released).toEqual([1]);
+    expect(reasons).toEqual(["fill"]);
   });
 });
 

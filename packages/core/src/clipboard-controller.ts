@@ -13,6 +13,7 @@ import type {
   CellStyle,
   CellValue,
   ClipboardOutcome,
+  CommitReason,
   Patch,
   Sheet,
   SheetId,
@@ -28,7 +29,7 @@ export interface ClipboardControllerDeps {
   readOnly: () => boolean;
   mergeAnchorAt: (row: number, col: number) => SelRect | null;
   toDataRow: (viewRow: number) => number;
-  commit: (patches: Patch[]) => void;
+  commit: (patches: Patch[], reason: CommitReason) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -98,7 +99,7 @@ export class ClipboardController {
     if (this.deps.readOnly()) return "done";
 
     this.snapshot = snapshot;
-    this.deps.commit(snapshot.clearPatches);
+    this.deps.commit(snapshot.clearPatches, "cut");
     return "done";
   }
 
@@ -223,7 +224,7 @@ export class ClipboardController {
         });
       }
     }
-    this.deps.commit(patches);
+    this.deps.commit(patches, "paste");
   }
 
   /**

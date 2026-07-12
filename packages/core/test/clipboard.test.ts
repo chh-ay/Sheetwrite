@@ -90,6 +90,8 @@ interface Harness {
   controller: ClipboardController;
   store: FakeStore;
   selection: SelectionModel;
+  /** CommitReasons the controller passed to `deps.commit`, in order. */
+  commitReasons: string[];
   select: (row: number, col: number) => void;
   setSystemClipboard: (text: string) => void;
   setReadOnly: (value: boolean) => void;
@@ -113,6 +115,7 @@ function makeHarness(): Harness {
   const selection = new SelectionModel(100, 0, 2);
   let readOnly = false;
 
+  const commitReasons: string[] = [];
   const controller = new ClipboardController({
     store: store as unknown as Store,
     selection: () => selection,
@@ -122,13 +125,17 @@ function makeHarness(): Harness {
     readOnly: () => readOnly,
     mergeAnchorAt: () => null,
     toDataRow: (viewRow) => viewRow,
-    commit: (patches) => store.apply(patches),
+    commit: (patches, reason) => {
+      commitReasons.push(reason);
+      store.apply(patches);
+    },
   });
 
   return {
     controller,
     store,
     selection,
+    commitReasons,
     select: (row, col) => selection.selectCell(row, col),
     setReadOnly: (value) => {
       readOnly = value;
@@ -171,6 +178,8 @@ describe("ClipboardController", () => {
 
     // Cut-paste does NOT shift refs (Sheets shifts on copy, not cut).
     expect(h.store.getFormula({ sheet: "s1", row: 3, col: 1 })).toBe("=A1+B$2");
+    // Cut-clear committed as "cut"; the paste block as "paste".
+    expect(h.commitReasons).toEqual(["cut", "paste"]);
   });
 
   it("keeps the source intact when the clipboard rejects a cut", async () => {
@@ -344,6 +353,7 @@ describe("ClipboardController", () => {
     h.select(3, 1);
     await expect(h.controller.paste()).resolves.toBe("done");
     expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBe("hello");
+    expect(h.commitReasons).toEqual(["paste"]);
   });
 
   it("resolves 'unsupported' when the navigator global itself is absent (SSR)", async () => {

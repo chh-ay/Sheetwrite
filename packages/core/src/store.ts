@@ -11,6 +11,7 @@ import type {
   Column,
   ColumnarData,
   ColumnFilter,
+  CommitReason,
   ConditionalFormatRule,
   Patch,
   ResolvedCell,
@@ -873,7 +874,11 @@ export class SheetwriteStore implements Store {
     return this.viewOrder.has(sheet);
   }
 
-  applyTransaction(tx: Transaction): void {
+  /**
+   * Public `Store` shape takes one argument (reason defaults to `"api"`);
+   * internal producers thread their {@link CommitReason} via the second.
+   */
+  applyTransaction(tx: Transaction, commitReason: CommitReason = "api"): void {
     // Non-reentrant barrier: a stale epoch is rejected outright (the app
     // rebases on the change stream and resubmits).
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) return;
@@ -928,6 +933,7 @@ export class SheetwriteStore implements Store {
       transaction,
       changes: changes ?? [],
       dirty: [...this.dirty],
+      commitReason,
       epoch: this.epoch,
     };
     for (const fn of this.listeners) fn(event);
