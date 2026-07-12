@@ -952,3 +952,94 @@ fn structural_edits_interleaved_with_queries_stay_consistent() {
     store.remove_rows(sheet, 0, rows);
     assert_eq!(store.get_window(sheet, 0, 10, &[0]).n_rows(), 0);
 }
+
+#[test]
+fn bulk_column_load_recomputes_same_and_cross_sheet_formulas() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(2, 3);
+    let dependent = store.add_sheet(2, 3);
+    store.set_sheet_name(source, "source", "Source");
+    store.set_sheet_name(dependent, "dependent", "Dependent");
+    store.set_number(source, 0, 0, 2.0, 0);
+    store.set_formula(source, 0, 1, "=A1*2", 0);
+    store.set_formula(dependent, 0, 0, "=Source!A1+1", 0);
+    store.set_formula(dependent, 0, 1, "=SUM(Source!A1:A3)", 0);
+    store.recompute(source);
+    store.recompute(dependent);
+    assert_close(number(&store, source, 0, 1), 4.0);
+    assert_close(number(&store, dependent, 0, 0), 3.0);
+
+    store.set_column_numbers(source, 0, 0, &[10.0, 20.0, 30.0], 0);
+    store.recompute(source);
+
+    assert_close(number(&store, source, 0, 1), 20.0);
+    assert_close(number(&store, dependent, 0, 0), 11.0);
+    assert_close(number(&store, dependent, 0, 1), 60.0);
+}
+
+#[test]
+fn nan_box_canonicalizes_hostile_string_tag_patterns() {
+    let hostile = [
+        0xFFFC_0000_0000_0000,
+        0xFFFC_0000_0000_0001,
+        0xFFFC_0000_FFFF_FFFE,
+        0xFFFC_FFFF_1234_5678,
+    ];
+    let mut sheet = SheetData::new(1, hostile.len());
+    for (row, bits) in hostile.into_iter().enumerate() {
+        let value = f64::from_bits(bits);
+        assert!(value.is_nan());
+        put_number(&mut sheet, row, 0, value);
+        let index = sheet.idx(row, 0);
+        assert_eq!(sheet.payload[index], encode_num(f64::NAN));
+        assert!(!payload_is_str(sheet.payload[index]));
+        assert_eq!(sheet.str_id_at(index), NO_STRING);
+        assert!(sheet.num_at(index).is_nan());
+    }
+}
+
+#[test]
+fn malformed_query_and_window_inputs_fail_closed_without_panicking() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 3);
+    store.set_number(sheet, 0, 0, 1.0, 0);
+    store.set_string(sheet, 1, 0, "x", 0);
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        assert_eq!(store.get_window(sheet, 2, 1, &[0]).n_rows(), 0);
+        assert_eq!(
+            store
+                .get_window(sheet, 0, usize::MAX, &[0, u32::MAX])
+                .n_rows(),
+            3
+        );
+        let explicit = store.get_window_rows(sheet, &[0, u32::MAX, 2], &[0, u32::MAX]);
+        assert_eq!(explicit.n_rows(), 3);
+        assert_eq!(explicit.n_cols(), 2);
+
+        assert!(store.sort_rows_multi(99, &[0], &[1], &[]).is_empty());
+        assert!(store
+            .sort_rows_multi(sheet, &[u32::MAX], &[1], &[])
+            .is_empty());
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[], &[], &[2, u32::MAX]),
+            vec![2, u32::MAX]
+        );
+        assert!(store
+            .filter_rows_multi(sheet, &[0], &[], &[], &[], &[], &[], &[], Vec::new())
+            .is_empty());
+        assert!(store
+            .filter_rows_multi(99, &[], &[], &[], &[], &[], &[], &[], Vec::new())
+            .is_empty());
+
+        let mut distinct = store.distinct_values(99, 0, usize::MAX);
+        assert!(distinct.take_kinds().is_empty());
+        let mut bad_col = store.distinct_values(sheet, usize::MAX, 0);
+        assert!(bad_col.take_kinds().is_empty());
+        assert_eq!(store.data_edge_ordered(99, &[], 0, 0, 1, 0), 0);
+        assert_eq!(store.data_edge_ordered(sheet, &[u32::MAX], 0, 0, 1, 0), 0);
+        assert_eq!(store.data_edge_ordered(sheet, &[0], usize::MAX, 0, 1, 0), 0);
+    }));
+
+    assert!(result.is_ok());
+}
