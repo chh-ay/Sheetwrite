@@ -1,0 +1,376 @@
+---
+import Nav from "../components/Nav.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sheetwrite — Google-Sheets-style workbook demo (100k rows)</title>
+  </head>
+  <body>
+    <Nav active="vanilla" />
+
+    <!-- Title + menu -->
+    <div class="gs-title">
+      <div class="gs-logo" aria-hidden="true">⊞</div>
+      <div class="gs-titlewrap">
+        <div class="gs-docname">Sales workbook — Sheetwrite</div>
+        <nav class="gs-menu">
+          <span>File</span><span>Edit</span><span>View</span><span>Insert</span>
+          <span>Format</span><span>Data</span><span>Tools</span><span>Help</span>
+        </nav>
+      </div>
+      <button class="gs-share" type="button">🔒 Share</button>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="gs-toolbar">
+      <button id="t-undo" type="button" title="Undo (Ctrl+Z)">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path
+            d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
+          ></path></svg
+        >
+      </button>
+      <button id="t-redo" type="button" title="Redo (Ctrl+Shift+Z)">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path
+            d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"
+          ></path></svg
+        >
+      </button>
+      <span class="gs-div"></span>
+      <button class="gs-zoom" type="button" title="Zoom">100%</button>
+      <span class="gs-div"></span>
+      <button id="t-bold" class="b" type="button" title="Bold (Ctrl+B)">B</button>
+      <button id="t-italic" class="i" type="button" title="Italic (Ctrl+I)">I</button>
+      <span class="gs-color" title="Text color">
+        <span class="glyph">A</span>
+        <span class="bar" id="t-textcolor-bar" style="background:#1a73e8"></span>
+        <input id="t-textcolor" type="color" value="#1a73e8" aria-label="Text color" />
+      </span>
+      <span class="gs-color" title="Fill color">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path
+            d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21z"
+          ></path></svg
+        >
+        <span class="bar" id="t-fillcolor-bar" style="background:#fff7e0"></span>
+        <input id="t-fillcolor" type="color" value="#fff7e0" aria-label="Fill color" />
+      </span>
+      <span class="gs-div"></span>
+      <button id="t-border" type="button" title="Borders">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path
+            d="M3 3v18h18V3H3zm8 16H5v-6h6v6zm0-8H5V5h6v6zm8 8h-6v-6h6v6zm0-8h-6V5h6v6z"
+          ></path></svg
+        >
+      </button>
+      <button id="t-merge" type="button" title="Merge cells">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path
+            d="M3 3v18h18V3H3zm16 16H5V5h14v14zM7.5 12l2.5-2.5v1.8h4V9.5L16.5 12 14 14.5v-1.8h-4v1.8z"
+          ></path></svg
+        >
+      </button>
+      <span class="gs-div"></span>
+      <button id="t-alignl" type="button" title="Align left">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path d="M3 5h18v2H3V5zm0 4h12v2H3V9zm0 4h18v2H3v-2zm0 4h12v2H3v-2z"></path></svg
+        >
+      </button>
+      <button id="t-alignc" type="button" title="Align center">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path d="M3 5h18v2H3V5zm3 4h12v2H6V9zm-3 4h18v2H3v-2zm3 4h12v2H6v-2z"></path></svg
+        >
+      </button>
+      <button id="t-alignr" type="button" title="Align right">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path d="M3 5h18v2H3V5zm6 4h12v2H9V9zm-6 4h18v2H3v-2zm6 4h12v2H9v-2z"></path></svg
+        >
+      </button>
+      <span class="gs-div"></span>
+      <button id="t-sort" type="button" title="Sort sheet by column (A→Z)">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"></path></svg
+        >
+      </button>
+      <button id="t-export" type="button" title="Download as CSV">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg
+        >
+      </button>
+      <button id="t-import" type="button" title="Import CSV">
+        <svg aria-hidden="true" viewBox="0 0 24 24"
+          ><path d="M5 15h4v6h6v-6h4l-7-7-7 7zM5 6V4h14v2H5z"></path></svg
+        >
+      </button>
+      <input id="csvfile" type="file" accept=".csv" hidden />
+    </div>
+
+    <!-- Formula bar -->
+    <div class="gs-formula">
+      <input
+        id="namebox"
+        class="gs-namebox"
+        value="A1"
+        aria-label="Name box"
+        title="Name box — type a cell (e.g. C12) and press Enter"
+      />
+      <span class="gs-fx">fx</span>
+      <input id="formula" class="gs-input" aria-label="Formula bar" placeholder="" />
+    </div>
+
+    <!-- Grid -->
+    <div id="app"></div>
+
+    <!-- Bottom bar: selection stats (sheet tabs live inside the grid). -->
+    <div class="gs-bottom">
+      <div class="gs-status" id="status"></div>
+    </div>
+
+    <script>
+      import "../lib/vanilla";
+    </script>
+
+    <style is:global>
+      :root {
+        --gs-blue: #1a73e8;
+        --gs-green: #188038;
+        --gs-text: #202124;
+        --gs-muted: #5f6368;
+        --gs-border: #dadce0;
+        --gs-hover: #f1f3f4;
+        --gs-bar: #ffffff;
+        --gs-toolbar: #edf2fa;
+        --gs-chip: #e8f0fe;
+        --gs-font: "Roboto", Arial, "Helvetica Neue", sans-serif;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: var(--gs-font);
+        color: var(--gs-text);
+        background: #f9fbfd;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* ── Title row ─────────────────────────────────────────────── */
+      .gs-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 12px;
+        background: var(--gs-bar);
+      }
+      .gs-logo {
+        width: 30px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 15px;
+        background: var(--gs-green);
+        border-radius: 4px;
+      }
+      .gs-titlewrap {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.25;
+        flex: 1;
+        min-width: 0;
+      }
+      .gs-docname {
+        font-size: 18px;
+        font-weight: 400;
+      }
+      .gs-menu {
+        display: flex;
+        gap: 2px;
+        font-size: 13px;
+        color: var(--gs-muted);
+      }
+      .gs-menu span {
+        padding: 1px 7px;
+        border-radius: 4px;
+        cursor: default;
+      }
+      .gs-menu span:hover {
+        background: var(--gs-hover);
+      }
+      .gs-share {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 36px;
+        padding: 0 18px 0 16px;
+        border: none;
+        border-radius: 18px;
+        background: #c2e7ff;
+        color: #001d35;
+        font: 500 14px var(--gs-font);
+        cursor: pointer;
+      }
+      .gs-share:hover {
+        box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3);
+      }
+
+      /* ── Toolbar row ───────────────────────────────────────────── */
+      .gs-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin: 2px 12px 6px;
+        padding: 3px 8px;
+        background: var(--gs-toolbar);
+        border-radius: 20px;
+      }
+      .gs-toolbar button {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: #444746;
+        cursor: pointer;
+        font: 500 14px var(--gs-font);
+        padding: 0;
+      }
+      .gs-toolbar button:hover {
+        background: #e1e8f2;
+      }
+      .gs-toolbar button svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      .gs-toolbar .b {
+        font-weight: 700;
+      }
+      .gs-toolbar .i {
+        font-style: italic;
+        font-family: Georgia, serif;
+      }
+      .gs-div {
+        width: 1px;
+        height: 20px;
+        margin: 0 6px;
+        background: #c7cdd6;
+      }
+      .gs-toolbar button.gs-zoom {
+        width: auto;
+        padding: 0 8px;
+        font-size: 13px;
+      }
+      .gs-color {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .gs-color:hover {
+        background: #e1e8f2;
+      }
+      .gs-toolbar .gs-color svg {
+        width: 18px;
+        height: 18px;
+        fill: #444746;
+      }
+      .gs-color input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .gs-color .glyph {
+        font-weight: 700;
+        font-size: 14px;
+        line-height: 1;
+        color: #444746;
+      }
+      .gs-color .bar {
+        position: absolute;
+        bottom: 4px;
+        width: 16px;
+        height: 3px;
+        border-radius: 1px;
+      }
+
+      /* ── Formula bar ───────────────────────────────────────────── */
+      .gs-formula {
+        display: flex;
+        align-items: center;
+        height: 30px;
+        border-top: 1px solid var(--gs-border);
+        border-bottom: 1px solid var(--gs-border);
+        background: var(--gs-bar);
+      }
+      .gs-namebox {
+        width: 96px;
+        height: 100%;
+        border: none;
+        border-right: 1px solid var(--gs-border);
+        text-align: center;
+        font: 500 13px var(--gs-font);
+        color: var(--gs-text);
+        outline: none;
+      }
+      .gs-fx {
+        padding: 0 14px 0 12px;
+        color: var(--gs-muted);
+        font: italic 14px Georgia, serif;
+      }
+      .gs-input {
+        flex: 1;
+        height: 100%;
+        border: none;
+        outline: none;
+        font: 13px var(--gs-font);
+        color: var(--gs-text);
+      }
+
+      /* ── Grid ──────────────────────────────────────────────────── */
+      #app {
+        flex: 1;
+        min-height: 0;
+        background: #fff;
+      }
+
+      /* ── Bottom bar ────────────────────────────────────────────── */
+      .gs-bottom {
+        display: flex;
+        align-items: center;
+        height: 37px;
+        padding: 0 8px;
+        background: var(--gs-bar);
+        border-top: 1px solid var(--gs-border);
+        font-size: 13px;
+        color: var(--gs-muted);
+      }
+      .gs-status {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+        padding: 0 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .gs-status b {
+        font-weight: 500;
+        color: var(--gs-text);
+      }
+    </style>
+  </body>
+</html>

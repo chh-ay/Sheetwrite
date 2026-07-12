@@ -1,0 +1,106 @@
+---
+import Nav from "../components/Nav.astro";
+import ReactWorkbook from "../components/ReactWorkbook";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sheetwrite — React analytics workbook</title>
+  </head>
+  <body>
+    <Nav active="react" />
+    <header>
+      <strong>Sheetwrite</strong> — React analytics workbook.
+      <p>
+        100,000 rows bulk-loaded into the Rust/WASM columnar store. Search, multi-key sort, typed
+        column filters, and the footer Sum/Avg are single Rust scans over the full dataset; Amount
+        uses an Excel-style <code>$#,##0.00</code> format with conditional highlighting, the ID
+        column is frozen, and CSV/XLSX export round-trips the visible view. Formulas and
+        cross-sheet references: see the vanilla and Svelte examples.
+        <br />
+        APIs exercised: worker renderer, <code>rendererKind()</code>, <code>renderer-fallback</code>,
+        live <code>overscan</code>, <code>onScroll</code>, <code>onEditBegin</code>, and
+        <code>onEditCommit</code>.
+      </p>
+    </header>
+    <div id="app">
+      <ReactWorkbook client:only="react" />
+    </div>
+
+    <style is:global>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 8px 12px;
+        border-bottom: 1px solid #e5e5e5;
+        font: 13px/1.4 system-ui, sans-serif;
+      }
+      header p {
+        margin: 2px 0 0;
+        opacity: 0.75;
+      }
+      #app {
+        flex: 1;
+        min-height: 0;
+      }
+      #app > astro-island,
+      #app > astro-island > .example-shell,
+      #app > .example-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .example-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.45rem 0.75rem;
+        border-bottom: 1px solid #d1d5db;
+        background: #f8fafc;
+        color: #1f2937;
+        font: 13px/1.4 system-ui, sans-serif;
+      }
+      .example-footer {
+        border-bottom: none;
+        border-top: 1px solid #d1d5db;
+      }
+      [data-theme="dark"] .example-controls {
+        border-color: #374151;
+        background: #1f2937;
+        color: #f9fafb;
+      }
+      .example-controls button,
+      .example-controls select,
+      .example-controls input[type="search"] {
+        padding: 0.25rem 0.5rem;
+        font: inherit;
+      }
+      .example-controls button[aria-pressed="true"] {
+        outline: 2px solid #2563eb;
+      }
+      .example-controls output {
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .example-divider {
+        flex: 1;
+      }
+      .example-grid {
+        flex: 1;
+        min-height: 0;
+      }
+    </style>
+  </body>
+</html>

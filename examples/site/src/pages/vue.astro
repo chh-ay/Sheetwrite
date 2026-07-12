@@ -1,0 +1,144 @@
+---
+import Nav from "../components/Nav.astro";
+import VueConsole from "../components/VueConsole";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sheetwrite — Vue streaming console</title>
+  </head>
+  <body>
+    <Nav active="vue" />
+    <header>
+      <strong>Sheetwrite</strong> — Vue streaming console.
+      <p>
+        1,000,000 virtual rows behind a paged <code>DataSource</code> with simulated network latency
+        — scroll fast and watch placeholder pages resolve. The right panel is the live event
+        pipeline (<code>scroll</code>, <code>edit-begin</code>, <code>edit-commit</code>,
+        <code>change</code>); committed edits queue in the store's dirty list until you acknowledge
+        them like a server (<code>getDirty</code> / <code>markClean</code>).
+        <br />
+        APIs exercised: <code>DataSource</code>, <code>grid.search()</code>,
+        <code>grid.findNext()</code>, <code>grid.findPrev()</code>, <code>search</code> emit,
+        <code>grid.setActiveSheet()</code>, and <code>active-sheet</code> emit.
+      </p>
+    </header>
+    <div id="app">
+      <VueConsole client:only="vue" />
+    </div>
+
+    <style is:global>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 8px 12px;
+        border-bottom: 1px solid #e5e5e5;
+        font: 13px/1.4 system-ui, sans-serif;
+      }
+      header p {
+        margin: 2px 0 0;
+        opacity: 0.75;
+      }
+      #app {
+        flex: 1;
+        min-height: 0;
+      }
+      #app > astro-island,
+      #app > astro-island > .example-shell,
+      #app > .example-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .example-body {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 300px;
+      }
+      .example-grid {
+        min-width: 0;
+        min-height: 0;
+      }
+      .example-log {
+        border-left: 1px solid #d1d5db;
+        padding: 10px 12px;
+        overflow-y: auto;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: #f8fafc;
+        color: #1f2937;
+      }
+      .example-log h2 {
+        margin: 0 0 4px;
+        font: 600 13px/1.3 system-ui, sans-serif;
+      }
+      .example-hint {
+        font: 12px/1.4 system-ui, sans-serif;
+        opacity: 0.75;
+      }
+      .example-sync {
+        display: block;
+        margin: 6px 0;
+        font-weight: 600;
+      }
+      .example-log button {
+        font: inherit;
+        padding: 0.25rem 0.5rem;
+      }
+      .example-log ul {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+        white-space: nowrap;
+      }
+      .example-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.45rem 0.75rem;
+        border-top: 1px solid #d1d5db;
+        background: #f8fafc;
+        color: #1f2937;
+        font: 13px/1.4 system-ui, sans-serif;
+      }
+      [data-theme="dark"] .example-controls,
+      [data-theme="dark"] .example-log {
+        border-color: #374151;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      .example-controls button {
+        padding: 0.25rem 0.5rem;
+        font: inherit;
+      }
+      .example-controls button[aria-pressed="true"] {
+        outline: 2px solid #0ea5e9;
+      }
+      .example-controls input {
+        box-sizing: border-box;
+        max-width: 10rem;
+        padding: 0.25rem 0.4rem;
+        font: inherit;
+      }
+      .example-controls output {
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .example-divider {
+        flex: 1;
+      }
+    </style>
+  </body>
+</html>

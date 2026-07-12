@@ -1,0 +1,110 @@
+---
+import Nav from "../components/Nav.astro";
+
+const cards = [
+  {
+    slug: "vanilla",
+    name: "Vanilla — Google-Sheets-style workbook",
+    body: "A full Sheets clone over the headless imperative API: custom toolbar bound to grid.actions, formula bar and name box, 100k rows, cross-sheet formulas, frozen panes, zoom, CSV import/export.",
+  },
+  {
+    slug: "theming",
+    name: "Theming — renderers & style lab",
+    body: "Runtime theme switching (light/dark/brand), a custom badge cell renderer, and store-backed per-cell fills.",
+  },
+  {
+    slug: "react",
+    name: "React — analytics workbook",
+    body: "100,000 eager rows in the Rust store. Search with live match counts, typed column filters, multi-key sort, whole-column Sum/Avg aggregates, currency formats, conditional highlighting, XLSX export.",
+  },
+  {
+    slug: "vue",
+    name: "Vue — streaming sync console",
+    body: "1,000,000 virtual rows behind a latency-simulated paged datasource, a live grid-event pipeline, and the getDirty/markClean server-acknowledgement flow.",
+  },
+  {
+    slug: "svelte",
+    name: "Svelte — formula workbook + shell",
+    body: "500 =SUM row formulas plus cross-sheet Summary aggregates, edited through the composable @sheetwrite/core/shell pieces. Insert/delete rows and watch every reference rewrite.",
+  },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sheetwrite — examples</title>
+  </head>
+  <body>
+    <Nav active="" />
+    <main>
+      <h1>Sheetwrite examples</h1>
+      <p>
+        One site, five demos. Each page exercises a different slice of the engine — pick a tab
+        above or a card below.
+      </p>
+      <div class="cards">
+        {
+          cards.map((card) => (
+            <a href={`/${card.slug}/`}>
+              <h2>{card.name}</h2>
+              <p>{card.body}</p>
+            </a>
+          ))
+        }
+      </div>
+    </main>
+
+    <style is:global>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font: 14px/1.5 system-ui, sans-serif;
+        color: #1f2430;
+        background: #f8fafc;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 24px 16px;
+      }
+      h1 {
+        margin: 0 0 4px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .cards a {
+        display: block;
+        padding: 14px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #fff;
+        color: inherit;
+        text-decoration: none;
+      }
+      .cards a:hover {
+        border-color: #0ea5e9;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+      }
+      .cards h2 {
+        margin: 0 0 6px;
+        font-size: 15px;
+      }
+      .cards p {
+        margin: 0;
+        opacity: 0.8;
+      }
+    </style>
+  </body>
+</html>
