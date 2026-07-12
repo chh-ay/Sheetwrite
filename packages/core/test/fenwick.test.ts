@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { OffsetIndex, ScaledScroll } from "../src/fenwick";
+import { OffsetIndex, ScaledScroll } from "../src/fenwick.js";
 
 describe("OffsetIndex", () => {
   it("maps rows to offsets and offsets to rows with uniform heights", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { OffsetIndex } from "../src/fenwick";
-import { computeWindow, windowContains } from "../src/virtualization";
+import { OffsetIndex } from "../src/fenwick.js";
+import { computeWindow, windowContains } from "../src/virtualization.js";
 
 describe("computeWindow", () => {
   const idx = new OffsetIndex(1000, 20);

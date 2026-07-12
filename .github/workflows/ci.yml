@@ -58,8 +58,15 @@ jobs:
         working-directory: packages/wasm
         run: cargo test
 
+      - name: Audit Rust dependencies
+        working-directory: packages/wasm
+        run: cargo install cargo-audit --version 0.22.2 --locked && cargo audit
+
       - name: Build packages
         run: bun run build
+
+      - name: Node ESM resolution check
+        run: bun run verify:node-esm
 
       - name: Typecheck
         run: bun run typecheck
@@ -69,6 +76,18 @@ jobs:
 
       - name: Test
         run: bun test
+
+      - name: Build examples site
+        run: bun run build:examples
+
+      - name: Packed consumer verification
+        run: bun run verify:packed
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Browser smoke tests
+        run: bun run test:browser
 
       - name: Changeset status
         run: bunx @changesets/cli status --since=origin/develop

@@ -1,8 +1,9 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid";
-import { SheetwriteStore } from "../src/store";
-import type { CellScalar, Store, Workbook } from "../src/types";
-import { makeColumnarData, makeWorkbook } from "./fixtures";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
+import { createGridController } from "../src/grid-controller.js";
+import { SheetwriteStore } from "../src/store.js";
+import type { CellScalar, RowData, Store, Workbook } from "../src/types.js";
+import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 // jsdom has no 2D canvas context, so record draw calls against a stub.
 interface RecordingCtx {
@@ -59,6 +60,7 @@ function makeFakeStore(
       throw new Error("Store.getCell must not be called in the render hot path");
     },
     getFormula: () => null,
+    getRefTarget: () => null,
     getVisibleWindow: (sheet, rows, cols) => {
       hooks.onWindow?.();
       const n = Math.max(0, (rows.end - rows.start) * cols.length);
@@ -70,6 +72,7 @@ function makeFakeStore(
     on: () => () => {},
     getDirty: () => [],
     markClean: () => {},
+    viewRowCount: (sheet) => workbook.sheets.find((s) => s.id === sheet)?.rowCount ?? 0,
   };
 }
 
@@ -446,5 +449,212 @@ describe("Grid editing (Layer 3)", () => {
     expect(store.getCell(addr).resolved).toBe(20);
 
     grid.destroy();
+  });
+  it("applies arbitrary patches as one undoable Grid transaction", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const first = { sheet: "s1", row: 0, col: 0 };
+    const second = { sheet: "s1", row: 1, col: 1 };
+    const events: number[] = [];
+    grid.on("change", (event) => events.push(event.transaction.patches.length));
+
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: first, value: { kind: "literal", value: "Batch" } },
+        { op: "set", addr: second, value: { kind: "literal", value: 99 } },
+      ],
+    });
+
+    expect(events).toEqual([2]);
+    expect(store.getCell(first).resolved).toBe("Batch");
+    expect(store.getCell(second).resolved).toBe(99);
+
+    grid.undo();
+    expect(store.getCell(first).resolved).toBe("Customer 0");
+    expect(store.getCell(second).resolved).toBe(10.5);
+
+    grid.redo();
+    expect(store.getCell(first).resolved).toBe("Batch");
+    expect(store.getCell(second).resolved).toBe(99);
+
+    grid.destroy();
+  });
+
+  it("updates read-only and config without clearing selection or history", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const addr = { sheet: "s1", row: 2, col: 0 };
+    const selection = { kind: "cell" as const, addr };
+
+    grid.setSelection(selection);
+    grid.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "Editable" } }],
+    });
+    grid.setConfig({ toolbar: false, contextMenu: false, find: false, keyboard: false });
+
+    expect(grid.getSelection()).toEqual(selection);
+    expect(host.querySelector(".sheetwrite-find")).toBeNull();
+
+    grid.setReadOnly(true);
+    expect(host.getAttribute("aria-readonly")).toBe("true");
+    grid.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "Blocked" } }],
+    });
+    grid.undo();
+    expect(store.getCell(addr).resolved).toBe("Editable");
+
+    grid.setReadOnly(false);
+    expect(host.hasAttribute("aria-readonly")).toBe(false);
+    grid.undo();
+    expect(store.getCell(addr).resolved).toBe("Customer 2");
+    expect(grid.getSelection()).toEqual(selection);
+
+    grid.destroy();
+  });
+
+  it("skips chrome rebuild for a shallowly-equal config object", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
+
+    const before = host.querySelector(".sheetwrite-toolbar");
+    expect(before).not.toBeNull();
+
+    // A fresh-but-identical object (declarative host re-render) is a no-op.
+    grid.setConfig({ toolbar: true });
+    expect(host.querySelector(".sheetwrite-toolbar")).toBe(before);
+
+    // A materially different config still rebuilds.
+    grid.setConfig({ toolbar: false });
+    expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
+
+    grid.destroy();
+    store.dispose();
+  });
+  it("forwards every Grid event through the shared controller", () => {
+    const workbook = makeWorkbook(10);
+    const host = mountHost();
+    const received: string[] = [];
+    const controller = createGridController(
+      host,
+      { workbook, data: makeColumnarData(10) },
+      {
+        onReady: () => {
+          received.push("ready");
+        },
+        onChange: (event) => {
+          expect(event.transaction.patches).toHaveLength(1);
+          received.push("change");
+        },
+        onSelectionChange: (selection) => {
+          expect(selection?.kind).toBe("cell");
+          received.push("selection");
+        },
+        onScroll: (event) => {
+          expect(event.lastRow).toBeGreaterThanOrEqual(event.firstRow);
+          received.push("scroll");
+        },
+        onEditBegin: (event) => {
+          expect(event.addr).toEqual({ sheet: "s1", row: 0, col: 0 });
+          received.push("edit-begin");
+        },
+        onEditCommit: (event) => {
+          expect(event.value).toEqual({ kind: "literal", value: "Committed" });
+          received.push("edit-commit");
+        },
+        onSearch: (result) => {
+          expect(result.query).toBe("Committed");
+          received.push("search");
+        },
+      },
+    );
+    const addr = { sheet: "s1", row: 0, col: 0 };
+
+    controller.grid.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "Changed" } }],
+    });
+    controller.grid.setSelection({ kind: "cell", addr });
+    controller.grid.refresh();
+    controller.grid.beginEdit(0, 0);
+    const editor = expectEditor(host);
+    editor.value = "Committed";
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    controller.grid.search("Committed");
+
+    expect(received).toContain("ready");
+    expect(received).toContain("change");
+    expect(received).toContain("selection");
+    expect(received).toContain("scroll");
+    expect(received).toContain("edit-begin");
+    expect(received).toContain("edit-commit");
+    expect(received).toContain("search");
+
+    controller.destroy();
+  });
+});
+
+describe("Grid store lifecycle", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("disposes the store it constructed and leaves a fresh grid usable", () => {
+    const host = mountHost();
+    const disposeSpy = spyOn(SheetwriteStore.prototype, "dispose");
+
+    // No store injected: the grid constructs and owns its SheetwriteStore, so
+    // destroy() must free the underlying WASM CellStore.
+    const grid = new GridImpl(host, { workbook: makeWorkbook(20) });
+    grid.destroy();
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
+    disposeSpy.mockRestore();
+
+    // Each store owns an independent CellStore, so freeing one must not corrupt
+    // a brand-new grid/store built afterwards.
+    const host2 = mountHost();
+    const grid2 = new GridImpl(host2, { workbook: makeWorkbook(20) });
+    expect(() => grid2.store.getCell({ sheet: "s1", row: 0, col: 0 })).not.toThrow();
+    grid2.destroy();
+  });
+
+  it("does not dispose a caller-provided store on destroy", () => {
+    const workbook = makeWorkbook(20);
+    const store = new SheetwriteStore(workbook, makeColumnarData(20));
+    const host = mountHost();
+
+    // Store injected via the constructor: the caller owns it, so destroy() must
+    // leave it alone and fully usable.
+    const grid = new GridImpl(host, { workbook }, store);
+    const disposeSpy = spyOn(store, "dispose");
+    grid.destroy();
+
+    expect(disposeSpy).not.toHaveBeenCalled();
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
+
+    disposeSpy.mockRestore();
+    store.dispose();
+  });
+  it("ignores a pending datasource result after destroying an owned store", async () => {
+    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<RowData[]>();
+    const datasource = {
+      getRows: () => pending,
+    };
+    const loadRowsSpy = spyOn(SheetwriteStore.prototype, "loadRows");
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(20),
+      datasource,
+    });
+
+    grid.destroy();
+    resolveRows([{ name: "Too late" }]);
+    await pending;
+    await Promise.resolve();
+
+    expect(loadRowsSpy).not.toHaveBeenCalled();
+    loadRowsSpy.mockRestore();
   });
 });

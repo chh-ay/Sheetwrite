@@ -1,4 +1,5 @@
-import type { CellFormat, CellValue } from "./types";
+import { parseDateInput } from "./date-serial.js";
+import type { CellFormat, CellValue } from "./types.js";
 
 /**
  * Coerce raw text input into a {@link CellValue}, following spreadsheet
@@ -7,6 +8,10 @@ import type { CellFormat, CellValue } from "./types";
  * - blank (after trimming) clears the cell to a `null` literal;
  * - text longer than one character beginning with `=` becomes a formula;
  * - in a `number` column a finite numeric string becomes a number literal;
+ * - in a `date` column a recognized date string ({@link parseDateInput}) becomes
+ *   its serial-number literal;
+ * - in a `currency` column a currency string ({@link parseCurrencyInput}) becomes
+ *   a plain number literal;
  * - anything else is stored verbatim as a text literal (the untrimmed `raw`).
  *
  * Shared by the grid's inline editor and any host-built formula bar, so input
@@ -23,12 +28,48 @@ export function parseCellInput(raw: string, type: CellFormat): CellValue {
     return { kind: "formula", src: trimmed };
   }
 
-  if (type === "number") {
+  if (type === "number" || type === "currency") {
     const parsed = Number(trimmed);
     if (Number.isFinite(parsed)) {
       return { kind: "literal", value: parsed };
     }
   }
 
+  if (type === "date") {
+    const serial = parseDateInput(trimmed);
+    if (serial !== null) {
+      return { kind: "literal", value: serial };
+    }
+  }
+
+  if (type === "currency") {
+    const amount = parseCurrencyInput(trimmed);
+    if (amount !== null) {
+      return { kind: "literal", value: amount };
+    }
+  }
+
   return { kind: "literal", value: raw };
+}
+
+/**
+ * Parse a currency-formatted string into a plain number, or `null` when the
+ * remaining text is not numeric. Strips currency symbols (`$ € £ ¥ ¤`), thousands
+ * grouping (`,`), and whitespace, and reads accounting-style parentheses
+ * (`(1,234.50)`) as a negative amount. Grouping/decimals follow the US locale the
+ * renderer uses.
+ */
+export function parseCurrencyInput(raw: string): number | null {
+  let body = raw.replace(/[$€£¥¤,\s]/g, "");
+  if (body === "") return null;
+
+  let sign = 1;
+  if (body.startsWith("(") && body.endsWith(")")) {
+    sign = -1;
+    body = body.slice(1, -1);
+  }
+  if (body === "") return null;
+
+  const parsed = Number(body);
+  return Number.isFinite(parsed) ? sign * parsed : null;
 }

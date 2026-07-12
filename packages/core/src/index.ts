@@ -1,33 +1,76 @@
-export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1";
-export { CanvasRenderer } from "./canvas-renderer";
-export { parseCellInput } from "./cell-input";
+export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
+export { parseCellInput, parseCurrencyInput } from "./cell-input.js";
+export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
   downloadBytes,
   fromCsv,
+  fromXlsx,
   parseCsv,
   setXlsxBackend,
+  setXlsxImportBackend,
   toCsv,
   toTsv,
   toXlsx,
   type XlsxBackend,
-} from "./export";
-export { OffsetIndex, ScaledScroll } from "./fenwick";
-export { FindBar } from "./find-bar";
+  type XlsxImportBackend,
+} from "./export.js";
 export {
   createGrid,
   DEFAULT_THEME,
   initSheetwrite,
   resolveThemeFromCss,
-} from "./grid";
-export {
-  createGridController,
-  type GridController,
-  type GridControllerHandlers,
-} from "./grid-controller";
-export { formatNumber } from "./number-format";
-export { REF_CYCLE } from "./reference";
-export { SheetwriteStore } from "./store";
-export { StyleDictionary } from "./style-dictionary";
-export type * from "./types";
-export { computeWindow, windowContains } from "./virtualization";
-export { WorkerRenderer } from "./worker-renderer";
+} from "./grid.js";
+export { formatNumber } from "./number-format.js";
+export { REF_CYCLE } from "./reference.js";
+export { SheetwriteStore } from "./store.js";
+export type {
+  AggregateOp,
+  CellAddress,
+  CellAlign,
+  CellBorder,
+  CellBorders,
+  CellChange,
+  CellFormat,
+  CellInputSnapshot,
+  CellPaintContext,
+  CellRenderer,
+  CellScalar,
+  CellStyle,
+  CellValue,
+  ChangeEvent,
+  Column,
+  ColumnarData,
+  ColumnFilter,
+  ConditionalFormatPredicate,
+  ConditionalFormatRule,
+  ContextMenuActionName,
+  ContextMenuItem,
+  DataSource,
+  Grid,
+  GridActions,
+  GridConfig,
+  GridEvents,
+  GridOptions,
+  GridTransaction,
+  HighlightRange,
+  Patch,
+  Range,
+  ReplaceResult,
+  ResolvedCell,
+  RowData,
+  RowGroup,
+  SearchOptions,
+  SearchResult,
+  Selection,
+  Sheet,
+  SheetId,
+  SortKey,
+  Store,
+  Theme,
+  ToolbarActionName,
+  ToolbarIcon,
+  ToolbarItem,
+  Transaction,
+  VisibleWindowView,
+  Workbook,
+} from "./types.js";

@@ -40,7 +40,7 @@ mock.module("@sheetwrite/core/adapter", () => ({
 }));
 
 // The adapter is loaded after installing its package-boundary controller mock.
-const { SheetwriteGrid } = await import("../src/index");
+const { SheetwriteGrid } = await import("../src/index.js");
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 

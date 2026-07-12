@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "../src/a1";
+import { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "../src/a1.js";
 
 describe("A1 column labels", () => {
   it("converts indices to labels across the 26-wrap boundary", () => {

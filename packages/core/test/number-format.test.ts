@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { formatNumber } from "../src/number-format";
+import { formatNumber } from "../src/number-format.js";
 
 describe("formatNumber", () => {
   it("applies fixed decimals and thousands grouping", () => {
@@ -15,6 +15,27 @@ describe("formatNumber", () => {
 
   it("applies a literal currency prefix", () => {
     expect(formatNumber(1234.5, "$#,##0.00")).toBe("$1,234.50");
+  });
+
+  it("matches Intl rounding for grouped formats without using toFixed semantics", () => {
+    const cases: Array<{ value: number; code: string }> = [
+      { value: 1.005, code: "#,##0.00" },
+      { value: -1.005, code: "#,##0.00" },
+      { value: -0, code: "#,##0.00" },
+      { value: -0.004, code: "#,##0.00" },
+      { value: 999.995, code: "#,##0.00" },
+      { value: 1e21, code: "#,##0.00" },
+    ];
+
+    for (const { value, code } of cases) {
+      expect(formatNumber(value, code)).toBe(
+        new Intl.NumberFormat("en-US", {
+          useGrouping: true,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(value),
+      );
+    }
   });
 
   it("falls back to a locale default without a code, and blanks non-finite", () => {

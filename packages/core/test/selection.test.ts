@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { SelectionModel } from "../src/selection";
+import { SelectionModel } from "../src/selection.js";
 
 describe("SelectionModel", () => {
   it("reports a single cell", () => {

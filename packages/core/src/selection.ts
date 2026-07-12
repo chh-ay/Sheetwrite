@@ -1,4 +1,4 @@
-import type { Range, Selection, SheetId } from "./types";
+import type { Range, Selection, SheetId } from "./types.js";
 
 export interface CellRef {
   row: number;
@@ -38,12 +38,17 @@ export class SelectionModel {
   private regions: Region[] = [];
   private anchor: CellRef | null = null;
   private focus: CellRef | null = null;
+  private revision = 0;
 
   constructor(
     private rowCount: number,
     private firstCol: number,
     private lastCol: number,
   ) {}
+
+  get version(): number {
+    return this.revision;
+  }
 
   setBounds(rowCount: number, firstCol: number, lastCol: number): void {
     this.rowCount = rowCount;
@@ -55,6 +60,7 @@ export class SelectionModel {
     this.regions = [];
     this.anchor = null;
     this.focus = null;
+    this.revision += 1;
   }
 
   get isEmpty(): boolean {
@@ -71,6 +77,7 @@ export class SelectionModel {
     else this.regions = [region];
     this.anchor = { row, col };
     this.focus = { row, col };
+    this.revision += 1;
   }
 
   /** Extend the active region from the current anchor to (row, col). */
@@ -100,6 +107,7 @@ export class SelectionModel {
     } else {
       active.rect = norm(this.anchor, { row, col });
     }
+    this.revision += 1;
   }
 
   selectColumn(col: number, additive = false): void {
@@ -111,6 +119,7 @@ export class SelectionModel {
     else this.regions = [region];
     this.anchor = { row: 0, col };
     this.focus = { row: 0, col };
+    this.revision += 1;
   }
 
   selectRow(row: number, additive = false): void {
@@ -122,6 +131,7 @@ export class SelectionModel {
     else this.regions = [region];
     this.anchor = { row, col: this.firstCol };
     this.focus = { row, col: this.firstCol };
+    this.revision += 1;
   }
 
   set(selection: Selection | null): void {

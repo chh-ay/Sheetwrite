@@ -1,4 +1,4 @@
-import { neutralizeInjection } from "./clipboard";
+import { neutralizeInjection } from "./clipboard.js";
 import type {
   CellFormat,
   CellScalar,
@@ -8,7 +8,7 @@ import type {
   Sheet,
   Store,
   Workbook,
-} from "./types";
+} from "./types.js";
 
 function scalarToText(value: CellScalar): string {
   if (value === null) return "";
@@ -164,13 +164,13 @@ export function parseCsv(text: string): string[][] {
 /**
  * Coerce one raw CSV field into a `CellScalar` for a column of the given type.
  * A missing or empty field becomes `null`; a `number` column parses a finite
- * number (non-numeric text falls back to `null`); every other type keeps the
- * raw string.
+ * number/currency (non-numeric text falls back to `null`); every other type
+ * keeps the raw string.
  */
 function coerceField(raw: string | undefined, type: CellFormat): CellScalar {
   if (raw === undefined || raw === "") return null;
 
-  if (type === "number") {
+  if (type === "number" || type === "currency") {
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -241,4 +241,41 @@ export function toXlsx(workbook: Workbook, store: Store): Promise<Uint8Array> {
     throw new Error("Sheetwrite: no xlsx backend configured (import and register one first)");
   }
   return backend.toXlsx(workbook, store);
+}
+
+// ── xlsx import ──────────────────────────────────────────────────────────────
+
+/**
+ * Pluggable xlsx *import* backend — the symmetric counterpart to `XlsxBackend`.
+ * Parses raw `.xlsx` bytes into the same `ColumnarData` shape `fromCsv` returns,
+ * so host ingestion code can stay format-agnostic. Kept pluggable so a Rust xlsx
+ * reader can replace the default `read-excel-file` one without changing callers.
+ */
+export interface XlsxImportBackend {
+  name: string;
+  fromXlsx(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
+}
+
+let importBackend: XlsxImportBackend | null = null;
+
+export function setXlsxImportBackend(b: XlsxImportBackend): void {
+  importBackend = b;
+}
+
+/**
+ * Parse `.xlsx` bytes into `ColumnarData` — the format-agnostic import mirror of
+ * `fromCsv`, returning the exact same shape. The first parsed row is treated as
+ * the header and its cell text becomes each column's key; only the first sheet is
+ * read (v1). Numbers stay numbers, date cells map to the date-serial convention
+ * (see `date-serial.ts`), strings are verbatim, and empty cells become `null`.
+ * Requires a registered backend — `import "@sheetwrite/core/xlsx"` registers the
+ * default one.
+ */
+export function fromXlsx(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
+  if (!importBackend) {
+    throw new Error(
+      "Sheetwrite: no xlsx import backend configured (import and register one first)",
+    );
+  }
+  return importBackend.fromXlsx(data);
 }

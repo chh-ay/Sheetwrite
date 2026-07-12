@@ -1,4 +1,4 @@
-import { createGrid } from "./grid";
+import { createGrid } from "./grid.js";
 import type {
   ChangeEvent,
   Grid,
@@ -7,7 +7,7 @@ import type {
   GridOptions,
   Selection,
   Theme,
-} from "./types";
+} from "./types.js";
 
 /**
  * Event callbacks a host (a framework adapter, or any plain app) hangs off a

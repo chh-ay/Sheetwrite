@@ -1,9 +1,12 @@
-import { cellA1, rangeA1, shiftA1Refs } from "./a1";
-import type { EditController } from "./editor";
-import type { FindBar } from "./find-bar";
-import type { CellRef, SelectionModel, SelRect } from "./selection";
-import type { SheetwriteStore } from "./store";
-import type { CellAddress, CellValue, Patch, Sheet, SheetId, Store, Theme } from "./types";
+import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
+import type { EditController } from "./editor.js";
+import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
+import type { FindBar } from "./find-bar.js";
+import { formatNumber } from "./number-format.js";
+import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
+import type { CellRef, SelectionModel, SelRect } from "./selection.js";
+import type { SheetwriteStore } from "./store.js";
+import type { CellAddress, CellValue, Patch, Sheet, SheetId, Store, Theme } from "./types.js";
 
 const PRINTABLE = /^.$/u;
 
@@ -25,9 +28,40 @@ export interface InputControllerDeps {
   nextVisibleCol: (col: number, dir: 1 | -1) => number;
   colAtX: (contentX: number) => number;
   rowAtOffset: (contentY: number) => number;
+  /**
+   * Freeze-aware viewport→content mapping: coordinates inside a frozen band
+   * resolve without the scroll offset, body coordinates with it. All pointer
+   * hit-testing MUST go through these, never raw scroll math.
+   */
+  contentXAt: (viewportX: number) => number;
+  contentYAt: (viewportY: number) => number;
+  /** Content zoom: pointer deltas are screen px, persisted sizes base units. */
+  zoom: () => number;
   rowCount: () => number;
   contentTop: () => number;
   viewportH: () => number;
+  /** Left content-X of a visible column (for boundary hit-testing). */
+  colLeftOf: (col: number) => number;
+  /** Top content-Y and height of a row (for row-boundary hit-testing). */
+  rowTop: (row: number) => number;
+  rowHeight: (row: number) => number;
+  /** Current vertical render window, for event-driven autofit measurement. */
+  visibleRowWindow: () => { start: number; end: number };
+  /** Live column-resize preview: set the width and re-lay-out without committing. */
+  previewColumnWidth: (col: number, width: number) => void;
+  /** Apply a row height directly (sheet metadata; not a Patch, not undoable). */
+  setRowHeight: (row: number, height: number) => void;
+  /**
+   * Ctrl+Arrow data-edge target for the moved axis (row for vertical, col for
+   * horizontal), or null when unsupported (non-columnar store or an active
+   * sort/filter view) — callers then fall back to the sheet edge.
+   */
+  dataEdge: (row: number, col: number, dRow: number, dCol: number) => number | null;
+  /**
+   * Stock-keymap policy: `false` disables every built-in binding, a function
+   * intercepts first (returning true consumes the event). See GridConfig.keyboard.
+   */
+  keyboard: () => boolean | ((e: KeyboardEvent) => boolean);
   screenRect: (
     row: number,
     col: number,
@@ -46,6 +80,7 @@ export interface InputControllerDeps {
   copy: () => void;
   cut: () => void;
   paste: () => void;
+  pasteValues: () => void;
   commit: (patches: Patch[]) => void;
   readOnly: () => boolean;
 }
@@ -59,11 +94,14 @@ export class InputController {
   private fillTarget: SelRect | null = null;
   private dragMove: ((ev: MouseEvent) => void) | null = null;
   private dragUp: ((ev: MouseEvent) => void) | null = null;
+  /** Detached 2D context for autofit text measurement; lazily created. */
+  private measureCtx: CanvasRenderingContext2D | null = null;
 
   constructor(deps: InputControllerDeps) {
     this.deps = deps;
     deps.scroller.addEventListener("mousedown", this.onMouseDown);
     deps.scroller.addEventListener("dblclick", this.onDblClick);
+    deps.scroller.addEventListener("mousemove", this.onHover);
     deps.host.addEventListener("keydown", this.onKeyDown);
   }
 
@@ -77,12 +115,11 @@ export class InputController {
     const theme = this.deps.theme();
     if (py < theme.headerHeight) return null;
 
-    const contentTop = this.deps.contentTop();
-    const contentX = clientX - rect.left + this.deps.scroller.scrollLeft - theme.rowHeaderWidth;
-    const contentY = contentTop + (py - theme.headerHeight);
+    const contentX = this.deps.contentXAt(clientX - rect.left);
+    const contentY = this.deps.contentYAt(py);
 
-    const row = this.deps.rowAtOffset(contentY);
-    const col = this.deps.colAtX(contentX);
+    const row = this.deps.rowAtOffset(Math.max(0, contentY));
+    const col = this.deps.colAtX(Math.max(0, contentX));
     if (col === -1 || row < 0 || row >= this.deps.sheet().rowCount) return null;
 
     return this.deps.anchorCell(row, col);
@@ -102,6 +139,7 @@ export class InputController {
     this.detachDrag();
     this.deps.scroller.removeEventListener("mousedown", this.onMouseDown);
     this.deps.scroller.removeEventListener("dblclick", this.onDblClick);
+    this.deps.scroller.removeEventListener("mousemove", this.onHover);
     this.deps.host.removeEventListener("keydown", this.onKeyDown);
   }
 
@@ -140,11 +178,22 @@ export class InputController {
       }
     }
 
+    // Resize gesture: near a column boundary in the top header, or a row boundary
+    // in the left gutter. Takes priority over selection; disabled while editing.
+    if (!editor.isEditing && !this.deps.readOnly()) {
+      const resize = this.resizeAt(e);
+      if (resize) {
+        e.preventDefault();
+        if (resize.kind === "col") this.startColumnResize(resize.index, e.clientX);
+        else this.startRowResize(resize.index, e.clientY);
+        return;
+      }
+    }
+
     const additive = e.ctrlKey || e.metaKey;
     const theme = this.deps.theme();
     const py = e.clientY - viewportRect.top;
-    const contentX =
-      e.clientX - viewportRect.left + this.deps.scroller.scrollLeft - theme.rowHeaderWidth;
+    const contentX = this.deps.contentXAt(e.clientX - viewportRect.left);
 
     // header row → column selection
     if (py < theme.headerHeight) {
@@ -179,19 +228,166 @@ export class InputController {
   };
 
   private readonly onDblClick = (e: MouseEvent): void => {
+    // Double-click a column boundary → autofit that column.
+    const resize = this.deps.readOnly() ? null : this.resizeAt(e);
+    if (resize && resize.kind === "col") {
+      e.preventDefault();
+      this.autofitColumn(resize.index);
+      return;
+    }
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
     this.deps.beginEdit(cell.row, cell.col, undefined, true);
   };
 
+  private readonly onHover = (e: MouseEvent): void => {
+    const resize = this.deps.readOnly() ? null : this.resizeAt(e);
+    this.deps.scroller.style.cursor =
+      resize?.kind === "col" ? "col-resize" : resize?.kind === "row" ? "row-resize" : "";
+  };
+
+  private resizeAt(e: MouseEvent): { kind: "col" | "row"; index: number } | null {
+    const rect = this.deps.viewportEl.getBoundingClientRect();
+    const theme = this.deps.theme();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (y < theme.headerHeight && x >= theme.rowHeaderWidth) {
+      const contentX = this.deps.contentXAt(x);
+      const col = this.deps.colAtX(Math.max(0, contentX));
+      if (col === -1) return null;
+
+      const cols = this.deps.colIndices();
+      const pos = cols.indexOf(col);
+      const prev = pos > 0 ? (cols[pos - 1] ?? -1) : -1;
+      const start = this.deps.colLeftOf(col);
+      const width = (this.deps.sheet().columns[col]?.width ?? MIN_COLUMN_WIDTH) * this.deps.zoom();
+      const target = resizeTargetAt(contentX, col, start, width, prev);
+      return target === null ? null : { kind: "col", index: target };
+    }
+
+    if (x < theme.rowHeaderWidth && y >= theme.headerHeight) {
+      const contentY = this.deps.contentYAt(y);
+      const row = this.deps.rowAtOffset(Math.max(0, contentY));
+      if (row < 0 || row >= this.deps.rowCount()) return null;
+
+      const target = resizeTargetAt(
+        contentY,
+        row,
+        this.deps.rowTop(row),
+        this.deps.rowHeight(row),
+        row - 1,
+      );
+      return target === null ? null : { kind: "row", index: target };
+    }
+
+    return null;
+  }
+
+  private startColumnResize(col: number, startX: number): void {
+    const startWidth = this.deps.sheet().columns[col]?.width ?? MIN_COLUMN_WIDTH;
+    let finalWidth = startWidth;
+
+    const move = (ev: MouseEvent): void => {
+      // Pointer deltas are screen px; widths persist in base (unzoomed) units.
+      const delta = (ev.clientX - startX) / this.deps.zoom();
+      finalWidth = Math.max(MIN_COLUMN_WIDTH, Math.round(startWidth + delta));
+      this.deps.previewColumnWidth(col, finalWidth);
+    };
+    const up = (): void => {
+      this.detachDrag();
+      this.deps.commit([
+        {
+          op: "setColumn",
+          sheet: this.deps.activeSheet(),
+          col,
+          patch: { width: finalWidth },
+        },
+      ]);
+    };
+    this.attachDrag(move, up);
+  }
+
+  private startRowResize(row: number, startY: number): void {
+    const startHeight = this.deps.rowHeight(row);
+    const move = (ev: MouseEvent): void => {
+      const height = Math.max(MIN_ROW_HEIGHT, Math.round(startHeight + ev.clientY - startY));
+      this.deps.setRowHeight(row, height);
+    };
+    this.attachDrag(move, () => this.detachDrag());
+  }
+
+  private autofitColumn(col: number): void {
+    const column = this.deps.sheet().columns[col];
+    if (!column) return;
+
+    const win = this.deps.visibleRowWindow();
+    const view = this.deps.store.getVisibleWindow(this.deps.activeSheet(), win, [col]);
+    const values = view.values;
+    const texts: string[] = [];
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i] ?? null;
+      if (value === null) texts.push("");
+      else if (typeof value === "number") texts.push(formatNumber(value, column.numberFormat));
+      else texts.push(value);
+    }
+
+    const width = autofitColumnWidth((text) => this.measureText(text), texts, column.header);
+    this.deps.commit([
+      {
+        op: "setColumn",
+        sheet: this.deps.activeSheet(),
+        col,
+        // measureText ran under the zoomed font; persist base units.
+        patch: { width: Math.max(MIN_COLUMN_WIDTH, Math.round(width / this.deps.zoom())) },
+      },
+    ]);
+  }
+
+  private measureText(text: string): number {
+    if (!this.measureCtx) {
+      const canvas = document.createElement("canvas");
+      this.measureCtx = canvas.getContext("2d");
+    }
+
+    const ctx = this.measureCtx;
+    if (!ctx) return text.length * 8;
+    ctx.font = this.deps.theme().font;
+    return ctx.measureText(text).width;
+  }
+
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (this.deps.editor.isEditing) return;
+    // Keys typed into an editable widget inside the host (find bar, custom
+    // toolbar fields) belong to that widget. Without this guard the grid's
+    // type-to-edit default steals focus mid-keystroke and Backspace becomes a
+    // destructive clearSelection().
+    const target = e.target;
+    const inEditableWidget =
+      target !== this.deps.host &&
+      (target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable));
+    if (inEditableWidget) return;
+
+    // Headless hosts own the keymap: `false` drops every stock binding, a
+    // handler intercepts first and consumes by returning true.
+    const keyboard = this.deps.keyboard();
+    if (keyboard === false) return;
+    if (typeof keyboard === "function" && keyboard(e)) return;
+
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
 
     if (mod && key === "f") {
       e.preventDefault();
       this.deps.findBar()?.open();
+      return;
+    }
+
+    if (mod && key === "h") {
+      e.preventDefault();
+      this.deps.findBar()?.open({ replace: true });
       return;
     }
 
@@ -210,7 +406,7 @@ export class InputController {
 
     if (mod && key === "c") return void this.deps.copy();
     if (mod && key === "x") return void this.deps.cut();
-    if (mod && key === "v") return void this.deps.paste();
+    if (mod && key === "v") return void (e.shiftKey ? this.deps.pasteValues() : this.deps.paste());
 
     const selection = this.deps.selection();
     const focus = selection.focusCell;
@@ -225,20 +421,25 @@ export class InputController {
       case "ArrowDown":
         this.navigate(
           focus,
-          mod ? sheet.rowCount - 1 : (focus?.row ?? 0) + 1,
+          mod ? this.dataEdgeRow(focus, 1) : (focus?.row ?? 0) + 1,
           undefined,
           e.shiftKey,
         );
         break;
       case "ArrowUp":
-        this.navigate(focus, mod ? 0 : (focus?.row ?? 0) - 1, undefined, e.shiftKey);
+        this.navigate(
+          focus,
+          mod ? this.dataEdgeRow(focus, -1) : (focus?.row ?? 0) - 1,
+          undefined,
+          e.shiftKey,
+        );
         break;
       case "ArrowRight":
         this.navigate(
           focus,
           undefined,
           mod
-            ? this.deps.lastCol()
+            ? this.dataEdgeCol(focus, 1)
             : this.deps.nextVisibleCol(focus?.col ?? this.deps.firstCol(), 1),
           e.shiftKey,
         );
@@ -248,7 +449,7 @@ export class InputController {
           focus,
           undefined,
           mod
-            ? this.deps.firstCol()
+            ? this.dataEdgeCol(focus, -1)
             : this.deps.nextVisibleCol(focus?.col ?? this.deps.firstCol(), -1),
           e.shiftKey,
         );
@@ -304,6 +505,29 @@ export class InputController {
     this.deps.scheduleRender();
   }
 
+  /** Ctrl+Arrow vertical target: data-run edge when available, else sheet edge. */
+  private dataEdgeRow(focus: CellRef | null, dir: 1 | -1): number {
+    const edge = dir > 0 ? this.deps.rowCount() - 1 : 0;
+    if (!focus) return edge;
+    return this.deps.dataEdge(focus.row, focus.col, dir, 0) ?? edge;
+  }
+
+  /**
+   * Ctrl+Arrow horizontal target. A data edge landing on a hidden column is
+   * nudged to the nearest visible column in the travel direction.
+   */
+  private dataEdgeCol(focus: CellRef | null, dir: 1 | -1): number {
+    const edge = dir > 0 ? this.deps.lastCol() : this.deps.firstCol();
+    if (!focus) return edge;
+
+    const target = this.deps.dataEdge(focus.row, focus.col, 0, dir);
+    if (target === null) return edge;
+
+    const cols = this.deps.colIndices();
+    if (cols.includes(target)) return target;
+    return this.deps.nextVisibleCol(target, dir);
+  }
+
   private fillSourceRect(): SelRect | null {
     const focus = this.deps.selection().focusCell;
     if (!focus) return null;
@@ -318,13 +542,11 @@ export class InputController {
 
   private fillCellAt(clientX: number, clientY: number): CellRef {
     const rect = this.deps.viewportEl.getBoundingClientRect();
-    const theme = this.deps.theme();
-    const contentTop = this.deps.contentTop();
-    const contentX = clientX - rect.left + this.deps.scroller.scrollLeft - theme.rowHeaderWidth;
-    const contentY = contentTop + (clientY - rect.top - theme.headerHeight);
+    const contentX = this.deps.contentXAt(clientX - rect.left);
+    const contentY = this.deps.contentYAt(clientY - rect.top);
     const rowCount = this.deps.sheet().rowCount;
     const row = Math.max(0, Math.min(rowCount - 1, this.deps.rowAtOffset(Math.max(0, contentY))));
-    let col = this.deps.colAtX(contentX);
+    let col = this.deps.colAtX(Math.max(0, contentX));
     if (col === -1) {
       const cols = this.deps.colIndices();
       col = contentX < 0 ? (cols[0] ?? 0) : (cols[cols.length - 1] ?? 0);
@@ -374,24 +596,50 @@ export class InputController {
 
   private commitFill(source: SelRect, target: SelRect): void {
     if (this.deps.readOnly()) return;
-    const srcRows = source.r1 - source.r0 + 1;
     const srcCols = source.c1 - source.c0 + 1;
+    const series = new Map<number, FillSeries>();
     const patches: Patch[] = [];
+
+    for (let c = target.c0; c <= target.c1; c++) {
+      const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
+      series.set(sc, this.seriesForColumn(source, sc));
+    }
+
     for (let r = target.r0; r <= target.r1; r++) {
       for (let c = target.c0; c <= target.c1; c++) {
         if (r >= source.r0 && r <= source.r1 && c >= source.c0 && c <= source.c1) continue;
-        const sr = source.r0 + ((((r - source.r0) % srcRows) + srcRows) % srcRows);
+
         const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
-        const sourceDataRow = this.deps.toDataRow(sr);
+        const step = series.get(sc)!.stepAt(r - source.r0);
         const targetDataRow = this.deps.toDataRow(r);
         patches.push({
           op: "set",
           addr: { sheet: this.deps.activeSheet(), row: targetDataRow, col: c },
-          value: this.fillValueFrom(sr, sc, targetDataRow - sourceDataRow, c - sc),
+          value:
+            step.kind === "value"
+              ? { kind: "literal", value: step.value }
+              : this.fillValueFrom(
+                  source.r0 + step.sourceIndex,
+                  sc,
+                  targetDataRow - this.deps.toDataRow(source.r0 + step.sourceIndex),
+                  c - sc,
+                ),
         });
       }
     }
     this.deps.commit(patches);
+  }
+
+  private seriesForColumn(source: SelRect, col: number): FillSeries {
+    const cells: FillSourceCell[] = [];
+    for (let row = source.r0; row <= source.r1; row++) {
+      const addr = { sheet: this.deps.activeSheet(), row: this.deps.toDataRow(row), col };
+      cells.push({
+        value: this.deps.store.getCell(addr).resolved,
+        isFormula: (this.deps.loadable?.getFormula(addr) ?? null) !== null,
+      });
+    }
+    return detectFillSeries(cells);
   }
 
   private fillValueFrom(sr: number, sc: number, dRow: number, dCol: number): CellValue {

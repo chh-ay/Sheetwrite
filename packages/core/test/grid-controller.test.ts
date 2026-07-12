@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { initSheetwrite } from "../src/grid";
-import type { GridControllerHandlers } from "../src/grid-controller";
-import { createGridController } from "../src/grid-controller";
-import type { GridEvents, Workbook } from "../src/types";
-import { makeColumnarData, makeWorkbook } from "./fixtures";
+import { initSheetwrite } from "../src/grid.js";
+import type { GridControllerHandlers } from "../src/grid-controller.js";
+import { createGridController } from "../src/grid-controller.js";
+import type { GridEvents, Workbook } from "../src/types.js";
+import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 // happy-dom has no 2D canvas or layout; stub both exactly like grid.test.ts.
 const originalGetContext = HTMLCanvasElement.prototype.getContext;

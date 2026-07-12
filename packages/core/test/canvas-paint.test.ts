@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { paintFrame } from "../src/canvas-paint";
-import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types";
+import { paintFrame } from "../src/canvas-paint.js";
+import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
 
 // jsdom/happy-dom has no 2D canvas context, so paint against a recording stub
 // (modelled on the one in grid.test.ts, extended to capture the geometry of each
@@ -61,6 +61,9 @@ function makeRecordingCtx(): RecordingCtx {
   ctx.moveTo = (x: number, y: number) => {
     ctx.moveTos.push({ x, y });
   };
+  // paintFrame measures the drawn run to size text decorations; approximate a
+  // monospace-ish width so the recording ctx has a deterministic run length.
+  ctx.measureText = (text: string) => ({ width: text.length * 7 });
 
   for (const op of [
     "setTransform",
@@ -130,6 +133,7 @@ function render(
   layout: RenderLayout,
   viewport: Viewport,
   theme: Theme = makeTheme(),
+  damage?: { x: number; y: number; w: number; h: number },
 ): RecordingCtx {
   const ctx = makeRecordingCtx();
   paintFrame(
@@ -140,6 +144,7 @@ function render(
     viewport,
     1,
     NO_RENDERERS,
+    damage,
   );
   return ctx;
 }
@@ -238,6 +243,22 @@ describe("paintFrame variable row heights", () => {
     // Uniform would have placed it at round(20 + 24) - 0.5 = 43.5.
     expect(ctx.moveTos.some((m) => m.y === 43.5)).toBe(false);
   });
+
+  it("skips cells outside a damage strip", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT, makeTheme(), {
+      x: 0,
+      y: HEADER_HEIGHT + ROW_HEIGHT * 2,
+      w: 400,
+      h: ROW_HEIGHT,
+    });
+
+    const bodyTexts = ctx.fillTexts.filter((call) => call.text === "x");
+    expect(bodyTexts).toHaveLength(1);
+    expect(bodyTexts[0]?.y).toBe(HEADER_HEIGHT + ROW_HEIGHT * 2 + ROW_HEIGHT / 2);
+  });
 });
 
 describe("paintFrame column styles", () => {
@@ -309,5 +330,67 @@ describe("paintFrame column styles", () => {
     // Column B's label uses the headerStyle foreground; column A keeps the theme's.
     expect(ctx.fillTexts.find((t) => t.text === "B")?.fillStyle).toBe(HEADER_FG);
     expect(ctx.fillTexts.find((t) => t.text === "A")?.fillStyle).toBe(theme.headerFg);
+  });
+});
+
+describe("paintFrame text decorations", () => {
+  const TEXT_COLOR = "#123456";
+  // Left-aligned text row 0, col 0 origin: cy = headerHeight + rowHeight/2.
+  const ROW_CY = HEADER_HEIGHT + ROW_HEIGHT / 2;
+
+  function renderDecorated(style: CellStyle): RecordingCtx {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const styleIds = new Uint32Array(3);
+    styleIds[0] = 1; // view-row 0 gets the decorated style; rows 1-2 stay default.
+    const view = makeView(styleIds, [{}, style], [0]);
+    return render(view, layout, UNIFORM_VIEWPORT);
+  }
+
+  /** 1px-high fill rects in the text color are the decoration lines. */
+  const decorationLines = (ctx: RecordingCtx): FillRectCall[] =>
+    ctx.fillRects.filter((r) => r.h === 1 && r.fillStyle === TEXT_COLOR);
+
+  it("draws an underline line below the text run, in the text color", () => {
+    const ctx = renderDecorated({ underline: true, color: TEXT_COLOR });
+
+    const lines = decorationLines(ctx);
+    expect(lines).toHaveLength(1);
+    const underline = lines[0]!;
+    // Below the "middle" baseline origin, still inside the row (20..44).
+    expect(underline.y).toBeGreaterThan(ROW_CY);
+    expect(underline.y).toBeLessThan(HEADER_HEIGHT + ROW_HEIGHT);
+    // Left-aligned run starts at x + CELL_PAD (0 + 6) and spans the measured "x".
+    expect(underline.x).toBe(6);
+    expect(underline.w).toBe(7);
+  });
+
+  it("draws a strikethrough line through the middle of the text run", () => {
+    const ctx = renderDecorated({ strikethrough: true, color: TEXT_COLOR });
+
+    const lines = decorationLines(ctx);
+    expect(lines).toHaveLength(1);
+    // Mid x-height ≈ the "middle" baseline origin at cy, rounded to a pixel.
+    expect(lines[0]?.y).toBe(Math.round(ROW_CY));
+  });
+
+  it("draws both lines when underline and strikethrough are set", () => {
+    const ctx = renderDecorated({ underline: true, strikethrough: true, color: TEXT_COLOR });
+
+    const lines = decorationLines(ctx);
+    expect(lines).toHaveLength(2);
+    // The two lines sit at distinct rows (underline below the strikethrough).
+    const ys = lines.map((l) => l.y).sort((a, b) => a - b);
+    expect(ys[0]).toBeLessThan(ys[1]!);
+  });
+
+  it("draws no decoration line for a plain cell", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    // Backgrounds/headers are full-height fills; a 1px-high rect would be a
+    // stray decoration. None should exist.
+    expect(ctx.fillRects.every((r) => r.h !== 1)).toBe(true);
   });
 });

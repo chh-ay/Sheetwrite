@@ -1,4 +1,7 @@
-import type { CellFormat, Theme } from "./types";
+import { type AssistDeps, FormulaAssist } from "./formula-assist.js";
+import type { CellFormat, Theme } from "./types.js";
+
+export type { AssistDeps };
 
 export type EditNavigate = "down" | "right" | "left" | "none";
 
@@ -35,9 +38,11 @@ export class EditController {
   private tearingDown = false;
   private refStart = -1;
   private refEnd = -1;
+  private readonly assist: FormulaAssist | null;
 
-  constructor(host: HTMLElement) {
+  constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
+    this.assist = assist ? new FormulaAssist(host, assist) : null;
   }
 
   get isEditing(): boolean {
@@ -54,9 +59,10 @@ export class EditController {
     const ta = document.createElement("textarea");
     ta.className = "sheetwrite-editor";
     ta.value = opts.initial;
-    ta.inputMode = opts.type === "number" ? "decimal" : "text";
+    ta.inputMode = opts.type === "number" || opts.type === "currency" ? "decimal" : "text";
     ta.spellcheck = false;
     ta.wrap = "off";
+    if (opts.type === "date") ta.placeholder = "yyyy-mm-dd";
     ta.style.cssText = [
       "position:absolute",
       "margin:0",
@@ -92,6 +98,7 @@ export class EditController {
       const end = ta.value.length;
       ta.setSelectionRange(end, end);
     }
+    this.assist?.attach(ta, opts.theme);
   }
 
   position(rect: EditRect): void {
@@ -102,6 +109,7 @@ export class EditController {
     ta.style.width = `${rect.w}px`;
     ta.style.height = `${rect.h}px`;
     ta.style.lineHeight = `${Math.max(1, rect.h - 4)}px`;
+    this.assist?.reposition();
   }
 
   get value(): string {
@@ -122,6 +130,7 @@ export class EditController {
     this.refEnd = start + ref.length;
     ta.setSelectionRange(this.refEnd, this.refEnd);
     ta.focus();
+    this.assist?.update();
   }
 
   /** Finish a reference pick; the next pick inserts fresh at the caret. */
@@ -132,6 +141,7 @@ export class EditController {
 
   private readonly onInput = (): void => {
     this.refStart = -1;
+    this.assist?.update();
   };
 
   commit(navigate: EditNavigate): void {
@@ -168,6 +178,10 @@ export class EditController {
       e.stopPropagation();
       return;
     }
+    if (this.assist?.handleKeyDown(e)) {
+      e.stopPropagation();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       this.commit("down");
@@ -190,6 +204,7 @@ export class EditController {
     const ta = this.textarea;
     if (!ta) return;
     this.tearingDown = true;
+    this.assist?.detach();
     ta.removeEventListener("compositionstart", this.onCompositionStart);
     ta.removeEventListener("compositionend", this.onCompositionEnd);
     ta.removeEventListener("keydown", this.onKeyDown);

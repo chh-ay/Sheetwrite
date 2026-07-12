@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // Resolve the published entrypoints straight from the built dist/ so this
+    // fixture guards the d.ts relative-specifier graph under nodenext without
+    // a pack+install cycle (scripts/verify-packed-consumer.ts covers that).
+    "paths": {
+      "@sheetwrite/core": ["../../packages/core/dist/index.d.ts"],
+      "@sheetwrite/core/adapter": ["../../packages/core/dist/adapter.d.ts"],
+      "@sheetwrite/core/xlsx": ["../../packages/core/dist/xlsx-backend.d.ts"]
+    }
+  },
+  "include": ["main.ts"]
+}

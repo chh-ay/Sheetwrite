@@ -1,6 +1,6 @@
-import type { SelectionModel, SelRect } from "./selection";
-import type { SheetwriteStore } from "./store";
-import type { CellStyle, CellValue, Patch, Sheet, SheetId, Store, Theme } from "./types";
+import type { SelectionModel, SelRect } from "./selection.js";
+import type { SheetwriteStore } from "./store.js";
+import type { CellStyle, CellValue, Patch, Sheet, SheetId, Store, Theme } from "./types.js";
 
 export interface StyleActionsDeps {
   store: Store;
@@ -44,7 +44,7 @@ export class StyleActions {
     });
   }
 
-  toggleStyle(prop: "bold" | "italic"): void {
+  toggleStyle(prop: "bold" | "italic" | "underline" | "strikethrough"): void {
     const f = this.deps.selection().focusCell;
     const cell = f ? this.deps.anchorCell(f.row, f.col) : null;
     const on = cell

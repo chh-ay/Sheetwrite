@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { cellKey, REF_CYCLE, ReferenceGraph } from "../src/reference";
-import type { CellAddress, CellScalar } from "../src/types";
+import { cellKey, REF_CYCLE, ReferenceGraph } from "../src/reference.js";
+import type { CellAddress, CellScalar } from "../src/types.js";
 
 function makeLiterals() {
   const m = new Map<string, CellScalar>();

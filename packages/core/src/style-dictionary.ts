@@ -1,4 +1,4 @@
-import type { CellStyle } from "./types";
+import type { CellStyle } from "./types.js";
 
 const EMPTY: CellStyle = {};
 
@@ -14,10 +14,12 @@ export class StyleDictionary {
   intern(style: CellStyle | undefined): number {
     if (!style) return 0;
     const border = style.border ? JSON.stringify(style.border) : "";
-    const key = `${style.bold ? 1 : 0}|${style.italic ? 1 : 0}|${style.fontSize ?? ""}|${
-      style.color ?? ""
-    }|${style.backgroundColor ?? ""}|${style.align ?? ""}|${style.wrap ? 1 : 0}|${border}`;
-    if (key === "0|0|||||0|") return 0;
+    const key = `${style.bold ? 1 : 0}|${style.italic ? 1 : 0}|${style.underline ? 1 : 0}|${
+      style.strikethrough ? 1 : 0
+    }|${style.fontSize ?? ""}|${style.color ?? ""}|${style.backgroundColor ?? ""}|${
+      style.align ?? ""
+    }|${style.wrap ? 1 : 0}|${border}`;
+    if (key === "0|0|0|0|||||0|") return 0;
     const existing = this.lookup.get(key);
     if (existing !== undefined) return existing;
     const id = this.styles.length;

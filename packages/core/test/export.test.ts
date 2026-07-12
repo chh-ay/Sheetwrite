@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { fromCsv, parseCsv, safeHeader, toCsv, toTsv, toXlsx } from "../src/export";
-import { initSheetwrite } from "../src/grid";
-import { SheetwriteStore } from "../src/store";
-import type { Workbook } from "../src/types";
+import { fromCsv, parseCsv, safeHeader, toCsv, toTsv, toXlsx } from "../src/export.js";
+import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
+import type { Workbook } from "../src/types.js";
 // side-effect import registers the write-excel-file backend
-import "../src/xlsx-backend";
+import "../src/xlsx-backend.js";
 
 beforeAll(async () => {
   await initSheetwrite();

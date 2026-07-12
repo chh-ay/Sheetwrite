@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { initSheetwrite } from "../src/grid";
-import { SheetwriteStore } from "../src/store";
-import type { Patch, Workbook } from "../src/types";
+import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
+import type { Patch, Workbook } from "../src/types.js";
 
 beforeAll(async () => {
   await initSheetwrite();

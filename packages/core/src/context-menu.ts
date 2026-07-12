@@ -6,7 +6,8 @@ import type {
   GridActions,
   GridConfig,
   Theme,
-} from "./types";
+} from "./types.js";
+import { seedWidgetTheme } from "./widget-theme.js";
 
 const DEFAULT_ITEMS: ContextMenuItem[] = [
   { action: "copy" },
@@ -14,6 +15,14 @@ const DEFAULT_ITEMS: ContextMenuItem[] = [
   { action: "paste" },
   { action: "separator" },
   { action: "clearContents" },
+  { action: "separator" },
+  { action: "insertRowAbove" },
+  { action: "insertRowBelow" },
+  { action: "deleteRow" },
+  { action: "separator" },
+  { action: "insertColumnLeft" },
+  { action: "insertColumnRight" },
+  { action: "deleteColumn" },
   { action: "separator" },
   { action: "merge" },
   { action: "unmerge" },
@@ -26,11 +35,15 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   clearContents: "Clear contents",
   merge: "Merge cells",
   unmerge: "Unmerge",
+  insertRowAbove: "Insert row above",
+  insertRowBelow: "Insert row below",
+  deleteRow: "Delete row",
+  insertColumnLeft: "Insert column left",
+  insertColumnRight: "Insert column right",
+  deleteColumn: "Delete column",
   exportCsv: "Export CSV",
   exportXlsx: "Export XLSX",
 };
-
-const ROW_CSS = "padding:5px 14px;cursor:pointer;white-space:nowrap;background:transparent;";
 
 /** Map a built-in action to the matching `GridActions` call; unknown/separator → no-op. */
 function actionHandler(
@@ -50,6 +63,18 @@ function actionHandler(
       return () => actions.merge();
     case "unmerge":
       return () => actions.unmerge();
+    case "insertRowAbove":
+      return () => actions.insertRowAbove();
+    case "insertRowBelow":
+      return () => actions.insertRowBelow();
+    case "deleteRow":
+      return () => actions.deleteRow();
+    case "insertColumnLeft":
+      return () => actions.insertColumnLeft();
+    case "insertColumnRight":
+      return () => actions.insertColumnRight();
+    case "deleteColumn":
+      return () => actions.deleteColumn();
     case "exportCsv":
       return () => actions.exportCsv();
     case "exportXlsx":
@@ -77,23 +102,13 @@ export class ContextMenu {
   ) {
     this.grid = grid;
 
+    seedWidgetTheme(host, theme);
+
     const menu = document.createElement("div");
     menu.className = "sheetwrite-context-menu";
-    menu.style.cssText = [
-      "position:fixed",
-      "display:none",
-      "min-width:160px",
-      "padding:4px 0",
-      `border:1px solid ${theme.gridLine}`,
-      "border-radius:6px",
-      `background:${theme.bg}`,
-      `color:${theme.fg}`,
-      `font:${theme.font}`,
-      "box-shadow:0 6px 20px rgba(0,0,0,0.18)",
-      "box-sizing:border-box",
-      "user-select:none",
-      "z-index:1000",
-    ].join(";");
+    // Fixed positioning + visibility toggle are behavior; cosmetics live in styles.css.
+    menu.style.position = "fixed";
+    menu.style.display = "none";
 
     // Keep grid focus so selection-based actions act on the right cells.
     menu.addEventListener("mousedown", (e) => e.preventDefault());
@@ -101,14 +116,12 @@ export class ContextMenu {
     const separator = (): HTMLDivElement => {
       const s = document.createElement("div");
       s.className = "sheetwrite-context-menu-sep";
-      s.style.cssText = `height:1px;margin:4px 0;background:${theme.gridLine};`;
       return s;
     };
 
     const row = (item: ContextMenuItem): HTMLDivElement => {
       const el = document.createElement("div");
       el.className = "sheetwrite-context-menu-item";
-      el.style.cssText = ROW_CSS;
 
       const action = item.action;
       el.textContent =
@@ -120,14 +133,6 @@ export class ContextMenu {
       el.addEventListener("click", () => {
         run();
         this.close();
-      });
-
-      el.addEventListener("pointerenter", () => {
-        el.style.background = theme.gridLine;
-      });
-
-      el.addEventListener("pointerleave", () => {
-        el.style.background = "transparent";
       });
 
       return el;

@@ -1,4 +1,4 @@
-import type { CellRef } from "./selection";
+import type { CellRef } from "./selection.js";
 
 /** Column index (0-based) → A1 column label (0 → "A", 26 → "AA"). */
 export function colToA1(col: number): string {

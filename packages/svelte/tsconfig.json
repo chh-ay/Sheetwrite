@@ -1,7 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    // `.svelte` ambient-module resolution (Grid.svelte.d.ts) does not work
+    // under NodeNext; this source-shipping package stays on Bundler.
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
   },
   "include": ["src/index.ts"]
 }

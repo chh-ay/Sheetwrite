@@ -1,4 +1,4 @@
-import type { CellScalar } from "./types";
+import type { CellScalar, CellStyle, CellValue } from "./types.js";
 
 // Values beginning with any of these are neutralized on paste so a pasted
 // "=cmd|..." or "+...", "-...", "@..." can't become an executable formula.
@@ -83,4 +83,34 @@ export function parseTsv(text: string): string[][] {
   // trailing field/row unless the text ended exactly on a row break
   if (field !== "" || row.length > 0) endRow();
   return rows;
+}
+
+// ── Internal snapshot ────────────────────────────────────────────────────────
+
+/**
+ * One copied cell in an internal clipboard snapshot: its source value (a formula
+ * whose src is preserved, or a literal), the scalar it resolved to at copy time
+ * (used by paste-values), and the style painted on it.
+ */
+export interface ClipboardCell {
+  value: CellValue;
+  resolved: CellScalar;
+  style: CellStyle;
+}
+
+/**
+ * Richer-than-TSV snapshot captured on every copy/cut. Paste reuses it —
+ * re-anchoring formulas and carrying styles — when the system clipboard still
+ * holds the {@link ClipboardSnapshot.tsv} this snapshot wrote; otherwise paste
+ * falls back to parsing whatever external TSV the system clipboard now holds.
+ */
+export interface ClipboardSnapshot {
+  /** Top-left source cell in data coordinates — the formula re-anchor origin. */
+  anchor: { row: number; col: number };
+  /** Row-major matrix of copied cells, in the source's view order. */
+  cells: ClipboardCell[][];
+  /** The exact TSV written to the system clipboard; the paste-time identity check. */
+  tsv: string;
+  /** True when produced by cut: formulas paste verbatim (Sheets shifts on copy, not cut). */
+  cut: boolean;
 }

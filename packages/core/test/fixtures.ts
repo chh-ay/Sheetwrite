@@ -1,4 +1,4 @@
-import type { ColumnarData, Workbook } from "../src/types";
+import type { ColumnarData, Workbook } from "../src/types.js";
 
 export function makeWorkbook(rowCount = 50): Workbook {
   return {

@@ -1,4 +1,5 @@
-import type { Grid, SearchResult, Theme } from "./types";
+import type { Grid, SearchResult, Theme } from "./types.js";
+import { seedWidgetTheme } from "./widget-theme.js";
 
 /** Counter label: empty when idle, "No results", or "<active+1> of <total>". */
 function formatCount(result: SearchResult): string {
@@ -10,9 +11,14 @@ function formatCount(result: SearchResult): string {
 }
 
 /**
- * Google-Sheets-style floating find box pinned to the top-right of the grid host.
- * The DOM is built once in the constructor; `open`/`close` only toggle visibility
- * and focus. Typing searches; Enter/Shift+Enter cycle matches; Esc closes.
+ * Google-Sheets-style floating find/replace box pinned to the top-right of the
+ * grid host. Two stacked rows: find (query + counter + nav) and replace
+ * (replacement + Replace/All). The DOM is built once in the constructor;
+ * `open`/`close` only toggle visibility and focus. Typing searches;
+ * Enter/Shift+Enter cycle matches; Enter in the replace field replaces the
+ * active match; Esc closes. The replace row is omitted entirely on a read-only
+ * grid. When `config.find === false` the whole widget (find and replace) is
+ * never constructed.
  */
 export class FindBar {
   private readonly host: HTMLElement;
@@ -21,71 +27,70 @@ export class FindBar {
   private readonly el: HTMLDivElement;
   private readonly input: HTMLInputElement;
   private readonly count: HTMLSpanElement;
+  private readonly replaceInput: HTMLInputElement | null;
 
   private _open = false;
 
-  constructor(host: HTMLElement, theme: Theme, grid: Grid) {
+  constructor(host: HTMLElement, theme: Theme, grid: Grid, readOnly = false) {
     this.host = host;
     this.grid = grid;
 
+    seedWidgetTheme(host, theme);
+
     const el = document.createElement("div");
     el.className = "sheetwrite-find";
-    el.style.cssText = [
-      "position:absolute",
-      "top:10px",
-      "right:10px",
-      "z-index:1000",
-      "display:none",
-      "align-items:center",
-      "gap:6px",
-      "padding:6px 8px",
-      `border:1px solid ${theme.gridLine}`,
-      "border-radius:8px",
-      `background:${theme.bg}`,
-      `color:${theme.fg}`,
-      `font:${theme.font}`,
-      "box-shadow:0 2px 6px rgba(60,64,67,0.3)",
-      "box-sizing:border-box",
-    ].join(";");
+    // Anchoring + visibility are behavior; everything cosmetic lives in styles.css.
+    el.style.position = "absolute";
+    el.style.top = "10px";
+    el.style.right = "10px";
+    el.style.display = "none";
+
+    const findRow = this.row("sheetwrite-find-row");
 
     const input = document.createElement("input");
     input.className = "sheetwrite-find-input";
     input.placeholder = "Find in sheet";
-    input.style.cssText = [
-      "width:220px",
-      "height:28px",
-      "padding:0 8px",
-      "border:none",
-      `border-bottom:1px solid ${theme.gridLine}`,
-      "border-radius:0",
-      `background:${theme.bg}`,
-      `color:${theme.fg}`,
-      "font:inherit",
-      "outline:none",
-      "box-sizing:border-box",
-    ].join(";");
 
     const count = document.createElement("span");
     count.className = "sheetwrite-find-count";
-    count.style.cssText = "min-width:72px;text-align:right;opacity:0.72;white-space:nowrap;";
 
-    const prev = this.button("sheetwrite-find-prev", "↑", "Previous", theme, () => {
-      this.update(this.grid.findPrev());
-    });
+    const prev = this.button(
+      "sheetwrite-find-prev",
+      "sheetwrite-find-icon-btn",
+      "↑",
+      "Previous",
+      () => {
+        this.update(this.grid.findPrev());
+      },
+    );
 
-    const next = this.button("sheetwrite-find-next", "↓", "Next", theme, () => {
-      this.update(this.grid.findNext());
-    });
+    const next = this.button(
+      "sheetwrite-find-next",
+      "sheetwrite-find-icon-btn",
+      "↓",
+      "Next",
+      () => {
+        this.update(this.grid.findNext());
+      },
+    );
 
-    const close = this.button("sheetwrite-find-close", "✕", "Close", theme, () => {
-      this.close();
-    });
+    const close = this.button(
+      "sheetwrite-find-close",
+      "sheetwrite-find-icon-btn",
+      "✕",
+      "Close",
+      () => {
+        this.close();
+      },
+    );
 
     input.addEventListener("input", () => {
       this.update(this.grid.search(input.value));
     });
 
     input.addEventListener("keydown", (e) => {
+      if (this.handleFieldShortcut(e)) return;
+
       if (e.key === "Enter") {
         e.stopPropagation();
         this.update(e.shiftKey ? this.grid.findPrev() : this.grid.findNext());
@@ -98,25 +103,72 @@ export class FindBar {
       }
     });
 
-    el.appendChild(input);
-    el.appendChild(count);
-    el.appendChild(prev);
-    el.appendChild(next);
-    el.appendChild(close);
+    findRow.append(input, count, prev, next, close);
+    el.appendChild(findRow);
+
+    let replaceInput: HTMLInputElement | null = null;
+    if (!readOnly) {
+      const replaceRow = this.row("sheetwrite-find-replace-row");
+
+      replaceInput = document.createElement("input");
+      replaceInput.className = "sheetwrite-find-replace-input";
+      replaceInput.placeholder = "Replace with";
+
+      const replaceBtn = this.button(
+        "sheetwrite-find-replace",
+        "sheetwrite-find-text-btn",
+        "Replace",
+        "Replace",
+        () => {
+          this.update(this.grid.replaceCurrent(replaceInput!.value));
+        },
+      );
+
+      const allBtn = this.button(
+        "sheetwrite-find-replace-all",
+        "sheetwrite-find-text-btn",
+        "All",
+        "Replace all",
+        () => {
+          this.update(this.grid.replaceAll(replaceInput!.value).result);
+        },
+      );
+
+      replaceInput.addEventListener("keydown", (e) => {
+        if (this.handleFieldShortcut(e)) return;
+
+        if (e.key === "Enter") {
+          e.stopPropagation();
+          this.update(this.grid.replaceCurrent(replaceInput!.value));
+          return;
+        }
+
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          this.close();
+        }
+      });
+
+      replaceRow.append(replaceInput, replaceBtn, allBtn);
+      el.appendChild(replaceRow);
+    }
 
     host.appendChild(el);
 
     this.el = el;
     this.input = input;
     this.count = count;
+    this.replaceInput = replaceInput;
   }
 
-  open(): void {
+  /** Show the bar. `replace: true` focuses the replace field (Ctrl/Cmd+H). */
+  open(opts: { replace?: boolean } = {}): void {
     this.el.style.display = "flex";
     this._open = true;
 
-    this.input.focus();
-    this.input.select();
+    const field = opts.replace && this.replaceInput ? this.replaceInput : this.input;
+    field.focus();
+    field.select();
 
     if (this.input.value) {
       this.update(this.grid.search(this.input.value));
@@ -143,41 +195,48 @@ export class FindBar {
     this.count.textContent = formatCount(result);
   }
 
-  /** A flat icon button that keeps grid focus (mousedown is suppressed). */
+  /**
+   * Ctrl/Cmd+F and Ctrl/Cmd+H pressed while a find-bar field is focused switch
+   * fields instead of falling through to the browser's native find dialog (the
+   * grid's host handler never sees keys originating in editable widgets).
+   */
+  private handleFieldShortcut(e: KeyboardEvent): boolean {
+    if (!(e.ctrlKey || e.metaKey)) return false;
+    const key = e.key.toLowerCase();
+    if (key !== "f" && key !== "h") return false;
+
+    e.preventDefault();
+    e.stopPropagation();
+    this.open({ replace: key === "h" });
+    return true;
+  }
+
+  private row(className: string): HTMLDivElement {
+    const row = document.createElement("div");
+    row.className = className;
+    return row;
+  }
+
+  /**
+   * A flat button that keeps grid focus (mousedown is suppressed). `typeClass`
+   * selects the icon (round nav/close) vs. text (Replace/All) sizing rule;
+   * `className` is the per-button hook. All cosmetics live in styles.css.
+   */
   private button(
     className: string,
+    typeClass: string,
     label: string,
     title: string,
-    theme: Theme,
     onClick: () => void,
   ): HTMLButtonElement {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = className;
+    btn.className = `sheetwrite-find-btn ${typeClass} ${className}`;
     btn.textContent = label;
     btn.title = title;
-    btn.style.cssText = [
-      "width:28px",
-      "height:28px",
-      "padding:0",
-      "border:none",
-      "border-radius:50%",
-      "background:transparent",
-      `color:${theme.headerFg}`,
-      "font:inherit",
-      "line-height:1",
-      "cursor:pointer",
-    ].join(";");
 
     // Keep grid focus so buttons act without observing focus oddly.
     btn.addEventListener("mousedown", (e) => e.preventDefault());
-    btn.addEventListener("mouseenter", () => {
-      btn.style.background = theme.selection;
-    });
-    btn.addEventListener("mouseleave", () => {
-      btn.style.background = "transparent";
-    });
-
     btn.addEventListener("click", onClick);
 
     return btn;

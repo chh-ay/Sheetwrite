@@ -1,4 +1,13 @@
-import type { Grid, GridActions, GridConfig, Theme, ToolbarActionName, ToolbarItem } from "./types";
+import type {
+  Grid,
+  GridActions,
+  GridConfig,
+  Theme,
+  ToolbarActionName,
+  ToolbarIcon,
+  ToolbarItem,
+} from "./types.js";
+import { seedWidgetTheme } from "./widget-theme.js";
 
 /** Button glyph for each built-in action. Color inputs (textColor/fillColor) carry no glyph. */
 const DEFAULT_ICON: Partial<Record<ToolbarActionName, string>> = {
@@ -6,6 +15,8 @@ const DEFAULT_ICON: Partial<Record<ToolbarActionName, string>> = {
   undo: "↶",
   redo: "↷",
   italic: "I",
+  underline: "U",
+  strikethrough: "S",
   alignLeft: "⟸",
   alignCenter: "≡",
   alignRight: "⟹",
@@ -25,6 +36,8 @@ const DEFAULT_TITLE: Record<Exclude<ToolbarActionName, "separator">, string> = {
   undo: "Undo",
   redo: "Redo",
   italic: "Italic",
+  underline: "Underline",
+  strikethrough: "Strikethrough",
   alignLeft: "Align left",
   alignCenter: "Align center",
   alignRight: "Align right",
@@ -40,254 +53,228 @@ const DEFAULT_TITLE: Record<Exclude<ToolbarActionName, "separator">, string> = {
   exportXlsx: "Export XLSX",
 };
 
-const BUTTON_CSS =
-  "min-width:28px;height:26px;padding:0 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;cursor:pointer;font:inherit;";
-
-const COLOR_INPUT_CSS =
-  "width:26px;height:26px;padding:0;border:none;background:transparent;cursor:pointer;";
-
 /** Shared mousedown guard so a control click never steals focus from the grid. */
 const preventDefault = (event: Event): void => event.preventDefault();
 
+/** Dispatch one built-in toolbar action to its `GridActions` method. */
+function runAction(actions: GridActions, action: ToolbarActionName): void {
+  switch (action) {
+    case "undo":
+      actions.undo();
+      break;
+    case "redo":
+      actions.redo();
+      break;
+    case "bold":
+      actions.toggleBold();
+      break;
+    case "italic":
+      actions.toggleItalic();
+      break;
+    case "underline":
+      actions.toggleUnderline();
+      break;
+    case "strikethrough":
+      actions.toggleStrikethrough();
+      break;
+    case "alignLeft":
+      actions.setAlign("left");
+      break;
+    case "alignCenter":
+      actions.setAlign("center");
+      break;
+    case "alignRight":
+      actions.setAlign("right");
+      break;
+    case "border":
+      actions.toggleBorder();
+      break;
+    case "clearFormat":
+      actions.clearFormat();
+      break;
+    case "merge":
+      actions.merge();
+      break;
+    case "unmerge":
+      actions.unmerge();
+      break;
+    case "sortAsc":
+      actions.sort(true);
+      break;
+    case "sortDesc":
+      actions.sort(false);
+      break;
+    case "exportCsv":
+      actions.exportCsv();
+      break;
+    case "exportXlsx":
+      actions.exportXlsx();
+      break;
+  }
+}
+
 /**
- * Config-driven toolbar. Renders either a custom `config.toolbar` item list or the
- * default per-flag set of built-ins, binding each control to a `GridActions` method.
- * The whole bar is built once in the constructor; nothing rebuilds per render.
+ * The default per-flag item list the built-in toolbar renders when no custom
+ * `ToolbarItem[]` is supplied. Also the default for the shell's toolbar.
+ */
+export function defaultToolbarItems(config: GridConfig): ToolbarItem[] {
+  const enabled = (flag: boolean | undefined): boolean => flag !== false;
+  const items: ToolbarItem[] = [];
+
+  if (enabled(config.undo)) {
+    items.push({ action: "undo" }, { action: "redo" }, { action: "separator" });
+  }
+
+  if (enabled(config.bold)) items.push({ action: "bold" });
+  if (enabled(config.italic)) items.push({ action: "italic" });
+  if (enabled(config.bold) || enabled(config.italic)) {
+    items.push({ action: "underline" }, { action: "strikethrough" });
+  }
+
+  if (enabled(config.align)) {
+    items.push({ action: "alignLeft" }, { action: "alignCenter" }, { action: "alignRight" });
+  }
+
+  if (enabled(config.textColor) || enabled(config.fillColor)) items.push({ action: "separator" });
+  if (enabled(config.textColor)) items.push({ action: "textColor" });
+  if (enabled(config.fillColor)) items.push({ action: "fillColor" });
+
+  if (enabled(config.border)) items.push({ action: "border" });
+  if (enabled(config.clearFormat)) items.push({ action: "clearFormat" });
+
+  if (enabled(config.merge)) {
+    items.push({ action: "separator" }, { action: "merge" }, { action: "unmerge" });
+  }
+
+  if (enabled(config.sort)) {
+    items.push({ action: "separator" }, { action: "sortAsc" }, { action: "sortDesc" });
+  }
+
+  if (config.export) {
+    items.push({ action: "separator" }, { action: "exportCsv" }, { action: "exportXlsx" });
+  }
+
+  return items;
+}
+
+/**
+ * Render toolbar items into `bar`, binding built-in actions to `grid.actions`
+ * and custom `onClick` handlers to the grid handle. Shared by the grid's
+ * legacy built-in toolbar and the shell's `createToolbar`, so the repo has one
+ * toolbar implementation. Icon strings are always text (never HTML); DOM-node
+ * icons are cloned so one config can serve several toolbars.
+ */
+export function renderToolbarItems(
+  bar: HTMLElement,
+  items: readonly ToolbarItem[],
+  grid: Grid,
+  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>,
+): void {
+  const setIcon = (el: HTMLElement, content: ToolbarIcon): void => {
+    if (typeof content === "string") {
+      // Icon strings are text-only; never interpret them as HTML.
+      el.textContent = content;
+      return;
+    }
+
+    const node = typeof content === "function" ? content() : content.cloneNode(true);
+    el.replaceChildren(node);
+  };
+
+  const addButton = (
+    suffix: string,
+    icon: ToolbarIcon,
+    title: string,
+    onClick: () => void,
+  ): void => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `sheetwrite-tb-button sheetwrite-tb-${suffix}`;
+    button.title = title;
+    if (title) button.setAttribute("aria-label", title);
+    setIcon(button, icon);
+
+    // Mouse activation must not steal focus/selection from the grid.
+    button.addEventListener("mousedown", preventDefault);
+    button.addEventListener("click", onClick);
+
+    bar.appendChild(button);
+  };
+
+  const addColorInput = (suffix: string, title: string, onPick: (color: string) => void): void => {
+    const input = document.createElement("input");
+    input.type = "color";
+    input.className = `sheetwrite-tb-color sheetwrite-tb-${suffix}`;
+    input.title = title;
+    if (title) input.setAttribute("aria-label", title);
+    input.addEventListener("input", () => onPick(input.value));
+
+    bar.appendChild(input);
+  };
+
+  for (const item of items) {
+    const action = item.action;
+
+    if (action === "separator") {
+      const divider = document.createElement("span");
+      divider.className = "sheetwrite-tb-separator";
+      divider.setAttribute("role", "separator");
+      bar.appendChild(divider);
+      continue;
+    }
+
+    const title = item.title ?? (action ? DEFAULT_TITLE[action] : "");
+    const icon = item.icon ?? (action ? (icons?.[action] ?? DEFAULT_ICON[action] ?? "") : "");
+
+    if (item.onClick) {
+      const onClick = item.onClick;
+      addButton(action ?? "custom", icon, title, () => onClick(grid));
+      continue;
+    }
+
+    if (action === "textColor") {
+      addColorInput("textColor", title, (color) => grid.actions.setTextColor(color));
+      continue;
+    }
+
+    if (action === "fillColor") {
+      addColorInput("fillColor", title, (color) => grid.actions.setFillColor(color));
+      continue;
+    }
+
+    if (action) {
+      addButton(action, icon, title, () => runAction(grid.actions, action));
+    }
+  }
+}
+
+/**
+ * Config-driven built-in toolbar. Renders either a custom `config.toolbar` item
+ * list or the default per-flag set of built-ins through the shared
+ * {@link renderToolbarItems}. Built once in the constructor; nothing rebuilds
+ * per render.
  */
 export class Toolbar {
   static readonly height = 36;
 
   private readonly el: HTMLDivElement;
 
-  constructor(
-    host: HTMLElement,
-    config: GridConfig,
-    theme: Theme,
-    actions: GridActions,
-    grid: Grid,
-  ) {
+  constructor(host: HTMLElement, config: GridConfig, theme: Theme, grid: Grid) {
+    seedWidgetTheme(host, theme);
+
     const bar = document.createElement("div");
     bar.className = "sheetwrite-toolbar";
-    bar.style.cssText = [
-      "position:absolute",
-      "top:0",
-      "left:0",
-      "right:0",
-      `height:${Toolbar.height}px`,
-      "display:flex",
-      "align-items:center",
-      "gap:2px",
-      "padding:0 6px",
-      `border-bottom:1px solid ${theme.gridLine}`,
-      `background:${theme.headerBg}`,
-      `color:${theme.headerFg}`,
-      `font:${theme.font}`,
-      "box-sizing:border-box",
-      "overflow-x:auto",
-    ].join(";");
+    // Anchoring + height back the grid's layout math; cosmetics live in styles.css.
+    bar.style.position = "absolute";
+    bar.style.top = "0";
+    bar.style.left = "0";
+    bar.style.right = "0";
+    bar.style.height = `${Toolbar.height}px`;
+    bar.setAttribute("role", "toolbar");
+    bar.setAttribute("aria-label", "Spreadsheet formatting");
 
-    // ── DOM builders (append directly to the bar) ──────────────────────────
-
-    const setIcon = (el: HTMLElement, content: string): void => {
-      // Consumer-authored markup is allowed: treat anything containing a tag as HTML.
-      if (content.includes("<")) {
-        el.innerHTML = content;
-      } else {
-        el.textContent = content;
-      }
-    };
-
-    const addButton = (suffix: string, icon: string, title: string, onClick: () => void): void => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `sheetwrite-tb-${suffix}`;
-      button.title = title;
-      button.style.cssText = BUTTON_CSS;
-      setIcon(button, icon);
-
-      button.addEventListener("mousedown", preventDefault);
-      button.addEventListener("click", onClick);
-
-      bar.appendChild(button);
-    };
-
-    const addColorInput = (
-      suffix: string,
-      title: string,
-      onPick: (color: string) => void,
-    ): void => {
-      const input = document.createElement("input");
-      input.type = "color";
-      input.className = `sheetwrite-tb-${suffix}`;
-      input.title = title;
-      input.style.cssText = COLOR_INPUT_CSS;
-      input.addEventListener("input", () => onPick(input.value));
-
-      bar.appendChild(input);
-    };
-
-    const addSeparator = (): void => {
-      const divider = document.createElement("span");
-      divider.className = "sheetwrite-tb-separator";
-      divider.style.cssText = `width:1px;height:20px;margin:0 4px;background:${theme.gridLine};`;
-
-      bar.appendChild(divider);
-    };
-
-    // ── Action binding (the action → method table) ─────────────────────────
-
-    const runAction = (action: ToolbarActionName): void => {
-      switch (action) {
-        case "undo":
-          actions.undo();
-          break;
-        case "redo":
-          actions.redo();
-          break;
-        case "bold":
-          actions.toggleBold();
-          break;
-        case "italic":
-          actions.toggleItalic();
-          break;
-        case "alignLeft":
-          actions.setAlign("left");
-          break;
-        case "alignCenter":
-          actions.setAlign("center");
-          break;
-        case "alignRight":
-          actions.setAlign("right");
-          break;
-        case "border":
-          actions.toggleBorder();
-          break;
-        case "clearFormat":
-          actions.clearFormat();
-          break;
-        case "merge":
-          actions.merge();
-          break;
-        case "unmerge":
-          actions.unmerge();
-          break;
-        case "sortAsc":
-          actions.sort(true);
-          break;
-        case "sortDesc":
-          actions.sort(false);
-          break;
-        case "exportCsv":
-          actions.exportCsv();
-          break;
-        case "exportXlsx":
-          actions.exportXlsx();
-          break;
-      }
-    };
-
-    // ── Custom item list ───────────────────────────────────────────────────
-
-    const renderItem = (item: ToolbarItem): void => {
-      const action = item.action;
-
-      if (action === "separator") {
-        addSeparator();
-        return;
-      }
-
-      const title = item.title ?? (action ? DEFAULT_TITLE[action] : "");
-      const icon = item.icon ?? (action ? (DEFAULT_ICON[action] ?? "") : "");
-
-      if (item.onClick) {
-        const onClick = item.onClick;
-        addButton(action ?? "custom", icon, title, () => onClick(grid));
-        return;
-      }
-
-      if (action === "textColor") {
-        addColorInput("textColor", title, (color) => actions.setTextColor(color));
-        return;
-      }
-
-      if (action === "fillColor") {
-        addColorInput("fillColor", title, (color) => actions.setFillColor(color));
-        return;
-      }
-
-      if (action) {
-        addButton(action, icon, title, () => runAction(action));
-      }
-    };
-
-    // ── Default per-flag toolbar ───────────────────────────────────────────
-
-    const iconFor = (action: ToolbarActionName): string =>
-      config.icons?.[action] ?? DEFAULT_ICON[action] ?? "";
-
-    const builtinButton = (
-      action: Exclude<ToolbarActionName, "separator" | "textColor" | "fillColor">,
-    ): void => {
-      addButton(action, iconFor(action), DEFAULT_TITLE[action], () => runAction(action));
-    };
-
-    const enabled = (flag: boolean | undefined): boolean => flag !== false;
-
-    const renderDefault = (): void => {
-      if (enabled(config.undo)) {
-        builtinButton("undo");
-        builtinButton("redo");
-        addSeparator();
-      }
-
-      if (enabled(config.bold)) builtinButton("bold");
-      if (enabled(config.italic)) builtinButton("italic");
-
-      if (enabled(config.align)) {
-        builtinButton("alignLeft");
-        builtinButton("alignCenter");
-        builtinButton("alignRight");
-      }
-
-      if (enabled(config.textColor) || enabled(config.fillColor)) addSeparator();
-      if (enabled(config.textColor)) {
-        addColorInput("textColor", DEFAULT_TITLE.textColor, (color) => actions.setTextColor(color));
-      }
-      if (enabled(config.fillColor)) {
-        addColorInput("fillColor", DEFAULT_TITLE.fillColor, (color) => actions.setFillColor(color));
-      }
-
-      if (enabled(config.border)) builtinButton("border");
-      if (enabled(config.clearFormat)) builtinButton("clearFormat");
-
-      if (enabled(config.merge)) {
-        addSeparator();
-        builtinButton("merge");
-        builtinButton("unmerge");
-      }
-
-      if (enabled(config.sort)) {
-        addSeparator();
-        builtinButton("sortAsc");
-        builtinButton("sortDesc");
-      }
-
-      if (config.export) {
-        addSeparator();
-        builtinButton("exportCsv");
-        builtinButton("exportXlsx");
-      }
-    };
-
-    // ── Build once ─────────────────────────────────────────────────────────
-
-    if (Array.isArray(config.toolbar)) {
-      for (const item of config.toolbar) {
-        renderItem(item);
-      }
-    } else {
-      renderDefault();
-    }
+    const items = Array.isArray(config.toolbar) ? config.toolbar : defaultToolbarItems(config);
+    renderToolbarItems(bar, items, grid, config.icons);
 
     host.appendChild(bar);
     this.el = bar;

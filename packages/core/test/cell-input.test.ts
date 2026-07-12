@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { parseCellInput } from "../src/cell-input";
+import { parseCellInput } from "../src/cell-input.js";
 
 describe("parseCellInput", () => {
   it("keeps cross-sheet links as formulas", () => {

@@ -1,6 +1,6 @@
-import { colToA1 } from "./a1";
-import type { CellRef } from "./selection";
-import type { VisibleWindowView } from "./types";
+import { colToA1 } from "./a1.js";
+import type { CellRef } from "./selection.js";
+import type { VisibleWindowView } from "./types.js";
 
 let ariaSeq = 0;
 
@@ -25,6 +25,19 @@ export class AriaMirror {
   private readonly focusCell: () => CellRef | null;
   private key = "";
   private version = 0;
+
+  /** Last `aria-activedescendant` written to the host; avoids redundant writes. */
+  private lastFocusId: string | null = null;
+
+  // ── Retained node references ─────────────────────────────────────────────
+  // Shape of the last rebuild plus the live nodes it produced. When a fresh
+  // window has the same nRows × nCols we patch these in place; a differing
+  // node count forces a full rebuild.
+  private lastNRows = -1;
+  private lastNCols = -1;
+  private headerCells: HTMLDivElement[] = [];
+  private rowEls: HTMLDivElement[] = [];
+  private cellEls: HTMLDivElement[] = [];
 
   constructor(deps: AriaMirrorDeps) {
     this.host = deps.host;
@@ -60,13 +73,44 @@ export class AriaMirror {
     const focusId = focus ? `${this.aria.id}-${focus.row}-${focus.col}` : "";
     const key = `${view.rows.start}:${view.rows.end}:${view.cols.length}:${focusId}:${this.version}`;
     if (key === this.key) {
-      this.host.setAttribute("aria-activedescendant", focusId);
+      this.writeActiveDescendant(focusId);
       return;
     }
     this.key = key;
 
     const nCols = view.cols.length;
+    const nRows = view.rows.end - view.rows.start;
+
+    // Same node count → reuse the existing tree and rewrite only what moved.
+    if (nRows === this.lastNRows && nCols === this.lastNCols) {
+      this.patchInPlace(view, focus, nRows, nCols);
+    } else {
+      this.rebuild(view, focus, nRows, nCols);
+      this.lastNRows = nRows;
+      this.lastNCols = nCols;
+    }
+
+    this.writeActiveDescendant(focusId);
+  }
+
+  private writeActiveDescendant(focusId: string): void {
+    if (focusId === this.lastFocusId) return;
+    this.host.setAttribute("aria-activedescendant", focusId);
+    this.lastFocusId = focusId;
+  }
+
+  /** Full teardown: build a fresh header + data grid and cache its nodes. */
+  private rebuild(
+    view: VisibleWindowView,
+    focus: CellRef | null,
+    nRows: number,
+    nCols: number,
+  ): void {
     const frag = document.createDocumentFragment();
+
+    this.headerCells = [];
+    this.rowEls = [];
+    this.cellEls = [];
 
     const headRow = document.createElement("div");
     headRow.setAttribute("role", "row");
@@ -77,10 +121,10 @@ export class AriaMirror {
       cell.setAttribute("aria-colindex", String(cj + 1));
       cell.textContent = colToA1(view.cols[cj]!);
       headRow.appendChild(cell);
+      this.headerCells.push(cell);
     }
     frag.appendChild(headRow);
 
-    const nRows = view.rows.end - view.rows.start;
     for (let ri = 0; ri < nRows; ri++) {
       const row = view.rows.start + ri;
       const rowEl = document.createElement("div");
@@ -98,12 +142,46 @@ export class AriaMirror {
           cell.setAttribute("aria-selected", "true");
         }
         rowEl.appendChild(cell);
+        this.cellEls.push(cell);
       }
       frag.appendChild(rowEl);
+      this.rowEls.push(rowEl);
     }
 
     this.aria.replaceChildren(frag);
-    this.host.setAttribute("aria-activedescendant", focusId);
+  }
+
+  /**
+   * Same shape, shifted window: rewrite header labels, per-row `aria-rowindex`,
+   * and each gridcell's id / text / `aria-selected` on the retained nodes. Ids,
+   * roles, and `aria-colindex` (position-based) stay stable across the reuse.
+   */
+  private patchInPlace(
+    view: VisibleWindowView,
+    focus: CellRef | null,
+    nRows: number,
+    nCols: number,
+  ): void {
+    for (let cj = 0; cj < nCols; cj++) {
+      this.headerCells[cj]!.textContent = colToA1(view.cols[cj]!);
+    }
+
+    for (let ri = 0; ri < nRows; ri++) {
+      const row = view.rows.start + ri;
+      this.rowEls[ri]!.setAttribute("aria-rowindex", String(row + 2));
+      for (let cj = 0; cj < nCols; cj++) {
+        const col = view.cols[cj]!;
+        const cell = this.cellEls[ri * nCols + cj]!;
+        cell.id = `${this.aria.id}-${row}-${col}`;
+        const v = view.values[ri * nCols + cj] ?? null;
+        cell.textContent = v !== null ? String(v) : "";
+        if (focus && focus.row === row && focus.col === col) {
+          cell.setAttribute("aria-selected", "true");
+        } else if (cell.hasAttribute("aria-selected")) {
+          cell.removeAttribute("aria-selected");
+        }
+      }
+    }
   }
 
   destroy(): void {

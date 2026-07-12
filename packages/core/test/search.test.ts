@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { initSheetwrite } from "../src/grid";
-import { SheetwriteStore } from "../src/store";
-import { makeColumnarData, makeWorkbook } from "./fixtures";
+import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
+import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -20,6 +20,12 @@ describe("SheetwriteStore.searchCells", () => {
     expect(matches.length).toBe(7);
     expect(matches.every((m) => m.col === 2)).toBe(true);
     expect(matches.map((m) => m.row)).toEqual([1, 4, 7, 10, 13, 16, 19]);
+  });
+
+  it("exposes flat row-major matches without per-cell objects", () => {
+    expect(Array.from(store().searchCellsFlat("s1", "tokyo"))).toEqual([
+      1, 2, 4, 2, 7, 2, 10, 2, 13, 2, 16, 2, 19, 2,
+    ]);
   });
 
   it("honors matchCase", () => {
