@@ -41,6 +41,10 @@
       "types": "./dist/worker.d.ts",
       "default": "./dist/worker.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./styles.css": "./styles.css",
     "./shell.css": "./shell.css"
   },

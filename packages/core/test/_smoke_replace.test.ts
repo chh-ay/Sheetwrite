@@ -2,55 +2,20 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { replaceInText } from "../src/search-replace.js";
 import { SheetwriteStore } from "../src/store.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-const origW = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-const origH = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+let restoreStubs: () => void;
 
 beforeEach(() => {
-  const rec: Record<string, unknown> = {
-    fillStyle: "",
-    strokeStyle: "",
-    font: "",
-    textAlign: "",
-    textBaseline: "",
-    lineWidth: 1,
-  };
-  for (const op of [
-    "setTransform",
-    "fillRect",
-    "fillText",
-    "beginPath",
-    "rect",
-    "clip",
-    "save",
-    "restore",
-    "moveTo",
-    "lineTo",
-    "stroke",
-  ])
-    rec[op] = () => {};
-  const stub = (): CanvasRenderingContext2D => rec as unknown as CanvasRenderingContext2D;
-  HTMLCanvasElement.prototype.getContext =
-    stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
-  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-    configurable: true,
-    get: () => 800,
-  });
-  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-    configurable: true,
-    get: () => 400,
-  });
+  restoreStubs = installCanvasTestStubs();
 });
 afterEach(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-  if (origW) Object.defineProperty(HTMLElement.prototype, "clientWidth", origW);
-  if (origH) Object.defineProperty(HTMLElement.prototype, "clientHeight", origH);
+  restoreStubs();
 });
 
 function mountHost(): HTMLDivElement {

@@ -374,6 +374,31 @@ mount(App, { target: document.getElementById("app")! });
 The Svelte adapter forwards the full `GridOptions` surface — `workerUrl`,
 `renderers`, `overscan`, and `minColumns` included.
 
+## Testing components that mount the grid
+
+Component tests on jsdom/happy-dom (React Testing Library, Vue Test Utils,
+Svelte Testing Library, bun test) fail on mount with:
+
+```
+Sheetwrite: 2D canvas context is unavailable
+```
+
+Those environments provide no 2D canvas and no layout. Install the supported
+stubs before mounting:
+
+```ts
+import { installCanvasTestStubs } from "@sheetwrite/core/testing";
+
+const restore = installCanvasTestStubs(); // optionally { width, height }
+// …mount, assert on grid STATE (selection, store values, DOM chrome)…
+restore();
+```
+
+Nothing is painted — assert grid state, never pixels. `initSheetwrite()`
+works for real under Node-based test runners (the loader reads the binary
+from disk), so no store mocking is needed. Sheetwrite's own test suite runs
+on this exact helper.
+
 ---
 
 ## Meta-frameworks (SSR): keep the grid client-only

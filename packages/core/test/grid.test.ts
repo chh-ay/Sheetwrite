@@ -2,51 +2,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "b
 import { DEFAULT_THEME, GridImpl, initSheetwrite, resolveThemeFromCss } from "../src/grid.js";
 import { createGridController } from "../src/grid-controller.js";
 import { SheetwriteStore } from "../src/store.js";
+import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.js";
 import type { CellScalar, RowData, Store, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
-
-// jsdom has no 2D canvas context, so record draw calls against a stub.
-interface RecordingCtx {
-  calls: Record<string, number>;
-  fillStyle: string;
-  strokeStyle: string;
-  font: string;
-  textAlign: string;
-  textBaseline: string;
-  lineWidth: number;
-  [op: string]: unknown;
-}
-
-function makeRecordingCtx(): RecordingCtx {
-  const calls: Record<string, number> = {};
-  const ctx: RecordingCtx = {
-    calls,
-    fillStyle: "",
-    strokeStyle: "",
-    font: "",
-    textAlign: "",
-    textBaseline: "",
-    lineWidth: 1,
-  };
-  for (const op of [
-    "setTransform",
-    "fillRect",
-    "fillText",
-    "beginPath",
-    "rect",
-    "clip",
-    "save",
-    "restore",
-    "moveTo",
-    "lineTo",
-    "stroke",
-  ]) {
-    ctx[op] = () => {
-      calls[op] = (calls[op] ?? 0) + 1;
-    };
-  }
-  return ctx;
-}
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
 function makeFakeStore(
@@ -76,33 +34,14 @@ function makeFakeStore(
   };
 }
 
-let recording: RecordingCtx;
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+let restoreStubs: () => void;
 
 beforeEach(() => {
-  recording = makeRecordingCtx();
-  // Stub: cast the function (not an inline member read) to the method's type.
-  const stub = (): CanvasRenderingContext2D => recording as unknown as CanvasRenderingContext2D;
-  HTMLCanvasElement.prototype.getContext =
-    stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
-  // happy-dom has no layout; give every element a viewport size for the grid.
-  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-    configurable: true,
-    get: () => 800,
-  });
-  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-    configurable: true,
-    get: () => 400,
-  });
+  restoreStubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-  if (origClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth);
-  if (origClientHeight)
-    Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight);
+  restoreStubs();
 });
 
 function mountHost(): HTMLDivElement {
@@ -178,7 +117,8 @@ describe("Grid render hot path", () => {
 
     expect(getCellCalls).toBe(0);
     expect(getWindowCalls).toBeGreaterThan(0);
-    expect(recording.calls.fillText).toBeGreaterThan(0);
+    const ctx = host.querySelector("canvas")?.getContext("2d") as unknown as RecordingContext2D;
+    expect(ctx.calls.fillText).toBeGreaterThan(0);
 
     grid.destroy();
   });

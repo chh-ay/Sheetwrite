@@ -1,57 +1,21 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellAddress, Renderer, Viewport, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
-// happy-dom has no 2D canvas context and no layout engine, so the grid needs a
-// stubbed context and hard-coded element dimensions to construct and paint.
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
 const originalRaf = globalThis.requestAnimationFrame;
+let restoreStubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  const rec: Record<string, unknown> = {
-    fillStyle: "",
-    strokeStyle: "",
-    font: "",
-    textAlign: "",
-    textBaseline: "",
-    lineWidth: 1,
-  };
-  for (const op of [
-    "setTransform",
-    "fillRect",
-    "fillText",
-    "beginPath",
-    "rect",
-    "clip",
-    "save",
-    "restore",
-    "moveTo",
-    "lineTo",
-    "stroke",
-  ]) {
-    rec[op] = () => {};
-  }
-  const stub = (): CanvasRenderingContext2D => rec as unknown as CanvasRenderingContext2D;
-  HTMLCanvasElement.prototype.getContext =
-    stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
-  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-    configurable: true,
-    get: () => 800,
-  });
-  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-    configurable: true,
-    get: () => 400,
-  });
+  restoreStubs = installCanvasTestStubs();
   globalThis.requestAnimationFrame = ((cb: FrameRequestCallback): number => {
     cb(0);
     return 0;
@@ -59,10 +23,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-  if (origClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth);
-  if (origClientHeight)
-    Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight);
+  restoreStubs();
   globalThis.requestAnimationFrame = originalRaf;
 });
 

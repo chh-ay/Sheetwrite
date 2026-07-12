@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridEvents } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
@@ -7,44 +8,14 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-// happy-dom has no 2D canvas or layout; stub both exactly like grid.test.ts.
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+let restoreStubs: () => void;
 
 beforeEach(() => {
-  const noop = (): void => {};
-  const recording = new Proxy(
-    { canvas: null, fillStyle: "", strokeStyle: "", font: "", lineWidth: 1 },
-    {
-      get(target, prop) {
-        if (prop in target) return Reflect.get(target, prop);
-        return noop;
-      },
-      set(target, prop, value) {
-        Reflect.set(target, prop, value);
-        return true;
-      },
-    },
-  );
-  const stub = (): CanvasRenderingContext2D => recording as unknown as CanvasRenderingContext2D;
-  HTMLCanvasElement.prototype.getContext =
-    stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
-  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-    configurable: true,
-    get: () => 800,
-  });
-  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-    configurable: true,
-    get: () => 400,
-  });
+  restoreStubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-  if (origClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth);
-  if (origClientHeight)
-    Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight);
+  restoreStubs();
 });
 
 function mountHost(): HTMLDivElement {
