@@ -79,7 +79,7 @@ row. The two booleans default to enabled and stay active even with `toolbar: fal
 | --- | --- | --- | --- |
 | `find` | `boolean` | `true` | Built-in **Ctrl+F** find widget (a search box with next / previous and a live match count). Set `false` to remove the shortcut and the widget. |
 | `contextMenu` | `boolean \| ContextMenuItem[]` | `true` | Right-click cell context menu (cut / copy / paste, clear, merge, export). Pass an array to supply a custom item list. |
-| `icons` | `Partial<Record<ToolbarActionName, string>>` | `undefined` | Override the built-in toolbar icon for any action by name, e.g. `{ bold: "𝐁", undo: "↶" }`. |
+| `icons` | `Partial<Record<ToolbarActionName, ToolbarIcon>>` | `undefined` | Override built-in toolbar icons by action name, e.g. `{ bold: "𝐁", undo: "↶" }`. Strings render as plain text; pass a DOM `Node` or `() => Node` for SVG/HTML icons without `innerHTML` (`Node` inputs are cloned so configs can be reused). |
 
 Undo/redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z**
 undoes the last edit, **Ctrl+Shift+Z** redoes it, and **Ctrl+F** opens the find
@@ -101,7 +101,18 @@ interface Grid {
   defineCellRenderer(name: string, renderer: CellRenderer): void;
   aggregate(col: number, op: AggregateOp): number;
   sortBy(col: number, ascending?: boolean): void;
+  sortByMulti(keys: readonly SortKey[]): void;
   filterBy(col: number, needle: string): void;
+  setColumnFilter(col: number, filter: ColumnFilter | null): void;
+  getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
+  distinctValues(col: number, limit?: number): CellScalar[];
+  hideRows(rows: readonly number[]): void;
+  showRows(rows?: readonly number[]): void;
+  hiddenRows(): readonly number[];
+  groupRows(start: number, end: number): void;
+  ungroupRows(start: number, end: number): void;
+  setGroupCollapsed(start: number, collapsed: boolean): void;
+  rowGroups(): readonly RowGroup[];
   clearView(): void;
   undo(): void;
   redo(): void;
@@ -111,7 +122,21 @@ interface Grid {
   findNext(): SearchResult;
   findPrev(): SearchResult;
   clearSearch(): void;
-  highlightCells(ranges: Range[] | null, color?: string): void;
+  replaceCurrent(replacement: string): SearchResult;
+  replaceAll(replacement: string): ReplaceResult;
+  insertRows(at: number, count?: number): void;
+  removeRows(at: number, count?: number): void;
+  insertColumns(at: number, count?: number): void;
+  removeColumns(at: number, count?: number): void;
+  highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
+  styleRange(range: Range, style: Partial<CellStyle> | null): void;
+  beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void;
+  dataEdge(row: number, col: number, dRow: number, dCol: number): number | null;
+  setRowHeight(row: number, height: number): void;
+  setColumnWidth(col: number, width: number): void;
+  setFrozen(rows: number, cols?: number): void;
+  setZoom(zoom: number): void;
+  getZoom(): number;
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
   refresh(): void;
   destroy(): void;
@@ -128,13 +153,26 @@ interface Grid {
 | `setTheme(partial)` | Merge a partial theme and repaint. |
 | `defineCellRenderer(name, r)` | Register a custom renderer after construction. |
 | `aggregate(col, op)` | Column aggregate; see [Data operations](./data-operations.md#aggregate). |
-| `sortBy` / `filterBy` / `clearView` | Non-mutating display views; see [Data operations](./data-operations.md#sort-filter-views). |
+| `sortBy` / `sortByMulti` | Non-mutating display sorts; see [Data operations](./data-operations.md#display-views). |
+| `filterBy` / `setColumnFilter` / `getColumnFilters` | Column filters that compose with sort, hidden rows, and row groups. |
+| `distinctValues(col, limit?)` | First-seen distinct values for building filter menus. |
+| `hideRows` / `showRows` / `hiddenRows` | Explicit row visibility separate from sort/filter state. |
+| `groupRows` / `ungroupRows` / `setGroupCollapsed` / `rowGroups` | Inclusive data-row groups with collapse state. |
+| `clearView()` | Clears sort/filter state; hidden rows and row groups remain. |
+| `setFrozen(rows, cols?)` | Pin leading view rows/columns while the body scrolls. |
+| `setZoom(z)` / `getZoom()` | Scale grid content between `0.5` and `2` without mutating workbook base sizes. |
 | `undo()` / `redo()` | Undo or redo the last recorded cell edit (also bound to Ctrl+Z / Ctrl+Shift+Z). |
 | `exportCsv` / `exportXlsx` | Download the active data; see [Data operations](./data-operations.md#export). |
 | `search(query, opts?)` | Find matching cells; highlights them, emits `search`, returns a [`SearchResult`](#search). |
 | `findNext()` / `findPrev()` | Step the active match forward / backward and scroll it into view. |
 | `clearSearch()` | Drop the current search and clear its highlights. |
+| `replaceCurrent()` / `replaceAll()` | Replace literal text/number matches through undoable transactions. |
+| `insertRows` / `removeRows` / `insertColumns` / `removeColumns` | Structural edits through undoable patches. |
 | `highlightCells(ranges, color?)` | Highlight arbitrary ranges (`null` clears); `color` overrides the theme highlight. |
+| `styleRange(range, style)` | Merge or clear store-backed cell styles across a range. |
+| `beginEdit(row, col, initial?, selectAll?)` | Open the inline editor at a view cell. |
+| `dataEdge(row, col, dRow, dCol)` | Ctrl+Arrow-style data-run jump target; vertical movement is view-aware under sort/filter. |
+| `setRowHeight(row, h)` / `setColumnWidth(col, w)` | Geometry APIs; row height is view-indexed and persists against the underlying data row. |
 | `on(evt, fn)` | Subscribe to an event; returns an unsubscribe function. |
 | `refresh()` | Force a re-render (e.g. after mutating the workbook directly). |
 | `destroy()` | Tear down listeners, DOM, and ARIA attributes. |

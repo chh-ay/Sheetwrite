@@ -137,8 +137,7 @@ events or `grid.store.getDirty()` before swapping a reset-bound input.
 | --- | --- | --- |
 | `workbook`, `data`, `datasource` | **reset** | New document: the store is rebuilt from the new inputs. Identity comparison — nested mutation is not watched. |
 | `renderer`, `workerUrl`, `renderers` | **reset** | The paint backend is constructed once; swapping it live is a deferred design. |
-| `minColumns` | **reset** | Column padding is baked into the store's sheet geometry at construction. |
-| `theme`, `readOnly`, `config`, `overscan` | live | Applied to the existing grid (`replaceTheme` / `setReadOnly` / `setConfig` / `setOverscan`). |
+| `theme`, `readOnly`, `config`, `overscan`, `minColumns` | live | Applied to the existing grid. Increasing `minColumns` silently extends store geometry without emitting `change` events or dirty patches. |
 | Event callbacks (`onChange`, …) | live | Read through the live handler bag on every event. |
 
 The same table applies to all three adapters.

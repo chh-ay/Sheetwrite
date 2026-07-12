@@ -1,16 +1,13 @@
 <script lang="ts">
-import {
-  type ChangeEvent,
-  type Grid,
-  type GridEvents,
-  type GridOptions,
-  type Selection,
+import type {
+  ChangeEvent,
+  Grid,
+  GridEvents,
+  GridOptions,
+  Selection,
 } from "@sheetwrite/core";
-import {
-  createGridController,
-  type GridController,
-  type GridControllerHandlers,
-} from "@sheetwrite/core/adapter";
+import { createGridController } from "@sheetwrite/core/adapter";
+import type { GridController, GridControllerHandlers } from "@sheetwrite/core/adapter";
 import { untrack } from "svelte";
 import type { HTMLAttributes } from "svelte/elements";
 
@@ -85,7 +82,7 @@ const handlers: GridControllerHandlers = {
 // Owns the host div: creates the imperative core grid through the shared
 // controller, forwards every core event, replaces it only when a
 // construction-bound option changes, and tears it down on unmount. Theme,
-// read-only, config, callbacks, and host attributes update live. It renders no
+// read-only, config, overscan, minColumns, callbacks, and host attributes update live. It renders no
 // cells. Call `await initSheetwrite(wasmUrl)` once before mounting.
 $effect(() => {
   // Track construction-bound option identities. Live options are read
@@ -97,7 +94,7 @@ $effect(() => {
   const activeWorkerUrl = workerUrl;
   const activeRenderers = renderers;
   const activeOverscan = untrack(() => overscan);
-  const activeMinColumns = minColumns;
+  const activeMinColumns = untrack(() => minColumns);
   const activeReadOnly = untrack(() => readOnly);
   const activeConfig = untrack(() => config);
   const activeTheme = untrack(() => theme);
@@ -151,6 +148,10 @@ $effect(() => {
 
 $effect(() => {
   controller?.setOverscan(overscan);
+});
+
+$effect(() => {
+  controller?.setMinColumns(minColumns);
 });
 </script>
 

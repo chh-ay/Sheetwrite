@@ -157,7 +157,7 @@ column headers the renderer draws — the `header` you set on a `Column` is meta
 
 Named **field** titles are therefore not chrome. The convention, exactly as in a
 real sheet, is to put them in **row 0** (the first data row) and style them
-yourself. `examples/vanilla` reserves row 0 and writes a styled header band over
+yourself. The vanilla example (`examples/site`, `/vanilla`) reserves row 0 and writes a styled header band over
 it once the initial page loads:
 
 ```ts

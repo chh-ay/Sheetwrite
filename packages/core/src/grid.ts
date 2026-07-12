@@ -184,7 +184,6 @@ export class GridImpl implements Grid {
   private config: GridConfig | undefined;
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
-  private readonly merges = new Map<SheetId, SelRect[]>();
   private readonly history = new UndoManager();
   private applyingHistory = false;
   private rowTopsScratch = new Float64Array(0);
@@ -317,7 +316,10 @@ export class GridImpl implements Grid {
       sheet: () => this.sheet(),
       readOnly: () => this.readOnly,
       theme: () => this.theme,
-      merges: this.merges,
+      merges: () => this.sheet().merges ?? [],
+      setMerges: (merges) => {
+        this.sheet().merges = merges;
+      },
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches) => this.commit(patches, "style"),
@@ -707,9 +709,7 @@ export class GridImpl implements Grid {
       rowHeight: this.theme.rowHeight,
       headerHeight: this.theme.headerHeight,
       totalRows: sheet.rowCount,
-      merges: this.loadable?.hasView(this.activeSheet)
-        ? []
-        : (this.merges.get(this.activeSheet) ?? []),
+      merges: this.loadable?.hasView(this.activeSheet) ? [] : (sheet.merges ?? []),
     });
     this.selection.setBounds(sheet.rowCount, this.firstCol(), this.lastCol());
     this.syncSizer();
@@ -736,6 +736,7 @@ export class GridImpl implements Grid {
     this.columnWindowStart = -1;
     this.columnWindowEnd = -1;
     this.windowedColIndices = [];
+    this.ariaMirror?.setColumnCount(this.colIndices.length);
   }
 
   private applyRowHeights(sheet: Sheet): void {
@@ -764,7 +765,7 @@ export class GridImpl implements Grid {
   private mergeAnchorAt(row: number, col: number): SelRect | null {
     if (this.loadable?.hasView(this.activeSheet)) return null;
 
-    const merges = this.merges.get(this.activeSheet);
+    const merges = this.sheet().merges;
     if (!merges) return null;
 
     for (const merge of merges) {
@@ -1451,11 +1452,19 @@ export class GridImpl implements Grid {
     );
   }
 
-  // NOTE: a live `setMinColumns` was evaluated and rejected: column count is
-  // baked into the WASM sheet geometry at construction (padColumns runs before
-  // the store exists), and the only public re-derivation (`addColumns`
-  // patches) would emit change events and dirty-list entries for a
-  // presentation knob. `minColumns` stays a reset boundary.
+  setMinColumns(minColumns?: number): void {
+    const target = padTarget(this.host, minColumns);
+    const sheet = this.sheet();
+    if (target <= sheet.columns.length) return;
+
+    const columns = sheet.columns.slice();
+    appendPadColumns(columns, target);
+    this.store.ensureColumns(sheet.id, columns);
+    this.rebuildColumnIndex();
+    this.applyLayout();
+    this.paintEpoch += 1;
+    this.scheduleRender();
+  }
   setOverscan(overscan?: number): void {
     const next = overscan === undefined ? DEFAULT_OVERSCAN : Math.max(0, Math.floor(overscan));
     if (next === this.overscan) return;
@@ -2023,14 +2032,18 @@ function padColumns(workbook: Workbook, opts: GridOptions, host: HTMLElement): W
 
     changed = true;
     const columns = sheet.columns.slice();
-    for (let c = columns.length; c < target; c++) {
-      columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "text" });
-    }
+    appendPadColumns(columns, target);
 
     return { ...sheet, columns };
   });
 
   return changed ? { ...workbook, sheets } : workbook;
+}
+
+function appendPadColumns(columns: Column[], target: number): void {
+  for (let c = columns.length; c < target; c++) {
+    columns.push({ key: `__pad_${c}`, header: "", width: DEFAULT_COL_WIDTH, type: "text" });
+  }
 }
 
 /** Columns needed to satisfy `minColumns` and fill the host width. */

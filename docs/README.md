@@ -17,9 +17,10 @@ copy-pasteable snippets grounded in the runnable examples under `examples/`.
 | [Configuration](./configuration.md) | Every `GridOptions` and `GridConfig` field with type and default, plus the `Grid` instance methods and events. |
 | [Styling](./styling.md) | `Theme` and `DEFAULT_THEME`, the `--sheetwrite-*` CSS custom properties and `@sheetwrite/core/styles.css`, `CellStyle` / per-side borders, and `numberFormat`. |
 | [Formulas](./formulas.md) | The A1 formula dialect: references and ranges, operators, the function set, cycle detection, point-mode, and reference rewriting. |
-| [Data operations](./data-operations.md) | Non-mutating `sortBy` / `filterBy` / `clearView` views, `aggregate`, and CSV / TSV / XLSX export. |
+| [Data operations](./data-operations.md) | Composable non-mutating sort/filter views, hidden rows/groups, frozen panes, zoom, aggregates, and CSV / TSV / XLSX import/export. |
 | [Interaction](./interaction.md) | Selection model, keyboard navigation, IME-safe inline editing, clipboard TSV, the toolbar, merged cells, and drag-to-fill. |
 | [Accessibility](./accessibility.md) | The ARIA grid shadow tree and its visible-window limitation. |
+| [Spreadsheet shell](./shell.md) | `@sheetwrite/core/shell`: the full Sheets-style shell and the composable toolbar / name-box / formula-bar / status pieces. |
 | [Framework integration](./framework-integration.md) | `@sheetwrite/react`, `@sheetwrite/vue`, `@sheetwrite/svelte`, and client-only recipes for Next.js, Nuxt, and SvelteKit. |
 | [Worker rendering](./worker-rendering.md) | `renderer: "worker"`, OffscreenCanvas, and the automatic main-thread fallback. |
 

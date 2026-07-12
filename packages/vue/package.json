@@ -1,9 +1,15 @@
 {
   "name": "@sheetwrite/vue",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Vue adapter for Sheetwrite.",
   "license": "MIT",
+  "keywords": [
+    "spreadsheet",
+    "data-grid",
+    "vue",
+    "canvas"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,8 +22,13 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {

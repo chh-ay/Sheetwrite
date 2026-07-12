@@ -1,11 +1,11 @@
 /**
  * Timing + summary statistics shared by both benchmark targets.
  *
- * The measurement protocol is deliberately conservative: a configurable number
- * of untimed warm-up iterations let JIT, allocation pools, and CPU caches reach
- * steady state, then a larger set of timed iterations is collected and reduced
- * to robust order statistics (median + p95) rather than a mean, so a single
- * GC pause or scheduler hiccup can't dominate the headline number.
+ * The measurement protocol runs a configurable number of untimed warm-up
+ * iterations, optionally forces a GC before each timed sample, then records the
+ * timed iterations as a finite sample. Summaries report the median as the
+ * headline, an interpolated p95 estimate, the arithmetic mean, min/max, and
+ * population standard deviation so small samples show both center and spread.
  */
 
 /** High-resolution monotonic clock in milliseconds. */
@@ -14,22 +14,32 @@ export const now: () => number =
     ? () => performance.now()
     : () => Number(process.hrtime.bigint()) / 1e6;
 
-/** Robust summary of a sample of durations (all in milliseconds). */
+/**
+ * Summary of a sample of durations (all in milliseconds). For very small
+ * samples, p95 is an interpolated estimate; min, max, and stddev show the true
+ * observed spread. stddev is the population standard deviation of the sample.
+ */
 export interface Stat {
   readonly median: number;
   readonly p95: number;
   readonly mean: number;
+  readonly stddev: number;
   readonly min: number;
   readonly max: number;
   readonly iters: number;
 }
 
-/** Nearest-rank percentile over a copy-sorted sample (0 ≤ p ≤ 1). */
+/** Linear-interpolated percentile over a copy-sorted sample (0 ≤ p ≤ 1). */
 function percentile(sorted: readonly number[], p: number): number {
   if (sorted.length === 0) return Number.NaN;
-  const rank = Math.ceil(p * sorted.length);
-  const idx = Math.min(sorted.length - 1, Math.max(0, rank - 1));
-  return sorted[idx]!;
+  const q = Number.isFinite(p) ? Math.min(1, Math.max(0, p)) : 0;
+  const pos = (sorted.length - 1) * q;
+  const lowerIdx = Math.floor(pos);
+  const upperIdx = Math.ceil(pos);
+  const lower = sorted[lowerIdx];
+  const upper = sorted[upperIdx];
+  if (lower === undefined || upper === undefined) return Number.NaN;
+  return lower + (upper - lower) * (pos - lowerIdx);
 }
 
 /** Reduce a raw sample of per-iteration durations to a {@link Stat}. */
@@ -39,6 +49,7 @@ export function summarize(samples: readonly number[]): Stat {
       median: Number.NaN,
       p95: Number.NaN,
       mean: Number.NaN,
+      stddev: Number.NaN,
       min: Number.NaN,
       max: Number.NaN,
       iters: 0,
@@ -46,10 +57,13 @@ export function summarize(samples: readonly number[]): Stat {
   }
   const sorted = [...samples].sort((a, b) => a - b);
   const sum = sorted.reduce((acc, v) => acc + v, 0);
+  const mean = sum / sorted.length;
+  const variance = sorted.reduce((acc, v) => acc + (v - mean) ** 2, 0) / sorted.length;
   return {
     median: percentile(sorted, 0.5),
     p95: percentile(sorted, 0.95),
-    mean: sum / sorted.length,
+    mean,
+    stddev: Math.sqrt(variance),
     min: sorted[0]!,
     max: sorted[sorted.length - 1]!,
     iters: sorted.length,

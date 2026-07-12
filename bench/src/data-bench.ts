@@ -2,8 +2,8 @@
  * Headless data-layer benchmark: Sheetwrite vs Handsontable.
  *
  * Measures the cost of pure data operations — load, windowed read, edit, sort,
- * filter, aggregate — with robust statistics (median + p95 over warmed-up,
- * repeated iterations) and a memory profile sampled in isolated subprocesses.
+ * filter, aggregate — with median, interpolated p95, and spread over warmed-up,
+ * repeated iterations, plus a memory profile sampled in isolated subprocesses.
  * The dataset is seeded and deterministic (see ./dataset.ts), so every workload
  * runs over byte-identical content on both engines and the numbers reproduce.
  *
@@ -57,7 +57,7 @@ import { forceGc, type MeasureOptions, measure, mib, ms, type Stat, summarize } 
 // ── Configuration ────────────────────────────────────────────────────────────
 
 /** Sheetwrite is measured across the full range; its store scales to 1M. */
-const SHEETWRITE_ROWS = [1_000, 10_000, 100_000, 500_000, 1_000_000] as const;
+export const SHEETWRITE_ROWS = [1_000, 10_000, 100_000, 500_000, 1_000_000] as const;
 /** Handsontable headless ceiling — larger sizes render every row (infeasible). */
 const HANDSONTABLE_ROWS = [1_000, 10_000] as const;
 /** Sizes where both engines run headlessly → the apples-to-apples head-to-head. */
@@ -67,10 +67,12 @@ const SHEET = "bench";
 const ALL_COLS: readonly number[] = [0, 1, 2, 3, 4];
 const WINDOW_ROWS = 50;
 const EDIT_COUNT = 1_000;
+const WINDOW_READ_BATCH = 32;
+const SMALL_AGGREGATE_BATCH = 128;
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
 
-const WORKLOADS = ["ingest", "windowRead", "edit", "sort", "filter", "aggregate"] as const;
-type Workload = (typeof WORKLOADS)[number];
+export const WORKLOADS = ["ingest", "windowRead", "edit", "sort", "filter", "aggregate"] as const;
+export type Workload = (typeof WORKLOADS)[number];
 type EngineId = "sheetwrite" | "handsontable";
 
 const WORKLOAD_LABELS: Record<Workload, string> = {
@@ -82,26 +84,46 @@ const WORKLOAD_LABELS: Record<Workload, string> = {
   aggregate: "Sum amount (aggregate)",
 };
 
-/** Per-workload iteration plan; expensive ops/sizes sample fewer times. */
-function plan(workload: Workload, rows: number): { warmup: number; iters: number } {
+/** Per-workload iteration plan; expensive at-scale ops sample fewer times. */
+type IterationPlan = Pick<MeasureOptions, "warmup" | "iters" | "gcBetween">;
+
+function plan(workload: Workload, rows: number): IterationPlan {
+  const atScale = rows >= 500_000;
   switch (workload) {
     case "ingest":
-      if (rows >= 1_000_000) return { warmup: 1, iters: 3 };
-      if (rows >= 500_000) return { warmup: 1, iters: 3 };
-      if (rows >= 100_000) return { warmup: 1, iters: 5 };
-      return { warmup: 1, iters: 7 };
+      return atScale ? { warmup: 1, iters: 3, gcBetween: true } : { warmup: 1, iters: 7 };
     case "windowRead":
       return { warmup: 50, iters: 300 };
     case "edit":
-      return { warmup: 1, iters: rows >= 500_000 ? 3 : 5 };
+      return atScale ? { warmup: 1, iters: 5, gcBetween: true } : { warmup: 1, iters: 15 };
     case "sort":
     case "filter":
-      if (rows >= 500_000) return { warmup: 1, iters: 5 };
-      if (rows >= 100_000) return { warmup: 1, iters: 6 };
-      return { warmup: 2, iters: 7 };
+      return atScale
+        ? { warmup: 1, iters: 5, gcBetween: true }
+        : { warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
     case "aggregate":
       return { warmup: 20, iters: 200 };
   }
+}
+function perOperation(stat: Stat, batch: number): Stat {
+  return {
+    median: stat.median / batch,
+    p95: stat.p95 / batch,
+    mean: stat.mean / batch,
+    stddev: stat.stddev / batch,
+    min: stat.min / batch,
+    max: stat.max / batch,
+    iters: stat.iters,
+  };
+}
+
+function measureBatched(fn: () => void, opts: MeasureOptions, batch: number): Stat {
+  return perOperation(
+    measure(() => {
+      for (let i = 0; i < batch; i++) fn();
+    }, opts),
+    batch,
+  );
 }
 
 // ── Result types ─────────────────────────────────────────────────────────────
@@ -114,11 +136,15 @@ interface MemoryProfile {
   readonly wasmDeltaBytes: number | null;
 }
 
-/** All measured workloads for one engine at one row count. */
-interface EngineResult {
+/** Timed workloads for one engine at one row count. */
+export interface TimedEngineResult {
   readonly rows: number;
   readonly stats: Record<Workload, Stat>;
   readonly notes: Partial<Record<Workload, string>>;
+}
+
+/** All measured workloads for one engine at one row count. */
+interface EngineResult extends TimedEngineResult {
   readonly memory: MemoryProfile;
 }
 
@@ -134,10 +160,7 @@ function makeWorkbook(rowCount: number): Workbook {
   return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
 }
 
-function benchSheetwrite(
-  ds: ColumnarDataset,
-  columnar: SheetwriteColumnar,
-): Omit<EngineResult, "memory"> {
+function benchSheetwrite(ds: ColumnarDataset, columnar: SheetwriteColumnar): TimedEngineResult {
   const rows = ds.rowCount;
   const stats = {} as Record<Workload, Stat>;
 
@@ -147,9 +170,18 @@ function benchSheetwrite(
     () => {
       storeSink = new SheetwriteStore(makeWorkbook(rows), columnar);
     },
-    plan("ingest", rows),
+    {
+      ...plan("ingest", rows),
+      before: () => {
+        // Free the previous iteration's store: WASM linear memory is released
+        // deterministically instead of accumulating across iterations/rounds.
+        storeSink?.dispose();
+        storeSink = undefined;
+      },
+    },
   );
-  void storeSink;
+  storeSink?.dispose();
+  storeSink = undefined;
 
   // One persistent store backs the remaining read/mutate workloads.
   const store = new SheetwriteStore(makeWorkbook(rows), columnar);
@@ -158,13 +190,14 @@ function benchSheetwrite(
   // per-window caching and sweep the whole sheet.
   const maxStart = Math.max(0, rows - WINDOW_ROWS);
   let off = 0;
-  stats.windowRead = measure(
+  stats.windowRead = measureBatched(
     () => {
       const start = off;
       off = off + 977 > maxStart ? 0 : off + 977;
       store.getVisibleWindow(SHEET, { start, end: start + WINDOW_ROWS }, ALL_COLS);
     },
     plan("windowRead", rows),
+    WINDOW_READ_BATCH,
   );
 
   // (c) edit — 1000 single-cell transactions; each recomputes the sheet, the
@@ -200,15 +233,59 @@ function benchSheetwrite(
 
   // (f) aggregate — WASM column sum.
   let aggSink = 0;
-  stats.aggregate = measure(
+  stats.aggregate = measureBatched(
     () => {
       aggSink = store.aggregate(SHEET, AGG_COL, "sum");
     },
     plan("aggregate", rows),
+    rows <= 10_000 ? SMALL_AGGREGATE_BATCH : 1,
   );
   void aggSink;
 
+  store.dispose();
   return { rows, stats, notes: {} };
+}
+function warmSheetwriteDataPath(): void {
+  const rows = 10_000;
+  const ds = makeColumnar(rows);
+  const columnar = toSheetwriteColumnar(ds);
+
+  // Warm constructor/load and JS↔WASM call paths before recording sub-ms medians.
+  for (let i = 0; i < 3; i++) {
+    new SheetwriteStore(makeWorkbook(rows), columnar).dispose();
+  }
+
+  const store = new SheetwriteStore(makeWorkbook(rows), columnar);
+  for (let i = 0; i < 100; i++) {
+    const start = (i * 97) % (rows - WINDOW_ROWS);
+    store.getVisibleWindow(SHEET, { start, end: start + WINDOW_ROWS }, ALL_COLS);
+  }
+
+  for (let k = 0; k < EDIT_COUNT; k++) {
+    const row = (k * 1009) % rows;
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: SHEET, row, col: COL.amount },
+          value: { kind: "literal", value: (k % 9000) + 0.5 },
+        },
+      ],
+    });
+  }
+
+  store.sortBy(SHEET, SORT_COL, true);
+  store.clearView(SHEET);
+  const smallRows = 1_000;
+  const smallDs = makeColumnar(smallRows);
+  const smallStore = new SheetwriteStore(makeWorkbook(smallRows), toSheetwriteColumnar(smallDs));
+  smallStore.sortBy(SHEET, SORT_COL, true);
+  smallStore.dispose();
+
+  store.filterBy(SHEET, FILTER_COL, FILTER_NEEDLE);
+  store.clearView(SHEET);
+  store.aggregate(SHEET, AGG_COL, "sum");
+  store.dispose();
 }
 
 // ── Handsontable harness ─────────────────────────────────────────────────────
@@ -503,16 +580,28 @@ function memoryTable(sw: Map<number, EngineResult>): string {
   return lines.join("\n");
 }
 
-async function runFullBench(): Promise<void> {
+export async function runSheetwriteDataBench(
+  rowsList: readonly number[] = SHEETWRITE_ROWS,
+): Promise<Map<number, TimedEngineResult>> {
   await initSheetwrite(readFileSync(WASM_PATH));
+  warmSheetwriteDataPath();
+
+  const results = new Map<number, TimedEngineResult>();
+  for (const rows of rowsList) {
+    process.stderr.write(`\n▶ Sheetwrite ${N(rows)} rows …\n`);
+    const ds = makeColumnar(rows);
+    results.set(rows, benchSheetwrite(ds, toSheetwriteColumnar(ds)));
+  }
+  return results;
+}
+
+async function runFullBench(): Promise<void> {
+  const timedSw = await runSheetwriteDataBench();
 
   const sw = new Map<number, EngineResult>();
   const hot = new Map<number, EngineResult>();
 
-  for (const rows of SHEETWRITE_ROWS) {
-    process.stderr.write(`\n▶ Sheetwrite ${N(rows)} rows …\n`);
-    const ds = makeColumnar(rows);
-    const timed = benchSheetwrite(ds, toSheetwriteColumnar(ds));
+  for (const [rows, timed] of timedSw) {
     const memory = probeMemory("sheetwrite", rows);
     sw.set(rows, { ...timed, memory });
   }
@@ -608,8 +697,10 @@ async function runFullBench(): Promise<void> {
 
 // ── Entry ────────────────────────────────────────────────────────────────────
 
-if (process.argv.includes("--mem")) {
-  await runMemMode();
-} else {
-  await runFullBench();
+if (import.meta.main) {
+  if (process.argv.includes("--mem")) {
+    await runMemMode();
+  } else {
+    await runFullBench();
+  }
 }

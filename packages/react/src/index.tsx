@@ -85,9 +85,11 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
     const readOnlyRef = useRef<GridOptions["readOnly"]>(readOnly);
     const configRef = useRef<GridOptions["config"]>(config);
     const overscanRef = useRef<GridOptions["overscan"]>(overscan);
+    const minColumnsRef = useRef<GridOptions["minColumns"]>(minColumns);
     readOnlyRef.current = readOnly;
     configRef.current = config;
     overscanRef.current = overscan;
+    minColumnsRef.current = minColumns;
 
     // Live-callback bag: the controller reads these fields on every event, so we
     // mutate the SAME object each render instead of recreating the grid.
@@ -133,7 +135,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
           readOnly: readOnlyRef.current,
           renderers,
           overscan: overscanRef.current,
-          minColumns,
+          minColumns: minColumnsRef.current,
           config: configRef.current,
         },
         handlers.current,
@@ -150,7 +152,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
           publishGrid(publishedRef.current, null);
         }
       };
-    }, [workbook, data, datasource, renderer, workerUrl, renderers, minColumns]);
+    }, [workbook, data, datasource, renderer, workerUrl, renderers]);
 
     useEffect(() => {
       controllerRef.current?.setReadOnly(readOnly ?? false);
@@ -165,6 +167,9 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
     useEffect(() => {
       controllerRef.current?.setOverscan(overscan);
     }, [overscan]);
+    useEffect(() => {
+      controllerRef.current?.setMinColumns(minColumns);
+    }, [minColumns]);
 
     // The grid adds `.sheetwrite` (the CSS-variable chrome) to this div; keep
     // it in the React-owned class so Tailwind-style `cn()` className churn

@@ -26,6 +26,7 @@ function makeFakeStore(
       for (let i = 0; i < n; i++) values[i] = `v${i}`;
       return { sheet, rows, cols, values, styleIds: new Uint32Array(n), styles: [{}] };
     },
+    ensureColumns: () => {},
     applyTransaction: () => {},
     on: () => () => {},
     getDirty: () => [],
@@ -782,6 +783,34 @@ describe("Grid.setOverscan", () => {
     grid.setOverscan();
     grid.refresh();
     expect(windows.at(-1)!.lastRow).toBeLessThan(after.lastRow);
+
+    grid.destroy();
+    store.dispose();
+  });
+});
+
+describe("Grid.setMinColumns", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("widens presentation geometry without emitting changes or dirty patches", () => {
+    const workbook = makeWorkbook(5);
+    const store = new SheetwriteStore(workbook, makeColumnarData(5));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    let changes = 0;
+    grid.on("change", () => {
+      changes += 1;
+    });
+
+    grid.setMinColumns(12);
+    grid.refresh();
+
+    expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(12);
+    expect(host.getAttribute("aria-colcount")).toBe("12");
+    expect(changes).toBe(0);
+    expect(store.getDirty()).toEqual([]);
 
     grid.destroy();
     store.dispose();

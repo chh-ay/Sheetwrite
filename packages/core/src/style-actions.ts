@@ -10,7 +10,8 @@ export interface StyleActionsDeps {
   sheet: () => Sheet;
   readOnly: () => boolean;
   theme: () => Theme;
-  merges: Map<SheetId, SelRect[]>;
+  merges: () => SelRect[];
+  setMerges: (merges: SelRect[]) => void;
   anchorCell: (row: number, col: number) => { row: number; col: number };
   toDataRow: (viewRow: number) => number;
   commit: (patches: Patch[]) => void;
@@ -109,24 +110,22 @@ export class StyleActions {
     const sel = this.deps.selection().toSelection(activeSheet);
     if (sel?.kind !== "range") return;
     const { start, end } = sel.range;
-    const list = this.deps.merges.get(activeSheet) ?? [];
+    const list = this.deps.merges();
     list.push({
       r0: Math.min(start.row, end.row),
       c0: Math.min(start.col, end.col),
       r1: Math.max(start.row, end.row),
       c1: Math.max(start.col, end.col),
     });
-    this.deps.merges.set(activeSheet, list);
+    this.deps.setMerges(list);
     this.deps.applyLayout();
   }
 
   unmergeSelection(): void {
     const f = this.deps.selection().focusCell;
-    const activeSheet = this.deps.activeSheet();
-    const list = this.deps.merges.get(activeSheet);
-    if (!f || !list) return;
-    this.deps.merges.set(
-      activeSheet,
+    const list = this.deps.merges();
+    if (!f || list.length === 0) return;
+    this.deps.setMerges(
       list.filter((m) => !(f.row >= m.r0 && f.row <= m.r1 && f.col >= m.c0 && f.col <= m.c1)),
     );
     this.deps.applyLayout();

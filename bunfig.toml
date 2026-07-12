@@ -1,2 +1,5 @@
 [test]
 preload = ["./test-setup.ts"]
+# Bun's runner owns packages/*; Playwright specs under test/browser run through
+# `bun run test:browser` and must not be collected here.
+root = "packages"

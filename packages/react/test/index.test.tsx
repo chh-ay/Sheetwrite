@@ -391,7 +391,7 @@ describe("SheetwriteGrid React lifecycle", () => {
     }
   });
 
-  it("keeps the grid AND committed edits when overscan changes (live option)", async () => {
+  it("keeps the grid and committed edits when overscan/minColumns change live", async () => {
     const workbook = makeWorkbook();
     const data = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
     const host = document.createElement("div");
@@ -416,12 +416,21 @@ describe("SheetwriteGrid React lifecycle", () => {
     });
 
     await act(async () => {
-      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} data={data} overscan={9} />);
+      root.render(
+        <SheetwriteGrid
+          ref={gridRef}
+          workbook={workbook}
+          data={data}
+          overscan={9}
+          minColumns={12}
+        />,
+      );
     });
 
     // No recreate: same grid, and the committed edit survived.
     expect(gridRef.current).toBe(first);
     expect(first.store.getCell({ sheet: "sheet", row: 0, col: 0 }).resolved).toBe("edited");
+    expect(host.querySelector("[role=grid]")?.getAttribute("aria-colcount")).toBe("12");
 
     await act(async () => root.unmount());
   });

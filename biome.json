@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -10,10 +10,11 @@
       "**",
       "!**/dist",
       "!**/pkg",
-      "!**/target",
       "!**/node_modules",
+      "!**/.astro",
       "!**/*.d.ts",
-      "!**/*.svelte"
+      "!**/*.svelte",
+      "!bench/results"
     ]
   },
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
@@ -41,5 +42,18 @@
       "semicolons": "always",
       "trailingCommas": "all"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.astro"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off",
+            "noUnusedVariables": "off"
+          }
+        }
+      }
+    }
+  ]
 }

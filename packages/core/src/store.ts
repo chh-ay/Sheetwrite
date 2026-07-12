@@ -874,6 +874,15 @@ export class SheetwriteStore implements Store {
     return this.viewOrder.has(sheet);
   }
 
+  ensureColumns(sheet: SheetId, columns: readonly Column[]): void {
+    const meta = this.sheetMeta(sheet);
+    if (columns.length <= meta.columns.length) return;
+
+    const additions = columns.slice(meta.columns.length);
+    this.wasm.insertCols(this.handleOf(sheet), meta.columns.length, additions.length);
+    meta.columns.push(...additions);
+  }
+
   /**
    * Public `Store` shape takes one argument (reason defaults to `"api"`);
    * internal producers thread their {@link CommitReason} via the second.

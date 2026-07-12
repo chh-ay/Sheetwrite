@@ -118,8 +118,8 @@ function fontFor(theme: Theme, bold: boolean | undefined, italic: boolean | unde
 
 /**
  * Draw horizontally-aligned text inside a cell or header rect. `cy` is the
- * vertical center (baseline is "middle") and `maxWidth` lets the engine condense
- * glyphs to fit.
+ * vertical center (baseline is "middle"). Deliberately omit Canvas's
+ * `maxWidth`: browsers satisfy it by horizontally distorting glyphs.
  */
 function fillAlignedText(
   ctx: Ctx,
@@ -128,17 +128,16 @@ function fillAlignedText(
   x: number,
   w: number,
   cy: number,
-  maxWidth: number,
 ): void {
   if (align === "right") {
     ctx.textAlign = "right";
-    ctx.fillText(text, x + w - CELL_PAD, cy, maxWidth);
+    ctx.fillText(text, x + w - CELL_PAD, cy);
   } else if (align === "center") {
     ctx.textAlign = "center";
-    ctx.fillText(text, x + w / 2, cy, maxWidth);
+    ctx.fillText(text, x + w / 2, cy);
   } else {
     ctx.textAlign = "left";
-    ctx.fillText(text, x + CELL_PAD, cy, maxWidth);
+    ctx.fillText(text, x + CELL_PAD, cy);
   }
 }
 
@@ -156,11 +155,9 @@ function paintTextDecoration(
   x: number,
   w: number,
   cy: number,
-  maxWidth: number,
   theme: Theme,
 ): void {
-  // fillText condenses the run to `maxWidth`, so the line never overruns the cell.
-  const runWidth = Math.min(ctx.measureText(text).width, maxWidth);
+  const runWidth = ctx.measureText(text).width;
   if (runWidth <= 0) return;
 
   let left: number;
@@ -525,11 +522,10 @@ function paintCell(
   const align =
     effective.align ??
     (column?.type === "number" || column?.type === "currency" ? "right" : "left");
-  const maxWidth = Math.max(1, w - CELL_PAD * 2);
   const cy = y + h / 2;
-  fillAlignedText(ctx, text, align, x, w, cy, maxWidth);
+  fillAlignedText(ctx, text, align, x, w, cy);
   if (effective.underline || effective.strikethrough) {
-    paintTextDecoration(ctx, effective, text, align, x, w, cy, maxWidth, theme);
+    paintTextDecoration(ctx, effective, text, align, x, w, cy, theme);
   }
 }
 
@@ -601,8 +597,7 @@ function paintHeader(
     applyFill(ctx, state, headerStyle?.color ?? theme.headerFg);
 
     const align = headerStyle?.align ?? "center";
-    const maxWidth = Math.max(1, w - CELL_PAD * 2);
-    fillAlignedText(ctx, column.header, align, x, w, cy, maxWidth);
+    fillAlignedText(ctx, column.header, align, x, w, cy);
   }
 
   ctx.strokeStyle = theme.gridLine;

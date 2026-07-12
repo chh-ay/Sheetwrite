@@ -1,6 +1,6 @@
 [package]
 name = "sheetwrite-wasm"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Sheetwrite columnar store and data engine (Rust/WASM)."
@@ -13,7 +13,12 @@ name = "sheetwrite_wasm"
 [dependencies]
 wasm-bindgen = "0.2"
 
+# Speed over size: this crate IS the data hot path (sort/filter/window/ingest).
+# Binary cost of `opt-level = 3` vs `"s"` is measured and recorded in plans/006.
 [profile.release]
-opt-level = "s"
-lto = true
+opt-level = 3
+lto = "fat"
 codegen-units = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3"]

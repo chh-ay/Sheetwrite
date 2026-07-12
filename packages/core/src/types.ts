@@ -91,6 +91,14 @@ export interface Column {
 
 export type SheetId = string;
 
+/** Inclusive merged-cell rectangle in data-row/column coordinates. */
+export interface MergeRange {
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
+}
+
 export interface Sheet {
   id: SheetId;
   name: string;
@@ -101,6 +109,8 @@ export interface Sheet {
   rowHeights?: Map<number, number>;
   /** Conditional styles folded into the bulk render-window style dictionary. */
   conditionalFormats?: ConditionalFormatRule[];
+  /** Persisted merged-cell regions; covered cells render/export from the anchor. */
+  merges?: MergeRange[];
   /** Leading view rows pinned above the scrolling body (0/undefined = none). */
   frozenRows?: number;
   /** Leading columns pinned left of the scrolling body (0/undefined = none). */
@@ -278,6 +288,11 @@ export interface Store {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView;
+  /**
+   * Ensure a sheet can address at least `columns.length` columns without
+   * producing user changes or dirty patches. Used for presentation padding.
+   */
+  ensureColumns(sheet: SheetId, columns: readonly Column[]): void;
   /**
    * Apply a low-level storage transaction.
    *
@@ -729,6 +744,11 @@ export interface Grid {
    * viewport); `undefined` restores the default.
    */
   setOverscan(overscan?: number): void;
+  /**
+   * Live-update the minimum rendered column count. Increasing the minimum
+   * silently extends presentation padding; `undefined` restores the default.
+   */
+  setMinColumns(minColumns?: number): void;
   /** Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color. */
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
   /**

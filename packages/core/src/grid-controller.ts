@@ -68,6 +68,10 @@ export interface GridController {
    * restores the default.
    */
   setOverscan(overscan: number | undefined): void;
+  /**
+   * Live-update the minimum rendered column count without emitting user edits.
+   */
+  setMinColumns(minColumns: number | undefined): void;
 
   /** Detach every event subscription and destroy the grid. Call exactly once. */
   destroy(): void;
@@ -151,6 +155,9 @@ export function createGridController(
 
     setOverscan(overscan) {
       grid.setOverscan(overscan);
+    },
+    setMinColumns(minColumns) {
+      grid.setMinColumns(minColumns);
     },
 
     destroy,

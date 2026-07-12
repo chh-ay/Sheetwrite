@@ -103,6 +103,7 @@ function mountGrid(
     data: makeData(workbook.sheets[0]?.rowCount ?? 5) as ColumnarData,
     theme: undefined as Record<string, string> | undefined,
     overscan: undefined as number | undefined,
+    minColumns: undefined as number | undefined,
   });
   const cmp = ref<SheetwriteGridExpose | null>(null);
 
@@ -115,6 +116,7 @@ function mountGrid(
           data: state.data,
           theme: state.theme,
           overscan: state.overscan,
+          minColumns: state.minColumns,
           ...listeners,
         });
     },
@@ -243,7 +245,7 @@ describe("SheetwriteGrid Vue lifecycle", () => {
     expect(harness.host.childElementCount).toBe(0);
   });
 
-  it("keeps the grid AND committed edits when overscan changes (live option)", async () => {
+  it("keeps the grid and committed edits when overscan/minColumns change live", async () => {
     const harness = mountGrid(makeWorkbook());
     const first = harness.getGrid()!;
 
@@ -259,11 +261,13 @@ describe("SheetwriteGrid Vue lifecycle", () => {
     });
 
     harness.state.overscan = 9;
+    harness.state.minColumns = 12;
     await nextTick();
 
     // No recreate: same grid, and the committed edit survived.
     expect(harness.getGrid()).toBe(first);
     expect(first.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("edited");
+    expect(harness.host.querySelector("[role=grid]")?.getAttribute("aria-colcount")).toBe("12");
 
     harness.unmount();
   });

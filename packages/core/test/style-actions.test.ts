@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { SelectionModel } from "../src/selection.js";
+import { SelectionModel, type SelRect } from "../src/selection.js";
 import { StyleActions } from "../src/style-actions.js";
 import type { CellStyle, Patch, ResolvedCell, Sheet, Store, Theme } from "../src/types.js";
 
@@ -22,6 +22,8 @@ function makeHarness() {
   const selection = new SelectionModel(100, 0, 2);
   const commits: Patch[][] = [];
 
+  let merges: SelRect[] = [];
+
   const actions = new StyleActions({
     store,
     loadable: null,
@@ -30,7 +32,10 @@ function makeHarness() {
     sheet: () => ({ columns: [{}, {}, {}] }) as unknown as Sheet,
     readOnly: () => false,
     theme: () => ({ fg: "#000000" }) as unknown as Theme,
-    merges: new Map(),
+    merges: () => merges,
+    setMerges: (next) => {
+      merges = next;
+    },
     anchorCell: (row, col) => ({ row, col }),
     toDataRow: (viewRow) => viewRow,
     commit: (patches) => {

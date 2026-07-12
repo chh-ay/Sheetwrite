@@ -18,6 +18,7 @@ interface FillTextCall {
   x: number;
   y: number;
   fillStyle: string;
+  maxWidth?: number;
 }
 
 interface MoveToCall {
@@ -55,8 +56,8 @@ function makeRecordingCtx(): RecordingCtx {
   ctx.fillRect = (x: number, y: number, w: number, h: number) => {
     ctx.fillRects.push({ x, y, w, h, fillStyle: ctx.fillStyle });
   };
-  ctx.fillText = (text: string, x: number, y: number) => {
-    ctx.fillTexts.push({ text, x, y, fillStyle: ctx.fillStyle });
+  ctx.fillText = (text: string, x: number, y: number, maxWidth?: number) => {
+    ctx.fillTexts.push({ text, x, y, maxWidth, fillStyle: ctx.fillStyle });
   };
   ctx.moveTo = (x: number, y: number) => {
     ctx.moveTos.push({ x, y });
@@ -330,6 +331,16 @@ describe("paintFrame column styles", () => {
     // Column B's label uses the headerStyle foreground; column A keeps the theme's.
     expect(ctx.fillTexts.find((t) => t.text === "B")?.fillStyle).toBe(HEADER_FG);
     expect(ctx.fillTexts.find((t) => t.text === "A")?.fillStyle).toBe(theme.headerFg);
+  });
+  it("does not horizontally distort text when a column is narrower than its label", () => {
+    const layout = makeLayout([{ key: "a", header: "Long header", width: 8, type: "text" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+    (view.values as string[])[0] = "Long cell value";
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    expect(ctx.fillTexts.find((call) => call.text === "Long header")?.maxWidth).toBeUndefined();
+    expect(ctx.fillTexts.find((call) => call.text === "Long cell value")?.maxWidth).toBeUndefined();
   });
 });
 

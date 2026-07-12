@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import type { CellObject } from "write-excel-file/universal";
 import {
   downloadBytes,
   fromCsv,
@@ -13,6 +14,7 @@ import { SheetwriteStore } from "../src/store.js";
 import type { Workbook } from "../src/types.js";
 // side-effect import registers the write-excel-file backend
 import "../src/xlsx-backend.js";
+import { buildXlsxModel } from "../src/xlsx-backend.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -89,6 +91,96 @@ describe("export", () => {
     expect(bytes.length).toBeGreaterThan(0);
     expect(bytes[0]).toBe(0x50); // 'P'
     expect(bytes[1]).toBe(0x4b); // 'K' — zip magic
+  });
+
+  it("xlsx model carries header and cell styles with per-cell precedence", () => {
+    const wb = workbook();
+    const column = wb.sheets[0]!.columns[0]!;
+    column.headerStyle = { bold: true };
+    column.cellStyle = { color: "#112233", bold: true };
+    const store = new SheetwriteStore(wb);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s", row: 0, col: 0 },
+          value: { kind: "literal", value: "styled" },
+          style: { bold: false, backgroundColor: "#ff0000" },
+        },
+      ],
+    });
+
+    const model = buildXlsxModel(store.getWorkbook(), store)!;
+    expect(model.data[0]![0]).toMatchObject({ fontWeight: "bold" });
+    expect(model.data[1]![0]).toMatchObject({
+      value: "styled",
+      textColor: "#112233",
+      backgroundColor: "#ff0000",
+    });
+    expect((model.data[1]![0] as CellObject).fontWeight).toBeUndefined();
+  });
+
+  it("xlsx model emits merge spans and null covered cells", () => {
+    const wb = workbook();
+    wb.sheets[0]!.merges = [{ r0: 0, c0: 0, r1: 1, c1: 1 }];
+    const store = new SheetwriteStore(wb);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s", row: 0, col: 0 },
+          value: { kind: "literal", value: "anchor" },
+        },
+      ],
+    });
+
+    const data = buildXlsxModel(store.getWorkbook(), store)!.data;
+    expect(data[1]![0]).toMatchObject({ value: "anchor", columnSpan: 2, rowSpan: 2 });
+    expect(data[1]![1]).toBeNull();
+    expect(data[2]![0]).toBeNull();
+    expect(data[2]![1]).toBeNull();
+  });
+
+  it("xlsx model carries number formats on numeric body cells", () => {
+    const wb = workbook();
+    wb.sheets[0]!.columns[1]!.numberFormat = "#,##0.00";
+    const store = new SheetwriteStore(wb);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s", row: 0, col: 1 },
+          value: { kind: "literal", value: 1234.5 },
+        },
+      ],
+    });
+
+    expect(buildXlsxModel(store.getWorkbook(), store)!.data[1]![1]).toMatchObject({
+      value: 1234.5,
+      format: "#,##0.00",
+    });
+  });
+
+  it("xlsx model excludes hidden columns from data and width options", () => {
+    const wb = workbook();
+    wb.sheets[0]!.columns[0]!.visible = false;
+    wb.sheets[0]!.columns[1]!.width = 75;
+    const store = new SheetwriteStore(wb);
+    const model = buildXlsxModel(store.getWorkbook(), store)!;
+
+    expect(model.data[0]).toHaveLength(1);
+    expect(model.data[0]![0]).toMatchObject({ value: "B" });
+    expect(model.options.columns).toEqual([{ width: 10 }]);
+  });
+
+  it("xlsx model carries row heights and sheet name", () => {
+    const wb = workbook();
+    wb.sheets[0]!.rowHeights = new Map([[1, 42]]);
+    const store = new SheetwriteStore(wb);
+    const model = buildXlsxModel(store.getWorkbook(), store)!;
+
+    expect(model.options.sheet).toBe("S");
+    expect(model.data[2]![0]).toMatchObject({ height: 42 });
   });
 
   it("csv: a cell value beginning with a formula char is neutralized", () => {

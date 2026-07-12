@@ -4,6 +4,7 @@ node_modules/
 # Build outputs
 dist/
 *.tsbuildinfo
+.astro/
 
 # Rust / WASM
 target/
@@ -11,6 +12,13 @@ packages/wasm/pkg/
 
 # Coverage
 coverage/
+
+# Local agent/audit working plans
+plans/
+
+# Browser-test output (Playwright)
+test-results/
+playwright-report/
 
 # Editor / OS
 .DS_Store

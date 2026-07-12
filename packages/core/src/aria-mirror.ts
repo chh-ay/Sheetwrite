@@ -68,6 +68,11 @@ export class AriaMirror {
     this.version++;
   }
 
+  setColumnCount(count: number): void {
+    this.host.setAttribute("aria-colcount", String(count));
+    this.bumpVersion();
+  }
+
   update(view: VisibleWindowView): void {
     const focus = this.focusCell();
     const focusId = focus ? `${this.aria.id}-${focus.row}-${focus.col}` : "";
