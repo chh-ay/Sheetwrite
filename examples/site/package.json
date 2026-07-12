@@ -27,12 +27,13 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9",
-    "@astrojs/react": "^4",
-    "@astrojs/svelte": "^7",
-    "@astrojs/vue": "^5",
+    "@astrojs/react": "^5.0.7",
+    "@astrojs/svelte": "^8.1.2",
+    "@astrojs/vue": "^6.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "astro": "^5",
-    "typescript": "^6"
+    "astro": "^6.4.8",
+    "typescript": "^6",
+    "vite": "^7.3.6"
   }
 }
