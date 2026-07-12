@@ -1,0 +1,118 @@
+/* Sheetwrite spreadsheet-shell chrome. Import AFTER the core stylesheet:
+   the shell only styles its own scoped elements and reads the same
+   --sheetwrite-widget-* tokens the built-in widgets use (seeded from the
+   grid theme at runtime), so host CSS overrides win without !important.
+   Every rule is scoped under .sheetwrite-shell; multiple shells per page
+   stay isolated. The mount host owns the shell's size. */
+
+.sheetwrite-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  color: var(--sheetwrite-widget-fg, #111111);
+  background: var(--sheetwrite-widget-bg, #ffffff);
+}
+
+.sheetwrite-shell-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-width: 0;
+}
+
+.sheetwrite-shell-toolbar-row {
+  overflow-x: auto;
+}
+
+/* The standalone toolbar reuses the built-in control classes
+   (.sheetwrite-tb-button / .sheetwrite-tb-color / .sheetwrite-tb-separator)
+   so it inherits their cosmetics from styles.css. */
+.sheetwrite-shell-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  background: var(--sheetwrite-toolbar-bg, #f4ede1);
+  color: var(--sheetwrite-toolbar-fg, #6b4a1f);
+  border-bottom: 1px solid var(--sheetwrite-widget-border, #eeeeee);
+  min-width: 0;
+  flex: 1;
+}
+
+.sheetwrite-shell-formula-row {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--sheetwrite-widget-border, #eeeeee);
+}
+
+.sheetwrite-shell-namebox {
+  width: 72px;
+  flex: none;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--sheetwrite-widget-border, #eeeeee);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: inherit;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.sheetwrite-shell-namebox[aria-invalid="true"] {
+  border-color: #dc2626;
+  outline: 1px solid #dc2626;
+}
+
+.sheetwrite-shell-fx {
+  flex: none;
+  font-style: italic;
+  opacity: 0.6;
+  padding: 0 2px;
+}
+
+.sheetwrite-shell-formula {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--sheetwrite-widget-border, #eeeeee);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.sheetwrite-shell-grid {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.sheetwrite-shell-bottom-row {
+  justify-content: space-between;
+  padding: 0 8px;
+  border-top: 1px solid var(--sheetwrite-widget-border, #eeeeee);
+  min-height: 28px;
+}
+
+/* Tabs reuse .sheetwrite-tab / .sheetwrite-tab-active cosmetics from styles.css. */
+.sheetwrite-shell-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 28px;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.sheetwrite-shell-status {
+  flex: none;
+  white-space: nowrap;
+  opacity: 0.72;
+  padding-left: 12px;
+}
