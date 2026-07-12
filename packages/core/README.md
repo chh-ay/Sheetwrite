@@ -64,24 +64,40 @@ grid.store.applyTransaction({
 });
 ```
 
+## Data views and geometry
+
+The `Grid` handle exposes composable, non-mutating views: `sortByMulti`,
+`setColumnFilter`, `distinctValues`, `hideRows`/`showRows`, and row groups.
+`clearView()` clears sorting and column filters while preserving explicitly hidden
+rows and collapsed groups. Use `setFrozen(rows, cols?)` for leading panes and
+`setZoom(0.5..2)` to scale painted geometry without changing workbook base
+dimensions. See the [data-operations guide](../../docs/data-operations.md) for
+the full API, including CSV/XLSX import and export.
+
 ## Subpath exports
 
-- `@sheetwrite/core` — `createGrid`, `initSheetwrite`, `SheetwriteStore`, renderers, A1 utilities, export helpers, and all types.
+- `@sheetwrite/core` — `createGrid`, `initSheetwrite`, `SheetwriteStore`, A1/date/input helpers, CSV/TSV/XLSX import/export helpers, and public types.
 - `@sheetwrite/core/styles.css` — default theme as CSS custom properties; import once.
-- `@sheetwrite/core/xlsx` — registers the XLSX export backend (backed by `write-excel-file`). Import it once before calling `grid.exportXlsx()`, or wire your own backend with `setXlsxBackend`.
-- `@sheetwrite/core/worker` — the worker-renderer entry. Pass it as `workerUrl` with `renderer: "worker"`:
+- `@sheetwrite/core/xlsx` — registers the XLSX import/export backends (backed by `read-excel-file` and `write-excel-file`). Import it once before calling `fromXlsx`, `toXlsx`, or `grid.exportXlsx()`, or wire your own backend with `setXlsxImportBackend` / `setXlsxBackend`.
+- `@sheetwrite/core/shell` — optional composable spreadsheet chrome (`createSpreadsheetShell`, toolbar/name-box/formula-bar/status factories); pair with `@sheetwrite/core/shell.css`. See [docs/shell.md](../../docs/shell.md).
+- `@sheetwrite/core/adapter` — `createGridController`, the lifecycle plumbing the framework adapters share. Only needed when building a new adapter or shell-like host.
+- `@sheetwrite/core/worker` — the worker-renderer entry (`dist/worker.js`). The browser must be able to fetch it: copy `@sheetwrite/core/dist/worker.js` into your public assets (or use your bundler's dependency-worker import) and pass its served URL as `workerUrl` with `renderer: "worker"`:
 
 ```ts
 const grid = createGrid(host, {
   workbook,
   data,
   renderer: "worker",
-  workerUrl: new URL("@sheetwrite/core/worker", import.meta.url),
+  workerUrl: "/assets/sheetwrite-worker.js",
 });
 ```
 
 The worker renderer runs on an OffscreenCanvas off the main thread and falls
-back to the main-thread `canvas` renderer if the worker cannot be constructed.
+back to the main-thread `canvas` renderer if the worker cannot be constructed —
+it emits a `renderer-fallback` event and `grid.rendererKind()` reports which
+renderer is active. A bare-specifier URL like
+`new URL("@sheetwrite/core/worker", import.meta.url)` is NOT reliable: the
+platform `URL` constructor does not consult package exports.
 
 ## Documentation
 

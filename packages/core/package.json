@@ -1,12 +1,21 @@
 {
   "name": "@sheetwrite/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Framework-agnostic, canvas-rendered spreadsheet grid core.",
   "license": "MIT",
+  "keywords": [
+    "spreadsheet",
+    "data-grid",
+    "canvas",
+    "wasm",
+    "excel",
+    "typescript"
+  ],
   "sideEffects": [
     "*.css",
-    "./dist/xlsx-backend.js"
+    "./dist/xlsx-backend.js",
+    "./dist/worker.js"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -16,23 +25,42 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./adapter": {
+      "types": "./dist/adapter.d.ts",
+      "default": "./dist/adapter.js"
+    },
+    "./shell": {
+      "types": "./dist/shell.d.ts",
+      "default": "./dist/shell.js"
+    },
     "./xlsx": {
       "types": "./dist/xlsx-backend.d.ts",
       "default": "./dist/xlsx-backend.js"
     },
-    "./worker": "./dist/worker.js",
-    "./styles.css": "./styles.css"
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    },
+    "./styles.css": "./styles.css",
+    "./shell.css": "./shell.css"
   },
   "files": [
     "dist",
-    "styles.css"
+    "styles.css",
+    "shell.css"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@sheetwrite/wasm": "workspace:*",
+    "read-excel-file": "^9.3.1",
     "write-excel-file": "^4.1.1"
   }
 }

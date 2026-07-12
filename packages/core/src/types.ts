@@ -490,10 +490,15 @@ export interface GridOptions {
   datasource?: DataSource;
   renderer?: "canvas" | "worker";
   /**
-   * Bundler-resolved URL for the worker renderer (`renderer: "worker"`). Provide
-   * it the way your bundler expects (e.g. `new URL("@sheetwrite/core/worker", import.meta.url)`).
-   * If omitted or the worker can't be constructed, the grid falls back to the
-   * main-thread canvas renderer.
+   * URL of the worker renderer module (`renderer: "worker"`), as served to the
+   * BROWSER — the platform `Worker` constructor does not consult package
+   * exports, so a bare specifier like `new URL("@sheetwrite/core/worker",
+   * import.meta.url)` is NOT reliable. Either copy
+   * `@sheetwrite/core/dist/worker.js` to your public assets and pass its URL
+   * string (works everywhere), or use your bundler's dependency-worker import
+   * if it has one (see docs/worker-rendering.md). If omitted or the worker
+   * can't be constructed, the grid falls back to the main-thread canvas
+   * renderer and emits `renderer-fallback` once.
    */
   workerUrl?: string | URL;
   theme?: Partial<Theme>;
@@ -558,6 +563,11 @@ export interface GridEvents {
   search: SearchResult;
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
+  /**
+   * Emitted once when the worker renderer could not be constructed and the
+   * grid fell back to the main-thread canvas renderer.
+   */
+  "renderer-fallback": { requested: "worker"; error: unknown };
 }
 
 export interface Grid {
@@ -690,6 +700,12 @@ export interface Grid {
   /** Content zoom factor (0.5–2): scales row/column geometry and fonts. */
   setZoom(zoom: number): void;
   getZoom(): number;
+  /**
+   * Which renderer is actually active: `"worker"` when the OffscreenCanvas
+   * worker constructed successfully, `"canvas"` otherwise (including after a
+   * `renderer-fallback`).
+   */
+  rendererKind(): "canvas" | "worker";
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
   refresh(): void;
   destroy(): void;

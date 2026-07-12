@@ -8,10 +8,17 @@ Worker with an OffscreenCanvas — same `Renderer` contract, drop-in.
 
 ## Enabling it
 
-Set `renderer: "worker"` and point `workerUrl` at the worker entry the way your
-bundler expects. The core ships the worker at the `@sheetwrite/core/worker`
-subpath; resolve it with `new URL(..., import.meta.url)` so the bundler emits and
-fingerprints it:
+Set `renderer: "worker"` and point `workerUrl` at the worker module **as the
+browser will fetch it**. The worker entry ships at
+`@sheetwrite/core/dist/worker.js` (export subpath `@sheetwrite/core/worker`),
+but the platform `Worker`/`URL` constructors do not consult package exports —
+`new URL("@sheetwrite/core/worker", import.meta.url)` treats the bare
+specifier as a relative path and produces a 404 URL unless your bundler
+happens to rewrite that exact form. Two reliable recipes:
+
+**Universal (any bundler, no bundler):** copy
+`node_modules/@sheetwrite/core/dist/worker.js` into your public/static assets
+and pass its served URL:
 
 ```ts
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
@@ -23,16 +30,38 @@ const grid = createGrid(host, {
   workbook,
   datasource,
   renderer: "worker",
-  workerUrl: new URL("@sheetwrite/core/worker", import.meta.url),
+  workerUrl: "/assets/sheetwrite-worker.js",
 });
 ```
 
-`workerUrl` accepts a `string | URL`. If you omit it, the worker renderer falls
-back to resolving its own entry relative to the module, but providing the
-bundler-resolved URL above is the reliable form.
+**Bundler dependency-worker import (verify against your bundler version):**
+Vite supports importing a worker URL from a dependency with the
+`?worker&url` query — verify against your Vite version (plan is to pin this
+recipe once the bundler fixtures exercise it):
 
-In the in-repo `examples/vanilla` app, append `?renderer=worker` to the URL to
-toggle the worker path on.
+```ts
+import workerUrl from "@sheetwrite/core/worker?worker&url";
+```
+
+`workerUrl` accepts a `string | URL`. If you omit it, the worker renderer
+resolves `./worker.js` relative to its own module — that only works when your
+bundler preserves module URLs (it usually does not after bundling to one file).
+
+## Verify it actually started
+
+A worker that fails to construct falls back to the main-thread canvas renderer
+(see below) — verify instead of assuming:
+
+```ts
+grid.on("renderer-fallback", ({ error }) => {
+  console.warn("Sheetwrite worker renderer unavailable, using canvas:", error);
+});
+
+if (grid.rendererKind() !== "worker") {
+  // main-thread rendering is active
+}
+```
+
 
 ## How it works
 

@@ -204,7 +204,11 @@ export class GridImpl implements Grid {
     "edit-commit": new Set(),
     search: new Set(),
     "active-sheet": new Set(),
+    "renderer-fallback": new Set(),
   };
+
+  /** Which renderer actually constructed; set by `createRenderer`. */
+  private activeRendererKind: "canvas" | "worker" = "canvas";
 
   private theme: Theme;
   private activeSheet: SheetId;
@@ -501,14 +505,27 @@ export class GridImpl implements Grid {
       try {
         const worker = new WorkerRenderer(opts.workerUrl);
         worker.mount(host, this.theme);
+        this.activeRendererKind = "worker";
         return worker;
-      } catch {
-        // worker unavailable (no OffscreenCanvas / bundling) — fall back to canvas
+      } catch (error) {
+        // Worker unavailable (no OffscreenCanvas / bad URL / CSP) — fall back
+        // to the main-thread canvas renderer, observably: subscribers attach
+        // right after createGrid returns, so defer the emit one microtask.
+        queueMicrotask(() => {
+          for (const fn of this.listeners["renderer-fallback"]) {
+            fn({ requested: "worker", error });
+          }
+        });
       }
     }
     const canvas = new CanvasRenderer();
     canvas.mount(host, this.theme);
+    this.activeRendererKind = "canvas";
     return canvas;
+  }
+
+  rendererKind(): "canvas" | "worker" {
+    return this.activeRendererKind;
   }
 
   // ── sheet / layout geometry ────────────────────────────────────────────────
