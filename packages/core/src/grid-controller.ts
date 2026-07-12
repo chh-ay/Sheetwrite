@@ -20,12 +20,12 @@ import type {
  */
 export interface GridControllerHandlers {
   /** Forwarded from the grid's `change` event (a committed transaction). */
-  onChange?(event: ChangeEvent): void;
+  onGridChange?(event: ChangeEvent): void;
 
   /** Forwarded from the grid's `selection` event; `null` when nothing is selected. */
   onSelectionChange?(selection: Selection | null): void;
   /** Forwarded from the grid's `scroll` event. */
-  onScroll?(event: GridEvents["scroll"]): void;
+  onViewportChange?(event: GridEvents["scroll"]): void;
 
   /** Forwarded when a cell editor opens. */
   onEditBegin?(event: GridEvents["edit-begin"]): void;
@@ -38,9 +38,6 @@ export interface GridControllerHandlers {
 
   /** Forwarded after the visible sheet changes. */
   onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
-
-  /** Invoked exactly once, with the freshly created grid, before the create call returns. */
-  onReady?(grid: Grid): void;
 }
 
 /**
@@ -80,14 +77,14 @@ export interface GridController {
 /**
  * Create a grid and wire its lifecycle once, so the React/Vue/Svelte adapters
  * (and any plain host) share a single, drift-free implementation instead of
- * each re-deriving the same create → subscribe → `onReady` → teardown dance.
+ * each re-deriving the same create → subscribe → teardown behavior.
  *
  * `initSheetwrite()` MUST already have been awaited; {@link createGrid} throws
  * otherwise.
  *
  * ### Live handlers
  * `handlers` is held **by reference**, not copied. Every event reads the
- * object's *current* fields (`handlers.onChange?.(…)`), so a host swaps
+ * object's *current* fields (`handlers.onGridChange?.(…)`), so a host swaps
  * callbacks across renders by **mutating the fields of the same object** it
  * passed in — never by replacing the object, which the controller would not
  * see. This is what lets a framework feed fresh closures each render without
@@ -107,9 +104,9 @@ export function createGridController(
   // Each closure reads `handlers.*` lazily, so mutating a field on the passed
   // object takes effect on the next event without re-subscribing.
   const unsubscribes: Array<() => void> = [
-    grid.on("change", (event) => handlers.onChange?.(event)),
+    grid.on("change", (event) => handlers.onGridChange?.(event)),
     grid.on("selection", (event) => handlers.onSelectionChange?.(event.selection)),
-    grid.on("scroll", (event) => handlers.onScroll?.(event)),
+    grid.on("scroll", (event) => handlers.onViewportChange?.(event)),
     grid.on("edit-begin", (event) => handlers.onEditBegin?.(event)),
     grid.on("edit-commit", (event) => handlers.onEditCommit?.(event)),
     grid.on("search", (result) => handlers.onSearch?.(result)),
@@ -127,17 +124,6 @@ export function createGridController(
 
     grid.destroy();
   };
-
-  // Announce the grid once subscriptions exist, so an `onReady` handler that
-  // drives an immediate edit is already observed by the listeners above. A
-  // throwing `onReady` must not leak the fully mounted grid: tear it down and
-  // rethrow the consumer's original error.
-  try {
-    handlers.onReady?.(grid);
-  } catch (error) {
-    destroy();
-    throw error;
-  }
 
   return {
     grid,

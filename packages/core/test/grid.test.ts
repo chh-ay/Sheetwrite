@@ -486,10 +486,7 @@ describe("Grid editing (Layer 3)", () => {
       host,
       { workbook, data: makeColumnarData(10) },
       {
-        onReady: () => {
-          received.push("ready");
-        },
-        onChange: (event) => {
+        onGridChange: (event) => {
           expect(event.transaction.patches).toHaveLength(1);
           received.push("change");
         },
@@ -497,7 +494,7 @@ describe("Grid editing (Layer 3)", () => {
           expect(selection?.kind).toBe("cell");
           received.push("selection");
         },
-        onScroll: (event) => {
+        onViewportChange: (event) => {
           expect(event.lastRow).toBeGreaterThanOrEqual(event.firstRow);
           received.push("scroll");
         },
@@ -528,7 +525,6 @@ describe("Grid editing (Layer 3)", () => {
     editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     controller.grid.search("Committed");
 
-    expect(received).toContain("ready");
     expect(received).toContain("change");
     expect(received).toContain("selection");
     expect(received).toContain("scroll");

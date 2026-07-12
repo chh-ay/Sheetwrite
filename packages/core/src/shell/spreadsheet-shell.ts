@@ -100,9 +100,8 @@ export function createSpreadsheetShell(
       gridHost,
       { ...options.grid, config: shellGridConfig(options.grid.config) },
       {
-        onChange: (event) => options.onChange?.(event),
+        onGridChange: (event) => options.onChange?.(event),
         onSelectionChange: (selection) => options.onSelectionChange?.(selection),
-        onReady: (grid) => options.onReady?.(grid),
       },
     );
   } catch (error) {
@@ -110,6 +109,13 @@ export function createSpreadsheetShell(
     throw error;
   }
   const grid = controller.grid;
+  try {
+    options.onReady?.(grid);
+  } catch (error) {
+    controller.destroy();
+    root.remove();
+    throw error;
+  }
 
   const focusGrid = (): void => gridHost.focus();
 

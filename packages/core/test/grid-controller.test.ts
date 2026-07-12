@@ -39,58 +39,6 @@ function multiSheetWorkbook(): Workbook {
   return base;
 }
 
-describe("createGridController onReady exception safety", () => {
-  it("rethrows the same error and leaves no leaked grid DOM when onReady throws", () => {
-    const host = mountHost();
-    const boom = new Error("consumer mount bug");
-
-    let thrown: unknown;
-    try {
-      createGridController(
-        host,
-        { workbook: makeWorkbook(10), data: makeColumnarData(10) },
-        {
-          onReady: () => {
-            throw boom;
-          },
-        },
-      );
-    } catch (error) {
-      thrown = error;
-    }
-
-    // The original error object is preserved (no wrapping), and destroy ran:
-    // the fully mounted grid was torn out of the host.
-    expect(thrown).toBe(boom);
-    expect(host.childElementCount).toBe(0);
-  });
-
-  it("allows a second create on the same host after a throwing onReady", () => {
-    const host = mountHost();
-
-    expect(() =>
-      createGridController(
-        host,
-        { workbook: makeWorkbook(10), data: makeColumnarData(10) },
-        {
-          onReady: () => {
-            throw new Error("first mount fails");
-          },
-        },
-      ),
-    ).toThrow("first mount fails");
-
-    const controller = createGridController(
-      host,
-      { workbook: makeWorkbook(10), data: makeColumnarData(10) },
-      {},
-    );
-    expect(host.childElementCount).toBeGreaterThan(0);
-
-    controller.destroy();
-  });
-});
-
 describe("createGridController active-sheet forwarding", () => {
   it("forwards active-sheet with the sheet id payload", () => {
     const host = mountHost();
