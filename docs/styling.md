@@ -26,6 +26,9 @@ interface Theme {
   rowHeight: number;
   headerHeight: number;
   rowHeaderWidth: number; // 0 hides the left row-number gutter
+  searchMatch: string;       // fill behind a search match
+  searchActiveMatch: string; // fill/outline for the active (current) match
+  highlight: string;         // fill for cells highlighted via Grid.highlightCells
 }
 ```
 
@@ -44,6 +47,20 @@ interface Theme {
 | `rowHeight` | `28` |
 | `headerHeight` | `32` |
 | `rowHeaderWidth` | `48` |
+| `searchMatch` | `"#ffd54f80"` |
+| `searchActiveMatch` | `"#f59e0b"` |
+| `highlight` | `"#a7f3d080"` |
+
+Note: the shipped `styles.css` declares different values for the search/highlight
+CSS custom properties (`#fff47580`, `#fbbc04`, `#e8f0fe99`); on a host that
+imports the stylesheet those win over `DEFAULT_THEME` per the resolution order
+below.
+
+Override the search-match colors at runtime via `setTheme`:
+
+```ts
+grid.setTheme({ searchMatch: "#fff47580", searchActiveMatch: "#fbbc04" });
+```
 
 ### Resolution order
 
@@ -93,12 +110,15 @@ import "@sheetwrite/core/styles.css";
 | `--sheetwrite-selection` | `selection` |
 | `--sheetwrite-selection-border` | `selectionBorder` |
 | `--sheetwrite-row-height` | `rowHeight` (parsed as a number) |
+| `--sheetwrite-search-match` | `searchMatch` |
+| `--sheetwrite-search-active` | `searchActiveMatch` |
+| `--sheetwrite-highlight` | `highlight` |
 
 `headerHeight` and `rowHeaderWidth` have no CSS variable — set them through the
 `theme` option. The stylesheet's `--sheetwrite-font` styles the container font but
 is not mapped to `Theme.font`.
 
-The recommended runtime-theming pattern (from `examples/theming`) drives both
+The recommended runtime-theming pattern (from the theming example page) drives both
 layers together: toggle `data-theme` on a wrapper so the surrounding
 CSS-variable chrome flips, and call `setTheme` so the canvas repaints.
 
@@ -126,6 +146,8 @@ its own patch supplies styling.
 interface CellStyle {
   bold?: boolean;
   italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
   fontSize?: number;
   color?: string;            // hex text color, e.g. "#111111"
   backgroundColor?: string;  // hex fill, e.g. "#ffffff"

@@ -72,9 +72,13 @@ const data: ColumnarData = {
 
 ## Props
 
-- `workbook` (required), `data`, `datasource`, `renderer`, `theme`, `readOnly`, `config` (toolbar/feature flags).
+- `workbook` (required), `data`, `datasource`, `renderer`, `workerUrl`, `theme`, `readOnly`, `renderers`, `overscan`, `minColumns`, `config` (toolbar/feature flags).
 - `onChange(event)` — committed edits (`ChangeEvent`).
 - `onSelectionChange(selection)` — the new selection (`Selection | null`).
+- `onScroll(event)` — the visible row window on scroll.
+- `onEditBegin(event)` — a cell editor opened.
+- `onEditCommit(event)` — a cell editor committed.
+- `onSearch(result)` — the active search result changed.
 - `onActiveSheetChange(event)` — fired after the visible sheet changes (`{ sheet: SheetId }`).
 - `onReady(grid)` — fired once with the core `Grid` after creation.
 - `bind:grid` — two-way binds the core `Grid` handle for imperative control.

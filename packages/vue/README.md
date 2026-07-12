@@ -70,16 +70,25 @@ In a single-file component the same props and emits bind with template syntax
 
 ## Props and emits
 
-Props: `workbook` (required), `data`, `datasource`, `renderer`, `theme`,
-`readOnly`, `renderers`, `overscan`, `config` (toolbar/feature flags). `class` and `style` fall through to the host
-`<div>`.
+Props: `workbook` (required), `data`, `datasource`, `renderer`, `workerUrl`,
+`theme`, `readOnly`, `renderers`, `overscan`, `minColumns`, `config`
+(toolbar/feature flags). `class` and `style` fall through to the host `<div>`.
 
-`onReady(grid)` is called once with the core `Grid` after mount.
+`onReady(grid)` is called once with the core `Grid` after mount. It is a
+**prop**, not a declared emit — bind it as `:on-ready="fn"` in a template:
+
+```vue
+<SheetwriteGrid :workbook="workbook" :on-ready="(grid) => grid.search('foo')" />
+```
 
 Emits:
 
 - `change` — committed edits (`ChangeEvent`).
 - `selection` — the new selection (`Selection | null`).
+- `scroll` — the visible row window on scroll.
+- `edit-begin` — a cell editor opened.
+- `edit-commit` — a cell editor committed.
+- `search` — the active search result changed.
 - `active-sheet` — the visible sheet changed (`{ sheet: SheetId }`).
 
 ## Imperative handle

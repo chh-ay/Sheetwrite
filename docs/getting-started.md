@@ -45,19 +45,19 @@ In a bundler, import the `.wasm` file as an asset and hand the resulting URL to
 subpath. The asset-import syntax is bundler-specific:
 
 ```ts
-// bun (import attribute) — used by examples/vanilla and examples/react
+// bun (import attribute)
 import wasmUrl from "@sheetwrite/wasm/wasm" with { type: "file" };
 
-// Vite / Rollup — used by examples/svelte
+// Vite / Astro — used by the in-repo examples site (`examples/site`)
 import wasmUrl from "@sheetwrite/wasm/wasm?url";
 
 await initSheetwrite(wasmUrl);
 ```
 
 Both forms resolve `wasmUrl` to a string the browser can fetch. The in-repo
-examples import the built binary by relative path
-(`../../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm`); published consumers use
-the `@sheetwrite/wasm/wasm` subpath above.
+examples site does exactly this — `examples/site/src/lib/sheetwrite.ts` imports
+`@sheetwrite/wasm/wasm?url` and is the Vite/Astro reference for wiring
+`initSheetwrite`.
 
 ## A minimal grid
 
@@ -136,11 +136,27 @@ cell values arrive through one of two inputs — pass at most one:
 
 - **`datasource: DataSource`** — lazy, paged, async. The grid calls `getRows`
   only for the window it needs as you scroll; placeholders show until each page
-  resolves. This is how the `examples/vanilla` app serves 100,000 rows.
+  resolves. This is how the Vue example page streams 1,000,000 virtual rows.
 
   ```ts
+  // The sheet's `rowCount` sets the scrollable extent; the datasource fills
+  // only the visible window on demand (here a 100,000-row sheet).
+  const workbook: Workbook = {
+    activeSheet: "sheet1",
+    sheets: [
+      {
+        id: "sheet1",
+        name: "Sheet 1",
+        rowCount: 100_000,
+        columns: [
+          { key: "name", header: "Name", width: 200, type: "text" },
+          { key: "qty", header: "Qty", width: 100, type: "number" },
+        ],
+      },
+    ],
+  };
+
   const datasource: DataSource = {
-    rowCount: () => 100_000,
     getRows: async (_sheet, start, end) => {
       const rows: RowData[] = [];
       for (let r = start; r < end; r++) {
@@ -157,7 +173,7 @@ Each `RowData` is keyed by the column `key`, and a value may be a scalar
 (`string | number | null`) or a full [`CellValue`](./concepts.md#cell-values).
 Named column titles are not chrome — see
 [the field-header pattern](./concepts.md#headers-letters-vs-field-names) for how
-`examples/vanilla` styles a title row in row 0.
+the vanilla example page styles a title row in row 0.
 
 ## Next steps
 

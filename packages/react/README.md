@@ -67,15 +67,19 @@ createRoot(host).render(
 
 - `workbook` (required) — the workbook model.
 - `data` / `datasource` — eager columnar data, or a paged datasource.
-- `renderer`, `workerUrl`, `theme`, `readOnly`, `renderers`, `overscan`, `config` — forwarded `GridOptions` fields.
+- `renderer`, `workerUrl`, `theme`, `readOnly`, `renderers`, `overscan`, `minColumns`, `config` — forwarded `GridOptions` fields.
 - `className`, `style` — applied to the host `<div>`.
 - `onChange(event)` — fired on committed edits (`ChangeEvent`).
 - `onSelectionChange(selection)` — fired when the selection changes (`Selection | null`).
+- `onScroll(event)` — fired on scroll (visible row window).
+- `onEditBegin(event)` — fired when a cell editor opens.
+- `onEditCommit(event)` — fired after a cell editor commits.
+- `onSearch(result)` — fired whenever the active search result changes.
 - `onActiveSheetChange(event)` — fired after the visible sheet changes (`{ sheet: SheetId }`).
 - `onReady(grid)` — fired once with the core `Grid` after it is created.
 
 The grid is rebuilt when `workbook` identity changes and re-applies `theme` when
-it changes; the `onChange`/`onSelectionChange` callbacks are read live.
+it changes; all event callbacks are read live.
 
 The component is a `forwardRef<Grid>`: its `ref` resolves to the core `Grid`
 (also delivered via `onReady`) so consumers can drive it imperatively.

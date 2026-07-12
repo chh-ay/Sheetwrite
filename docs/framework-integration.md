@@ -8,9 +8,9 @@ render cells — that is all canvas. In every framework you must
 `await initSheetwrite(wasmUrl)` **once** before the grid mounts (see
 [Getting started](./getting-started.md#load-the-wasm-engine)).
 
-The adapters expose different subsets of [`GridOptions`](./configuration.md#gridoptions):
-React forwards all of them, while Vue and Svelte forward a curated set. The tables
-below list exactly what each accepts.
+All three adapters forward the full [`GridOptions`](./configuration.md#gridoptions)
+surface and every grid event callback. The tables below list exactly what each
+accepts.
 
 ## Binding columns to API fields
 
@@ -224,12 +224,17 @@ main thread or overwriting data the worker may still be painting.
 
 | Prop | Type | Notes |
 | --- | --- | --- |
-| …all of `GridOptions` | | `workbook`, `data`, `datasource`, `renderer`, `workerUrl`, `theme`, `readOnly`, `renderers`, `overscan`, `config`. |
+| …all of `GridOptions` | | `workbook`, `data`, `datasource`, `renderer`, `workerUrl`, `theme`, `readOnly`, `renderers`, `overscan`, `minColumns`, `config`. |
 | `className` | `string` | Applied to the host div. |
 | `style` | `CSSProperties` | Applied to the host div (give it a height). |
 | `onChange` | `(event: ChangeEvent) => void` | Forwards the `change` event. |
 | `onSelectionChange` | `(selection: Selection \| null) => void` | Forwards the `selection` event's payload. |
+| `onScroll` | `(event: GridEvents["scroll"]) => void` | Forwards the `scroll` event. |
+| `onEditBegin` | `(event: GridEvents["edit-begin"]) => void` | Forwards the `edit-begin` event. |
+| `onEditCommit` | `(event: GridEvents["edit-commit"]) => void` | Forwards the `edit-commit` event. |
+| `onSearch` | `(result: GridEvents["search"]) => void` | Forwards the `search` event. |
 | `onActiveSheetChange` | `(event: { sheet: SheetId }) => void` | Forwards the `active-sheet` event. |
+| `onReady` | `(grid: Grid) => void` | Called once with the core `Grid` after creation. |
 
 The grid is rebuilt when the `workbook` identity changes; changing the `theme`
 prop calls `setTheme`. Because the props include all of `GridOptions`, the
@@ -266,11 +271,13 @@ host div.
 | `workbook` | `Workbook` | Required. |
 | `data` | `ColumnarData` | |
 | `datasource` | `DataSource` | |
-| `renderer` | `"canvas"` | |
+| `renderer` | `GridOptions["renderer"]` | |
+| `workerUrl` | `string \| URL` | Worker renderer script URL. |
 | `theme` | `Partial<Theme>` | Re-applied via `setTheme` when it changes. |
 | `readOnly` | `boolean` | |
 | `renderers` | `Record<string, CellRenderer>` | |
 | `overscan` | `number` | |
+| `minColumns` | `number` | |
 | `config` | `GridOptions["config"]` | Enables the built-in toolbar. |
 | `onReady` | `(grid: Grid) => void` | Called once with the grid after creation. |
 
@@ -278,6 +285,10 @@ host div.
 | --- | --- |
 | `change` | `ChangeEvent` |
 | `selection` | `Selection \| null` |
+| `scroll` | `GridEvents["scroll"]` |
+| `edit-begin` | `GridEvents["edit-begin"]` |
+| `edit-commit` | `GridEvents["edit-commit"]` |
+| `search` | `GridEvents["search"]` |
 | `active-sheet` | `{ sheet: SheetId }` |
 
 ```vue
@@ -298,8 +309,9 @@ import { workbook, datasource } from "./data";
 </template>
 ```
 
-The Vue adapter surfaces `config` (the built-in toolbar) but not `workerUrl`; for
-the worker renderer, drive the core directly with `createGrid`.
+The Vue adapter forwards the full `GridOptions` surface, including `workerUrl`
+for the worker renderer. `onReady` is a **prop** (bind `:on-ready="fn"`), not a
+declared emit.
 
 ## Svelte — `@sheetwrite/svelte`
 
@@ -312,11 +324,19 @@ condition. It renders a bare host `<div>`.
 | `data` | `ColumnarData` | `undefined` |
 | `datasource` | `DataSource` | `undefined` |
 | `renderer` | `GridOptions["renderer"]` | `"canvas"` |
+| `workerUrl` | `string \| URL` | `undefined` |
 | `theme` | `Partial<Theme>` | `undefined` |
 | `readOnly` | `boolean` | `undefined` |
+| `renderers` | `Record<string, CellRenderer>` | `undefined` |
+| `overscan` | `number` | `undefined` |
+| `minColumns` | `number` | `undefined` |
 | `config` | `GridOptions["config"]` | `undefined` |
 | `onChange` | `(event: ChangeEvent) => void` | — |
 | `onSelectionChange` | `(selection: Selection \| null) => void` | — |
+| `onScroll` | `(event: GridEvents["scroll"]) => void` | — |
+| `onEditBegin` | `(event: GridEvents["edit-begin"]) => void` | — |
+| `onEditCommit` | `(event: GridEvents["edit-commit"]) => void` | — |
+| `onSearch` | `(result: GridEvents["search"]) => void` | — |
 | `onActiveSheetChange` | `(event: { sheet: SheetId }) => void` | — |
 | `onReady` | `(grid: Grid) => void` | — |
 | `grid` | `Grid` (bindable via `bind:grid`) | — |
@@ -330,7 +350,10 @@ import { workbook, datasource } from "./data";
 <SheetwriteGrid
   {workbook}
   {datasource}
+  renderer="worker"
+  workerUrl="/sheetwrite-worker.js"
   onSelectionChange={(sel) => console.log(sel)}
+  onEditCommit={(event) => console.log("committed", event.addr)}
 />
 ```
 
@@ -347,8 +370,8 @@ await initSheetwrite(wasmUrl);
 mount(App, { target: document.getElementById("app")! });
 ```
 
-The Svelte adapter surfaces `config` but not `workerUrl`, `renderers`, or
-`overscan`; use `createGrid` directly if you need those.
+The Svelte adapter forwards the full `GridOptions` surface — `workerUrl`,
+`renderers`, `overscan`, and `minColumns` included.
 
 ---
 
