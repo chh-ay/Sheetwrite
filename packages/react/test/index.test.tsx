@@ -1,71 +1,87 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { Grid, GridOptions, Workbook } from "@sheetwrite/core";
-import type { GridController, GridControllerHandlers } from "@sheetwrite/core/adapter";
-import { act, createRef } from "react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
+import { initSheetwrite } from "@sheetwrite/core";
+import { act, createRef, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { SheetwriteGrid } from "../src/index.js";
 
-interface FakeCreation {
-  options: GridOptions;
-  handlers: GridControllerHandlers;
-  controller: GridController;
-}
-
-const creations: FakeCreation[] = [];
-
-mock.module("@sheetwrite/core/adapter", () => ({
-  createGridController: (
-    _host: HTMLElement,
-    options: GridOptions,
-    handlers: GridControllerHandlers,
-  ): GridController => {
-    const grid = {
-      marker: creations.length + 1,
-      // Mirrors the real grid's active-sheet emission so ref-driven tests can
-      // exercise the controller's forwarding path.
-      setActiveSheet: (sheet: string) => {
-        handlers.onActiveSheetChange?.({ sheet });
-      },
-    } as unknown as Grid;
-    const controller: GridController = {
-      grid,
-      setTheme: mock(() => {}),
-      setReadOnly: mock(() => {}),
-      setConfig: mock(() => {}),
-      destroy: mock(() => {}),
-    };
-    creations.push({ options, handlers, controller });
-    handlers.onReady?.(grid);
-    return controller;
-  },
-}));
-
-// The adapter is loaded after installing its package-boundary controller mock.
-const { SheetwriteGrid } = await import("../src/index.js");
+beforeAll(async () => {
+  await initSheetwrite();
+});
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-const workbook: Workbook = {
-  activeSheet: "sheet",
-  sheets: [
-    {
-      id: "sheet",
-      name: "Sheet",
-      rowCount: 1,
-      columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
-    },
-  ],
-};
+// happy-dom has no 2D canvas or layout; stub both like the core suites do.
+const originalGetContext = HTMLCanvasElement.prototype.getContext;
+const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
 
 beforeEach(() => {
-  creations.length = 0;
   document.body.replaceChildren();
+  const noop = (): void => {};
+  const recording = new Proxy(
+    { canvas: null, fillStyle: "", strokeStyle: "", font: "", lineWidth: 1 },
+    {
+      get(target, prop) {
+        if (prop in target) return Reflect.get(target, prop);
+        return noop;
+      },
+      set(target, prop, value) {
+        Reflect.set(target, prop, value);
+        return true;
+      },
+    },
+  );
+  const stub = (): CanvasRenderingContext2D => recording as unknown as CanvasRenderingContext2D;
+  HTMLCanvasElement.prototype.getContext =
+    stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+    configurable: true,
+    get: () => 800,
+  });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+    configurable: true,
+    get: () => 400,
+  });
 });
+
+afterEach(() => {
+  HTMLCanvasElement.prototype.getContext = originalGetContext;
+  if (origClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth);
+  if (origClientHeight)
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight);
+});
+
+function makeWorkbook(extraSheet = false): Workbook {
+  const workbook: Workbook = {
+    activeSheet: "sheet",
+    sheets: [
+      {
+        id: "sheet",
+        name: "Sheet",
+        rowCount: 3,
+        columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+      },
+    ],
+  };
+  if (extraSheet) {
+    workbook.sheets.push({
+      id: "sheet2",
+      name: "Summary",
+      rowCount: 2,
+      columns: [{ key: "note", header: "Note", width: 200, type: "text" }],
+    });
+  }
+  return workbook;
+}
 
 describe("SheetwriteGrid React lifecycle", () => {
   it("publishes, replaces, transfers, and clears the forwarded Grid ref", async () => {
+    const workbook = makeWorkbook();
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
+    const created: Grid[] = [];
     const firstValues: Array<Grid | null> = [];
     const secondValues: Array<Grid | null> = [];
     const firstRef = (grid: Grid | null): void => {
@@ -74,57 +90,60 @@ describe("SheetwriteGrid React lifecycle", () => {
     const secondRef = (grid: Grid | null): void => {
       secondValues.push(grid);
     };
-    const firstWorker = new URL("https://example.test/first-worker.js");
-    const secondWorker = new URL("https://example.test/second-worker.js");
+    const firstData = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
+    const secondData = { rowCount: 3, columns: { value: ["x", "y", "z"] } };
+    const onReady = (grid: Grid): void => {
+      created.push(grid);
+    };
 
     await act(async () => {
-      root.render(<SheetwriteGrid ref={firstRef} workbook={workbook} workerUrl={firstWorker} />);
+      root.render(
+        <SheetwriteGrid ref={firstRef} workbook={workbook} data={firstData} onReady={onReady} />,
+      );
     });
-    const firstGrid = creations[0]!.controller.grid;
-    expect(firstValues.at(-1)).toBe(firstGrid);
+    expect(created).toHaveLength(1);
+    expect(firstValues.at(-1)).toBe(created[0]!);
 
+    // Swapping only the ref transfers the SAME grid: no recreate.
     await act(async () => {
-      root.render(<SheetwriteGrid ref={secondRef} workbook={workbook} workerUrl={firstWorker} />);
+      root.render(
+        <SheetwriteGrid ref={secondRef} workbook={workbook} data={firstData} onReady={onReady} />,
+      );
     });
-    expect(creations).toHaveLength(1);
+    expect(created).toHaveLength(1);
     expect(firstValues.at(-1)).toBeNull();
-    expect(secondValues.at(-1)).toBe(firstGrid);
+    expect(secondValues.at(-1)).toBe(created[0]!);
 
+    // A construction-bound option (data identity) recreates the grid.
     await act(async () => {
-      root.render(<SheetwriteGrid ref={secondRef} workbook={workbook} workerUrl={secondWorker} />);
+      root.render(
+        <SheetwriteGrid ref={secondRef} workbook={workbook} data={secondData} onReady={onReady} />,
+      );
     });
-    expect(creations).toHaveLength(2);
-    expect(creations[0]!.controller.destroy).toHaveBeenCalledTimes(1);
+    expect(created).toHaveLength(2);
     expect(secondValues).toContain(null);
-    expect(secondValues.at(-1)).toBe(creations[1]!.controller.grid);
+    expect(secondValues.at(-1)).toBe(created[1]!);
 
     await act(async () => root.unmount());
     expect(secondValues.at(-1)).toBeNull();
-    expect(creations[1]!.controller.destroy).toHaveBeenCalledTimes(1);
+    expect(host.childElementCount).toBe(0);
   });
 
   it("keeps the Grid while updating live options, host props, and event callbacks", async () => {
+    const workbook = makeWorkbook();
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
     const gridRef = createRef<Grid>();
-    const initialConfig = { find: true };
-    const nextConfig = { find: false, toolbar: false };
     const calls: string[] = [];
-    const renderers = {};
 
     await act(async () => {
       root.render(
         <SheetwriteGrid
           ref={gridRef}
           workbook={workbook}
-          renderer="worker"
-          workerUrl="worker.js"
-          renderers={renderers}
-          overscan={9}
-          minColumns={12}
           readOnly={false}
-          config={initialConfig}
+          config={{ toolbar: true }}
           className="initial"
           style={{ height: 200 }}
           onScroll={() => calls.push("old-scroll")}
@@ -132,63 +151,45 @@ describe("SheetwriteGrid React lifecycle", () => {
       );
     });
 
-    expect(creations).toHaveLength(1);
-    expect(creations[0]!.options).toMatchObject({
-      workbook,
-      renderer: "worker",
-      workerUrl: "worker.js",
-      overscan: 9,
-      minColumns: 12,
-      readOnly: false,
-      config: initialConfig,
-    });
-    expect(gridRef.current).toBe(creations[0]!.controller.grid);
+    const first = gridRef.current;
+    expect(first).not.toBeNull();
+    expect(host.firstElementChild?.classList.contains("initial")).toBe(true);
+    expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
 
     await act(async () => {
       root.render(
         <SheetwriteGrid
           ref={gridRef}
           workbook={workbook}
-          renderer="worker"
-          workerUrl="worker.js"
-          renderers={renderers}
-          overscan={9}
-          minColumns={12}
           readOnly
-          config={nextConfig}
+          config={{ toolbar: false }}
           className="updated"
           style={{ height: 240 }}
           onScroll={() => calls.push("new-scroll")}
-          onEditBegin={() => calls.push("edit-begin")}
-          onEditCommit={() => calls.push("edit-commit")}
-          onSearch={() => calls.push("search")}
         />,
       );
     });
 
-    expect(creations).toHaveLength(1);
-    const active = creations[0]!;
-    expect(active.controller.setReadOnly).toHaveBeenLastCalledWith(true);
-    expect(active.controller.setConfig).toHaveBeenLastCalledWith(nextConfig);
-    active.handlers.onScroll?.({ scrollTop: 1, firstRow: 2, lastRow: 3 });
-    active.handlers.onEditBegin?.({ addr: { sheet: "sheet", row: 0, col: 0 } });
-    active.handlers.onEditCommit?.({
-      addr: { sheet: "sheet", row: 0, col: 0 },
-      value: { kind: "literal", value: "x" },
-    });
-    active.handlers.onSearch?.({ query: "x", matches: [], active: -1 });
-    expect(calls).toEqual(["new-scroll", "edit-begin", "edit-commit", "search"]);
-    expect(host.firstElementChild?.className).toBe("updated");
+    // Live options applied on the SAME grid instance — no recreate.
+    expect(gridRef.current).toBe(first);
+    expect(host.firstElementChild?.classList.contains("updated")).toBe(true);
+    expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
+
+    // The swapped callback is read live: a refresh emits scroll to the NEW one.
+    gridRef.current!.refresh();
+    expect(calls).toContain("new-scroll");
+    expect(calls).not.toContain("old-scroll");
 
     await act(async () => root.unmount());
   });
 
   it("forwards active-sheet through onActiveSheetChange, reading the live callback", async () => {
+    const workbook = makeWorkbook(true);
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
     const gridRef = createRef<Grid>();
-    const events: Array<{ sheet: string }> = [];
+    const events: Array<GridEvents["active-sheet"]> = [];
 
     await act(async () => {
       root.render(
@@ -200,12 +201,12 @@ describe("SheetwriteGrid React lifecycle", () => {
       );
     });
 
-    expect(creations).toHaveLength(1);
     gridRef.current!.setActiveSheet("sheet2");
     expect(events).toEqual([{ sheet: "sheet2" }]);
 
     // A re-render swaps the live callback without recreating the grid.
-    const swapped: Array<{ sheet: string }> = [];
+    const swapped: Array<GridEvents["active-sheet"]> = [];
+    const first = gridRef.current;
     await act(async () => {
       root.render(
         <SheetwriteGrid
@@ -216,11 +217,41 @@ describe("SheetwriteGrid React lifecycle", () => {
       );
     });
 
-    expect(creations).toHaveLength(1);
+    expect(gridRef.current).toBe(first);
     gridRef.current!.setActiveSheet("sheet");
     expect(events).toEqual([{ sheet: "sheet2" }]);
     expect(swapped).toEqual([{ sheet: "sheet" }]);
 
     await act(async () => root.unmount());
+  });
+
+  it("StrictMode replay creates twice, keeps a live grid, and leaks nothing", async () => {
+    const workbook = makeWorkbook();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const gridRef = createRef<Grid>();
+    const ready: Grid[] = [];
+
+    await act(async () => {
+      root.render(
+        <StrictMode>
+          <SheetwriteGrid ref={gridRef} workbook={workbook} onReady={(grid) => ready.push(grid)} />
+        </StrictMode>,
+      );
+    });
+
+    // StrictMode replays the mount effect: create → destroy → create.
+    expect(ready).toHaveLength(2);
+    expect(gridRef.current).toBe(ready[1]!);
+    expect(gridRef.current).not.toBe(ready[0]!);
+
+    // The replayed-away first grid is fully torn down: exactly one live grid
+    // remains inside the host.
+    expect(host.querySelectorAll(".sheetwrite").length).toBe(1);
+
+    await act(async () => root.unmount());
+    expect(gridRef.current).toBeNull();
+    expect(host.childElementCount).toBe(0);
   });
 });
