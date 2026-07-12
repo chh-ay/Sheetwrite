@@ -1,5 +1,13 @@
 import { createGrid } from "./grid";
-import type { ChangeEvent, Grid, GridOptions, Selection, Theme } from "./types";
+import type {
+  ChangeEvent,
+  Grid,
+  GridConfig,
+  GridEvents,
+  GridOptions,
+  Selection,
+  Theme,
+} from "./types";
 
 /**
  * Event callbacks a host (a framework adapter, or any plain app) hangs off a
@@ -16,6 +24,20 @@ export interface GridControllerHandlers {
 
   /** Forwarded from the grid's `selection` event; `null` when nothing is selected. */
   onSelectionChange?(selection: Selection | null): void;
+  /** Forwarded from the grid's `scroll` event. */
+  onScroll?(event: GridEvents["scroll"]): void;
+
+  /** Forwarded when a cell editor opens. */
+  onEditBegin?(event: GridEvents["edit-begin"]): void;
+
+  /** Forwarded after a cell editor commits. */
+  onEditCommit?(event: GridEvents["edit-commit"]): void;
+
+  /** Forwarded whenever the active search result changes. */
+  onSearch?(result: GridEvents["search"]): void;
+
+  /** Forwarded after the visible sheet changes. */
+  onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
 
   /** Invoked exactly once, with the freshly created grid, before the create call returns. */
   onReady?(grid: Grid): void;
@@ -32,6 +54,11 @@ export interface GridController {
 
   /** Forward a (partial) theme update to the grid. */
   setTheme(theme: Partial<Theme>): void;
+  /** Update editability without replacing the owned grid. */
+  setReadOnly(readOnly: boolean): void;
+
+  /** Update built-in chrome and keyboard configuration without replacing the grid. */
+  setConfig(config: GridConfig | undefined): void;
 
   /** Detach every event subscription and destroy the grid. Call exactly once. */
   destroy(): void;
@@ -69,11 +96,35 @@ export function createGridController(
   const unsubscribes: Array<() => void> = [
     grid.on("change", (event) => handlers.onChange?.(event)),
     grid.on("selection", (event) => handlers.onSelectionChange?.(event.selection)),
+    grid.on("scroll", (event) => handlers.onScroll?.(event)),
+    grid.on("edit-begin", (event) => handlers.onEditBegin?.(event)),
+    grid.on("edit-commit", (event) => handlers.onEditCommit?.(event)),
+    grid.on("search", (result) => handlers.onSearch?.(result)),
+    grid.on("active-sheet", (event) => handlers.onActiveSheetChange?.(event)),
   ];
 
+  let destroyed = false;
+
+  const destroy = (): void => {
+    if (destroyed) return;
+    destroyed = true;
+    for (const unsubscribe of unsubscribes) {
+      unsubscribe();
+    }
+
+    grid.destroy();
+  };
+
   // Announce the grid once subscriptions exist, so an `onReady` handler that
-  // drives an immediate edit is already observed by the listeners above.
-  handlers.onReady?.(grid);
+  // drives an immediate edit is already observed by the listeners above. A
+  // throwing `onReady` must not leak the fully mounted grid: tear it down and
+  // rethrow the consumer's original error.
+  try {
+    handlers.onReady?.(grid);
+  } catch (error) {
+    destroy();
+    throw error;
+  }
 
   return {
     grid,
@@ -81,13 +132,14 @@ export function createGridController(
     setTheme(theme) {
       grid.setTheme(theme);
     },
-
-    destroy() {
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe();
-      }
-
-      grid.destroy();
+    setReadOnly(readOnly) {
+      grid.setReadOnly(readOnly);
     },
+
+    setConfig(config) {
+      grid.setConfig(config);
+    },
+
+    destroy,
   };
 }

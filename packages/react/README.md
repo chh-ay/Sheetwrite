@@ -71,6 +71,7 @@ createRoot(host).render(
 - `className`, `style` — applied to the host `<div>`.
 - `onChange(event)` — fired on committed edits (`ChangeEvent`).
 - `onSelectionChange(selection)` — fired when the selection changes (`Selection | null`).
+- `onActiveSheetChange(event)` — fired after the visible sheet changes (`{ sheet: SheetId }`).
 - `onReady(grid)` — fired once with the core `Grid` after it is created.
 
 The grid is rebuilt when `workbook` identity changes and re-applies `theme` when
@@ -84,6 +85,12 @@ const gridRef = useRef<Grid>(null);
 // <SheetwriteGrid ref={gridRef} workbook={workbook} data={data} />
 gridRef.current?.search("foo");
 ```
+
+The `Grid` handle exposed by `ref`/`onReady` has the same core data-view and
+geometry API as vanilla Sheetwrite: `sortByMulti`, `setColumnFilter`,
+`distinctValues`, `hideRows`/`showRows`, row groups, `setFrozen`, and `setZoom`.
+Views are non-mutating; `clearView()` clears sorting and filters but preserves
+explicitly hidden rows and collapsed groups. See [Data operations](../../docs/data-operations.md).
 
 ## Documentation
 

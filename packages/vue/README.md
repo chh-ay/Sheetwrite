@@ -80,6 +80,7 @@ Emits:
 
 - `change` — committed edits (`ChangeEvent`).
 - `selection` — the new selection (`Selection | null`).
+- `active-sheet` — the visible sheet changed (`{ sheet: SheetId }`).
 
 ## Imperative handle
 
@@ -96,6 +97,12 @@ const gridRef = ref();
 // gridRef.value?.getGrid()?.search("foo");
 </script>
 ```
+
+The handle returned by `getGrid()` exposes the core data-view and geometry API:
+`sortByMulti`, `setColumnFilter`, `distinctValues`, `hideRows`/`showRows`, row
+groups, `setFrozen`, and `setZoom`. Views are non-mutating; `clearView()` clears
+sort/filter state but preserves explicitly hidden rows and collapsed groups. See
+[Data operations](../../docs/data-operations.md).
 
 ## Documentation
 

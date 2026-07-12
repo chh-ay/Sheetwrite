@@ -1,39 +1,63 @@
+import type {
+  CellRenderer,
+  ChangeEvent,
+  ColumnarData,
+  DataSource,
+  Grid,
+  GridEvents,
+  GridOptions,
+  Selection,
+  Theme,
+  Workbook,
+} from "@sheetwrite/core";
 import {
-  type CellRenderer,
-  type ColumnarData,
   createGridController,
-  type DataSource,
-  type Grid,
   type GridController,
   type GridControllerHandlers,
-  type GridOptions,
-  type Theme,
-  type Workbook,
-} from "@sheetwrite/core";
+} from "@sheetwrite/core/adapter";
 import { defineComponent, h, onBeforeUnmount, onMounted, type PropType, ref, watch } from "vue";
+
+export interface SheetwriteGridExpose {
+  getGrid(): Grid | null;
+}
 
 /**
  * Thin Vue 3 wrapper: it owns a host `<div>`, drives the imperative core grid
- * through a {@link createGridController}, forwards events as `change`/`selection`
- * emits, recreates the grid when the `workbook` identity changes, and tears down
- * on unmount. It renders no cells. `class`/`style` fall through to the host div.
- * Call `await initSheetwrite(wasmUrl)` once before mounting (WASM must be ready).
+ * through a {@link createGridController}, forwards every core event, replaces
+ * the grid only when a construction-bound option changes, and tears down on
+ * unmount. Theme, read-only, and UI configuration update the existing grid. It
+ * renders no cells. `class`/`style` and ordinary attributes fall through to the
+ * host div. Call `await initSheetwrite(wasmUrl)` once before mounting (WASM must
+ * be ready).
  */
-export const SheetwriteGrid = defineComponent({
+const SheetwriteGridComponent = defineComponent({
   name: "SheetwriteGrid",
   props: {
     workbook: { type: Object as PropType<Workbook>, required: true },
     data: { type: Object as PropType<ColumnarData>, default: undefined },
     datasource: { type: Object as PropType<DataSource>, default: undefined },
-    renderer: { type: String as PropType<"canvas">, default: undefined },
+    renderer: { type: String as PropType<GridOptions["renderer"]>, default: undefined },
+    workerUrl: {
+      type: [String, URL] as unknown as PropType<GridOptions["workerUrl"]>,
+      default: undefined,
+    },
     theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
     readOnly: { type: Boolean, default: undefined },
     renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
     overscan: { type: Number, default: undefined },
+    minColumns: { type: Number, default: undefined },
     config: { type: Object as PropType<GridOptions["config"]>, default: undefined },
     onReady: { type: Function as PropType<(grid: Grid) => void>, default: undefined },
   },
-  emits: ["change", "selection"],
+  emits: {
+    change: (_event: ChangeEvent) => true,
+    selection: (_selection: Selection | null) => true,
+    scroll: (_event: GridEvents["scroll"]) => true,
+    "edit-begin": (_event: GridEvents["edit-begin"]) => true,
+    "edit-commit": (_event: GridEvents["edit-commit"]) => true,
+    search: (_result: GridEvents["search"]) => true,
+    "active-sheet": (_event: GridEvents["active-sheet"]) => true,
+  },
   setup(props, { emit, expose }) {
     const host = ref<HTMLDivElement | null>(null);
 
@@ -45,6 +69,11 @@ export const SheetwriteGrid = defineComponent({
     const handlers: GridControllerHandlers = {
       onChange: (event) => emit("change", event),
       onSelectionChange: (selection) => emit("selection", selection),
+      onScroll: (event) => emit("scroll", event),
+      onEditBegin: (event) => emit("edit-begin", event),
+      onEditCommit: (event) => emit("edit-commit", event),
+      onSearch: (result) => emit("search", result),
+      onActiveSheetChange: (event) => emit("active-sheet", event),
       onReady: (grid) => props.onReady?.(grid),
     };
 
@@ -54,10 +83,12 @@ export const SheetwriteGrid = defineComponent({
         data: props.data,
         datasource: props.datasource,
         renderer: props.renderer,
+        workerUrl: props.workerUrl,
         theme: props.theme,
         readOnly: props.readOnly,
         renderers: props.renderers,
         overscan: props.overscan,
+        minColumns: props.minColumns,
         config: props.config,
       };
     }
@@ -76,14 +107,33 @@ export const SheetwriteGrid = defineComponent({
     onMounted(mountGrid);
     onBeforeUnmount(teardownGrid);
 
-    // Recreate the grid when the workbook identity changes (parity with the
-    // other adapters); ordinary edits flow through `change`/`selection` instead.
+    // Recreate only when a construction-bound option changes. Theme,
+    // read-only, and config are applied live below.
     watch(
-      () => props.workbook,
+      () => [
+        props.workbook,
+        props.data,
+        props.datasource,
+        props.renderer,
+        props.workerUrl,
+        props.renderers,
+        props.overscan,
+        props.minColumns,
+      ],
       () => {
         teardownGrid();
         mountGrid();
       },
+    );
+
+    watch(
+      () => props.readOnly,
+      (readOnly) => controller?.setReadOnly(readOnly ?? false),
+    );
+
+    watch(
+      () => props.config,
+      (config) => controller?.setConfig(config),
     );
 
     watch(
@@ -98,3 +148,6 @@ export const SheetwriteGrid = defineComponent({
     return () => h("div", { ref: host });
   },
 });
+export const SheetwriteGrid = SheetwriteGridComponent as typeof SheetwriteGridComponent & {
+  new (): InstanceType<typeof SheetwriteGridComponent> & SheetwriteGridExpose;
+};

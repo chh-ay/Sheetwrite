@@ -75,6 +75,7 @@ const data: ColumnarData = {
 - `workbook` (required), `data`, `datasource`, `renderer`, `theme`, `readOnly`, `config` (toolbar/feature flags).
 - `onChange(event)` — committed edits (`ChangeEvent`).
 - `onSelectionChange(selection)` — the new selection (`Selection | null`).
+- `onActiveSheetChange(event)` — fired after the visible sheet changes (`{ sheet: SheetId }`).
 - `onReady(grid)` — fired once with the core `Grid` after creation.
 - `bind:grid` — two-way binds the core `Grid` handle for imperative control.
 
@@ -87,6 +88,12 @@ let grid: Grid | undefined = $state();
 <SheetwriteGrid bind:grid {workbook} {data} />
 <button onclick={() => grid?.search("foo")}>Find</button>
 ```
+
+The bound `Grid` handle exposes the core data-view and geometry API:
+`sortByMulti`, `setColumnFilter`, `distinctValues`, `hideRows`/`showRows`, row
+groups, `setFrozen`, and `setZoom`. Views are non-mutating; `clearView()` clears
+sort/filter state but preserves explicitly hidden rows and collapsed groups. See
+[Data operations](../../docs/data-operations.md).
 
 ## Documentation
 
