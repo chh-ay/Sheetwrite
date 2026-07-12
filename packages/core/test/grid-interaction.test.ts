@@ -227,6 +227,52 @@ describe("merge repaint invalidation", () => {
     expect(focusRect().style.height).toBe("28px");
     grid.destroy();
   });
+
+  it("keeps merge metadata unchanged in read-only mode", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, readOnly: true }, store);
+    const recorder = makePaintRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
+    });
+    const originalMerges = workbook.sheets[0]?.merges?.map((merge) => ({ ...merge })) ?? [];
+    recorder.layouts.length = 0;
+    recorder.paints.length = 0;
+
+    grid.actions.merge();
+
+    expect(workbook.sheets[0]?.merges ?? []).toEqual(originalMerges);
+    expect(recorder.layouts).toEqual([]);
+    expect(recorder.paints).toEqual([]);
+    grid.destroy();
+
+    const mergedWorkbook = makeWorkbook(10);
+    mergedWorkbook.sheets[0]!.merges = [{ r0: 1, c0: 0, r1: 2, c1: 1 }];
+    const mergedStore = new SheetwriteStore(mergedWorkbook, makeColumnarData(10));
+    const mergedHost = mountHost();
+    const mergedGrid = new GridImpl(
+      mergedHost,
+      { workbook: mergedWorkbook, readOnly: true },
+      mergedStore,
+    );
+    const mergedRecorder = makePaintRecorder();
+    expect(Reflect.set(mergedGrid, "renderer", mergedRecorder)).toBe(true);
+    mergedGrid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+    mergedRecorder.layouts.length = 0;
+    mergedRecorder.paints.length = 0;
+
+    mergedGrid.actions.unmerge();
+
+    expect(mergedWorkbook.sheets[0]?.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
+    expect(mergedRecorder.layouts).toEqual([]);
+    expect(mergedRecorder.paints).toEqual([]);
+    mergedGrid.destroy();
+  });
 });
 describe("datasource repaint invalidation", () => {
   it("repaints when an async page resolves without another interaction", async () => {

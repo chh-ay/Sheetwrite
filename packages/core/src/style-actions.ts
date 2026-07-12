@@ -104,6 +104,7 @@ export class StyleActions {
   }
 
   mergeSelection(): void {
+    if (this.deps.readOnly()) return;
     const activeSheet = this.deps.activeSheet();
     if (this.deps.loadable?.hasView(activeSheet)) return;
 
@@ -122,6 +123,7 @@ export class StyleActions {
   }
 
   unmergeSelection(): void {
+    if (this.deps.readOnly()) return;
     const f = this.deps.selection().focusCell;
     const list = this.deps.merges();
     if (!f || list.length === 0) return;
