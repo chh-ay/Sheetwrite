@@ -8,10 +8,10 @@
 
 import { readFileSync } from "node:fs";
 import {
-  SHEETWRITE_ROWS,
-  WORKLOADS,
   runSheetwriteDataBench,
+  SHEETWRITE_ROWS,
   type TimedEngineResult,
+  WORKLOADS,
   type Workload,
 } from "./data-bench.js";
 import { ms } from "./stats.js";
@@ -34,9 +34,7 @@ function sheetwriteBaseline(root: unknown): Record<string, unknown> {
   const record = asRecord(root);
   const sheetwrite = asRecord(record?.sheetwrite);
   if (!sheetwrite) {
-    throw new Error(
-      `Baseline ${BASELINE_PATH.pathname} does not contain a sheetwrite result set`,
-    );
+    throw new Error(`Baseline ${BASELINE_PATH.pathname} does not contain a sheetwrite result set`);
   }
   return sheetwrite;
 }
@@ -109,11 +107,9 @@ function printTable(rows: readonly ComparisonRow[]): void {
   lines.push("| rows | workload | baseline median | fresh median | change | status |");
   lines.push("|---:|:--|---:|---:|---:|:--|");
   for (const row of rows) {
-    const baseline =
-      row.baselineMedian === undefined ? "—" : ms(row.baselineMedian);
+    const baseline = row.baselineMedian === undefined ? "—" : ms(row.baselineMedian);
     const fresh = row.freshMedian === undefined ? "—" : ms(row.freshMedian);
-    const delta =
-      row.ratio === undefined ? "—" : `${((row.ratio - 1) * 100).toFixed(1)}%`;
+    const delta = row.ratio === undefined ? "—" : `${((row.ratio - 1) * 100).toFixed(1)}%`;
     lines.push(
       `| ${row.rows.toLocaleString("en-US")} | ${row.workload} | ${baseline} | ${fresh} | ` +
         `${delta} | ${status(row)} |`,
@@ -135,9 +131,7 @@ async function main(): Promise<void> {
 
   const threshold = (REGRESSION_THRESHOLD * 100).toFixed(0);
   if (regressions.length === 0) {
-    process.stderr.write(
-      `\n✔ no Sheetwrite median regressions above ${threshold}%\n`,
-    );
+    process.stderr.write(`\n✔ no Sheetwrite median regressions above ${threshold}%\n`);
     return;
   }
 

@@ -609,6 +609,112 @@ fn match_cache_handles_repeats_eviction_and_collisions() {
     }
 
 #[test]
+fn small_numeric_sort_matches_total_order_for_one_thousand_rows() {
+    let mut store = CellStore::new();
+    let rows = 1_000usize;
+    let sheet = store.add_sheet(1, rows);
+    let values: Vec<f64> = (0..rows)
+        .map(|row| {
+            let mixed = (row as u64).wrapping_mul(6_364_136_223_846_793_005);
+            let magnitude = ((mixed >> 24) % 20_001) as i64 - 10_000;
+            magnitude as f64 / 8.0
+        })
+        .collect();
+    for (row, &value) in values.iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+
+    let mut expected: Vec<u32> = (0..rows as u32).collect();
+    expected.sort_unstable_by(|&left, &right| {
+        values[left as usize]
+            .partial_cmp(&values[right as usize])
+            .unwrap()
+            .then_with(|| left.cmp(&right))
+    });
+    assert_eq!(store.sort_rows(sheet, 0, true), expected);
+
+    expected.sort_unstable_by(|&left, &right| {
+        values[right as usize]
+            .partial_cmp(&values[left as usize])
+            .unwrap()
+            .then_with(|| left.cmp(&right))
+    });
+    assert_eq!(store.sort_rows(sheet, 0, false), expected);
+}
+
+#[test]
+fn numeric_sort_radix_boundary_matches_comparison_contract() {
+    let mut store = CellStore::new();
+    let rows = 4_096usize;
+    let sheet = store.add_sheet(1, rows);
+    let values: Vec<f64> = (0..rows)
+        .map(|row| match row % 8 {
+            0 => -0.0,
+            1 => 0.0,
+            2 => f64::MIN_POSITIVE,
+            3 => -f64::MIN_POSITIVE,
+            4 => f64::MAX,
+            5 => -f64::MAX,
+            _ => (row as i64 - 2_048) as f64,
+        })
+        .collect();
+    for (row, &value) in values.iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+
+    let mut expected: Vec<u32> = (0..rows as u32).collect();
+    expected.sort_unstable_by(|&left, &right| {
+        values[left as usize]
+            .partial_cmp(&values[right as usize])
+            .unwrap()
+            .then_with(|| left.cmp(&right))
+    });
+    assert_eq!(store.sort_rows(sheet, 0, true), expected);
+}
+
+#[test]
+fn pure_string_filter_fast_path_matches_mixed_and_unicode_fallbacks() {
+    let mut store = CellStore::new();
+    let rows = 5_000usize;
+    let sheet = store.add_sheet(3, rows);
+    for row in 0..rows {
+        let text = if row % 11 == 0 {
+            "Needle"
+        } else if row % 17 == 0 {
+            "CAFÉ"
+        } else {
+            "haystack"
+        };
+        store.set_string(sheet, row, 0, text, 0);
+        if row % 5 == 0 {
+            store.set_number(sheet, row, 1, 12_345.0, 0);
+        } else {
+            store.set_string(sheet, row, 1, text, 0);
+        }
+        store.set_string(sheet, row, 2, text, 0);
+    }
+
+    let needle: Vec<u32> = (0..rows)
+        .filter(|row| row % 11 == 0)
+        .map(|row| row as u32)
+        .collect();
+    assert_eq!(store.filter_rows(sheet, 0, "needle"), needle);
+    assert_eq!(store.filter_rows(sheet, 2, "NEEDLE"), needle);
+
+    let mixed: Vec<u32> = (0..rows)
+        .filter(|row| row % 5 != 0 && row % 11 == 0)
+        .map(|row| row as u32)
+        .collect();
+    assert_eq!(store.filter_rows(sheet, 1, "needle"), mixed);
+
+    let unicode: Vec<u32> = (0..rows)
+        .filter(|row| row % 17 == 0 && row % 11 != 0)
+        .map(|row| row as u32)
+        .collect();
+    assert_eq!(store.filter_rows(sheet, 0, "café"), unicode);
+}
+
+#[test]
     fn string_pool_reuses_ids_without_duplicate_pool_entries() {
         let mut store = CellStore::new();
         let a = store.intern("repeated");
