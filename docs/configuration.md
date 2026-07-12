@@ -57,6 +57,15 @@ late page never overwrites a cell edited after that request began.
 The legacy `getRows(sheet, start, end): Promise<RowData[]>` shape remains
 accepted and is normalized once when the grid is constructed.
 
+### Serializable documents
+
+Use `WorkbookSnapshot` plus `validateWorkbookSnapshot()` at persistence
+boundaries. `schemaVersion: 1` rejects unsupported future schemas with
+structured errors. `DocumentOp` covers the complete document mutation model;
+the current `Patch` transaction type is its implemented cell/row/column subset.
+Session-only grid options such as `renderer`, `readOnly`, local zoom, selection,
+scroll, search, and temporary highlights never belong in a snapshot.
+
 A `CellRenderer` paints (or returns a DOM node for) a single cell:
 
 ```ts

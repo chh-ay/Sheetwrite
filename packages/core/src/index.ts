@@ -2,6 +2,13 @@ export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
 export { parseCellInput, parseCurrencyInput } from "./cell-input.js";
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
+  type DocumentValidationError,
+  type DocumentValidationResult,
+  documentOpTarget,
+  validateWorkbookSnapshot,
+  WORKBOOK_SCHEMA_VERSION,
+} from "./document-protocol.js";
+export {
   downloadBytes,
   fromCsv,
   fromXlsx,
@@ -29,6 +36,7 @@ export type {
   ApplyTransactionResult,
   CellAddress,
   CellAlign,
+  CellBlock,
   CellBorder,
   CellBorders,
   CellChange,
@@ -51,6 +59,7 @@ export type {
   DataSource,
   DataSourcePage,
   DataSourceRequest,
+  DocumentOp,
   Grid,
   GridActions,
   GridConfig,
@@ -59,17 +68,22 @@ export type {
   GridTransaction,
   HighlightRange,
   LegacyDataSource,
+  MergeRange,
+  NamedRangeSnapshot,
   Patch,
   Range,
   ReplaceResult,
   ResolvedCell,
   RowData,
   RowGroup,
+  RowMetadata,
   SearchOptions,
   SearchResult,
   Selection,
   Sheet,
   SheetId,
+  SheetSnapshot,
+  SnapshotCell,
   SortKey,
   Store,
   Theme,
@@ -79,4 +93,5 @@ export type {
   Transaction,
   VisibleWindowView,
   Workbook,
+  WorkbookSnapshot,
 } from "./types.js";

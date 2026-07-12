@@ -148,15 +148,98 @@ export interface Workbook {
   activeSheet: SheetId;
 }
 
-// ── Transactions & change events ─────────────────────────────────────────────
+/** Stable named range extension point; evaluation is introduced separately. */
+export interface NamedRangeSnapshot {
+  name: string;
+  range: Range;
+}
 
-export type Patch =
+export interface RowMetadata {
+  height?: number;
+  hidden?: boolean;
+}
+
+export interface SnapshotCell {
+  rowOffset: number;
+  colOffset: number;
+  value: CellValue;
+  style?: CellStyle;
+}
+
+/** Sparse row-major cells bounded by one rectangular block. */
+export interface CellBlock {
+  startRow: number;
+  startCol: number;
+  rowCount: number;
+  colCount: number;
+  cells: SnapshotCell[];
+}
+
+export interface SheetSnapshot {
+  id: SheetId;
+  name: string;
+  order: number;
+  rowCount: number;
+  /** Keys are stable, unique document column identities as well as datasource keys. */
+  columns: Column[];
+  frozenRows?: number;
+  frozenCols?: number;
+  rowMeta?: Array<[row: number, meta: RowMetadata]>;
+  merges?: MergeRange[];
+  conditionalFormats?: ConditionalFormatRule[];
+  rowGroups?: RowGroup[];
+  cells: CellBlock[];
+}
+
+export interface WorkbookSnapshot {
+  schemaVersion: 1;
+  documentId?: string;
+  version?: number;
+  workbook: {
+    activeSheet: SheetId;
+    namedRanges?: NamedRangeSnapshot[];
+  };
+  sheets: SheetSnapshot[];
+}
+
+export type DocumentOp =
   | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle }
+  | { op: "setRange"; range: Range; cells: SnapshotCell[] }
+  | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean }
   | { op: "addRows"; sheet: SheetId; at: number; count: number }
   | { op: "removeRows"; sheet: SheetId; at: number; count: number }
+  | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number }
   | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] }
   | { op: "removeColumns"; sheet: SheetId; at: number; count: number }
-  | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> };
+  | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number }
+  | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> }
+  | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null }
+  | { op: "addMerge"; sheet: SheetId; merge: MergeRange }
+  | { op: "removeMerge"; sheet: SheetId; merge: MergeRange }
+  | { op: "addSheet"; sheet: SheetSnapshot }
+  | { op: "removeSheet"; sheet: SheetId }
+  | { op: "renameSheet"; sheet: SheetId; name: string }
+  | { op: "moveSheet"; sheet: SheetId; to: number }
+  | {
+      op: "setSheetMeta";
+      sheet: SheetId;
+      patch: {
+        frozenRows?: number;
+        frozenCols?: number;
+        conditionalFormats?: ConditionalFormatRule[];
+        rowGroups?: RowGroup[];
+      };
+    }
+  | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
+  | { op: "removeNamedRange"; name: string };
+
+/** The existing storage transaction is the implemented subset of the document protocol. */
+export type Patch = Extract<
+  DocumentOp,
+  { op: "set" | "addRows" | "removeRows" | "addColumns" | "removeColumns" | "setColumn" }
+>;
+
+// ── Transactions & change events ─────────────────────────────────────────────
 
 /**
  * Low-level Store transaction. `epoch` provides optional optimistic

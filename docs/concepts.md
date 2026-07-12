@@ -101,40 +101,45 @@ interface Store {
 `getDirty` / `markClean` exist so you can sync edits to a backend and then mark
 them confirmed.
 
-## Transactions & patches
+## Document protocol and storage transactions
 
-All mutation goes through one channel: a `Transaction` carrying a list of
-`Patch`es, applied with `store.applyTransaction({ patches })`. There are four
-patch ops:
+`WorkbookSnapshot` is the versioned, JSON-safe authoritative document. Schema 1
+contains sheet order and identity, stable column keys, literal/formula/reference
+cell inputs, sparse styles and row metadata, merges, frozen panes, conditional
+formats, row groups, hidden document metadata, and named-range extension points.
+Formula source is authoritative; resolved values are derived caches and are not
+serialized.
 
-```ts
-type Patch =
-  | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle }
-  | { op: "addRows"; sheet: SheetId; at: number; count: number }
-  | { op: "removeRows"; sheet: SheetId; at: number; count: number }
-  | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> };
-```
-
-A `set` replaces both the value and (if given) the style of a cell, so to restyle
-a cell while keeping its value, read the current value first and pass it back:
+`DocumentOp` is the exhaustive plain-data mutation vocabulary for that document.
+The existing `Patch` type is an `Extract<DocumentOp, ...>` subset implemented by
+the current store transaction path, so there is no second independently evolving
+operation union. Plan-level migrations route the remaining metadata operations
+through the same protocol.
 
 ```ts
-const current = grid.store.getCell(addr).resolved;
-grid.store.applyTransaction({
+const checked = validateWorkbookSnapshot(JSON.parse(payload));
+if (!checked.ok) throw new Error(checked.errors[0]?.message);
+
+const outcome = grid.store.applyTransaction({
   patches: [
     {
       op: "set",
       addr,
-      value: { kind: "literal", value: current },
+      value: { kind: "literal", value: "authoritative input" },
       style: { backgroundColor: "#fde68a" },
     },
   ],
 });
 ```
 
-Applying a transaction emits a `change` event whose payload carries the
-`transaction`, the per-cell `changes` (with old/new value and style for undo), and
-the accumulated `dirty` patches — this is the stream you forward to a backend.
+Document state does **not** include selection, scroll position, editor/caret
+state, search results, temporary highlights, renderer choice, read-only policy,
+or local zoom. Those are session state. `Workbook.activeSheet` remains document
+metadata in schema 1.
+
+Applied storage transactions emit `change` with the filtered transaction,
+per-cell rollback data, accumulated dirty patches, and epoch. Conflicts and
+no-ops return explicit outcomes rather than throwing.
 
 ### Cell values
 
