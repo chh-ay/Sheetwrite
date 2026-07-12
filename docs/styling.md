@@ -71,8 +71,26 @@ DEFAULT_THEME  <  --sheetwrite-* CSS custom properties (resolveThemeFromCss)  < 
 ```
 
 `resolveThemeFromCss(host)` reads CSS custom properties from the host's computed
-style into a partial theme, and `opts.theme` wins last. For runtime theme
-switching, prefer `grid.setTheme(...)` — it repaints the canvas immediately.
+style into a partial theme, and `opts.theme` wins last.
+
+Two runtime methods with different semantics:
+
+- `grid.setTheme(partial)` — **imperative patch**: merges into the accumulated
+  base theme and repaints. Use for incremental tweaks.
+- `grid.replaceTheme(partial | undefined)` — **option-level replacement**:
+  re-runs the construction-time resolution above with the new value;
+  `undefined` restores the CSS-variable/default resolution. The framework
+  adapters call this for their `theme` prop, so **the prop is authoritative**:
+  removing it (or dropping a field) restores defaults instead of leaving stale
+  merged values behind.
+- `grid.getEffectiveTheme()` returns the effective (post-zoom) theme currently
+  painting.
+
+Tailwind works through the same seam: set `--sheetwrite-*` custom properties on
+the host with arbitrary-property utilities (e.g.
+`class="[--sheetwrite-bg:#0b0b0c] [--sheetwrite-fg:#e7e7e7]"`) or a `@layer`
+rule; construction and `replaceTheme(undefined)` both pick them up from the
+computed style.
 
 ```ts
 const DARK: Partial<Theme> = {

@@ -585,7 +585,18 @@ export interface Grid {
   getCellInput(row: number, col: number): CellInputSnapshot | null;
   getSelection(): Selection | null;
   setSelection(sel: Selection | null): void;
+  /** Imperative patch: merge `theme` into the accumulated base theme. */
   setTheme(theme: Partial<Theme>): void;
+  /**
+   * Option-level replacement: re-run construction-time resolution
+   * (`DEFAULT_THEME < CSS custom properties < theme`) with the new partial.
+   * `undefined` restores the CSS-variable/default resolution. Adapters call
+   * this for their declarative `theme` prop; imperative patching stays on
+   * {@link setTheme}.
+   */
+  replaceTheme(theme: Partial<Theme> | undefined): void;
+  /** The effective (post-zoom) theme the renderer is currently painting with. */
+  getEffectiveTheme(): Theme;
   /** Update editability without replacing the Grid or clearing session state. */
   setReadOnly(readOnly: boolean): void;
   /**

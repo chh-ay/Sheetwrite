@@ -1540,6 +1540,17 @@ export class GridImpl implements Grid {
     this.applyZoomedTheme();
   }
 
+  replaceTheme(theme: Partial<Theme> | undefined): void {
+    // Re-run construction-time resolution (grid.ts constructor): defaults,
+    // then host CSS custom properties, then the new option value.
+    this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
+    this.applyZoomedTheme();
+  }
+
+  getEffectiveTheme(): Theme {
+    return this.theme;
+  }
+
   setReadOnly(readOnly: boolean): void {
     if (readOnly === this.readOnly) return;
 

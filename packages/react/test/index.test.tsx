@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
-import { initSheetwrite } from "@sheetwrite/core";
+import { DEFAULT_THEME, initSheetwrite } from "@sheetwrite/core";
 import { act, createRef, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { SheetwriteGrid } from "../src/index.js";
@@ -156,6 +156,10 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(host.firstElementChild?.classList.contains("initial")).toBe(true);
     expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
 
+    // The initial mount may repaint (theme effect) and emit scroll to the
+    // still-current callback; the swap contract concerns post-rerender events.
+    calls.length = 0;
+
     await act(async () => {
       root.render(
         <SheetwriteGrid
@@ -253,5 +257,28 @@ describe("SheetwriteGrid React lifecycle", () => {
     await act(async () => root.unmount());
     expect(gridRef.current).toBeNull();
     expect(host.childElementCount).toBe(0);
+  });
+  it("treats the theme prop as authoritative: removing it restores defaults", async () => {
+    const workbook = makeWorkbook();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const gridRef = createRef<Grid>();
+
+    await act(async () => {
+      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} theme={{ bg: "#ff0000" }} />);
+    });
+    expect(gridRef.current!.getEffectiveTheme().bg).toBe("#ff0000");
+    const first = gridRef.current;
+
+    await act(async () => {
+      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} />);
+    });
+
+    // Same grid (no recreate); theme back to default resolution.
+    expect(gridRef.current).toBe(first);
+    expect(gridRef.current!.getEffectiveTheme().bg).toBe(DEFAULT_THEME.bg);
+
+    await act(async () => root.unmount());
   });
 });

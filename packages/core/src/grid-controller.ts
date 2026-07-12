@@ -52,8 +52,11 @@ export interface GridController {
   /** The imperative core grid this controller owns. */
   readonly grid: Grid;
 
-  /** Forward a (partial) theme update to the grid. */
-  setTheme(theme: Partial<Theme>): void;
+  /**
+   * Apply the host's declarative theme prop: option-level replacement via
+   * {@link Grid.replaceTheme}; `undefined` restores CSS/default resolution.
+   */
+  setTheme(theme: Partial<Theme> | undefined): void;
   /** Update editability without replacing the owned grid. */
   setReadOnly(readOnly: boolean): void;
 
@@ -130,7 +133,7 @@ export function createGridController(
     grid,
 
     setTheme(theme) {
-      grid.setTheme(theme);
+      grid.replaceTheme(theme);
     },
     setReadOnly(readOnly) {
       grid.setReadOnly(readOnly);

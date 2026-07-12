@@ -138,9 +138,7 @@ const SheetwriteGridComponent = defineComponent({
 
     watch(
       () => props.theme,
-      (theme) => {
-        if (theme) controller?.setTheme(theme);
-      },
+      (theme) => controller?.setTheme(theme),
     );
 
     expose({ getGrid: () => controller?.grid ?? null });

@@ -151,9 +151,8 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
     useEffect(() => {
       controllerRef.current?.setConfig(config);
     }, [config]);
-
     useEffect(() => {
-      if (theme) controllerRef.current?.setTheme(theme);
+      controllerRef.current?.setTheme(theme);
     }, [theme]);
 
     return <div ref={hostRef} className={className} style={style} />;

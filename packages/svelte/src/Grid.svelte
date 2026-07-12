@@ -146,7 +146,7 @@ $effect(() => {
 });
 
 $effect(() => {
-  if (theme) controller?.setTheme(theme);
+  controller?.setTheme(theme);
 });
 </script>
 

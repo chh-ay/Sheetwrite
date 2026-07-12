@@ -660,3 +660,67 @@ describe("Grid store lifecycle", () => {
     loadRowsSpy.mockRestore();
   });
 });
+
+describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("replaceTheme(undefined) restores CSS/default resolution after a patch", () => {
+    const workbook = makeWorkbook(10);
+    const grid = new GridImpl(mountHost(), { workbook }, makeFakeStore(workbook));
+
+    grid.setTheme({ bg: "#ff0000" });
+    expect(grid.getEffectiveTheme().bg).toBe("#ff0000");
+
+    grid.replaceTheme(undefined);
+    expect(grid.getEffectiveTheme().bg).toBe(DEFAULT_THEME.bg);
+
+    grid.destroy();
+  });
+
+  it("replaceTheme(undefined) re-reads host CSS custom properties (Tailwind-style)", () => {
+    const workbook = makeWorkbook(10);
+    const host = mountHost();
+    // A Tailwind arbitrary property (`[--sheetwrite-bg:...]`) lands as a
+    // custom property on the host; construction and replaceTheme(undefined)
+    // must both resolve it.
+    host.style.setProperty("--sheetwrite-bg", "#0b0b0c");
+    const grid = new GridImpl(host, { workbook }, makeFakeStore(workbook));
+    expect(grid.getEffectiveTheme().bg).toBe("#0b0b0c");
+
+    grid.setTheme({ bg: "#ff0000" });
+    grid.replaceTheme(undefined);
+    expect(grid.getEffectiveTheme().bg).toBe("#0b0b0c");
+
+    grid.destroy();
+  });
+
+  it("replaceTheme replaces the whole option value instead of merging", () => {
+    const workbook = makeWorkbook(10);
+    const grid = new GridImpl(mountHost(), { workbook }, makeFakeStore(workbook));
+
+    grid.replaceTheme({ bg: "#ff0000" });
+    grid.replaceTheme({ fg: "#123456" });
+
+    const theme = grid.getEffectiveTheme();
+    expect(theme.fg).toBe("#123456");
+    expect(theme.bg).toBe(DEFAULT_THEME.bg); // not kept from the previous value
+
+    grid.destroy();
+  });
+
+  it("setTheme keeps merging for imperative users", () => {
+    const workbook = makeWorkbook(10);
+    const grid = new GridImpl(mountHost(), { workbook }, makeFakeStore(workbook));
+
+    grid.setTheme({ bg: "#ff0000" });
+    grid.setTheme({ fg: "#123456" });
+
+    const theme = grid.getEffectiveTheme();
+    expect(theme.bg).toBe("#ff0000");
+    expect(theme.fg).toBe("#123456");
+
+    grid.destroy();
+  });
+});
