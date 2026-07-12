@@ -3,6 +3,7 @@ import { cellKey, type LiteralLookup, parseCellKey, ReferenceGraph } from "./ref
 import { StyleDictionary } from "./style-dictionary.js";
 import type {
   AggregateOp,
+  ApplyTransactionResult,
   CellAddress,
   CellScalar,
   CellStyle,
@@ -887,10 +888,12 @@ export class SheetwriteStore implements Store {
    * Public `Store` shape takes one argument (reason defaults to `"api"`);
    * internal producers thread their {@link CommitReason} via the second.
    */
-  applyTransaction(tx: Transaction, commitReason: CommitReason = "api"): void {
+  applyTransaction(tx: Transaction, commitReason: CommitReason = "api"): ApplyTransactionResult {
     // Non-reentrant barrier: a stale epoch is rejected outright (the app
     // rebases on the change stream and resubmits).
-    if (tx.epoch !== undefined && tx.epoch !== this.epoch) return;
+    if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
+      return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
+    }
 
     const hasListeners = this.listeners.size > 0;
     const changes: ChangeEvent["changes"] | null = hasListeners ? [] : null;
@@ -917,7 +920,13 @@ export class SheetwriteStore implements Store {
       }
     }
 
-    if (appliedPatches.length === 0) return;
+    if (appliedPatches.length === 0) {
+      return {
+        status: "noop",
+        epoch: this.epoch,
+        reason: tx.patches.length === 0 ? "empty" : "out-of-bounds",
+      };
+    }
 
     if (hasStructuralPatch) {
       this.syncFormulaSources();
@@ -936,7 +945,9 @@ export class SheetwriteStore implements Store {
     const transaction =
       appliedPatches.length === tx.patches.length ? tx : { ...tx, patches: appliedPatches };
 
-    if (!hasListeners) return;
+    if (!hasListeners) {
+      return { status: "applied", epoch: this.epoch, transaction };
+    }
 
     const event: ChangeEvent = {
       transaction,
@@ -946,6 +957,7 @@ export class SheetwriteStore implements Store {
       epoch: this.epoch,
     };
     for (const fn of this.listeners) fn(event);
+    return { status: "applied", epoch: this.epoch, transaction };
   }
 
   private applyPatch(patch: Patch, changes: ChangeEvent["changes"] | null): void {

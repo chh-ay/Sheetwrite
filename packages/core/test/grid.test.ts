@@ -27,7 +27,7 @@ function makeFakeStore(
       return { sheet, rows, cols, values, styleIds: new Uint32Array(n), styles: [{}] };
     },
     ensureColumns: () => {},
-    applyTransaction: () => {},
+    applyTransaction: () => ({ status: "noop", epoch: 0, reason: "empty" }),
     on: () => () => {},
     getDirty: () => [],
     markClean: () => {},

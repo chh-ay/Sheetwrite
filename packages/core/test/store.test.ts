@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { ChangeEvent, Workbook } from "../src/types.js";
+import type { ChangeEvent, Transaction, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
@@ -235,24 +235,63 @@ describe("SheetwriteStore", () => {
     expect(stillHighStyle.backgroundColor).toBe("#fef3c7");
   });
 
-  it("rejects a transaction whose epoch is stale", () => {
+  it("returns exhaustive outcomes and emits only applied transactions", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
-    // first edit advances epoch 0 -> 1
-    store.applyTransaction({
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    const firstTransaction: Transaction = {
       epoch: 0,
       patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "a" } }],
+    };
+    expect(store.applyTransaction(firstTransaction)).toEqual({
+      status: "applied",
+      epoch: 1,
+      transaction: firstTransaction,
     });
-    // resubmitting against the now-stale epoch 0 is dropped
-    store.applyTransaction({
-      epoch: 0,
-      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "b" } }],
-    });
+    expect(events).toHaveLength(1);
+
+    expect(
+      store.applyTransaction({
+        epoch: 0,
+        patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "b" } }],
+      }),
+    ).toEqual({ status: "conflict", expectedEpoch: 0, actualEpoch: 1 });
     expect(store.getCell(addr(0, 0)).resolved).toBe("a");
-    // a transaction with no epoch always applies
-    store.applyTransaction({
-      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "c" } }],
+    expect(events).toHaveLength(1);
+
+    expect(store.applyTransaction({ patches: [] })).toEqual({
+      status: "noop",
+      epoch: 1,
+      reason: "empty",
     });
-    expect(store.getCell(addr(0, 0)).resolved).toBe("c");
+    expect(events).toHaveLength(1);
+
+    expect(
+      store.applyTransaction({
+        patches: [{ op: "set", addr: addr(10, 0), value: { kind: "literal", value: "outside" } }],
+      }),
+    ).toEqual({ status: "noop", epoch: 1, reason: "out-of-bounds" });
+    expect(events).toHaveLength(1);
+
+    const validPatch = {
+      op: "set",
+      addr: addr(1, 0),
+      value: { kind: "literal", value: "valid" },
+    } as const;
+    const mixedResult = store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(10, 0), value: { kind: "literal", value: "outside" } },
+        validPatch,
+      ],
+    });
+    expect(mixedResult).toEqual({
+      status: "applied",
+      epoch: 2,
+      transaction: { patches: [validPatch] },
+    });
+    expect(events).toHaveLength(2);
+    expect(events[1]?.transaction).toEqual({ patches: [validPatch] });
   });
 
   it("tracks dirty patches and clears them on markClean", () => {

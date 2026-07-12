@@ -170,6 +170,11 @@ export interface Transaction {
   epoch?: number;
 }
 
+export type ApplyTransactionResult =
+  | { status: "applied"; epoch: number; transaction: Transaction }
+  | { status: "conflict"; expectedEpoch: number; actualEpoch: number }
+  | { status: "noop"; epoch: number; reason: "empty" | "out-of-bounds" };
+
 /**
  * An undoable transaction submitted through a Grid.
  *
@@ -300,7 +305,7 @@ export interface Store {
    * `Grid.applyTransaction` for normal host-driven edits.
    * Queued and flushed at a barrier — never reentrant.
    */
-  applyTransaction(tx: Transaction): void;
+  applyTransaction(tx: Transaction): ApplyTransactionResult;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
   /** Pending unsynced edits. */
   getDirty(): Patch[];

@@ -1193,8 +1193,8 @@ export class GridImpl implements Grid {
 
   /** Thread the reason when the store is ours; injected stores stay 1-arg. */
   private storeApply(patches: Patch[], reason: CommitReason): void {
-    if (this.loadable) this.loadable.applyTransaction({ patches }, reason);
-    else this.store.applyTransaction({ patches });
+    if (this.loadable) void this.loadable.applyTransaction({ patches }, reason);
+    else void this.store.applyTransaction({ patches });
   }
 
   private inversePatch(patch: Patch): Patch[] {

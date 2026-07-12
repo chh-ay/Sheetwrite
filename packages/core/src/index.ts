@@ -26,6 +26,7 @@ export { REF_CYCLE } from "./reference.js";
 export { SheetwriteStore } from "./store.js";
 export type {
   AggregateOp,
+  ApplyTransactionResult,
   CellAddress,
   CellAlign,
   CellBorder,
