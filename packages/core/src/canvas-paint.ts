@@ -107,13 +107,51 @@ export function columnEdges(layout: RenderLayout): number[] {
   return colX;
 }
 
-/**
- * Build a canvas `font` string for the given weight and slant. Returns the plain
- * theme font when neither bold nor italic is requested (the hot-path default).
- */
-function fontFor(theme: Theme, bold: boolean | undefined, italic: boolean | undefined): string {
-  if (!bold && !italic) return theme.font;
-  return `${italic ? "italic " : ""}${bold ? "bold " : ""}${theme.font}`;
+/** Build the effective canvas font, preserving the default hot path unchanged. */
+export function fontFor(
+  theme: Theme,
+  style: Pick<CellStyle, "bold" | "italic" | "fontSize">,
+  zoom = 1,
+  cache?: Map<string, string>,
+): string {
+  if (!style.bold && !style.italic && style.fontSize === undefined) return theme.font;
+  const size = style.fontSize === undefined ? undefined : style.fontSize * zoom;
+  const key = `${style.italic ? 1 : 0}:${style.bold ? 1 : 0}:${size ?? ""}`;
+  const cached = cache?.get(key);
+  if (cached !== undefined) return cached;
+  const base = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
+  const font = `${style.italic ? "italic " : ""}${style.bold ? "bold " : ""}${base}`;
+  cache?.set(key, font);
+  return font;
+}
+
+/** Wrapped-only line layout; the ordinary single-line path never calls this. */
+export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
+  const lines: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    if (paragraph === "") {
+      lines.push("");
+      continue;
+    }
+    let start = 0;
+    while (start < paragraph.length) {
+      let end = start;
+      let lastBreak = -1;
+      while (end < paragraph.length) {
+        const next = end + 1;
+        if (/\s/.test(paragraph[end]!)) lastBreak = next;
+        if (ctx.measureText(paragraph.slice(start, next)).width > width) {
+          if (end === start) end = next;
+          else if (lastBreak > start) end = lastBreak;
+          break;
+        }
+        end = next;
+      }
+      lines.push(paragraph.slice(start, end));
+      start = end;
+    }
+  }
+  return lines;
 }
 
 /**
@@ -155,7 +193,7 @@ function paintTextDecoration(
   x: number,
   w: number,
   cy: number,
-  theme: Theme,
+  fontPx: number,
 ): void {
   const runWidth = ctx.measureText(text).width;
   if (runWidth <= 0) return;
@@ -165,11 +203,11 @@ function paintTextDecoration(
   else if (align === "center") left = x + w / 2 - runWidth / 2;
   else left = x + CELL_PAD;
 
-  const fontPx = Number.parseFloat(FONT_PX_RE.exec(theme.font)?.[1] ?? "") || 12;
+  const effectiveFontPx = fontPx || 12;
 
   if (style.underline) {
     // Just under the baseline, which sits ~0.4em below the "middle" text origin.
-    ctx.fillRect(left, Math.round(cy + fontPx * 0.4), runWidth, 1);
+    ctx.fillRect(left, Math.round(cy + effectiveFontPx * 0.4), runWidth, 1);
   }
   if (style.strikethrough) {
     // Through the run's visual middle (≈ the "middle" baseline origin at `cy`).
@@ -188,6 +226,7 @@ interface PaintState {
   measuredFont: string;
   digitWidth: number;
   hashWidth: number;
+  fontCache: Map<string, string>;
 }
 
 function applyFont(ctx: Ctx, state: PaintState, font: string): void {
@@ -314,6 +353,7 @@ export function paintFrame(
     measuredFont: "",
     digitWidth: 0,
     hashWidth: 0,
+    fontCache: new Map(),
   };
   const styleCache = new Map<number, CellStyle>();
   const styleStride = view.styles.length || 1;
@@ -605,7 +645,8 @@ function paintCell(
 
   if (value === null || value === "") return;
 
-  applyFont(ctx, state, fontFor(theme, effective.bold, effective.italic));
+  const effectiveFont = fontFor(theme, effective, layout.zoom ?? 1, state.fontCache);
+  applyFont(ctx, state, effectiveFont);
   applyFill(ctx, state, effective.color ?? theme.fg);
 
   const align =
@@ -630,27 +671,48 @@ function paintCell(
     }
   }
 
-  // Left-aligned strings spill right, right-aligned strings spill left, and
-  // centered strings can use both sides. Numeric output never spills.
-  let textClipX = x;
-  let textClipW = w;
-  if (!numeric) {
-    if (align === "left") textClipW = spillX + spillW - x;
-    else if (align === "right") {
-      textClipX = spillX;
-      textClipW = x + w - spillX;
-    } else {
-      textClipX = spillX;
-      textClipW = spillW;
-    }
-  }
-
-  const cy = y + h / 2;
+  const fontPx =
+    effective.fontSize === undefined
+      ? Number.parseFloat(FONT_PX_RE.exec(theme.font)?.[1] ?? "") || 12
+      : effective.fontSize * (layout.zoom ?? 1);
   ctx.save();
-  clipCell(ctx, textClipX, y, textClipW, h);
-  fillAlignedText(ctx, text, align, x, w, cy);
-  if (effective.underline || effective.strikethrough) {
-    paintTextDecoration(ctx, effective, text, align, x, w, cy, theme);
+  if (effective.wrap && !numeric) {
+    clipCell(ctx, x, y, w, h);
+    const lines = layoutTextLines(ctx, text, availableTextWidth);
+    const lineHeight = fontPx * 1.2;
+    const blockHeight = lines.length * lineHeight;
+    const firstCy = y + (h - Math.min(h, blockHeight)) / 2 + lineHeight / 2;
+    for (let line = 0; line < lines.length; line++) {
+      const cy = firstCy + line * lineHeight;
+      if (cy - lineHeight / 2 >= y + h) break;
+      const lineText = lines[line]!;
+      fillAlignedText(ctx, lineText, align, x, w, cy);
+      if (effective.underline || effective.strikethrough) {
+        paintTextDecoration(ctx, effective, lineText, align, x, w, cy, fontPx);
+      }
+    }
+  } else {
+    // Left-aligned strings spill right, right-aligned strings spill left, and
+    // centered strings can use both sides. Numeric output never spills.
+    let textClipX = x;
+    let textClipW = w;
+    if (!numeric) {
+      if (align === "left") textClipW = spillX + spillW - x;
+      else if (align === "right") {
+        textClipX = spillX;
+        textClipW = x + w - spillX;
+      } else {
+        textClipX = spillX;
+        textClipW = spillW;
+      }
+    }
+
+    const cy = y + h / 2;
+    clipCell(ctx, textClipX, y, textClipW, h);
+    fillAlignedText(ctx, text, align, x, w, cy);
+    if (effective.underline || effective.strikethrough) {
+      paintTextDecoration(ctx, effective, text, align, x, w, cy, fontPx);
+    }
   }
   ctx.restore();
 }
@@ -719,7 +781,16 @@ function paintHeader(
 
     // Theme header defaults are bold and centered; `headerStyle` overrides where set.
     const bold = headerStyle?.bold ?? true;
-    applyFont(ctx, state, fontFor(theme, bold, headerStyle?.italic));
+    applyFont(
+      ctx,
+      state,
+      fontFor(
+        theme,
+        { bold, italic: headerStyle?.italic, fontSize: headerStyle?.fontSize },
+        layout.zoom ?? 1,
+        state.fontCache,
+      ),
+    );
     applyFill(ctx, state, headerStyle?.color ?? theme.headerFg);
 
     const align = headerStyle?.align ?? "center";

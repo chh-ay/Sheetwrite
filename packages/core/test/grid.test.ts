@@ -829,3 +829,34 @@ describe("Grid.setMinColumns", () => {
     store.dispose();
   });
 });
+
+describe("Grid auto-fit", () => {
+  it("measures wrapped rows and columns only when explicitly invoked", () => {
+    const workbook = makeWorkbook(5);
+    const store = new SheetwriteStore(workbook, makeColumnarData(5));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const rowAddr = { sheet: "s1", row: 0, col: 0 };
+    const longValue = "A deliberately long value that must widen the first spreadsheet column";
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: rowAddr,
+          value: { kind: "literal", value: `${longValue}\nsecond line` },
+          style: { wrap: true, fontSize: 18 },
+        },
+      ],
+    });
+
+    expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
+    const originalWidth = workbook.sheets[0]!.columns[0]!.width;
+
+    grid.autoFitRows({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } });
+    grid.autoFitColumns([0]);
+
+    expect(workbook.sheets[0]!.rowHeights?.get(0)).toBeGreaterThan(28);
+    expect(workbook.sheets[0]!.columns[0]!.width).toBeGreaterThan(originalWidth);
+    grid.destroy();
+    store.dispose();
+  });
+});

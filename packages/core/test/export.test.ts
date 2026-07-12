@@ -105,7 +105,7 @@ describe("export", () => {
           op: "set",
           addr: { sheet: "s", row: 0, col: 0 },
           value: { kind: "literal", value: "styled" },
-          style: { bold: false, backgroundColor: "#ff0000" },
+          style: { bold: false, backgroundColor: "#ff0000", fontSize: 18, wrap: true },
         },
       ],
     });
@@ -116,6 +116,8 @@ describe("export", () => {
       value: "styled",
       textColor: "#112233",
       backgroundColor: "#ff0000",
+      fontSize: 18,
+      wrap: true,
     });
     expect((model.data[1]![0] as CellObject).fontWeight).toBeUndefined();
   });

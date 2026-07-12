@@ -18,6 +18,7 @@ interface FillTextCall {
   x: number;
   y: number;
   fillStyle: string;
+  font: string;
   maxWidth?: number;
 }
 
@@ -74,7 +75,7 @@ function makeRecordingCtx(): RecordingCtx {
     ctx.fillRects.push({ x, y, w, h, fillStyle: ctx.fillStyle });
   };
   ctx.fillText = (text: string, x: number, y: number, maxWidth?: number) => {
-    ctx.fillTexts.push({ text, x, y, maxWidth, fillStyle: ctx.fillStyle });
+    ctx.fillTexts.push({ text, x, y, maxWidth, fillStyle: ctx.fillStyle, font: ctx.font });
   };
   let segmentStart: MoveToCall | undefined;
   ctx.moveTo = (x: number, y: number) => {
@@ -444,6 +445,73 @@ describe("paintFrame column styles", () => {
 
     expect(ctx.fillTexts.some((call) => call.text === "#")).toBe(true);
     expect(ctx.fillTexts.some((call) => call.text === "12345")).toBe(false);
+  });
+});
+
+describe("paintFrame typography and wrapping", () => {
+  it("uses per-cell font size with valid italic-bold ordering", () => {
+    const layout = {
+      ...makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]),
+      zoom: 1,
+    };
+    const styleIds = Uint32Array.from([1, 0, 0]);
+    const view = makeView(styleIds, [{}, { fontSize: 18, bold: true, italic: true }], [0]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    expect(ctx.fillTexts.find((call) => call.text === "x")?.font).toBe(
+      "italic bold 18px sans-serif",
+    );
+  });
+
+  it("scales a base font size exactly once with layout zoom", () => {
+    const layout = {
+      ...makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]),
+      zoom: 2,
+    };
+    const styleIds = Uint32Array.from([1, 0, 0]);
+    const view = makeView(styleIds, [{}, { fontSize: 18 }], [0]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT, makeTheme({ font: "24px sans-serif" }));
+
+    expect(ctx.fillTexts.find((call) => call.text === "x")?.font).toBe("36px sans-serif");
+  });
+
+  it("wraps explicit and measured lines inside the owning cell", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 47, type: "text" }]);
+    const styleIds = Uint32Array.from([1, 0, 0]);
+    const view = makeView(styleIds, [{}, { wrap: true, align: "center" }], [0]);
+    (view.values as string[])[0] = "one two\nthree";
+    const viewport = {
+      ...UNIFORM_VIEWPORT,
+      rowTops: Float64Array.from([0, 48, 72]),
+      rowHeights: Float64Array.from([48, 24, 24]),
+    };
+
+    const ctx = render(view, layout, viewport);
+    const cellLines = ctx.fillTexts.filter((call) => ["one ", "two", "three"].includes(call.text));
+
+    expect(cellLines.map((call) => call.text)).toEqual(["one ", "two", "three"]);
+    expect(ctx.clipRects).toContainEqual({ x: 0, y: HEADER_HEIGHT, w: 47, h: 48 });
+    expect(cellLines.every((call) => call.x === 23.5)).toBe(true);
+  });
+
+  it("breaks an overlong token at character boundaries", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 26, type: "text" }]);
+    const styleIds = Uint32Array.from([1, 0, 0]);
+    const view = makeView(styleIds, [{}, { wrap: true }], [0]);
+    (view.values as string[])[0] = "abcdef";
+    const viewport = {
+      ...UNIFORM_VIEWPORT,
+      rowTops: Float64Array.from([0, 48, 72]),
+      rowHeights: Float64Array.from([48, 24, 24]),
+    };
+
+    const ctx = render(view, layout, viewport);
+    const painted = ctx.fillTexts
+      .filter((call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48 && call.x === 6)
+      .map((call) => call.text);
+    expect(painted).toEqual(["ab", "cd", "ef"]);
   });
 });
 

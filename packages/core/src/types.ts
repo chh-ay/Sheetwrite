@@ -776,6 +776,10 @@ export interface Grid {
   setRowHeight(row: number, height: number): void;
   /** Set one column's width via an undoable `setColumn` patch. */
   setColumnWidth(col: number, width: number): void;
+  /** Explicitly resize rows to fit wrapped content; never runs during paint. */
+  autoFitRows(range?: Range): void;
+  /** Explicitly resize columns from a bulk worksheet read. */
+  autoFitColumns(cols?: readonly number[]): void;
   /**
    * Pin the first `rows` view rows and `cols` columns; they stay visible while
    * the body scrolls (0 = unfreeze that axis). Persisted on the active sheet.
@@ -801,6 +805,8 @@ export interface RenderLayout {
   columns: readonly Column[];
   rowHeight: number;
   headerHeight: number;
+  /** Grid zoom used to scale base-unit per-cell typography exactly once. */
+  zoom?: number;
   totalRows: number;
   /** Merged cell regions in display-row space (empty under sort/filter). */
   merges?: ReadonlyArray<{ r0: number; c0: number; r1: number; c1: number }>;
