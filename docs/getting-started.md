@@ -51,11 +51,21 @@ initialization, repeat calls after success are no-ops, a concurrent call with a
 with a corrected source. `isSheetwriteReady(): boolean` reports whether
 initialization has completed — useful for SSR guards and suspense-style UIs.
 
-In a bundler, resolve the two published assets — the `.wasm` binary
-(`@sheetwrite/wasm/wasm` subpath) and, if you use the worker renderer, the
-worker module (`@sheetwrite/core/worker` subpath, see
-[Worker rendering](./worker-rendering.md)) — and hand the URLs to Sheetwrite.
-The canonical per-bundler matrix:
+**Try zero-config first.** With no argument, the WASM loader resolves the
+binary relative to its own module (`new URL(..., import.meta.url)` inside the
+generated glue), and Vite and webpack/Next.js rewrite that into an emitted,
+fingerprinted asset — no URL plumbing at all:
+
+```ts
+await initSheetwrite(); // runtime-verified on Vite and webpack production builds
+```
+
+Pass an explicit URL only when your bundler mangles module URLs (e.g.
+bundling to a single file) or you serve the binary yourself. The two
+published assets are the `.wasm` binary (`@sheetwrite/wasm/wasm` subpath)
+and, if you use the worker renderer, the worker module
+(`@sheetwrite/core/worker` subpath, see
+[Worker rendering](./worker-rendering.md)). The canonical per-bundler matrix:
 
 | Bundler / runtime | WASM URL | Worker URL |
 |---|---|---|
