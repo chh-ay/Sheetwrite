@@ -9,11 +9,11 @@ import { colToA1, labelToCol } from "./a1.js";
 import { dateToSerial, serialToDate } from "./date-serial.js";
 import { validateWorkbookSnapshot } from "./document-protocol.js";
 import {
-  setXlsxBackend,
-  setXlsxImportBackend,
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
-  type XlsxBackend,
-  type XlsxImportBackend,
+  type XlsxTableExportBackend,
+  type XlsxTableImportBackend,
   type XlsxWorkbookBackend,
   type XlsxWorkbookOptions,
   type XlsxWorkbookWarning,
@@ -178,7 +178,7 @@ export function buildXlsxModel(workbook: Workbook, store: Store): XlsxModel | nu
   };
 }
 
-async function toXlsxBytes(workbook: Workbook, store: Store): Promise<Uint8Array> {
+async function toXlsxTableBytes(workbook: Workbook, store: Store): Promise<Uint8Array> {
   const model = buildXlsxModel(workbook, store);
   if (!model) return new Uint8Array();
 
@@ -186,13 +186,13 @@ async function toXlsxBytes(workbook: Workbook, store: Store): Promise<Uint8Array
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-/** Default xlsx backend (MIT `write-excel-file`). Importing this module registers it. */
-export const writeExcelFileBackend: XlsxBackend = {
+/** Default table export backend. Importing this module registers it. */
+export const writeExcelFileTableExportBackend: XlsxTableExportBackend = {
   name: "write-excel-file",
-  toXlsx: toXlsxBytes,
+  toXlsxTable: toXlsxTableBytes,
 };
 
-setXlsxBackend(writeExcelFileBackend);
+setXlsxTableExportBackend(writeExcelFileTableExportBackend);
 
 // ── xlsx import ──────────────────────────────────────────────────────────────
 
@@ -233,7 +233,7 @@ function toArrayBuffer(data: ArrayBuffer | Uint8Array): ArrayBuffer {
   return out;
 }
 
-async function fromXlsxBytes(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
+async function fromXlsxTableBytes(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
   // `trim: false` keeps string cells verbatim. Only the first sheet is read.
   const rows = await readSheet(toArrayBuffer(data), { trim: false });
   if (rows.length === 0) return { rowCount: 0, columns: {} };
@@ -257,13 +257,13 @@ async function fromXlsxBytes(data: ArrayBuffer | Uint8Array): Promise<ColumnarDa
   return { rowCount, columns };
 }
 
-/** Default xlsx import backend (MIT `read-excel-file`). Importing this module registers it. */
-export const readExcelFileImportBackend: XlsxImportBackend = {
+/** Default table import backend. Importing this module registers it. */
+export const readExcelFileTableImportBackend: XlsxTableImportBackend = {
   name: "read-excel-file",
-  fromXlsx: fromXlsxBytes,
+  fromXlsxTable: fromXlsxTableBytes,
 };
 
-setXlsxImportBackend(readExcelFileImportBackend);
+setXlsxTableImportBackend(readExcelFileTableImportBackend);
 // ── formula-preserving workbook import/export (optional ExcelJS backend) ─────
 
 const WORKBOOK_META_MARKER = "sheetwrite-workbook-metadata-v1";

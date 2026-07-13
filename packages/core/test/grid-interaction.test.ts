@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Renderer, RenderLayout, RowData, Viewport } from "../src/types.js";
+import type { DataSourcePage, Renderer, RenderLayout, Viewport } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
@@ -276,7 +276,7 @@ describe("merge repaint invalidation", () => {
 });
 describe("datasource repaint invalidation", () => {
   it("repaints when an async page resolves without another interaction", async () => {
-    const { promise, resolve } = Promise.withResolvers<RowData[]>();
+    const { promise, resolve } = Promise.withResolvers<DataSourcePage>();
     const workbook = makeWorkbook(20);
     const host = mountHost();
     const grid = new GridImpl(host, {
@@ -286,13 +286,14 @@ describe("datasource repaint invalidation", () => {
     const recorder = makePaintRecorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
 
-    resolve(
-      Array.from({ length: 20 }, (_, row) => ({
+    resolve({
+      start: 0,
+      rows: Array.from({ length: 20 }, (_, row) => ({
         name: `Loaded ${row}`,
         amount: row,
         city: "Tokyo",
       })),
-    );
+    });
     await promise;
     await Promise.resolve();
 

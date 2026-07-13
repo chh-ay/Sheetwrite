@@ -9,7 +9,7 @@ import { ContextMenu } from "./context-menu.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import { EditController, type EditNavigate } from "./editor.js";
-import { downloadBytes, toCsv, toXlsx } from "./export.js";
+import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
@@ -35,8 +35,6 @@ import type {
   ColumnFilter,
   CommitReason,
   ConditionalFormatRule,
-  DataSourcePage,
-  DataSourceRequest,
   DataValidationRule,
   DocumentOp,
   Grid,
@@ -47,7 +45,6 @@ import type {
   GridTransaction,
   HighlightRange,
   MutationPolicyMode,
-  Patch,
   PresenceOverlay,
   ProtectedRange,
   ProtectionResolver,
@@ -55,7 +52,6 @@ import type {
   RemoteOperationOptions,
   Renderer,
   ReplaceResult,
-  RowData,
   RowGroup,
   SearchOptions,
   SearchResult,
@@ -269,21 +265,7 @@ export class GridImpl implements Grid {
     for (const sheet of workbook.sheets) {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
-    const getRows = opts.datasource?.getRows;
-    const datasource: ((request: DataSourceRequest) => Promise<DataSourcePage>) | undefined =
-      getRows
-        ? async (request) => {
-            const result =
-              getRows.length >= 2
-                ? await (
-                    getRows as (sheet: SheetId, start: number, end: number) => Promise<RowData[]>
-                  )(request.sheet, request.start, request.end)
-                : await (
-                    getRows as (request: DataSourceRequest) => Promise<DataSourcePage | RowData[]>
-                  )(request);
-            return Array.isArray(result) ? { start: request.start, rows: result } : result;
-          }
-        : undefined;
+    const datasource = opts.datasource?.getRows;
     this.readOnly = opts.readOnly ?? false;
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
@@ -1023,7 +1005,7 @@ export class GridImpl implements Grid {
     if (this.readOnly || this.selection.isEmpty) return;
 
     const sheet = this.sheet();
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     const rects: SelRect[] = [];
     this.selection.forEachRect((rect) => rects.push(rect));
     const intersectsMerge = (sheet.merges ?? []).some((merge) =>
@@ -1123,7 +1105,7 @@ export class GridImpl implements Grid {
     const c0 = Math.min(range.start.col, range.end.col);
     const c1 = Math.max(range.start.col, range.end.col);
 
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (let row = r0; row <= r1; row++) {
       for (let col = c0; col <= c1; col++) {
         const addr = { sheet: range.sheet, row, col };
@@ -1176,7 +1158,7 @@ export class GridImpl implements Grid {
     const ctx = this.measurementContext();
     if (!ctx) return;
     const merges = sheet.merges ?? [];
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (let row = r0; row <= r1; row++) {
       let required = this.baseTheme.rowHeight;
       for (let ci = 0; ci < cols.length; ci++) {
@@ -1228,7 +1210,7 @@ export class GridImpl implements Grid {
     );
     const ctx = this.measurementContext();
     if (!ctx) return;
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (let ci = 0; ci < targets.length; ci++) {
       const col = targets[ci]!;
       const column = sheet.columns[col]!;
@@ -1733,7 +1715,7 @@ export class GridImpl implements Grid {
     return columns;
   }
 
-  private materializeVirtualColumns(patches: Patch[]): Patch[] {
+  private materializeVirtualColumns(patches: DocumentOp[]): DocumentOp[] {
     const maxColumnBySheet = new Map<SheetId, number>();
     for (const patch of patches) {
       let sheet: SheetId | null = null;
@@ -1761,7 +1743,7 @@ export class GridImpl implements Grid {
       }
     }
 
-    const additions: Patch[] = [];
+    const additions: DocumentOp[] = [];
     for (const [sheetId, maxColumn] of maxColumnBySheet) {
       const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
       if (!stored || maxColumn < stored.columns.length) continue;
@@ -1939,7 +1921,7 @@ export class GridImpl implements Grid {
 
   hideRows(rows: readonly number[]): void {
     const sheet = this.sheet();
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (const row of new Set(rows)) {
       if (row < 0 || row >= sheet.rowCount) continue;
       patches.push({
@@ -1956,7 +1938,7 @@ export class GridImpl implements Grid {
   showRows(rows?: readonly number[]): void {
     const sheet = this.sheet();
     const targets = rows ?? [...(sheet.hiddenRows ?? [])];
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (const row of new Set(targets)) {
       if (row < 0 || row >= sheet.rowCount) continue;
       patches.push({
@@ -1986,7 +1968,7 @@ export class GridImpl implements Grid {
       (count, column) => count + (column.visible === false ? 0 : 1),
       0,
     );
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (const col of unique) {
       if (visibleCount <= 1) break;
       patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: false } });
@@ -1999,7 +1981,7 @@ export class GridImpl implements Grid {
     const sheet = this.sheet();
     const targets =
       cols ?? sheet.columns.flatMap((column, col) => (column.visible === false ? [col] : []));
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (const col of new Set(targets)) {
       if (col < 0 || col >= sheet.columns.length || sheet.columns[col]?.visible !== false) continue;
       patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: true } });
@@ -2077,7 +2059,7 @@ export class GridImpl implements Grid {
 
   async exportXlsx(filename: string): Promise<void> {
     this.requireCompleteExport(this.store.getWorkbook().sheets);
-    const bytes = await toXlsx(this.store.getWorkbook(), this.store);
+    const bytes = await toXlsxTable(this.store.getWorkbook(), this.store);
     downloadBytes(
       bytes,
       filename,

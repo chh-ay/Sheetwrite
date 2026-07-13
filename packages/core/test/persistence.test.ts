@@ -127,10 +127,9 @@ function richSnapshot(): WorkbookSnapshot {
 }
 
 describe("snapshot persistence boundary", () => {
-  it("round-trips a rich workbook deterministically without dirty hydration", () => {
+  it("round-trips a rich workbook deterministically without hydration events", () => {
     const store = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(richSnapshot())));
 
-    expect(store.getDirty()).toEqual([]);
     expect(store.getWorkbook().activeSheet).toBe("summary");
     expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["source", "summary"]);
     expect(store.getCell({ sheet: "source", row: 0, col: 0 })).toEqual({
@@ -162,7 +161,6 @@ describe("snapshot persistence boundary", () => {
 
     const restored = SheetwriteStore.fromSnapshot(JSON.parse(bytes));
     expect(JSON.stringify(restored.exportSnapshot())).toBe(bytes);
-    expect(restored.getDirty()).toEqual([]);
     store.dispose();
     restored.dispose();
   });
@@ -178,7 +176,6 @@ describe("snapshot persistence boundary", () => {
 
     grid.undo();
     expect(grid.store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
-    expect(grid.store.getDirty()).toEqual([]);
     expect(changes).toBe(0);
     grid.destroy();
 
@@ -224,7 +221,7 @@ describe("snapshot persistence boundary", () => {
     expect(host.childElementCount).toBe(0);
   });
 
-  it("applies remote operations observably without dirty echo or local history", async () => {
+  it("applies remote operations observably without local history", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
     const grid = createGridFromSnapshot(host, richSnapshot());
@@ -247,8 +244,7 @@ describe("snapshot persistence boundary", () => {
     expect(result.status).toBe("applied");
     expect(events).toHaveLength(1);
     expect(events[0]?.source).toBe("remote");
-    expect(events[0]?.dirty).toEqual([]);
-    expect(grid.store.getDirty()).toEqual([]);
+    expect(events[0]?.transaction.patches).toHaveLength(1);
     expect(grid.store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(9);
     expect(grid.store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe(9);
     expect(context.calls.fillText ?? 0).toBeGreaterThan(paintsBefore);
@@ -296,7 +292,6 @@ describe("snapshot persistence boundary", () => {
     const second = createGridFromSnapshot(secondHost, await adapter.load("doc-1"));
     expect(second.store.getCell({ sheet: "source", row: 0, col: 0 }).resolved).toBe(12);
     expect(second.store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(13);
-    expect(second.store.getDirty()).toEqual([]);
     second.destroy();
     const controller = new AbortController();
     controller.abort("test cancellation");

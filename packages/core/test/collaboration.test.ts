@@ -142,7 +142,6 @@ describe("presence coordinator", () => {
     expect(presenceRects.length).toBeGreaterThan(0);
     expect(presenceRects[0]?.getAttribute("title")).toBe("Left User");
     expect(right.grid.exportSnapshot()).toEqual(before);
-    expect(right.grid.store.getDirty()).toEqual([]);
 
     const poolSize = right.host.querySelectorAll(".sheetwrite-overlay > div").length;
     left.grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });

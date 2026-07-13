@@ -80,37 +80,36 @@ const datasource: DataSource = {
 
 `rows` may contain scalars, `CellValue` objects, or
 `{ value: CellValue, style?: CellStyle }` wrappers. Hydrated formulas,
-references, and styles do not become dirty user edits. Short pages mark only
-the returned rows loaded; malformed ranges emit `datasource-error` and remain
+references, and styles do not emit user change events. Short pages mark only the
+returned rows loaded; malformed ranges emit `datasource-error` and remain
 retryable. Resetting or destroying the grid aborts outstanding requests, and a
 late page never overwrites a cell edited after that request began.
 
-Dense storage remains the compatibility default. `{ mode: "paged" }` allocates
+Dense storage is the default. `{ mode: "paged" }` allocates
 power-of-two row chunks only for loaded or locally edited areas; `cacheBytes`
 bounds clean cached chunks, while dirty chunks remain pinned until
 acknowledgement. Full-sheet queries and exports report incomplete data until all
 required pages are loaded. `Store.queryCapability(sheet)` and
 `getCellLoadState(addr)` expose that state.
 
-The legacy `getRows(sheet, start, end): Promise<RowData[]>` shape remains
-accepted and is normalized once when the grid is constructed.
 
 ### Serializable documents
 
 Use `WorkbookSnapshot` plus `validateWorkbookSnapshot()` at persistence
 boundaries. `schemaVersion: 1` rejects unsupported future schemas with
-structured errors. `DocumentOp` and its backwards-compatible `Patch` alias cover
-the complete reducer path, including metadata and sheet lifecycle operations.
+structured errors. `DocumentOp` is the exhaustive reducer operation union,
+including metadata and sheet lifecycle operations.
 Session-only grid options such as `renderer`, `readOnly`, local zoom, selection,
 scroll, search, and temporary highlights never belong in a snapshot.
 
 `createGridFromSnapshot(host, snapshot, options)` validates and hydrates every
-sheet before mounting. Hydration emits no changes, dirty patches, or undo entry.
+sheet before mounting. Hydration emits no change event or undo entry.
 `grid.exportSnapshot()` uses bulk sheet reads and returns deterministic sparse
 blocks. `grid.applyRemoteOperations(operations)` emits a change with
-`source: "remote"` while skipping dirty state and undo history.
-`SyncCoordinator` queues local changes as immutable mutation records. Its
-`serverVersion` option is required and should come from the loaded snapshot.
+`source: "remote"` while remaining outside local undo history and
+`SyncCoordinator`'s outgoing queue. `SyncCoordinator` queues each non-empty local
+transaction as an immutable mutation record. Its `serverVersion` option is
+required and should come from the loaded snapshot.
 `sendNext()` and `retry(id)` are host-controlled; retries retain the original
 ID. `subscribe(source)` accepts a transport-neutral callback source and validates
 strict version order. Use `MemoryPersistenceAdapter` as an executable,

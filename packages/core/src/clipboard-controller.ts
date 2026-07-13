@@ -14,8 +14,8 @@ import type {
   CellValue,
   ClipboardOutcome,
   CommitReason,
+  DocumentOp,
   PackedCellBlock,
-  Patch,
   Sheet,
   SheetId,
   Store,
@@ -30,7 +30,7 @@ export interface ClipboardControllerDeps {
   readOnly: () => boolean;
   mergeAnchorAt: (row: number, col: number) => SelRect | null;
   toDataRow: (viewRow: number) => number;
-  commit: (patches: Patch[], reason: CommitReason) => void;
+  commit: (patches: DocumentOp[], reason: CommitReason) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -41,7 +41,7 @@ interface CellWrite {
 
 interface CapturedClipboard extends ClipboardSnapshot {
   /** Exact source addresses captured before an asynchronous cut writes the clipboard. */
-  clearPatches: Patch[];
+  clearPatches: DocumentOp[];
 }
 
 export const SHEETWRITE_CLIPBOARD_MIME = "application/x-sheetwrite+json";
@@ -554,7 +554,7 @@ export class ClipboardController {
       }
     }
 
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (let r = 0; r < height; r++) {
       const width = widthAt(r);
       for (let c = 0; c < width; c++) {
@@ -597,7 +597,7 @@ export class ClipboardController {
     const activeSheet = this.deps.activeSheet();
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
-    const clearPatches: Patch[] = [];
+    const clearPatches: DocumentOp[] = [];
     const firstDataRow = this.deps.toDataRow(rect.r0);
     let rangeClear = true;
     for (let row = rect.r0; row <= rect.r1 && rangeClear; row++) {

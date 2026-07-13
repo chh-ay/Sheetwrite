@@ -23,13 +23,13 @@ import type {
   ConditionalFormatRule,
   DataCell,
   DataValidationRule,
+  DocumentOp,
   MergeRange,
   MutationIssue,
   MutationPolicyMode,
   NamedRangeSnapshot,
   PackedCellBlock,
   PagedStoreStats,
-  Patch,
   ProtectedRange,
   ProtectionResolver,
   QueryCapability,
@@ -195,7 +195,7 @@ export interface CompactRangeHistory {
   readonly resource: RangeSnapshot;
   readonly byteLength: number;
   readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
-  toDocumentOp(range: Range): Extract<Patch, { op: "setBlock" }>;
+  toDocumentOp(range: Range): Extract<DocumentOp, { op: "setBlock" }>;
   dispose(): void;
 }
 
@@ -263,8 +263,8 @@ function packSortKeys(keys: readonly SortKey[]): { cols: Uint32Array; ascending:
 
 /**
  * JS facade over the Rust/WASM columnar store. Heavy data lives in WASM linear
- * memory; this object holds workbook metadata, the style dictionary, dirty
- * tracking, and the transaction barrier. The render hot path goes through
+ * memory; this object holds workbook metadata, the style dictionary, paged-cell
+ * state, and the transaction barrier. The render hot path goes through
  * `getVisibleWindow` (one bulk read), never `getCell`.
  */
 export class SheetwriteStore implements Store {
@@ -274,8 +274,6 @@ export class SheetwriteStore implements Store {
   private readonly handles = new Map<SheetId, number>();
   private readonly styles = new StyleDictionary();
   private readonly listeners = new Set<ChangeListener>();
-  private dirty: Patch[] = [];
-  private dirtyTrackingSuspensions = 0;
   private epoch = 0;
   private readonly refs = new ReferenceGraph((addr, value) => this.writeRefShadow(addr, value));
   private readonly viewOrder = new Map<SheetId, Uint32Array>();
@@ -412,7 +410,7 @@ export class SheetwriteStore implements Store {
     );
   }
 
-  canApplyLocally(patch: Patch): boolean {
+  canApplyLocally(patch: DocumentOp): boolean {
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;
     if (
@@ -747,7 +745,6 @@ export class SheetwriteStore implements Store {
     const event: ChangeEvent = {
       transaction: { patches: [] },
       changes: [],
-      dirty: [],
       commitReason: "api",
       source: "local",
       epoch: this.epoch,
@@ -1069,7 +1066,7 @@ export class SheetwriteStore implements Store {
   /** Hide the given data rows; they drop out of the view until shown again. */
   hideRows(sheet: SheetId, rows: readonly number[]): void {
     const meta = this.sheetMeta(sheet);
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (const row of new Set(rows)) {
       if (!integerAt(row) || row >= meta.rowCount) continue;
       patches.push({
@@ -1086,7 +1083,7 @@ export class SheetwriteStore implements Store {
   showRows(sheet: SheetId, rows?: readonly number[]): void {
     const meta = this.sheetMeta(sheet);
     const targets = rows ?? [...(meta.hiddenRows ?? [])];
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (const row of new Set(targets)) {
       if (!integerAt(row) || row >= meta.rowCount) continue;
       patches.push({
@@ -1441,14 +1438,14 @@ export class SheetwriteStore implements Store {
   }
 
   private evaluateLocalPolicy(
-    patches: readonly Patch[],
+    patches: readonly DocumentOp[],
     commitReason: CommitReason,
   ): {
-    patches: Patch[];
+    patches: DocumentOp[];
     warnings: MutationIssue[];
     rejections: MutationIssue[];
   } {
-    const allowed: Patch[] = [];
+    const allowed: DocumentOp[] = [];
     const warnings: MutationIssue[] = [];
     const rejections: MutationIssue[] = [];
     const rulesBySheet = new Map<SheetId, DataValidationRule[]>();
@@ -1524,7 +1521,7 @@ export class SheetwriteStore implements Store {
   }
 
   private protectionIssues(
-    patch: Patch,
+    patch: DocumentOp,
     operationIndex: number,
     commitReason: CommitReason,
     protectedRanges: readonly ProtectedRange[],
@@ -1570,7 +1567,7 @@ export class SheetwriteStore implements Store {
     return issues;
   }
 
-  private affectedRanges(patch: Patch): Range[] {
+  private affectedRanges(patch: DocumentOp): Range[] {
     if (patch.op === "set") return [cellRange(patch.addr)];
     if (
       patch.op === "setRange" ||
@@ -1632,7 +1629,7 @@ export class SheetwriteStore implements Store {
   }
 
   private validationIssues(
-    patch: Patch,
+    patch: DocumentOp,
     operationIndex: number,
     rules: readonly DataValidationRule[],
   ): MutationIssue[] {
@@ -1759,7 +1756,7 @@ export class SheetwriteStore implements Store {
 
   /**
    * Internal producers may pass a bare reason; public persistence callers pass
-   * explicit source/dirty options.
+   * explicit source and commit-reason options.
    */
   applyTransaction(
     tx: Transaction,
@@ -1769,7 +1766,6 @@ export class SheetwriteStore implements Store {
       typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
     const commitReason = options.commitReason ?? "api";
     const source = options.source ?? "local";
-    const markDirty = options.markDirty ?? source === "local";
     // Non-reentrant barrier: a stale epoch is rejected outright (the app
     // rebases on the change stream and resubmits).
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
@@ -1795,7 +1791,7 @@ export class SheetwriteStore implements Store {
 
     const hasListeners = this.listeners.size > 0;
     const changes: ChangeEvent["changes"] | null = hasListeners ? [] : null;
-    const appliedPatches: Patch[] = [];
+    const appliedPatches: DocumentOp[] = [];
     const touchedSheets = new Set<SheetId>();
     let hasStructuralPatch = false;
 
@@ -1860,7 +1856,6 @@ export class SheetwriteStore implements Store {
       this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
     }
 
-    if (markDirty && this.dirtyTrackingSuspensions === 0) this.dirty.push(...appliedPatches);
     this.epoch += 1;
 
     const transaction =
@@ -1881,7 +1876,6 @@ export class SheetwriteStore implements Store {
     const event: ChangeEvent = {
       transaction,
       changes: changes ?? [],
-      dirty: [...this.dirty],
       commitReason,
       source,
       epoch: this.epoch,
@@ -1896,7 +1890,7 @@ export class SheetwriteStore implements Store {
     };
   }
 
-  private applyPatch(patch: Patch, changes: ChangeEvent["changes"] | null): boolean {
+  private applyPatch(patch: DocumentOp, changes: ChangeEvent["changes"] | null): boolean {
     switch (patch.op) {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
@@ -2470,8 +2464,8 @@ export class SheetwriteStore implements Store {
     rowEnd: number,
     colStart: number,
     colEnd: number,
-  ): Array<Extract<Patch, { op: "set" }>> {
-    const patches: Array<Extract<Patch, { op: "set" }>> = [];
+  ): Array<Extract<DocumentOp, { op: "set" }>> {
+    const patches: Array<Extract<DocumentOp, { op: "set" }>> = [];
     for (let row = rowStart; row < rowEnd; row++) {
       for (let col = colStart; col < colEnd; col++) {
         const addr = { sheet, row, col };
@@ -2491,7 +2485,7 @@ export class SheetwriteStore implements Store {
   }
 
   private moveRows(
-    patch: Extract<Patch, { op: "moveRows" }>,
+    patch: Extract<DocumentOp, { op: "moveRows" }>,
     changes: ChangeEvent["changes"] | null,
   ): boolean {
     const sheet = this.sheetMeta(patch.sheet);
@@ -2590,7 +2584,7 @@ export class SheetwriteStore implements Store {
   }
 
   private moveColumns(
-    patch: Extract<Patch, { op: "moveColumns" }>,
+    patch: Extract<DocumentOp, { op: "moveColumns" }>,
     changes: ChangeEvent["changes"] | null,
   ): boolean {
     const sheet = this.sheetMeta(patch.sheet);
@@ -3119,38 +3113,7 @@ export class SheetwriteStore implements Store {
     return () => this.listeners.delete(fn);
   }
 
-  getDirty(): Patch[] {
-    return [...this.dirty];
-  }
-
-  markClean(patches: Patch[]): void {
-    this.acknowledgeOperations(patches);
-    if (patches.length === 0 || this.dirty.length === 0) return;
-
-    let prefix = 0;
-    while (
-      prefix < patches.length &&
-      prefix < this.dirty.length &&
-      this.dirty[prefix] === patches[prefix]
-    ) {
-      prefix += 1;
-    }
-    if (prefix === patches.length) {
-      if (prefix === this.dirty.length) {
-        this.dirty = [];
-      } else if (prefix > 1024 && prefix * 2 > this.dirty.length) {
-        this.dirty = this.dirty.slice(prefix);
-      } else {
-        this.dirty.splice(0, prefix);
-      }
-      return;
-    }
-
-    const clean = new Set(patches);
-    this.dirty = this.dirty.filter((p) => !clean.has(p));
-  }
-
-  acknowledgeOperations(operations: readonly Patch[]): void {
+  acknowledgeOperations(operations: readonly DocumentOp[]): void {
     for (const operation of operations) {
       if (operation.op === "set") {
         this.wasm.markRangeClean(
@@ -3182,17 +3145,6 @@ export class SheetwriteStore implements Store {
         );
       }
     }
-  }
-
-  suspendDirtyTracking(): () => void {
-    this.dirtyTrackingSuspensions += 1;
-    this.dirty = [];
-    let released = false;
-    return () => {
-      if (released) return;
-      released = true;
-      this.dirtyTrackingSuspensions = Math.max(0, this.dirtyTrackingSuspensions - 1);
-    };
   }
 
   exportSnapshot(): WorkbookSnapshot {
@@ -3340,8 +3292,8 @@ export class SheetwriteStore implements Store {
     try {
       const handle = this.handleOf(sheet);
       const columns = this.sheetMeta(sheet).columns;
-      const exceptions: Patch[] = [];
-      const protectedCells: Patch[] = [];
+      const exceptions: DocumentOp[] = [];
+      const protectedCells: DocumentOp[] = [];
 
       for (let c = 0; c < columns.length; c++) {
         const column = columns[c]!;
@@ -3396,9 +3348,9 @@ export class SheetwriteStore implements Store {
   }
 
   private hydrateSnapshotCells(snapshot: WorkbookSnapshot): void {
-    const literalExceptions: Patch[] = [];
-    const formulas: Patch[] = [];
-    const references: Patch[] = [];
+    const literalExceptions: DocumentOp[] = [];
+    const formulas: DocumentOp[] = [];
+    const references: DocumentOp[] = [];
 
     for (const sourceSheet of snapshot.sheets) {
       const handle = this.handleOf(sourceSheet.id);
@@ -3410,7 +3362,7 @@ export class SheetwriteStore implements Store {
             row: block.startRow + cell.rowOffset,
             col: block.startCol + cell.colOffset,
           };
-          const patch: Patch = { op: "set", addr, value: cell.value, style: cell.style };
+          const patch: DocumentOp = { op: "set", addr, value: cell.value, style: cell.style };
           if (cell.value.kind === "formula") {
             formulas.push(patch);
           } else if (cell.value.kind === "ref") {
@@ -3472,7 +3424,6 @@ export class SheetwriteStore implements Store {
       this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
     }
     this.epoch = snapshot.version ?? 0;
-    this.dirty = [];
   }
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
@@ -3773,7 +3724,7 @@ function validSortAndFilters(
   return true;
 }
 
-function patchSheetId(patch: Patch): SheetId | null {
+function patchSheetId(patch: DocumentOp): SheetId | null {
   switch (patch.op) {
     case "set":
     case "setNote":

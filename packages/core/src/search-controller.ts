@@ -4,7 +4,7 @@ import type { SheetwriteStore } from "./store.js";
 import type {
   CellAddress,
   CellValue,
-  Patch,
+  DocumentOp,
   ReplaceResult,
   SearchOptions,
   SearchResult,
@@ -26,7 +26,7 @@ export interface SearchControllerDeps {
   /** Whether writes are disabled; replace becomes a no-op. */
   readOnly: () => boolean;
   /** Route replacement writes through the grid so they land on the undo stack. */
-  commit: (patches: Patch[]) => void;
+  commit: (patches: DocumentOp[]) => void;
 }
 
 export interface SearchMatchSet {
@@ -185,7 +185,7 @@ export class SearchController {
       return { replaced: 0, result: this.emitSearch() };
     }
 
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     for (let i = 0; i < this.searchMatches.length; i++) {
       const match = this.searchMatches.at(i);
       if (!match) continue;
@@ -210,7 +210,7 @@ export class SearchController {
    * Preserves the cell's existing style and re-parses through `parseCellInput`
    * so numbers stay numbers.
    */
-  private replacementPatch(addr: CellAddress, replacement: string): Patch | null {
+  private replacementPatch(addr: CellAddress, replacement: string): DocumentOp | null {
     // Formula cells carry source text we must never rewrite; ref cells are
     // WASM-cleared and never surface in matches, but guard anyway.
     if (this.deps.store.getFormula(addr) !== null) return null;

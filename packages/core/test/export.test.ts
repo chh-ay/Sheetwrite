@@ -7,7 +7,7 @@ import {
   safeHeader,
   toCsv,
   toTsv,
-  toXlsx,
+  toXlsxTable,
 } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -87,7 +87,7 @@ describe("export", () => {
         },
       ],
     });
-    const bytes = await toXlsx(store.getWorkbook(), store);
+    const bytes = await toXlsxTable(store.getWorkbook(), store);
     expect(bytes.length).toBeGreaterThan(0);
     expect(bytes[0]).toBe(0x50); // 'P'
     expect(bytes[1]).toBe(0x4b); // 'K' — zip magic

@@ -10,7 +10,7 @@ import type {
   CellAddress,
   CellValue,
   CommitReason,
-  Patch,
+  DocumentOp,
   Sheet,
   SheetId,
   Store,
@@ -58,7 +58,7 @@ export interface InputControllerDeps {
   visibleRowWindow: () => { start: number; end: number };
   /** Live column-resize preview: set the width and re-lay-out without committing. */
   previewColumnWidth: (col: number, width: number) => void;
-  /** Apply a row height directly (sheet metadata; not a Patch, not undoable). */
+  /** Apply a row height directly (sheet metadata, not undoable). */
   setRowHeight: (row: number, height: number) => void;
   /**
    * Ctrl+Arrow data-edge target for the moved axis (row for vertical, col for
@@ -90,7 +90,7 @@ export interface InputControllerDeps {
   cut: () => void;
   paste: () => void;
   pasteValues: () => void;
-  commit: (patches: Patch[], reason: CommitReason) => void;
+  commit: (patches: DocumentOp[], reason: CommitReason) => void;
   readOnly: () => boolean;
 }
 
@@ -687,7 +687,7 @@ export class InputController {
     if (this.deps.readOnly()) return;
     const srcCols = source.c1 - source.c0 + 1;
     const series = new Map<number, FillSeries>();
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
 
     for (let c = target.c0; c <= target.c1; c++) {
       const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);

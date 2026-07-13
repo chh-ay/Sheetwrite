@@ -100,15 +100,12 @@ interface Store {
   getWorkbook(): Workbook;
   getCell(addr: CellAddress): ResolvedCell;
   getVisibleWindow(sheet, rows: { start; end }, cols: readonly number[]): VisibleWindowView;
-  applyTransaction(tx, { source?, markDirty?, commitReason? }): ApplyTransactionResult;
+  applyTransaction(tx, { source?, commitReason? }): ApplyTransactionResult;
   on("change", fn): () => void;                              // returns an unsubscribe
-  getDirty(): DocumentOp[];                                  // pending unsynced edits
-  markClean(patches: DocumentOp[]): void;                     // clear dirty flags after the API confirms
+  acknowledgeOperations?(operations: readonly DocumentOp[]): void;             // release paged dirty-cell pins after acknowledgement
 }
 ```
 
-`getDirty` / `markClean` remain a legacy manual queue. They are not a network
-protocol: new synchronization should use `SyncCoordinator` mutation IDs.
 
 ## Document protocol and storage transactions
 
@@ -119,14 +116,15 @@ formats, validation rules, protected ranges, notes, row groups, hidden document
 metadata, filters, sort keys, and named ranges. Formula source is authoritative;
 resolved values are derived caches and are not serialized.
 
-`DocumentOp` is the exhaustive plain-data mutation vocabulary for that document,
-and `Patch` is its backwards-compatible transaction name. Cells, ranges,
-rows/columns, merges, row metadata, frozen panes, conditional formats, validation,
-protection, notes, row groups, named ranges, and sheet lifecycle operations use
-the same store reducer and change-event shape. Local operations submitted through
-`Grid` also enter grid undo/redo history and dirty tracking. Direct
-`Store.applyTransaction` calls deliberately bypass grid read-only/history policy;
-remote grid operations bypass outgoing dirty state and local history.
+`DocumentOp` is the exhaustive plain-data mutation vocabulary for that document.
+Cells, ranges, rows/columns, merges, row metadata, frozen panes, conditional
+formats, validation, protection, notes, row groups, named ranges, and sheet
+lifecycle operations use the same store reducer and change-event shape. Local
+operations submitted through `Grid` enter grid undo/redo history;
+`SyncCoordinator` observes each non-empty local transaction and owns its durable
+mutation-ID record. Direct `Store.applyTransaction` calls deliberately bypass
+grid read-only/history policy. Remote operations remain observable with
+`source: "remote"` but enter neither local history nor outgoing synchronization.
 
 ```ts
 const checked = validateWorkbookSnapshot(JSON.parse(payload));

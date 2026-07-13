@@ -6,19 +6,25 @@ import writeXlsxFile, { type SheetData } from "write-excel-file/universal";
 import { dateToSerial } from "../src/date-serial.js";
 import { initSheetwrite } from "../src/grid.js";
 import {
-  fromXlsx,
   fromXlsxTable,
   fromXlsxWorkbook,
-  setXlsxImportBackend,
-  toXlsx,
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
+  setXlsxWorkbookBackend,
   toXlsxTable,
   toXlsxWorkbook,
-  type XlsxImportBackend,
+  type XlsxTableExportBackend,
+  type XlsxTableImportBackend,
+  type XlsxWorkbookBackend,
 } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { Workbook, WorkbookSnapshot } from "../src/types.js";
-// side-effect import registers both the write and the import backends
-import { readExcelFileImportBackend } from "../src/xlsx-backend.js";
+// Side-effect registration also installs the concrete table and workbook backends.
+import {
+  excelJsWorkbookBackend,
+  readExcelFileTableImportBackend,
+  writeExcelFileTableExportBackend,
+} from "../src/xlsx-backend.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -41,8 +47,32 @@ function workbook(): Workbook {
   };
 }
 
-describe("xlsx import", () => {
-  it("toXlsx round-trips through fromXlsx: strings verbatim, numbers, empty → null", async () => {
+describe("table XLSX interchange", () => {
+  it("reports the explicit registration entry when a backend is missing", () => {
+    const store = new SheetwriteStore(workbook());
+    setXlsxTableExportBackend(null as never);
+    setXlsxTableImportBackend(null as never);
+    setXlsxWorkbookBackend(null as never);
+    try {
+      expect(() => toXlsxTable(store.getWorkbook(), store)).toThrow(
+        "import @sheetwrite/core/xlsx first",
+      );
+      expect(() => fromXlsxTable(new Uint8Array())).toThrow("import @sheetwrite/core/xlsx first");
+      expect(() => toXlsxWorkbook(roundTripWorkbook())).toThrow(
+        "import @sheetwrite/core/xlsx first",
+      );
+      expect(() => fromXlsxWorkbook(new Uint8Array())).toThrow(
+        "import @sheetwrite/core/xlsx first",
+      );
+    } finally {
+      setXlsxTableExportBackend(writeExcelFileTableExportBackend);
+      setXlsxTableImportBackend(readExcelFileTableImportBackend);
+      setXlsxWorkbookBackend(excelJsWorkbookBackend);
+      store.dispose();
+    }
+  });
+
+  it("round-trips table XLSX strings, numbers, and empty cells", async () => {
     const store = new SheetwriteStore(workbook());
     store.applyTransaction({
       patches: [
@@ -71,9 +101,9 @@ describe("xlsx import", () => {
       ],
     });
 
-    // toXlsx yields a Uint8Array — exercise the Uint8Array input path.
-    const bytes = await toXlsx(store.getWorkbook(), store);
-    const data = await fromXlsx(bytes);
+    // Exercise the Uint8Array input path returned by the table exporter.
+    const bytes = await toXlsxTable(store.getWorkbook(), store);
+    const data = await fromXlsxTable(bytes);
 
     // Columns are keyed by the header-row text ("Name"/"Amount"), not the source keys.
     expect(data.rowCount).toBe(3);
@@ -81,7 +111,7 @@ describe("xlsx import", () => {
     expect(Array.from(data.columns.Amount!)).toEqual([42.5, null, -7]);
   });
 
-  it("fromXlsx maps date cells to date serials and reads an ArrayBuffer", async () => {
+  it("maps table XLSX date cells to serials and reads an ArrayBuffer", async () => {
     const day = new Date(Date.UTC(2021, 0, 15));
     const moment = new Date(Date.UTC(2021, 0, 15, 6, 30, 0));
     const rowsIn: SheetData = [
@@ -99,7 +129,7 @@ describe("xlsx import", () => {
 
     // blob.arrayBuffer() yields an ArrayBuffer — exercise the ArrayBuffer input path.
     const buffer = await (await writeXlsxFile(rowsIn).toBlob()).arrayBuffer();
-    const data = await fromXlsx(buffer);
+    const data = await fromXlsxTable(buffer);
 
     expect(data.rowCount).toBe(1);
     // A whole-day date maps to an exact integer serial; a datetime to a fractional one.
@@ -109,19 +139,30 @@ describe("xlsx import", () => {
     expect(data.columns.Note![0]).toBe("  spaced  ");
   });
 
-  it("exports the XLSX import contract from the package root", async () => {
-    const backend: XlsxImportBackend = {
-      name: "test",
-      fromXlsx: async () => ({ rowCount: 1, columns: { Imported: ["yes"] } }),
+  it("injects table export and import backends independently", async () => {
+    const exportBackend: XlsxTableExportBackend = {
+      name: "test-export",
+      toXlsxTable: async () => new Uint8Array([1, 2, 3]),
     };
-    setXlsxImportBackend(backend);
+    const importBackend: XlsxTableImportBackend = {
+      name: "test-import",
+      fromXlsxTable: async () => ({ rowCount: 1, columns: { Imported: ["yes"] } }),
+    };
+    const store = new SheetwriteStore(workbook());
+    setXlsxTableExportBackend(exportBackend);
+    setXlsxTableImportBackend(importBackend);
     try {
-      await expect(fromXlsx(new Uint8Array())).resolves.toEqual({
+      await expect(toXlsxTable(store.getWorkbook(), store)).resolves.toEqual(
+        new Uint8Array([1, 2, 3]),
+      );
+      await expect(fromXlsxTable(new Uint8Array())).resolves.toEqual({
         rowCount: 1,
         columns: { Imported: ["yes"] },
       });
     } finally {
-      setXlsxImportBackend(readExcelFileImportBackend);
+      setXlsxTableExportBackend(writeExcelFileTableExportBackend);
+      setXlsxTableImportBackend(readExcelFileTableImportBackend);
+      store.dispose();
     }
   });
 });
@@ -347,9 +388,20 @@ function roundTripWorkbook(): WorkbookSnapshot {
 }
 
 describe("workbook XLSX round-trip", () => {
-  it("keeps the legacy table APIs explicit and unchanged", () => {
-    expect(toXlsxTable).toBe(toXlsx);
-    expect(fromXlsxTable).toBe(fromXlsx);
+  it("injects the workbook backend independently from table backends", async () => {
+    const snapshot = roundTripWorkbook();
+    const backend: XlsxWorkbookBackend = {
+      name: "test-workbook",
+      toXlsxWorkbook: async () => new Uint8Array([4, 5, 6]),
+      fromXlsxWorkbook: async () => snapshot,
+    };
+    setXlsxWorkbookBackend(backend);
+    try {
+      await expect(toXlsxWorkbook(snapshot)).resolves.toEqual(new Uint8Array([4, 5, 6]));
+      await expect(fromXlsxWorkbook(new Uint8Array())).resolves.toBe(snapshot);
+    } finally {
+      setXlsxWorkbookBackend(excelJsWorkbookBackend);
+    }
   });
 
   it("rejects empty workbooks and duplicate names but preserves an empty sheet", async () => {

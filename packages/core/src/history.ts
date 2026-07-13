@@ -1,11 +1,11 @@
-import type { CellAddress, Patch, Range, SheetId } from "./types.js";
+import type { CellAddress, DocumentOp, Range, SheetId } from "./types.js";
 
 export type HistoryPart =
-  | { kind: "patches"; patches: Patch[] }
+  | { kind: "patches"; patches: DocumentOp[] }
   | {
       kind: "rangeSnapshot";
       range: Range;
-      toPatch: (range: Range) => Extract<Patch, { op: "setBlock" }>;
+      toPatch: (range: Range) => Extract<DocumentOp, { op: "setBlock" }>;
       dispose: () => void;
     };
 
@@ -13,7 +13,7 @@ export type HistoryAction = HistoryPart[];
 
 interface UndoEntry {
   undo: HistoryAction;
-  redo: Patch[];
+  redo: DocumentOp[];
 }
 
 /**
@@ -28,7 +28,7 @@ export class UndoManager {
   constructor(private readonly limit = 200) {}
 
   /** Record an applied edit. A fresh edit disposes the discarded redo stack. */
-  push(undo: HistoryAction, redo: Patch[]): void {
+  push(undo: HistoryAction, redo: DocumentOp[]): void {
     if (undo.length === 0) return;
 
     this.undoStack.push({ undo, redo });
@@ -84,8 +84,8 @@ export class UndoManager {
   }
 }
 
-export function materializeHistoryAction(action: HistoryAction): Patch[] {
-  const patches: Patch[] = [];
+export function materializeHistoryAction(action: HistoryAction): DocumentOp[] {
+  const patches: DocumentOp[] = [];
   for (const part of action) {
     if (part.kind === "patches") patches.push(...part.patches);
     else patches.push(part.toPatch(part.range));
@@ -135,10 +135,10 @@ function rebaseEntries(
 }
 
 function rebasePatches(
-  patches: Patch[],
+  patches: DocumentOp[],
   mapAddr: (addr: CellAddress) => CellAddress | null,
-): Patch[] {
-  const out: Patch[] = [];
+): DocumentOp[] {
+  const out: DocumentOp[] = [];
   for (const patch of patches) {
     if (patch.op === "set") {
       const addr = mapAddr(patch.addr);

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { Patch, Workbook } from "../src/types.js";
+import type { DocumentOp, Workbook } from "../src/types.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -25,7 +25,7 @@ function workbook(): Workbook {
 }
 
 function setNumbers(store: SheetwriteStore, values: number[]): void {
-  const patches: Patch[] = values.map((value, row) => ({
+  const patches: DocumentOp[] = values.map((value, row) => ({
     op: "set",
     addr: { sheet: "s", row, col: 0 },
     value: { kind: "literal", value },

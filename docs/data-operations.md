@@ -116,8 +116,7 @@ reopened in a spreadsheet app.
 
 Sheetwrite exposes two intentionally different XLSX contracts:
 
-- **Table interchange**: `toXlsx` / `fromXlsx` (also exported as the explicit
-  aliases `toXlsxTable` / `fromXlsxTable`). This is the existing active-sheet,
+- **Table interchange**: `toXlsxTable` / `fromXlsxTable`. This is the active-sheet,
   first-row-header API used by `grid.exportXlsx`.
 - **Workbook round-trip**: `toXlsxWorkbook` / `fromXlsxWorkbook`. This consumes
   and produces the same `WorkbookSnapshot` used by persistence, without adding
@@ -165,11 +164,11 @@ downloadBytes(
 | Function | Signature |
 | --- | --- |
 | `fromCsv` | `fromCsv(text: string, columns: readonly Column[]): ColumnarData` |
-| `fromXlsxTable` / `fromXlsx` | `(data: ArrayBuffer \| Uint8Array) => Promise<ColumnarData>` |
+| `fromXlsxTable` | `(data: ArrayBuffer \| Uint8Array) => Promise<ColumnarData>` |
 | `fromXlsxWorkbook` | `(data: ArrayBuffer \| Uint8Array, options?: XlsxWorkbookOptions) => Promise<WorkbookSnapshot>` |
 | `toCsv` | `toCsv(sheet: Sheet, store: Store): string` |
 | `toTsv` | `toTsv(range: Range, store: Store): string` |
-| `toXlsxTable` / `toXlsx` | `(workbook: Workbook, store: Store) => Promise<Uint8Array>` |
+| `toXlsxTable` | `(workbook: Workbook, store: Store) => Promise<Uint8Array>` |
 | `toXlsxWorkbook` | `(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions) => Promise<Uint8Array>` |
 | `downloadBytes` | `downloadBytes(bytes: Uint8Array \| string, filename: string, mime: string): void` |
 
@@ -217,20 +216,20 @@ objects for explicit registration or wrapping:
 ```ts
 import {
   excelJsWorkbookBackend,
-  readExcelFileImportBackend,
-  writeExcelFileBackend,
+  readExcelFileTableImportBackend,
+  writeExcelFileTableExportBackend,
 } from "@sheetwrite/core/xlsx";
 import {
-  setXlsxBackend,
-  setXlsxImportBackend,
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
-  type XlsxBackend,
-  type XlsxImportBackend,
+  type XlsxTableExportBackend,
+  type XlsxTableImportBackend,
   type XlsxWorkbookBackend,
 } from "@sheetwrite/core";
 
-setXlsxBackend(writeExcelFileBackend);
-setXlsxImportBackend(readExcelFileImportBackend);
+setXlsxTableExportBackend(writeExcelFileTableExportBackend);
+setXlsxTableImportBackend(readExcelFileTableImportBackend);
 setXlsxWorkbookBackend(excelJsWorkbookBackend);
 ```
 

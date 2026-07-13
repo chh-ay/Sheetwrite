@@ -71,7 +71,6 @@ function profile(
 
 function runSize(rows: number, wasmMemory: WebAssembly.Memory): Result[] {
   const store = new SheetwriteStore(workbook(rows), toSheetwriteColumnar(makeColumnar(rows)));
-  const resumeDirtyTracking = store.suspendDirtyTracking();
   const results: Result[] = [];
   const wholeColumn: Range = {
     sheet: SHEET,
@@ -194,7 +193,6 @@ function runSize(rows: number, wasmMemory: WebAssembly.Memory): Result[] {
     ),
   );
 
-  resumeDirtyTracking();
   store.dispose();
   return results;
 }

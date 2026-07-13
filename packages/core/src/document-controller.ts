@@ -11,10 +11,10 @@ import type {
   CellValue,
   Column,
   CommitReason,
+  DocumentOp,
   GridTransaction,
   MergeRange,
   MutationIssue,
-  Patch,
   Range,
   RemoteOperationOptions,
   Sheet,
@@ -29,7 +29,7 @@ export interface DocumentControllerOptions {
   loadable: SheetwriteStore | null;
   readOnly: () => boolean;
   epoch: () => number;
-  materializeVirtualColumns: (patches: Patch[]) => Patch[];
+  materializeVirtualColumns: (patches: DocumentOp[]) => DocumentOp[];
   onMutationRejected: (issues: MutationIssue[]) => void;
   onHistoryApplied: () => void;
 }
@@ -50,20 +50,19 @@ export class DocumentController {
   }
 
   applyRemoteOperations(
-    operations: readonly Patch[],
+    operations: readonly DocumentOp[],
     options: RemoteOperationOptions = {},
   ): ApplyTransactionResult {
     return this.options.store.applyTransaction(
       { patches: operations.slice() },
       {
         source: "remote",
-        markDirty: false,
         commitReason: options.commitReason ?? "api",
       },
     );
   }
 
-  commit(input: Patch[], reason: CommitReason): ApplyTransactionResult {
+  commit(input: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
     if (this.options.readOnly()) {
       return { status: "noop", epoch: this.options.epoch(), reason: "read-only" };
     }
@@ -77,7 +76,7 @@ export class DocumentController {
 
     if (this.applyingHistory) return this.storeApply(patches, reason);
 
-    const inverseByPatch = new Map<Patch, Array<Patch | HistoryPart>>();
+    const inverseByPatch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
     for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
 
     const outcome = this.storeApply(patches, reason);
@@ -125,11 +124,11 @@ export class DocumentController {
     this.history.clear();
   }
 
-  private storeApply(patches: Patch[], reason: CommitReason): ApplyTransactionResult {
+  private storeApply(patches: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
     return this.options.store.applyTransaction({ patches }, { commitReason: reason });
   }
 
-  private inversePatch(patch: Patch): Array<Patch | HistoryPart> {
+  private inversePatch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {
     switch (patch.op) {
       case "set":
         return [this.inverseSetPatch(patch)];
@@ -268,7 +267,7 @@ export class DocumentController {
       case "removeSheet": {
         const snapshot = this.snapshotSheet(patch.sheet);
         if (!snapshot) return [];
-        const restore: Patch[] = [
+        const restore: DocumentOp[] = [
           { op: "addSheet", sheet: snapshot },
           ...this.snapshotExternalFormulaAndRefs(patch.sheet),
         ];
@@ -418,7 +417,7 @@ export class DocumentController {
     };
   }
 
-  private inverseSetPatch(patch: Extract<Patch, { op: "set" }>): Patch {
+  private inverseSetPatch(patch: Extract<DocumentOp, { op: "set" }>): DocumentOp {
     const formula =
       this.options.loadable?.getFormula(patch.addr) ?? this.options.store.getFormula(patch.addr);
     const refTarget = this.options.store.getRefTarget(patch.addr);
@@ -437,11 +436,11 @@ export class DocumentController {
     };
   }
 
-  private snapshotRows(sheetId: SheetId, at: number, count: number): Patch[] {
+  private snapshotRows(sheetId: SheetId, at: number, count: number): DocumentOp[] {
     const sheet = this.sheetById(sheetId);
     if (!sheet) return [];
 
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     const end = Math.min(sheet.rowCount, at + count);
     for (let row = at; row < end; row++) {
       for (let col = 0; col < sheet.columns.length; col++) {
@@ -457,11 +456,11 @@ export class DocumentController {
     return sheet.columns.slice(at, at + count).map((column) => ({ ...column }));
   }
 
-  private snapshotColumnCells(sheetId: SheetId, at: number, count: number): Patch[] {
+  private snapshotColumnCells(sheetId: SheetId, at: number, count: number): DocumentOp[] {
     const sheet = this.sheetById(sheetId);
     if (!sheet) return [];
 
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     const end = Math.min(sheet.columns.length, at + count);
     for (let row = 0; row < sheet.rowCount; row++) {
       for (let col = at; col < end; col++) {
@@ -471,7 +470,7 @@ export class DocumentController {
     return patches;
   }
 
-  private snapshotCell(addr: CellAddress): Extract<Patch, { op: "set" }> {
+  private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
     const formula = this.options.store.getFormula(addr);
     const refTarget = this.options.store.getRefTarget(addr);
     const cell = this.options.store.getCell(addr);
@@ -503,8 +502,8 @@ export class DocumentController {
     return cells;
   }
 
-  private snapshotCellsInMerge(sheet: SheetId, merge: MergeRange): Patch[] {
-    const patches: Patch[] = [];
+  private snapshotCellsInMerge(sheet: SheetId, merge: MergeRange): DocumentOp[] {
+    const patches: DocumentOp[] = [];
     const r0 = Math.min(merge.r0, merge.r1);
     const r1 = Math.max(merge.r0, merge.r1);
     const c0 = Math.min(merge.c0, merge.c1);
@@ -575,8 +574,8 @@ export class DocumentController {
     };
   }
 
-  private snapshotExternalFormulaAndRefs(removedSheet: SheetId): Patch[] {
-    const patches: Patch[] = [];
+  private snapshotExternalFormulaAndRefs(removedSheet: SheetId): DocumentOp[] {
+    const patches: DocumentOp[] = [];
     for (const sheet of this.options.store.getWorkbook().sheets) {
       if (sheet.id === removedSheet) continue;
       for (let row = 0; row < sheet.rowCount; row++) {
@@ -591,7 +590,7 @@ export class DocumentController {
     return patches;
   }
 
-  private rebaseHistoryFor(patch: Patch): void {
+  private rebaseHistoryFor(patch: DocumentOp): void {
     switch (patch.op) {
       case "addRows":
         this.history.rebaseRows(patch.sheet, patch.at, patch.count);

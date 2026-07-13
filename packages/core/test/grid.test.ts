@@ -37,8 +37,6 @@ function makeFakeStore(
     ensureColumns: () => {},
     applyTransaction: () => ({ status: "noop", epoch: 0, reason: "empty" }),
     on: () => () => {},
-    getDirty: () => [],
-    markClean: () => {},
     viewRowCount: (sheet) => workbook.sheets.find((s) => s.id === sheet)?.rowCount ?? 0,
   };
 }
@@ -233,6 +231,35 @@ describe("Grid editing (Layer 3)", () => {
     expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("Sorted edit");
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
 
+    grid.destroy();
+  });
+
+  it("passes the canonical structured datasource request and consumes its page", async () => {
+    const workbook = makeWorkbook(20);
+    let captured: DataSourceRequest | undefined;
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      datasource: {
+        getRows: async (request: DataSourceRequest) => {
+          captured = request;
+          return {
+            start: request.start,
+            rows: [{ name: "Structured", amount: 7, city: "Paris" }],
+          };
+        },
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    if (!captured) throw new Error("datasource request was not issued");
+    expect(Object.keys(captured).sort()).toEqual(["end", "revision", "sheet", "signal", "start"]);
+    expect(captured.sheet).toBe("s1");
+    expect(captured.start).toBe(0);
+    expect(captured.end).toBeGreaterThan(captured.start);
+    expect(captured.revision).toBe(0);
+    expect(captured.signal).toBeInstanceOf(AbortSignal);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Structured");
     grid.destroy();
   });
 
@@ -755,7 +782,10 @@ describe("Grid store lifecycle", () => {
     store.dispose();
   });
   it("ignores a pending datasource result after destroying an owned store", async () => {
-    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<RowData[]>();
+    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<{
+      start: number;
+      rows: RowData[];
+    }>();
     const datasource = {
       getRows: () => pending,
     };
@@ -766,7 +796,7 @@ describe("Grid store lifecycle", () => {
     });
 
     grid.destroy();
-    resolveRows([{ name: "Too late" }]);
+    resolveRows({ start: 0, rows: [{ name: "Too late" }] });
     await pending;
     await Promise.resolve();
 
@@ -983,7 +1013,6 @@ describe("Grid.setMinColumns", () => {
     expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(3);
     expect(host.getAttribute("aria-colcount")).toBe("12");
     expect(changes).toBe(0);
-    expect(store.getDirty()).toEqual([]);
 
     grid.applyTransaction({
       patches: [
@@ -1083,7 +1112,6 @@ describe("transactional document metadata", () => {
         value: { kind: "literal", value: null },
       },
     ]);
-    expect(events.at(-1)?.dirty.some((patch) => patch.op === "addMerge")).toBe(true);
     expect(workbook.sheets[0]!.merges).toEqual([{ r0: 0, c0: 0, r1: 1, c1: 1 }]);
     grid.undo();
     expect(workbook.sheets[0]!.merges).toEqual([]);
@@ -1211,7 +1239,6 @@ describe("transactional document metadata", () => {
         },
       ],
     });
-    store.markClean(store.getDirty());
     const grid = new GridImpl(mountHost(), { workbook }, store);
     const events: ChangeEvent[] = [];
     grid.on("change", (event) => events.push(event));

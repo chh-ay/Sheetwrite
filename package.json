@@ -15,6 +15,8 @@
   },
   "scripts": {
     "build:wasm": "cd packages/wasm && bun run build",
+    "api:report": "bun scripts/public-api.ts report",
+    "api:check": "bun scripts/public-api.ts check",
     "build:packages": "bun run build:wasm && bun run --filter '@sheetwrite/core' build && bun run --filter '@sheetwrite/react' build && bun run --filter '@sheetwrite/vue' build",
     "build:examples": "bun run --filter '@sheetwrite/example-*' build",
     "build": "bun run build:packages",
@@ -46,6 +48,7 @@
     "react-dom": "^19.2.7",
     "svelte": "^5.56.4",
     "typescript": "^7.0.2",
+    "typescript-compiler": "npm:typescript@^6.0.3",
     "vue": "^3.5.39"
   },
   "trustedDependencies": [

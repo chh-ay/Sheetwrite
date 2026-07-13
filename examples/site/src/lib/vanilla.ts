@@ -3,8 +3,8 @@ import type {
   CellStyle,
   CellValue,
   ColumnarData,
+  DocumentOp,
   Grid,
-  Patch,
   Selection,
   Theme,
   Workbook,
@@ -126,12 +126,12 @@ function setPatch(
   col: number,
   value: CellValue,
   style?: CellStyle,
-): Patch {
+): DocumentOp {
   const addr: CellAddress = { sheet, row, col };
   return style === undefined ? { op: "set", addr, value } : { op: "set", addr, value, style };
 }
 
-function initialPatches(): Patch[] {
+function initialPatches(): DocumentOp[] {
   const headerStyle: CellStyle = {
     bold: true,
     align: "center",
@@ -319,7 +319,7 @@ csvFile.addEventListener("change", async () => {
   if (!file) return;
 
   const imported = fromCsv(await file.text(), importColumns);
-  const patches: Patch[] = [];
+  const patches: DocumentOp[] = [];
   for (let c = 0; c < importColumns.length; c++) {
     const column = importColumns[c];
     if (!column) continue;

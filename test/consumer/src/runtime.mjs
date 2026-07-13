@@ -24,6 +24,33 @@ for (const [name, entry] of Object.entries(entries)) {
   }
 }
 
+const forbiddenCoreExports = [
+  "Patch",
+  "LegacyDataSource",
+  "toXlsx",
+  "fromXlsx",
+  "XlsxBackend",
+  "XlsxImportBackend",
+  "setXlsxBackend",
+  "setXlsxImportBackend",
+];
+for (const name of forbiddenCoreExports) {
+  if (name in Core) throw new Error(`@sheetwrite/core still exports removed ${name}`);
+}
+for (const name of [
+  "toXlsxTable",
+  "fromXlsxTable",
+  "setXlsxTableExportBackend",
+  "setXlsxTableImportBackend",
+  "toXlsxWorkbook",
+  "fromXlsxWorkbook",
+  "setXlsxWorkbookBackend",
+]) {
+  if (typeof Reflect.get(Core, name) !== "function") {
+    throw new Error(`@sheetwrite/core is missing canonical runtime export ${name}`);
+  }
+}
+
 await load();
 
 const cssUrl = import.meta.resolve("@sheetwrite/core/styles.css");

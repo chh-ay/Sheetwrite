@@ -1,6 +1,6 @@
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
-import type { CellStyle, CellValue, Patch, Sheet, SheetId, Store, Theme } from "./types.js";
+import type { CellStyle, CellValue, DocumentOp, Sheet, SheetId, Store, Theme } from "./types.js";
 
 export interface StyleActionsDeps {
   store: Store;
@@ -13,7 +13,7 @@ export interface StyleActionsDeps {
   merges: () => SelRect[];
   anchorCell: (row: number, col: number) => { row: number; col: number };
   toDataRow: (viewRow: number) => number;
-  commit: (patches: Patch[]) => void;
+  commit: (patches: DocumentOp[]) => void;
 }
 
 /**
@@ -81,7 +81,7 @@ export class StyleActions {
         ),
       );
 
-    const patches: Patch[] = [];
+    const patches: DocumentOp[] = [];
     if (!intersectsMerge) {
       for (const rect of rects) {
         let runStart = this.deps.toDataRow(rect.r0);
@@ -172,7 +172,7 @@ export class StyleActions {
       return;
     }
 
-    const patches: Patch[] = [{ op: "addMerge", sheet: activeSheet, merge }];
+    const patches: DocumentOp[] = [{ op: "addMerge", sheet: activeSheet, merge }];
     for (let row = merge.r0; row <= merge.r1; row++) {
       for (let col = merge.c0; col <= merge.c1; col++) {
         if (row === merge.r0 && col === merge.c0) continue;

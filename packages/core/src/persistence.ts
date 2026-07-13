@@ -129,7 +129,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     try {
       const outcome = store.applyTransaction(
         { patches: request.operations.slice() },
-        { source: "remote", markDirty: false, commitReason: "api" },
+        { source: "remote", commitReason: "api" },
       );
       if (
         outcome.status === "conflict" ||

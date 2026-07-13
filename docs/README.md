@@ -44,3 +44,12 @@ spreadsheet engine, not a claim of Google Sheets or Excel feature parity.
 
 New to the project? Read [Getting started](./getting-started.md), then
 [Concepts](./concepts.md).
+
+## Public API policy
+
+Before the first public stable release, public APIs are renamed or removed by a
+clean cutover: update every caller, test, example, declaration, and document in
+the same change rather than retaining aliases, wrappers, or fallback branches.
+After a stable release, compatibility requires an explicit product and release
+decision supported by migration evidence; it is not added ad hoc. Run
+`bun run api:report` and `bun run api:check` when reviewing a public API change.

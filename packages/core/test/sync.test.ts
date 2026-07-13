@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
+  type ChangeEvent,
   createGridFromSnapshot,
   initSheetwrite,
   MemoryPersistenceAdapter,
@@ -123,7 +124,6 @@ describe("sync coordinator", () => {
     patch.value.value = 99;
 
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
-    expect(grid.store.getDirty()).toEqual([]);
     expect(coordinator.pendingCommits()).toEqual([
       {
         documentId: "sync-doc",
@@ -154,7 +154,8 @@ describe("sync coordinator", () => {
     expect(events.some((event) => event.type === "acknowledged")).toBe(true);
     coordinator.destroy();
     grid.applyTransaction({ patches: [localSet(3)] });
-    expect(grid.store.getDirty()).toEqual([localSet(3)]);
+    expect(coordinator.pendingCount).toBe(0);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(3);
     grid.destroy();
   });
 
@@ -245,6 +246,10 @@ describe("sync coordinator", () => {
 
   it("applies canonical and remote operations without outgoing echo", () => {
     const { grid, coordinator, events } = harness();
+    const remoteEvents: ChangeEvent[] = [];
+    grid.on("change", (event) => {
+      if (event.source === "remote") remoteEvents.push(event);
+    });
     grid.applyTransaction({ patches: [localSet(2)] });
     coordinator.handleResponse({
       status: "applied",
@@ -268,6 +273,8 @@ describe("sync coordinator", () => {
       expectedVersion: 10,
       receivedVersion: 11,
     });
+    expect(remoteEvents).toHaveLength(2);
+    expect(remoteEvents.every((event) => event.transaction.patches.length === 1)).toBe(true);
     coordinator.destroy();
     grid.destroy();
   });

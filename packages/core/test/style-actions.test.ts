@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { SelectionModel, type SelRect } from "../src/selection.js";
 import { StyleActions } from "../src/style-actions.js";
-import type { CellStyle, Patch, ResolvedCell, Sheet, Store, Theme } from "../src/types.js";
+import type { CellStyle, DocumentOp, ResolvedCell, Sheet, Store, Theme } from "../src/types.js";
 
 /**
  * Build a `StyleActions` over a real `SelectionModel` and a mutable in-memory
@@ -20,7 +20,7 @@ function makeHarness(toDataRow: (viewRow: number) => number = (viewRow) => viewR
   } as unknown as Store;
 
   const selection = new SelectionModel(100, 0, 2);
-  const commits: Patch[][] = [];
+  const commits: DocumentOp[][] = [];
 
   const merges: SelRect[] = [];
 

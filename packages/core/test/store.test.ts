@@ -2,7 +2,13 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { validateWorkbookSnapshot } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { ChangeEvent, Transaction, Workbook, WorkbookSnapshot } from "../src/types.js";
+import type {
+  ChangeEvent,
+  DocumentOp,
+  Transaction,
+  Workbook,
+  WorkbookSnapshot,
+} from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
@@ -295,17 +301,47 @@ describe("SheetwriteStore", () => {
     expect(events[1]?.transaction).toEqual({ patches: [validPatch] });
   });
 
-  it("tracks dirty patches and clears them on markClean", () => {
+  it("keeps local change payloads bounded to their own transaction", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
-    const patch = {
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: addr(0, 0),
+          value: { kind: "literal", value: 0 },
+        },
+      ],
+    });
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    for (let index = 0; index < 128; index++) {
+      store.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: addr(0, 0),
+            value: { kind: "literal", value: index % 2 },
+          },
+        ],
+      });
+    }
+
+    expect(events).toHaveLength(128);
+    expect(events.every((event) => event.transaction.patches.length === 1)).toBe(true);
+    expect(events[0]?.transaction.patches[0]).toMatchObject({
       op: "set",
-      addr: addr(0, 0),
+      value: { kind: "literal", value: 0 },
+    });
+    expect(events[1]?.transaction.patches[0]).toMatchObject({
+      op: "set",
       value: { kind: "literal", value: 1 },
-    } as const;
-    store.applyTransaction({ patches: [patch] });
-    expect(store.getDirty()).toHaveLength(1);
-    store.markClean([patch]);
-    expect(store.getDirty()).toHaveLength(0);
+    });
+    expect(
+      new Set(events.map(({ epoch: _epoch, ...event }) => JSON.stringify(event).length)).size,
+    ).toBe(1);
+    expect(events.every((event) => !("dirty" in event))).toBe(true);
+    store.dispose();
   });
 
   it("emits a change event carrying old and new values for rollback", () => {
@@ -1043,7 +1079,6 @@ describe("datasource row hydration", () => {
     expect(store.getCell(addr(0, 2)).resolved).toBeNull();
     store.loadRows("s1", 1, [{ name: "later source" }]);
     expect(store.getCell(addr(0, 2)).resolved).toBe("later source");
-    expect(store.getDirty()).toEqual([]);
     expect(changes).toBe(0);
     store.dispose();
   });
@@ -1228,7 +1263,6 @@ describe("document metadata reducer validation", () => {
     expect(result.status).toBe("applied");
     expect(events).toHaveLength(1);
     expect(events[0]?.transaction.patches).toEqual(operations);
-    expect(events[0]?.dirty).toEqual(operations);
     expect(JSON.parse(JSON.stringify(events[0]?.transaction.patches))).toEqual(operations);
     expect(workbook.sheets[0]).toMatchObject({ frozenRows: 1, frozenCols: 1 });
     expect(workbook.sheets[0]!.rowHeights?.get(2)).toBe(40);
@@ -1442,6 +1476,34 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 
+  it("keeps paged edits pinned until their operations are acknowledged", () => {
+    const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 150,
+    });
+    const operation: DocumentOp = {
+      op: "set",
+      addr: addr(100, 1),
+      value: { kind: "literal", value: 77 },
+    };
+
+    store.applyTransaction({ patches: [operation] });
+    for (const row of [0, 4, 8, 12, 16]) {
+      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "B" }]);
+    }
+    expect(store.getCellLoadState(operation.addr)).toBe("local-edit");
+    expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+
+    store.acknowledgeOperations([operation]);
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    for (const row of [20, 24, 28, 32, 36]) {
+      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "C" }]);
+    }
+    expect(store.getCellLoadState(operation.addr)).toBe("unloaded");
+    store.dispose();
+  });
+
   it("recomputes formulas and references after unloaded dependencies arrive", () => {
     const store = new SheetwriteStore(makeWorkbook(6000), undefined, {
       storage: "paged",
@@ -1517,7 +1579,7 @@ describe("paged datasource storage", () => {
       {
         patches: [{ op: "set", addr: addr(20, 1), value: { kind: "literal", value: 55 } }],
       },
-      { source: "remote", markDirty: false },
+      { source: "remote" },
     );
     expect(store.getCell(addr(20, 1)).resolved).toBe(55);
     expect(store.getCellLoadState(addr(20, 1))).toBe("loaded-value");

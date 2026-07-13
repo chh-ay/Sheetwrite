@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { neutralizeInjection, parseTsv, toTsv } from "../src/clipboard.js";
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
 import { SelectionModel } from "../src/selection.js";
-import type { CellAddress, CellScalar, CellStyle, CellValue, Patch, Store } from "../src/types.js";
+import type {
+  CellAddress,
+  CellScalar,
+  CellStyle,
+  CellValue,
+  DocumentOp,
+  Store,
+} from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 describe("clipboard TSV", () => {
@@ -74,7 +81,7 @@ class FakeStore {
     return this.rowCount;
   }
 
-  apply(patches: Patch[]): void {
+  apply(patches: DocumentOp[]): void {
     for (const patch of patches) {
       if (patch.op === "set") {
         const resolved = patch.value.kind === "literal" ? patch.value.value : null;

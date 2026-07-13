@@ -105,7 +105,6 @@ export class SyncCoordinator {
   private readonly storageErrors = new Map<string, unknown>();
   private readonly gapBuffer = new Map<number, VersionedOperation>();
   private readonly disposeGrid: () => void;
-  private readonly resumeDirtyTracking: () => void;
   private readonly readyPromise: Promise<void>;
   private disposeRemote?: () => void;
   private destroyed = false;
@@ -124,7 +123,6 @@ export class SyncCoordinator {
     this.version = options.serverVersion;
     this.connection = options.initialConnection ?? "online";
     this.hydrating = options.pendingStorage !== undefined;
-    this.resumeDirtyTracking = grid.store.suspendDirtyTracking?.() ?? (() => {});
     this.disposeGrid = grid.on("change", (event) => {
       if (event.source !== "local" || event.transaction.patches.length === 0) return;
       this.enqueue(event.transaction.patches);
@@ -465,7 +463,6 @@ export class SyncCoordinator {
     if (this.destroyed) return;
     this.destroyed = true;
     this.disposeGrid();
-    this.resumeDirtyTracking();
     this.disposeRemote?.();
     this.disposeRemote = undefined;
     this.abortController.abort("Sheetwrite sync coordinator destroyed");

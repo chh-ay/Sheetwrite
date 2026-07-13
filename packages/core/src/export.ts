@@ -233,62 +233,59 @@ export function downloadBytes(bytes: Uint8Array | string, filename: string, mime
 }
 
 /**
- * Pluggable xlsx backend (Plan: `write-excel-file` first, Rust xlsx later
- * without changing this contract).
+ * Pluggable first-row-header, first-sheet table export backend.
  */
-export interface XlsxBackend {
+export interface XlsxTableExportBackend {
   name: string;
-  toXlsx(workbook: Workbook, store: Store): Promise<Uint8Array>;
+  toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
 }
 
-let backend: XlsxBackend | null = null;
+let tableExportBackend: XlsxTableExportBackend | null = null;
 
-export function setXlsxBackend(b: XlsxBackend): void {
-  backend = b;
+export function setXlsxTableExportBackend(next: XlsxTableExportBackend): void {
+  tableExportBackend = next;
 }
 
-export function toXlsx(workbook: Workbook, store: Store): Promise<Uint8Array> {
-  if (!backend) {
-    throw new Error("Sheetwrite: no xlsx backend configured (import and register one first)");
+export function toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array> {
+  if (!tableExportBackend) {
+    throw new Error(
+      "Sheetwrite: no table xlsx export backend configured (import @sheetwrite/core/xlsx first)",
+    );
   }
-  return backend.toXlsx(workbook, store);
+  return tableExportBackend.toXlsxTable(workbook, store);
 }
 
 // ── xlsx import ──────────────────────────────────────────────────────────────
 
 /**
- * Pluggable xlsx *import* backend — the symmetric counterpart to `XlsxBackend`.
- * Parses raw `.xlsx` bytes into the same `ColumnarData` shape `fromCsv` returns,
- * so host ingestion code can stay format-agnostic. Kept pluggable so a Rust xlsx
- * reader can replace the default `read-excel-file` one without changing callers.
+ * Pluggable table import backend. Parses raw `.xlsx` bytes into the same
+ * `ColumnarData` shape `fromCsv` returns, so host ingestion code can stay
+ * format-agnostic.
  */
-export interface XlsxImportBackend {
+export interface XlsxTableImportBackend {
   name: string;
-  fromXlsx(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
+  fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
 }
 
-let importBackend: XlsxImportBackend | null = null;
+let tableImportBackend: XlsxTableImportBackend | null = null;
 
-export function setXlsxImportBackend(b: XlsxImportBackend): void {
-  importBackend = b;
+export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
+  tableImportBackend = next;
 }
 
 /**
- * Parse `.xlsx` bytes into `ColumnarData` — the format-agnostic import mirror of
- * `fromCsv`, returning the exact same shape. The first parsed row is treated as
- * the header and its cell text becomes each column's key; only the first sheet is
- * read (v1). Numbers stay numbers, date cells map to the date-serial convention
- * (see `date-serial.ts`), strings are verbatim, and empty cells become `null`.
- * Requires a registered backend — `import "@sheetwrite/core/xlsx"` registers the
- * default one.
+ * Parse the first sheet of `.xlsx` bytes into `ColumnarData`. The first parsed
+ * row is treated as the header and its cell text becomes each column's key.
+ * Numbers stay numbers, date cells use the date-serial convention, strings are
+ * verbatim, and empty cells become `null`.
  */
-export function fromXlsx(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
-  if (!importBackend) {
+export function fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
+  if (!tableImportBackend) {
     throw new Error(
-      "Sheetwrite: no xlsx import backend configured (import and register one first)",
+      "Sheetwrite: no table xlsx import backend configured (import @sheetwrite/core/xlsx first)",
     );
   }
-  return importBackend.fromXlsx(data);
+  return tableImportBackend.fromXlsxTable(data);
 }
 
 // ── Workbook-level XLSX round-trip ───────────────────────────────────────────
@@ -331,12 +328,6 @@ let workbookBackend: XlsxWorkbookBackend | null = null;
 export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void {
   workbookBackend = next;
 }
-
-/** Explicit compatibility name: first-row-header, first-sheet table export. */
-export const toXlsxTable = toXlsx;
-
-/** Explicit compatibility name: first-row-header, first-sheet table import. */
-export const fromXlsxTable = fromXlsx;
 
 function workbookSnapshotOf(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,

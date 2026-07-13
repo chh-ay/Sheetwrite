@@ -351,9 +351,6 @@ export type DocumentOp =
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string; scope?: SheetId };
 
-/** Backward-compatible transaction name for the one exhaustive document operation union. */
-export type Patch = DocumentOp;
-
 // ── Transactions & change events ─────────────────────────────────────────────
 
 /**
@@ -364,7 +361,7 @@ export type Patch = DocumentOp;
  * undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
  */
 export interface Transaction {
-  patches: Patch[];
+  patches: DocumentOp[];
   epoch?: number;
 }
 
@@ -393,8 +390,6 @@ export type OperationSource = "local" | "remote";
 export interface TransactionApplicationOptions {
   /** Distinguishes host persistence input from local user/API output. */
   source?: OperationSource;
-  /** Defaults to true for local operations and false for remote operations. */
-  markDirty?: boolean;
   /** Event classification; defaults to `api`. */
   commitReason?: CommitReason;
 }
@@ -466,7 +461,7 @@ export interface RemoteOperationSource {
  * that participate in read-only policy and undo/redo history.
  */
 export interface GridTransaction {
-  patches: Patch[];
+  patches: DocumentOp[];
 }
 
 /** One committed cell edit, carrying enough to roll back. */
@@ -507,7 +502,6 @@ export type CommitReason =
 export interface ChangeEvent {
   transaction: Transaction;
   changes: CellChange[];
-  dirty: Patch[];
   /** What produced this commit — see {@link CommitReason}. */
   commitReason: CommitReason;
   /** Remote input is observable but never belongs in outgoing local persistence. */
@@ -619,15 +613,6 @@ export interface Store {
    */
   setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
-  /** Pending unsynced edits. */
-  getDirty(): Patch[];
-  /** Clear dirty flags after the API confirms. */
-  markClean(patches: Patch[]): void;
-  /**
-   * Let a mutation-ID coordinator own pending state instead of duplicating the
-   * legacy object-identity dirty queue. Returns a release function.
-   */
-  suspendDirtyTracking?(): () => void;
   /** Explicit partial-data state for paged datasource stores. */
   queryCapability?(sheet: SheetId): QueryCapability;
   /** Loaded/empty/local state; dense stores always return a loaded state. */
@@ -746,17 +731,12 @@ export interface DataSource {
 }
 
 export interface DataSourceStorageOptions {
-  /** Storage engine. Dense remains the compatibility default. */
+  /** Storage engine. Dense is the default. */
   mode?: "dense" | "paged";
   /** Power-of-two row chunk size. Defaults to 4096. */
   chunkRows?: number;
   /** Clean-chunk cache budget. Dirty and visible chunks may exceed it. */
   cacheBytes?: number;
-}
-
-/** Supported compatibility input, normalized once by Grid construction. */
-export interface LegacyDataSource {
-  getRows(sheet: SheetId, start: number, end: number): Promise<RowData[]>;
 }
 
 // ── Grid options, events, instance ───────────────────────────────────────────
@@ -930,7 +910,7 @@ export interface GridConfig {
 export interface GridOptions {
   workbook: Workbook;
   data?: ColumnarData;
-  datasource?: DataSource | LegacyDataSource;
+  datasource?: DataSource;
   datasourceStorage?: DataSourceStorageOptions;
   renderer?: "canvas" | "worker";
   /**
