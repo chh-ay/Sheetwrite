@@ -7,6 +7,7 @@ import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { ColumnIndex } from "./column-index.js";
 import { ContextMenu } from "./context-menu.js";
+import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { downloadBytes, toCsv, toXlsx } from "./export.js";
@@ -188,9 +189,9 @@ export class GridImpl implements Grid {
   private readonly clipboard: ClipboardController;
   private readonly styleActions: StyleActions;
   private readonly document: DocumentController;
+  private readonly datasourceController: DatasourceController;
   private readonly overlayPainter: OverlayPainter;
   private overscan: number;
-  private readonly datasource?: (request: DataSourceRequest) => Promise<DataSourcePage>;
   private readOnly: boolean;
   private tabBar: HTMLDivElement | null = null;
   private sheetTabs: SheetTabs | null = null;
@@ -250,10 +251,6 @@ export class GridImpl implements Grid {
   private colIndices: number[];
   private columnIndex: ColumnIndex;
   private selection: SelectionModel;
-  private loaded: Uint8Array;
-  private inFlight = new Set<number>();
-  private loadGeneration = 0;
-  private readonly loadControllers = new Set<AbortController>();
   private readonly cellRevisions = new Map<string, number>();
   private destroyed = false;
   private frame = 0;
@@ -294,19 +291,20 @@ export class GridImpl implements Grid {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
     const getRows = opts.datasource?.getRows;
-    this.datasource = getRows
-      ? async (request) => {
-          const result =
-            getRows.length >= 2
-              ? await (
-                  getRows as (sheet: SheetId, start: number, end: number) => Promise<RowData[]>
-                )(request.sheet, request.start, request.end)
-              : await (
-                  getRows as (request: DataSourceRequest) => Promise<DataSourcePage | RowData[]>
-                )(request);
-          return Array.isArray(result) ? { start: request.start, rows: result } : result;
-        }
-      : undefined;
+    const datasource: ((request: DataSourceRequest) => Promise<DataSourcePage>) | undefined =
+      getRows
+        ? async (request) => {
+            const result =
+              getRows.length >= 2
+                ? await (
+                    getRows as (sheet: SheetId, start: number, end: number) => Promise<RowData[]>
+                  )(request.sheet, request.start, request.end)
+                : await (
+                    getRows as (request: DataSourceRequest) => Promise<DataSourcePage | RowData[]>
+                  )(request);
+            return Array.isArray(result) ? { start: request.start, rows: result } : result;
+          }
+        : undefined;
     this.readOnly = opts.readOnly ?? false;
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
@@ -354,7 +352,26 @@ export class GridImpl implements Grid {
       MAX_ELEMENT_HEIGHT,
     );
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
-    this.loaded = new Uint8Array(sheet.rowCount);
+    this.datasourceController = new DatasourceController(
+      {
+        datasource,
+        loadable: this.loadable,
+        activeSheet: () => this.activeSheet,
+        rowCount: (sheetId) => this.sheet(sheetId).rowCount,
+        revision: () => this.storeEpoch,
+        isCellNewerThan: (address, revision) =>
+          (this.cellRevisions.get(`${address.sheet}:${address.row}:${address.col}`) ?? -1) >
+          revision,
+        onRowsLoaded: () => {
+          this.storeEpoch += 1;
+          this.scheduleRender();
+        },
+        onError: (request, error) => {
+          for (const fn of this.listeners["datasource-error"]) fn({ request, error });
+        },
+      },
+      sheet.rowCount,
+    );
     this.searchController = new SearchController({
       store: this.store,
       loadable: this.loadable,
@@ -872,7 +889,7 @@ export class GridImpl implements Grid {
     const sheet = this.sheet();
     this.index = new OffsetIndex(sheet.rowCount, this.theme.rowHeight);
     this.applyRowHeights(sheet);
-    if (this.loaded.length !== sheet.rowCount) this.loaded = new Uint8Array(sheet.rowCount);
+    this.datasourceController.resize(sheet.rowCount);
     this.syncSizer();
   }
 
@@ -964,10 +981,8 @@ export class GridImpl implements Grid {
     const win =
       fr > 0 ? { start: Math.max(rawWin.start, fr), end: Math.max(rawWin.end, fr) } : rawWin;
     const rowGeometry = this.rowGeometryForWindow(win);
-    if (this.datasource) {
-      if (fr > 0) this.ensureLoaded(0, fr);
-      this.ensureLoaded(win.start, win.end);
-    }
+    if (fr > 0) this.datasourceController.ensureLoaded(0, fr);
+    this.datasourceController.ensureLoaded(win.start, win.end);
 
     const cellViewportWidth = Math.max(0, clientW - this.theme.rowHeaderWidth);
     const rawColumnWin = computeColumnWindow(
@@ -1175,89 +1190,6 @@ export class GridImpl implements Grid {
     }
 
     return { rowTops: this.rowTopsView, rowHeights: this.rowHeightsView };
-  }
-
-  private clearInFlight(a: number, b: number): void {
-    for (let r = a; r < b; r++) this.inFlight.delete(r);
-  }
-
-  private ensureLoaded(start: number, end: number): void {
-    let lo = -1;
-    let hi = -1;
-    for (let r = start; r < end; r++) {
-      if (this.loaded[r] === 0 && !this.inFlight.has(r)) {
-        if (lo === -1) lo = r;
-        hi = r;
-      }
-    }
-    const datasource = this.datasource;
-    const loadable = this.loadable;
-    if (lo === -1 || !datasource || !loadable) return;
-
-    const a = lo;
-    const b = hi + 1;
-    for (let r = a; r < b; r++) this.inFlight.add(r);
-
-    const sheetId = this.activeSheet;
-    const generation = this.loadGeneration;
-    const revision = this.storeEpoch;
-    const controller = new AbortController();
-    this.loadControllers.add(controller);
-    const request = { sheet: sheetId, start: a, end: b, signal: controller.signal, revision };
-    let pending: Promise<DataSourcePage>;
-
-    try {
-      pending = datasource(request);
-    } catch (error) {
-      this.loadControllers.delete(controller);
-      this.clearInFlight(a, b);
-      for (const fn of this.listeners["datasource-error"]) {
-        fn({ request: { sheet: sheetId, start: a, end: b, revision }, error });
-      }
-      return;
-    }
-
-    Promise.resolve(pending)
-      .then((page) => {
-        this.loadControllers.delete(controller);
-        if (this.destroyed || generation !== this.loadGeneration || controller.signal.aborted)
-          return;
-        const rows = page.rows;
-        const valid =
-          page.start === a &&
-          Array.isArray(rows) &&
-          rows.length <= b - a &&
-          page.start + rows.length <= this.sheet().rowCount;
-        if (!valid) {
-          this.clearInFlight(a, b);
-          const error = new RangeError("Datasource page does not match the requested range");
-          for (const fn of this.listeners["datasource-error"]) {
-            fn({ request: { sheet: sheetId, start: a, end: b, revision }, error });
-          }
-          return;
-        }
-
-        loadable.loadRows(
-          sheetId,
-          page.start,
-          rows,
-          (addr) =>
-            (this.cellRevisions.get(`${addr.sheet}:${addr.row}:${addr.col}`) ?? -1) > revision,
-        );
-        this.storeEpoch += 1;
-        for (let r = page.start; r < page.start + rows.length; r++) this.loaded[r] = 1;
-        this.clearInFlight(a, b);
-        this.scheduleRender();
-      })
-      .catch((error) => {
-        this.loadControllers.delete(controller);
-        if (this.destroyed || generation !== this.loadGeneration || controller.signal.aborted)
-          return;
-        this.clearInFlight(a, b);
-        for (const fn of this.listeners["datasource-error"]) {
-          fn({ request: { sheet: sheetId, start: a, end: b, revision }, error });
-        }
-      });
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
@@ -1672,9 +1604,6 @@ export class GridImpl implements Grid {
     if (id === this.activeSheet) return;
     if (!this.store.getWorkbook().sheets.some((sheet) => sheet.id === id)) return;
 
-    this.loadGeneration += 1;
-    for (const controller of this.loadControllers) controller.abort();
-    this.loadControllers.clear();
     this.editor.cancel();
     this.validationEditor.cancel();
     this.activeSheet = id;
@@ -1685,8 +1614,7 @@ export class GridImpl implements Grid {
     this.index = new OffsetIndex(sheet.rowCount, this.theme.rowHeight);
     this.applyRowHeights(sheet);
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
-    this.loaded = new Uint8Array(sheet.rowCount);
-    this.inFlight.clear();
+    this.datasourceController.reset(sheet.rowCount);
     this.scroller.scrollTop = 0;
     this.scroller.scrollLeft = 0;
 
@@ -2482,10 +2410,7 @@ export class GridImpl implements Grid {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.loadGeneration += 1;
-    this.inFlight.clear();
-    for (const controller of this.loadControllers) controller.abort();
-    this.loadControllers.clear();
+    this.datasourceController.destroy();
     if (this.frame) (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
     this.editor.destroy();
     this.validationEditor.destroy();
