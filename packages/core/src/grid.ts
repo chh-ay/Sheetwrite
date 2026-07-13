@@ -14,6 +14,7 @@ import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { FindBar } from "./find-bar.js";
 import { InputController } from "./input-controller.js";
 import { OverlayPainter } from "./overlay-painter.js";
+import { RenderCoordinator } from "./render-coordinator.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { SheetTabs } from "./sheet-tabs.js";
@@ -47,7 +48,6 @@ import type {
   HighlightRange,
   MergeRange,
   MutationPolicyMode,
-  PanePaint,
   Patch,
   PresenceOverlay,
   ProtectedRange,
@@ -68,8 +68,6 @@ import type {
   SortKey,
   Store,
   Theme,
-  Viewport,
-  VisibleWindowView,
   WorkbookSnapshot,
 } from "./types.js";
 import { ValidationEditor } from "./validation-editor.js";
@@ -190,6 +188,7 @@ export class GridImpl implements Grid {
   private readonly datasourceController: DatasourceController;
   private readonly geometry: GeometryLayoutController;
   private readonly overlayPainter: OverlayPainter;
+  private readonly renderCoordinator: RenderCoordinator;
   private overscan: number;
   private readOnly: boolean;
   private tabBar: HTMLDivElement | null = null;
@@ -243,15 +242,7 @@ export class GridImpl implements Grid {
   private selection: SelectionModel;
   private readonly cellRevisions = new Map<string, number>();
   private destroyed = false;
-  private frame = 0;
-  private columnWindowStart = -1;
-  private columnWindowEnd = -1;
-  private windowedColIndices: readonly number[] = [];
-  private columnWindowSignature = "";
   private storeEpoch = 0;
-  private paintEpoch = 0;
-  private lastPaintSignature = "";
-  private lastPaintView: VisibleWindowView | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private readonly onScroll = () => this.scheduleRender();
   private readonly disposeStore: () => void;
@@ -313,10 +304,6 @@ export class GridImpl implements Grid {
       },
       onHistoryApplied: () => {
         this.emitSelection();
-        if (this.frame) {
-          (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
-          this.frame = 0;
-        }
         this.render();
       },
     });
@@ -538,7 +525,7 @@ export class GridImpl implements Grid {
       searchMatches: () => this.searchController.matches,
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
-      geometryVersion: () => this.storeEpoch + this.paintEpoch,
+      geometryVersion: () => this.renderCoordinator.geometryVersion,
       scheduleRender: () => this.scheduleRender(),
     });
 
@@ -554,6 +541,28 @@ export class GridImpl implements Grid {
       noteAt: (row, col) =>
         this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
       selection: () => this.selection.toSelection(this.activeSheet),
+    });
+
+    this.renderCoordinator = new RenderCoordinator({
+      renderer: () => this.renderer,
+      overlayPainter: this.overlayPainter,
+      ariaMirror: this.ariaMirror,
+      geometry: this.geometry,
+      datasource: this.datasourceController,
+      store: this.store,
+      activeSheet: () => this.activeSheet,
+      theme: () => this.theme,
+      overscan: () => this.overscan,
+      zoom: () => this.zoom,
+      storeEpoch: () => this.storeEpoch,
+      viewportHeight: () => this.viewportH(),
+      viewportWidth: () => this.viewportEl.clientWidth,
+      scrollTop: () => this.scroller.scrollTop,
+      scrollLeft: () => this.scroller.scrollLeft,
+      repositionEditor: (contentTop, scrollLeft) => this.repositionEditor(contentTop, scrollLeft),
+      emitScroll: (event) => {
+        for (const fn of this.listeners.scroll) fn(event);
+      },
     });
 
     if (this.tabBarHeight > 0) this.buildTabBar();
@@ -813,7 +822,7 @@ export class GridImpl implements Grid {
   }
 
   private applyLayout(): void {
-    this.paintEpoch += 1;
+    this.renderCoordinator.invalidate();
     const sheet = this.sheet();
     this.renderer.setLayout({
       columns: sheet.columns.map((column, c) => ({
@@ -847,9 +856,7 @@ export class GridImpl implements Grid {
 
   private rebuildColumnIndex(): void {
     this.geometry.rebuildColumns();
-    this.columnWindowStart = -1;
-    this.columnWindowEnd = -1;
-    this.windowedColIndices = [];
+    this.renderCoordinator.invalidateColumns();
     this.ariaMirror?.setColumnCount(this.geometry.columnIndices.length);
   }
 
@@ -881,185 +888,12 @@ export class GridImpl implements Grid {
     return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
   }
 
-  // ── render loop ──────────────────────────────────────────────────────────--
-
   private scheduleRender(): void {
-    if (this.frame) return;
-    const raf =
-      globalThis.requestAnimationFrame ?? ((fn: FrameRequestCallback) => setTimeout(fn, 16));
-    this.frame = raf(() => {
-      this.frame = 0;
-      this.render();
-    }) as unknown as number;
+    this.renderCoordinator.schedule();
   }
 
   private render(): void {
-    const clientH = this.viewportH();
-    const clientW = this.viewportEl.clientWidth;
-    const headerHeight = this.theme.headerHeight;
-    const bodyHeight = Math.max(0, clientH - headerHeight);
-    const contentTop = this.geometry.toContent(this.scroller.scrollTop);
-    const scrollLeft = this.scroller.scrollLeft;
-
-    const cellViewportWidth = Math.max(0, clientW - this.theme.rowHeaderWidth);
-    const paintWindow = this.geometry.paintWindow(
-      contentTop,
-      scrollLeft,
-      bodyHeight,
-      cellViewportWidth,
-      this.overscan,
-    );
-    const fr = paintWindow.frozenRows;
-    const fc = paintWindow.frozenColumns;
-    const frozenH = paintWindow.frozenHeight;
-    const frozenW = paintWindow.frozenWidth;
-    const win = paintWindow.rows;
-    const columnWin = paintWindow.columns;
-    const usePanes = (fr > 0 || fc > 0) && this.renderer.paintPanes !== undefined;
-    const rowGeometry = this.geometry.rowGeometry(win);
-    if (fr > 0) this.datasourceController.ensureLoaded(0, fr);
-    this.datasourceController.ensureLoaded(win.start, win.end);
-    if (columnWin.start !== this.columnWindowStart || columnWin.end !== this.columnWindowEnd) {
-      this.columnWindowStart = columnWin.start;
-      this.columnWindowEnd = columnWin.end;
-      this.windowedColIndices = this.geometry.columnIndices.slice(columnWin.start, columnWin.end);
-      this.columnWindowSignature = this.windowedColIndices.join(",");
-      this.ariaMirror.bumpVersion();
-    }
-    const cols = this.windowedColIndices;
-
-    const viewport: Viewport = {
-      scrollTop: contentTop,
-      scrollLeft,
-      width: clientW,
-      height: clientH,
-      contentRevision: this.storeEpoch + this.paintEpoch,
-    };
-
-    if (rowGeometry) {
-      viewport.rowTops = rowGeometry.rowTops;
-      viewport.rowHeights = rowGeometry.rowHeights;
-    }
-
-    this.renderer.setViewport(viewport);
-
-    const paintSignature =
-      `${this.activeSheet}|${win.start}|${win.end}|${this.columnWindowSignature}` +
-      `|${contentTop}|${scrollLeft}|${clientW}|${clientH}|${this.storeEpoch}|${this.paintEpoch}` +
-      `|${fr}|${fc}|${this.zoom}`;
-
-    let view = this.lastPaintView;
-    if (!view || paintSignature !== this.lastPaintSignature) {
-      if (usePanes) {
-        view = this.paintFrozenPanes(
-          win,
-          cols,
-          fr,
-          fc,
-          frozenH,
-          frozenW,
-          contentTop,
-          scrollLeft,
-          clientW,
-          clientH,
-          rowGeometry,
-        );
-      } else {
-        view = this.store.getVisibleWindow(this.activeSheet, win, cols);
-        this.renderer.paint(view);
-      }
-      this.lastPaintView = view;
-      this.lastPaintSignature = paintSignature;
-    }
-    this.ariaMirror.update(view);
-
-    this.overlayPainter.paint(contentTop, scrollLeft, clientW, clientH);
-    this.repositionEditor(contentTop, scrollLeft);
-
-    for (const fn of this.listeners.scroll) {
-      fn({
-        scrollTop: contentTop,
-        firstRow: win.start,
-        lastRow: Math.max(win.start, win.end - 1),
-      });
-    }
-  }
-
-  /**
-   * Frozen-frame paint: up to four clipped panes (corner, top, left, body),
-   * each its own bulk window read with pinned axes at scroll 0. Returns the
-   * body pane's view (the one ARIA mirrors and the paint cache retain).
-   */
-  private paintFrozenPanes(
-    bodyWin: { start: number; end: number },
-    bodyCols: readonly number[],
-    fr: number,
-    fc: number,
-    frozenH: number,
-    frozenW: number,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
-    bodyGeometry: { rowTops: Float64Array; rowHeights: Float64Array } | null,
-  ): VisibleWindowView {
-    const g = this.theme.rowHeaderWidth;
-    const hh = this.theme.headerHeight;
-    const xSplit = fc > 0 ? g + frozenW : 0;
-    const ySplit = fr > 0 ? hh + frozenH : 0;
-    const bodyW = Math.max(0, clientW - xSplit);
-    const bodyH = Math.max(0, clientH - ySplit);
-
-    const frozenWin = { start: 0, end: fr };
-    const frozenCols = fc > 0 ? this.geometry.columnIndices.slice(0, fc) : [];
-    const frozenGeometry = fr > 0 ? this.geometry.frozenRowGeometry(fr) : null;
-
-    const panes: PanePaint[] = [];
-    if (fr > 0 && fc > 0) {
-      panes.push({
-        view: this.store.getVisibleWindow(this.activeSheet, frozenWin, frozenCols),
-        clip: { x: 0, y: 0, w: xSplit, h: ySplit },
-        scrollTop: 0,
-        scrollLeft: 0,
-        rowTops: frozenGeometry?.rowTops,
-        rowHeights: frozenGeometry?.rowHeights,
-      });
-    }
-    if (fr > 0) {
-      panes.push({
-        view: this.store.getVisibleWindow(this.activeSheet, frozenWin, bodyCols),
-        clip: { x: xSplit, y: 0, w: bodyW, h: ySplit },
-        scrollTop: 0,
-        scrollLeft,
-        rowTops: frozenGeometry?.rowTops,
-        rowHeights: frozenGeometry?.rowHeights,
-      });
-    }
-    if (fc > 0) {
-      panes.push({
-        view: this.store.getVisibleWindow(this.activeSheet, bodyWin, frozenCols),
-        clip: { x: 0, y: ySplit, w: xSplit, h: bodyH },
-        scrollTop: contentTop,
-        scrollLeft: 0,
-        rowTops: bodyGeometry?.rowTops,
-        rowHeights: bodyGeometry?.rowHeights,
-      });
-    }
-    const bodyView = this.store.getVisibleWindow(this.activeSheet, bodyWin, bodyCols);
-    panes.push({
-      view: bodyView,
-      clip: { x: xSplit, y: ySplit, w: bodyW, h: bodyH },
-      scrollTop: contentTop,
-      scrollLeft,
-      rowTops: bodyGeometry?.rowTops,
-      rowHeights: bodyGeometry?.rowHeights,
-    });
-
-    this.renderer.paintPanes?.(panes, {
-      x: fc > 0 ? xSplit - 0.5 : null,
-      y: fr > 0 ? ySplit - 0.5 : null,
-    });
-    return bodyView;
+    this.renderCoordinator.renderNow();
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
@@ -1456,7 +1290,6 @@ export class GridImpl implements Grid {
     this.activeSheetCache = null;
     this.rebuildColumnIndex();
     this.applyLayout();
-    this.paintEpoch += 1;
     this.scheduleRender();
   }
   setOverscan(overscan?: number): void {
@@ -1464,7 +1297,7 @@ export class GridImpl implements Grid {
     if (next === this.overscan) return;
     this.overscan = next;
     // Read per frame by the window calculations; a repaint picks it up.
-    this.paintEpoch += 1;
+    this.renderCoordinator.invalidate();
     this.scheduleRender();
   }
 
@@ -2265,7 +2098,7 @@ export class GridImpl implements Grid {
     // The view permutation lives outside the store, so it must invalidate the
     // paint signature itself — a view change with an identical window/scroll
     // (e.g. sorting while already at the top) would otherwise paint stale.
-    this.paintEpoch += 1;
+    this.renderCoordinator.invalidate();
     this.syncSizer();
     this.render();
   }
@@ -2279,7 +2112,7 @@ export class GridImpl implements Grid {
     if (this.destroyed) return;
     this.destroyed = true;
     this.datasourceController.destroy();
-    if (this.frame) (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
+    this.renderCoordinator.destroy();
     this.editor.destroy();
     this.validationEditor.destroy();
     this.input.destroy();
