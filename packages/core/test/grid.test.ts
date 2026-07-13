@@ -538,6 +538,68 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
+  it("undoes a populated column removal through one compact serializable block", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "formula", src: "=A1" },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 1 },
+          value: { kind: "ref", target: { sheet: "s1", row: 0, col: 0 } },
+          style: { italic: true },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 1 },
+          value: { kind: "literal", value: "kept" },
+          style: { underline: true },
+        },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const events: ChangeEvent[] = [];
+    grid.on("change", (event) => events.push(event));
+
+    grid.applyTransaction({
+      patches: [{ op: "removeColumns", sheet: "s1", at: 1, count: 1 }],
+    });
+    expect(workbook.sheets[0]!.columns).toHaveLength(2);
+
+    grid.undo();
+    expect(workbook.sheets[0]!.columns[1]!.key).toBe("amount");
+    expect(store.getFormula({ sheet: "s1", row: 0, col: 1 })).toBe("=A1");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).style).toEqual({ bold: true });
+    expect(store.getRefTarget({ sheet: "s1", row: 1, col: 1 })).toEqual({
+      sheet: "s1",
+      row: 0,
+      col: 0,
+    });
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style).toEqual({ italic: true });
+    expect(store.getCell({ sheet: "s1", row: 2, col: 1 })).toMatchObject({
+      resolved: "kept",
+      style: { underline: true },
+    });
+    const undoEvent = events.at(-1)!;
+    expect(undoEvent.transaction.patches.map((patch) => patch.op)).toEqual([
+      "addColumns",
+      "setBlock",
+    ]);
+    expect(JSON.parse(JSON.stringify(undoEvent.transaction.patches))).toEqual(
+      undoEvent.transaction.patches,
+    );
+
+    grid.redo();
+    expect(workbook.sheets[0]!.columns).toHaveLength(2);
+    grid.destroy();
+  });
+
   it("updates read-only and config without clearing selection or history", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));

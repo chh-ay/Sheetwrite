@@ -606,7 +606,10 @@ fn filter_and_search_match_strings_and_numbers() {
     assert_eq!(store.filter_rows(sheet, 1, "42"), vec![1]);
 
     // search returns flat [row, col, ...] sorted row-major.
-    assert_eq!(store.search(sheet, &[0, 1], "tokyo", true, false), vec![0, 0, 2, 0]);
+    assert_eq!(
+        store.search(sheet, &[0, 1], "tokyo", true, false),
+        vec![0, 0, 2, 0]
+    );
 }
 
 #[test]
@@ -634,42 +637,48 @@ fn match_cache_handles_repeats_eviction_and_collisions() {
 }
 
 #[test]
-    fn packed_string_column_load_matches_per_row_semantics() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(2, 4);
+fn packed_string_column_load_matches_per_row_semantics() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 4);
 
-        // ASCII fast path: byte offsets equal UTF-16 lengths.
-        store.set_column_strings_packed(sheet, 0, 0, "abdefg".to_string(), &[2, 0, 2, 2], 7);
-        assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("ab"));
-        assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some(""));
-        assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("de"));
-        assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("fg"));
+    // ASCII fast path: byte offsets equal UTF-16 lengths.
+    store.set_column_strings_packed(sheet, 0, 0, "abdefg".to_string(), &[2, 0, 2, 2], 7);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("ab"));
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some(""));
+    assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("de"));
+    assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("fg"));
 
-        // Non-ASCII path: "é" is 1 UTF-16 unit / 2 UTF-8 bytes, "𝄞" is 2
-        // UTF-16 units / 4 UTF-8 bytes.
-        store.set_column_strings_packed(sheet, 1, 0, "éx𝄞ab".to_string(), &[2, 2, 2], 0);
-        assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("éx"));
-        assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("𝄞"));
-        assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("ab"));
+    // Non-ASCII path: "é" is 1 UTF-16 unit / 2 UTF-8 bytes, "𝄞" is 2
+    // UTF-16 units / 4 UTF-8 bytes.
+    store.set_column_strings_packed(sheet, 1, 0, "éx𝄞ab".to_string(), &[2, 2, 2], 0);
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("éx"));
+    assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("𝄞"));
+    assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("ab"));
 
-        // Bulk load flags the sheet dirty exactly like the per-row loader.
-        assert!(store.sheets[sheet].all_dirty);
-    }
+    // Bulk load flags the sheet dirty exactly like the per-row loader.
+    assert!(store.sheets[sheet].all_dirty);
+}
 
 #[test]
-    fn numeric_sort_orders_finite_numbers_and_keeps_equal_rows_stable() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(1, 8);
-        for (row, value) in [3.0, -2.0, 0.0, -0.0, 1.5, 3.0, -10.0, 2.0]
-            .into_iter()
-            .enumerate()
-        {
-            store.set_number(sheet, row, 0, value, 0);
-        }
-
-        assert_eq!(store.sort_rows(sheet, 0, true), vec![6, 1, 2, 3, 4, 7, 0, 5]);
-        assert_eq!(store.sort_rows(sheet, 0, false), vec![0, 5, 7, 4, 2, 3, 1, 6]);
+fn numeric_sort_orders_finite_numbers_and_keeps_equal_rows_stable() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 8);
+    for (row, value) in [3.0, -2.0, 0.0, -0.0, 1.5, 3.0, -10.0, 2.0]
+        .into_iter()
+        .enumerate()
+    {
+        store.set_number(sheet, row, 0, value, 0);
     }
+
+    assert_eq!(
+        store.sort_rows(sheet, 0, true),
+        vec![6, 1, 2, 3, 4, 7, 0, 5]
+    );
+    assert_eq!(
+        store.sort_rows(sheet, 0, false),
+        vec![0, 5, 7, 4, 2, 3, 1, 6]
+    );
+}
 
 #[test]
 fn small_numeric_sort_matches_total_order_for_one_thousand_rows() {
@@ -778,17 +787,17 @@ fn pure_string_filter_fast_path_matches_mixed_and_unicode_fallbacks() {
 }
 
 #[test]
-    fn string_pool_reuses_ids_without_duplicate_pool_entries() {
-        let mut store = CellStore::new();
-        let a = store.intern("repeated");
-        let b = store.intern("repeated");
-        let c = store.intern("other");
+fn string_pool_reuses_ids_without_duplicate_pool_entries() {
+    let mut store = CellStore::new();
+    let a = store.intern("repeated");
+    let b = store.intern("repeated");
+    let c = store.intern("other");
 
-        assert_eq!(a, b);
-        assert_ne!(a, c);
-        assert_eq!(store.strings.len(), 2);
-        assert_eq!(store.string_lookup.len(), 2);
-    }
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+    assert_eq!(store.strings.len(), 2);
+    assert_eq!(store.string_lookup.len(), 2);
+}
 
 #[test]
 fn data_edge_follows_google_ctrl_arrow_semantics() {
@@ -1172,4 +1181,71 @@ fn multi_query_entry_points_preserve_order_filters_distinctness_and_edges() {
     let order = [1, 3, 0, 2, 4];
     assert_eq!(store.data_edge_ordered(sheet, &order, 0, 0, 1, 0), 4);
     assert_eq!(store.data_edge_ordered(sheet, &order, 4, 0, -1, 0), 0);
+}
+
+#[test]
+fn range_native_block_clear_and_style_remap_preserve_column_major_semantics() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 3);
+    assert!(store.set_block(
+        sheet,
+        0,
+        0,
+        3,
+        2,
+        &[1, 2, 0, 1, 2, 1],
+        &[1.0, 0.0, 0.0, 4.0, 0.0, 6.0],
+        vec![
+            String::new(),
+            "two".to_string(),
+            String::new(),
+            String::new(),
+            "five".to_string(),
+            String::new(),
+        ],
+        &[7, 8, 7, 8, 7, 8],
+    ));
+
+    assert_close(number(&store, sheet, 0, 0), 1.0);
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("two"));
+    assert_eq!(store.get_cell(sheet, 1, 0).kind(), KIND_EMPTY);
+    assert_close(number(&store, sheet, 2, 1), 6.0);
+    assert_eq!(store.range_style_ids(sheet, 0, 0, 2, 1), vec![7, 8]);
+    assert!(store.remap_range_styles(sheet, 0, 0, 2, 1, &[7, 8], &[70, 80]));
+    assert_eq!(store.style_id_at(sheet, 0, 0), 70);
+    assert_eq!(store.style_id_at(sheet, 0, 1), 80);
+
+    assert!(store.clear_range(sheet, 0, 0, 2, 0, true, false));
+    assert_eq!(store.get_cell(sheet, 0, 0).kind(), KIND_EMPTY);
+    assert_eq!(store.style_id_at(sheet, 0, 0), 70);
+    assert_close(number(&store, sheet, 2, 1), 6.0);
+    assert_eq!(string(&store, sheet, 2, 1).as_deref(), None);
+}
+
+#[test]
+fn opaque_range_snapshot_restores_values_formulas_and_styles() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 3);
+    store.set_number(sheet, 0, 0, 5.0, 11);
+    store.set_formula(sheet, 1, 0, "=A1+1", 12);
+    store.set_string(sheet, 2, 1, "tail", 13);
+    store.recompute(sheet);
+
+    let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
+    assert_eq!(snapshot.formula_offsets(), vec![1, 0]);
+    assert_eq!(snapshot.formula_sources(), vec!["=(A1+1)"]);
+    assert!(store.clear_range(sheet, 0, 0, 2, 1, true, true));
+    assert!(store.restore_range(sheet, 0, 0, &snapshot));
+    store.recompute(sheet);
+
+    assert_close(number(&store, sheet, 0, 0), 5.0);
+    assert_close(number(&store, sheet, 1, 0), 6.0);
+    assert_eq!(
+        store.formula_source(sheet, 1, 0).as_deref(),
+        Some("=(A1+1)")
+    );
+    assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("tail"));
+    assert_eq!(store.style_id_at(sheet, 0, 0), 11);
+    assert_eq!(store.style_id_at(sheet, 1, 0), 12);
+    assert_eq!(store.style_id_at(sheet, 2, 1), 13);
 }

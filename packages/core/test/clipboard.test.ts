@@ -75,13 +75,62 @@ class FakeStore {
 
   apply(patches: Patch[]): void {
     for (const patch of patches) {
-      if (patch.op !== "set") continue;
-      const resolved = patch.value.kind === "literal" ? patch.value.value : null;
-      this.cells.set(this.key(patch.addr), {
-        value: patch.value,
-        resolved,
-        style: patch.style ?? {},
-      });
+      if (patch.op === "set") {
+        const resolved = patch.value.kind === "literal" ? patch.value.value : null;
+        this.cells.set(this.key(patch.addr), {
+          value: patch.value,
+          resolved,
+          style: patch.style ?? {},
+        });
+        continue;
+      }
+      if (patch.op === "setBlock") {
+        const formulas = new Map(patch.block.formulas ?? []);
+        const refs = new Map(patch.block.refs ?? []);
+        const styles = patch.block.styleTable ?? [];
+        const styleIds = patch.block.styleIds;
+        for (let row = 0; row < patch.block.rowCount; row++) {
+          for (let col = 0; col < patch.block.colCount; col++) {
+            const offset = row * patch.block.colCount + col;
+            const value: CellValue = formulas.has(offset)
+              ? { kind: "formula", src: formulas.get(offset)! }
+              : refs.has(offset)
+                ? { kind: "ref", target: refs.get(offset)! }
+                : { kind: "literal", value: patch.block.values[offset]! };
+            const addr = {
+              sheet: patch.range.sheet,
+              row: Math.min(patch.range.start.row, patch.range.end.row) + row,
+              col: Math.min(patch.range.start.col, patch.range.end.col) + col,
+            };
+            this.cells.set(this.key(addr), {
+              value,
+              resolved: value.kind === "literal" ? value.value : null,
+              style: styleIds ? (styles[styleIds[offset]!] ?? {}) : {},
+            });
+          }
+        }
+        continue;
+      }
+      if (patch.op === "clearRange") {
+        const r0 = Math.min(patch.range.start.row, patch.range.end.row);
+        const r1 = Math.max(patch.range.start.row, patch.range.end.row);
+        const c0 = Math.min(patch.range.start.col, patch.range.end.col);
+        const c1 = Math.max(patch.range.start.col, patch.range.end.col);
+        for (let row = r0; row <= r1; row++) {
+          for (let col = c0; col <= c1; col++) {
+            const addr = { sheet: patch.range.sheet, row, col };
+            const existing = this.cells.get(this.key(addr));
+            this.cells.set(this.key(addr), {
+              value:
+                patch.contents === false
+                  ? (existing?.value ?? { kind: "literal", value: null })
+                  : { kind: "literal", value: null },
+              resolved: patch.contents === false ? (existing?.resolved ?? null) : null,
+              style: patch.style === false ? (existing?.style ?? {}) : {},
+            });
+          }
+        }
+      }
     }
   }
 }

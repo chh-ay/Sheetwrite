@@ -1005,3 +1005,106 @@ describe("document metadata reducer validation", () => {
     store.dispose();
   });
 });
+
+describe("range-native mutations", () => {
+  it("applies a typed block with formula, reference, and interned style exceptions", () => {
+    const store = new SheetwriteStore(makeWorkbook(4));
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    const outcome = store.applyTransaction({
+      patches: [
+        {
+          op: "setBlock",
+          range: {
+            sheet: "s1",
+            start: { row: 0, col: 0 },
+            end: { row: 1, col: 1 },
+          },
+          block: {
+            rowCount: 2,
+            colCount: 2,
+            values: [3, null, "label", null],
+            formulas: [[1, "=A1*2"]],
+            refs: [[3, addr(0, 0)]],
+            styleTable: [{ bold: true }, { italic: true }],
+            styleIds: [0, 1, 1, 0],
+          },
+        },
+      ],
+    });
+
+    expect(outcome.status).toBe("applied");
+    expect(store.getCell(addr(0, 0))).toMatchObject({ resolved: 3, style: { bold: true } });
+    expect(store.getFormula(addr(0, 1))).toBe("=A1*2");
+    expect(store.getCell(addr(0, 1))).toMatchObject({ resolved: 6, style: { italic: true } });
+    expect(store.getCell(addr(1, 0))).toMatchObject({
+      resolved: "label",
+      style: { italic: true },
+    });
+    expect(store.getRefTarget(addr(1, 1))).toEqual(addr(0, 0));
+    expect(store.getCell(addr(1, 1))).toMatchObject({ resolved: 3, style: { bold: true } });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.transaction.patches).toHaveLength(1);
+    store.dispose();
+  });
+
+  it("styles and clears 100K cells as one operation without per-cell change objects", () => {
+    const store = new SheetwriteStore(makeWorkbook(100_000));
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+    const range = {
+      sheet: "s1",
+      start: { row: 0, col: 0 },
+      end: { row: 99_999, col: 0 },
+    };
+
+    store.applyTransaction({ patches: [{ op: "setRangeStyle", range, style: { bold: true } }] });
+    store.applyTransaction({
+      patches: [{ op: "clearRange", range, contents: true, style: false }],
+    });
+
+    expect(store.getCell(addr(0, 0)).style).toEqual({ bold: true });
+    expect(store.getCell(addr(99_999, 0)).style).toEqual({ bold: true });
+    expect(events).toHaveLength(2);
+    expect(events.every((event) => event.transaction.patches.length === 1)).toBe(true);
+    expect(events.every((event) => event.changes.length === 0)).toBe(true);
+    store.dispose();
+  });
+
+  it("materializes an opaque history snapshot only as a JSON-safe setBlock operation", () => {
+    const store = new SheetwriteStore(makeWorkbook(3));
+    store.applyTransaction({
+      patches: [
+        {
+          op: "setBlock",
+          range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+          block: {
+            rowCount: 2,
+            colCount: 1,
+            values: [5, null],
+            formulas: [[1, "=A1+1"]],
+            styleTable: [{ underline: true }],
+            styleIds: [0, 0],
+          },
+        },
+      ],
+    });
+    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } };
+    const history = store.captureRangeHistory(range);
+    expect(history).not.toBeNull();
+    store.applyTransaction({ patches: [{ op: "clearRange", range }] });
+
+    const restore = history!.toDocumentOp(range);
+    expect(JSON.parse(JSON.stringify(restore))).toEqual(restore);
+    expect("resource" in restore).toBe(false);
+    store.applyTransaction({ patches: [restore] });
+    expect(store.getCell(addr(0, 0)).resolved).toBe(5);
+    expect(store.getFormula(addr(1, 0))).toBe("=A1+1");
+    expect(store.getCell(addr(1, 0)).resolved).toBe(6);
+
+    history!.dispose();
+    history!.dispose();
+    store.dispose();
+  });
+});

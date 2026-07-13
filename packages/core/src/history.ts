@@ -1,14 +1,25 @@
-import type { CellAddress, Patch, SheetId } from "./types.js";
+import type { CellAddress, Patch, Range, SheetId } from "./types.js";
+
+export type HistoryPart =
+  | { kind: "patches"; patches: Patch[] }
+  | {
+      kind: "rangeSnapshot";
+      range: Range;
+      toPatch: (range: Range) => Extract<Patch, { op: "setBlock" }>;
+      dispose: () => void;
+    };
+
+export type HistoryAction = HistoryPart[];
 
 interface UndoEntry {
-  undo: Patch[];
+  undo: HistoryAction;
   redo: Patch[];
 }
 
 /**
- * Bounded undo/redo over cell transactions. Stores each edit as its inverse
- * (undo) and forward (redo) patch lists; the grid supplies both. Store-agnostic
- * except for address rebasing after structural row/column edits.
+ * Bounded undo/redo over document transactions. Destructive bulk edits may
+ * retain opaque store-local range resources, which are materialized into a
+ * serializable `setBlock` only when undo executes.
  */
 export class UndoManager {
   private readonly undoStack: UndoEntry[] = [];
@@ -16,27 +27,27 @@ export class UndoManager {
 
   constructor(private readonly limit = 200) {}
 
-  /** Record an applied edit. A fresh edit clears the redo stack. */
-  push(undo: Patch[], redo: Patch[]): void {
+  /** Record an applied edit. A fresh edit disposes the discarded redo stack. */
+  push(undo: HistoryAction, redo: Patch[]): void {
     if (undo.length === 0) return;
 
     this.undoStack.push({ undo, redo });
-    if (this.undoStack.length > this.limit) this.undoStack.shift();
+    if (this.undoStack.length > this.limit) disposeEntry(this.undoStack.shift()!);
+    for (const entry of this.redoStack) disposeEntry(entry);
     this.redoStack.length = 0;
   }
 
-  /** Rebase stored patch addresses after a row insert/delete in data space. */
+  /** Rebase stored addresses after a row insert/delete in data space. */
   rebaseRows(sheet: SheetId, at: number, delta: number): void {
     this.rebase((addr) => rebaseAddrRows(addr, sheet, at, delta));
   }
 
-  /** Rebase stored patch addresses after a column insert/delete in data space. */
+  /** Rebase stored addresses after a column insert/delete in data space. */
   rebaseCols(sheet: SheetId, at: number, delta: number): void {
     this.rebase((addr) => rebaseAddrCols(addr, sheet, at, delta));
   }
 
-  /** Inverse patches to apply for an undo, or null when nothing is recorded. */
-  undo(): Patch[] | null {
+  undo(): HistoryAction | null {
     const entry = this.undoStack.pop();
     if (!entry) return null;
 
@@ -44,16 +55,17 @@ export class UndoManager {
     return entry.undo;
   }
 
-  /** Forward patches to re-apply for a redo, or null when nothing is undone. */
-  redo(): Patch[] | null {
+  redo(): HistoryAction | null {
     const entry = this.redoStack.pop();
     if (!entry) return null;
 
     this.undoStack.push(entry);
-    return entry.redo;
+    return [{ kind: "patches", patches: entry.redo }];
   }
 
   clear(): void {
+    for (const entry of this.undoStack) disposeEntry(entry);
+    for (const entry of this.redoStack) disposeEntry(entry);
     this.undoStack.length = 0;
     this.redoStack.length = 0;
   }
@@ -72,25 +84,88 @@ export class UndoManager {
   }
 }
 
-function rebaseEntries(entries: UndoEntry[], mapAddr: (addr: CellAddress) => CellAddress | null) {
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const entry = entries[i]!;
-    entry.undo = rebasePatches(entry.undo, mapAddr);
-    entry.redo = rebasePatches(entry.redo, mapAddr);
-    if (entry.undo.length === 0 || entry.redo.length === 0) entries.splice(i, 1);
+export function materializeHistoryAction(action: HistoryAction): Patch[] {
+  const patches: Patch[] = [];
+  for (const part of action) {
+    if (part.kind === "patches") patches.push(...part.patches);
+    else patches.push(part.toPatch(part.range));
+  }
+  return patches;
+}
+
+function disposeEntry(entry: UndoEntry): void {
+  for (const part of entry.undo) {
+    if (part.kind === "rangeSnapshot") part.dispose();
   }
 }
 
-function rebasePatches(patches: Patch[], mapAddr: (addr: CellAddress) => CellAddress | null) {
+function rebaseEntries(
+  entries: UndoEntry[],
+  mapAddr: (addr: CellAddress) => CellAddress | null,
+): void {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i]!;
+    const undo: HistoryAction = [];
+    for (const part of entry.undo) {
+      if (part.kind === "patches") {
+        const patches = rebasePatches(part.patches, mapAddr);
+        if (patches.length > 0) undo.push({ kind: "patches", patches });
+        continue;
+      }
+      const start = mapAddr({ sheet: part.range.sheet, ...part.range.start });
+      const end = mapAddr({ sheet: part.range.sheet, ...part.range.end });
+      if (start && end && start.sheet === end.sheet) {
+        part.range = {
+          sheet: start.sheet,
+          start: { row: start.row, col: start.col },
+          end: { row: end.row, col: end.col },
+        };
+        undo.push(part);
+      } else {
+        part.dispose();
+      }
+    }
+    entry.undo = undo;
+    entry.redo = rebasePatches(entry.redo, mapAddr);
+    if (entry.undo.length === 0 || entry.redo.length === 0) {
+      disposeEntry(entry);
+      entries.splice(i, 1);
+    }
+  }
+}
+
+function rebasePatches(
+  patches: Patch[],
+  mapAddr: (addr: CellAddress) => CellAddress | null,
+): Patch[] {
   const out: Patch[] = [];
   for (const patch of patches) {
-    if (patch.op !== "set") {
-      out.push(patch);
+    if (patch.op === "set") {
+      const addr = mapAddr(patch.addr);
+      if (addr) out.push({ ...patch, addr });
       continue;
     }
-
-    const addr = mapAddr(patch.addr);
-    if (addr) out.push({ ...patch, addr });
+    if (
+      patch.op === "setRange" ||
+      patch.op === "setBlock" ||
+      patch.op === "setRangeStyle" ||
+      patch.op === "clearRange"
+    ) {
+      const start = mapAddr({ sheet: patch.range.sheet, ...patch.range.start });
+      const end = mapAddr({ sheet: patch.range.sheet, ...patch.range.end });
+      if (start && end && start.sheet === end.sheet) {
+        out.push({
+          ...patch,
+          range: {
+            sheet: start.sheet,
+            start: { row: start.row, col: start.col },
+            end: { row: end.row, col: end.col },
+          },
+        });
+      }
+      continue;
+    }
+    out.push(patch);
   }
   return out;
 }

@@ -8,7 +8,7 @@ import type { CellStyle, Patch, ResolvedCell, Sheet, Store, Theme } from "../src
  * style map. `commit` applies each set patch back into the map so a follow-up
  * toggle observes the freshly written style (mirroring the store round-trip).
  */
-function makeHarness() {
+function makeHarness(toDataRow: (viewRow: number) => number = (viewRow) => viewRow) {
   const styles = new Map<string, CellStyle>();
   const keyOf = (row: number, col: number): string => `${row},${col}`;
 
@@ -34,11 +34,25 @@ function makeHarness() {
     theme: () => ({ fg: "#000000" }) as unknown as Theme,
     merges: () => merges,
     anchorCell: (row, col) => ({ row, col }),
-    toDataRow: (viewRow) => viewRow,
+    toDataRow,
     commit: (patches) => {
       commits.push(patches);
       for (const p of patches) {
         if (p.op === "set") styles.set(keyOf(p.addr.row, p.addr.col), p.style ?? {});
+        if (p.op === "setRangeStyle") {
+          const r0 = Math.min(p.range.start.row, p.range.end.row);
+          const r1 = Math.max(p.range.start.row, p.range.end.row);
+          const c0 = Math.min(p.range.start.col, p.range.end.col);
+          const c1 = Math.max(p.range.start.col, p.range.end.col);
+          for (let row = r0; row <= r1; row++) {
+            for (let col = c0; col <= c1; col++) {
+              styles.set(
+                keyOf(row, col),
+                p.style === null ? {} : { ...(styles.get(keyOf(row, col)) ?? {}), ...p.style },
+              );
+            }
+          }
+        }
       }
     },
   });
@@ -56,11 +70,12 @@ describe("StyleActions underline/strikethrough toggles", () => {
 
     expect(commits).toHaveLength(1); // single undo step
     const patches = commits[0]!;
-    expect(patches).toHaveLength(2); // one per selected cell
-    for (const p of patches) {
-      expect(p.op).toBe("set");
-      if (p.op === "set") expect(p.style?.underline).toBe(true);
-    }
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toEqual({
+      op: "setRangeStyle",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } },
+      style: { underline: true },
+    });
   });
 
   it("clears underline on the re-toggle when the focus cell already has it", () => {
@@ -72,9 +87,13 @@ describe("StyleActions underline/strikethrough toggles", () => {
     actions.toggleStyle("underline");
 
     expect(commits).toHaveLength(2);
-    for (const p of commits[1]!) {
-      if (p.op === "set") expect(p.style?.underline).toBe(false);
-    }
+    expect(commits[1]).toEqual([
+      {
+        op: "setRangeStyle",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } },
+        style: { underline: false },
+      },
+    ]);
   });
 
   it("toggles strikethrough independently of underline", () => {
@@ -84,8 +103,8 @@ describe("StyleActions underline/strikethrough toggles", () => {
     actions.toggleStyle("strikethrough");
 
     const patch = commits[0]![0]!;
-    expect(patch.op).toBe("set");
-    if (patch.op === "set") {
+    expect(patch.op).toBe("setRangeStyle");
+    if (patch.op === "setRangeStyle") {
       expect(patch.style?.strikethrough).toBe(true);
       expect(patch.style?.underline).toBeUndefined();
     }
@@ -99,10 +118,44 @@ describe("StyleActions underline/strikethrough toggles", () => {
     actions.toggleStyle("strikethrough");
 
     const patch = commits[1]![0]!;
-    if (patch.op === "set") {
-      expect(patch.style?.underline).toBe(true);
+    if (patch.op === "setRangeStyle") {
+      expect(patch.style?.underline).toBeUndefined();
       expect(patch.style?.strikethrough).toBe(true);
     }
+  });
+  it("coalesces a descending sorted-view selection without changing data coordinates", () => {
+    const { actions, selection, commits } = makeHarness((viewRow) => 9 - viewRow);
+    selection.selectCell(0, 0);
+    selection.extendTo(2, 0);
+
+    actions.toggleStyle("underline");
+
+    expect(commits).toEqual([
+      [
+        {
+          op: "setRangeStyle",
+          range: { sheet: "s1", start: { row: 9, col: 0 }, end: { row: 7, col: 0 } },
+          style: { underline: true },
+        },
+      ],
+    ]);
+  });
+
+  it("keeps non-contiguous filtered-view rows as separate compact ranges", () => {
+    const rows = [2, 5, 9];
+    const { actions, selection, commits } = makeHarness((viewRow) => rows[viewRow]!);
+    selection.selectCell(0, 1);
+    selection.extendTo(2, 1);
+
+    actions.toggleStyle("underline");
+
+    expect(commits[0]!.map((patch) => (patch.op === "setRangeStyle" ? patch.range : null))).toEqual(
+      rows.map((row) => ({
+        sheet: "s1",
+        start: { row, col: 1 },
+        end: { row, col: 1 },
+      })),
+    );
   });
 
   it("does nothing when the selection is empty", () => {

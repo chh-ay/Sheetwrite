@@ -177,6 +177,20 @@ export interface SnapshotCell {
   value: CellValue;
   style?: CellStyle;
 }
+/**
+ * Dense row-major mutation payload. Primitive arrays keep large paste/fill
+ * operations JSON-safe without allocating one operation object per cell.
+ * Formula/reference tuples are sparse exceptions keyed by row-major offset.
+ */
+export interface PackedCellBlock {
+  rowCount: number;
+  colCount: number;
+  values: CellScalar[];
+  formulas?: Array<[offset: number, source: string]>;
+  refs?: Array<[offset: number, target: CellAddress]>;
+  styleTable?: CellStyle[];
+  styleIds?: number[];
+}
 
 /** Sparse row-major cells bounded by one rectangular block. */
 export interface CellBlock {
@@ -217,6 +231,8 @@ export interface WorkbookSnapshot {
 export type DocumentOp =
   | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle }
   | { op: "setRange"; range: Range; cells: SnapshotCell[] }
+  | { op: "setBlock"; range: Range; block: PackedCellBlock }
+  | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null }
   | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean }
   | { op: "addRows"; sheet: SheetId; at: number; count: number }
   | { op: "removeRows"; sheet: SheetId; at: number; count: number }

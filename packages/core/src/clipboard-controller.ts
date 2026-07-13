@@ -14,6 +14,7 @@ import type {
   CellValue,
   ClipboardOutcome,
   CommitReason,
+  PackedCellBlock,
   Patch,
   Sheet,
   SheetId,
@@ -203,6 +204,91 @@ export class ClipboardController {
     const startPos = colIndices.indexOf(focus.col);
     if (startPos < 0) return;
 
+    const availableRows = Math.min(height, rowLimit - focus.row);
+    const width = availableRows > 0 ? widthAt(0) : 0;
+    const targetCols = colIndices.slice(startPos, startPos + width);
+    const firstDataRow = availableRows > 0 ? this.deps.toDataRow(focus.row) : -1;
+    const rectangular =
+      availableRows > 0 &&
+      width > 0 &&
+      targetCols.length === width &&
+      Array.from({ length: availableRows }, (_, row) => row).every(
+        (row) =>
+          widthAt(row) === width && this.deps.toDataRow(focus.row + row) === firstDataRow + row,
+      );
+    if (rectangular) {
+      const values: CellScalar[] = new Array(availableRows * width);
+      const formulas: Array<[number, string]> = [];
+      const refs: Array<[number, { sheet: SheetId; row: number; col: number }]> = [];
+      const styleTable: CellStyle[] = [];
+      const styleLookup = new Map<string, number>();
+      const styleIds: number[] = new Array(availableRows * width);
+      let canPack = true;
+      for (let row = 0; row < availableRows && canPack; row++) {
+        for (let col = 0; col < width; col++) {
+          const targetRow = focus.row + row;
+          const targetCol = targetCols[col]!;
+          if (this.deps.mergeAnchorAt(targetRow, targetCol)) {
+            canPack = false;
+            break;
+          }
+          const write = cellAt(row, col, targetCol);
+          if (!write) {
+            canPack = false;
+            break;
+          }
+          const offset = row * width + col;
+          if (write.value.kind === "formula") {
+            values[offset] = null;
+            formulas.push([offset, write.value.src]);
+          } else if (write.value.kind === "ref") {
+            values[offset] = null;
+            refs.push([offset, { ...write.value.target }]);
+          } else {
+            values[offset] = write.value.value;
+          }
+          const style = write.style ?? {};
+          const styleKey = JSON.stringify(style);
+          let styleId = styleLookup.get(styleKey);
+          if (styleId === undefined) {
+            styleId = styleTable.length;
+            styleLookup.set(styleKey, styleId);
+            styleTable.push(style);
+          }
+          styleIds[offset] = styleId;
+        }
+      }
+      if (canPack) {
+        const block: PackedCellBlock = {
+          rowCount: availableRows,
+          colCount: width,
+          values,
+          formulas: formulas.length > 0 ? formulas : undefined,
+          refs: refs.length > 0 ? refs : undefined,
+          styleTable,
+          styleIds,
+        };
+        this.deps.commit(
+          [
+            {
+              op: "setBlock",
+              range: {
+                sheet: activeSheet,
+                start: { row: firstDataRow, col: targetCols[0]! },
+                end: {
+                  row: firstDataRow + availableRows - 1,
+                  col: targetCols[targetCols.length - 1]!,
+                },
+              },
+              block,
+            },
+          ],
+          "paste",
+        );
+        return;
+      }
+    }
+
     const patches: Patch[] = [];
     for (let r = 0; r < height; r++) {
       const width = widthAt(r);
@@ -247,6 +333,30 @@ export class ClipboardController {
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
     const clearPatches: Patch[] = [];
+    const firstDataRow = this.deps.toDataRow(rect.r0);
+    let rangeClear = true;
+    for (let row = rect.r0; row <= rect.r1 && rangeClear; row++) {
+      if (this.deps.toDataRow(row) !== firstDataRow + row - rect.r0) {
+        rangeClear = false;
+        break;
+      }
+      for (let col = rect.c0; col <= rect.c1; col++) {
+        if (this.deps.mergeAnchorAt(row, col)) {
+          rangeClear = false;
+          break;
+        }
+      }
+    }
+    if (rangeClear) {
+      clearPatches.push({
+        op: "clearRange",
+        range: {
+          sheet: activeSheet,
+          start: { row: firstDataRow, col: rect.c0 },
+          end: { row: firstDataRow + rect.r1 - rect.r0, col: rect.c1 },
+        },
+      });
+    }
     for (let r = rect.r0; r <= rect.r1; r++) {
       const cellLine: ClipboardCell[] = [];
       const valueLine: CellScalar[] = [];
@@ -267,11 +377,13 @@ export class ClipboardController {
 
         cellLine.push({ value, resolved: cell.resolved, style: cell.style });
         valueLine.push(cell.resolved);
-        clearPatches.push({
-          op: "set",
-          addr,
-          value: { kind: "literal", value: null },
-        });
+        if (!rangeClear) {
+          clearPatches.push({
+            op: "set",
+            addr,
+            value: { kind: "literal", value: null },
+          });
+        }
       }
       cells.push(cellLine);
       values.push(valueLine);

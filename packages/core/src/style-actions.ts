@@ -69,8 +69,45 @@ export class StyleActions {
     const rects: SelRect[] = [];
     const seen = new Set<number>();
     selection.forEachRect((r) => rects.push(r));
+    const intersectsMerge = this.deps
+      .merges()
+      .some((merge) =>
+        rects.some(
+          (rect) =>
+            rect.r0 <= merge.r1 &&
+            merge.r0 <= rect.r1 &&
+            rect.c0 <= merge.c1 &&
+            merge.c0 <= rect.c1,
+        ),
+      );
 
     const patches: Patch[] = [];
+    if (!intersectsMerge) {
+      for (const rect of rects) {
+        let runStart = this.deps.toDataRow(rect.r0);
+        let previous = runStart;
+        for (let viewRow = rect.r0 + 1; viewRow <= rect.r1 + 1; viewRow++) {
+          const dataRow = viewRow <= rect.r1 ? this.deps.toDataRow(viewRow) : -1;
+          if (viewRow <= rect.r1 && Math.abs(dataRow - previous) === 1) {
+            previous = dataRow;
+            continue;
+          }
+          patches.push({
+            op: "setRangeStyle",
+            range: {
+              sheet: activeSheet,
+              start: { row: runStart, col: rect.c0 },
+              end: { row: previous, col: rect.c1 },
+            },
+            style: patch,
+          });
+          runStart = dataRow;
+          previous = dataRow;
+        }
+      }
+      this.deps.commit(patches);
+      return;
+    }
     for (const rect of rects) {
       for (let r = rect.r0; r <= rect.r1; r++) {
         for (let c = rect.c0; c <= rect.c1; c++) {

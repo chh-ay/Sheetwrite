@@ -1,4 +1,4 @@
-import { CellStore, isLoaded, type WindowView } from "@sheetwrite/wasm";
+import { CellStore, isLoaded, type RangeSnapshot, type WindowView } from "@sheetwrite/wasm";
 import {
   SnapshotValidationError,
   validateWorkbookSnapshot,
@@ -21,6 +21,7 @@ import type {
   ConditionalFormatRule,
   DataCell,
   MergeRange,
+  PackedCellBlock,
   Patch,
   Range,
   ResolvedCell,
@@ -95,6 +96,46 @@ type RecomputingCellStore = CellStore & {
     strs: string[],
     flags: Uint8Array,
   ): void;
+  setBlock(
+    sheet: number,
+    startRow: number,
+    startCol: number,
+    rows: number,
+    cols: number,
+    kinds: Uint8Array,
+    numbers: Float64Array,
+    texts: string[],
+    styles: Uint32Array,
+  ): boolean;
+  clearRange(
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+    contents: boolean,
+    style: boolean,
+  ): boolean;
+  rangeStyleIds(sheet: number, r0: number, c0: number, r1: number, c1: number): Uint32Array;
+  remapRangeStyles(
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+    oldIds: Uint32Array,
+    newIds: Uint32Array,
+  ): boolean;
+  captureRange(
+    sheet: number,
+    r0: number,
+    c0: number,
+    rows: number,
+    cols: number,
+  ): RangeSnapshot | undefined;
+  snapshotNumbers(snapshot: RangeSnapshot): Float64Array;
+  snapshotTexts(snapshot: RangeSnapshot): string[];
+  restoreRange(sheet: number, r0: number, c0: number, snapshot: RangeSnapshot): boolean;
 };
 
 type ConsumingWindowView = WindowView & {
@@ -107,6 +148,16 @@ type ConsumingWindowView = WindowView & {
   takeStrings(): string[];
   takeCondMatches(): Uint32Array;
 };
+
+/** Store-local compact history resource. Never serialize `resource`. */
+export interface CompactRangeHistory {
+  readonly range: Range;
+  readonly resource: RangeSnapshot;
+  readonly byteLength: number;
+  readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
+  toDocumentOp(range: Range): Extract<Patch, { op: "setBlock" }>;
+  dispose(): void;
+}
 
 function literalOf(value: CellScalar): CellValue {
   return { kind: "literal", value };
@@ -277,6 +328,122 @@ export class SheetwriteStore implements Store {
       addr.col >= 0 &&
       addr.col < meta.columns.length
     );
+  }
+
+  /**
+   * Capture one rectangle in WASM for undo. The returned resource is local to
+   * this store and must be disposed by history when evicted or destroyed.
+   */
+  captureRangeHistory(input: Range): CompactRangeHistory | null {
+    const range = normalizedRange(input);
+    const sheet = this.sheetMeta(range.sheet);
+    if (
+      range.start.row < 0 ||
+      range.start.col < 0 ||
+      range.end.row >= sheet.rowCount ||
+      range.end.col >= sheet.columns.length
+    ) {
+      return null;
+    }
+    const rows = range.end.row - range.start.row + 1;
+    const cols = range.end.col - range.start.col + 1;
+    const resource = this.wasm.captureRange(
+      this.handleOf(range.sheet),
+      range.start.row,
+      range.start.col,
+      rows,
+      cols,
+    );
+    if (!resource) return null;
+
+    const formulas: Array<[number, string]> = [];
+    for (const [key, source] of this.formulaSrc) {
+      const addr = parseCellKey(key);
+      if (
+        addr.sheet === range.sheet &&
+        addr.row >= range.start.row &&
+        addr.row <= range.end.row &&
+        addr.col >= range.start.col &&
+        addr.col <= range.end.col
+      ) {
+        formulas.push([(addr.row - range.start.row) * cols + addr.col - range.start.col, source]);
+      }
+    }
+
+    const refs: Array<[number, CellAddress]> = [];
+    for (const [source, target] of this.refs.entries()) {
+      if (
+        source.sheet === range.sheet &&
+        source.row >= range.start.row &&
+        source.row <= range.end.row &&
+        source.col >= range.start.col &&
+        source.col <= range.end.col
+      ) {
+        refs.push([
+          (source.row - range.start.row) * cols + source.col - range.start.col,
+          { ...target },
+        ]);
+      }
+    }
+
+    let disposed = false;
+    return {
+      range,
+      byteLength: resource.byteLength(),
+      resource,
+      refs,
+      toDocumentOp: (target) => {
+        if (disposed) throw new Error("history range snapshot already disposed");
+        const kindsColumnMajor = resource.kinds();
+        const numbersColumnMajor = this.wasm.snapshotNumbers(resource);
+        const textsColumnMajor = this.wasm.snapshotTexts(resource);
+        const stylesColumnMajor = resource.styleIds();
+        const values: CellScalar[] = new Array(rows * cols);
+        const numbers = new Float64Array(rows * cols);
+        const texts: string[] = new Array(rows * cols);
+        const styleIds: number[] = new Array(rows * cols);
+        const styleTable: CellStyle[] = [];
+        const styleLookup = new Map<number, number>();
+        for (let col = 0; col < cols; col++) {
+          for (let row = 0; row < rows; row++) {
+            const source = col * rows + row;
+            const offset = row * cols + col;
+            const kind = kindsColumnMajor[source]!;
+            numbers[offset] = numbersColumnMajor[source]!;
+            texts[offset] = textsColumnMajor[source]!;
+            values[offset] =
+              kind === KIND_NUMBER
+                ? numbers[offset]!
+                : kind === KIND_STRING
+                  ? texts[offset]!
+                  : null;
+            const storeStyleId = stylesColumnMajor[source]!;
+            let tableId = styleLookup.get(storeStyleId);
+            if (tableId === undefined) {
+              tableId = styleTable.length;
+              styleLookup.set(storeStyleId, tableId);
+              styleTable.push({ ...this.styles.get(storeStyleId) });
+            }
+            styleIds[offset] = tableId;
+          }
+        }
+        const block: PackedCellBlock = {
+          rowCount: rows,
+          colCount: cols,
+          values,
+          formulas: formulas.length > 0 ? formulas : undefined,
+          refs: refs.length > 0 ? refs.map(([offset, ref]) => [offset, { ...ref }]) : undefined,
+          styleTable,
+          styleIds,
+        };
+        return { op: "setBlock", range: target, block };
+      },
+      dispose: () => {
+        if (disposed) return;
+        disposed = true;
+        resource.free();
+      },
+    };
   }
 
   /** Replace a sheet's view order and drop its stale inverse lookup. */
@@ -951,6 +1118,33 @@ export class SheetwriteStore implements Store {
     );
   }
 
+  private clearHostValuesInRange(range: Range): void {
+    const bounds = normalizedRange(range);
+    for (const key of this.formulaSrc.keys()) {
+      const addr = parseCellKey(key);
+      if (
+        addr.sheet === bounds.sheet &&
+        addr.row >= bounds.start.row &&
+        addr.row <= bounds.end.row &&
+        addr.col >= bounds.start.col &&
+        addr.col <= bounds.end.col
+      ) {
+        this.formulaSrc.delete(key);
+      }
+    }
+    for (const [source] of this.refs.entries()) {
+      if (
+        source.sheet === bounds.sheet &&
+        source.row >= bounds.start.row &&
+        source.row <= bounds.end.row &&
+        source.col >= bounds.start.col &&
+        source.col <= bounds.end.col
+      ) {
+        this.refs.removeRef(cellKey(source));
+      }
+    }
+  }
+
   /**
    * Clear a sheet's column sort and filters. Hidden rows and row groups are
    * deliberately preserved and keep applying — a "clear view" resets the query
@@ -1013,7 +1207,12 @@ export class SheetwriteStore implements Store {
       appliedPatches.push(patch);
 
       if (patch.op === "set") touchedSheets.add(patch.addr.sheet);
-      else if (patch.op === "setRange" || patch.op === "clearRange") {
+      else if (
+        patch.op === "setRange" ||
+        patch.op === "setBlock" ||
+        patch.op === "setRangeStyle" ||
+        patch.op === "clearRange"
+      ) {
         touchedSheets.add(patch.range.sheet);
       } else if (
         patch.op !== "setNamedRange" &&
@@ -1158,6 +1357,147 @@ export class SheetwriteStore implements Store {
         }
         return true;
       }
+      case "setBlock": {
+        const bounds = normalizedRange(patch.range);
+        const sheet = this.sheetMeta(bounds.sheet);
+        const rows = bounds.end.row - bounds.start.row + 1;
+        const cols = bounds.end.col - bounds.start.col + 1;
+        const cellCount = rows * cols;
+        const { block } = patch;
+        const styleTable = block.styleTable ?? [];
+        const styleIds = block.styleIds;
+        const exceptions = [...(block.formulas ?? []), ...(block.refs ?? [])];
+        if (
+          bounds.start.row < 0 ||
+          bounds.start.col < 0 ||
+          bounds.end.row >= sheet.rowCount ||
+          bounds.end.col >= sheet.columns.length ||
+          block.rowCount !== rows ||
+          block.colCount !== cols ||
+          block.values.length !== cellCount ||
+          (styleIds !== undefined && styleIds.length !== cellCount) ||
+          exceptions.some(
+            ([offset]) => !Number.isInteger(offset) || offset < 0 || offset >= cellCount,
+          ) ||
+          (styleIds?.some(
+            (styleId) => !Number.isInteger(styleId) || styleId < 0 || styleId >= styleTable.length,
+          ) ??
+            false)
+        ) {
+          return false;
+        }
+
+        const formulaByOffset = new Map(block.formulas ?? []);
+        const refByOffset = new Map(block.refs ?? []);
+        const kinds = new Uint8Array(cellCount);
+        const numbers = new Float64Array(cellCount);
+        const texts: string[] = new Array(cellCount);
+        const wasmStyles = new Uint32Array(cellCount);
+        for (let offset = 0; offset < cellCount; offset++) {
+          const value = block.values[offset]!;
+          if (formulaByOffset.has(offset) || refByOffset.has(offset) || value === null) {
+            kinds[offset] = 0;
+            texts[offset] = "";
+          } else if (typeof value === "number") {
+            kinds[offset] = KIND_NUMBER;
+            numbers[offset] = value;
+            texts[offset] = "";
+          } else {
+            kinds[offset] = KIND_STRING;
+            texts[offset] = value;
+          }
+          wasmStyles[offset] = this.styles.intern(
+            styleIds === undefined ? undefined : styleTable[styleIds[offset]!],
+          );
+        }
+
+        this.clearHostValuesInRange(bounds);
+        if (
+          !this.wasm.setBlock(
+            this.handleOf(bounds.sheet),
+            bounds.start.row,
+            bounds.start.col,
+            rows,
+            cols,
+            kinds,
+            numbers,
+            texts,
+            wasmStyles,
+          )
+        ) {
+          return false;
+        }
+        for (const [offset, source] of formulaByOffset) {
+          const rowOffset = Math.floor(offset / cols);
+          const colOffset = offset % cols;
+          this.applyPatch(
+            {
+              op: "set",
+              addr: {
+                sheet: bounds.sheet,
+                row: bounds.start.row + rowOffset,
+                col: bounds.start.col + colOffset,
+              },
+              value: { kind: "formula", src: source },
+              style: styleIds === undefined ? undefined : styleTable[styleIds[offset]!],
+            },
+            null,
+          );
+        }
+        for (const [offset, target] of refByOffset) {
+          const rowOffset = Math.floor(offset / cols);
+          const colOffset = offset % cols;
+          this.applyPatch(
+            {
+              op: "set",
+              addr: {
+                sheet: bounds.sheet,
+                row: bounds.start.row + rowOffset,
+                col: bounds.start.col + colOffset,
+              },
+              value: { kind: "ref", target },
+              style: styleIds === undefined ? undefined : styleTable[styleIds[offset]!],
+            },
+            null,
+          );
+        }
+        return true;
+      }
+      case "setRangeStyle": {
+        const bounds = normalizedRange(patch.range);
+        const sheet = this.sheetMeta(bounds.sheet);
+        if (
+          bounds.start.row < 0 ||
+          bounds.start.col < 0 ||
+          bounds.end.row >= sheet.rowCount ||
+          bounds.end.col >= sheet.columns.length
+        ) {
+          return false;
+        }
+        const oldIds = this.wasm.rangeStyleIds(
+          this.handleOf(bounds.sheet),
+          bounds.start.row,
+          bounds.start.col,
+          bounds.end.row,
+          bounds.end.col,
+        );
+        const newIds = new Uint32Array(oldIds.length);
+        for (let i = 0; i < oldIds.length; i++) {
+          newIds[i] =
+            patch.style === null
+              ? 0
+              : this.styles.intern({ ...this.styles.get(oldIds[i]!), ...patch.style });
+        }
+        return this.wasm.remapRangeStyles(
+          this.handleOf(bounds.sheet),
+          bounds.start.row,
+          bounds.start.col,
+          bounds.end.row,
+          bounds.end.col,
+          oldIds,
+          newIds,
+        );
+      }
       case "clearRange": {
         const bounds = normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
@@ -1171,18 +1511,16 @@ export class SheetwriteStore implements Store {
         }
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
-        for (let row = bounds.start.row; row <= bounds.end.row; row++) {
-          for (let col = bounds.start.col; col <= bounds.end.col; col++) {
-            const addr = { sheet: bounds.sheet, row, col };
-            const cell = this.getCell(addr);
-            const value = clearContents
-              ? { kind: "literal" as const, value: null }
-              : this.valueAt(addr);
-            const style = clearStyle ? undefined : cell.style;
-            this.applyPatch({ op: "set", addr, value, style }, changes);
-          }
-        }
-        return true;
+        if (clearContents) this.clearHostValuesInRange(bounds);
+        return this.wasm.clearRange(
+          this.handleOf(bounds.sheet),
+          bounds.start.row,
+          bounds.start.col,
+          bounds.end.row,
+          bounds.end.col,
+          clearContents,
+          clearStyle,
+        );
       }
       case "addRows": {
         const meta = this.sheetMeta(patch.sheet);

@@ -153,6 +153,16 @@ describe("workbook document protocol", () => {
         cells: [],
       },
       {
+        op: "setBlock",
+        range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        block: { rowCount: 1, colCount: 1, values: [1] },
+      },
+      {
+        op: "setRangeStyle",
+        range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+        style: { bold: true },
+      },
+      {
         op: "clearRange",
         range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
         contents: true,
@@ -193,6 +203,8 @@ describe("workbook document protocol", () => {
     ];
 
     expect(operations.map(documentOpTarget)).toEqual([
+      "s",
+      "s",
       "s",
       "s",
       "s",

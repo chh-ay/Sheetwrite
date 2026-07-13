@@ -343,6 +343,8 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "set":
       return operation.addr.sheet;
     case "setRange":
+    case "setBlock":
+    case "setRangeStyle":
     case "clearRange":
       return operation.range.sheet;
     case "addRows":

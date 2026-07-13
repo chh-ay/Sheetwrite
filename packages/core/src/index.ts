@@ -84,6 +84,7 @@ export type {
   MergeRange,
   NamedRangeSnapshot,
   OperationSource,
+  PackedCellBlock,
   Patch,
   PendingCommit,
   PersistenceAdapter,

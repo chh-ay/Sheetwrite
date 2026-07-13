@@ -11,7 +11,12 @@ import { EditController, type EditNavigate } from "./editor.js";
 import { downloadBytes, toCsv, toXlsx } from "./export.js";
 import { OffsetIndex, ScaledScroll } from "./fenwick.js";
 import { FindBar } from "./find-bar.js";
-import { UndoManager } from "./history.js";
+import {
+  type HistoryAction,
+  type HistoryPart,
+  materializeHistoryAction,
+  UndoManager,
+} from "./history.js";
 import { InputController } from "./input-controller.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { SearchController } from "./search-controller.js";
@@ -1297,14 +1302,32 @@ export class GridImpl implements Grid {
       return;
     }
 
-    const inverseByPatch = new Map<Patch, Patch[]>();
+    const inverseByPatch = new Map<Patch, Array<Patch | HistoryPart>>();
     for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
 
     const outcome = this.storeApply(patches, reason);
-    if (outcome.status !== "applied") return;
+    if (outcome.status !== "applied") {
+      for (const inverse of inverseByPatch.values()) {
+        for (const item of inverse) {
+          if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
+        }
+      }
+      return;
+    }
     const applied = outcome.transaction.patches;
-    const inverse: Patch[] = [];
-    for (const patch of applied) inverse.push(...(inverseByPatch.get(patch) ?? []));
+    const appliedSet = new Set(applied);
+    const inverse: HistoryAction = [];
+    for (const [patch, items] of inverseByPatch) {
+      if (!appliedSet.has(patch)) {
+        for (const item of items) {
+          if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
+        }
+        continue;
+      }
+      for (const item of items) {
+        inverse.push("kind" in item ? item : { kind: "patches", patches: [item] });
+      }
+    }
     for (const patch of applied) this.rebaseHistoryFor(patch);
     this.history.push(inverse, applied);
   }
@@ -1314,26 +1337,45 @@ export class GridImpl implements Grid {
     return this.store.applyTransaction({ patches }, { commitReason: reason });
   }
 
-  private inversePatch(patch: Patch): Patch[] {
+  private inversePatch(patch: Patch): Array<Patch | HistoryPart> {
     switch (patch.op) {
       case "set":
         return [this.inverseSetPatch(patch)];
       case "setRange":
-      case "clearRange":
-        return [
-          {
-            op: "setRange",
-            range: patch.range,
-            cells: this.snapshotRangeCells(patch.range),
-          },
-        ];
+      case "setBlock":
+      case "setRangeStyle":
+      case "clearRange": {
+        const compact = this.compactHistoryPart(patch.range);
+        return compact
+          ? [compact]
+          : [
+              {
+                op: "setRange",
+                range: patch.range,
+                cells: this.snapshotRangeCells(patch.range),
+              },
+            ];
+      }
       case "addRows":
         return [{ op: "removeRows", sheet: patch.sheet, at: patch.at, count: patch.count }];
-      case "removeRows":
-        return [
-          { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
-          ...this.snapshotRows(patch.sheet, patch.at, patch.count),
-        ];
+      case "removeRows": {
+        const sheet = this.sheetById(patch.sheet);
+        const range =
+          sheet && sheet.columns.length > 0
+            ? {
+                sheet: patch.sheet,
+                start: { row: patch.at, col: 0 },
+                end: { row: patch.at + patch.count - 1, col: sheet.columns.length - 1 },
+              }
+            : null;
+        const compact = range ? this.compactHistoryPart(range) : null;
+        return compact
+          ? [{ op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count }, compact]
+          : [
+              { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
+              ...this.snapshotRows(patch.sheet, patch.at, patch.count),
+            ];
+      }
       case "moveRows":
         return [
           {
@@ -1353,16 +1395,37 @@ export class GridImpl implements Grid {
             count: patch.columns.length,
           },
         ];
-      case "removeColumns":
-        return [
-          {
-            op: "addColumns",
-            sheet: patch.sheet,
-            at: patch.at,
-            columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
-          },
-          ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
-        ];
+      case "removeColumns": {
+        const sheet = this.sheetById(patch.sheet);
+        const range =
+          sheet && sheet.rowCount > 0
+            ? {
+                sheet: patch.sheet,
+                start: { row: 0, col: patch.at },
+                end: { row: sheet.rowCount - 1, col: patch.at + patch.count - 1 },
+              }
+            : null;
+        const compact = range ? this.compactHistoryPart(range) : null;
+        return compact
+          ? [
+              {
+                op: "addColumns",
+                sheet: patch.sheet,
+                at: patch.at,
+                columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
+              },
+              compact,
+            ]
+          : [
+              {
+                op: "addColumns",
+                sheet: patch.sheet,
+                at: patch.at,
+                columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
+              },
+              ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
+            ];
+      }
       case "moveColumns":
         return [
           {
@@ -1464,6 +1527,17 @@ export class GridImpl implements Grid {
         return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
       }
     }
+  }
+
+  private compactHistoryPart(range: Range): HistoryPart | null {
+    const snapshot = this.loadable?.captureRangeHistory(range);
+    if (!snapshot) return null;
+    return {
+      kind: "rangeSnapshot",
+      range: snapshot.range,
+      toPatch: (target) => snapshot.toDocumentOp(target),
+      dispose: () => snapshot.dispose(),
+    };
   }
 
   private inverseSetPatch(patch: Extract<Patch, { op: "set" }>): Patch {
@@ -1654,7 +1728,8 @@ export class GridImpl implements Grid {
     return this.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
   }
 
-  private applyHistoryPatches(patches: Patch[], reason: "undo" | "redo"): void {
+  private applyHistoryPatches(action: HistoryAction, reason: "undo" | "redo"): void {
+    const patches = materializeHistoryAction(action);
     if (patches.length === 0) return;
 
     this.applyingHistory = true;
@@ -1688,26 +1763,56 @@ export class GridImpl implements Grid {
     if (this.readOnly || this.selection.isEmpty) return;
 
     const sheet = this.sheet();
-    const seen = new Set<number>();
     const patches: Patch[] = [];
-    const nullValue: CellValue = { kind: "literal", value: null };
-
-    this.selection.forEachRect((rect) => {
-      for (let r = rect.r0; r <= rect.r1; r++) {
-        for (let c = rect.c0; c <= rect.c1; c++) {
-          const cell = this.anchorCell(r, c);
-          const key = cell.row * sheet.columns.length + cell.col;
-          if (seen.has(key)) continue;
-          seen.add(key);
-
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push(rect));
+    const intersectsMerge = (sheet.merges ?? []).some((merge) =>
+      rects.some(
+        (rect) =>
+          rect.r0 <= merge.r1 && merge.r0 <= rect.r1 && rect.c0 <= merge.c1 && merge.c0 <= rect.c1,
+      ),
+    );
+    if (!intersectsMerge) {
+      for (const rect of rects) {
+        let runStart = this.toDataRow(rect.r0);
+        let previous = runStart;
+        for (let viewRow = rect.r0 + 1; viewRow <= rect.r1 + 1; viewRow++) {
+          const dataRow = viewRow <= rect.r1 ? this.toDataRow(viewRow) : -1;
+          if (viewRow <= rect.r1 && Math.abs(dataRow - previous) === 1) {
+            previous = dataRow;
+            continue;
+          }
           patches.push({
-            op: "set",
-            addr: { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
-            value: nullValue,
+            op: "clearRange",
+            range: {
+              sheet: this.activeSheet,
+              start: { row: runStart, col: rect.c0 },
+              end: { row: previous, col: rect.c1 },
+            },
           });
+          runStart = dataRow;
+          previous = dataRow;
         }
       }
-    });
+    } else {
+      const seen = new Set<number>();
+      const nullValue: CellValue = { kind: "literal", value: null };
+      for (const rect of rects) {
+        for (let r = rect.r0; r <= rect.r1; r++) {
+          for (let c = rect.c0; c <= rect.c1; c++) {
+            const cell = this.anchorCell(r, c);
+            const key = cell.row * sheet.columns.length + cell.col;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            patches.push({
+              op: "set",
+              addr: { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col },
+              value: nullValue,
+            });
+          }
+        }
+      }
+    }
 
     this.commit(patches, "clear");
   }
@@ -2562,6 +2667,7 @@ export class GridImpl implements Grid {
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.resizeObserver?.disconnect();
+    this.history.clear();
     this.disposeStore();
     // Free the WASM CellStore only when we constructed it. A caller-provided
     // store is owned by the caller and must stay usable after the grid is gone.

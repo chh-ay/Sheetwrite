@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{parse, resolve_sheet_refs};
 use crate::eval::{bool_text, DepIndex};
-use crate::sheet::{formula_error_at, CondPred, CondRule, SheetData};
+use crate::sheet::{formula_error_at, payload_num, payload_str_id, CondPred, CondRule, SheetData};
 use crate::types::{
     cell_key, string_from_pool, FormulaEntry, FormulaValueKind, StringPool, KIND_EMPTY,
     KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
@@ -35,6 +35,64 @@ impl Hasher for IdentityHasher {
 
     fn write_u64(&mut self, n: u64) {
         self.0 = n;
+    }
+}
+
+/// Opaque, store-local history payload for one dense rectangular cell block.
+///
+/// The host may retain this object in undo history, but it is deliberately not
+/// part of the serialized document protocol. String payloads remain interned in
+/// the owning `CellStore`, so snapshots must only be restored into that store.
+#[wasm_bindgen]
+pub struct RangeSnapshot {
+    rows: usize,
+    cols: usize,
+    kind: Vec<u8>,
+    payload: Vec<u64>,
+    style: Vec<u32>,
+    formulas: Vec<(u32, u32, FormulaEntry)>,
+}
+
+#[wasm_bindgen]
+impl RangeSnapshot {
+    #[wasm_bindgen(js_name = formulaOffsets)]
+    pub fn formula_offsets(&self) -> Vec<u32> {
+        let mut offsets = Vec::with_capacity(self.formulas.len() * 2);
+        for (row, col, _) in &self.formulas {
+            offsets.push(*row);
+            offsets.push(*col);
+        }
+        offsets
+    }
+
+    #[wasm_bindgen(js_name = kinds)]
+    pub fn kinds(&self) -> Vec<u8> {
+        self.kind.clone()
+    }
+
+    #[wasm_bindgen(js_name = styleIds)]
+    pub fn style_ids(&self) -> Vec<u32> {
+        self.style.clone()
+    }
+
+    #[wasm_bindgen(js_name = byteLength)]
+    pub fn byte_length(&self) -> usize {
+        self.kind.len()
+            + self.payload.len() * std::mem::size_of::<u64>()
+            + self.style.len() * std::mem::size_of::<u32>()
+            + self
+                .formulas
+                .iter()
+                .map(|(_, _, entry)| std::mem::size_of::<(u32, u32)>() + entry.source.len())
+                .sum::<usize>()
+    }
+
+    #[wasm_bindgen(js_name = formulaSources)]
+    pub fn formula_sources(&self) -> Vec<String> {
+        self.formulas
+            .iter()
+            .map(|(_, _, entry)| entry.source.clone())
+            .collect()
     }
 }
 
@@ -67,6 +125,27 @@ impl CellStore {
             formula_epoch: 0,
             dep_index: None,
         }
+    }
+    #[wasm_bindgen(js_name = snapshotNumbers)]
+    pub fn snapshot_numbers(&self, snapshot: &RangeSnapshot) -> Vec<f64> {
+        snapshot.payload.iter().copied().map(payload_num).collect()
+    }
+
+    #[wasm_bindgen(js_name = snapshotTexts)]
+    pub fn snapshot_texts(&self, snapshot: &RangeSnapshot) -> Vec<String> {
+        snapshot
+            .payload
+            .iter()
+            .copied()
+            .map(|payload| {
+                let id = payload_str_id(payload);
+                if id == NO_STRING {
+                    String::new()
+                } else {
+                    string_from_pool(&self.strings, id).unwrap_or_default()
+                }
+            })
+            .collect()
     }
 
     /// Allocate a sheet grid and return its numeric handle.
@@ -339,6 +418,287 @@ impl CellStore {
             self.bump_formula_epoch();
         }
     }
+    /// Write one row-major typed block in a single boundary call. `kinds` uses
+    /// 0 empty / 1 number / 2 string; formulas and references are sparse host
+    /// exceptions applied after this literal bulk write.
+    #[wasm_bindgen(js_name = setBlock)]
+    pub fn set_block(
+        &mut self,
+        sheet: usize,
+        start_row: usize,
+        start_col: usize,
+        rows: usize,
+        cols: usize,
+        kinds: &[u8],
+        numbers: &[f64],
+        texts: Vec<String>,
+        styles: &[u32],
+    ) -> bool {
+        let Some(cell_count) = rows.checked_mul(cols) else {
+            return false;
+        };
+        let Some(existing) = self.sheets.get(sheet) else {
+            return false;
+        };
+        if rows == 0
+            || cols == 0
+            || kinds.len() != cell_count
+            || numbers.len() != cell_count
+            || texts.len() != cell_count
+            || styles.len() != cell_count
+            || start_row
+                .checked_add(rows)
+                .is_none_or(|end| end > existing.row_count)
+            || start_col
+                .checked_add(cols)
+                .is_none_or(|end| end > existing.n_cols)
+        {
+            return false;
+        }
+
+        let mut string_ids = vec![NO_STRING; cell_count];
+        for (offset, text) in texts.iter().enumerate() {
+            if kinds[offset] == KIND_STRING {
+                string_ids[offset] = self.intern(text);
+            }
+        }
+
+        let s = &mut self.sheets[sheet];
+        let mut removed_formula = false;
+        for col_offset in 0..cols {
+            let col = start_col + col_offset;
+            let base = col * s.row_count + start_row;
+            for row_offset in 0..rows {
+                let row = start_row + row_offset;
+                let offset = row_offset * cols + col_offset;
+                let index = base + row_offset;
+                s.kind[index] = kinds[offset];
+                match kinds[offset] {
+                    KIND_NUMBER => s.set_num(index, numbers[offset]),
+                    KIND_STRING => s.set_str(index, string_ids[offset]),
+                    _ => {
+                        s.kind[index] = KIND_EMPTY;
+                        s.clear_payload(index);
+                    }
+                }
+                s.style[index] = styles[offset];
+                if let Some(key) = cell_key(row, col) {
+                    removed_formula |= s.formulas.remove(&key).is_some();
+                }
+            }
+        }
+        s.clear_dirty();
+        s.all_dirty = true;
+        if removed_formula {
+            self.bump_formula_epoch();
+        }
+        true
+    }
+
+    /// Clear a rectangle while independently controlling contents and style.
+    #[wasm_bindgen(js_name = clearRange)]
+    pub fn clear_range(
+        &mut self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        r1: usize,
+        c1: usize,
+        contents: bool,
+        style: bool,
+    ) -> bool {
+        let Some(s) = self.sheets.get_mut(sheet) else {
+            return false;
+        };
+        if r0 > r1 || c0 > c1 || r1 >= s.row_count || c1 >= s.n_cols {
+            return false;
+        }
+        let mut removed_formula = false;
+        for col in c0..=c1 {
+            let base = col * s.row_count;
+            for row in r0..=r1 {
+                let index = base + row;
+                if contents {
+                    s.kind[index] = KIND_EMPTY;
+                    s.clear_payload(index);
+                    if let Some(key) = cell_key(row, col) {
+                        removed_formula |= s.formulas.remove(&key).is_some();
+                    }
+                }
+                if style {
+                    s.style[index] = 0;
+                }
+            }
+        }
+        s.clear_dirty();
+        s.all_dirty = true;
+        if removed_formula {
+            self.bump_formula_epoch();
+        }
+        true
+    }
+
+    /// Unique style ids present in a rectangle; cost stays inside WASM.
+    #[wasm_bindgen(js_name = rangeStyleIds)]
+    pub fn range_style_ids(
+        &self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        r1: usize,
+        c1: usize,
+    ) -> Vec<u32> {
+        let Some(s) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        if r0 > r1 || c0 > c1 || r1 >= s.row_count || c1 >= s.n_cols {
+            return Vec::new();
+        }
+        let mut ids = HashMap::<u32, ()>::new();
+        for col in c0..=c1 {
+            let base = col * s.row_count;
+            for row in r0..=r1 {
+                ids.insert(s.style[base + row], ());
+            }
+        }
+        let mut out: Vec<u32> = ids.into_keys().collect();
+        out.sort_unstable();
+        out
+    }
+
+    /// Remap styles over a rectangle using parallel old/new id tables.
+    #[wasm_bindgen(js_name = remapRangeStyles)]
+    pub fn remap_range_styles(
+        &mut self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        r1: usize,
+        c1: usize,
+        old_ids: &[u32],
+        new_ids: &[u32],
+    ) -> bool {
+        let Some(s) = self.sheets.get_mut(sheet) else {
+            return false;
+        };
+        if r0 > r1
+            || c0 > c1
+            || r1 >= s.row_count
+            || c1 >= s.n_cols
+            || old_ids.len() != new_ids.len()
+        {
+            return false;
+        }
+        let mapping: HashMap<u32, u32> = old_ids
+            .iter()
+            .copied()
+            .zip(new_ids.iter().copied())
+            .collect();
+        for col in c0..=c1 {
+            let base = col * s.row_count;
+            for row in r0..=r1 {
+                let style = &mut s.style[base + row];
+                if let Some(new_style) = mapping.get(style) {
+                    *style = *new_style;
+                }
+            }
+        }
+        true
+    }
+
+    /// Capture a dense rectangle into an opaque store-local history resource.
+    #[wasm_bindgen(js_name = captureRange)]
+    pub fn capture_range(
+        &self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Option<RangeSnapshot> {
+        let s = self.sheets.get(sheet)?;
+        if rows == 0
+            || cols == 0
+            || r0.checked_add(rows).is_none_or(|end| end > s.row_count)
+            || c0.checked_add(cols).is_none_or(|end| end > s.n_cols)
+        {
+            return None;
+        }
+        let cell_count = rows.checked_mul(cols)?;
+        let mut kind = Vec::with_capacity(cell_count);
+        let mut payload = Vec::with_capacity(cell_count);
+        let mut style = Vec::with_capacity(cell_count);
+        for col_offset in 0..cols {
+            let base = (c0 + col_offset) * s.row_count + r0;
+            kind.extend_from_slice(&s.kind[base..base + rows]);
+            payload.extend_from_slice(&s.payload[base..base + rows]);
+            style.extend_from_slice(&s.style[base..base + rows]);
+        }
+        let formulas = s
+            .formulas
+            .iter()
+            .filter_map(|(&(row, col), entry)| {
+                let row = row as usize;
+                let col = col as usize;
+                (row >= r0 && row < r0 + rows && col >= c0 && col < c0 + cols)
+                    .then(|| ((row - r0) as u32, (col - c0) as u32, entry.clone()))
+            })
+            .collect();
+        Some(RangeSnapshot {
+            rows,
+            cols,
+            kind,
+            payload,
+            style,
+            formulas,
+        })
+    }
+
+    /// Restore a captured block at a destination of the same dimensions.
+    #[wasm_bindgen(js_name = restoreRange)]
+    pub fn restore_range(
+        &mut self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        snapshot: &RangeSnapshot,
+    ) -> bool {
+        let Some(s) = self.sheets.get_mut(sheet) else {
+            return false;
+        };
+        if r0
+            .checked_add(snapshot.rows)
+            .is_none_or(|end| end > s.row_count)
+            || c0
+                .checked_add(snapshot.cols)
+                .is_none_or(|end| end > s.n_cols)
+        {
+            return false;
+        }
+        s.formulas.retain(|&(row, col), _| {
+            let row = row as usize;
+            let col = col as usize;
+            row < r0 || row >= r0 + snapshot.rows || col < c0 || col >= c0 + snapshot.cols
+        });
+        for col_offset in 0..snapshot.cols {
+            let source = col_offset * snapshot.rows;
+            let target = (c0 + col_offset) * s.row_count + r0;
+            s.kind[target..target + snapshot.rows]
+                .copy_from_slice(&snapshot.kind[source..source + snapshot.rows]);
+            s.payload[target..target + snapshot.rows]
+                .copy_from_slice(&snapshot.payload[source..source + snapshot.rows]);
+            s.style[target..target + snapshot.rows]
+                .copy_from_slice(&snapshot.style[source..source + snapshot.rows]);
+        }
+        for (row, col, entry) in &snapshot.formulas {
+            s.formulas
+                .insert((r0 as u32 + *row, c0 as u32 + *col), entry.clone());
+        }
+        s.clear_dirty();
+        s.all_dirty = true;
+        self.bump_formula_epoch();
+        true
+    }
 
     /// Bulk-load one column with numbers starting at `start_row`.
     #[wasm_bindgen(js_name = setColumnNumbers)]
@@ -501,8 +861,12 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = addRows)]
     pub fn add_rows(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(row_count) = self.sheets.get(sheet).map(|s| s.row_count) else { return; };
-        if count == 0 { return; }
+        let Some(row_count) = self.sheets.get(sheet).map(|s| s.row_count) else {
+            return;
+        };
+        if count == 0 {
+            return;
+        }
         let at = at.min(row_count);
         self.sheets[sheet].insert_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
@@ -511,8 +875,12 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = removeRows)]
     pub fn remove_rows(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(row_count) = self.sheets.get(sheet).map(|s| s.row_count) else { return; };
-        if count == 0 || at >= row_count { return; }
+        let Some(row_count) = self.sheets.get(sheet).map(|s| s.row_count) else {
+            return;
+        };
+        if count == 0 || at >= row_count {
+            return;
+        }
         let count = count.min(row_count - at);
         self.sheets[sheet].delete_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
@@ -521,8 +889,12 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = insertCols)]
     pub fn insert_cols(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(col_count) = self.sheets.get(sheet).map(|s| s.n_cols) else { return; };
-        if count == 0 { return; }
+        let Some(col_count) = self.sheets.get(sheet).map(|s| s.n_cols) else {
+            return;
+        };
+        if count == 0 {
+            return;
+        }
         let at = at.min(col_count);
         self.sheets[sheet].insert_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
@@ -531,8 +903,12 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = removeCols)]
     pub fn remove_cols(&mut self, sheet: usize, at: usize, count: usize) {
-        let Some(col_count) = self.sheets.get(sheet).map(|s| s.n_cols) else { return; };
-        if count == 0 || at >= col_count { return; }
+        let Some(col_count) = self.sheets.get(sheet).map(|s| s.n_cols) else {
+            return;
+        };
+        if count == 0 || at >= col_count {
+            return;
+        }
         let count = count.min(col_count - at);
         self.sheets[sheet].delete_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
@@ -804,4 +1180,3 @@ impl CellOut {
         self.style
     }
 }
-
