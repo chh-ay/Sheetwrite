@@ -1,7 +1,7 @@
 import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
-import type { HighlightRange, Sheet, SheetId, Theme } from "./types.js";
+import type { HighlightRange, PresenceOverlay, Sheet, SheetId, Theme } from "./types.js";
 
 export interface OverlayPainterDeps {
   theme: () => Theme;
@@ -43,6 +43,7 @@ export class OverlayPainter {
   private readonly overlay: HTMLDivElement;
   private readonly deps: OverlayPainterDeps;
   private manualHighlights: { ranges: readonly HighlightRange[]; color: string } | null = null;
+  private presenceOverlays: readonly PresenceOverlay[] = [];
 
   // ── Rect pool ──────────────────────────────────────────────────────────
   // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
@@ -62,6 +63,7 @@ export class OverlayPainter {
   private paintSheet: Sheet | null = null;
 
   private highlightVersion = 0;
+  private presenceVersion = 0;
 
   // ── Cached paint signature ─────────────────────────────────────────────
   // `paint` skips when every field below is unchanged and the theme identity
@@ -74,6 +76,7 @@ export class OverlayPainter {
   private lastActiveSheet: SheetId = "";
   private lastSelVersion = -1;
   private lastHighlightVersion = -1;
+  private lastPresenceVersion = -1;
   private lastSearchVersion = -1;
   private lastGeometryVersion = -1;
   private lastSearchActive = -1;
@@ -105,6 +108,12 @@ export class OverlayPainter {
     this.deps.scheduleRender();
   }
 
+  setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void {
+    this.presenceOverlays = overlays ? overlays.slice(0, 32) : [];
+    this.presenceVersion += 1;
+    this.deps.scheduleRender();
+  }
+
   paint(contentTop: number, scrollLeft: number, clientW: number, clientH: number): void {
     const theme = this.deps.theme();
     if (this.samePaintState(contentTop, scrollLeft, clientW, clientH, theme)) return;
@@ -112,6 +121,7 @@ export class OverlayPainter {
     const sheet = this.deps.sheet();
     this.cursor = 0;
     this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paintPresence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintNotes(sheet, contentTop, scrollLeft, clientW, clientH);
 
     const selection = this.deps.selection();
@@ -174,6 +184,7 @@ export class OverlayPainter {
       activeSheet === this.lastActiveSheet &&
       selVersion === this.lastSelVersion &&
       this.highlightVersion === this.lastHighlightVersion &&
+      this.presenceVersion === this.lastPresenceVersion &&
       searchVersion === this.lastSearchVersion &&
       geometryVersion === this.lastGeometryVersion &&
       searchActive === this.lastSearchActive &&
@@ -195,6 +206,7 @@ export class OverlayPainter {
     this.lastActiveSheet = activeSheet;
     this.lastSelVersion = selVersion;
     this.lastHighlightVersion = this.highlightVersion;
+    this.lastPresenceVersion = this.presenceVersion;
     this.lastSearchVersion = searchVersion;
     this.lastGeometryVersion = geometryVersion;
     this.lastSearchActive = searchActive;
@@ -355,6 +367,62 @@ export class OverlayPainter {
         if (cRight <= cLeft || left >= clientW) continue;
 
         this.acquireRect(cLeft, cTop, cRight - cLeft, cBottom - cTop, fill, border);
+      }
+    }
+  }
+
+  private paintPresence(
+    theme: Theme,
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    if (sheet.rowCount <= 0 || sheet.columns.length <= 0) return;
+    const activeSheet = this.deps.activeSheet();
+    const maxRow = sheet.rowCount - 1;
+    const maxCol = sheet.columns.length - 1;
+
+    for (const presence of this.presenceOverlays) {
+      if (presence.activeSheet !== activeSheet) continue;
+      for (const range of presence.ranges.slice(0, 8)) {
+        if (range.sheet !== activeSheet) continue;
+        const dataR0 = Math.max(0, Math.min(maxRow, Math.min(range.start.row, range.end.row)));
+        const dataR1 = Math.max(0, Math.min(maxRow, Math.max(range.start.row, range.end.row)));
+        const viewR0 = this.deps.toViewRow(dataR0);
+        const viewR1 = this.deps.toViewRow(dataR1);
+        if (viewR0 === null || viewR1 === null) continue;
+        const c0 = Math.max(0, Math.min(maxCol, Math.min(range.start.col, range.end.col)));
+        const c1 = Math.max(0, Math.min(maxCol, Math.max(range.start.col, range.end.col)));
+        const before = this.cursor;
+        this.appendClampedRange(
+          Math.min(viewR0, viewR1),
+          c0,
+          Math.max(viewR0, viewR1),
+          c1,
+          "transparent",
+          presence.color,
+          theme,
+          sheet,
+          contentTop,
+          scrollLeft,
+          clientW,
+          clientH,
+        );
+        for (let i = before; i < this.cursor; i++) {
+          const rect = this.pool[i]!;
+          rect.dataset.sheetwritePresence = presence.actorId;
+          rect.style.outlineWidth = "2px";
+          rect.title = presence.displayName ?? presence.actorId;
+          if (i === before && presence.displayName) {
+            rect.textContent = presence.displayName;
+            rect.style.color = presence.color;
+            rect.style.font = `600 11px ${theme.font}`;
+            rect.style.lineHeight = "14px";
+            rect.style.paddingLeft = "2px";
+          }
+        }
       }
     }
   }
@@ -543,6 +611,13 @@ export class OverlayPainter {
     this.cursor++;
 
     el.style.clipPath = "";
+    el.textContent = "";
+    el.removeAttribute("data-sheetwrite-presence");
+    el.removeAttribute("title");
+    el.style.color = "";
+    el.style.font = "";
+    el.style.lineHeight = "";
+    el.style.paddingLeft = "";
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
     el.style.width = `${Math.max(0, width)}px`;
@@ -559,6 +634,9 @@ export class OverlayPainter {
   private hideSurplus(): void {
     for (let i = this.cursor; i < this.pool.length; i++) {
       const el = this.pool[i]!;
+      el.removeAttribute("data-sheetwrite-presence");
+      el.removeAttribute("title");
+      el.textContent = "";
       if (el.style.display !== "none") el.style.display = "none";
     }
   }

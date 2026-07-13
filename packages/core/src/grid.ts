@@ -54,6 +54,7 @@ import type {
   MutationPolicyMode,
   PanePaint,
   Patch,
+  PresenceOverlay,
   ProtectedRange,
   ProtectionResolver,
   Range,
@@ -2024,6 +2025,10 @@ export class GridImpl implements Grid {
 
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
     this.overlayPainter.highlightCells(ranges, color);
+  }
+
+  setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void {
+    this.overlayPainter.setPresenceOverlays(overlays);
   }
 
   styleRange(range: Range, style: Partial<CellStyle> | null): void {

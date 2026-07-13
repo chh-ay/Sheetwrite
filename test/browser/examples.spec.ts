@@ -87,6 +87,38 @@ test("workbook XLSX backend preserves formulas in a browser build", async ({ pag
   expect(errors.console).toEqual([]);
 });
 
+test("offline queue, two-grid sync, and presence converge in a browser", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto(`http://localhost:${SITE_PORT}/test/collaboration/`);
+  const result = page.locator("#result");
+  await expect
+    .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
+    .not.toBe("running");
+
+  expect(
+    await result.getAttribute("data-status"),
+    (await result.textContent()) ?? "Collaboration smoke returned no result text",
+  ).toBe("ready");
+  const payload = JSON.parse((await result.textContent()) ?? "{}") as {
+    literal?: number;
+    formula?: number;
+    sheetName?: string;
+    presenceRects?: number;
+    restoredMutation?: string;
+    version?: number;
+  };
+  expect(payload).toEqual({
+    literal: 21,
+    formula: 42,
+    sheetName: "Shared",
+    presenceRects: 1,
+    restoredMutation: "durable-browser-m1",
+    version: 3,
+  });
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("example pages cross-link through the shared nav", async ({ page }) => {
   await page.goto(urlOf("vanilla"));
   await page.waitForSelector(".sw-nav");

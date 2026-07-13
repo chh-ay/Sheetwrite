@@ -410,7 +410,12 @@ export interface PendingCommit {
   readonly operations: readonly DocumentOp[];
 }
 
-export type SyncMutationStatus = "pending" | "sending" | "conflicted";
+export type SyncMutationStatus =
+  | "persisting"
+  | "pending"
+  | "sending"
+  | "conflicted"
+  | "storage-error";
 
 export interface SyncMutationRecord extends PendingCommit {
   status: SyncMutationStatus;
@@ -687,6 +692,18 @@ export interface Range {
 export interface HighlightRange extends Range {
   /** Overrides the call-level `color` / theme highlight for this range only. */
   color?: string;
+}
+
+/**
+ * Ephemeral collaborator selection rendered above the grid. Presence never
+ * enters document operations, snapshots, dirty state, or undo history.
+ */
+export interface PresenceOverlay {
+  actorId: string;
+  displayName?: string;
+  color: string;
+  activeSheet: SheetId;
+  ranges: readonly Range[];
 }
 
 export type Selection =
@@ -1161,6 +1178,8 @@ export interface Grid {
   setMinColumns(minColumns?: number): void;
   /** Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color. */
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
+  /** Replace ephemeral remote-presence overlays; null clears every collaborator. */
+  setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;
   /**
    * Merge `style` into every cell of `range` (null clears cell styles) as one
    * undoable transaction. Styles land in the store and paint in the canvas —

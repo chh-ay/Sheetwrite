@@ -29,6 +29,10 @@
       "types": "./dist/adapter.d.ts",
       "default": "./dist/adapter.js"
     },
+    "./browser": {
+      "types": "./dist/indexeddb.d.ts",
+      "default": "./dist/indexeddb.js"
+    },
     "./shell": {
       "types": "./dist/shell.d.ts",
       "default": "./dist/shell.js"

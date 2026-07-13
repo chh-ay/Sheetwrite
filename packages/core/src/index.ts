@@ -1,6 +1,35 @@
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
 export { cellScalarToText, parseCellInput, parseCurrencyInput } from "./cell-input.js";
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
+export {
+  type CommentAdapter,
+  type CommentAnchor,
+  type CommentAuthorRef,
+  CommentCoordinator,
+  type CommentCoordinatorEvent,
+  type CommentCoordinatorOptions,
+  type CommentListResult,
+  type CommentMessage,
+  type CommentMutation,
+  type CommentMutationRequest,
+  type CommentMutationResponse,
+  type CommentThread,
+  type PresenceActor,
+  PresenceCoordinator,
+  type PresenceCoordinatorEvent,
+  type PresenceCoordinatorOptions,
+  type PresenceMessage,
+  type PresencePrivacyOptions,
+  type PresenceTransport,
+  type RevisionAdapter,
+  RevisionCoordinator,
+  type RevisionCoordinatorEvent,
+  type RevisionCoordinatorOptions,
+  type RevisionRestoreRequest,
+  type RevisionRestoreResponse,
+  type RevisionSummary,
+  type VersionedCommentEvent,
+} from "./collaboration.js";
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
   type DocumentValidationError,
@@ -46,12 +75,23 @@ export {
   type PersistenceErrorCode,
   type SnapshotGridOptions,
 } from "./persistence.js";
+export {
+  type DocumentRebaseResult,
+  type RebaseConflict,
+  type RebaseConflictCode,
+  rebaseDocumentOperations,
+} from "./rebase.js";
 export { REF_CYCLE } from "./reference.js";
 export { IncompleteDataError, SheetwriteStore } from "./store.js";
 export {
+  type PendingCommitStorage,
+  type SyncActivityState,
+  type SyncConnectionState,
   SyncCoordinator,
   type SyncCoordinatorEvent,
   type SyncCoordinatorOptions,
+  type SyncStateSnapshot,
+  type SyncVersionGapRequest,
 } from "./sync.js";
 export type {
   AggregateOp,
@@ -107,6 +147,7 @@ export type {
   PersistenceAdapter,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
+  PresenceOverlay,
   ProtectedRange,
   ProtectionRequest,
   ProtectionResolver,
