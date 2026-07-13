@@ -7,16 +7,11 @@ import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { ColumnIndex } from "./column-index.js";
 import { ContextMenu } from "./context-menu.js";
+import { DocumentController } from "./document-controller.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { downloadBytes, toCsv, toXlsx } from "./export.js";
 import { OffsetIndex, ScaledScroll } from "./fenwick.js";
 import { FindBar } from "./find-bar.js";
-import {
-  type HistoryAction,
-  type HistoryPart,
-  materializeHistoryAction,
-  UndoManager,
-} from "./history.js";
 import { InputController } from "./input-controller.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { SearchController } from "./search-controller.js";
@@ -92,14 +87,6 @@ function scaleFontPx(font: string, zoom: number): string {
     /(\d+(?:\.\d+)?)px/g,
     (_, px: string) => `${Math.round(Number.parseFloat(px) * zoom * 10) / 10}px`,
   );
-}
-
-function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<Column> {
-  const previous: Partial<Column> = {};
-  for (const key of Object.keys(changed) as Array<keyof Column>) {
-    Reflect.set(previous, key, column[key]);
-  }
-  return previous;
 }
 
 export const DEFAULT_THEME: Theme = {
@@ -200,6 +187,7 @@ export class GridImpl implements Grid {
   private readonly searchController: SearchController;
   private readonly clipboard: ClipboardController;
   private readonly styleActions: StyleActions;
+  private readonly document: DocumentController;
   private readonly overlayPainter: OverlayPainter;
   private overscan: number;
   private readonly datasource?: (request: DataSourceRequest) => Promise<DataSourcePage>;
@@ -216,8 +204,6 @@ export class GridImpl implements Grid {
   private config: GridConfig | undefined;
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
-  private readonly history = new UndoManager();
-  private applyingHistory = false;
   private rowTopsScratch = new Float64Array(0);
   private rowHeightsScratch = new Float64Array(0);
   private rowTopsView = this.rowTopsScratch;
@@ -328,6 +314,24 @@ export class GridImpl implements Grid {
     this.theme = this.baseTheme;
     this.activeSheet = opts.workbook.activeSheet;
     this.tabBarHeight = opts.config?.tabs !== false && opts.workbook.sheets.length > 1 ? 28 : 0;
+    this.document = new DocumentController({
+      store: this.store,
+      loadable: this.loadable,
+      readOnly: () => this.readOnly,
+      epoch: () => this.storeEpoch,
+      materializeVirtualColumns: (patches) => this.materializeVirtualColumns(patches),
+      onMutationRejected: (issues) => {
+        for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
+      },
+      onHistoryApplied: () => {
+        this.emitSelection();
+        if (this.frame) {
+          (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
+          this.frame = 0;
+        }
+        this.render();
+      },
+    });
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
     // construction; the input controller consults this on every keydown.
@@ -370,7 +374,7 @@ export class GridImpl implements Grid {
         for (const fn of this.listeners.search) fn(result);
       },
       readOnly: () => this.readOnly,
-      commit: (patches) => this.commit(patches, "replace"),
+      commit: (patches) => this.document.commit(patches, "replace"),
     });
     this.clipboard = new ClipboardController({
       store: this.store,
@@ -381,7 +385,7 @@ export class GridImpl implements Grid {
       readOnly: () => this.readOnly,
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
-      commit: (patches, reason) => this.commit(patches, reason),
+      commit: (patches, reason) => this.document.commit(patches, reason),
     });
     this.styleActions = new StyleActions({
       store: this.store,
@@ -394,7 +398,7 @@ export class GridImpl implements Grid {
       merges: () => this.sheet().merges ?? [],
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
-      commit: (patches) => this.commit(patches, "style"),
+      commit: (patches) => this.document.commit(patches, "style"),
     });
 
     this.actions = this.buildActions();
@@ -500,7 +504,7 @@ export class GridImpl implements Grid {
       cut: () => this.clipboard.cut(),
       paste: () => void this.clipboard.paste(),
       pasteValues: () => void this.clipboard.pasteValues(),
-      commit: (patches, reason) => this.commit(patches, reason),
+      commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
     });
 
@@ -670,6 +674,10 @@ export class GridImpl implements Grid {
     if (sheet !== stored) appendPadColumns(sheet.columns, target);
     if (id === this.activeSheet) this.activeSheetCache = sheet;
     return sheet;
+  }
+
+  private sheetById(id: SheetId): Sheet | null {
+    return this.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
   }
 
   private viewportH(): number {
@@ -1345,7 +1353,7 @@ export class GridImpl implements Grid {
     const dataRow = this.toDataRow(row);
     const reason: CommitReason =
       navigate === "down" ? "edit-enter" : navigate === "none" ? "edit-blur" : "edit-tab";
-    const outcome = this.commit(
+    const outcome = this.document.commit(
       [
         {
           op: "set",
@@ -1364,564 +1372,6 @@ export class GridImpl implements Grid {
     }
     this.host.focus();
     this.scheduleRender();
-  }
-
-  private commit(patches: Patch[], reason: CommitReason): ApplyTransactionResult {
-    if (this.readOnly) {
-      return { status: "noop", epoch: this.storeEpoch, reason: "read-only" };
-    }
-    if (patches.length === 0) {
-      return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
-    }
-    patches = this.materializeVirtualColumns(patches);
-    if (patches.some((patch) => this.loadable?.canApplyLocally(patch) === false)) {
-      return { status: "noop", epoch: this.storeEpoch, reason: "incomplete-data" };
-    }
-
-    if (this.applyingHistory) return this.storeApply(patches, reason);
-
-    const inverseByPatch = new Map<Patch, Array<Patch | HistoryPart>>();
-    for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
-
-    const outcome = this.storeApply(patches, reason);
-    if (outcome.status !== "applied") {
-      for (const inverse of inverseByPatch.values()) {
-        for (const item of inverse) {
-          if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
-        }
-      }
-      if (outcome.status === "rejected") {
-        for (const fn of this.listeners["mutation-rejected"]) fn({ issues: outcome.issues });
-      }
-      return outcome;
-    }
-    if (outcome.rejections?.length) {
-      for (const fn of this.listeners["mutation-rejected"]) {
-        fn({ issues: outcome.rejections });
-      }
-    }
-    const applied = outcome.transaction.patches;
-    const appliedSet = new Set(applied);
-    const inverse: HistoryAction = [];
-    for (const [patch, items] of inverseByPatch) {
-      if (!appliedSet.has(patch)) {
-        for (const item of items) {
-          if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
-        }
-        continue;
-      }
-      for (const item of items) {
-        inverse.push("kind" in item ? item : { kind: "patches", patches: [item] });
-      }
-    }
-    for (const patch of applied) this.rebaseHistoryFor(patch);
-    this.history.push(inverse, applied);
-    return outcome;
-  }
-
-  /** Thread the reason when the store is ours; injected stores stay 1-arg. */
-  private storeApply(patches: Patch[], reason: CommitReason): ApplyTransactionResult {
-    return this.store.applyTransaction({ patches }, { commitReason: reason });
-  }
-
-  private inversePatch(patch: Patch): Array<Patch | HistoryPart> {
-    switch (patch.op) {
-      case "set":
-        return [this.inverseSetPatch(patch)];
-      case "setRange":
-      case "setBlock":
-      case "setRangeStyle":
-      case "clearRange": {
-        const compact = this.compactHistoryPart(patch.range);
-        return compact
-          ? [compact]
-          : [
-              {
-                op: "setRange",
-                range: patch.range,
-                cells: this.snapshotRangeCells(patch.range),
-              },
-            ];
-      }
-      case "addRows":
-        return [{ op: "removeRows", sheet: patch.sheet, at: patch.at, count: patch.count }];
-      case "removeRows": {
-        const sheet = this.sheetById(patch.sheet);
-        const range =
-          sheet && sheet.columns.length > 0
-            ? {
-                sheet: patch.sheet,
-                start: { row: patch.at, col: 0 },
-                end: { row: patch.at + patch.count - 1, col: sheet.columns.length - 1 },
-              }
-            : null;
-        const compact = range ? this.compactHistoryPart(range) : null;
-        return compact
-          ? [{ op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count }, compact]
-          : [
-              { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
-              ...this.snapshotRows(patch.sheet, patch.at, patch.count),
-            ];
-      }
-      case "moveRows":
-        return [
-          {
-            op: "moveRows",
-            sheet: patch.sheet,
-            from: patch.to,
-            count: patch.count,
-            to: patch.from,
-          },
-        ];
-      case "addColumns":
-        return [
-          {
-            op: "removeColumns",
-            sheet: patch.sheet,
-            at: patch.at,
-            count: patch.columns.length,
-          },
-        ];
-      case "removeColumns": {
-        const sheet = this.sheetById(patch.sheet);
-        const range =
-          sheet && sheet.rowCount > 0
-            ? {
-                sheet: patch.sheet,
-                start: { row: 0, col: patch.at },
-                end: { row: sheet.rowCount - 1, col: patch.at + patch.count - 1 },
-              }
-            : null;
-        const compact = range ? this.compactHistoryPart(range) : null;
-        return compact
-          ? [
-              {
-                op: "addColumns",
-                sheet: patch.sheet,
-                at: patch.at,
-                columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
-              },
-              compact,
-            ]
-          : [
-              {
-                op: "addColumns",
-                sheet: patch.sheet,
-                at: patch.at,
-                columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
-              },
-              ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
-            ];
-      }
-      case "moveColumns":
-        return [
-          {
-            op: "moveColumns",
-            sheet: patch.sheet,
-            from: patch.to,
-            count: patch.count,
-            to: patch.from,
-          },
-        ];
-      case "setColumn": {
-        const sheet = this.sheetById(patch.sheet);
-        const column = sheet?.columns[patch.col];
-        return column
-          ? [
-              {
-                op: "setColumn",
-                sheet: patch.sheet,
-                col: patch.col,
-                patch: previousColumnPatch(column, patch.patch),
-              },
-            ]
-          : [];
-      }
-      case "setRowMeta": {
-        const sheet = this.sheetById(patch.sheet);
-        if (!sheet) return [];
-        const height = sheet.rowHeights?.get(patch.row);
-        const hidden = sheet.hiddenRows?.has(patch.row) ?? false;
-        return [
-          {
-            op: "setRowMeta",
-            sheet: patch.sheet,
-            row: patch.row,
-            meta: height === undefined && !hidden ? null : { height, hidden },
-          },
-        ];
-      }
-      case "addMerge":
-        return [
-          { op: "removeMerge", sheet: patch.sheet, merge: patch.merge },
-          ...this.snapshotCellsInMerge(patch.sheet, patch.merge),
-        ];
-      case "removeMerge":
-        return [{ op: "addMerge", sheet: patch.sheet, merge: patch.merge }];
-      case "addSheet":
-        return [{ op: "removeSheet", sheet: patch.sheet.id }];
-      case "removeSheet": {
-        const snapshot = this.snapshotSheet(patch.sheet);
-        if (!snapshot) return [];
-        const restore: Patch[] = [
-          { op: "addSheet", sheet: snapshot },
-          ...this.snapshotExternalFormulaAndRefs(patch.sheet),
-        ];
-        for (const namedRange of this.store.getWorkbook().namedRanges ?? []) {
-          if (namedRange.range.sheet === patch.sheet || namedRange.scope === patch.sheet) {
-            restore.push({ op: "setNamedRange", namedRange: { ...namedRange } });
-          }
-        }
-        return restore;
-      }
-      case "renameSheet": {
-        const sheet = this.sheetById(patch.sheet);
-        return sheet ? [{ op: "renameSheet", sheet: patch.sheet, name: sheet.name }] : [];
-      }
-      case "moveSheet": {
-        const from = this.store.getWorkbook().sheets.findIndex((sheet) => sheet.id === patch.sheet);
-        return from < 0 ? [] : [{ op: "moveSheet", sheet: patch.sheet, to: from }];
-      }
-      case "setSheetMeta": {
-        const sheet = this.sheetById(patch.sheet);
-        if (!sheet) return [];
-        return [
-          {
-            op: "setSheetMeta",
-            sheet: patch.sheet,
-            patch: {
-              frozenRows:
-                patch.patch.frozenRows === undefined ? undefined : (sheet.frozenRows ?? 0),
-              frozenCols:
-                patch.patch.frozenCols === undefined ? undefined : (sheet.frozenCols ?? 0),
-              conditionalFormats:
-                patch.patch.conditionalFormats === undefined
-                  ? undefined
-                  : (sheet.conditionalFormats?.map((rule) => ({ ...rule })) ?? []),
-              rowGroups:
-                patch.patch.rowGroups === undefined
-                  ? undefined
-                  : (sheet.rowGroups?.map((group) => ({ ...group })) ?? []),
-              sortKeys:
-                patch.patch.sortKeys === undefined
-                  ? undefined
-                  : (sheet.sortKeys?.map((key) => ({ ...key })) ?? []),
-              filters:
-                patch.patch.filters === undefined
-                  ? undefined
-                  : (sheet.filters?.map(([col, filter]) => [col, structuredClone(filter)]) ?? []),
-            },
-          },
-        ];
-      }
-      case "setValidationRule": {
-        const previous = this.sheetById(patch.sheet)?.validationRules?.find(
-          (rule) => rule.id === patch.rule.id,
-        );
-        return previous
-          ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
-          : [{ op: "removeValidationRule", sheet: patch.sheet, id: patch.rule.id }];
-      }
-      case "removeValidationRule": {
-        const previous = this.sheetById(patch.sheet)?.validationRules?.find(
-          (rule) => rule.id === patch.id,
-        );
-        return previous
-          ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
-          : [];
-      }
-      case "setProtectedRange": {
-        const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
-          (range) => range.id === patch.protectedRange.id,
-        );
-        return previous
-          ? [
-              {
-                op: "setProtectedRange",
-                sheet: patch.sheet,
-                protectedRange: structuredClone(previous),
-              },
-            ]
-          : [{ op: "removeProtectedRange", sheet: patch.sheet, id: patch.protectedRange.id }];
-      }
-      case "removeProtectedRange": {
-        const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
-          (range) => range.id === patch.id,
-        );
-        return previous
-          ? [
-              {
-                op: "setProtectedRange",
-                sheet: patch.sheet,
-                protectedRange: structuredClone(previous),
-              },
-            ]
-          : [];
-      }
-      case "setNote": {
-        const previous = this.sheetById(patch.addr.sheet)?.notes?.find(
-          (note) => note.addr.row === patch.addr.row && note.addr.col === patch.addr.col,
-        );
-        return [
-          {
-            op: "setNote",
-            addr: { ...patch.addr },
-            text: previous?.text ?? null,
-          },
-        ];
-      }
-      case "setNamedRange": {
-        const previous = this.store
-          .getWorkbook()
-          .namedRanges?.find(
-            (range) =>
-              range.name.toUpperCase() === patch.namedRange.name.toUpperCase() &&
-              range.scope === patch.namedRange.scope,
-          );
-        return previous
-          ? [{ op: "setNamedRange", namedRange: { ...previous } }]
-          : [
-              {
-                op: "removeNamedRange",
-                name: patch.namedRange.name,
-                scope: patch.namedRange.scope,
-              },
-            ];
-      }
-      case "removeNamedRange": {
-        const previous = this.store
-          .getWorkbook()
-          .namedRanges?.find(
-            (range) =>
-              range.name.toUpperCase() === patch.name.toUpperCase() && range.scope === patch.scope,
-          );
-        return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
-      }
-    }
-  }
-
-  private compactHistoryPart(range: Range): HistoryPart | null {
-    const snapshot = this.loadable?.captureRangeHistory(range);
-    if (!snapshot) return null;
-    return {
-      kind: "rangeSnapshot",
-      range: snapshot.range,
-      toPatch: (target) => snapshot.toDocumentOp(target),
-      dispose: () => snapshot.dispose(),
-    };
-  }
-
-  private inverseSetPatch(patch: Extract<Patch, { op: "set" }>): Patch {
-    const formula = this.loadable?.getFormula(patch.addr) ?? this.store.getFormula(patch.addr);
-    const refTarget = this.store.getRefTarget(patch.addr);
-    const cell = this.store.getCell(patch.addr);
-    const value: CellValue = formula
-      ? { kind: "formula", src: formula }
-      : refTarget
-        ? { kind: "ref", target: refTarget }
-        : { kind: "literal", value: cell.resolved };
-
-    return {
-      op: "set",
-      addr: patch.addr,
-      value,
-      style: cell.style,
-    };
-  }
-
-  private snapshotRows(sheetId: SheetId, at: number, count: number): Patch[] {
-    const sheet = this.sheetById(sheetId);
-    if (!sheet) return [];
-
-    const patches: Patch[] = [];
-    const end = Math.min(sheet.rowCount, at + count);
-    for (let row = at; row < end; row++) {
-      for (let col = 0; col < sheet.columns.length; col++) {
-        patches.push(this.snapshotCell({ sheet: sheetId, row, col }));
-      }
-    }
-    return patches;
-  }
-
-  private snapshotColumns(sheetId: SheetId, at: number, count: number): Column[] {
-    const sheet = this.sheetById(sheetId);
-    if (!sheet) return [];
-    return sheet.columns.slice(at, at + count).map((col) => ({ ...col }));
-  }
-
-  private snapshotColumnCells(sheetId: SheetId, at: number, count: number): Patch[] {
-    const sheet = this.sheetById(sheetId);
-    if (!sheet) return [];
-
-    const patches: Patch[] = [];
-    const end = Math.min(sheet.columns.length, at + count);
-    for (let row = 0; row < sheet.rowCount; row++) {
-      for (let col = at; col < end; col++) {
-        patches.push(this.snapshotCell({ sheet: sheetId, row, col }));
-      }
-    }
-    return patches;
-  }
-
-  private snapshotCell(addr: CellAddress): Extract<Patch, { op: "set" }> {
-    const formula = this.store.getFormula(addr);
-    const refTarget = this.store.getRefTarget(addr);
-    const cell = this.store.getCell(addr);
-    const value: CellValue = formula
-      ? { kind: "formula", src: formula }
-      : refTarget
-        ? { kind: "ref", target: refTarget }
-        : { kind: "literal", value: cell.resolved };
-    return { op: "set", addr, value, style: cell.style };
-  }
-
-  private snapshotRangeCells(range: Range): SnapshotCell[] {
-    const r0 = Math.min(range.start.row, range.end.row);
-    const r1 = Math.max(range.start.row, range.end.row);
-    const c0 = Math.min(range.start.col, range.end.col);
-    const c1 = Math.max(range.start.col, range.end.col);
-    const cells: SnapshotCell[] = [];
-    for (let row = r0; row <= r1; row++) {
-      for (let col = c0; col <= c1; col++) {
-        const patch = this.snapshotCell({ sheet: range.sheet, row, col });
-        cells.push({
-          rowOffset: row - r0,
-          colOffset: col - c0,
-          value: patch.value,
-          style: patch.style,
-        });
-      }
-    }
-    return cells;
-  }
-
-  private snapshotCellsInMerge(sheet: SheetId, merge: MergeRange): Patch[] {
-    const patches: Patch[] = [];
-    const r0 = Math.min(merge.r0, merge.r1);
-    const r1 = Math.max(merge.r0, merge.r1);
-    const c0 = Math.min(merge.c0, merge.c1);
-    const c1 = Math.max(merge.c0, merge.c1);
-    for (let row = r0; row <= r1; row++) {
-      for (let col = c0; col <= c1; col++) {
-        patches.push(this.snapshotCell({ sheet, row, col }));
-      }
-    }
-    return patches;
-  }
-
-  private snapshotSheet(id: SheetId): SheetSnapshot | null {
-    const sheet = this.sheetById(id);
-    if (!sheet) return null;
-    const cells: SnapshotCell[] = [];
-    for (let row = 0; row < sheet.rowCount; row++) {
-      for (let col = 0; col < sheet.columns.length; col++) {
-        const patch = this.snapshotCell({ sheet: id, row, col });
-        const literalEmpty = patch.value.kind === "literal" && patch.value.value === null;
-        if (literalEmpty && Object.keys(patch.style ?? {}).length === 0) continue;
-        cells.push({ rowOffset: row, colOffset: col, value: patch.value, style: patch.style });
-      }
-    }
-    const rowMeta: Array<[number, { height?: number; hidden?: boolean }]> = [];
-    const rows = new Set([
-      ...(sheet.rowHeights?.keys() ?? []),
-      ...(sheet.hiddenRows?.values() ?? []),
-    ]);
-    for (const row of [...rows].sort((left, right) => left - right)) {
-      rowMeta.push([
-        row,
-        {
-          height: sheet.rowHeights?.get(row),
-          hidden: sheet.hiddenRows?.has(row) || undefined,
-        },
-      ]);
-    }
-    return {
-      id: sheet.id,
-      name: sheet.name,
-      order: this.store.getWorkbook().sheets.findIndex((candidate) => candidate.id === id),
-      rowCount: sheet.rowCount,
-      columns: sheet.columns.map((column) => ({ ...column })),
-      frozenRows: sheet.frozenRows,
-      frozenCols: sheet.frozenCols,
-      rowMeta,
-      merges: sheet.merges?.map((candidate) => ({ ...candidate })),
-      conditionalFormats: sheet.conditionalFormats?.map((rule) => ({ ...rule })),
-      validationRules: structuredClone(sheet.validationRules),
-      protectedRanges: structuredClone(sheet.protectedRanges),
-      notes: structuredClone(sheet.notes),
-      sortKeys: structuredClone(sheet.sortKeys),
-      filters: structuredClone(sheet.filters),
-      rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
-      cells:
-        cells.length === 0
-          ? []
-          : [
-              {
-                startRow: 0,
-                startCol: 0,
-                rowCount: sheet.rowCount,
-                colCount: sheet.columns.length,
-                cells,
-              },
-            ],
-    };
-  }
-
-  private snapshotExternalFormulaAndRefs(removedSheet: SheetId): Patch[] {
-    const patches: Patch[] = [];
-    for (const sheet of this.store.getWorkbook().sheets) {
-      if (sheet.id === removedSheet) continue;
-      for (let row = 0; row < sheet.rowCount; row++) {
-        for (let col = 0; col < sheet.columns.length; col++) {
-          const addr = { sheet: sheet.id, row, col };
-          if (this.store.getFormula(addr) || this.store.getRefTarget(addr)) {
-            patches.push(this.snapshotCell(addr));
-          }
-        }
-      }
-    }
-    return patches;
-  }
-
-  private rebaseHistoryFor(patch: Patch): void {
-    switch (patch.op) {
-      case "addRows":
-        this.history.rebaseRows(patch.sheet, patch.at, patch.count);
-        break;
-      case "removeRows":
-        this.history.rebaseRows(patch.sheet, patch.at, -patch.count);
-        break;
-      case "addColumns":
-        this.history.rebaseCols(patch.sheet, patch.at, patch.columns.length);
-        break;
-      case "removeColumns":
-        this.history.rebaseCols(patch.sheet, patch.at, -patch.count);
-        break;
-    }
-  }
-
-  private sheetById(id: SheetId): Sheet | null {
-    return this.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
-  }
-
-  private applyHistoryPatches(action: HistoryAction, reason: "undo" | "redo"): void {
-    const patches = materializeHistoryAction(action);
-    if (patches.length === 0) return;
-
-    this.applyingHistory = true;
-    try {
-      this.storeApply(patches, reason);
-    } finally {
-      this.applyingHistory = false;
-    }
-    for (const patch of patches) this.rebaseHistoryFor(patch);
-
-    this.emitSelection();
-    if (this.frame) {
-      (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
-      this.frame = 0;
-    }
-    this.render();
   }
 
   private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {
@@ -1990,7 +1440,7 @@ export class GridImpl implements Grid {
       }
     }
 
-    this.commit(patches, "clear");
+    this.document.commit(patches, "clear");
   }
 
   private emitSelection(): void {
@@ -2056,7 +1506,7 @@ export class GridImpl implements Grid {
         });
       }
     }
-    this.commit(patches, "style");
+    this.document.commit(patches, "style");
   }
 
   dataEdge(row: number, col: number, dRow: number, dCol: number): number | null {
@@ -2127,7 +1577,7 @@ export class GridImpl implements Grid {
         meta: { height: required },
       });
     }
-    this.commit(patches, "structure");
+    this.document.commit(patches, "structure");
   }
 
   autoFitColumns(cols?: readonly number[]): void {
@@ -2171,11 +1621,11 @@ export class GridImpl implements Grid {
         patch: { width: Math.max(1, Math.ceil(width)) },
       });
     }
-    this.commit(patches, "structure");
+    this.document.commit(patches, "structure");
   }
 
   setRowHeight(row: number, height: number): void {
-    this.commit(
+    this.document.commit(
       [
         {
           op: "setRowMeta",
@@ -2189,7 +1639,7 @@ export class GridImpl implements Grid {
   }
 
   setColumnWidth(col: number, width: number): void {
-    this.commit(
+    this.document.commit(
       [{ op: "setColumn", sheet: this.activeSheet, col, patch: { width: Math.max(1, width) } }],
       "structure",
     );
@@ -2410,7 +1860,7 @@ export class GridImpl implements Grid {
   }
 
   applyTransaction(transaction: GridTransaction): ApplyTransactionResult {
-    return this.commit(transaction.patches.slice(), "api");
+    return this.document.commit(transaction.patches.slice(), "api");
   }
 
   exportSnapshot(): WorkbookSnapshot {
@@ -2425,14 +1875,7 @@ export class GridImpl implements Grid {
     operations: readonly DocumentOp[],
     options: RemoteOperationOptions = {},
   ): ApplyTransactionResult {
-    return this.store.applyTransaction(
-      { patches: operations.slice() },
-      {
-        source: "remote",
-        markDirty: false,
-        commitReason: options.commitReason ?? "api",
-      },
-    );
+    return this.document.applyRemoteOperations(operations, options);
   }
 
   setZoom(zoom: number): void {
@@ -2473,7 +1916,7 @@ export class GridImpl implements Grid {
   }
 
   setFrozen(rows: number, cols = 0): void {
-    this.commit(
+    this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2496,7 +1939,7 @@ export class GridImpl implements Grid {
 
   insertRows(at: number, count = 1): void {
     if (count <= 0) return;
-    this.commit(
+    this.document.commit(
       [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
       "structure",
     );
@@ -2505,7 +1948,7 @@ export class GridImpl implements Grid {
   removeRows(at: number, count = 1): void {
     const sheet = this.sheet();
     if (count <= 0 || at >= sheet.rowCount) return;
-    this.commit(
+    this.document.commit(
       [
         {
           op: "removeRows",
@@ -2521,7 +1964,7 @@ export class GridImpl implements Grid {
   insertColumns(at: number, count = 1): void {
     if (count <= 0) return;
     const insertAt = Math.max(0, Math.min(at, this.sheet().columns.length));
-    this.commit(
+    this.document.commit(
       [
         {
           op: "addColumns",
@@ -2538,7 +1981,7 @@ export class GridImpl implements Grid {
     const sheet = this.sheet();
     if (count <= 0 || at >= sheet.columns.length || sheet.columns.length <= 1) return;
     const removeAt = Math.max(0, at);
-    this.commit(
+    this.document.commit(
       [
         {
           op: "removeColumns",
@@ -2568,24 +2011,24 @@ export class GridImpl implements Grid {
       columns,
       cells: [],
     };
-    this.commit([{ op: "addSheet", sheet: snapshot }], "structure");
+    this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
     return id;
   }
 
   removeSheet(id: SheetId): void {
-    this.commit([{ op: "removeSheet", sheet: id }], "structure");
+    this.document.commit([{ op: "removeSheet", sheet: id }], "structure");
   }
 
   renameSheet(id: SheetId, name: string): void {
-    this.commit([{ op: "renameSheet", sheet: id, name }], "structure");
+    this.document.commit([{ op: "renameSheet", sheet: id, name }], "structure");
   }
 
   moveSheet(id: SheetId, toIndex: number): void {
-    this.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
+    this.document.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
   }
 
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void {
-    this.commit(
+    this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2598,18 +2041,21 @@ export class GridImpl implements Grid {
   }
 
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult {
-    return this.commit(
+    return this.document.commit(
       [{ op: "setValidationRule", sheet: this.activeSheet, rule: structuredClone(rule) }],
       "api",
     );
   }
 
   removeValidationRule(id: string): ApplyTransactionResult {
-    return this.commit([{ op: "removeValidationRule", sheet: this.activeSheet, id }], "api");
+    return this.document.commit(
+      [{ op: "removeValidationRule", sheet: this.activeSheet, id }],
+      "api",
+    );
   }
 
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult {
-    return this.commit(
+    return this.document.commit(
       [
         {
           op: "setProtectedRange",
@@ -2622,7 +2068,10 @@ export class GridImpl implements Grid {
   }
 
   removeProtectedRange(id: string): ApplyTransactionResult {
-    return this.commit([{ op: "removeProtectedRange", sheet: this.activeSheet, id }], "api");
+    return this.document.commit(
+      [{ op: "removeProtectedRange", sheet: this.activeSheet, id }],
+      "api",
+    );
   }
 
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void {
@@ -2630,7 +2079,7 @@ export class GridImpl implements Grid {
   }
 
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult {
-    return this.commit([{ op: "setNote", addr: { ...addr }, text: text || null }], "api");
+    return this.document.commit([{ op: "setNote", addr: { ...addr }, text: text || null }], "api");
   }
 
   getNote(addr: CellAddress): string | null {
@@ -2803,7 +2252,7 @@ export class GridImpl implements Grid {
   }
 
   clearView(): void {
-    const outcome = this.commit(
+    const outcome = this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2821,7 +2270,7 @@ export class GridImpl implements Grid {
   }
 
   setSort(keys: readonly SortKey[]): ApplyTransactionResult {
-    const outcome = this.commit(
+    const outcome = this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2839,7 +2288,7 @@ export class GridImpl implements Grid {
     const filters = new Map(this.sheet().filters ?? []);
     if (filter === null) filters.delete(col);
     else filters.set(col, structuredClone(filter));
-    const outcome = this.commit(
+    const outcome = this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2872,7 +2321,7 @@ export class GridImpl implements Grid {
         meta: { height: sheet.rowHeights?.get(row), hidden: true },
       });
     }
-    this.commit(patches, "structure");
+    this.document.commit(patches, "structure");
     this.applyView();
   }
 
@@ -2889,7 +2338,7 @@ export class GridImpl implements Grid {
         meta: { height: sheet.rowHeights?.get(row), hidden: false },
       });
     }
-    this.commit(patches, "structure");
+    this.document.commit(patches, "structure");
     this.applyView();
   }
 
@@ -2915,7 +2364,7 @@ export class GridImpl implements Grid {
       patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: false } });
       visibleCount--;
     }
-    this.commit(patches, "structure");
+    this.document.commit(patches, "structure");
   }
 
   showColumns(cols?: readonly number[]): void {
@@ -2927,7 +2376,7 @@ export class GridImpl implements Grid {
       if (col < 0 || col >= sheet.columns.length || sheet.columns[col]?.visible !== false) continue;
       patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: true } });
     }
-    this.commit(patches, "structure");
+    this.document.commit(patches, "structure");
   }
 
   hiddenColumns(): readonly number[] {
@@ -2940,7 +2389,7 @@ export class GridImpl implements Grid {
     const groups = (sheet.rowGroups ?? []).filter(
       (existing) => existing.start !== group.start || existing.end !== group.end,
     );
-    this.commit(
+    this.document.commit(
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: [...groups, group] } }],
       "structure",
     );
@@ -2953,7 +2402,7 @@ export class GridImpl implements Grid {
     const groups = (this.sheet().rowGroups ?? []).filter(
       (group) => group.start !== r0 || group.end !== r1,
     );
-    this.commit(
+    this.document.commit(
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
@@ -2964,7 +2413,7 @@ export class GridImpl implements Grid {
     const groups = (this.sheet().rowGroups ?? []).map((group) =>
       group.start === start ? { ...group, collapsed } : group,
     );
-    this.commit(
+    this.document.commit(
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
@@ -2976,19 +2425,11 @@ export class GridImpl implements Grid {
   }
 
   undo(): void {
-    if (this.readOnly) return;
-    const patches = this.history.undo();
-    if (!patches) return;
-
-    this.applyHistoryPatches(patches, "undo");
+    if (!this.readOnly) this.document.undo();
   }
 
   redo(): void {
-    if (this.readOnly) return;
-    const patches = this.history.redo();
-    if (!patches) return;
-
-    this.applyHistoryPatches(patches, "redo");
+    if (!this.readOnly) this.document.redo();
   }
 
   private requireCompleteExport(sheets: readonly Sheet[]): void {
@@ -3052,7 +2493,7 @@ export class GridImpl implements Grid {
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.resizeObserver?.disconnect();
-    this.history.clear();
+    this.document.destroy();
     this.disposeStore();
     // Free the WASM CellStore only when we constructed it. A caller-provided
     // store is owned by the caller and must stay usable after the grid is gone.
