@@ -38,7 +38,7 @@ export {
   type SnapshotGridOptions,
 } from "./persistence.js";
 export { REF_CYCLE } from "./reference.js";
-export { SheetwriteStore } from "./store.js";
+export { IncompleteDataError, SheetwriteStore } from "./store.js";
 export {
   SyncCoordinator,
   type SyncCoordinatorEvent,
@@ -55,6 +55,7 @@ export type {
   CellChange,
   CellFormat,
   CellInputSnapshot,
+  CellLoadState,
   CellPaintContext,
   CellRenderer,
   CellScalar,
@@ -72,6 +73,7 @@ export type {
   DataSource,
   DataSourcePage,
   DataSourceRequest,
+  DataSourceStorageOptions,
   DocumentOp,
   Grid,
   GridActions,
@@ -85,11 +87,13 @@ export type {
   NamedRangeSnapshot,
   OperationSource,
   PackedCellBlock,
+  PagedStoreStats,
   Patch,
   PendingCommit,
   PersistenceAdapter,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
+  QueryCapability,
   Range,
   RemoteOperationOptions,
   RemoteOperationSource,

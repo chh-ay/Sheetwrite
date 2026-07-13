@@ -15,7 +15,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { SyncCoordinator } from "@sheetwrite/core";
+import { SheetwriteStore, SyncCoordinator } from "@sheetwrite/core";
 import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/vue";
 import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef } from "vue";
 import "@sheetwrite/vue/styles.css";
@@ -37,6 +37,12 @@ const SIMPLE_COLUMNS = [
 
 interface VueGridHandle {
   grid: Grid | null;
+}
+
+declare global {
+  interface Window {
+    __sheetwriteVueGrid?: Grid;
+  }
 }
 
 const ROWS = 1_000_000;
@@ -108,6 +114,7 @@ const workbook: Workbook = {
 
 /** Hoisted: a stable identity means the adapter never reconfigures chrome per render. */
 const GRID_CONFIG = { toolbar: true } as const;
+const PAGED_STORAGE = { mode: "paged", chunkRows: 4096, cacheBytes: 32 * 1024 * 1024 } as const;
 
 const integer = new Intl.NumberFormat("en-US");
 
@@ -314,6 +321,9 @@ const App = defineComponent({
     // The adapter owns client-side WASM initialization.
     const ready = ref(true);
     onBeforeUnmount(() => sync?.destroy());
+    onBeforeUnmount(() => {
+      delete window.__sheetwriteVueGrid;
+    });
 
     return () =>
       !ready.value
@@ -332,11 +342,16 @@ const App = defineComponent({
                   ref: gridComponent,
                   workbook,
                   datasource,
+                  datasourceStorage: PAGED_STORAGE,
                   theme: dark.value ? DARK_THEME : LIGHT_THEME,
                   readOnly: readOnly.value,
                   config: GRID_CONFIG,
                   style: "flex: 1; min-height: 0",
                   onReady: ({ grid }: { grid: Grid }) => {
+                    window.__sheetwriteVueGrid = grid;
+                    if (!(grid.store instanceof SheetwriteStore)) {
+                      throw new Error("Vue streaming demo requires SheetwriteStore");
+                    }
                     grid.setFrozen(0, 1);
                     sync?.destroy();
                     sync = new SyncCoordinator(grid, syncAdapter, {

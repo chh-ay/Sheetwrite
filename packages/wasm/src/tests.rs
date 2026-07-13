@@ -1249,3 +1249,116 @@ fn opaque_range_snapshot_restores_values_formulas_and_styles() {
     assert_eq!(store.style_id_at(sheet, 1, 0), 12);
     assert_eq!(store.style_id_at(sheet, 2, 1), 13);
 }
+
+#[test]
+fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 1_000_000, 4096, 110_000);
+    assert_eq!(store.paged_stats(sheet), vec![0.0, 0.0, 0.0, 0.0, 0.0]);
+    assert_eq!(store.cell_state(sheet, 0, 0), 0);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#LOADING!"));
+
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[1.0], 0);
+    store.set_column_numbers(sheet, 0, 4096, &[2.0], 0);
+    store.end_page_load();
+    let loaded = store.paged_stats(sheet);
+    assert_eq!(loaded[0], 2.0);
+    assert_eq!(loaded[1], 2.0);
+    assert_eq!(loaded[2], 0.0);
+
+    // A local edit dirties and pins chunk 0. Loading two more clean chunks
+    // evicts the older clean chunk, never the dirty edit.
+    store.set_number(sheet, 0, 0, 10.0, 0);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 8192, &[3.0], 0);
+    store.set_column_numbers(sheet, 0, 12288, &[4.0], 0);
+    store.end_page_load();
+    let evicted = store.paged_stats(sheet);
+    assert_eq!(evicted[0], 2.0);
+    assert_eq!(evicted[2], 1.0);
+    assert_close(number(&store, sheet, 0, 0), 10.0);
+    assert_eq!(store.cell_state(sheet, 4096, 0), 0);
+
+    store.mark_range_clean(sheet, 0, 1, 0, 1);
+    assert_eq!(store.paged_stats(sheet)[2], 0.0);
+}
+
+#[test]
+fn paged_formulas_propagate_loading_until_dependencies_arrive() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 6000, 4096, 1_000_000);
+    store.set_formula(sheet, 0, 1, "=A5001+1", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("#LOADING!"));
+
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 5000, &[41.0], 0);
+    store.end_page_load();
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 42.0);
+}
+
+#[test]
+fn fully_loaded_paged_queries_match_dense_query_semantics() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 3, 4, 1_000_000);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[3.0, 1.0, 2.0], 0);
+    store.set_column_strings(
+        sheet,
+        1,
+        0,
+        vec![
+            "alpha".to_string(),
+            "beta".to_string(),
+            "alphabet".to_string(),
+        ],
+        0,
+    );
+    store.end_page_load();
+
+    assert!(store.is_fully_loaded(sheet));
+    assert_close(store.aggregate(sheet, 0, 0), 6.0);
+    assert_eq!(store.sort_rows(sheet, 0, true), vec![1, 2, 0]);
+    assert_eq!(store.filter_rows(sheet, 1, "alpha"), vec![0, 2]);
+    assert_eq!(store.search(sheet, &[1], "beta", true, false), vec![1, 1]);
+}
+
+#[test]
+fn paged_structural_edits_remap_loaded_cells_without_dense_allocation() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 6, 4, 1_000_000);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 0);
+    store.set_column_strings(
+        sheet,
+        1,
+        0,
+        (0..6).map(|row| format!("r{row}")).collect(),
+        0,
+    );
+    store.end_page_load();
+    assert!(store.is_fully_loaded(sheet));
+
+    store.add_rows(sheet, 2, 2);
+    assert_eq!(store.row_count(sheet), 8);
+    assert_eq!(store.cell_state(sheet, 2, 0), 0);
+    assert_close(number(&store, sheet, 4, 0), 3.0);
+    assert_eq!(string(&store, sheet, 4, 1).as_deref(), Some("r2"));
+
+    store.remove_rows(sheet, 1, 2);
+    assert_eq!(store.row_count(sheet), 6);
+    assert_eq!(store.cell_state(sheet, 1, 0), 0);
+    assert_close(number(&store, sheet, 2, 0), 3.0);
+
+    store.insert_cols(sheet, 1, 1);
+    assert_eq!(store.col_count(sheet), 3);
+    assert_eq!(store.cell_state(sheet, 2, 1), 0);
+    assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("r2"));
+
+    store.remove_cols(sheet, 0, 1);
+    assert_eq!(store.col_count(sheet), 2);
+    assert_eq!(store.cell_state(sheet, 2, 0), 0);
+    assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("r2"));
+}

@@ -39,7 +39,7 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 6];
+        let mut error_slots = [-1i32; 7];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
@@ -115,7 +115,7 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 6];
+        let mut error_slots = [-1i32; 7];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
@@ -187,14 +187,19 @@ pub(crate) fn fill_window_cell(
     str_local: &mut [i32],
     style_local: &mut [u32],
     string_ids: &mut [u32],
-    error_slots: &mut [i32; 6],
+    error_slots: &mut [i32; 7],
     strings: &mut Vec<String>,
     style_dict: &mut Vec<u32>,
 ) {
+    if !sheet.is_loaded(row, col) {
+        kind[dst] = KIND_STRING;
+        str_local[dst] = local_error_index(FormulaError::Loading, error_slots, strings);
+        return;
+    }
     let src = sheet.idx(row, col);
-    let stored_kind = sheet.kind[src];
+    let stored_kind = sheet.kind_at(src);
     kind[dst] = stored_kind;
-    style_local[dst] = local_style_index(sheet.style[src], style_dict);
+    style_local[dst] = local_style_index(sheet.style_at(src), style_dict);
 
     match stored_kind {
         KIND_NUMBER => num[dst] = sheet.num_at(src),
@@ -241,7 +246,7 @@ pub(crate) fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32
 /// table (one per `FormulaError` variant), allocation-free.
 pub(crate) fn local_error_index(
     error: FormulaError,
-    slots: &mut [i32; 6],
+    slots: &mut [i32; 7],
     strings: &mut Vec<String>,
 ) -> i32 {
     let slot = &mut slots[error.slot()];
@@ -428,4 +433,3 @@ impl WindowView {
         std::mem::take(&mut self.cond_matches)
     }
 }
-

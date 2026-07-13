@@ -15,6 +15,7 @@ describe("shared adapter option policy", () => {
       "config",
       "data",
       "datasource",
+      "datasourceStorage",
       "minColumns",
       "overscan",
       "readOnly",
@@ -29,6 +30,9 @@ describe("shared adapter option policy", () => {
       "input-reset",
     );
     expect(getGridResetReason(initial, { ...initial, renderer: "worker" })).toBe("renderer-reset");
+    expect(getGridResetReason(initial, { ...initial, datasourceStorage: { mode: "paged" } })).toBe(
+      "input-reset",
+    );
     expect(getGridResetReason(initial, { ...initial, readOnly: true })).toBeNull();
   });
 

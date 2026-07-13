@@ -52,7 +52,10 @@ pub(crate) fn encode_num(value: f64) -> u64 {
 
 #[inline]
 pub(crate) fn encode_str_id(id: u32) -> u64 {
-    debug_assert!(id != NO_STRING, "NO_STRING is expressed by a non-tagged payload");
+    debug_assert!(
+        id != NO_STRING,
+        "NO_STRING is expressed by a non-tagged payload"
+    );
     STR_TAG | u64::from(id)
 }
 
@@ -82,6 +85,220 @@ pub(crate) fn payload_str_id(bits: u64) -> u32 {
     }
 }
 
+pub(crate) const DEFAULT_PAGE_CHUNK_ROWS: usize = 4096;
+const BITS_PER_WORD: usize = 64;
+
+struct CellChunk {
+    kind: Vec<u8>,
+    payload: Vec<u64>,
+    style: Vec<u32>,
+    loaded: Vec<u64>,
+    dirty: Vec<u64>,
+    last_access: u64,
+}
+
+impl CellChunk {
+    fn new(rows: usize, last_access: u64) -> Self {
+        let words = rows.div_ceil(BITS_PER_WORD);
+        Self {
+            kind: vec![KIND_EMPTY; rows],
+            payload: vec![0; rows],
+            style: vec![0; rows],
+            loaded: vec![0; words],
+            dirty: vec![0; words],
+            last_access,
+        }
+    }
+
+    fn bit(bits: &[u64], offset: usize) -> bool {
+        bits[offset / BITS_PER_WORD] & (1 << (offset % BITS_PER_WORD)) != 0
+    }
+
+    fn set_bit(bits: &mut [u64], offset: usize, value: bool) {
+        let mask = 1 << (offset % BITS_PER_WORD);
+        let word = &mut bits[offset / BITS_PER_WORD];
+        if value {
+            *word |= mask;
+        } else {
+            *word &= !mask;
+        }
+    }
+
+    fn has_dirty(&self) -> bool {
+        self.dirty.iter().any(|word| *word != 0)
+    }
+
+    fn byte_len(&self) -> usize {
+        self.kind.len()
+            + self.payload.len() * std::mem::size_of::<u64>()
+            + self.style.len() * std::mem::size_of::<u32>()
+            + (self.loaded.len() + self.dirty.len()) * std::mem::size_of::<u64>()
+    }
+}
+
+pub(crate) struct PagedStorage {
+    chunk_rows: usize,
+    byte_budget: usize,
+    chunks: HashMap<(usize, usize), CellChunk>,
+    pinned: HashSet<(usize, usize)>,
+    clock: u64,
+}
+
+impl PagedStorage {
+    fn new(chunk_rows: usize, byte_budget: usize) -> Self {
+        Self {
+            chunk_rows: chunk_rows.max(1).next_power_of_two(),
+            byte_budget,
+            chunks: HashMap::new(),
+            pinned: HashSet::new(),
+            clock: 0,
+        }
+    }
+
+    fn key_offset(&self, row: usize, col: usize) -> ((usize, usize), usize) {
+        ((col, row / self.chunk_rows), row % self.chunk_rows)
+    }
+
+    fn chunk_bytes(&self) -> usize {
+        let words = self.chunk_rows.div_ceil(BITS_PER_WORD);
+        self.chunk_rows
+            * (std::mem::size_of::<u8>() + std::mem::size_of::<u64>() + std::mem::size_of::<u32>())
+            + words * std::mem::size_of::<u64>() * 2
+    }
+
+    fn evict_for_chunk(&mut self) {
+        if self.byte_budget == 0 {
+            return;
+        }
+        let chunk_bytes = self.chunk_bytes();
+        while (self.chunks.len() + 1) * chunk_bytes > self.byte_budget {
+            let candidate = self
+                .chunks
+                .iter()
+                .filter(|(key, chunk)| !self.pinned.contains(key) && !chunk.has_dirty())
+                .min_by_key(|(_, chunk)| chunk.last_access)
+                .map(|(key, _)| *key);
+            let Some(key) = candidate else {
+                break;
+            };
+            self.chunks.remove(&key);
+        }
+    }
+
+    fn ensure_chunk(&mut self, key: (usize, usize)) -> &mut CellChunk {
+        if !self.chunks.contains_key(&key) {
+            self.evict_for_chunk();
+            self.clock = self.clock.wrapping_add(1);
+            self.chunks
+                .insert(key, CellChunk::new(self.chunk_rows, self.clock));
+        }
+        self.clock = self.clock.wrapping_add(1);
+        let chunk = self.chunks.get_mut(&key).expect("inserted paged chunk");
+        chunk.last_access = self.clock;
+        chunk
+    }
+
+    fn read(&self, row: usize, col: usize) -> (u8, u64, u32, bool, bool) {
+        let (key, offset) = self.key_offset(row, col);
+        let Some(chunk) = self.chunks.get(&key) else {
+            return (KIND_EMPTY, 0, 0, false, false);
+        };
+        if !CellChunk::bit(&chunk.loaded, offset) {
+            return (KIND_EMPTY, 0, 0, false, false);
+        }
+        (
+            chunk.kind[offset],
+            chunk.payload[offset],
+            chunk.style[offset],
+            true,
+            CellChunk::bit(&chunk.dirty, offset),
+        )
+    }
+
+    fn write(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32, dirty: bool) {
+        let (key, offset) = self.key_offset(row, col);
+        let chunk = self.ensure_chunk(key);
+        chunk.kind[offset] = kind;
+        chunk.payload[offset] = payload;
+        chunk.style[offset] = style;
+        CellChunk::set_bit(&mut chunk.loaded, offset, true);
+        if dirty {
+            CellChunk::set_bit(&mut chunk.dirty, offset, true);
+        }
+    }
+
+    fn mark_clean(&mut self, row: usize, col: usize) {
+        let (key, offset) = self.key_offset(row, col);
+        if let Some(chunk) = self.chunks.get_mut(&key) {
+            CellChunk::set_bit(&mut chunk.dirty, offset, false);
+        }
+    }
+
+    fn pin_range(&mut self, r0: usize, r1: usize, cols: &[u32]) {
+        self.pinned.clear();
+        for &col in cols {
+            for chunk in r0 / self.chunk_rows..=r1 / self.chunk_rows {
+                let key = (col as usize, chunk);
+                self.pinned.insert(key);
+                if let Some(existing) = self.chunks.get_mut(&key) {
+                    self.clock = self.clock.wrapping_add(1);
+                    existing.last_access = self.clock;
+                }
+            }
+        }
+    }
+
+    fn entries(&self) -> Vec<(usize, usize, u8, u64, u32, bool)> {
+        let mut entries = Vec::with_capacity(self.loaded_cells());
+        for (&(col, chunk_index), chunk) in &self.chunks {
+            for offset in 0..self.chunk_rows {
+                if !CellChunk::bit(&chunk.loaded, offset) {
+                    continue;
+                }
+                entries.push((
+                    chunk_index * self.chunk_rows + offset,
+                    col,
+                    chunk.kind[offset],
+                    chunk.payload[offset],
+                    chunk.style[offset],
+                    CellChunk::bit(&chunk.dirty, offset),
+                ));
+            }
+        }
+        entries
+    }
+
+    fn byte_len(&self) -> usize {
+        self.chunks.values().map(CellChunk::byte_len).sum()
+    }
+
+    fn loaded_cells(&self) -> usize {
+        self.chunks
+            .values()
+            .map(|chunk| {
+                chunk
+                    .loaded
+                    .iter()
+                    .map(|word| word.count_ones() as usize)
+                    .sum::<usize>()
+            })
+            .sum()
+    }
+
+    fn dirty_cells(&self) -> usize {
+        self.chunks
+            .values()
+            .map(|chunk| {
+                chunk
+                    .dirty
+                    .iter()
+                    .map(|word| word.count_ones() as usize)
+                    .sum::<usize>()
+            })
+            .sum()
+    }
+}
+
 /// One sheet's column-major scalar grid.
 pub(crate) struct SheetData {
     pub(crate) n_cols: usize,
@@ -92,6 +309,7 @@ pub(crate) struct SheetData {
     pub(crate) payload: Vec<u64>,
     /// Host style-dictionary id; `0` means "no explicit style".
     pub(crate) style: Vec<u32>,
+    paged: Option<PagedStorage>,
     /// Arithmetic formulas keyed by (row, col); successful results cache in the payload.
     pub(crate) formulas: HashMap<CellKey, FormulaEntry>,
     /// Cells changed since the last transaction-barrier formula recompute.
@@ -119,6 +337,7 @@ impl SheetData {
             kind: vec![KIND_EMPTY; len],
             payload: vec![0; len],
             style: vec![0; len],
+            paged: None,
             formulas: HashMap::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -126,16 +345,168 @@ impl SheetData {
         }
     }
 
+    pub(crate) fn new_paged(
+        n_cols: usize,
+        row_count: usize,
+        chunk_rows: usize,
+        byte_budget: usize,
+    ) -> Self {
+        Self {
+            n_cols,
+            row_count,
+            kind: Vec::new(),
+            payload: Vec::new(),
+            style: Vec::new(),
+            paged: Some(PagedStorage::new(chunk_rows, byte_budget)),
+            formulas: HashMap::new(),
+            dirty_cells: HashSet::new(),
+            all_dirty: false,
+            cond_rules: Vec::new(),
+        }
+    }
+
+    pub(crate) fn is_paged(&self) -> bool {
+        self.paged.is_some()
+    }
+
+    fn coordinates(&self, index: usize) -> (usize, usize) {
+        (index % self.row_count, index / self.row_count)
+    }
+
+    #[inline]
+    pub(crate) fn kind_at(&self, index: usize) -> u8 {
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            paged.read(row, col).0
+        } else {
+            self.kind[index]
+        }
+    }
+
+    #[inline]
+    pub(crate) fn style_at(&self, index: usize) -> u32 {
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            paged.read(row, col).2
+        } else {
+            self.style[index]
+        }
+    }
+
+    pub(crate) fn set_kind(&mut self, index: usize, kind: u8) {
+        if self.paged.is_some() {
+            let (row, col) = self.coordinates(index);
+            let (_, payload, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
+            self.paged
+                .as_mut()
+                .unwrap()
+                .write(row, col, kind, payload, style, dirty);
+        } else {
+            self.kind[index] = kind;
+        }
+    }
+
+    pub(crate) fn set_style(&mut self, index: usize, style: u32) {
+        if self.paged.is_some() {
+            let (row, col) = self.coordinates(index);
+            let (kind, payload, _, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
+            self.paged
+                .as_mut()
+                .unwrap()
+                .write(row, col, kind, payload, style, dirty);
+        } else {
+            self.style[index] = style;
+        }
+    }
+
+    pub(crate) fn mark_cell_loaded(&mut self, row: usize, col: usize, dirty: bool) {
+        if let Some(paged) = &mut self.paged {
+            let (kind, payload, style, _, was_dirty) = paged.read(row, col);
+            paged.write(row, col, kind, payload, style, dirty || was_dirty);
+        }
+    }
+
+    pub(crate) fn is_loaded(&self, row: usize, col: usize) -> bool {
+        self.paged
+            .as_ref()
+            .is_none_or(|paged| paged.read(row, col).3)
+    }
+
+    pub(crate) fn is_cell_dirty(&self, row: usize, col: usize) -> bool {
+        self.paged
+            .as_ref()
+            .is_some_and(|paged| paged.read(row, col).4)
+    }
+
+    pub(crate) fn mark_range_clean(
+        &mut self,
+        start_row: usize,
+        end_row: usize,
+        start_col: usize,
+        end_col: usize,
+    ) {
+        if let Some(paged) = &mut self.paged {
+            for col in start_col..end_col {
+                for row in start_row..end_row {
+                    paged.mark_clean(row, col);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn pin_range(&mut self, start_row: usize, end_row: usize, cols: &[u32]) {
+        if let Some(paged) = &mut self.paged {
+            if start_row < end_row {
+                paged.pin_range(start_row, end_row - 1, cols);
+            }
+        }
+    }
+
+    pub(crate) fn paged_stats(&self) -> Option<(usize, usize, usize, usize)> {
+        self.paged.as_ref().map(|paged| {
+            (
+                paged.chunks.len(),
+                paged.loaded_cells(),
+                paged.dirty_cells(),
+                paged.byte_len(),
+            )
+        })
+    }
+
+    pub(crate) fn is_fully_loaded(&self) -> bool {
+        self.paged.as_ref().is_none_or(|paged| {
+            self.row_count
+                .checked_mul(self.n_cols)
+                .is_some_and(|cells| paged.loaded_cells() >= cells)
+        })
+    }
+
+    pub(crate) fn range_fully_loaded(&self, r0: usize, c0: usize, r1: usize, c1: usize) -> bool {
+        self.paged
+            .as_ref()
+            .is_none_or(|paged| (c0..=c1).all(|col| (r0..=r1).all(|row| paged.read(row, col).3)))
+    }
+
     // ── Payload accessors ────────────────────────────────────────────────────
 
     #[inline]
     pub(crate) fn num_at(&self, i: usize) -> f64 {
-        payload_num(self.payload[i])
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(i);
+            payload_num(paged.read(row, col).1)
+        } else {
+            payload_num(self.payload[i])
+        }
     }
 
     #[inline]
     pub(crate) fn str_id_at(&self, i: usize) -> u32 {
-        payload_str_id(self.payload[i])
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(i);
+            payload_str_id(paged.read(row, col).1)
+        } else {
+            payload_str_id(self.payload[i])
+        }
     }
 
     /// # Safety
@@ -147,17 +518,44 @@ impl SheetData {
 
     #[inline]
     pub(crate) fn set_num(&mut self, i: usize, value: f64) {
-        self.payload[i] = encode_num(value);
+        if self.paged.is_some() {
+            let (row, col) = self.coordinates(i);
+            let (kind, _, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
+            self.paged
+                .as_mut()
+                .unwrap()
+                .write(row, col, kind, encode_num(value), style, dirty);
+        } else {
+            self.payload[i] = encode_num(value);
+        }
     }
 
     #[inline]
     pub(crate) fn set_str(&mut self, i: usize, id: u32) {
-        self.payload[i] = encode_str_id(id);
+        if self.paged.is_some() {
+            let (row, col) = self.coordinates(i);
+            let (kind, _, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
+            self.paged
+                .as_mut()
+                .unwrap()
+                .write(row, col, kind, encode_str_id(id), style, dirty);
+        } else {
+            self.payload[i] = encode_str_id(id);
+        }
     }
 
     #[inline]
     pub(crate) fn clear_payload(&mut self, i: usize) {
-        self.payload[i] = 0;
+        if self.paged.is_some() {
+            let (row, col) = self.coordinates(i);
+            let (kind, _, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
+            self.paged
+                .as_mut()
+                .unwrap()
+                .write(row, col, kind, 0, style, dirty);
+        } else {
+            self.payload[i] = 0;
+        }
     }
 
     #[inline]
@@ -182,10 +580,42 @@ impl SheetData {
         }
     }
 
+    fn remap_paged<F>(&mut self, new_rows: usize, new_cols: usize, mut remap: F)
+    where
+        F: FnMut(usize, usize) -> Option<(usize, usize)>,
+    {
+        let Some(current) = self.paged.take() else {
+            return;
+        };
+        let entries = current.entries();
+        let mut next = PagedStorage::new(current.chunk_rows, current.byte_budget);
+        for (row, col, kind, payload, style, dirty) in entries {
+            if let Some((new_row, new_col)) = remap(row, col) {
+                if new_row < new_rows && new_col < new_cols {
+                    next.write(new_row, new_col, kind, payload, style, dirty);
+                }
+            }
+        }
+        self.row_count = new_rows;
+        self.n_cols = new_cols;
+        self.paged = Some(next);
+    }
+
     /// Rebuild the column-major buffers for a new row count, preserving the
     /// overlap `[0, min(old, new))` of every column. Used by structural edits.
     pub(crate) fn resize_rows(&mut self, new_row_count: usize) {
         if new_row_count == self.row_count {
+            return;
+        }
+        if self.is_paged() {
+            self.remap_paged(new_row_count, self.n_cols, |row, col| {
+                (row < new_row_count).then_some((row, col))
+            });
+            self.formulas.retain(|&(row, col), _| {
+                (row as usize) < new_row_count && (col as usize) < self.n_cols
+            });
+            self.clear_dirty();
+            self.all_dirty = true;
             return;
         }
 
@@ -232,6 +662,28 @@ impl SheetData {
         let Some(new_count) = old.checked_add(count) else {
             return;
         };
+
+        if self.is_paged() {
+            self.remap_paged(new_count, self.n_cols, |row, col| {
+                Some((if row >= at { row + count } else { row }, col))
+            });
+            if !self.formulas.is_empty() {
+                let (at_u, count_u) = (at as u32, count as u32);
+                let moved = std::mem::take(&mut self.formulas);
+                for ((row, col), mut entry) in moved {
+                    entry.shift_rows(at_u, i64::from(count_u), sheet, sheet);
+                    let new_row = if row >= at_u {
+                        row.saturating_add(count_u)
+                    } else {
+                        row
+                    };
+                    self.formulas.insert((new_row, col), entry);
+                }
+            }
+            self.clear_dirty();
+            self.all_dirty = true;
+            return;
+        }
 
         self.resize_rows(new_count);
         let rc = self.row_count;
@@ -280,6 +732,35 @@ impl SheetData {
         let count = count.min(self.row_count - at);
         let old = self.row_count;
 
+        if self.is_paged() {
+            self.remap_paged(old - count, self.n_cols, |row, col| {
+                if row >= at && row < at + count {
+                    None
+                } else {
+                    Some((if row >= at + count { row - count } else { row }, col))
+                }
+            });
+            if !self.formulas.is_empty() {
+                let (at_u, count_u) = (at as u32, count as u32);
+                let moved = std::mem::take(&mut self.formulas);
+                for ((row, col), mut entry) in moved {
+                    if row >= at_u && row < at_u.saturating_add(count_u) {
+                        continue;
+                    }
+                    entry.shift_rows(at_u, -i64::from(count_u), sheet, sheet);
+                    let new_row = if row >= at_u.saturating_add(count_u) {
+                        row - count_u
+                    } else {
+                        row
+                    };
+                    self.formulas.insert((new_row, col), entry);
+                }
+            }
+            self.clear_dirty();
+            self.all_dirty = true;
+            return;
+        }
+
         for col in 0..self.n_cols {
             let base = col * old;
 
@@ -324,6 +805,28 @@ impl SheetData {
         let Some(new_cols) = old_cols.checked_add(count) else {
             return;
         };
+        if self.is_paged() {
+            self.remap_paged(self.row_count, new_cols, |row, col| {
+                Some((row, if col >= at { col + count } else { col }))
+            });
+            if !self.formulas.is_empty() {
+                let (at_u, count_u) = (at as u32, count as u32);
+                let moved = std::mem::take(&mut self.formulas);
+                for ((row, col), mut entry) in moved {
+                    entry.shift_cols(at_u, i64::from(count_u), sheet, sheet);
+                    let new_col = if col >= at_u {
+                        col.saturating_add(count_u)
+                    } else {
+                        col
+                    };
+                    self.formulas.insert((row, new_col), entry);
+                }
+            }
+            self.clear_dirty();
+            self.all_dirty = true;
+            return;
+        }
+
         let Some(new_len) = new_cols.checked_mul(self.row_count) else {
             return;
         };
@@ -380,6 +883,35 @@ impl SheetData {
         let count = count.min(self.n_cols - at);
         let old_cols = self.n_cols;
         let new_cols = old_cols - count;
+        if self.is_paged() {
+            self.remap_paged(self.row_count, new_cols, |row, col| {
+                if col >= at && col < at + count {
+                    None
+                } else {
+                    Some((row, if col >= at + count { col - count } else { col }))
+                }
+            });
+            if !self.formulas.is_empty() {
+                let (at_u, count_u) = (at as u32, count as u32);
+                let moved = std::mem::take(&mut self.formulas);
+                for ((row, col), mut entry) in moved {
+                    if col >= at_u && col < at_u.saturating_add(count_u) {
+                        continue;
+                    }
+                    entry.shift_cols(at_u, -i64::from(count_u), sheet, sheet);
+                    let new_col = if col >= at_u.saturating_add(count_u) {
+                        col - count_u
+                    } else {
+                        col
+                    };
+                    self.formulas.insert((row, new_col), entry);
+                }
+            }
+            self.clear_dirty();
+            self.all_dirty = true;
+            return;
+        }
+
         let Some(new_len) = new_cols.checked_mul(self.row_count) else {
             return;
         };

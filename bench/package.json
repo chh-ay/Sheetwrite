@@ -7,6 +7,7 @@
   "scripts": {
     "bench:data": "bun run src/data-bench.ts",
     "bench:range": "bun run src/range-bench.ts",
+    "bench:paged": "bun run src/paged-bench.ts",
     "bench:render": "bun src/render-bench.html",
     "bench:check": "bun run src/check.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

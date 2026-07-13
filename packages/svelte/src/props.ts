@@ -15,6 +15,7 @@ export interface SheetwriteGridProps
   workbook: GridOptions["workbook"];
   data?: GridOptions["data"];
   datasource?: GridOptions["datasource"];
+  datasourceStorage?: GridOptions["datasourceStorage"];
   renderer?: GridOptions["renderer"];
   workerUrl?: GridOptions["workerUrl"];
   theme?: GridOptions["theme"];

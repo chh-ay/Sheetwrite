@@ -1,4 +1,12 @@
 import { expect, type Page, test } from "@playwright/test";
+import type { Grid } from "../../packages/core/src/types.js";
+
+declare global {
+  interface Window {
+    __sheetwriteVueGrid?: Grid;
+  }
+}
+
 import { examplePages, SITE_PORT } from "./playwright.config.js";
 
 /**
@@ -111,6 +119,54 @@ test("theming example repaints when switching themes", async ({ page }) => {
   const darkButton = page.getByRole("button", { name: /dark/i });
   await darkButton.click();
   await expect.poll(sample, { message: "theme switch never repainted" }).not.toBe(light);
+});
+
+test("vue paged datasource keeps one million rows allocation-lazy", async ({ page }) => {
+  await page.goto(urlOf("vue"));
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+
+  const stats = async () =>
+    page.evaluate(() => {
+      const store = window.__sheetwriteVueGrid?.store;
+      if (!store || !("getPagedStats" in store) || typeof store.getPagedStats !== "function") {
+        return null;
+      }
+      return store.getPagedStats("orders");
+    });
+  await expect.poll(stats, { timeout: 15_000 }).toMatchObject({
+    fullyLoaded: false,
+  });
+  await expect
+    .poll(async () => (await stats())?.loadedCells ?? 0, { timeout: 15_000 })
+    .toBeGreaterThan(0);
+
+  const initial = await stats();
+  expect(initial).not.toBeNull();
+  expect(initial!.allocatedBytes).toBeLessThanOrEqual(32 * 1024 * 1024);
+  expect(
+    await page.evaluate(
+      () => window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 0, col: 0 }).resolved,
+    ),
+  ).toBe(1);
+
+  await page.evaluate(() => {
+    window.__sheetwriteVueGrid?.scrollToCell({ sheet: "orders", row: 500_000, col: 0 });
+  });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            window.__sheetwriteVueGrid?.store.getCell({
+              sheet: "orders",
+              row: 500_000,
+              col: 0,
+            }).resolved,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(500_001);
+  expect((await stats())!.allocatedBytes).toBeLessThanOrEqual(32 * 1024 * 1024);
 });
 
 test("vue sync demo queues, retries, and acknowledges a stable mutation", async ({ page }) => {

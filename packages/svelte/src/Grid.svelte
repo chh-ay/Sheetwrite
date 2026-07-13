@@ -14,6 +14,7 @@ let {
   workbook,
   data,
   datasource,
+  datasourceStorage,
   renderer = "canvas",
   workerUrl,
   theme,
@@ -60,7 +61,16 @@ const handlers = {
 let previousOptions: GridOptions | null = null;
 
 $effect(() => {
-  const resetInputs = { workbook, data, datasource, renderer, workerUrl, renderers, wasmSource };
+  const resetInputs = {
+    workbook,
+    data,
+    datasource,
+    datasourceStorage,
+    renderer,
+    workerUrl,
+    renderers,
+    wasmSource,
+  };
   let current = true;
   let active: GridController | undefined;
   loading = !isSheetwriteReady();
@@ -73,6 +83,7 @@ $effect(() => {
         workbook: resetInputs.workbook,
         data: resetInputs.data,
         datasource: resetInputs.datasource,
+        datasourceStorage: resetInputs.datasourceStorage,
         renderer: resetInputs.renderer,
         workerUrl: resetInputs.workerUrl,
         renderers: resetInputs.renderers,

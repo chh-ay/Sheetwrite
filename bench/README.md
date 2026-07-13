@@ -223,6 +223,29 @@ state is `O(columns + unique styles + active view)`, never `O(cells)`.
 1M rows × 5 columns (including a unique string per row in `customer`) fit in
 ~320 MiB of WASM — a flat ~335 bytes/row.
 
+### Memory — 1M-row paged datasource store (exact, isolated processes)
+
+`bun run --filter '@sheetwrite/bench' bench:paged` spawns a clean process for
+each scenario and records both WASM linear-memory growth and live chunk bytes in
+`results/paged-results.json`. The five numeric columns isolate cell storage from
+string-pool growth.
+
+| scenario | WASM delta | live chunk bytes | chunks | loaded cells | dirty cells |
+|---|---:|---:|---:|---:|---:|
+| empty datasource | 0.06 MiB | 0.00 MiB | 0 | 0 | 0 |
+| +15 virtual padding columns | 0.06 MiB | 0.00 MiB | 0 | 0 | 0 |
+| 30-row viewport | 0.31 MiB | 0.26 MiB | 5 | 150 | 0 |
+| sequential scroll through 1% | 0.81 MiB | 0.78 MiB | 15 | 50,000 | 0 |
+| sequential scroll through 10% | 6.56 MiB | 6.47 MiB | 125 | 500,000 | 0 |
+| sequential scroll through 100% | 32.19 MiB | 31.99 MiB | 618 | 2,513,728 | 0 |
+| 100 edits in unloaded chunks | 5.25 MiB | 5.18 MiB | 100 | 100 | 100 |
+
+The empty store and virtual padding allocate no chunks. A complete sequential
+scan stays at the configured 32 MiB clean-chunk budget; dirty chunks remain
+resident until acknowledgement and may exceed that budget by design. Repeated
+12-run timing samples measured 1M-row construction at 0.04 ms median, first-page
+load at 0.33 ms, and a distant-page load at 0.30 ms.
+
 ### Notes & caveats
 
 - Handsontable edits are wrapped in `suspendRender`/`resumeRender` to isolate the

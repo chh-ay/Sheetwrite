@@ -67,6 +67,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       workbook,
       data,
       datasource,
+      datasourceStorage,
       renderer,
       workerUrl,
       theme,
@@ -157,6 +158,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         workbook,
         data,
         datasource,
+        datasourceStorage,
         renderer,
         workerUrl,
         renderers,
@@ -191,7 +193,16 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         if (controllerRef.current === controller) controllerRef.current = null;
         controller.destroy();
       };
-    }, [initializationState, workbook, data, datasource, renderer, workerUrl, renderers]);
+    }, [
+      initializationState,
+      workbook,
+      data,
+      datasource,
+      datasourceStorage,
+      renderer,
+      workerUrl,
+      renderers,
+    ]);
 
     useEffect(() => controllerRef.current?.setReadOnly(readOnly ?? false), [readOnly]);
     useEffect(() => controllerRef.current?.setConfig(config), [config]);

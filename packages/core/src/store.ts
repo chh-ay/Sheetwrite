@@ -10,6 +10,7 @@ import type {
   AggregateOp,
   ApplyTransactionResult,
   CellAddress,
+  CellLoadState,
   CellScalar,
   CellStyle,
   CellValue,
@@ -22,7 +23,9 @@ import type {
   DataCell,
   MergeRange,
   PackedCellBlock,
+  PagedStoreStats,
   Patch,
+  QueryCapability,
   Range,
   ResolvedCell,
   RowData,
@@ -66,6 +69,7 @@ const STRING_CACHE_CAP = 65_536;
  * reference and let the buffer die with the caller's view (see `windowValuesFor`).
  */
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
+const DEFAULT_PAGED_CACHE_BYTES = 32 * 1024 * 1024;
 
 type ChangeListener = (event: ChangeEvent) => void;
 
@@ -136,6 +140,22 @@ type RecomputingCellStore = CellStore & {
   snapshotNumbers(snapshot: RangeSnapshot): Float64Array;
   snapshotTexts(snapshot: RangeSnapshot): string[];
   restoreRange(sheet: number, r0: number, c0: number, snapshot: RangeSnapshot): boolean;
+  addPagedSheet(columns: number, rows: number, chunkRows: number, byteBudget: number): number;
+  isPaged(sheet: number): boolean;
+  pagedStats(sheet: number): Float64Array;
+  cellState(sheet: number, row: number, col: number): number;
+  isFullyLoaded(sheet: number): boolean;
+  rangeFullyLoaded(sheet: number, r0: number, c0: number, r1: number, c1: number): boolean;
+  pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
+  beginPageLoad(): void;
+  endPageLoad(): void;
+  markRangeClean(
+    sheet: number,
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number,
+  ): void;
 };
 
 type ConsumingWindowView = WindowView & {
@@ -157,6 +177,22 @@ export interface CompactRangeHistory {
   readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
   toDocumentOp(range: Range): Extract<Patch, { op: "setBlock" }>;
   dispose(): void;
+}
+
+export interface SheetwriteStoreOptions {
+  storage?: "dense" | "paged";
+  chunkRows?: number;
+  cacheBytes?: number;
+}
+
+export class IncompleteDataError extends Error {
+  readonly capability: Extract<QueryCapability, { status: "incomplete" }>;
+
+  constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete" }>) {
+    super(`Sheetwrite: ${sheet} has unloaded datasource cells`);
+    this.name = "IncompleteDataError";
+    this.capability = capability;
+  }
 }
 
 function literalOf(value: CellScalar): CellValue {
@@ -212,6 +248,7 @@ function packSortKeys(keys: readonly SortKey[]): { cols: Uint32Array; ascending:
 export class SheetwriteStore implements Store {
   private readonly wasm: RecomputingCellStore;
   private readonly workbook: Workbook;
+  private readonly storageOptions: SheetwriteStoreOptions;
   private readonly handles = new Map<SheetId, number>();
   private readonly styles = new StyleDictionary();
   private readonly listeners = new Set<ChangeListener>();
@@ -230,14 +267,18 @@ export class SheetwriteStore implements Store {
 
   private documentId?: string;
   private documentVersion?: number;
-  constructor(workbook: Workbook, data?: ColumnarData) {
+  constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
     if (!isLoaded()) {
       throw new Error("Sheetwrite: await initSheetwrite() before constructing SheetwriteStore");
     }
+    if (data && options.storage === "paged") {
+      throw new Error("Sheetwrite: ColumnarData requires dense storage");
+    }
     this.workbook = workbook;
+    this.storageOptions = options;
     this.wasm = new CellStore() as RecomputingCellStore;
     for (const sheet of workbook.sheets) {
-      const handle = this.wasm.addSheet(sheet.columns.length, sheet.rowCount);
+      const handle = this.allocateSheet(sheet.columns.length, sheet.rowCount);
       this.wasm.setSheetName(handle, sheet.id, sheet.name);
       this.handles.set(sheet.id, handle);
     }
@@ -248,6 +289,96 @@ export class SheetwriteStore implements Store {
     const handle = this.handles.get(sheet);
     if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
     return handle;
+  }
+
+  private allocateSheet(columns: number, rows: number): number {
+    return this.storageOptions.storage === "paged"
+      ? this.wasm.addPagedSheet(
+          columns,
+          rows,
+          this.storageOptions.chunkRows ?? 4096,
+          this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES,
+        )
+      : this.wasm.addSheet(columns, rows);
+  }
+
+  isPaged(sheet: SheetId): boolean {
+    return this.wasm.isPaged(this.handleOf(sheet));
+  }
+
+  getPagedStats(sheet: SheetId): PagedStoreStats {
+    const stats = this.wasm.pagedStats(this.handleOf(sheet));
+    return {
+      chunks: stats[0] ?? 0,
+      loadedCells: stats[1] ?? 0,
+      dirtyCells: stats[2] ?? 0,
+      allocatedBytes: stats[3] ?? 0,
+      fullyLoaded: stats[4] === 1,
+    };
+  }
+
+  queryCapability(sheet: SheetId): QueryCapability {
+    const meta = this.sheetMeta(sheet);
+    const stats = this.getPagedStats(sheet);
+    if (!this.isPaged(sheet) || stats.fullyLoaded) return { status: "complete" };
+    return {
+      status: "incomplete",
+      loadedCells: stats.loadedCells,
+      totalCells: meta.rowCount * meta.columns.length,
+    };
+  }
+
+  getCellLoadState(addr: CellAddress): CellLoadState {
+    const state = this.wasm.cellState(this.handleOf(addr.sheet), addr.row, addr.col);
+    if (state === 0) return "unloaded";
+    if (state === 1) return "loaded-empty";
+    if (state === 3) return "local-edit";
+    return "loaded-value";
+  }
+
+  isRangeFullyLoaded(input: Range): boolean {
+    const range = normalizedRange(input);
+    return this.wasm.rangeFullyLoaded(
+      this.handleOf(range.sheet),
+      range.start.row,
+      range.start.col,
+      range.end.row,
+      range.end.col,
+    );
+  }
+
+  canApplyLocally(patch: Patch): boolean {
+    const sheet =
+      patch.op === "set"
+        ? patch.addr.sheet
+        : patch.op === "setRange" ||
+            patch.op === "setBlock" ||
+            patch.op === "setRangeStyle" ||
+            patch.op === "clearRange"
+          ? patch.range.sheet
+          : patch.op === "setNamedRange" || patch.op === "removeNamedRange"
+            ? null
+            : patch.op === "addSheet"
+              ? patch.sheet.id
+              : patch.sheet;
+    if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;
+    if (patch.op === "setRangeStyle" || patch.op === "clearRange") {
+      return this.isRangeFullyLoaded(patch.range);
+    }
+    if (
+      patch.op === "removeRows" ||
+      patch.op === "moveRows" ||
+      patch.op === "removeColumns" ||
+      patch.op === "moveColumns"
+    ) {
+      return this.wasm.isFullyLoaded(this.handleOf(sheet));
+    }
+    return true;
+  }
+
+  private requireCompleteQuery(sheet: SheetId): void {
+    const capability = this.queryCapability(sheet);
+    if (capability.status === "incomplete") throw new IncompleteDataError(sheet, capability);
   }
 
   static fromSnapshot(input: unknown): SheetwriteStore {
@@ -303,11 +434,19 @@ export class SheetwriteStore implements Store {
     const handle = this.handles.get(addr.sheet);
     if (handle === undefined) return;
 
-    const style = this.wasm.styleIdAt(handle, addr.row, addr.col);
-    if (typeof value === "number") this.wasm.setNumber(handle, addr.row, addr.col, value, style);
-    else if (typeof value === "string") {
-      this.wasm.setString(handle, addr.row, addr.col, value, style);
-    } else this.wasm.clearCell(handle, addr.row, addr.col, style);
+    this.wasm.beginPageLoad();
+    try {
+      const style = this.wasm.styleIdAt(handle, addr.row, addr.col);
+      if (typeof value === "number") {
+        this.wasm.setNumber(handle, addr.row, addr.col, value, style);
+      } else if (typeof value === "string") {
+        this.wasm.setString(handle, addr.row, addr.col, value, style);
+      } else {
+        this.wasm.clearCell(handle, addr.row, addr.col, style);
+      }
+    } finally {
+      this.wasm.endPageLoad();
+    }
   }
 
   private sheetMeta(sheet: SheetId) {
@@ -577,6 +716,9 @@ export class SheetwriteStore implements Store {
   ): VisibleWindowView {
     const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
+    if (this.wasm.isPaged(handle)) {
+      this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
+    }
     const order = applyView ? this.viewOrder.get(sheet) : undefined;
     const hasCondRules = applyView && this.syncConditionalRules(sheet, handle);
 
@@ -748,6 +890,7 @@ export class SheetwriteStore implements Store {
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
+    this.requireCompleteQuery(sheet);
     return this.wasm.aggregate(this.handleOf(sheet), col, AGG_OP[op]);
   }
 
@@ -762,6 +905,7 @@ export class SheetwriteStore implements Store {
    * groups intact.
    */
   sortByMulti(sheet: SheetId, keys: readonly SortKey[]): void {
+    if (keys.length > 0) this.requireCompleteQuery(sheet);
     this.ensureViewState(sheet).sortKeys = keys.map((k) => ({
       col: k.col,
       ascending: k.ascending,
@@ -774,6 +918,7 @@ export class SheetwriteStore implements Store {
    * active column filters AND together.
    */
   setColumnFilter(sheet: SheetId, col: number, filter: ColumnFilter | null): void {
+    if (filter !== null) this.requireCompleteQuery(sheet);
     if (filter === null) {
       const state = this.viewState.get(sheet);
       if (!state?.filters.delete(col)) return;
@@ -799,6 +944,7 @@ export class SheetwriteStore implements Store {
    * Feeds a values-filter picker.
    */
   distinctValues(sheet: SheetId, col: number, limit = 1000): CellScalar[] {
+    this.requireCompleteQuery(sheet);
     const column = this.wasm.distinctValues(this.handleOf(sheet), col, limit);
     const kinds = column.takeKinds();
     const numbers = column.takeNumbers();
@@ -903,6 +1049,7 @@ export class SheetwriteStore implements Store {
    * Without a view it scans data space (`dataEdge`) exactly as before.
    */
   dataEdge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number {
+    this.requireCompleteQuery(sheet);
     const handle = this.handleOf(sheet);
     const order = this.viewOrder.get(sheet);
     if (order) return this.wasm.dataEdgeOrdered(handle, order, row, col, dRow, dCol);
@@ -1107,6 +1254,7 @@ export class SheetwriteStore implements Store {
     query: string,
     opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
   ): Uint32Array {
+    this.requireCompleteQuery(sheet);
     const handle = this.handleOf(sheet);
     const columns = opts.columns ?? this.sheetMeta(sheet).columns.map((_, i) => i);
     return this.wasm.search(
@@ -1195,6 +1343,9 @@ export class SheetwriteStore implements Store {
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
       return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
     }
+    if (source === "local" && tx.patches.some((patch) => !this.canApplyLocally(patch))) {
+      return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
+    }
 
     const hasListeners = this.listeners.size > 0;
     const changes: ChangeEvent["changes"] | null = hasListeners ? [] : null;
@@ -1202,38 +1353,43 @@ export class SheetwriteStore implements Store {
     const touchedSheets = new Set<SheetId>();
     let hasStructuralPatch = false;
 
-    for (const patch of tx.patches) {
-      if (!this.applyPatch(patch, changes)) continue;
-      appliedPatches.push(patch);
+    if (source === "remote") this.wasm.beginPageLoad();
+    try {
+      for (const patch of tx.patches) {
+        if (!this.applyPatch(patch, changes)) continue;
+        appliedPatches.push(patch);
 
-      if (patch.op === "set") touchedSheets.add(patch.addr.sheet);
-      else if (
-        patch.op === "setRange" ||
-        patch.op === "setBlock" ||
-        patch.op === "setRangeStyle" ||
-        patch.op === "clearRange"
-      ) {
-        touchedSheets.add(patch.range.sheet);
-      } else if (
-        patch.op !== "setNamedRange" &&
-        patch.op !== "removeNamedRange" &&
-        patch.op !== "removeSheet"
-      ) {
-        const sheet = patch.op === "addSheet" ? patch.sheet.id : patch.sheet;
-        touchedSheets.add(sheet);
+        if (patch.op === "set") touchedSheets.add(patch.addr.sheet);
+        else if (
+          patch.op === "setRange" ||
+          patch.op === "setBlock" ||
+          patch.op === "setRangeStyle" ||
+          patch.op === "clearRange"
+        ) {
+          touchedSheets.add(patch.range.sheet);
+        } else if (
+          patch.op !== "setNamedRange" &&
+          patch.op !== "removeNamedRange" &&
+          patch.op !== "removeSheet"
+        ) {
+          const sheet = patch.op === "addSheet" ? patch.sheet.id : patch.sheet;
+          touchedSheets.add(sheet);
+        }
+        if (
+          patch.op === "addRows" ||
+          patch.op === "removeRows" ||
+          patch.op === "moveRows" ||
+          patch.op === "addColumns" ||
+          patch.op === "removeColumns" ||
+          patch.op === "moveColumns" ||
+          patch.op === "addSheet" ||
+          patch.op === "removeSheet"
+        ) {
+          hasStructuralPatch = true;
+        }
       }
-      if (
-        patch.op === "addRows" ||
-        patch.op === "removeRows" ||
-        patch.op === "moveRows" ||
-        patch.op === "addColumns" ||
-        patch.op === "removeColumns" ||
-        patch.op === "moveColumns" ||
-        patch.op === "addSheet" ||
-        patch.op === "removeSheet"
-      ) {
-        hasStructuralPatch = true;
-      }
+    } finally {
+      if (source === "remote") this.wasm.endPageLoad();
     }
 
     if (appliedPatches.length === 0) {
@@ -1933,7 +2089,7 @@ export class SheetwriteStore implements Store {
     ) {
       return false;
     }
-    const handle = this.wasm.addSheet(snapshot.columns.length, snapshot.rowCount);
+    const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
     this.wasm.setSheetName(handle, snapshot.id, snapshot.name);
     this.handles.set(snapshot.id, handle);
     const sheet: Sheet = {
@@ -2272,6 +2428,7 @@ export class SheetwriteStore implements Store {
   }
 
   markClean(patches: Patch[]): void {
+    this.acknowledgeOperations(patches);
     if (patches.length === 0 || this.dirty.length === 0) return;
 
     let prefix = 0;
@@ -2297,6 +2454,40 @@ export class SheetwriteStore implements Store {
     this.dirty = this.dirty.filter((p) => !clean.has(p));
   }
 
+  acknowledgeOperations(operations: readonly Patch[]): void {
+    for (const operation of operations) {
+      if (operation.op === "set") {
+        this.wasm.markRangeClean(
+          this.handleOf(operation.addr.sheet),
+          operation.addr.row,
+          operation.addr.row + 1,
+          operation.addr.col,
+          operation.addr.col + 1,
+        );
+      } else if (operation.op === "setRange") {
+        const range = normalizedRange(operation.range);
+        for (const cell of operation.cells) {
+          const row = range.start.row + cell.rowOffset;
+          const col = range.start.col + cell.colOffset;
+          this.wasm.markRangeClean(this.handleOf(range.sheet), row, row + 1, col, col + 1);
+        }
+      } else if (
+        operation.op === "setBlock" ||
+        operation.op === "setRangeStyle" ||
+        operation.op === "clearRange"
+      ) {
+        const range = normalizedRange(operation.range);
+        this.wasm.markRangeClean(
+          this.handleOf(range.sheet),
+          range.start.row,
+          range.end.row + 1,
+          range.start.col,
+          range.end.col + 1,
+        );
+      }
+    }
+  }
+
   suspendDirtyTracking(): () => void {
     this.dirtyTrackingSuspensions += 1;
     this.dirty = [];
@@ -2309,6 +2500,9 @@ export class SheetwriteStore implements Store {
   }
 
   exportSnapshot(): WorkbookSnapshot {
+    for (const sheet of this.workbook.sheets) {
+      this.requireCompleteQuery(sheet.id);
+    }
     const refTargets = new Map<string, CellAddress>();
     for (const [source, target] of this.refs.entries()) {
       refTargets.set(cellKey(source), target);
@@ -2437,55 +2631,62 @@ export class SheetwriteStore implements Store {
     protect?: (addr: CellAddress) => boolean,
   ): void {
     if (rows.length === 0) return;
-    const handle = this.handleOf(sheet);
-    const columns = this.sheetMeta(sheet).columns;
-    const exceptions: Patch[] = [];
-    const protectedCells: Patch[] = [];
+    this.wasm.beginPageLoad();
+    try {
+      const handle = this.handleOf(sheet);
+      const columns = this.sheetMeta(sheet).columns;
+      const exceptions: Patch[] = [];
+      const protectedCells: Patch[] = [];
 
-    for (let c = 0; c < columns.length; c++) {
-      const column = columns[c]!;
-      for (let offset = 0; offset < rows.length; offset++) {
-        const addr = { sheet, row: start + offset, col: c };
-        if (protect?.(addr)) {
-          const formula = this.getFormula(addr);
-          const target = this.getRefTarget(addr);
-          const cell = this.getCell(addr);
-          const value: CellValue = formula
-            ? { kind: "formula", src: formula }
-            : target
-              ? { kind: "ref", target }
-              : { kind: "literal", value: cell.resolved };
-          protectedCells.push({ op: "set", addr, value, style: cell.style });
-          continue;
+      for (let c = 0; c < columns.length; c++) {
+        const column = columns[c]!;
+        for (let offset = 0; offset < rows.length; offset++) {
+          const addr = { sheet, row: start + offset, col: c };
+          if (this.wasm.cellState(handle, addr.row, addr.col) === 3 || protect?.(addr)) {
+            const formula = this.getFormula(addr);
+            const target = this.getRefTarget(addr);
+            const cell = this.getCell(addr);
+            const value: CellValue = formula
+              ? { kind: "formula", src: formula }
+              : target
+                ? { kind: "ref", target }
+                : { kind: "literal", value: cell.resolved };
+            protectedCells.push({ op: "set", addr, value, style: cell.style });
+            continue;
+          }
+          const dataCell = rows[offset]![column.key];
+          const wrapped =
+            dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
+              ? dataCell
+              : undefined;
+          const value: CellScalar | CellValue | undefined = wrapped
+            ? wrapped.value
+            : (dataCell as CellScalar | CellValue | undefined);
+          if (
+            wrapped?.style !== undefined ||
+            (value &&
+              typeof value === "object" &&
+              (value.kind === "formula" || value.kind === "ref"))
+          ) {
+            exceptions.push({
+              op: "set",
+              addr,
+              value: value as CellValue,
+              style: wrapped?.style,
+            });
+          }
         }
-        const dataCell = rows[offset]![column.key];
-        const wrapped =
-          dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
-            ? dataCell
-            : undefined;
-        const value: CellScalar | CellValue | undefined = wrapped
-          ? wrapped.value
-          : (dataCell as CellScalar | CellValue | undefined);
-        if (
-          wrapped?.style !== undefined ||
-          (value && typeof value === "object" && (value.kind === "formula" || value.kind === "ref"))
-        ) {
-          exceptions.push({
-            op: "set",
-            addr,
-            value: value as CellValue,
-            style: wrapped?.style,
-          });
-        }
+        this.loadColumnBlock(handle, column, c, start, rows);
       }
-      this.loadColumnBlock(handle, column, c, start, rows);
-    }
 
-    for (const patch of exceptions) this.applyPatch(patch, null);
-    for (const patch of protectedCells) this.applyPatch(patch, null);
-    this.wasm.recompute(handle);
-    if (this.refs.hasRefs()) {
-      this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+      for (const patch of exceptions) this.applyPatch(patch, null);
+      for (const patch of protectedCells) this.applyPatch(patch, null);
+      this.wasm.recompute(handle);
+      if (this.refs.hasRefs()) {
+        this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+      }
+    } finally {
+      this.wasm.endPageLoad();
     }
   }
 

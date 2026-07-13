@@ -521,8 +521,7 @@ impl Parser {
         let Some(Tok::Ident(start, _)) = self.next() else {
             return Err("expected cell after !".into());
         };
-        let (row, col, flags) =
-            parse_a1(&start).ok_or_else(|| format!("bad cell ref: {start}"))?;
+        let (row, col, flags) = parse_a1(&start).ok_or_else(|| format!("bad cell ref: {start}"))?;
         let qualifier = UnresolvedSheetRef {
             name: sheet_name.clone(),
             quoted,
@@ -534,16 +533,8 @@ impl Parser {
             if end_sheet != sheet_name {
                 return Err("cross-sheet ranges must stay on one sheet".into());
             }
-            let (r0, c0, r1, c1, range_flags) =
-                normalize_range(row, col, flags, r1, c1, end_flags);
-            return Ok(Ast::SheetRange(
-                qualifier,
-                r0,
-                c0,
-                r1,
-                c1,
-                range_flags,
-            ));
+            let (r0, c0, r1, c1, range_flags) = normalize_range(row, col, flags, r1, c1, end_flags);
+            return Ok(Ast::SheetRange(qualifier, r0, c0, r1, c1, range_flags));
         }
 
         Ok(Ast::SheetCell(qualifier, row, col, flags))
@@ -562,13 +553,11 @@ impl Parser {
             let Some(Tok::Ident(end, _)) = self.next() else {
                 return Err("expected cell after !".into());
             };
-            let (row, col, flags) =
-                parse_a1(&end).ok_or_else(|| format!("bad cell ref: {end}"))?;
+            let (row, col, flags) = parse_a1(&end).ok_or_else(|| format!("bad cell ref: {end}"))?;
             return Ok((first, row, col, flags));
         }
 
-        let (row, col, flags) =
-            parse_a1(&first).ok_or_else(|| format!("bad cell ref: {first}"))?;
+        let (row, col, flags) = parse_a1(&first).ok_or_else(|| format!("bad cell ref: {first}"))?;
         Ok((sheet_name.to_string(), row, col, flags))
     }
 }
@@ -650,24 +639,12 @@ enum Axis {
 }
 
 /// Rewrite row references affected by an edit on `edited_sheet`.
-pub fn shift_rows(
-    ast: &mut Ast,
-    at: u32,
-    delta: i64,
-    formula_sheet: u32,
-    edited_sheet: u32,
-) {
+pub fn shift_rows(ast: &mut Ast, at: u32, delta: i64, formula_sheet: u32, edited_sheet: u32) {
     rewrite_axis(ast, Axis::Row, at, delta, formula_sheet, edited_sheet);
 }
 
 /// Rewrite column references affected by an edit on `edited_sheet`.
-pub fn shift_cols(
-    ast: &mut Ast,
-    at: u32,
-    delta: i64,
-    formula_sheet: u32,
-    edited_sheet: u32,
-) {
+pub fn shift_cols(ast: &mut Ast, at: u32, delta: i64, formula_sheet: u32, edited_sheet: u32) {
     rewrite_axis(ast, Axis::Col, at, delta, formula_sheet, edited_sheet);
 }
 
@@ -1036,19 +1013,47 @@ mod tests {
         assert_eq!(parse_a1("A1"), Some((0, 0, RefFlags::default())));
         assert_eq!(
             parse_a1("$A1"),
-            Some((0, 0, RefFlags { row_abs: false, col_abs: true }))
+            Some((
+                0,
+                0,
+                RefFlags {
+                    row_abs: false,
+                    col_abs: true
+                }
+            ))
         );
         assert_eq!(
             parse_a1("A$1"),
-            Some((0, 0, RefFlags { row_abs: true, col_abs: false }))
+            Some((
+                0,
+                0,
+                RefFlags {
+                    row_abs: true,
+                    col_abs: false
+                }
+            ))
         );
         assert_eq!(
             parse_a1("$A$1"),
-            Some((0, 0, RefFlags { row_abs: true, col_abs: true }))
+            Some((
+                0,
+                0,
+                RefFlags {
+                    row_abs: true,
+                    col_abs: true
+                }
+            ))
         );
         assert_eq!(
             parse_a1("aa$10"),
-            Some((9, 26, RefFlags { row_abs: true, col_abs: false }))
+            Some((
+                9,
+                26,
+                RefFlags {
+                    row_abs: true,
+                    col_abs: false
+                }
+            ))
         );
 
         assert_eq!(parse_a1("A0"), None);

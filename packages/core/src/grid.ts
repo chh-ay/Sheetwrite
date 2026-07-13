@@ -22,7 +22,7 @@ import { OverlayPainter } from "./overlay-painter.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { SheetTabs } from "./sheet-tabs.js";
-import { SheetwriteStore } from "./store.js";
+import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import type {
@@ -70,7 +70,6 @@ import type {
   Theme,
   Viewport,
   VisibleWindowView,
-  Workbook,
   WorkbookSnapshot,
 } from "./types.js";
 import { computeColumnWindow, computeWindow } from "./virtualization.js";
@@ -243,6 +242,7 @@ export class GridImpl implements Grid {
   private activeSheet: SheetId;
   /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
   private activeSheetCache: Sheet | null = null;
+  private readonly virtualColumnTargets = new Map<SheetId, number>();
   private index: OffsetIndex;
   private scaled: ScaledScroll;
   private colIndices: number[];
@@ -274,10 +274,20 @@ export class GridImpl implements Grid {
     ownsStore = store === undefined,
   ) {
     this.host = host;
-    const workbook = store ? opts.workbook : padColumns(opts.workbook, opts, host);
-    this.store = store ?? new SheetwriteStore(workbook, opts.data);
+    const workbook = opts.workbook;
+    this.store =
+      store ??
+      new SheetwriteStore(workbook, opts.data, {
+        storage: opts.datasourceStorage?.mode ?? "dense",
+        chunkRows: opts.datasourceStorage?.chunkRows,
+        cacheBytes: opts.datasourceStorage?.cacheBytes,
+      });
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.ownsStore = ownsStore;
+    const virtualTarget = padTarget(host, opts.minColumns);
+    for (const sheet of workbook.sheets) {
+      this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
+    }
     const getRows = opts.datasource?.getRows;
     this.datasource = getRows
       ? async (request) => {
@@ -629,10 +639,14 @@ export class GridImpl implements Grid {
   private sheet(id: SheetId = this.activeSheet): Sheet {
     if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
 
-    const s = this.store.getWorkbook().sheets.find((sh) => sh.id === id);
-    if (!s) throw new Error(`Sheetwrite: unknown sheet ${id}`);
-    if (id === this.activeSheet) this.activeSheetCache = s;
-    return s;
+    const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
+    if (!stored) throw new Error(`Sheetwrite: unknown sheet ${id}`);
+    const target = this.virtualColumnTargets.get(id) ?? stored.columns.length;
+    const sheet =
+      target > stored.columns.length ? { ...stored, columns: [...stored.columns] } : stored;
+    if (sheet !== stored) appendPadColumns(sheet.columns, target);
+    if (id === this.activeSheet) this.activeSheetCache = sheet;
+    return sheet;
   }
 
   private viewportH(): number {
@@ -1296,6 +1310,8 @@ export class GridImpl implements Grid {
   private commit(patches: Patch[], reason: CommitReason): void {
     if (this.readOnly) return;
     if (patches.length === 0) return;
+    patches = this.materializeVirtualColumns(patches);
+    if (patches.some((patch) => this.loadable?.canApplyLocally(patch) === false)) return;
 
     if (this.applyingHistory) {
       this.storeApply(patches, reason);
@@ -2011,13 +2027,12 @@ export class GridImpl implements Grid {
   }
 
   setMinColumns(minColumns?: number): void {
-    const target = padTarget(this.host, minColumns);
-    const sheet = this.sheet();
-    if (target <= sheet.columns.length) return;
-
-    const columns = sheet.columns.slice();
-    appendPadColumns(columns, target);
-    this.store.ensureColumns(sheet.id, columns);
+    const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
+    if (!stored) return;
+    const target = Math.max(stored.columns.length, padTarget(this.host, minColumns));
+    if (target === this.virtualColumnTargets.get(this.activeSheet)) return;
+    this.virtualColumnTargets.set(this.activeSheet, target);
+    this.activeSheetCache = null;
     this.rebuildColumnIndex();
     this.applyLayout();
     this.paintEpoch += 1;
@@ -2424,6 +2439,53 @@ export class GridImpl implements Grid {
     return columns;
   }
 
+  private materializeVirtualColumns(patches: Patch[]): Patch[] {
+    const maxColumnBySheet = new Map<SheetId, number>();
+    for (const patch of patches) {
+      let sheet: SheetId | null = null;
+      let col = -1;
+      if (patch.op === "set") {
+        sheet = patch.addr.sheet;
+        col = patch.addr.col;
+      } else if (
+        patch.op === "setRange" ||
+        patch.op === "setBlock" ||
+        patch.op === "setRangeStyle" ||
+        patch.op === "clearRange"
+      ) {
+        sheet = patch.range.sheet;
+        col = Math.max(patch.range.start.col, patch.range.end.col);
+      } else if (patch.op === "setColumn") {
+        sheet = patch.sheet;
+        col = patch.col;
+      } else if (patch.op === "addMerge" || patch.op === "removeMerge") {
+        sheet = patch.sheet;
+        col = Math.max(patch.merge.c0, patch.merge.c1);
+      }
+      if (sheet !== null) {
+        maxColumnBySheet.set(sheet, Math.max(maxColumnBySheet.get(sheet) ?? -1, col));
+      }
+    }
+
+    const additions: Patch[] = [];
+    for (const [sheetId, maxColumn] of maxColumnBySheet) {
+      const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId);
+      if (!stored || maxColumn < stored.columns.length) continue;
+      const used = new Set(stored.columns.map((column) => column.key));
+      const columns: Column[] = [];
+      for (let col = stored.columns.length; col <= maxColumn; col++) {
+        const base = `col_${col}`;
+        let key = base;
+        let suffix = 1;
+        while (used.has(key)) key = `${base}_${suffix++}`;
+        used.add(key);
+        columns.push({ key, header: colToA1(col), width: DEFAULT_COL_WIDTH, type: "text" });
+      }
+      additions.push({ op: "addColumns", sheet: sheetId, at: stored.columns.length, columns });
+    }
+    return additions.length > 0 ? [...additions, ...patches] : patches;
+  }
+
   // ── toolbar actions (operate on the current selection) ──────────────────────
 
   private buildActions(): GridActions {
@@ -2619,11 +2681,23 @@ export class GridImpl implements Grid {
     this.applyHistoryPatches(patches, "redo");
   }
 
+  private requireCompleteExport(sheets: readonly Sheet[]): void {
+    if (!this.loadable) return;
+    for (const sheet of sheets) {
+      const capability = this.loadable.queryCapability(sheet.id);
+      if (capability.status === "incomplete") {
+        throw new IncompleteDataError(sheet.id, capability);
+      }
+    }
+  }
+
   exportCsv(filename: string): void {
+    this.requireCompleteExport([this.sheet()]);
     downloadBytes(toCsv(this.sheet(), this.store), filename, "text/csv;charset=utf-8");
   }
 
   async exportXlsx(filename: string): Promise<void> {
+    this.requireCompleteExport(this.store.getWorkbook().sheets);
     const bytes = await toXlsx(this.store.getWorkbook(), this.store);
     downloadBytes(
       bytes,
@@ -2703,24 +2777,6 @@ function buildColumnIndex(sheet: Sheet, colIndices: readonly number[], zoom: num
   }
 
   return new ColumnIndex(colIndices, widths);
-}
-
-function padColumns(workbook: Workbook, opts: GridOptions, host: HTMLElement): Workbook {
-  const target = padTarget(host, opts.minColumns);
-  if (target <= 0) return workbook;
-
-  let changed = false;
-  const sheets = workbook.sheets.map((sheet) => {
-    if (sheet.columns.length >= target) return sheet;
-
-    changed = true;
-    const columns = sheet.columns.slice();
-    appendPadColumns(columns, target);
-
-    return { ...sheet, columns };
-  });
-
-  return changed ? { ...workbook, sheets } : workbook;
 }
 
 function appendPadColumns(columns: Column[], target: number): void {

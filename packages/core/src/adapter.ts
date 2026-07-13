@@ -23,6 +23,7 @@ export const GRID_OPTION_POLICY = {
   workbook: "reset",
   data: "reset",
   datasource: "reset",
+  datasourceStorage: "reset",
   renderer: "reset",
   workerUrl: "reset",
   renderers: "reset",

@@ -1108,3 +1108,156 @@ describe("range-native mutations", () => {
     store.dispose();
   });
 });
+
+describe("paged datasource storage", () => {
+  it("allocates no cell buffers up front and keeps dirty chunks resident", () => {
+    const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 150,
+    });
+    expect(store.getPagedStats("s1")).toEqual({
+      chunks: 0,
+      loadedCells: 0,
+      dirtyCells: 0,
+      allocatedBytes: 0,
+      fullyLoaded: false,
+    });
+    expect(store.getCellLoadState(addr(0, 0))).toBe("unloaded");
+    expect(store.getCell(addr(0, 0)).resolved).toBe("#LOADING!");
+    expect(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]).values).toEqual(["#LOADING!"]);
+    expect(store.queryCapability("s1")).toEqual({
+      status: "incomplete",
+      loadedCells: 0,
+      totalCells: 3_000_000,
+    });
+    expect(() => store.aggregate("s1", 1, "sum")).toThrow(/has unloaded datasource cells/);
+    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
+
+    store.loadRows("s1", 0, [{ name: "zero", amount: 1, city: "A" }]);
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 1), value: { kind: "literal", value: 99 } }],
+    });
+    store.loadRows("s1", 0, [{ name: "stale", amount: 2, city: "stale" }]);
+    for (const row of [4, 8, 12]) {
+      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "B" }]);
+    }
+
+    expect(store.getCell(addr(0, 1)).resolved).toBe(99);
+    expect(store.getCellLoadState(addr(0, 1))).toBe("local-edit");
+    expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+    // One viewport-pinned chunk, one dirty chunk, and at most one clean victim.
+    expect(store.getPagedStats("s1").chunks).toBeLessThanOrEqual(3);
+    expect(store.getCellLoadState(addr(4, 0))).toBe("unloaded");
+
+    store.acknowledgeOperations([
+      { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 99 } },
+    ]);
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    store.dispose();
+  });
+
+  it("recomputes formulas and references after unloaded dependencies arrive", () => {
+    const store = new SheetwriteStore(makeWorkbook(6000), undefined, {
+      storage: "paged",
+      cacheBytes: 2_000_000,
+    });
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 2), value: { kind: "formula", src: "=B5001+1" } },
+        { op: "set", addr: addr(1, 2), value: { kind: "ref", target: addr(5000, 1) } },
+      ],
+    });
+    expect(store.getCell(addr(0, 2)).resolved).toBe("#LOADING!");
+    expect(store.getCell(addr(1, 2)).resolved).toBe("#LOADING!");
+    expect(store.getCellLoadState(addr(0, 2))).toBe("local-edit");
+    expect(store.getCellLoadState(addr(1, 2))).toBe("local-edit");
+
+    store.loadRows("s1", 5000, [{ name: null, amount: 41, city: null }]);
+    expect(store.getCell(addr(0, 2)).resolved).toBe(42);
+    expect(store.getCell(addr(1, 2)).resolved).toBe(41);
+    expect(store.getCellLoadState(addr(0, 2))).toBe("local-edit");
+    expect(store.getCellLoadState(addr(1, 2))).toBe("local-edit");
+    store.dispose();
+  });
+
+  it("adds logical columns without allocating every row", () => {
+    const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
+      storage: "paged",
+      chunkRows: 4096,
+      cacheBytes: 1024 * 1024,
+    });
+    store.applyTransaction({
+      patches: [
+        {
+          op: "addColumns",
+          sheet: "s1",
+          at: 3,
+          columns: Array.from({ length: 8 }, (_, index) => ({
+            key: `virtual-${index}`,
+            header: "",
+            width: 100,
+            type: "text" as const,
+          })),
+        },
+      ],
+    });
+    expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(11);
+    expect(store.getPagedStats("s1").allocatedBytes).toBe(0);
+
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: addr(0, 10),
+          value: { kind: "literal", value: "only this cell" },
+        },
+      ],
+    });
+    expect(store.getPagedStats("s1")).toMatchObject({
+      chunks: 1,
+      loadedCells: 1,
+      dirtyCells: 1,
+    });
+    store.dispose();
+  });
+
+  it("tracks remote paged writes as clean authoritative data", () => {
+    const store = new SheetwriteStore(makeWorkbook(100), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1024,
+    });
+    store.applyTransaction(
+      {
+        patches: [{ op: "set", addr: addr(20, 1), value: { kind: "literal", value: 55 } }],
+      },
+      { source: "remote", markDirty: false },
+    );
+    expect(store.getCell(addr(20, 1)).resolved).toBe(55);
+    expect(store.getCellLoadState(addr(20, 1))).toBe("loaded-value");
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    store.dispose();
+  });
+
+  it("runs local query operations once every paged cell is loaded", () => {
+    const store = new SheetwriteStore(makeWorkbook(3), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1_000_000,
+    });
+    store.loadRows("s1", 0, [
+      { name: "alpha", amount: 3, city: "A" },
+      { name: "beta", amount: 1, city: "B" },
+      { name: "alphabet", amount: 2, city: "C" },
+    ]);
+
+    expect(store.queryCapability("s1")).toEqual({ status: "complete" });
+    expect(store.aggregate("s1", 1, "sum")).toBe(6);
+    store.sortBy("s1", 1, true);
+    expect([0, 1, 2].map((row) => store.dataRowAt("s1", row))).toEqual([1, 2, 0]);
+    store.clearView("s1");
+    expect(store.searchCells("s1", "beta")).toEqual([addr(1, 0)]);
+    store.dispose();
+  });
+});

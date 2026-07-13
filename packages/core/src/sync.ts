@@ -178,6 +178,7 @@ export class SyncCoordinator {
     if (response.status === "applied" && response.canonicalOperations?.length) {
       this.grid.applyRemoteOperations(response.canonicalOperations);
     }
+    this.grid.store.acknowledgeOperations?.(record.operations);
     this.version = Math.max(this.version, response.version);
     this.records.delete(id);
     const index = this.order.indexOf(id);

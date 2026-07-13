@@ -50,6 +50,7 @@ pub(crate) enum FormulaError {
     Num,
     Value,
     Error,
+    Loading,
 }
 
 impl FormulaError {
@@ -61,6 +62,7 @@ impl FormulaError {
             FormulaError::Num => "#NUM!",
             FormulaError::Value => "#VALUE!",
             FormulaError::Error => "#ERROR!",
+            FormulaError::Loading => "#LOADING!",
         }
     }
 
@@ -73,6 +75,7 @@ impl FormulaError {
             FormulaError::Num => 3,
             FormulaError::Value => 4,
             FormulaError::Error => 5,
+            FormulaError::Loading => 6,
         }
     }
 }

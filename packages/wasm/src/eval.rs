@@ -7,9 +7,9 @@ use crate::calc::{Ast, CmpOp, Func, Op};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaEntry,
-    FormulaError, FormulaValueKind, StringPool, KIND_EMPTY, KIND_FORMULA, RANGE_CELL_LIMIT,
-    Value, FORMULA_RECURSION_LIMIT, KIND_NUMBER, KIND_STRING,
+    cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaEntry, FormulaError,
+    FormulaValueKind, StringPool, Value, FORMULA_RECURSION_LIMIT, KIND_EMPTY, KIND_FORMULA,
+    KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
 pub(crate) struct DepIndex {
@@ -154,24 +154,48 @@ impl CellStore {
                 _ => None,
             };
             let sheet_index = abs_key.sheet as usize;
-            let Some(s) = self.sheets.get_mut(sheet_index) else { continue; };
+            let Some(s) = self.sheets.get_mut(sheet_index) else {
+                continue;
+            };
             let (row, col) = abs_key.local();
             let (row, col) = (row as usize, col as usize);
-            if !s.contains_cell(row, col) { continue; }
+            if !s.contains_cell(row, col) {
+                continue;
+            }
             let i = s.idx(row, col);
             {
-                let Some(entry) = s.formulas.get_mut(&abs_key.local()) else { continue; };
+                let Some(entry) = s.formulas.get_mut(&abs_key.local()) else {
+                    continue;
+                };
                 match &result {
-                    Value::Number(_) => { entry.error = None; entry.value_kind = FormulaValueKind::Number; }
-                    Value::Text(_) => { entry.error = None; entry.value_kind = FormulaValueKind::Text; }
-                    Value::Bool(_) => { entry.error = None; entry.value_kind = FormulaValueKind::Bool; }
-                    Value::Blank => { entry.error = None; entry.value_kind = FormulaValueKind::Number; }
-                    Value::Error(error) => { entry.error = Some(*error); entry.value_kind = FormulaValueKind::Number; }
+                    Value::Number(_) => {
+                        entry.error = None;
+                        entry.value_kind = FormulaValueKind::Number;
+                    }
+                    Value::Text(_) => {
+                        entry.error = None;
+                        entry.value_kind = FormulaValueKind::Text;
+                    }
+                    Value::Bool(_) => {
+                        entry.error = None;
+                        entry.value_kind = FormulaValueKind::Bool;
+                    }
+                    Value::Blank => {
+                        entry.error = None;
+                        entry.value_kind = FormulaValueKind::Number;
+                    }
+                    Value::Error(error) => {
+                        entry.error = Some(*error);
+                        entry.value_kind = FormulaValueKind::Number;
+                    }
                 }
             }
             match result {
                 Value::Number(value) => s.set_num(i, value),
-                Value::Text(_) | Value::Bool(_) => match interned { Some(id) => s.set_str(i, id), None => s.clear_payload(i) },
+                Value::Text(_) | Value::Bool(_) => match interned {
+                    Some(id) => s.set_str(i, id),
+                    None => s.clear_payload(i),
+                },
                 Value::Blank | Value::Error(_) => s.clear_payload(i),
             }
         }
@@ -198,6 +222,9 @@ impl CellStore {
         if !s.contains_cell(row, col) {
             return Value::Error(FormulaError::Ref);
         }
+        if !s.is_loaded(row, col) {
+            return Value::Error(FormulaError::Loading);
+        }
 
         // 2026-06 release harness: unchecked cell access was 1.13x here,
         // below the 2x threshold; keep the safe indexing.
@@ -212,7 +239,7 @@ impl CellStore {
             }
         }
 
-        match s.kind[i] {
+        match s.kind_at(i) {
             KIND_NUMBER => Value::number(s.num_at(i)),
             KIND_STRING => string_from_pool_ref(&self.strings, s.str_id_at(i))
                 .map(Value::text)
@@ -352,446 +379,453 @@ impl CellStore {
         }
     }
 
-fn eval_func(
-    &self,
-    func: Func,
-    args: &[Ast],
-    sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
-    depth: usize,
-) -> EvalResult {
-    if depth > FORMULA_RECURSION_LIMIT {
-        return Value::Error(FormulaError::Num);
-    }
+    fn eval_func(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> EvalResult {
+        if depth > FORMULA_RECURSION_LIMIT {
+            return Value::Error(FormulaError::Num);
+        }
 
-    if func == Func::If {
-        let Some(condition) = args.first() else {
-            return Value::Error(FormulaError::Value);
-        };
-        let condition = self.eval_ast(condition, sheet, affected, memo, visiting, depth + 1);
-        let use_true_branch = match bool_from_value(&condition) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let branch = if use_true_branch {
-            args.get(1)
-        } else {
-            args.get(2)
-        };
-        return if let Some(branch) = branch {
-            self.eval_ast(branch, sheet, affected, memo, visiting, depth + 1)
-        } else {
-            Value::Number(0.0)
-        };
-    }
-
-    if func == Func::IfError {
-        let Some(primary) = args.first() else {
-            return Value::Number(0.0);
-        };
-        let value = self.eval_ast(primary, sheet, affected, memo, visiting, depth + 1);
-        return if matches!(value, Value::Error(_)) {
-            if let Some(fallback) = args.get(1) {
-                self.eval_ast(fallback, sheet, affected, memo, visiting, depth + 1)
+        if func == Func::If {
+            let Some(condition) = args.first() else {
+                return Value::Error(FormulaError::Value);
+            };
+            let condition = self.eval_ast(condition, sheet, affected, memo, visiting, depth + 1);
+            let use_true_branch = match bool_from_value(&condition) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let branch = if use_true_branch {
+                args.get(1)
+            } else {
+                args.get(2)
+            };
+            return if let Some(branch) = branch {
+                self.eval_ast(branch, sheet, affected, memo, visiting, depth + 1)
             } else {
                 Value::Number(0.0)
-            }
-        } else {
-            value
-        };
-    }
-
-    let mut values = FuncAccumulator::default();
-    for arg in args {
-        let range = match arg {
-            Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-                sheet as u32,
-                *row_start,
-                *col_start,
-                *row_end,
-                *col_end,
-            )),
-            Ast::AbsRange(sheet_ref, row_start, col_start, row_end, col_end, _) => Some(
-                CellRange::new(sheet_ref.handle, *row_start, *col_start, *row_end, *col_end),
-            ),
-            _ => None,
-        };
-        if let Some(range) = range {
-            if let Err(error) =
-                self.eval_range_values(range, affected, memo, visiting, depth + 1, &mut values)
-            {
-                return Value::Error(error);
-            }
-            continue;
+            };
         }
 
-        let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
-        if let Value::Error(error) = value {
-            return Value::Error(error);
+        if func == Func::IfError {
+            let Some(primary) = args.first() else {
+                return Value::Number(0.0);
+            };
+            let value = self.eval_ast(primary, sheet, affected, memo, visiting, depth + 1);
+            return if matches!(value, Value::Error(_)) {
+                if let Some(fallback) = args.get(1) {
+                    self.eval_ast(fallback, sheet, affected, memo, visiting, depth + 1)
+                } else {
+                    Value::Number(0.0)
+                }
+            } else {
+                value
+            };
         }
-        if treats_cell_as_reference(func) && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..)) {
-            if !matches!(value, Value::Blank) {
-                values.push_range(value);
-            }
-        } else {
-            values.push_scalar(value);
-        }
-    }
 
-    apply_func(func, &values)
-}
-
-fn eval_range_values(
-    &self,
-    range: CellRange,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
-    depth: usize,
-    values: &mut FuncAccumulator,
-) -> Result<(), FormulaError> {
-    if depth > FORMULA_RECURSION_LIMIT {
-        return Err(FormulaError::Num);
-    }
-
-    let sheet = range.sheet as usize;
-    let Some(s) = self.sheets.get(sheet) else {
-        return Err(FormulaError::Ref);
-    };
-    if s.row_count == 0
-        || s.n_cols == 0
-        || range.row_start as usize >= s.row_count
-        || range.col_start as usize >= s.n_cols
-    {
-        return Err(FormulaError::Ref);
-    }
-
-    let row_start = range.row_start as usize;
-    let col_start = range.col_start as usize;
-    let row_end = (range.row_end as usize).min(s.row_count - 1);
-    let col_end = (range.col_end as usize).min(s.n_cols - 1);
-
-    let row_len = row_end - row_start + 1;
-    let col_len = col_end - col_start + 1;
-    let total = (row_len as u64).saturating_mul(col_len as u64);
-    if total > RANGE_CELL_LIMIT {
-        return Err(FormulaError::Num);
-    }
-
-    for row in row_start..=row_end {
-        for col in col_start..=col_end {
-            let i = s.idx(row, col);
-            if s.kind[i] == KIND_EMPTY {
+        let mut values = FuncAccumulator::default();
+        for arg in args {
+            let range = match arg {
+                Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
+                    sheet as u32,
+                    *row_start,
+                    *col_start,
+                    *row_end,
+                    *col_end,
+                )),
+                Ast::AbsRange(sheet_ref, row_start, col_start, row_end, col_end, _) => Some(
+                    CellRange::new(sheet_ref.handle, *row_start, *col_start, *row_end, *col_end),
+                ),
+                _ => None,
+            };
+            if let Some(range) = range {
+                if let Err(error) =
+                    self.eval_range_values(range, affected, memo, visiting, depth + 1, &mut values)
+                {
+                    return Value::Error(error);
+                }
                 continue;
             }
-            let value = self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1);
+
+            let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
             if let Value::Error(error) = value {
-                return Err(error);
+                return Value::Error(error);
             }
-            values.push_range(value);
+            if treats_cell_as_reference(func) && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..)) {
+                if !matches!(value, Value::Blank) {
+                    values.push_range(value);
+                }
+            } else {
+                values.push_scalar(value);
+            }
         }
+
+        apply_func(func, &values)
     }
 
-    Ok(())
-}
+    fn eval_range_values(
+        &self,
+        range: CellRange,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+        values: &mut FuncAccumulator,
+    ) -> Result<(), FormulaError> {
+        if depth > FORMULA_RECURSION_LIMIT {
+            return Err(FormulaError::Num);
+        }
+
+        let sheet = range.sheet as usize;
+        let Some(s) = self.sheets.get(sheet) else {
+            return Err(FormulaError::Ref);
+        };
+        if s.row_count == 0
+            || s.n_cols == 0
+            || range.row_start as usize >= s.row_count
+            || range.col_start as usize >= s.n_cols
+        {
+            return Err(FormulaError::Ref);
+        }
+
+        let row_start = range.row_start as usize;
+        let col_start = range.col_start as usize;
+        let row_end = (range.row_end as usize).min(s.row_count - 1);
+        let col_end = (range.col_end as usize).min(s.n_cols - 1);
+
+        let row_len = row_end - row_start + 1;
+        let col_len = col_end - col_start + 1;
+        let total = (row_len as u64).saturating_mul(col_len as u64);
+        if total > RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+
+        for row in row_start..=row_end {
+            for col in col_start..=col_end {
+                if !s.is_loaded(row, col) {
+                    return Err(FormulaError::Loading);
+                }
+                let i = s.idx(row, col);
+                if s.kind_at(i) == KIND_EMPTY {
+                    continue;
+                }
+                let value = self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1);
+                if let Value::Error(error) = value {
+                    return Err(error);
+                }
+                values.push_range(value);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Default)]
 struct FuncAccumulator {
-values: Vec<FuncValue>,
+    values: Vec<FuncValue>,
 }
 
 #[derive(Debug)]
 struct FuncValue {
-value: Value,
-from_range: bool,
+    value: Value,
+    from_range: bool,
 }
 
 impl FuncAccumulator {
-fn push_scalar(&mut self, value: Value) {
-    self.values.push(FuncValue {
-        value,
-        from_range: false,
-    });
-}
+    fn push_scalar(&mut self, value: Value) {
+        self.values.push(FuncValue {
+            value,
+            from_range: false,
+        });
+    }
 
-fn push_range(&mut self, value: Value) {
-    self.values.push(FuncValue {
-        value,
-        from_range: true,
-    });
-}
+    fn push_range(&mut self, value: Value) {
+        self.values.push(FuncValue {
+            value,
+            from_range: true,
+        });
+    }
 
-fn first(&self, index: usize) -> Value {
-    self.values
-        .get(index)
-        .map(|entry| entry.value.clone())
-        .unwrap_or(Value::Number(0.0))
-}
+    fn first(&self, index: usize) -> Value {
+        self.values
+            .get(index)
+            .map(|entry| entry.value.clone())
+            .unwrap_or(Value::Number(0.0))
+    }
 
-fn len(&self) -> usize {
-    self.values.len()
-}
+    fn len(&self) -> usize {
+        self.values.len()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct NumericAggregate {
-count: u64,
-sum: f64,
-min: f64,
-max: f64,
+    count: u64,
+    sum: f64,
+    min: f64,
+    max: f64,
 }
 
 fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
-match func {
-    Func::Count => Value::number(count_numeric(values) as f64),
-    Func::CountA => Value::number(count_present(values) as f64),
-    Func::Sum => match aggregate_numbers(values) {
-        Ok(stats) => Value::number(stats.sum),
-        Err(error) => Value::Error(error),
-    },
-    Func::Avg => match aggregate_numbers(values) {
-        Ok(stats) if stats.count > 0 => Value::number(stats.sum / stats.count as f64),
-        Ok(_) => Value::Number(0.0),
-        Err(error) => Value::Error(error),
-    },
-    Func::Min => match aggregate_numbers(values) {
-        Ok(stats) if stats.count > 0 => Value::number(stats.min),
-        Ok(_) => Value::Number(0.0),
-        Err(error) => Value::Error(error),
-    },
-    Func::Max => match aggregate_numbers(values) {
-        Ok(stats) if stats.count > 0 => Value::number(stats.max),
-        Ok(_) => Value::Number(0.0),
-        Err(error) => Value::Error(error),
-    },
-    Func::If | Func::IfError => values.first(0),
-    Func::Abs => {
-        number_arg(values, 0, 0.0).map_or_else(Value::Error, |value| Value::number(value.abs()))
-    }
-    Func::Sqrt => number_arg(values, 0, 0.0)
-        .map_or_else(Value::Error, |value| Value::number(value.sqrt())),
-    Func::Round => {
-        let value = match number_arg(values, 0, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let digits = match number_arg(values, 1, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let factor = 10f64.powf(digits);
-        if factor == 0.0 || !factor.is_finite() {
-            Value::Error(FormulaError::Num)
-        } else {
-            Value::number((value * factor).round() / factor)
-        }
-    }
-    Func::Mod => {
-        let value = match number_arg(values, 0, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let divisor = match number_arg(values, 1, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        if divisor == 0.0 {
-            Value::Error(FormulaError::DivZero)
-        } else {
-            Value::number(value % divisor)
-        }
-    }
-    Func::Pow => {
-        let value = match number_arg(values, 0, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let exponent = match number_arg(values, 1, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        Value::number(value.powf(exponent))
-    }
-    Func::Floor => {
-        let value = match number_arg(values, 0, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let significance = match number_arg(values, 1, 1.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        if significance == 0.0 {
-            Value::Error(FormulaError::DivZero)
-        } else {
-            Value::number((value / significance).floor() * significance)
-        }
-    }
-    Func::Ceiling => {
-        let value = match number_arg(values, 0, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let significance = match number_arg(values, 1, 1.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        if significance == 0.0 {
-            Value::Error(FormulaError::DivZero)
-        } else {
-            Value::number((value / significance).ceil() * significance)
-        }
-    }
-    Func::Int => number_arg(values, 0, 0.0)
-        .map_or_else(Value::Error, |value| Value::number(value.floor())),
-    Func::Trunc => {
-        let value = match number_arg(values, 0, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let digits = match number_arg(values, 1, 0.0) {
-            Ok(value) => value,
-            Err(error) => return Value::Error(error),
-        };
-        let factor = 10f64.powf(digits);
-        if factor == 0.0 || !factor.is_finite() {
-            Value::Error(FormulaError::Num)
-        } else {
-            Value::number((value * factor).trunc() / factor)
-        }
-    }
-    Func::Sign => number_arg(values, 0, 0.0).map_or_else(Value::Error, |value| {
-        Value::Number(if value > 0.0 {
-            1.0
-        } else if value < 0.0 {
-            -1.0
-        } else {
-            0.0
-        })
-    }),
-    Func::Pi => Value::number(std::f64::consts::PI),
-    Func::And => {
-        for entry in &values.values {
-            match bool_from_value(&entry.value) {
-                Ok(false) => return Value::Bool(false),
-                Ok(true) => {}
-                Err(error) => return Value::Error(error),
-            }
-        }
-        Value::Bool(true)
-    }
-    Func::Or => {
-        for entry in &values.values {
-            match bool_from_value(&entry.value) {
-                Ok(true) => return Value::Bool(true),
-                Ok(false) => {}
-                Err(error) => return Value::Error(error),
-            }
-        }
-        Value::Bool(false)
-    }
-    Func::Not => match bool_from_value(&values.first(0)) {
-        Ok(value) => Value::Bool(!value),
-        Err(error) => Value::Error(error),
-    },
-    Func::Len => match text_arg(values, 0) {
-        Ok(text) => Value::number(text.chars().count() as f64),
-        Err(error) => Value::Error(error),
-    },
-    Func::Left => {
-        let text = match text_arg(values, 0) {
-            Ok(text) => text,
-            Err(error) => return Value::Error(error),
-        };
-        let count = match text_count_arg(values, 1, 1.0) {
-            Ok(count) => count,
-            Err(error) => return Value::Error(error),
-        };
-        Value::text(text.chars().take(count).collect::<String>())
-    }
-    Func::Right => {
-        let text = match text_arg(values, 0) {
-            Ok(text) => text,
-            Err(error) => return Value::Error(error),
-        };
-        let count = match text_count_arg(values, 1, 1.0) {
-            Ok(count) => count,
-            Err(error) => return Value::Error(error),
-        };
-        let len = text.chars().count();
-        Value::text(text.chars().skip(len.saturating_sub(count)).collect::<String>())
-    }
-    Func::Mid => {
-        let text = match text_arg(values, 0) {
-            Ok(text) => text,
-            Err(error) => return Value::Error(error),
-        };
-        let start = match number_arg(values, 1, 1.0) {
-            Ok(value) if value >= 1.0 => value.trunc() as usize,
-            Ok(_) => return Value::Error(FormulaError::Value),
-            Err(error) => return Value::Error(error),
-        };
-        let count = match text_count_arg(values, 2, 0.0) {
-            Ok(count) => count,
-            Err(error) => return Value::Error(error),
-        };
-        Value::text(text.chars().skip(start - 1).take(count).collect::<String>())
-    }
-    Func::Concat | Func::Concatenate => {
-        let mut out = String::new();
-        for entry in &values.values {
-            match text_from_value(&entry.value) {
-                Ok(text) => out.push_str(&text),
-                Err(error) => return Value::Error(error),
-            }
-        }
-        Value::text(out)
-    }
-    Func::Upper => match text_arg(values, 0) {
-        Ok(text) => Value::text(text.to_uppercase()),
-        Err(error) => Value::Error(error),
-    },
-    Func::Lower => match text_arg(values, 0) {
-        Ok(text) => Value::text(text.to_lowercase()),
-        Err(error) => Value::Error(error),
-    },
-    Func::Trim => match text_arg(values, 0) {
-        Ok(text) => Value::text(text.split_whitespace().collect::<Vec<_>>().join(" ")),
-        Err(error) => Value::Error(error),
-    },
-    Func::Text => {
-        let value = values.first(0);
-        let format = match text_arg(values, 1) {
-            Ok(format) => format,
-            Err(error) => return Value::Error(error),
-        };
-        match format_basic_text(&value, &format) {
-            Ok(text) => Value::text(text),
+    match func {
+        Func::Count => Value::number(count_numeric(values) as f64),
+        Func::CountA => Value::number(count_present(values) as f64),
+        Func::Sum => match aggregate_numbers(values) {
+            Ok(stats) => Value::number(stats.sum),
             Err(error) => Value::Error(error),
+        },
+        Func::Avg => match aggregate_numbers(values) {
+            Ok(stats) if stats.count > 0 => Value::number(stats.sum / stats.count as f64),
+            Ok(_) => Value::Number(0.0),
+            Err(error) => Value::Error(error),
+        },
+        Func::Min => match aggregate_numbers(values) {
+            Ok(stats) if stats.count > 0 => Value::number(stats.min),
+            Ok(_) => Value::Number(0.0),
+            Err(error) => Value::Error(error),
+        },
+        Func::Max => match aggregate_numbers(values) {
+            Ok(stats) if stats.count > 0 => Value::number(stats.max),
+            Ok(_) => Value::Number(0.0),
+            Err(error) => Value::Error(error),
+        },
+        Func::If | Func::IfError => values.first(0),
+        Func::Abs => {
+            number_arg(values, 0, 0.0).map_or_else(Value::Error, |value| Value::number(value.abs()))
+        }
+        Func::Sqrt => number_arg(values, 0, 0.0)
+            .map_or_else(Value::Error, |value| Value::number(value.sqrt())),
+        Func::Round => {
+            let value = match number_arg(values, 0, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let digits = match number_arg(values, 1, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let factor = 10f64.powf(digits);
+            if factor == 0.0 || !factor.is_finite() {
+                Value::Error(FormulaError::Num)
+            } else {
+                Value::number((value * factor).round() / factor)
+            }
+        }
+        Func::Mod => {
+            let value = match number_arg(values, 0, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let divisor = match number_arg(values, 1, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            if divisor == 0.0 {
+                Value::Error(FormulaError::DivZero)
+            } else {
+                Value::number(value % divisor)
+            }
+        }
+        Func::Pow => {
+            let value = match number_arg(values, 0, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let exponent = match number_arg(values, 1, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            Value::number(value.powf(exponent))
+        }
+        Func::Floor => {
+            let value = match number_arg(values, 0, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let significance = match number_arg(values, 1, 1.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            if significance == 0.0 {
+                Value::Error(FormulaError::DivZero)
+            } else {
+                Value::number((value / significance).floor() * significance)
+            }
+        }
+        Func::Ceiling => {
+            let value = match number_arg(values, 0, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let significance = match number_arg(values, 1, 1.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            if significance == 0.0 {
+                Value::Error(FormulaError::DivZero)
+            } else {
+                Value::number((value / significance).ceil() * significance)
+            }
+        }
+        Func::Int => number_arg(values, 0, 0.0)
+            .map_or_else(Value::Error, |value| Value::number(value.floor())),
+        Func::Trunc => {
+            let value = match number_arg(values, 0, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let digits = match number_arg(values, 1, 0.0) {
+                Ok(value) => value,
+                Err(error) => return Value::Error(error),
+            };
+            let factor = 10f64.powf(digits);
+            if factor == 0.0 || !factor.is_finite() {
+                Value::Error(FormulaError::Num)
+            } else {
+                Value::number((value * factor).trunc() / factor)
+            }
+        }
+        Func::Sign => number_arg(values, 0, 0.0).map_or_else(Value::Error, |value| {
+            Value::Number(if value > 0.0 {
+                1.0
+            } else if value < 0.0 {
+                -1.0
+            } else {
+                0.0
+            })
+        }),
+        Func::Pi => Value::number(std::f64::consts::PI),
+        Func::And => {
+            for entry in &values.values {
+                match bool_from_value(&entry.value) {
+                    Ok(false) => return Value::Bool(false),
+                    Ok(true) => {}
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            Value::Bool(true)
+        }
+        Func::Or => {
+            for entry in &values.values {
+                match bool_from_value(&entry.value) {
+                    Ok(true) => return Value::Bool(true),
+                    Ok(false) => {}
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            Value::Bool(false)
+        }
+        Func::Not => match bool_from_value(&values.first(0)) {
+            Ok(value) => Value::Bool(!value),
+            Err(error) => Value::Error(error),
+        },
+        Func::Len => match text_arg(values, 0) {
+            Ok(text) => Value::number(text.chars().count() as f64),
+            Err(error) => Value::Error(error),
+        },
+        Func::Left => {
+            let text = match text_arg(values, 0) {
+                Ok(text) => text,
+                Err(error) => return Value::Error(error),
+            };
+            let count = match text_count_arg(values, 1, 1.0) {
+                Ok(count) => count,
+                Err(error) => return Value::Error(error),
+            };
+            Value::text(text.chars().take(count).collect::<String>())
+        }
+        Func::Right => {
+            let text = match text_arg(values, 0) {
+                Ok(text) => text,
+                Err(error) => return Value::Error(error),
+            };
+            let count = match text_count_arg(values, 1, 1.0) {
+                Ok(count) => count,
+                Err(error) => return Value::Error(error),
+            };
+            let len = text.chars().count();
+            Value::text(
+                text.chars()
+                    .skip(len.saturating_sub(count))
+                    .collect::<String>(),
+            )
+        }
+        Func::Mid => {
+            let text = match text_arg(values, 0) {
+                Ok(text) => text,
+                Err(error) => return Value::Error(error),
+            };
+            let start = match number_arg(values, 1, 1.0) {
+                Ok(value) if value >= 1.0 => value.trunc() as usize,
+                Ok(_) => return Value::Error(FormulaError::Value),
+                Err(error) => return Value::Error(error),
+            };
+            let count = match text_count_arg(values, 2, 0.0) {
+                Ok(count) => count,
+                Err(error) => return Value::Error(error),
+            };
+            Value::text(text.chars().skip(start - 1).take(count).collect::<String>())
+        }
+        Func::Concat | Func::Concatenate => {
+            let mut out = String::new();
+            for entry in &values.values {
+                match text_from_value(&entry.value) {
+                    Ok(text) => out.push_str(&text),
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            Value::text(out)
+        }
+        Func::Upper => match text_arg(values, 0) {
+            Ok(text) => Value::text(text.to_uppercase()),
+            Err(error) => Value::Error(error),
+        },
+        Func::Lower => match text_arg(values, 0) {
+            Ok(text) => Value::text(text.to_lowercase()),
+            Err(error) => Value::Error(error),
+        },
+        Func::Trim => match text_arg(values, 0) {
+            Ok(text) => Value::text(text.split_whitespace().collect::<Vec<_>>().join(" ")),
+            Err(error) => Value::Error(error),
+        },
+        Func::Text => {
+            let value = values.first(0);
+            let format = match text_arg(values, 1) {
+                Ok(format) => format,
+                Err(error) => return Value::Error(error),
+            };
+            match format_basic_text(&value, &format) {
+                Ok(text) => Value::text(text),
+                Err(error) => Value::Error(error),
+            }
+        }
+        Func::Exact => {
+            let left = match text_arg(values, 0) {
+                Ok(text) => text,
+                Err(error) => return Value::Error(error),
+            };
+            let right = match text_arg(values, 1) {
+                Ok(text) => text,
+                Err(error) => return Value::Error(error),
+            };
+            Value::Bool(left == right)
         }
     }
-    Func::Exact => {
-        let left = match text_arg(values, 0) {
-            Ok(text) => text,
-            Err(error) => return Value::Error(error),
-        };
-        let right = match text_arg(values, 1) {
-            Ok(text) => text,
-            Err(error) => return Value::Error(error),
-        };
-        Value::Bool(left == right)
-    }
-}
 }
 
 fn treats_cell_as_reference(func: Func) -> bool {
-matches!(
-    func,
-    Func::Sum | Func::Avg | Func::Min | Func::Max | Func::Count | Func::CountA
-)
+    matches!(
+        func,
+        Func::Sum | Func::Avg | Func::Min | Func::Max | Func::Count | Func::CountA
+    )
 }
 pub(crate) fn cached_formula_value(
     sheet: &SheetData,
@@ -969,7 +1003,10 @@ fn count_present(values: &FuncAccumulator) -> u64 {
     values.len() as u64
 }
 
-pub(crate) fn aggregate_number(value: &Value, from_range: bool) -> Result<Option<f64>, FormulaError> {
+pub(crate) fn aggregate_number(
+    value: &Value,
+    from_range: bool,
+) -> Result<Option<f64>, FormulaError> {
     match value {
         Value::Number(value) if value.is_finite() => Ok(Some(*value)),
         Value::Number(_) => Err(FormulaError::Num),
@@ -1079,7 +1116,11 @@ pub(crate) fn prepare_interval_index(intervals: &mut [RangeInterval]) {
     }
 }
 
-pub(crate) fn collect_interval_matches(intervals: &[RangeInterval], point: u32, out: &mut Vec<usize>) {
+pub(crate) fn collect_interval_matches(
+    intervals: &[RangeInterval],
+    point: u32,
+    out: &mut Vec<usize>,
+) {
     out.clear();
     let mut cursor = intervals.partition_point(|interval| interval.start <= point);
     while cursor > 0 {
@@ -1350,4 +1391,3 @@ pub(crate) fn formula_dependency_depth(
     depth_memo.insert(key, result);
     result
 }
-

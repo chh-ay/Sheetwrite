@@ -1,0 +1,87 @@
+{
+  "rows": 1000000,
+  "columns": 5,
+  "runs": 12,
+  "pageRows": 120,
+  "cacheBudgetBytes": 33554432,
+  "denseLogicalBytes": 65000000,
+  "startup": {
+    "medianMs": 0.043735000000005186,
+    "p95Ms": 0.7703309999999988
+  },
+  "firstPage": {
+    "medianMs": 0.3315590000000057,
+    "p95Ms": 2.1880840000000035
+  },
+  "distantPage": {
+    "medianMs": 0.2974710000000016,
+    "p95Ms": 0.8876449999999991
+  },
+  "peakAllocatedBytes": 542720,
+  "peakChunks": 10,
+  "probes": [
+    {
+      "scenario": "empty",
+      "wasmDeltaBytes": 65536,
+      "chunks": 0,
+      "loadedCells": 0,
+      "dirtyCells": 0,
+      "allocatedBytes": 0,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "padding",
+      "wasmDeltaBytes": 65536,
+      "chunks": 0,
+      "loadedCells": 0,
+      "dirtyCells": 0,
+      "allocatedBytes": 0,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "viewport",
+      "wasmDeltaBytes": 327680,
+      "chunks": 5,
+      "loadedCells": 150,
+      "dirtyCells": 0,
+      "allocatedBytes": 271360,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "scroll-1",
+      "wasmDeltaBytes": 851968,
+      "chunks": 15,
+      "loadedCells": 50000,
+      "dirtyCells": 0,
+      "allocatedBytes": 814080,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "scroll-10",
+      "wasmDeltaBytes": 6881280,
+      "chunks": 125,
+      "loadedCells": 500000,
+      "dirtyCells": 0,
+      "allocatedBytes": 6784000,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "scroll-100",
+      "wasmDeltaBytes": 33751040,
+      "chunks": 618,
+      "loadedCells": 2513728,
+      "dirtyCells": 0,
+      "allocatedBytes": 33540096,
+      "fullyLoaded": false
+    },
+    {
+      "scenario": "dirty",
+      "wasmDeltaBytes": 5505024,
+      "chunks": 100,
+      "loadedCells": 100,
+      "dirtyCells": 100,
+      "allocatedBytes": 5427200,
+      "fullyLoaded": false
+    }
+  ]
+}

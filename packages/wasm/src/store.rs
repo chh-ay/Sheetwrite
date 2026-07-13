@@ -7,10 +7,13 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{parse, resolve_sheet_refs};
 use crate::eval::{bool_text, DepIndex};
-use crate::sheet::{formula_error_at, payload_num, payload_str_id, CondPred, CondRule, SheetData};
+use crate::sheet::{
+    formula_error_at, payload_num, payload_str_id, CondPred, CondRule, SheetData,
+    DEFAULT_PAGE_CHUNK_ROWS,
+};
 use crate::types::{
-    cell_key, string_from_pool, FormulaEntry, FormulaValueKind, StringPool, KIND_EMPTY,
-    KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, string_from_pool, FormulaEntry, FormulaError, FormulaValueKind, StringPool,
+    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 pub(crate) enum InternSlot {
@@ -109,6 +112,7 @@ pub struct CellStore {
     pub(crate) string_lookup: InternMap,
     pub(crate) formula_epoch: u64,
     pub(crate) dep_index: Option<DepIndex>,
+    loading_page: usize,
 }
 
 #[wasm_bindgen]
@@ -124,6 +128,7 @@ impl CellStore {
             string_lookup: InternMap::default(),
             formula_epoch: 0,
             dep_index: None,
+            loading_page: 0,
         }
     }
     #[wasm_bindgen(js_name = snapshotNumbers)]
@@ -156,6 +161,124 @@ impl CellStore {
         self.sheet_names.push(String::new());
         self.sheet_alive.push(true);
         index
+    }
+
+    /// Allocate a logical sheet whose cell chunks materialize on page load or edit.
+    #[wasm_bindgen(js_name = addPagedSheet)]
+    pub fn add_paged_sheet(
+        &mut self,
+        n_cols: usize,
+        row_count: usize,
+        chunk_rows: usize,
+        byte_budget: usize,
+    ) -> usize {
+        let index = self.sheets.len();
+        self.sheets.push(SheetData::new_paged(
+            n_cols,
+            row_count,
+            if chunk_rows == 0 {
+                DEFAULT_PAGE_CHUNK_ROWS
+            } else {
+                chunk_rows
+            },
+            byte_budget,
+        ));
+        self.sheet_names.push(String::new());
+        self.sheet_alive.push(true);
+        index
+    }
+
+    #[wasm_bindgen(js_name = isPaged)]
+    pub fn is_paged(&self, sheet: usize) -> bool {
+        self.sheets.get(sheet).is_some_and(SheetData::is_paged)
+    }
+
+    /// `[chunks, loaded cells, dirty cells, allocated bytes, fully loaded]`.
+    #[wasm_bindgen(js_name = pagedStats)]
+    pub fn paged_stats(&self, sheet: usize) -> Vec<f64> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return vec![0.0; 5];
+        };
+        let Some((chunks, loaded, dirty, bytes)) = data.paged_stats() else {
+            return vec![0.0, 0.0, 0.0, 0.0, 1.0];
+        };
+        vec![
+            chunks as f64,
+            loaded as f64,
+            dirty as f64,
+            bytes as f64,
+            if data.is_fully_loaded() { 1.0 } else { 0.0 },
+        ]
+    }
+
+    /// 0 unloaded, 1 loaded-empty, 2 loaded-value, 3 dirty local edit.
+    #[wasm_bindgen(js_name = cellState)]
+    pub fn cell_state(&self, sheet: usize, row: usize, col: usize) -> u8 {
+        let Some(data) = self.sheets.get(sheet) else {
+            return 0;
+        };
+        if !data.contains_cell(row, col) || !data.is_loaded(row, col) {
+            return 0;
+        }
+        if data.is_cell_dirty(row, col) {
+            3
+        } else if data.kind_at(data.idx(row, col)) == KIND_EMPTY {
+            1
+        } else {
+            2
+        }
+    }
+
+    #[wasm_bindgen(js_name = isFullyLoaded)]
+    pub fn is_fully_loaded(&self, sheet: usize) -> bool {
+        self.sheets
+            .get(sheet)
+            .is_some_and(SheetData::is_fully_loaded)
+    }
+
+    #[wasm_bindgen(js_name = rangeFullyLoaded)]
+    pub fn range_fully_loaded(
+        &self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        r1: usize,
+        c1: usize,
+    ) -> bool {
+        self.sheets
+            .get(sheet)
+            .is_some_and(|data| data.range_fully_loaded(r0, c0, r1, c1))
+    }
+
+    #[wasm_bindgen(js_name = markRangeClean)]
+    pub fn mark_range_clean(
+        &mut self,
+        sheet: usize,
+        start_row: usize,
+        end_row: usize,
+        start_col: usize,
+        end_col: usize,
+    ) {
+        if let Some(data) = self.sheets.get_mut(sheet) {
+            data.mark_range_clean(start_row, end_row, start_col, end_col);
+        }
+    }
+
+    #[wasm_bindgen(js_name = pinRange)]
+    pub fn pin_range(&mut self, sheet: usize, start_row: usize, end_row: usize, cols: &[u32]) {
+        if let Some(data) = self.sheets.get_mut(sheet) {
+            data.pin_range(start_row, end_row, cols);
+        }
+    }
+
+    #[wasm_bindgen(js_name = beginPageLoad)]
+    pub fn begin_page_load(&mut self) {
+        self.loading_page = self.loading_page.saturating_add(1);
+    }
+
+    #[wasm_bindgen(js_name = endPageLoad)]
+    pub fn end_page_load(&mut self) {
+        self.loading_page = self.loading_page.saturating_sub(1);
     }
 
     #[wasm_bindgen(js_name = setSheetName)]
@@ -270,6 +393,7 @@ impl CellStore {
         let Some(key) = cell_key(row, col) else {
             return;
         };
+        let local_dirty = self.loading_page == 0;
         let removed_formula = {
             let Some(s) = self.sheets.get_mut(sheet) else {
                 return;
@@ -279,9 +403,10 @@ impl CellStore {
             }
 
             let i = s.idx(row, col);
-            s.kind[i] = KIND_NUMBER;
+            s.set_kind(i, KIND_NUMBER);
             s.set_num(i, value);
-            s.style[i] = style;
+            s.set_style(i, style);
+            s.mark_cell_loaded(row, col, local_dirty);
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -302,7 +427,7 @@ impl CellStore {
         if !s.contains_cell(row, col) {
             return 0;
         }
-        s.style[s.idx(row, col)]
+        s.style_at(s.idx(row, col))
     }
 
     /// Replace a sheet's conditional-format rules. Packed columnar encoding,
@@ -377,13 +502,15 @@ impl CellStore {
             return;
         }
 
+        let local_dirty = self.loading_page == 0;
         let id = self.intern(value);
         let removed_formula = {
             let s = &mut self.sheets[sheet];
             let i = s.idx(row, col);
-            s.kind[i] = KIND_STRING;
+            s.set_kind(i, KIND_STRING);
             s.set_str(i, id);
-            s.style[i] = style;
+            s.set_style(i, style);
+            s.mark_cell_loaded(row, col, local_dirty);
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -398,6 +525,7 @@ impl CellStore {
         let Some(key) = cell_key(row, col) else {
             return;
         };
+        let local_dirty = self.loading_page == 0;
         let removed_formula = {
             let Some(s) = self.sheets.get_mut(sheet) else {
                 return;
@@ -407,9 +535,10 @@ impl CellStore {
             }
 
             let i = s.idx(row, col);
-            s.kind[i] = KIND_EMPTY;
+            s.set_kind(i, KIND_EMPTY);
             s.clear_payload(i);
-            s.style[i] = style;
+            s.set_style(i, style);
+            s.mark_cell_loaded(row, col, local_dirty);
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -463,6 +592,7 @@ impl CellStore {
             }
         }
 
+        let local_dirty = self.loading_page == 0;
         let s = &mut self.sheets[sheet];
         let mut removed_formula = false;
         for col_offset in 0..cols {
@@ -472,16 +602,17 @@ impl CellStore {
                 let row = start_row + row_offset;
                 let offset = row_offset * cols + col_offset;
                 let index = base + row_offset;
-                s.kind[index] = kinds[offset];
+                s.set_kind(index, kinds[offset]);
                 match kinds[offset] {
                     KIND_NUMBER => s.set_num(index, numbers[offset]),
                     KIND_STRING => s.set_str(index, string_ids[offset]),
                     _ => {
-                        s.kind[index] = KIND_EMPTY;
+                        s.set_kind(index, KIND_EMPTY);
                         s.clear_payload(index);
                     }
                 }
-                s.style[index] = styles[offset];
+                s.set_style(index, styles[offset]);
+                s.mark_cell_loaded(row, col, local_dirty);
                 if let Some(key) = cell_key(row, col) {
                     removed_formula |= s.formulas.remove(&key).is_some();
                 }
@@ -507,6 +638,7 @@ impl CellStore {
         contents: bool,
         style: bool,
     ) -> bool {
+        let local_dirty = self.loading_page == 0;
         let Some(s) = self.sheets.get_mut(sheet) else {
             return false;
         };
@@ -518,16 +650,20 @@ impl CellStore {
             let base = col * s.row_count;
             for row in r0..=r1 {
                 let index = base + row;
+                if s.is_paged() && !s.is_loaded(row, col) {
+                    continue;
+                }
                 if contents {
-                    s.kind[index] = KIND_EMPTY;
+                    s.set_kind(index, KIND_EMPTY);
                     s.clear_payload(index);
                     if let Some(key) = cell_key(row, col) {
                         removed_formula |= s.formulas.remove(&key).is_some();
                     }
                 }
                 if style {
-                    s.style[index] = 0;
+                    s.set_style(index, 0);
                 }
+                s.mark_cell_loaded(row, col, local_dirty);
             }
         }
         s.clear_dirty();
@@ -558,7 +694,9 @@ impl CellStore {
         for col in c0..=c1 {
             let base = col * s.row_count;
             for row in r0..=r1 {
-                ids.insert(s.style[base + row], ());
+                if s.is_loaded(row, col) {
+                    ids.insert(s.style_at(base + row), ());
+                }
             }
         }
         let mut out: Vec<u32> = ids.into_keys().collect();
@@ -578,6 +716,7 @@ impl CellStore {
         old_ids: &[u32],
         new_ids: &[u32],
     ) -> bool {
+        let local_dirty = self.loading_page == 0;
         let Some(s) = self.sheets.get_mut(sheet) else {
             return false;
         };
@@ -597,9 +736,13 @@ impl CellStore {
         for col in c0..=c1 {
             let base = col * s.row_count;
             for row in r0..=r1 {
-                let style = &mut s.style[base + row];
-                if let Some(new_style) = mapping.get(style) {
-                    *style = *new_style;
+                if !s.is_loaded(row, col) {
+                    continue;
+                }
+                let old_style = s.style_at(base + row);
+                if let Some(new_style) = mapping.get(&old_style) {
+                    s.set_style(base + row, *new_style);
+                    s.mark_cell_loaded(row, col, local_dirty);
                 }
             }
         }
@@ -629,10 +772,18 @@ impl CellStore {
         let mut payload = Vec::with_capacity(cell_count);
         let mut style = Vec::with_capacity(cell_count);
         for col_offset in 0..cols {
-            let base = (c0 + col_offset) * s.row_count + r0;
-            kind.extend_from_slice(&s.kind[base..base + rows]);
-            payload.extend_from_slice(&s.payload[base..base + rows]);
-            style.extend_from_slice(&s.style[base..base + rows]);
+            let col = c0 + col_offset;
+            for row_offset in 0..rows {
+                let row = r0 + row_offset;
+                let index = s.idx(row, col);
+                kind.push(s.kind_at(index));
+                payload.push(if s.str_id_at(index) != NO_STRING {
+                    crate::sheet::encode_str_id(s.str_id_at(index))
+                } else {
+                    crate::sheet::encode_num(s.num_at(index))
+                });
+                style.push(s.style_at(index));
+            }
         }
         let formulas = s
             .formulas
@@ -663,6 +814,7 @@ impl CellStore {
         c0: usize,
         snapshot: &RangeSnapshot,
     ) -> bool {
+        let local_dirty = self.loading_page == 0;
         let Some(s) = self.sheets.get_mut(sheet) else {
             return false;
         };
@@ -682,13 +834,22 @@ impl CellStore {
         });
         for col_offset in 0..snapshot.cols {
             let source = col_offset * snapshot.rows;
-            let target = (c0 + col_offset) * s.row_count + r0;
-            s.kind[target..target + snapshot.rows]
-                .copy_from_slice(&snapshot.kind[source..source + snapshot.rows]);
-            s.payload[target..target + snapshot.rows]
-                .copy_from_slice(&snapshot.payload[source..source + snapshot.rows]);
-            s.style[target..target + snapshot.rows]
-                .copy_from_slice(&snapshot.style[source..source + snapshot.rows]);
+            let col = c0 + col_offset;
+            for row_offset in 0..snapshot.rows {
+                let row = r0 + row_offset;
+                let target = s.idx(row, col);
+                s.set_kind(target, snapshot.kind[source + row_offset]);
+                if payload_str_id(snapshot.payload[source + row_offset]) != NO_STRING {
+                    s.set_str(
+                        target,
+                        payload_str_id(snapshot.payload[source + row_offset]),
+                    );
+                } else {
+                    s.set_num(target, payload_num(snapshot.payload[source + row_offset]));
+                }
+                s.set_style(target, snapshot.style[source + row_offset]);
+                s.mark_cell_loaded(row, col, local_dirty);
+            }
         }
         for (row, col, entry) in &snapshot.formulas {
             s.formulas
@@ -710,6 +871,7 @@ impl CellStore {
         values: &[f64],
         style: u32,
     ) {
+        let local_dirty = self.loading_page == 0;
         let removed_formula = {
             let Some(s) = self.sheets.get_mut(sheet) else {
                 return;
@@ -727,9 +889,10 @@ impl CellStore {
                     continue;
                 };
                 let i = base + row;
-                s.kind[i] = KIND_NUMBER;
+                s.set_kind(i, KIND_NUMBER);
                 s.set_num(i, value);
-                s.style[i] = style;
+                s.set_style(i, style);
+                s.mark_cell_loaded(row, col, local_dirty);
                 removed_formula |= s.formulas.remove(&key).is_some();
             }
             if limit > 0 {
@@ -752,6 +915,7 @@ impl CellStore {
         values: Vec<String>,
         style: u32,
     ) {
+        let local_dirty = self.loading_page == 0;
         let Some(existing) = self.sheets.get(sheet) else {
             return;
         };
@@ -772,9 +936,10 @@ impl CellStore {
             let id = self.intern(&value);
             let s = &mut self.sheets[sheet];
             let i = base + row;
-            s.kind[i] = KIND_STRING;
+            s.set_kind(i, KIND_STRING);
             s.set_str(i, id);
-            s.style[i] = style;
+            s.set_style(i, style);
+            s.mark_cell_loaded(row, col, local_dirty);
             removed_formula |= s.formulas.remove(&key).is_some();
         }
         if limit > 0 {
@@ -799,6 +964,7 @@ impl CellStore {
         utf16_lens: &[u32],
         style: u32,
     ) {
+        let local_dirty = self.loading_page == 0;
         let Some(existing) = self.sheets.get(sheet) else {
             return;
         };
@@ -846,9 +1012,10 @@ impl CellStore {
             let id = self.intern(text);
             let s = &mut self.sheets[sheet];
             let i = base + row;
-            s.kind[i] = KIND_STRING;
+            s.set_kind(i, KIND_STRING);
             s.set_str(i, id);
-            s.style[i] = style;
+            s.set_style(i, style);
+            s.mark_cell_loaded(row, col, local_dirty);
             removed_formula |= s.formulas.remove(&key).is_some();
         }
         if limit > 0 {
@@ -924,9 +1091,17 @@ impl CellStore {
         if !s.contains_cell(row, col) {
             return CellOut::empty();
         }
+        if !s.is_loaded(row, col) {
+            return CellOut {
+                kind: KIND_STRING,
+                num: 0.0,
+                string: Some(FormulaError::Loading.sentinel().to_string()),
+                style: 0,
+            };
+        }
 
         let i = s.idx(row, col);
-        let kind = s.kind[i];
+        let kind = s.kind_at(i);
         let key = cell_key(row, col);
         if kind == KIND_FORMULA {
             if let Some(error) = key.and_then(|key| formula_error_at(s, key)) {
@@ -934,7 +1109,7 @@ impl CellStore {
                     kind: KIND_STRING,
                     num: 0.0,
                     string: Some(error.sentinel().to_string()),
-                    style: s.style[i],
+                    style: s.style_at(i),
                 };
             }
             if s.str_id_at(i) != NO_STRING {
@@ -953,7 +1128,7 @@ impl CellStore {
                     kind: KIND_STRING,
                     num,
                     string,
-                    style: s.style[i],
+                    style: s.style_at(i),
                 };
             }
         }
@@ -966,7 +1141,7 @@ impl CellStore {
             } else {
                 None
             },
-            style: s.style[i],
+            style: s.style_at(i),
         }
     }
 
@@ -1004,11 +1179,12 @@ impl CellStore {
             Ok(ast) => FormulaEntry::parsed(ast, sheet as u32),
             Err(_) => FormulaEntry::parse_error(src),
         };
+        let local_dirty = self.loading_page == 0;
 
         let cached_value = {
             let s = &mut self.sheets[sheet];
             let i = s.idx(row, col);
-            s.kind[i] = KIND_FORMULA;
+            s.set_kind(i, KIND_FORMULA);
             // A formula keeps the previous numeric cached value until the
             // barrier recompute; a previous string payload reads as 0.0,
             // matching the old zeroed `num` slot.
@@ -1018,7 +1194,8 @@ impl CellStore {
                 s.num_at(i)
             };
             s.set_num(i, carried);
-            s.style[i] = style;
+            s.set_style(i, style);
+            s.mark_cell_loaded(row, col, local_dirty);
             s.formulas.insert(key, entry);
             s.dirty_cells.insert(key);
             carried

@@ -281,7 +281,11 @@ export interface Transaction {
 export type ApplyTransactionResult =
   | { status: "applied"; epoch: number; transaction: Transaction }
   | { status: "conflict"; expectedEpoch: number; actualEpoch: number }
-  | { status: "noop"; epoch: number; reason: "empty" | "out-of-bounds" };
+  | {
+      status: "noop";
+      epoch: number;
+      reason: "empty" | "out-of-bounds" | "incomplete-data";
+    };
 
 export type OperationSource = "local" | "remote";
 
@@ -451,6 +455,20 @@ export interface ResolvedCell {
   style: CellStyle;
 }
 
+export type CellLoadState = "unloaded" | "loaded-empty" | "loaded-value" | "local-edit";
+
+export interface PagedStoreStats {
+  chunks: number;
+  loadedCells: number;
+  dirtyCells: number;
+  allocatedBytes: number;
+  fullyLoaded: boolean;
+}
+
+export type QueryCapability =
+  | { status: "complete" }
+  | { status: "incomplete"; loadedCells: number; totalCells: number };
+
 export interface Store {
   getWorkbook(): Workbook;
   /**
@@ -494,6 +512,12 @@ export interface Store {
    * legacy object-identity dirty queue. Returns a release function.
    */
   suspendDirtyTracking?(): () => void;
+  /** Explicit partial-data state for paged datasource stores. */
+  queryCapability?(sheet: SheetId): QueryCapability;
+  /** Loaded/empty/local state; dense stores always return a loaded state. */
+  getCellLoadState?(addr: CellAddress): CellLoadState;
+  /** Release paged dirty pins after server acknowledgement. */
+  acknowledgeOperations?(operations: readonly DocumentOp[]): void;
   /** Deterministic, JSON-safe authoritative runtime document. */
   exportSnapshot?(): WorkbookSnapshot;
   /** Displayed row count after any active sort/filter view. */
@@ -591,6 +615,15 @@ export interface DataSourcePage {
 
 export interface DataSource {
   getRows(request: DataSourceRequest): Promise<DataSourcePage>;
+}
+
+export interface DataSourceStorageOptions {
+  /** Storage engine. Dense remains the compatibility default. */
+  mode?: "dense" | "paged";
+  /** Power-of-two row chunk size. Defaults to 4096. */
+  chunkRows?: number;
+  /** Clean-chunk cache budget. Dirty and visible chunks may exceed it. */
+  cacheBytes?: number;
 }
 
 /** Supported compatibility input, normalized once by Grid construction. */
@@ -756,6 +789,7 @@ export interface GridOptions {
   workbook: Workbook;
   data?: ColumnarData;
   datasource?: DataSource | LegacyDataSource;
+  datasourceStorage?: DataSourceStorageOptions;
   renderer?: "canvas" | "worker";
   /**
    * URL of the worker renderer module (`renderer: "worker"`), as served to the

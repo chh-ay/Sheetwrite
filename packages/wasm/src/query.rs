@@ -28,36 +28,43 @@ impl CellStore {
         let mut count = 0u32;
         let mut min = f64::INFINITY;
         let mut max = f64::NEG_INFINITY;
-        // 2026-06 release harness: unchecked scalar loads were 4.36x faster
-        // for this column-major aggregate, so the loop uses proven indexes.
-        for row in 0..s.row_count {
-            let i = base + row;
-            // SAFETY: `col < s.n_cols` above and `row < s.row_count`, so
-            // `base + row` is in-bounds for all column-major cell vectors.
-            let stored_kind = unsafe { *s.kind.get_unchecked(i) };
-            let value = match stored_kind {
-                // SAFETY: same invariant as `stored_kind`; the payload vector
-                // has the same length as `kind` for every `SheetData`. A
-                // NUMBER cell's payload is always canonical f64 bits.
-                KIND_NUMBER => Some(f64::from_bits(unsafe { s.payload_unchecked(i) })),
-                KIND_FORMULA => {
-                    // SAFETY: same invariant as `stored_kind`.
-                    let bits = unsafe { s.payload_unchecked(i) };
-                    if !payload_is_str(bits)
-                        && key_for_index(s, i).is_some_and(|key| formula_error_at(s, key).is_none())
-                    {
-                        Some(f64::from_bits(bits))
-                    } else {
-                        None
-                    }
+        if s.is_paged() {
+            for row in 0..s.row_count {
+                if let Some(value) = numeric_cell_value(s, base + row) {
+                    sum += value;
+                    count += 1;
+                    min = min.min(value);
+                    max = max.max(value);
                 }
-                _ => None,
-            };
-            if let Some(value) = value {
-                sum += value;
-                count += 1;
-                min = min.min(value);
-                max = max.max(value);
+            }
+        } else {
+            // The dense aggregate keeps its proven unchecked contiguous loop.
+            for row in 0..s.row_count {
+                let i = base + row;
+                // SAFETY: `col < n_cols`, `row < row_count`, and all dense cell
+                // vectors have the same `n_cols * row_count` length.
+                let stored_kind = unsafe { *s.kind.get_unchecked(i) };
+                let value = match stored_kind {
+                    KIND_NUMBER => Some(f64::from_bits(unsafe { s.payload_unchecked(i) })),
+                    KIND_FORMULA => {
+                        let bits = unsafe { s.payload_unchecked(i) };
+                        if !payload_is_str(bits)
+                            && key_for_index(s, i)
+                                .is_some_and(|key| formula_error_at(s, key).is_none())
+                        {
+                            Some(f64::from_bits(bits))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+                if let Some(value) = value {
+                    sum += value;
+                    count += 1;
+                    min = min.min(value);
+                    max = max.max(value);
+                }
             }
         }
         match op {
@@ -113,9 +120,13 @@ impl CellStore {
         // ~2·n·log2(n) times, each a scattered heap deref for text cells.
         let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.row_count);
         for row in 0..s.row_count {
-            // SAFETY: `col < s.n_cols` above and `row < s.row_count`, so
-            // `base + row` is in-bounds for all column-major cell vectors.
-            keys.push(unsafe { ComparableCell::from_cell_unchecked(s, &self.strings, base + row) });
+            let index = base + row;
+            keys.push(if s.is_paged() {
+                ComparableCell::from_cell(s, &self.strings, index)
+            } else {
+                // SAFETY: the dense column index is in bounds.
+                unsafe { ComparableCell::from_cell_unchecked(s, &self.strings, index) }
+            });
         }
 
         let mut order: Vec<u32> = (0..s.row_count as u32).collect();
@@ -151,29 +162,36 @@ impl CellStore {
         let mut out: Vec<u32> = Vec::with_capacity(s.row_count.min(1024));
         let mut cache = MatchCache::new();
 
-        // Column slices let the pure-string fast path below run bounds-check
-        // free; string columns dominate text filtering, and the generic
-        // per-cell path only pays for formula/number cells.
-        let kinds = &s.kind[base..base + s.row_count];
-        let payloads = &s.payload[base..base + s.row_count];
-        for (row, (&kind, &bits)) in kinds.iter().zip(payloads.iter()).enumerate() {
-            let matched = if kind == KIND_STRING {
-                cache.matches(&self.strings, payload_str_id(bits), &needle, true, false)
-            } else if kind == KIND_EMPTY {
-                false
-            } else {
-                cell_matches_text(
-                    s,
-                    &self.strings,
-                    base + row,
-                    &needle,
-                    true,
-                    false,
-                    &mut cache,
-                )
-            };
-            if matched {
-                out.push(row as u32);
+        if s.is_paged() {
+            for row in 0..s.row_count {
+                let index = base + row;
+                if cell_matches_text(s, &self.strings, index, &needle, true, false, &mut cache) {
+                    out.push(row as u32);
+                }
+            }
+        } else {
+            // Dense string columns keep the slice-based bounds-check-free path.
+            let kinds = &s.kind[base..base + s.row_count];
+            let payloads = &s.payload[base..base + s.row_count];
+            for (row, (&kind, &bits)) in kinds.iter().zip(payloads.iter()).enumerate() {
+                let matched = if kind == KIND_STRING {
+                    cache.matches(&self.strings, payload_str_id(bits), &needle, true, false)
+                } else if kind == KIND_EMPTY {
+                    false
+                } else {
+                    cell_matches_text(
+                        s,
+                        &self.strings,
+                        base + row,
+                        &needle,
+                        true,
+                        false,
+                        &mut cache,
+                    )
+                };
+                if matched {
+                    out.push(row as u32);
+                }
             }
         }
         out
@@ -212,7 +230,7 @@ impl CellStore {
                 p * s.row_count + row
             }
         };
-        let occupied = |p: usize| -> bool { s.kind[index_of(p)] != KIND_EMPTY };
+        let occupied = |p: usize| -> bool { s.kind_at(index_of(p)) != KIND_EMPTY };
 
         let last = limit - 1;
         let next = pos as isize + step;
@@ -322,24 +340,44 @@ impl CellStore {
         ascending: &[u8],
         candidates: &[u32],
     ) -> Vec<u32> {
-        let Some(data) = self.sheets.get(sheet) else { return Vec::new(); };
-        if cols.is_empty() { return candidates.to_vec(); }
-        if cols.len() == 1 && candidates.is_empty() {
-            return self.sort_rows(sheet, cols[0] as usize, ascending.first().copied().unwrap_or(1) != 0);
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        if cols.is_empty() {
+            return candidates.to_vec();
         }
-        if cols.iter().any(|&col| col as usize >= data.n_cols) { return Vec::new(); }
+        if cols.len() == 1 && candidates.is_empty() {
+            return self.sort_rows(
+                sheet,
+                cols[0] as usize,
+                ascending.first().copied().unwrap_or(1) != 0,
+            );
+        }
+        if cols.iter().any(|&col| col as usize >= data.n_cols) {
+            return Vec::new();
+        }
         let mut rows: Vec<u32> = if candidates.is_empty() {
             (0..data.row_count as u32).collect()
         } else {
-            candidates.iter().copied().filter(|&row| (row as usize) < data.row_count).collect()
+            candidates
+                .iter()
+                .copied()
+                .filter(|&row| (row as usize) < data.row_count)
+                .collect()
         };
         rows.sort_by(|&left, &right| {
             for (key, &col) in cols.iter().enumerate() {
                 let base = col as usize * data.row_count;
                 let a = ComparableCell::from_cell(data, &self.strings, base + left as usize);
                 let b = ComparableCell::from_cell(data, &self.strings, base + right as usize);
-                let order = if ascending.get(key).copied().unwrap_or(1) != 0 { a.cmp(&b) } else { b.cmp(&a) };
-                if order != Ordering::Equal { return order; }
+                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
+                    a.cmp(&b)
+                } else {
+                    b.cmp(&a)
+                };
+                if order != Ordering::Equal {
+                    return order;
+                }
             }
             left.cmp(&right)
         });
@@ -360,13 +398,18 @@ impl CellStore {
         value_nums: &[f64],
         value_texts: Vec<String>,
     ) -> Vec<u32> {
-        let Some(data) = self.sheets.get(sheet) else { return Vec::new(); };
-        if cols.len() != kinds.len() || cols.iter().any(|&col| col as usize >= data.n_cols) { return Vec::new(); }
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        if cols.len() != kinds.len() || cols.iter().any(|&col| col as usize >= data.n_cols) {
+            return Vec::new();
+        }
         let mut num_offsets = Vec::with_capacity(cols.len());
         let mut text_offsets = Vec::with_capacity(cols.len());
         let (mut no, mut to) = (0usize, 0usize);
         for i in 0..cols.len() {
-            num_offsets.push(no); text_offsets.push(to);
+            num_offsets.push(no);
+            text_offsets.push(to);
             no = no.saturating_add(num_counts.get(i).copied().unwrap_or(0) as usize);
             to = to.saturating_add(text_counts.get(i).copied().unwrap_or(0) as usize);
         }
@@ -382,33 +425,55 @@ impl CellStore {
                         let tc = text_counts.get(i).copied().unwrap_or(0) as usize;
                         if kind == 1 {
                             if let Some(value) = numeric_cell_value(data, index) {
-                                hit |= value_nums.get(num_offsets[i]..num_offsets[i] + nc).unwrap_or(&[]).contains(&value);
+                                hit |= value_nums
+                                    .get(num_offsets[i]..num_offsets[i] + nc)
+                                    .unwrap_or(&[])
+                                    .contains(&value);
                             }
                         } else if kind == 2 {
                             if let Some(text) = resolved_text(data, &self.strings, index) {
-                                hit |= value_texts.get(text_offsets[i]..text_offsets[i] + tc).unwrap_or(&[]).iter().any(|v| v == text);
+                                hit |= value_texts
+                                    .get(text_offsets[i]..text_offsets[i] + tc)
+                                    .unwrap_or(&[])
+                                    .iter()
+                                    .any(|v| v == text);
                             }
                         }
                         hit
                     }
                     1 => {
-                        let needle = value_texts.get(text_offsets[i]).map(String::as_str).unwrap_or("");
+                        let needle = value_texts
+                            .get(text_offsets[i])
+                            .map(String::as_str)
+                            .unwrap_or("");
                         let mut cache = MatchCache::new();
-                        cell_matches_text(data, &self.strings, index, needle, flags.get(i).copied().unwrap_or(0) == 0, false, &mut cache)
+                        cell_matches_text(
+                            data,
+                            &self.strings,
+                            index,
+                            needle,
+                            flags.get(i).copied().unwrap_or(0) == 0,
+                            false,
+                            &mut cache,
+                        )
                     }
-                    2 => numeric_cell_value(data, index).is_some_and(|value| match flags.get(i).copied().unwrap_or(0) {
-                        0 => value > nums.get(i).copied().unwrap_or(0.0),
-                        1 => value >= nums.get(i).copied().unwrap_or(0.0),
-                        2 => value < nums.get(i).copied().unwrap_or(0.0),
-                        3 => value <= nums.get(i).copied().unwrap_or(0.0),
-                        4 => value == nums.get(i).copied().unwrap_or(0.0),
-                        _ => value != nums.get(i).copied().unwrap_or(0.0),
+                    2 => numeric_cell_value(data, index).is_some_and(|value| {
+                        match flags.get(i).copied().unwrap_or(0) {
+                            0 => value > nums.get(i).copied().unwrap_or(0.0),
+                            1 => value >= nums.get(i).copied().unwrap_or(0.0),
+                            2 => value < nums.get(i).copied().unwrap_or(0.0),
+                            3 => value <= nums.get(i).copied().unwrap_or(0.0),
+                            4 => value == nums.get(i).copied().unwrap_or(0.0),
+                            _ => value != nums.get(i).copied().unwrap_or(0.0),
+                        }
                     }),
                     3 => kind == 0,
                     4 => kind != 0,
                     _ => false,
                 };
-                if !matches { continue 'rows; }
+                if !matches {
+                    continue 'rows;
+                }
             }
             out.push(row as u32);
         }
@@ -418,54 +483,103 @@ impl CellStore {
     #[wasm_bindgen(js_name = distinctValues)]
     pub fn distinct_values(&self, sheet: usize, col: usize, limit: usize) -> DistinctColumn {
         let mut out = DistinctColumn::default();
-        let Some(data) = self.sheets.get(sheet) else { return out; };
-        if col >= data.n_cols { return out; }
+        let Some(data) = self.sheets.get(sheet) else {
+            return out;
+        };
+        if col >= data.n_cols {
+            return out;
+        }
         let mut seen = std::collections::HashSet::new();
         for row in 0..data.row_count {
             let index = col * data.row_count + row;
             let kind = resolved_kind(data, index);
             let key = match kind {
-                1 => format!("n:{}", numeric_cell_value(data, index).unwrap_or(0.0).to_bits()),
-                2 => format!("s:{}", resolved_text(data, &self.strings, index).unwrap_or("")),
+                1 => format!(
+                    "n:{}",
+                    numeric_cell_value(data, index).unwrap_or(0.0).to_bits()
+                ),
+                2 => format!(
+                    "s:{}",
+                    resolved_text(data, &self.strings, index).unwrap_or("")
+                ),
                 _ => "b".to_string(),
             };
-            if !seen.insert(key) { continue; }
+            if !seen.insert(key) {
+                continue;
+            }
             out.kinds.push(kind);
-            if kind == 1 { out.numbers.push(numeric_cell_value(data, index).unwrap_or(0.0)); }
-            else if kind == 2 { out.texts.push(resolved_text(data, &self.strings, index).unwrap_or("").to_string()); }
-            if limit != 0 && out.kinds.len() >= limit { break; }
+            if kind == 1 {
+                out.numbers
+                    .push(numeric_cell_value(data, index).unwrap_or(0.0));
+            } else if kind == 2 {
+                out.texts.push(
+                    resolved_text(data, &self.strings, index)
+                        .unwrap_or("")
+                        .to_string(),
+                );
+            }
+            if limit != 0 && out.kinds.len() >= limit {
+                break;
+            }
         }
         out
     }
 
     #[wasm_bindgen(js_name = dataEdgeOrdered)]
-    pub fn data_edge_ordered(&self, sheet: usize, order: &[u32], row: usize, col: usize, d_row: i32, d_col: i32) -> u32 {
-        let Some(data) = self.sheets.get(sheet) else { return 0; };
-        if row >= order.len() || col >= data.n_cols { return 0; }
-        if d_row == 0 { return self.data_edge(sheet, order[row] as usize, col, 0, d_col); }
-        let occupied = |view: usize| order.get(view).is_some_and(|&r| {
-            let r = r as usize; r < data.row_count && resolved_kind(data, col * data.row_count + r) != 0
-        });
+    pub fn data_edge_ordered(
+        &self,
+        sheet: usize,
+        order: &[u32],
+        row: usize,
+        col: usize,
+        d_row: i32,
+        d_col: i32,
+    ) -> u32 {
+        let Some(data) = self.sheets.get(sheet) else {
+            return 0;
+        };
+        if row >= order.len() || col >= data.n_cols {
+            return 0;
+        }
+        if d_row == 0 {
+            return self.data_edge(sheet, order[row] as usize, col, 0, d_col);
+        }
+        let occupied = |view: usize| {
+            order.get(view).is_some_and(|&r| {
+                let r = r as usize;
+                r < data.row_count && resolved_kind(data, col * data.row_count + r) != 0
+            })
+        };
         edge_scan(row, order.len(), d_row.signum() as isize, occupied) as u32
     }
 }
 
 fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
-    match sheet.kind[index] {
+    match sheet.kind_at(index) {
         KIND_NUMBER => 1,
         KIND_STRING => 2,
         KIND_FORMULA => {
-            let Some(key) = key_for_index(sheet, index) else { return 0; };
-            if formula_error_at(sheet, key).is_some() || sheet.str_id_at(index) != NO_STRING { 2 } else { 1 }
+            let Some(key) = key_for_index(sheet, index) else {
+                return 0;
+            };
+            if formula_error_at(sheet, key).is_some() || sheet.str_id_at(index) != NO_STRING {
+                2
+            } else {
+                1
+            }
         }
         _ => 0,
     }
 }
 
 fn resolved_text<'a>(sheet: &SheetData, strings: &'a StringPool, index: usize) -> Option<&'a str> {
-    match sheet.kind[index] {
-        KIND_STRING | KIND_FORMULA if sheet.str_id_at(index) != NO_STRING => string_from_pool_ref(strings, sheet.str_id_at(index)),
-        KIND_FORMULA => key_for_index(sheet, index).and_then(|key| formula_error_at(sheet, key)).map(FormulaError::sentinel),
+    match sheet.kind_at(index) {
+        KIND_STRING | KIND_FORMULA if sheet.str_id_at(index) != NO_STRING => {
+            string_from_pool_ref(strings, sheet.str_id_at(index))
+        }
+        KIND_FORMULA => key_for_index(sheet, index)
+            .and_then(|key| formula_error_at(sheet, key))
+            .map(FormulaError::sentinel),
         _ => None,
     }
 }
@@ -481,15 +595,21 @@ pub struct DistinctColumn {
 #[wasm_bindgen]
 impl DistinctColumn {
     #[wasm_bindgen(js_name = takeKinds)]
-    pub fn take_kinds(&mut self) -> Vec<u8> { std::mem::take(&mut self.kinds) }
+    pub fn take_kinds(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.kinds)
+    }
     #[wasm_bindgen(js_name = takeNumbers)]
-    pub fn take_numbers(&mut self) -> Vec<f64> { std::mem::take(&mut self.numbers) }
+    pub fn take_numbers(&mut self) -> Vec<f64> {
+        std::mem::take(&mut self.numbers)
+    }
     #[wasm_bindgen(js_name = takeTexts)]
-    pub fn take_texts(&mut self) -> Vec<String> { std::mem::take(&mut self.texts) }
+    pub fn take_texts(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.texts)
+    }
 }
 
 pub(crate) fn numeric_cell_value(sheet: &SheetData, index: usize) -> Option<f64> {
-    match sheet.kind[index] {
+    match sheet.kind_at(index) {
         KIND_NUMBER => Some(sheet.num_at(index)),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
@@ -685,7 +805,7 @@ pub(crate) fn cell_matches_text(
     whole_cell: bool,
     cache: &mut MatchCache,
 ) -> bool {
-    match sheet.kind[index] {
+    match sheet.kind_at(index) {
         KIND_NUMBER => {
             number_matches_text(sheet.num_at(index), needle, case_insensitive, whole_cell)
         }
@@ -730,15 +850,19 @@ fn sort_finite_number_column_comparison(
     let mut order = Vec::with_capacity(sheet.row_count);
     for row in 0..sheet.row_count {
         let index = base + row;
-        // SAFETY: caller passes `base = col * row_count` for an in-bounds
-        // column and `row < row_count`, so `index` is valid for all cell
-        // vectors.
-        if unsafe { *sheet.kind.get_unchecked(index) } != KIND_NUMBER {
-            return None;
-        }
-        // SAFETY: same index invariant as above; a NUMBER cell's payload is
-        // always canonical f64 bits.
-        if !f64::from_bits(unsafe { sheet.payload_unchecked(index) }).is_finite() {
+        let value = if sheet.is_paged() {
+            if sheet.kind_at(index) != KIND_NUMBER {
+                return None;
+            }
+            sheet.num_at(index)
+        } else {
+            // SAFETY: caller supplied an in-bounds dense column.
+            if unsafe { *sheet.kind.get_unchecked(index) } != KIND_NUMBER {
+                return None;
+            }
+            f64::from_bits(unsafe { sheet.payload_unchecked(index) })
+        };
+        if !value.is_finite() {
             return None;
         }
         order.push(row as u32);
@@ -747,9 +871,8 @@ fn sort_finite_number_column_comparison(
     order.sort_unstable_by(|&a, &b| {
         // SAFETY: `order` holds only rows from `0..row_count`, and the scan
         // above proved every value in this column is a finite number.
-        let va = f64::from_bits(unsafe { sheet.payload_unchecked(base + a as usize) });
-        // SAFETY: as above.
-        let vb = f64::from_bits(unsafe { sheet.payload_unchecked(base + b as usize) });
+        let va = sheet.num_at(base + a as usize);
+        let vb = sheet.num_at(base + b as usize);
         let ord = va.partial_cmp(&vb).unwrap_or(Ordering::Equal);
         let ord = if ascending { ord } else { ord.reverse() };
         if ord == Ordering::Equal {
@@ -769,15 +892,18 @@ fn sort_finite_number_column_radix(
     let mut pairs = Vec::with_capacity(sheet.row_count);
     for row in 0..sheet.row_count {
         let index = base + row;
-        // SAFETY: caller passes `base = col * row_count` for an in-bounds
-        // column and `row < row_count`, so `index` is valid for all cell
-        // vectors.
-        if unsafe { *sheet.kind.get_unchecked(index) } != KIND_NUMBER {
-            return None;
-        }
-        // SAFETY: same index invariant as above; a NUMBER cell's payload is
-        // always canonical f64 bits.
-        let value = f64::from_bits(unsafe { sheet.payload_unchecked(index) });
+        let value = if sheet.is_paged() {
+            if sheet.kind_at(index) != KIND_NUMBER {
+                return None;
+            }
+            sheet.num_at(index)
+        } else {
+            // SAFETY: caller supplied an in-bounds dense column.
+            if unsafe { *sheet.kind.get_unchecked(index) } != KIND_NUMBER {
+                return None;
+            }
+            f64::from_bits(unsafe { sheet.payload_unchecked(index) })
+        };
         let key = finite_number_sort_key(value)?;
         pairs.push((if ascending { key } else { !key }, row as u32));
     }
@@ -878,7 +1004,11 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
         }
         candidate += step;
     }
-    if step < 0 { 0 } else { last }
+    if step < 0 {
+        0
+    } else {
+        last
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -890,7 +1020,7 @@ pub(crate) enum ComparableCell<'a> {
 
 impl<'a> ComparableCell<'a> {
     pub(crate) fn from_cell(sheet: &'a SheetData, strings: &'a StringPool, index: usize) -> Self {
-        match sheet.kind[index] {
+        match sheet.kind_at(index) {
             KIND_NUMBER => ComparableCell::Number(OrderedNumber(sheet.num_at(index))),
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
@@ -986,4 +1116,3 @@ impl PartialOrd for OrderedNumber {
         Some(self.cmp(other))
     }
 }
-

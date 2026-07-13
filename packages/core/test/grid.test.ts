@@ -966,7 +966,7 @@ describe("Grid.setMinColumns", () => {
     await initSheetwrite();
   });
 
-  it("widens presentation geometry without emitting changes or dirty patches", () => {
+  it("keeps presentation padding virtual until a padded column is edited", () => {
     const workbook = makeWorkbook(5);
     const store = new SheetwriteStore(workbook, makeColumnarData(5));
     const host = mountHost();
@@ -979,13 +979,44 @@ describe("Grid.setMinColumns", () => {
     grid.setMinColumns(12);
     grid.refresh();
 
-    expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(12);
+    expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(3);
     expect(host.getAttribute("aria-colcount")).toBe("12");
     expect(changes).toBe(0);
     expect(store.getDirty()).toEqual([]);
 
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 10 },
+          value: { kind: "literal", value: "materialized" },
+        },
+      ],
+    });
+    expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(11);
+    expect(store.getCell({ sheet: "s1", row: 0, col: 10 }).resolved).toBe("materialized");
+    expect(changes).toBe(1);
+
     grid.destroy();
     store.dispose();
+  });
+
+  it("keeps dense datasource storage by default and enables paging explicitly", () => {
+    const datasource = {
+      getRows: async (request: { start: number }) => ({ start: request.start, rows: [] }),
+    };
+    const dense = new GridImpl(mountHost(), { workbook: makeWorkbook(5), datasource });
+    const paged = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(5),
+      datasource,
+      datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 1024 },
+    });
+
+    expect((dense.store as SheetwriteStore).isPaged("s1")).toBe(false);
+    expect((paged.store as SheetwriteStore).isPaged("s1")).toBe(true);
+    expect(() => paged.exportCsv("partial.csv")).toThrow(/unloaded datasource cells/);
+    dense.destroy();
+    paged.destroy();
   });
 });
 
