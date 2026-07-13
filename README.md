@@ -21,7 +21,7 @@ import "@sheetwrite/react/styles.css";
   ]}
   defaultRows={products}
   height={500}
-  onGridChange={(event) => event.source === "local" && save(event.transaction.patches)}
+  onGridChange={(event) => console.log(event.source, event.transaction.patches)}
 />;
 ```
 
@@ -29,7 +29,11 @@ Use the equivalent `Sheetwrite` export and package-local `styles.css` from `@she
 
 `defaultRows` is an uncontrolled seed. Sheetwrite never mutates it; edits live in the grid. Changing its identity deliberately replaces the grid and creates a new readiness generation. Use `height` for fixed sizing or `fill` inside an ancestor that already has available height.
 
-`SheetwriteGrid` remains the advanced component for explicit `workbook` plus `data`/`datasource`. Reset-bound inputs are `workbook`, `data`, `datasource`, `renderer`, `workerUrl`, and `renderers`. Live inputs are `theme`, `readOnly`, `config`, `overscan`, and `minColumns`.
+`onGridChange` is an observation hook, not an acknowledgement protocol. For
+durable/versioned writes use `SyncCoordinator`; do not persist only
+`event.changes`, which omits non-cell document operations.
+
+`SheetwriteGrid` remains the advanced component for explicit `workbook` plus `data`/`datasource`. Reset-bound inputs are `workbook`, `data`, `datasource`, `datasourceStorage`, `renderer`, `workerUrl`, and `renderers`. Live inputs are `theme`, `readOnly`, `config`, `overscan`, and `minColumns`.
 
 Readiness reports `{ grid, generation, reason }`, where reason is `initial`, `input-reset`, or `renderer-reset`. Grid events use collision-free names: `onGridChange`/`grid-change`, `onViewportChange`/`viewport-change`, selection, edit, search, and active-sheet variants. Native host change and scroll events remain available.
 
@@ -86,12 +90,17 @@ const sync = new SyncCoordinator(grid, adapter, {
   serverVersion: snapshot.version ?? 0,
 });
 
-saveButton.onclick = () => void sync.sendNext(); // explicit host-controlled timing/retry
-sync.subscribe(remoteOperationSource);
+await sync.ready();
+const unsubscribeRemote = sync.subscribe(remoteOperationSource);
+saveButton.onclick = () => void sync.flush(); // ordered mutation IDs + acknowledgements
 
 const backup = grid.exportSnapshot();
 grid.applyRemoteOperations(remoteOperations); // observable, not dirty or undoable
 ```
+
+See [Offline and collaboration](docs/collaboration.md) for a complete HTTP
+adapter, database-neutral snapshot/operation-log schema, IndexedDB pending queue,
+conflict reload, conservative rebase, presence, comments, and revisions.
 
 ## Packages
 

@@ -25,7 +25,7 @@ import "@sheetwrite/react/styles.css";
   ]}
   defaultRows={products}
   height={500}
-  onGridChange={(event) => event.source === "local" && save(event.transaction.patches)}
+  onGridChange={(event) => console.log(event.source, event.transaction.patches)}
 />;
 ```
 
@@ -33,7 +33,11 @@ Vue uses `:columns`, `:default-rows`, and `@grid-change`; Svelte uses the corres
 
 `defaultRows` is an uncontrolled seed. It is not mutated or synchronized after construction. Changing its identity intentionally resets the grid. `height` supplies a fixed host height; `fill` occupies an ancestor that already has available height and applies `min-height: 0`.
 
-Use `SheetwriteGrid` for advanced `workbook` with `data` or `datasource`. The imperative handle is published before the readiness event. Readiness is `{ grid, generation, reason }`, where reason is `initial`, `input-reset`, or `renderer-reset`.
+`onGridChange` observes a transaction. `event.changes` contains cell-level
+rollback detail, not the complete persistence payload; document storage must use
+`event.transaction.patches` or `SyncCoordinator`.
+
+Use `SheetwriteGrid` for advanced `workbook` with `data` or `datasource`. The imperative handle is published before the readiness event. Readiness is `{ grid, generation, reason }`, where reason is `initial`, `input-reset`, or `renderer-reset`. Attach versioned persistence to that `Grid`; see [Offline and collaboration](./collaboration.md).
 
 ## Imperative engine
 

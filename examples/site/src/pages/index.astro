@@ -6,8 +6,8 @@ const cards = [
     slug: "vanilla",
     accent: "var(--color-fw-vanilla)",
     kicker: "Vanilla · imperative core",
-    name: "Google-Sheets-style workbook",
-    body: "A full Sheets clone over the headless API: custom toolbar on grid.actions, formula bar and name box, cross-sheet formulas, frozen panes, zoom, CSV import/export.",
+    name: "Spreadsheet workbook",
+    body: "An application shell over grid.actions: custom toolbar, formula bar and name box, cross-sheet formulas, frozen panes, zoom, and CSV import/export.",
     stat: "100k rows",
     chips: ["grid.actions", "parseCellInput", "fromCsv", "setFrozen"],
   },
@@ -52,7 +52,7 @@ const cards = [
 const stats = [
   { value: "1,000,000", label: "virtual rows, paged on scroll" },
   { value: "100,000", label: "eager rows, scanned in Rust" },
-  { value: "=SUM(Model!F:F)", label: "cross-sheet formulas, live recalc" },
+  { value: "=SUM(Model!F1:F500)", label: "cross-sheet formulas, live recalc" },
   { value: "3 + 1", label: "adapters — React, Vue, Svelte, vanilla" },
 ];
 ---
@@ -107,7 +107,7 @@ const stats = [
   ]{"}"}
   <span class="a">defaultRows</span>={"{"}products{"}"}
   <span class="a">height</span>={"{"}500{"}"}
-  <span class="a">onGridChange</span>={"{"}(event) =&gt; event.source === <span class="s">"local"</span> &amp;&amp; save(event.transaction.patches){"}"}
+  <span class="a">onGridChange</span>={"{"}(event) =&gt; console.log(event.source, event.transaction.patches){"}"}
 /&gt;</code></pre>
         </figure>
       </div>
@@ -158,6 +158,17 @@ const stats = [
             </a>
           ))
         }
+      </div>
+    </section>
+
+    <section class="demo-index mx-auto max-w-[1280px] px-5 pb-14">
+      <div class="demo-index-head">
+        <h2>Run fidelity scenarios.</h2>
+        <p>Browser-runnable fixtures exercise workbook round-trip and reconnect/reload collaboration paths.</p>
+      </div>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="/test/xlsx/" class="hero-secondary">XLSX round-trip fixture</a>
+        <a href="/test/collaboration/" class="hero-secondary">Offline collaboration fixture</a>
       </div>
     </section>
 

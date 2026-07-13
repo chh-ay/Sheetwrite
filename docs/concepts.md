@@ -22,15 +22,24 @@ flowchart TD
   store -->|"FFI"| wasm["columnar store + calc DAG (Rust/WASM)"]
 ```
 
-The renderer never holds cell data. Every frame it asks the store for one
-rectangular window of resolved values and paints from that.
+The renderer never owns document cells. Each frame requests one bulk resolved
+window per painted pane; an unfrozen sheet uses one window, while frozen panes
+use up to four clipped windows.
+
+`GridImpl` is the composition root rather than the owner of every subsystem.
+`DocumentController` owns document commits and history, `DatasourceController`
+owns paged request generations and cancellation, `GeometryLayoutController`
+owns row/column indexes and frozen-window mapping, and `RenderCoordinator` is
+the sole animation-frame and paint-cache owner. Interaction-specific controllers
+remain separate. These are internal ownership boundaries; the public API stays
+the `Grid` and `Store` contracts.
 
 ## Canvas rendering + the WASM columnar store
 
 Cells live in the WASM module as typed columns, not as objects. Each cell has a
-kind — `EMPTY=0`, `NUMBER=1`, `STRING=2`, `FORMULA=4` — and numeric/string data is
-held in parallel typed arrays. This keeps memory flat and lets the store hand the
-renderer a transferable, typed-array-backed snapshot.
+kind—`EMPTY=0`, `NUMBER=1`, `STRING=2`, `BOOLEAN=3`, or `FORMULA=4`—and
+numeric/string data is held in parallel typed arrays. This keeps memory flat and
+lets the store hand the renderer a transferable, typed-array-backed window.
 
 Because the engine is columnar and WASM-resident:
 
@@ -113,9 +122,11 @@ resolved values are derived caches and are not serialized.
 `DocumentOp` is the exhaustive plain-data mutation vocabulary for that document,
 and `Patch` is its backwards-compatible transaction name. Cells, ranges,
 rows/columns, merges, row metadata, frozen panes, conditional formats, validation,
-protection, notes, row groups, named ranges, and sheet lifecycle operations all
-pass through the same reducer, change event, dirty state, and grid undo/redo
-history.
+protection, notes, row groups, named ranges, and sheet lifecycle operations use
+the same store reducer and change-event shape. Local operations submitted through
+`Grid` also enter grid undo/redo history and dirty tracking. Direct
+`Store.applyTransaction` calls deliberately bypass grid read-only/history policy;
+remote grid operations bypass outgoing dirty state and local history.
 
 ```ts
 const checked = validateWorkbookSnapshot(JSON.parse(payload));
@@ -148,18 +159,20 @@ const sync = new SyncCoordinator(grid, adapter, {
   serverVersion: saved.version ?? 0,
 });
 
+await sync.ready();
+const unsubscribeRemote = sync.subscribe(remoteOperationSource);
 await sync.sendNext(); // host chooses send/retry timing
-sync.subscribe(remoteOperationSource);
 ```
 
-Each local transaction becomes one immutable `PendingCommit` with a stable
+Each local grid transaction becomes one immutable `PendingCommit` with a stable
 `clientMutationId` and explicit `baseVersion`. Records move from `pending` to
-`sending`; an applied or duplicate response removes only the matching ID.
-Transport failure returns that record to `pending`, so a host retry sends the
-same ID. A conflict remains `conflicted` with its local operations intact and
-exposes server operations or a snapshot. `resumeAfterReload(snapshot)` only
-resets versions/status after the host has reloaded and reapplied local work—it
-does not invent a structural merge.
+`sending`; an applied or duplicate response acknowledges store dirty state and
+removes only the matching ID. Transport failure returns that record to `pending`,
+so retry sends the same ID. A conflict remains `conflicted` with its local
+operations intact and exposes server operations or a snapshot; Sheetwrite does
+not silently merge ambiguous structural edits. See
+[Offline and collaboration](./collaboration.md) for durable storage, recovery,
+presence, comments, revisions, and the conservative rebase gate.
 
 Remote operations must arrive at exactly `serverVersion + 1`. Older versions and
 known mutation echoes are idempotently ignored; a gap emits `reload-required`
@@ -199,9 +212,9 @@ A cell value is one of three shapes:
 
 ```ts
 type CellValue =
-  | { kind: "literal"; value: string | number | null }
-  | { kind: "ref"; target: CellAddress }   // a plain cross-reference
-  | { kind: "formula"; src: string };      // an "=" formula (see Formulas)
+  | { kind: "literal"; value: string | number | boolean | null }
+  | { kind: "ref"; target: CellAddress } // a plain cross-reference
+  | { kind: "formula"; src: string }; // authoritative source; "=" is optional at storage
 ```
 
 ## Headers: letters vs. field names

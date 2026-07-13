@@ -6,16 +6,16 @@
   "cacheBudgetBytes": 33554432,
   "denseLogicalBytes": 65000000,
   "startup": {
-    "medianMs": 0.043735000000005186,
-    "p95Ms": 0.7703309999999988
+    "medianMs": 0.0724389999999886,
+    "p95Ms": 1.4380919999999975
   },
   "firstPage": {
-    "medianMs": 0.3315590000000057,
-    "p95Ms": 2.1880840000000035
+    "medianMs": 0.8132290000000069,
+    "p95Ms": 4.531947000000002
   },
   "distantPage": {
-    "medianMs": 0.2974710000000016,
-    "p95Ms": 0.8876449999999991
+    "medianMs": 0.756489000000002,
+    "p95Ms": 2.1678270000000026
   },
   "peakAllocatedBytes": 542720,
   "peakChunks": 10,

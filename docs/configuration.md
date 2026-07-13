@@ -17,8 +17,9 @@ createGrid(host: HTMLElement, opts: GridOptions): Grid
 | `workbook` | `Workbook` | — (required) | Sheets, columns, row counts, and the `activeSheet` id. |
 | `data` | `ColumnarData` | `undefined` | Eager, in-memory, column-major values. Pass this **or** `datasource`. |
 | `datasource` | `DataSource` | `undefined` | Lazy, paged async source; rows fetched per visible window. |
+| `datasourceStorage` | `DataSourceStorageOptions` | `{ mode: "dense" }` | Use `{ mode: "paged", chunkRows?, cacheBytes? }` for allocation-lazy datasource storage. |
 | `renderer` | `"canvas" \| "worker"` | `"canvas"` | `"worker"` paints off-thread via OffscreenCanvas, falling back to canvas. See [Worker rendering](./worker-rendering.md). |
-| `workerUrl` | `string \| URL` | `undefined` | Bundler-resolved worker entry for `renderer: "worker"`, e.g. `new URL("@sheetwrite/core/worker", import.meta.url)`. |
+| `workerUrl` | `string \| URL` | `undefined` | Browser-fetchable module URL, e.g. `"/sheetwrite/worker.js"` after copying the package `dist/`; Vite can import `@sheetwrite/core/worker?worker&url`. See [Worker rendering](./worker-rendering.md). |
 | `theme` | `Partial<Theme>` | `undefined` | Overrides merged over `DEFAULT_THEME` and any `--sheetwrite-*` CSS vars. See [Styling](./styling.md). |
 | `readOnly` | `boolean` | `false` | When `true`, all mutating interactions (edit, clear, fill, paste, restyle) are disabled and the host gets `aria-readonly="true"`. |
 | `protectionResolver` | `ProtectionResolver` | `undefined` | Host callback for protected local mutations; no resolver means deny. Client-side UX policy only, never server authorization. |
@@ -37,13 +38,42 @@ generation and reset reason.
 
 ### Datasource pages
 
-The cancellable request API owns one visible-window generation:
+The cancellable request API owns one visible-window generation. Pages can carry
+authoritative formula source and style rather than only resolved scalars:
 
 ```ts
+import type { DataSource } from "@sheetwrite/core";
+
+interface ApiRow {
+  label: string;
+  quantity: number;
+  price: number;
+}
+
 const datasource: DataSource = {
   async getRows({ sheet, start, end, signal, revision }) {
-    const response = await fetch(`/sheets/${sheet}?start=${start}&end=${end}`, { signal });
-    return { start, rows: await response.json(), revision };
+    const response = await fetch(
+      `/sheets/${encodeURIComponent(sheet)}?start=${start}&end=${end}`,
+      { signal },
+    );
+    if (!response.ok) throw new Error(`Datasource request failed: ${response.status}`);
+    const records = (await response.json()) as ApiRow[];
+    return {
+      start,
+      revision: response.headers.get("etag") ?? revision,
+      rows: records.map((record, index) => ({
+        label: record.label,
+        quantity: record.quantity,
+        price: record.price,
+        total: {
+          value: {
+            kind: "formula",
+            src: `=B${start + index + 1}*C${start + index + 1}`,
+          },
+          style: { numberFormat: "$#,##0.00", bold: true },
+        },
+      })),
+    };
   },
 };
 ```
@@ -54,6 +84,13 @@ references, and styles do not become dirty user edits. Short pages mark only
 the returned rows loaded; malformed ranges emit `datasource-error` and remain
 retryable. Resetting or destroying the grid aborts outstanding requests, and a
 late page never overwrites a cell edited after that request began.
+
+Dense storage remains the compatibility default. `{ mode: "paged" }` allocates
+power-of-two row chunks only for loaded or locally edited areas; `cacheBytes`
+bounds clean cached chunks, while dirty chunks remain pinned until
+acknowledgement. Full-sheet queries and exports report incomplete data until all
+required pages are loaded. `Store.queryCapability(sheet)` and
+`getCellLoadState(addr)` expose that state.
 
 The legacy `getRows(sheet, start, end): Promise<RowData[]>` shape remains
 accepted and is normalized once when the grid is constructed.

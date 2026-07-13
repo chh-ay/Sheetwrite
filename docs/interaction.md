@@ -159,7 +159,7 @@ Merging combines the selected range into one cell: the top-left value is shown a
 the covered cells are hidden, tracked in a per-sheet merge registry. Unmerge
 reverses it. Merges are **not drawn while a sort or filter view is active** (the
 display order no longer maps cleanly to the merged region); clear the view to see
-them again. See [Data operations](./data-operations.md#sort--filter-views).
+them again. See [Data operations](./data-operations.md#display-views).
 
 ## Drag-to-fill
 
@@ -170,7 +170,7 @@ across the new region. The source is tiled (repeated) to cover the target.
 When the filled cells contain formulas, references are rewritten as they are
 copied: **relative** A1 parts shift by the fill offset and **absolute** parts
 (prefixed with `$`) stay fixed. For example, filling `=A1 + $B$1` one column right
-yields `=B1 + $B$1`. See [Formulas → Reference rewriting](./formulas.md#reference-rewriting).
+yields `=B1 + $B$1`. See [Formulas → Point mode and reference rewriting](./formulas.md#point-mode-and-reference-rewriting).
 
 Drag-to-fill is unavailable while a sort/filter view is active (the handle is
 hidden) and when `readOnly`.

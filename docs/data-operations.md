@@ -242,4 +242,4 @@ implementing `XlsxWorkbookBackend`; table backend contracts remain unchanged.
 ## See also
 
 - [Interaction](./interaction.md) for clipboard TSV and the toolbar sort control.
-- [Concepts](./concepts.md#transactions--patches) for the `addRows` / `removeRows` patches.
+- [Concepts](./concepts.md#document-protocol-and-storage-transactions) for row/column `DocumentOp` transactions.

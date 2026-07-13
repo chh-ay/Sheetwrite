@@ -77,12 +77,24 @@ removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
 
-Three sequential full runs on Bun 1.3.14 linux/x64 reproduced the 100K headline
-medians: parse/load 71.6–73.8 ms, first recompute 151–156 ms, fan-out edit
-107–119 ms, and scalar edit affecting 100K formulas 107–116 ms. Isolated memory
-was identical on all runs: 0.88 MiB (1K), 7.13 MiB (10K), and 59.56 MiB (100K).
-No focused optimization was justified; the observed large workloads scale
-linearly and remain well inside the declared gates.
+Latest checked capture: `bench:formula:smoke` at
+`2026-07-13T08:56:07Z`, core commit `844da4e`, Bun 1.3.14, linux/x64,
+12th Gen Intel Core i9-12900H (14 cores / 20 logical CPUs). Times are local-run
+regression evidence, not cross-machine latency guarantees:
+
+| 100K-formula workload | median ms | p95 ms |
+| --- | ---: | ---: |
+| parse/load | 75.58 | 87.92 |
+| first recompute | 172.71 | 227.22 |
+| fan-out edit | 136.17 | 146.28 |
+| scalar edit affecting 100K | 114.65 | 123.81 |
+| criteria range edit | 5.59 | 5.75 |
+| lookup range edit | 6.18 | 6.71 |
+
+Isolated WASM growth was 0.88 MiB (1K), 7.31 MiB (10K), and 62.00 MiB
+(100K). The capture passed the declared gates. Raw samples, means, deviations,
+and gate metadata remain in `results/formula-results.json`; the generated
+`results/formula-results.md` is the matching human-readable report.
 
 ### Honest asymmetries (declared, not hidden)
 
@@ -132,18 +144,19 @@ without framework noise.
 It does **not** currently measure framework adapter overhead. React, Vue, and
 Svelte wrappers do not render cells — cells are still painted by canvas — so the
 expected overhead is around mount/unmount, event forwarding, parent re-renders,
-and app-side `onChange` work rather than per-cell rendering. A separate adapter
+and app-side `onGridChange` work rather than per-cell rendering. A separate adapter
 benchmark should cover:
 
 - vanilla `createGrid` vs. React, Vue, and Svelte `<SheetwriteGrid>` mount time;
 - first paint after framework mount;
 - parent re-render with a stable `workbook` identity;
-- `change` event callback latency with and without app state updates;
+- `onGridChange` callback latency with and without app state updates;
 - unmount/remount cost.
 
-The current benchmark also excludes network/API submission, validation,
-optimistic retry/rollback, and conflict-resolution policy. Those are host-app
-concerns and should be measured in an application benchmark when they matter.
+The current benchmark also excludes validation-enabled edit workloads,
+network/API submission, durable retry, and conflict-resolution UX. Core
+validation can be benchmarked separately; transport and conflict policy belong
+in an application benchmark.
 
 ### How to run
 
@@ -165,87 +178,26 @@ read them after load.
 
 ─────────────────────────────────────────────────────────────────────────────
 
-## Results — data layer (real, captured)
+## Results — data layer (fresh generated capture)
 
-Bun 1.3.14 · linux/x64 · 12th Gen Intel Core i9-12900H · seeded dataset ·
-median (p95) ms · **lower is better**. Reproduce with `bun run bench:data`.
+Captured by `bun run bench:data` on 2026-07-13 at 22:47 UTC+07, core commit
+`844da4e`, Bun 1.3.14, linux/x64, 12th Gen Intel Core i9-12900H (14 cores /
+20 logical CPUs). The run uses the seeded dataset and warmed median/p95 protocol
+above. Absolute times and ratios are runner-specific.
 
-### Head-to-head, both engines (1k / 10k — Handsontable's headless ceiling)
+The command generates both authoritative views from the same in-memory result:
 
-**Ingest N rows**
+- [`results/data-results.md`](./results/data-results.md) — all tables, including
+  both-engine 1K/10K comparisons, 1K→1M scaling, derived ratios, and caveats;
+- [`results/data-results.json`](./results/data-results.json) — raw statistics,
+  iteration counts, memory bytes, environment, and workload metadata.
 
-| rows | Sheetwrite | Handsontable | Sheetwrite |
-|---:|---:|---:|:--|
-| 1,000 | 1.24 (1.93) | 546 (624) | **441× faster** |
-| 10,000 | 11.10 (13.25) | 4424 (4652) | **399× faster** |
-
-**Read 50×5 window**
-
-| rows | Sheetwrite | Handsontable | Sheetwrite |
-|---:|---:|---:|:--|
-| 1,000 | 0.033 (0.052) | 0.065 (0.100) | **2.0× faster** |
-| 10,000 | 0.025 (0.039) | 0.080 (0.108) | **3.1× faster** |
-
-**1000 single-cell edits**
-
-| rows | Sheetwrite | Handsontable | Sheetwrite |
-|---:|---:|---:|:--|
-| 1,000 | 10.27 (17.77) | 72.83 (106) | **7.1× faster** |
-| 10,000 | 8.62 (15.26) | 374 (379) | **43× faster** |
-
-**Sort by amount (numeric)**
-
-| rows | Sheetwrite | Handsontable | Sheetwrite |
-|---:|---:|---:|:--|
-| 1,000 | 0.123 (0.126) | 197 (224) | **1604× faster** |
-| 10,000 | 1.33 (1.48) | 1923 (2141) | **1445× faster** |
-
-**Filter city contains "Tokyo"**
-
-| rows | Sheetwrite | Handsontable | Sheetwrite |
-|---:|---:|---:|:--|
-| 1,000 | 0.139 (0.164) | 92.24 (98.20) | **662× faster** |
-| 10,000 | 0.660 (0.723) | 686 (731) | **1038× faster** |
-
-**Sum amount (aggregate)**
-
-| rows | Sheetwrite | Handsontable | Sheetwrite |
-|---:|---:|---:|:--|
-| 1,000 | 0.007 (0.010) | 0.186 (0.317) | **28× faster** |
-| 10,000 | 0.018 (0.032) | 1.15 (1.93) | **65× faster** |
-
-### Sheetwrite data-engine scaling (1k → 1M)
-
-Handsontable is omitted at 100k–1M (headless render-all is infeasible — see the
-browser bench). Median (p95) ms.
-
-| rows | Ingest | Window read | 1000 edits | Sort | Filter | Aggregate |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1,000 | 1.24 (1.93) | 0.033 (0.052) | 10.27 (17.77) | 0.123 (0.126) | 0.139 (0.164) | 0.007 (0.010) |
-| 10,000 | 11.10 (13.25) | 0.025 (0.039) | 8.62 (15.26) | 1.33 (1.48) | 0.660 (0.723) | 0.018 (0.032) |
-| 100,000 | 105 (112) | 0.022 (0.037) | 26.74 (32.27) | 16.16 (18.50) | 4.49 (4.79) | 0.187 (0.235) |
-| 500,000 | 553 (578) | 0.023 (0.040) | 103 (107) | 97.81 (105) | 22.71 (22.88) | 0.941 (1.07) |
-| 1,000,000 | 1298 (1322) | 0.026 (0.039) | 198 (200) | 214 (236) | 44.46 (47.38) | 1.91 (2.45) |
-
-Reads stay flat (~0.02–0.03 ms) regardless of row count — Sheetwrite reads only
-the visible window from WASM. Sort/filter/aggregate scale linearly and stay
-interactive even at 1M (sort 214 ms, filter 44 ms, aggregate 1.9 ms).
-
-### Memory — Sheetwrite columnar footprint (exact, isolated process)
-
-The whole columnar store (all five columns) lives in WASM; JS-side retained
-state is `O(columns + unique styles + active view)`, never `O(cells)`.
-
-| rows | Sheetwrite data (WASM columnar store) | bytes/row |
-|---:|---:|---:|
-| 1,000 | 0.44 MiB | 459 B |
-| 10,000 | 3.19 MiB | 334 B |
-| 100,000 | 33.50 MiB | 351 B |
-| 500,000 | 160.00 MiB | 336 B |
-| 1,000,000 | 319.56 MiB | 335 B |
-
-1M rows × 5 columns (including a unique string per row in `customer`) fit in
-~320 MiB of WASM — a flat ~335 bytes/row.
+Do not copy the generated tables back into this file: one generated report avoids
+stale ratios after a rerun. In this capture, Sheetwrite's 1M-row medians were
+283 ms ingest, 0.011 ms for a 50×5 window, 23.45 ms sort, 3.38 ms filter, and
+1.80 ms aggregate. Exact isolated WASM growth was 207.13 MiB (217 bytes/row)
+for the five-column dataset. See the generated report for p95 values,
+Handsontable comparisons, asymmetry notes, and smaller sizes.
 
 ### Memory — 1M-row paged datasource store (exact, isolated processes)
 
@@ -267,8 +219,9 @@ string-pool growth.
 The empty store and virtual padding allocate no chunks. A complete sequential
 scan stays at the configured 32 MiB clean-chunk budget; dirty chunks remain
 resident until acknowledgement and may exceed that budget by design. Repeated
-12-run timing samples measured 1M-row construction at 0.04 ms median, first-page
-load at 0.33 ms, and a distant-page load at 0.30 ms.
+12-run samples captured on the same runner measured 1M-row construction at
+0.072 ms median (1.44 ms p95), first-page load at 0.813 ms (4.53 ms p95), and a
+distant-page load at 0.756 ms (2.17 ms p95).
 
 ### Notes & caveats
 
@@ -287,46 +240,38 @@ load at 0.33 ms, and a distant-page load at 0.30 ms.
 
 ─────────────────────────────────────────────────────────────────────────────
 
-## Results — render (browser)
+## Results — render (fresh browser capture)
 
-Real numbers, captured by running `bun run bench:render` in headless Chromium
-(Chrome/140, 1100×760 viewport), median (p95) ms over `samples = 100` unless
-noted — **lower is better**. Reproduce per `(grid, rows)` with the procedure below.
+Captured from `bun run bench:render` on 2026-07-13 at 15:50–15:53 UTC, core
+commit `844da4e`, Chrome 140 headless, 1100×760 viewport, on the linux/x64
+i9-12900H host above. Chromium's reported user agent was Windows because the
+automation browser applies a compatibility user agent. Values are median (p95)
+milliseconds over 100 samples; lower is better. These are one-run,
+runner-specific characterization numbers.
 
 | scenario | Sheetwrite 100k | HOT 100k | Sheetwrite 1M | HOT 1M |
 |---|---:|---:|---:|---:|
-| initial render / mount (ms) | 142 | 470 | 2538 | **crashed** |
-| scroll-down top-left (per 50px step) | 1.7 (2.1) | 0.2 (32.0) | 1.5 (1.8) | — |
-| scroll-down top-left, dropped frames /100 | **0** | **29** | **0** | — |
-| scroll-down middle | 1.5 (2.2) | 0.2 (33.9) | 1.6 (2.7) | — |
-| edit-open (middle) | 0.40 (0.50) | 1.50 (1.80) | 0.50 (0.60) | — |
-| edit-commit (middle) | 1.6 (1.8) | 61.3 (68.8) | 1.8 (2.7) | — |
-| insert 5 rows (top) | 5.4 (8.1) | 119 (133) | 43.9 (49.3) | — |
-| remove 5 rows (top) | 5.8 (8.2) | 124 (144) | 43.0 (49.1) | — |
-| arrow-down (top-left) | 1.4 (2.0) | 3.0 (40.0) | 1.4 (1.8) | — |
-| arrow-right (middle) | 0.20 (0.30) | 1.40 (1.50) | 0.10 (0.30) | — |
-| JS heap after mount (MiB) | 74.6 | 112.8 | 541.0 | — |
+| initial render / mount (ms) | 129 | 1128 | 531 | **crashed** |
+| scroll-down top-left (per 50px step) | 4.50 (7.41) | 0.40 (65.49) | 2.20 (3.30) | — |
+| scroll-down top-left, dropped frames /100 | 0 | 29 | 0 | — |
+| scroll-down middle | 5.95 (7.82) | 0.30 (73.28) | 2.10 (2.90) | — |
+| scroll-down middle, dropped frames /100 | 1 | 26 | 0 | — |
+| edit-open (middle) | 2.90 (3.81) | 3.90 (5.71) | 0.85 (1.10) | — |
+| edit-commit (middle) | 3.10 (3.91) | 165.40 (197.96) | 1.00 (1.70) | — |
+| insert 5 rows (top) | 6.70 (9.46) | 124.55 (284.71) | 20.90 (25.92) | — |
+| remove 5 rows (top) | 6.60 (10.34) | 125.00 (143.12) | 21.35 (37.97) | — |
+| arrow-down (top-left) | 3.85 (6.22) | 18.55 (43.42) | 1.70 (2.40) | — |
+| arrow-right (middle) | 2.15 (3.30) | 1.40 (2.60) | 0.70 (1.30) | — |
+| JS heap after mount (MiB) | 50.56 | 115.71 | 314.99 | — |
 
-**Handsontable could not run at 1,000,000 rows** — it threw `Maximum call stack
-size exceeded` during construction and never produced results. Sheetwrite mounts
-1M rows in ~2.5 s and then scrolls, edits, and navigates as fast as it does at
-100k.
-
-What the numbers say:
-
-- **Scroll smoothness is the headline.** Sheetwrite holds ~1.5–1.7 ms per 50px
-  step with **0 dropped frames** at *both* 100k and 1M. Handsontable's median step
-  is low (~0.2 ms) but its p95 is ~32 ms with **~29 dropped frames per 100** at
-  100k — visible jank under sustained scroll, where Sheetwrite stays glassy.
-- **Edit-commit, altering, and mount are categorically faster** on Sheetwrite at
-  100k: edit-commit 1.6 ms vs 61 ms (~38×), insert-5-rows 5.4 ms vs 119 ms (~22×),
-  mount 142 ms vs 470 ms (~3.3×).
-- **Constant at scale.** 100k → 1M leaves Sheetwrite's scroll/edit/navigation
-  essentially unchanged (only mount and altering grow); the DOM grid cannot make
-  the trip at all.
-- **Where HOT is competitive:** its *median* single scroll step and edit-open are
-  low (incremental DOM); the cost surfaces in tail latency, dropped frames,
-  edit-commit, altering, and the hard 1M ceiling.
+Handsontable at 1M rows failed during construction with
+`Maximum call stack size exceeded` and produced no scenario data. At 100K,
+Handsontable's median vertical scroll callback was shorter, but its 65–73 ms
+p95 and 26–29 dropped frames expose the tail cost; Sheetwrite's p95 stayed below
+8 ms with zero or one dropped frame. Handsontable also had the lower
+arrow-right median (1.40 vs 2.15 ms). Sheetwrite's measured advantages in this
+capture were mount, edit commit, row altering, arrow-down, tail scroll latency,
+and the completed 1M run. No claim extends beyond these scenarios.
 
 Capture procedure (per `(grid, rows)`):
 
@@ -339,104 +284,24 @@ read   window.__benchResults           # typed BenchResults; also logged as "[re
 
 ─────────────────────────────────────────────────────────────────────────────
 
-## Versus Google Sheets — what's comparable, and what isn't
+## Interpretation boundaries
 
-Handsontable is an installable library, so the numbers above are a controlled,
-reproducible head-to-head (identical seeded data, programmatic workloads, one
-machine). **Google Sheets is a different kind of artifact** — a hosted, auth-gated
-web app, DOM-rendered and network-backed — so it is **not** run as a live
-head-to-head here. Driving a signed-in Sheets session to 1M rows would be neither
-reproducible nor appropriate, and any number from it would conflate Google's
-servers, the network, and the browser. **This section is documented context, not a
-measurement** (unlike the Handsontable tables, which are measured).
-
-Google Sheets' publicly documented envelope:
-
-- A spreadsheet is capped at **10,000,000 cells** and **18,278 columns**; large or
-  formula-heavy sheets slow well before that cap.
-- It is **network-backed** — data load and edits round-trip to Google's servers
-  (and sync for collaboration), so latency and offline behavior hinge on the
-  connection, not just the device.
-- Rendering is **DOM-based with virtualization** — the same family as Handsontable,
-  subject to the same per-rendered-cell DOM cost the render bench above quantifies.
-
-How that frames Sheetwrite:
-
-- Sheetwrite is **fully local**: a Rust/WASM columnar store plus a `<canvas>`
-  viewport — no server, no network in the hot path. The measured figures (1M rows
-  ingested in ~2.5 s, ~1.5 ms scroll steps with zero dropped frames, ~320 MiB of
-  WASM) are device-only and offline.
-- Google Sheets' **10M-cell** ceiling is roughly **1M rows × 10 columns**;
-  Sheetwrite handled **1M rows × 5 columns (5M cells)** here on a laptop with room
-  to spare, and its window-read cost is flat regardless of row count.
-- Honest framing: Google Sheets is a far broader **product** (real-time
-  collaboration, hundreds of functions, charts, pivot tables, a whole app
-  platform). Sheetwrite is an **embeddable grid engine**. Where they overlap —
-  rendering and operating on a large local dataset in the browser — Sheetwrite's
-  canvas + WASM architecture is built to stay fluid at sizes where a DOM/network
-  spreadsheet gets sluggish.
-
-To compare against Sheets yourself, the render-bench protocol (programmatic scroll
-+ per-frame timing) can be pointed at a Sheets tab by hand; it is deliberately
-left out of the automated suite for the reasons above.
-
-─────────────────────────────────────────────────────────────────────────────
-
-## Why Sheetwrite
-
-Grounded in the architecture **and** the numbers above — including where
-Handsontable holds its own.
-
-**1. The data engine is in Rust/WASM, columnar, and off the JS heap.**
-Ingest, sort, filter, and aggregate run in compiled Rust over typed columns, not
-interpreted JS over row objects. The data-layer results are not incremental —
-they are categorical: sort is **~1500× faster**, filter **~700–1000× faster**,
-ingest **~400×**, at the 1k/10k sizes where Handsontable can even be measured
-headlessly. And it keeps scaling: at **1M rows** Sheetwrite still sorts in
-214 ms, filters in 44 ms, and sums in under 2 ms.
-
-**2. Reads are windowed and O(viewport), not O(rows).**
-`getVisibleWindow` pulls only the visible cells from WASM in one call. Window-read
-time is essentially **constant (~0.02–0.03 ms) from 1k to 1M rows** — the render
-hot path does not get slower as the dataset grows. This is the foundation of
-true virtualization.
-
-**3. Canvas virtualization scales to 100k+ rows; the DOM does not.**
-Sheetwrite paints a `<canvas>` viewport regardless of dataset size. Handsontable
-virtualizes in a real browser, but it is fundamentally tied to a DOM/JS-array
-layer — which is exactly why it **cannot run headless at scale** (it renders
-every row without a layout engine; 100k ≈ 26 s, ~131k `<tr>`s). The browser
-render bench is built to quantify the at-scale difference in initial paint and
-sustained scroll smoothness.
-
-**4. Memory is compact and predictable.**
-1M rows × 5 columns occupy ~**320 MiB of WASM** (~335 bytes/row, flat), with
-negligible JS-heap overhead because cells never become JS objects. A DOM grid
-pays per-rendered-cell DOM cost and holds its data on the JS heap.
-
-**5. Bundle considerations.**
-Sheetwrite ships a small WASM binary (the built `sheetwrite_wasm_bg.wasm` is
-~194 KB as bundled here) plus the core JS. The performance comes from
-architecture, not from shipping a large runtime.
-
-### Where Handsontable is competitive — stated plainly
-
-- **Windowed reads** are close at small sizes (Sheetwrite ~1.5–3× faster at
-  1k/10k, not orders of magnitude) — both read a small range cheaply.
-- **Aggregate at 1k** is a tight JS loop for Handsontable (~0.19 ms); Sheetwrite
-  wins (~28×) but both are sub-millisecond and imperceptible at that size.
-- **Feature breadth.** Handsontable is a mature product with a large plugin
-  ecosystem (dropdown menus, comments, merged cells, nested headers, many cell
-  types). This benchmark measures *performance of core data + render
-  operations*, not feature surface.
-- **Editing UX & ecosystem maturity.** Handsontable's interactive editing,
-  validation, and framework wrappers are battle-tested across many apps.
-
-The case for Sheetwrite is unambiguous where it counts for large datasets: the
-data engine and the render path are categorically faster and use far less
-memory, and that advantage **widens** as row counts grow toward 1M. For grids
-that must stay fluid over very large datasets, that architecture — a WASM
-columnar store with canvas virtualization — is the deciding factor.
+- The generated data report computes every comparison from one capture. Rerun
+  it before quoting a ratio; do not mix numbers from different machines or
+  commits.
+- The headless ingest paths are intentionally asymmetric: Sheetwrite constructs
+  its store without rendering, while Handsontable construction includes its
+  happy-dom view. Browser render results are the at-scale UI comparison.
+- The browser table is a single local capture, not a product-wide or
+  cross-device guarantee. Median, p95, dropped frames, viewport, sample count,
+  runtime, host, and failure state are part of the result.
+- Sheetwrite's observed window-read scaling follows its bulk visible-window
+  API. That architectural fact does not imply every operation is constant-time:
+  ingest, sort, filter, formulas, structural edits, and memory still scale with
+  affected data.
+- Google Sheets is not benchmarked here. Hosted service, network, account,
+  browser, and product behavior prevent a controlled library comparison, so no
+  relative performance claim is made.
 
 ─────────────────────────────────────────────────────────────────────────────
 
@@ -444,15 +309,21 @@ columnar store with canvas virtualization — is the deciding factor.
 
 ```
 bench/
-  package.json            # @sheetwrite/bench — scripts: bench:data, bench:render
+  package.json            # data, paged, range, formula, render, and check scripts
   src/
-    dataset.ts            # seeded, deterministic synthetic data (shared)
-    stats.ts              # warm-up + timed sampling, median/p95 helpers
-    dom-setup.ts          # happy-dom bootstrap for headless Handsontable
-    data-bench.ts         # headless data-layer benchmark  (bench:data)
-    render-bench.ts       # browser render benchmark         (bench:render)
-    render-bench.html     # render bench page shell
+    dataset.ts            # seeded deterministic comparison data
+    formula-dataset.ts    # deterministic formula topologies
+    stats.ts              # warm-up, timed sampling, median/p95 helpers
+    dom-setup.ts           # happy-dom bootstrap for headless Handsontable
+    range-bench.ts        # large-range mutation and query timing
+    data-bench.ts          # headless data-layer comparison
+    paged-bench.ts         # isolated allocation-lazy storage probes
+    formula-bench.ts       # correctness-gated formula timing/memory suite
+    render-bench.ts        # real-browser render scenarios and result contract
+    render-bench.html      # render benchmark page shell
+    check.ts               # regression checks against captured results
   results/
-    data-results.md       # captured headless report (regenerated by bench:data)
-    data-results.json     # machine-readable results
+    data-results.{md,json} # generated by bench:data
+    formula-results.{md,json} # generated by bench:formula[:smoke]
+    paged-results.json     # generated by bench:paged
 ```

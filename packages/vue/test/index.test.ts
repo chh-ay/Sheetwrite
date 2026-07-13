@@ -16,7 +16,14 @@ const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 
 beforeEach(() => {
   const noop = (): void => {};
   const recording = new Proxy(
-    { canvas: null, fillStyle: "", strokeStyle: "", font: "", lineWidth: 1 },
+    {
+      canvas: null,
+      fillStyle: "",
+      strokeStyle: "",
+      font: "",
+      lineWidth: 1,
+      measureText: () => ({ width: 8 }),
+    },
     {
       get(target, prop) {
         if (prop in target) return Reflect.get(target, prop);

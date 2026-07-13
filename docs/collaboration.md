@@ -2,6 +2,136 @@
 
 Sheetwrite provides transport-, database-, and authentication-neutral collaboration primitives. The host still owns server sequencing, durable document storage, user identity, authorization, and network lifecycle.
 
+## Load, mount, queue, and acknowledge
+
+Load a validated snapshot before mounting, then let one `SyncCoordinator`
+observe local grid transactions. Do not also save `event.changes`: that list is
+cell-oriented rollback detail and omits document metadata operations.
+
+```ts
+import {
+  createGridFromSnapshot,
+  SyncCoordinator,
+  type PersistenceAdapter,
+  type RemoteOperationSource,
+} from "@sheetwrite/core";
+
+const documentId = "workbook-42";
+const snapshot = await persistenceAdapter.load(documentId);
+const grid = createGridFromSnapshot(document.querySelector("#grid")!, snapshot);
+const sync = new SyncCoordinator(grid, persistenceAdapter, {
+  documentId,
+  serverVersion: snapshot.version ?? 0,
+});
+
+sync.on((event) => {
+  if (event.type === "acknowledged") {
+    console.log(`server version ${event.version} acknowledged ${event.clientMutationId}`);
+  } else if (event.type === "conflict") {
+    console.error("conflict retained for host recovery", event.mutation);
+  }
+});
+
+await sync.ready();
+const unsubscribeRemote = sync.subscribe(remoteOperationSource);
+
+saveButton.addEventListener("click", () => {
+  void sync.flush(); // sends in order; each response acknowledges only its mutation ID
+});
+
+// Teardown:
+// unsubscribeRemote();
+// sync.destroy();
+// grid.destroy();
+```
+
+`SyncCoordinator` subscribes to `Grid` changes itself. Local rendering remains
+optimistic; the host controls when to call `sendNext`, `flush`, or `retry`.
+`applied` and `duplicate` responses acknowledge the matching operations and
+remove that mutation. A transport error leaves the immutable record pending.
+
+An HTTP adapter can stay transport-neutral at the core boundary:
+
+```ts
+import type {
+  PersistenceAdapter,
+  PersistenceCommitRequest,
+  PersistenceCommitResponse,
+  WorkbookSnapshot,
+} from "@sheetwrite/core";
+
+async function responseJson<T>(response: Response): Promise<T> {
+  if (!response.ok) throw new Error(`Persistence request failed: ${response.status}`);
+  return (await response.json()) as T;
+}
+
+const persistenceAdapter: PersistenceAdapter = {
+  async load(documentId, signal) {
+    const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}`, { signal });
+    return responseJson<WorkbookSnapshot>(response);
+  },
+  async commit(request: PersistenceCommitRequest) {
+    const { signal, ...body } = request;
+    const response = await fetch(
+      `/api/documents/${encodeURIComponent(request.documentId)}/operations`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      },
+    );
+    return responseJson<PersistenceCommitResponse>(response);
+  },
+};
+```
+
+The server must authenticate the request, authorize every operation, validate
+the document schema/policy, and assign the version. Client protection metadata
+is not authorization.
+
+## Database-neutral server model
+
+A snapshot plus append-only operation log is the default persistence shape:
+
+```sql
+documents(
+  document_id       primary key,
+  current_version   integer not null,
+  snapshot_version  integer not null,
+  snapshot_json     json not null
+)
+
+document_operations(
+  document_id        not null,
+  version            integer not null,
+  client_mutation_id text not null,
+  operations_json    json not null,
+  created_at         server_timestamp not null,
+  primary key(document_id, version),
+  unique(document_id, client_mutation_id)
+)
+```
+
+Handle `commit()` in one database transaction:
+
+1. Return `duplicate` with the existing version when
+   `(document_id, client_mutation_id)` already exists.
+2. Lock/read the document version. If it differs from `baseVersion`, return
+   `conflict` with ordered operations since base or a current snapshot.
+3. Validate and authorize the submitted `DocumentOp[]` on the server.
+4. Append at `current_version + 1`, update the document version, and return
+   `applied` with the same mutation ID.
+5. Periodically fold the log into `snapshot_json`; never rewrite operation
+   versions or accept client-authored server timestamps.
+
+Normalized cell tables are an alternative for products that need SQL queries
+over cell values. They do not replace the protocol: the host must still
+reconstruct a complete schema-versioned `WorkbookSnapshot`, preserve formula
+source/style/metadata, and serialize structural operations under one document
+version. Mixing independent cell writes with the operation log breaks atomic
+row/column/formula semantics.
+
 ## Durable pending commits
 
 `SyncCoordinator` can receive a `PendingCommitStorage` adapter. With one configured, it:
@@ -42,7 +172,98 @@ IndexedDB record migration is versioned. Unsupported future schemas, blocked upg
 
 `SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries.
 
-A gap emits `reload-required`. Hosts that can fetch missing operations or a current snapshot can provide `recoverVersionGap`. Missing operations are applied in version order. A returned snapshot is emitted to the host for remount/hydration, after which the host calls `resumeAfterReload` with retained local operations already reapplied.
+A gap emits `reload-required`. Prefer fetching missing ordered operations through
+`recoverVersionGap`; the coordinator applies them in sequence. A returned
+snapshot is a host remount signal, not an automatic store replacement.
+`resumeAfterReload(snapshot)` updates retained queue base versions only after the
+host has installed that snapshot and reapplied local work; it does not hydrate a
+grid or attach the coordinator to a newly created grid.
+
+### Conflict and snapshot reload
+
+Never acknowledge or discard a conflicted mutation implicitly. If the server
+returns both `operationsSinceBase` and a current snapshot, the host can gate
+every pending transaction through the conservative rebaser, clear the old
+durable IDs, remount, and submit the safe results as new mutations:
+
+```ts
+import {
+  createGridFromSnapshot,
+  rebaseDocumentOperations,
+  SyncCoordinator,
+  type Grid,
+  type PersistenceCommitResponse,
+} from "@sheetwrite/core";
+
+type ConflictResponse = Extract<PersistenceCommitResponse, { status: "conflict" }>;
+interface SyncSession {
+  grid: Grid;
+  sync: SyncCoordinator;
+  unsubscribeRemote: () => void;
+}
+
+async function reloadAfterConflict(
+  session: SyncSession,
+  response: ConflictResponse,
+): Promise<SyncSession> {
+  if (!response.operationsSinceBase) {
+    console.error("Manual conflict review required: server did not return an operation tail");
+    return session;
+  }
+
+  const pending = session.sync.pendingCommits();
+  const remoteOperations = response.operationsSinceBase.flatMap((entry) => [
+    ...entry.operations,
+  ]);
+  const safeBatches: Array<ReturnType<typeof rebaseDocumentOperations> & {
+    status: "rebased";
+  }> = [];
+
+  for (const record of pending) {
+    const result = rebaseDocumentOperations(record.operations, remoteOperations);
+    if (result.status === "conflict") {
+      console.error("Manual conflict review required", result.conflict);
+      return session; // old queue and grid remain intact
+    }
+    safeBatches.push(result);
+  }
+
+  const latest = response.snapshot ?? (await persistenceAdapter.load(documentId));
+  for (const record of pending) {
+    await pendingStorage.remove(documentId, record.clientMutationId);
+  }
+
+  session.unsubscribeRemote();
+  session.sync.destroy();
+  session.grid.destroy();
+
+  const grid = createGridFromSnapshot(document.querySelector("#grid")!, latest);
+  const sync = new SyncCoordinator(grid, persistenceAdapter, {
+    documentId,
+    serverVersion: latest.version ?? 0,
+    pendingStorage,
+  });
+  await sync.ready(); // the stale IDs were removed before hydration
+
+  for (const batch of safeBatches) {
+    const outcome = grid.applyTransaction({ patches: [...batch.operations] });
+    if (outcome.status !== "applied") {
+      throw new Error(`Rebased local transaction was not applied: ${outcome.status}`);
+    }
+  }
+
+  const unsubscribeRemote = sync.subscribe(remoteOperationSource);
+  await sync.flush();
+  return { grid, sync, unsubscribeRemote };
+}
+```
+
+When the rebaser reports `conflict`—overlap, formulas across structural changes,
+concurrent moves, or sheet lifecycle ambiguity—keep the original queue and show
+product-specific conflict UI. If the server returns only a snapshot, the host
+cannot infer a safe transform; offer explicit discard/export/manual re-entry
+instead. Reloading a snapshot over pending edits without this decision loses
+intent.
 
 ## Presence
 

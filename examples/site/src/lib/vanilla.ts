@@ -173,7 +173,7 @@ await ensureSheetwrite();
 const host = document.getElementById("app");
 if (!host) throw new Error("missing #app host element");
 
-// The built-in toolbar is off — the page provides a Google-Sheets-style toolbar
+// The built-in toolbar is off — the page provides an application toolbar
 // wired to `grid.actions`. Ctrl+F find and the right-click menu stay enabled.
 const grid = createGrid(host, {
   workbook,
@@ -377,7 +377,7 @@ grid.on("selection", (e) => {
   if (sel) renderSelectionStats(sel);
 });
 
-/** Google-Sheets-style status readout: Sum / Avg / Count over the selection. */
+/** Status readout: Sum / Avg / Count over the selection. */
 function renderSelectionStats(sel: Selection): void {
   const sheetId = selectionSheet(sel);
   const sheet = sheetById(sheetId);

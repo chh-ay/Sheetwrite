@@ -17,7 +17,7 @@ import "@sheetwrite/react/styles.css";
   columns={columns}
   defaultRows={rows}
   height={500}
-  onGridChange={save}
+  onGridChange={(event) => console.log(event.source, event.transaction.patches)}
   onReady={({ grid, generation, reason }) => console.log(grid, generation, reason)}
 />;
 ```
@@ -38,7 +38,7 @@ import "@sheetwrite/vue/styles.css";
     :columns="columns"
     :default-rows="rows"
     height="500px"
-    @grid-change="save"
+    @grid-change="(event) => console.log(event.source, event.transaction.patches)"
     @ready="onReady"
   />
 </template>
@@ -59,7 +59,7 @@ import "@sheetwrite/svelte/styles.css";
   {columns}
   defaultRows={rows}
   height="500px"
-  onGridChange={save}
+  onGridChange={(event) => console.log(event.source, event.transaction.patches)}
   onReady={onReady}
 />
 ```
@@ -72,7 +72,7 @@ The bindable `grid` is populated before `onReady` and cleared on reset/unmount.
 
 | Inputs | Policy |
 |---|---|
-| `workbook`, `data`, `datasource` | input reset |
+| `workbook`, `data`, `datasource`, `datasourceStorage` | input reset |
 | `renderer`, `workerUrl`, `renderers` | renderer reset |
 | `theme`, `readOnly`, `config`, `overscan`, `minColumns` | live update |
 
@@ -108,6 +108,23 @@ React accepts `fallback`; Vue and Svelte use fallback content/slots. Failures re
 | Initialization failure | `onInitializationError` | `initialization-error` |
 
 Native host change and scroll handlers are not occupied by grid semantics. There are no compatibility aliases for the removed `onChange`, `onScroll`, `change`, `scroll`, `selection`, or `active-sheet` names.
+
+`onGridChange`/`grid-change` receives a `ChangeEvent`. Its
+`transaction.patches` are the exhaustive document operations; `changes` is
+cell-level rollback detail and omits metadata-only operations. A custom
+unversioned queue can consume local transactions directly:
+
+```ts
+function queueGridChange(event: ChangeEvent): void {
+  if (event.source === "local") operationQueue.push([...event.transaction.patches]);
+}
+```
+
+For durable collaboration, attach one `SyncCoordinator` to the ready/bound
+`Grid` instead. It observes the same transactions and adds immutable mutation
+IDs, durable-before-send ordering, acknowledgements, retries, conflict state,
+and remote-version sequencing. Destroy it when the component replaces that
+grid. See [Offline and collaboration](./collaboration.md).
 
 ## Advanced features
 
