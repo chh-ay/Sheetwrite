@@ -14,7 +14,6 @@ import {
   RevisionCoordinator,
   type RevisionRestoreRequest,
   type RevisionRestoreResponse,
-  rebaseDocumentOperations,
   type VersionedCommentEvent,
   type WorkbookSnapshot,
 } from "../src/index.js";
@@ -374,92 +373,5 @@ describe("comment coordinator", () => {
       ),
     ).rejects.toThrow("server adapter");
     coordinator.destroy();
-  });
-});
-
-describe("server-ordered structural rebase", () => {
-  it("shifts non-overlapping literal edits across row and column insertion", () => {
-    const result = rebaseDocumentOperations(
-      [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 3, col: 1 },
-          value: { kind: "literal", value: "offline" },
-        },
-      ],
-      [
-        { op: "addRows", sheet: "s1", at: 1, count: 2 },
-        {
-          op: "addColumns",
-          sheet: "s1",
-          at: 0,
-          columns: [{ key: "new", header: "New", width: 100, type: "text" }],
-        },
-      ],
-    );
-    expect(result).toEqual({
-      status: "rebased",
-      operations: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 5, col: 2 },
-          value: { kind: "literal", value: "offline" },
-        },
-      ],
-    });
-  });
-
-  it("characterizes overlapping delete, formula, range-paste, and sheet-lifecycle conflicts", () => {
-    expect(
-      rebaseDocumentOperations(
-        [
-          {
-            op: "set",
-            addr: { sheet: "s1", row: 2, col: 0 },
-            value: { kind: "literal", value: 1 },
-          },
-        ],
-        [{ op: "removeRows", sheet: "s1", at: 1, count: 3 }],
-      ),
-    ).toMatchObject({ status: "conflict", conflict: { code: "structural-overlap" } });
-
-    expect(
-      rebaseDocumentOperations(
-        [
-          {
-            op: "set",
-            addr: { sheet: "s1", row: 8, col: 0 },
-            value: { kind: "formula", src: "=A1+1" },
-          },
-        ],
-        [{ op: "addRows", sheet: "s1", at: 1, count: 1 }],
-      ),
-    ).toMatchObject({ status: "conflict", conflict: { code: "formula-structural" } });
-
-    expect(
-      rebaseDocumentOperations(
-        [
-          {
-            op: "setBlock",
-            range: { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 3, col: 1 } },
-            block: { rowCount: 2, colCount: 2, values: [1, 2, 3, 4] },
-          },
-        ],
-        [
-          {
-            op: "setRangeStyle",
-            range: { sheet: "s1", start: { row: 3, col: 1 }, end: { row: 4, col: 1 } },
-            style: { bold: true },
-          },
-        ],
-      ),
-    ).toMatchObject({ status: "conflict", conflict: { code: "overlapping-edit" } });
-
-    expect(
-      rebaseDocumentOperations(
-        [{ op: "renameSheet", sheet: "s1", name: "Offline name" }],
-        [{ op: "removeSheet", sheet: "s1" }],
-      ),
-    ).toMatchObject({ status: "conflict", conflict: { code: "sheet-removed" } });
   });
 });

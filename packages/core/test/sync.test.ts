@@ -7,6 +7,7 @@ import {
   type PersistenceAdapter,
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
+  rebaseDocumentOperations,
   SyncCoordinator,
   type SyncCoordinatorEvent,
   type VersionedOperation,
@@ -240,6 +241,58 @@ describe("sync coordinator", () => {
       baseVersion: 8,
       status: "pending",
     });
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("applies host-rebased conflicted work without duplicating the outgoing mutation", () => {
+    const { grid, coordinator } = harness();
+    const remoteEvents: ChangeEvent[] = [];
+    grid.on("change", (event) => {
+      if (event.source === "remote") remoteEvents.push(event);
+    });
+    const local = {
+      op: "set" as const,
+      addr: { sheet: "s1", row: 2, col: 0 },
+      value: { kind: "literal" as const, value: 7 },
+    };
+    const remote = [{ op: "addRows" as const, sheet: "s1", at: 0, count: 1 }];
+    grid.applyTransaction({ patches: [local] });
+    coordinator.handleResponse(
+      { status: "conflict", currentVersion: 8, snapshot: { ...snapshot(), version: 8 } },
+      "m1",
+    );
+
+    const rebased = rebaseDocumentOperations(coordinator.pendingCommits()[0]!.operations, remote);
+    expect(rebased).toEqual({
+      status: "rebased",
+      operations: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 3, col: 0 },
+          value: { kind: "literal", value: 7 },
+        },
+      ],
+    });
+    if (rebased.status !== "rebased") throw new Error("Expected successful host rebase");
+
+    coordinator.applyVersionedOperation({ version: 9, operations: remote });
+    grid.applyRemoteOperations(rebased.operations);
+
+    expect(remoteEvents.map((event) => event.transaction.patches)).toEqual([
+      remote,
+      [...rebased.operations],
+    ]);
+    expect(grid.store.getCell({ sheet: "s1", row: 3, col: 0 }).resolved).toBe(7);
+    expect(coordinator.pendingCommits()).toEqual([
+      {
+        documentId: "sync-doc",
+        baseVersion: 7,
+        clientMutationId: "m1",
+        operations: [local],
+        status: "conflicted",
+      },
+    ]);
     coordinator.destroy();
     grid.destroy();
   });

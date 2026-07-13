@@ -507,10 +507,24 @@ function lifecycleConflict(local: DocumentOp, remote: DocumentOp): TransformFail
 function operationTouchesSheet(operation: DocumentOp, sheet: string): boolean {
   switch (operation.op) {
     case "set":
+      return (
+        operation.addr.sheet === sheet ||
+        (operation.value.kind === "ref" && operation.value.target.sheet === sheet)
+      );
     case "setNote":
       return operation.addr.sheet === sheet;
     case "setRange":
+      return (
+        operation.range.sheet === sheet ||
+        operation.cells.some(
+          (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
+        )
+      );
     case "setBlock":
+      return (
+        operation.range.sheet === sheet ||
+        (operation.block.refs?.some((tuple) => tuple[1].sheet === sheet) ?? false)
+      );
     case "setRangeStyle":
     case "clearRange":
       return operation.range.sheet === sheet;
@@ -519,7 +533,14 @@ function operationTouchesSheet(operation: DocumentOp, sheet: string): boolean {
     case "removeNamedRange":
       return operation.scope === sheet;
     case "addSheet":
-      return operation.sheet.id === sheet;
+      return (
+        operation.sheet.id === sheet ||
+        operation.sheet.cells.some((block) =>
+          block.cells.some(
+            (cell) => cell.value.kind === "ref" && cell.value.target.sheet === sheet,
+          ),
+        )
+      );
     default:
       return "sheet" in operation && operation.sheet === sheet;
   }
