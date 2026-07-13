@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import type { Grid } from "../../packages/core/src/types.js";
+import { hasOpaqueForeground } from "./canvas-assertions.js";
 
 declare global {
   interface Window {
@@ -8,6 +9,14 @@ declare global {
 }
 
 import { examplePages, SITE_PORT } from "./playwright.config.js";
+
+const EXPECTED_CELL_VALUE = {
+  vanilla: "Customer 000001",
+  react: "Customer 000001",
+  vue: "Customer 0000001",
+  svelte: "Product line 001",
+  theming: "Account 001",
+} satisfies Record<(typeof examplePages)[number], string>;
 
 /**
  * Shared boot contract for every production-built example page: it loads
@@ -35,24 +44,31 @@ function collectErrors(page: Page): BootErrors {
   return errors;
 }
 
-/** True when the first grid canvas holds any pixel that isn't the page background. */
-async function canvasPainted(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-    if (!(canvas instanceof HTMLCanvasElement)) return false;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return false;
-
-    const w = Math.min(canvas.width, 320);
-    const h = Math.min(canvas.height, 200);
-    if (w === 0 || h === 0) return false;
-
-    const data = ctx.getImageData(0, 0, w, h).data;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255) return true;
+/** True when the canvas body holds opaque paint beyond its dominant background. */
+async function canvasBodyPainted(page: Page): Promise<boolean> {
+  const sample = await page.evaluate(() => {
+    const canvas = document.querySelector(".sheetwrite canvas");
+    if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) {
+      return null;
     }
-    return false;
+    const ctx = canvas.getContext("2d");
+    const bounds = canvas.getBoundingClientRect();
+    if (!ctx || bounds.width === 0 || bounds.height === 0) return null;
+
+    const scaleX = canvas.width / bounds.width;
+    const scaleY = canvas.height / bounds.height;
+    // All shipped themes keep their row/column headers within these insets.
+    // Sampling beyond both excludes grid chrome while retaining several body cells.
+    const left = Math.ceil(64 * scaleX);
+    const top = Math.ceil(40 * scaleY);
+    const width = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
+    const height = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
+    if (width <= 0 || height <= 0) return null;
+
+    return Array.from(ctx.getImageData(left, top, width, height).data);
   });
+
+  return sample !== null && hasOpaqueForeground(sample);
 }
 
 for (const name of examplePages) {
@@ -61,8 +77,24 @@ for (const name of examplePages) {
 
     await page.goto(urlOf(name));
     await page.waitForSelector(".sheetwrite", { state: "attached", timeout: 15_000 });
+    if (name === "vue") {
+      // The paged fixture resolves after the mirror's initial loading snapshot.
+      // Wait on its visible request counter, then focus a body cell so the live
+      // accessibility window is refreshed through normal grid interaction.
+      await expect(page.locator(".stream-strip output")).toContainText(/[1-9][0-9]* requests/);
+      await page.locator(".example-grid .sheetwrite").click({ position: { x: 80, y: 50 } });
+    }
     await expect
-      .poll(() => canvasPainted(page), { timeout: 15_000, message: "grid canvas never painted" })
+      .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
+        timeout: 15_000,
+        message: `${name} grid never exposed its expected cell value`,
+      })
+      .toContain(EXPECTED_CELL_VALUE[name]);
+    await expect
+      .poll(() => canvasBodyPainted(page), {
+        timeout: 15_000,
+        message: "grid body cells never painted",
+      })
       .toBe(true);
 
     expect(errors.page).toEqual([]);
@@ -153,7 +185,7 @@ test("vanilla example commits an edit through the formula bar and undoes it", as
 test("theming example repaints when switching themes", async ({ page }) => {
   await page.goto(urlOf("theming"));
   await page.waitForSelector(".sheetwrite canvas", { state: "attached" });
-  await expect.poll(() => canvasPainted(page)).toBe(true);
+  await expect.poll(() => canvasBodyPainted(page)).toBe(true);
 
   const sample = () =>
     page.evaluate(() => {

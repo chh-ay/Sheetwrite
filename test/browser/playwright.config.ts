@@ -5,7 +5,7 @@ export const examplePages = ["vanilla", "react", "vue", "svelte", "theming"] as 
 
 export default defineConfig({
   testDir: import.meta.dirname,
-  testMatch: "examples.spec.ts",
+  testMatch: "**/*.spec.ts",
   fullyParallel: false,
   workers: 1,
   use: {
