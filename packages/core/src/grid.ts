@@ -36,6 +36,7 @@ import type {
   ConditionalFormatRule,
   DataSourcePage,
   DataSourceRequest,
+  DocumentOp,
   Grid,
   GridActions,
   GridConfig,
@@ -47,6 +48,7 @@ import type {
   PanePaint,
   Patch,
   Range,
+  RemoteOperationOptions,
   Renderer,
   ReplaceResult,
   RowData,
@@ -64,6 +66,7 @@ import type {
   Viewport,
   VisibleWindowView,
   Workbook,
+  WorkbookSnapshot,
 } from "./types.js";
 import { computeColumnWindow, computeWindow } from "./virtualization.js";
 import { WorkerRenderer } from "./worker-renderer.js";
@@ -259,12 +262,17 @@ export class GridImpl implements Grid {
   private readonly onScroll = () => this.scheduleRender();
   private readonly disposeStore: () => void;
 
-  constructor(host: HTMLElement, opts: GridOptions, store?: Store) {
+  constructor(
+    host: HTMLElement,
+    opts: GridOptions,
+    store?: Store,
+    ownsStore = store === undefined,
+  ) {
     this.host = host;
     const workbook = store ? opts.workbook : padColumns(opts.workbook, opts, host);
     this.store = store ?? new SheetwriteStore(workbook, opts.data);
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
-    this.ownsStore = store === undefined;
+    this.ownsStore = ownsStore;
     const getRows = opts.datasource?.getRows;
     this.datasource = getRows
       ? async (request) => {
@@ -1303,8 +1311,7 @@ export class GridImpl implements Grid {
 
   /** Thread the reason when the store is ours; injected stores stay 1-arg. */
   private storeApply(patches: Patch[], reason: CommitReason): ApplyTransactionResult {
-    if (this.loadable) return this.loadable.applyTransaction({ patches }, reason);
-    return this.store.applyTransaction({ patches });
+    return this.store.applyTransaction({ patches }, { commitReason: reason });
   }
 
   private inversePatch(patch: Patch): Patch[] {
@@ -2111,6 +2118,28 @@ export class GridImpl implements Grid {
 
   applyTransaction(transaction: GridTransaction): void {
     this.commit(transaction.patches.slice(), "api");
+  }
+
+  exportSnapshot(): WorkbookSnapshot {
+    const snapshot = this.store.exportSnapshot?.();
+    if (!snapshot) {
+      throw new Error("Sheetwrite: the injected Store does not support snapshot export");
+    }
+    return snapshot;
+  }
+
+  applyRemoteOperations(
+    operations: readonly DocumentOp[],
+    options: RemoteOperationOptions = {},
+  ): ApplyTransactionResult {
+    return this.store.applyTransaction(
+      { patches: operations.slice() },
+      {
+        source: "remote",
+        markDirty: false,
+        commitReason: options.commitReason ?? "api",
+      },
+    );
   }
 
   setZoom(zoom: number): void {

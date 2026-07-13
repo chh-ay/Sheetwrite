@@ -1,8 +1,19 @@
 // Declaration-resolution guard: a strict `moduleResolution: nodenext` consumer
 // must be able to follow @sheetwrite/core's d.ts graph (every relative
 // specifier inside dist/*.d.ts needs an explicit .js extension).
-import type { GridOptions, Theme, Workbook } from "@sheetwrite/core";
-import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import type {
+  GridOptions,
+  PersistenceAdapter,
+  Theme,
+  Workbook,
+  WorkbookSnapshot,
+} from "@sheetwrite/core";
+import {
+  createGrid,
+  createGridFromSnapshot,
+  initSheetwrite,
+  MemoryPersistenceAdapter,
+} from "@sheetwrite/core";
 import { createGridController } from "@sheetwrite/core/adapter";
 import "@sheetwrite/core/xlsx";
 
@@ -20,5 +31,17 @@ const workbook: Workbook = {
 
 const options: GridOptions = { workbook };
 const theme: Partial<Theme> = { bg: "#ffffff" };
+const snapshot = null as unknown as WorkbookSnapshot;
+const persistence = null as unknown as PersistenceAdapter;
 
-export { createGrid, createGridController, initSheetwrite, options, theme };
+export {
+  createGrid,
+  createGridController,
+  createGridFromSnapshot,
+  initSheetwrite,
+  MemoryPersistenceAdapter,
+  options,
+  persistence,
+  snapshot,
+  theme,
+};

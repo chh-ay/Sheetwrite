@@ -1,4 +1,9 @@
 import { CellStore, isLoaded, type WindowView } from "@sheetwrite/wasm";
+import {
+  SnapshotValidationError,
+  validateWorkbookSnapshot,
+  WORKBOOK_SCHEMA_VERSION,
+} from "./document-protocol.js";
 import { cellKey, type LiteralLookup, parseCellKey, ReferenceGraph } from "./reference.js";
 import { StyleDictionary } from "./style-dictionary.js";
 import type {
@@ -24,11 +29,14 @@ import type {
   Sheet,
   SheetId,
   SheetSnapshot,
+  SnapshotCell,
   SortKey,
   Store,
   Transaction,
+  TransactionApplicationOptions,
   VisibleWindowView,
   Workbook,
+  WorkbookSnapshot,
 } from "./types.js";
 
 // Mirror of the WASM cell tags.
@@ -168,6 +176,8 @@ export class SheetwriteStore implements Store {
   private readonly stringCache = new Map<number, string>();
   private readonly condRulesSynced = new Map<SheetId, string>();
 
+  private documentId?: string;
+  private documentVersion?: number;
   constructor(workbook: Workbook, data?: ColumnarData) {
     if (!isLoaded()) {
       throw new Error("Sheetwrite: await initSheetwrite() before constructing SheetwriteStore");
@@ -186,6 +196,49 @@ export class SheetwriteStore implements Store {
     const handle = this.handles.get(sheet);
     if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
     return handle;
+  }
+
+  static fromSnapshot(input: unknown): SheetwriteStore {
+    const checked = validateWorkbookSnapshot(input);
+    if (!checked.ok) throw new SnapshotValidationError(checked.errors);
+    const snapshot = checked.value;
+    const workbook: Workbook = {
+      activeSheet: snapshot.workbook.activeSheet,
+      namedRanges: cloneJsonValue(snapshot.workbook.namedRanges),
+      sheets: snapshot.sheets.map((source) => {
+        const rowHeights = new Map<number, number>();
+        const hiddenRows = new Set<number>();
+        for (const [row, meta] of source.rowMeta ?? []) {
+          if (meta.height !== undefined) rowHeights.set(row, meta.height);
+          if (meta.hidden) hiddenRows.add(row);
+        }
+        return {
+          id: source.id,
+          name: source.name,
+          rowCount: source.rowCount,
+          columns: cloneJsonValue(source.columns) ?? [],
+          frozenRows: source.frozenRows,
+          frozenCols: source.frozenCols,
+          rowHeights: rowHeights.size > 0 ? rowHeights : undefined,
+          hiddenRows: hiddenRows.size > 0 ? hiddenRows : undefined,
+          merges: cloneJsonValue(source.merges),
+          conditionalFormats: cloneJsonValue(source.conditionalFormats),
+          rowGroups: cloneJsonValue(source.rowGroups),
+        };
+      }),
+    };
+
+    let store: SheetwriteStore | undefined;
+    try {
+      store = new SheetwriteStore(workbook);
+      store.documentId = snapshot.documentId;
+      store.documentVersion = snapshot.version;
+      store.hydrateSnapshotCells(snapshot);
+      return store;
+    } catch (error) {
+      store?.dispose();
+      throw error;
+    }
   }
 
   /**
@@ -345,10 +398,19 @@ export class SheetwriteStore implements Store {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
+    return this.readWindow(sheet, rows, cols, true);
+  }
+
+  private readWindow(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+    applyView: boolean,
+  ): VisibleWindowView {
     const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
-    const order = this.viewOrder.get(sheet);
-    const hasCondRules = this.syncConditionalRules(sheet, handle);
+    const order = applyView ? this.viewOrder.get(sheet) : undefined;
+    const hasCondRules = applyView && this.syncConditionalRules(sheet, handle);
 
     let view: ConsumingWindowView;
     let dataRows: Uint32Array | null = null;
@@ -921,10 +983,18 @@ export class SheetwriteStore implements Store {
   }
 
   /**
-   * Public `Store` shape takes one argument (reason defaults to `"api"`);
-   * internal producers thread their {@link CommitReason} via the second.
+   * Internal producers may pass a bare reason; public persistence callers pass
+   * explicit source/dirty options.
    */
-  applyTransaction(tx: Transaction, commitReason: CommitReason = "api"): ApplyTransactionResult {
+  applyTransaction(
+    tx: Transaction,
+    reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
+  ): ApplyTransactionResult {
+    const options =
+      typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
+    const commitReason = options.commitReason ?? "api";
+    const source = options.source ?? "local";
+    const markDirty = options.markDirty ?? source === "local";
     // Non-reentrant barrier: a stale epoch is rejected outright (the app
     // rebases on the change stream and resubmits).
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
@@ -984,8 +1054,11 @@ export class SheetwriteStore implements Store {
         this.wasm.recompute(this.handleOf(sheet));
       }
     }
+    if (this.refs.hasRefs()) {
+      this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+    }
 
-    this.dirty.push(...appliedPatches);
+    if (markDirty) this.dirty.push(...appliedPatches);
     this.epoch += 1;
 
     const transaction =
@@ -1000,6 +1073,7 @@ export class SheetwriteStore implements Store {
       changes: changes ?? [],
       dirty: [...this.dirty],
       commitReason,
+      source,
       epoch: this.epoch,
     };
     for (const fn of this.listeners) fn(event);
@@ -1884,6 +1958,100 @@ export class SheetwriteStore implements Store {
     this.dirty = this.dirty.filter((p) => !clean.has(p));
   }
 
+  exportSnapshot(): WorkbookSnapshot {
+    const refTargets = new Map<string, CellAddress>();
+    for (const [source, target] of this.refs.entries()) {
+      refTargets.set(cellKey(source), target);
+    }
+    const sheets: SheetSnapshot[] = this.workbook.sheets.map((sheet, order) => {
+      const rowMetaRows = new Set<number>([
+        ...(sheet.rowHeights?.keys() ?? []),
+        ...(sheet.hiddenRows?.values() ?? []),
+      ]);
+      const rowMeta = [...rowMetaRows]
+        .sort((left, right) => left - right)
+        .map(
+          (row) =>
+            [
+              row,
+              {
+                ...(sheet.rowHeights?.has(row) ? { height: sheet.rowHeights.get(row) } : {}),
+                ...(sheet.hiddenRows?.has(row) ? { hidden: true } : {}),
+              },
+            ] as const,
+        );
+
+      const cols = sheet.columns.map((_, col) => col);
+      const window = this.readWindow(sheet.id, { start: 0, end: sheet.rowCount }, cols, false);
+      const cells: SnapshotCell[] = [];
+      for (let row = 0; row < sheet.rowCount; row++) {
+        for (let col = 0; col < cols.length; col++) {
+          const index = row * cols.length + col;
+          const addr = { sheet: sheet.id, row, col };
+          const key = cellKey(addr);
+          const formula = this.formulaSrc.get(key);
+          const target = refTargets.get(key);
+          const style = window.styles[window.styleIds[index] ?? 0] ?? {};
+          const hasStyle = Object.keys(style).length > 0;
+          const resolved = window.values[index] ?? null;
+          if (!formula && !target && resolved === null && !hasStyle) continue;
+          const value: CellValue = formula
+            ? { kind: "formula", src: formula }
+            : target
+              ? { kind: "ref", target: { ...target } }
+              : { kind: "literal", value: resolved };
+          cells.push({
+            rowOffset: row,
+            colOffset: col,
+            value,
+            ...(hasStyle ? { style: cloneJsonValue(style) } : {}),
+          });
+        }
+      }
+
+      return {
+        id: sheet.id,
+        name: sheet.name,
+        order,
+        rowCount: sheet.rowCount,
+        columns: cloneJsonValue(sheet.columns) ?? [],
+        ...(sheet.frozenRows !== undefined ? { frozenRows: sheet.frozenRows } : {}),
+        ...(sheet.frozenCols !== undefined ? { frozenCols: sheet.frozenCols } : {}),
+        ...(rowMeta.length > 0 ? { rowMeta: rowMeta.map(([row, meta]) => [row, meta]) } : {}),
+        ...(sheet.merges?.length ? { merges: cloneJsonValue(sheet.merges) } : {}),
+        ...(sheet.conditionalFormats?.length
+          ? { conditionalFormats: cloneJsonValue(sheet.conditionalFormats) }
+          : {}),
+        ...(sheet.rowGroups?.length ? { rowGroups: cloneJsonValue(sheet.rowGroups) } : {}),
+        cells:
+          cells.length > 0
+            ? [
+                {
+                  startRow: 0,
+                  startCol: 0,
+                  rowCount: sheet.rowCount,
+                  colCount: sheet.columns.length,
+                  cells,
+                },
+              ]
+            : [],
+      };
+    });
+
+    return {
+      schemaVersion: WORKBOOK_SCHEMA_VERSION,
+      ...(this.documentId !== undefined ? { documentId: this.documentId } : {}),
+      ...(this.documentVersion !== undefined ? { version: this.documentVersion } : {}),
+      workbook: {
+        activeSheet: this.workbook.activeSheet,
+        ...(this.workbook.namedRanges?.length
+          ? { namedRanges: cloneJsonValue(this.workbook.namedRanges) }
+          : {}),
+      },
+      sheets,
+    };
+  }
+
   /** Rewrite resolved formula sheet identity without changing the stable WASM handle. */
   renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
     const handle = this.handleOf(sheet);
@@ -1923,7 +2091,6 @@ export class SheetwriteStore implements Store {
     const columns = this.sheetMeta(sheet).columns;
     const exceptions: Patch[] = [];
     const protectedCells: Patch[] = [];
-    const loadedLiteralKeys: string[] = [];
 
     for (let c = 0; c < columns.length; c++) {
       const column = columns[c]!;
@@ -1959,8 +2126,6 @@ export class SheetwriteStore implements Store {
             value: value as CellValue,
             style: wrapped?.style,
           });
-        } else {
-          loadedLiteralKeys.push(cellKey(addr));
         }
       }
       this.loadColumnBlock(handle, column, c, start, rows);
@@ -1968,11 +2133,90 @@ export class SheetwriteStore implements Store {
 
     for (const patch of exceptions) this.applyPatch(patch, null);
     for (const patch of protectedCells) this.applyPatch(patch, null);
-    if (loadedLiteralKeys.length > 0 && this.refs.hasRefs()) {
-      const literalAt: LiteralLookup = (addr) => this.rawCell(addr).resolved;
-      for (const key of loadedLiteralKeys) this.refs.onLiteralChanged(key, literalAt);
-    }
     this.wasm.recompute(handle);
+    if (this.refs.hasRefs()) {
+      this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+    }
+  }
+
+  private hydrateSnapshotCells(snapshot: WorkbookSnapshot): void {
+    const literalExceptions: Patch[] = [];
+    const formulas: Patch[] = [];
+    const references: Patch[] = [];
+
+    for (const sourceSheet of snapshot.sheets) {
+      const handle = this.handleOf(sourceSheet.id);
+      const bulkByColumn = new Map<number, Array<{ row: number; value: string | number }>>();
+      for (const block of sourceSheet.cells) {
+        for (const cell of block.cells) {
+          const addr = {
+            sheet: sourceSheet.id,
+            row: block.startRow + cell.rowOffset,
+            col: block.startCol + cell.colOffset,
+          };
+          const patch: Patch = { op: "set", addr, value: cell.value, style: cell.style };
+          if (cell.value.kind === "formula") {
+            formulas.push(patch);
+          } else if (cell.value.kind === "ref") {
+            references.push(patch);
+          } else if (
+            cell.style === undefined &&
+            (typeof cell.value.value === "number" || typeof cell.value.value === "string")
+          ) {
+            const entries = bulkByColumn.get(addr.col) ?? [];
+            entries.push({ row: addr.row, value: cell.value.value });
+            bulkByColumn.set(addr.col, entries);
+          } else {
+            literalExceptions.push(patch);
+          }
+        }
+      }
+
+      for (const [col, entries] of bulkByColumn) {
+        entries.sort((left, right) => left.row - right.row);
+        for (let index = 0; index < entries.length; ) {
+          const first = entries[index]!;
+          const kind = typeof first.value;
+          let end = index + 1;
+          while (
+            end < entries.length &&
+            entries[end]!.row === entries[end - 1]!.row + 1 &&
+            typeof entries[end]!.value === kind
+          ) {
+            end += 1;
+          }
+          const run = entries.slice(index, end);
+          if (kind === "number") {
+            this.wasm.setColumnNumbers(
+              handle,
+              col,
+              first.row,
+              Float64Array.from(run, (entry) => entry.value as number),
+              0,
+            );
+          } else {
+            const values = run.map((entry) => entry.value as string);
+            const lengths = Uint32Array.from(values, (value) => value.length);
+            this.wasm.setColumnStringsPacked(handle, col, first.row, values.join(""), lengths, 0);
+          }
+          index = end;
+        }
+      }
+    }
+
+    for (const patch of literalExceptions) this.applyPatch(patch, null);
+    for (const patch of formulas) this.applyPatch(patch, null);
+    for (const patch of references) this.applyPatch(patch, null);
+    for (const sheet of this.workbook.sheets) {
+      const handle = this.handleOf(sheet.id);
+      this.syncConditionalRules(sheet.id, handle);
+      this.wasm.recompute(handle);
+    }
+    if (this.refs.hasRefs()) {
+      this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+    }
+    this.epoch = snapshot.version ?? 0;
+    this.dirty = [];
   }
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
@@ -2236,4 +2480,8 @@ function toText(value: DataCell | undefined): string {
     return toText(unwrapped.value);
   }
   return "";
+}
+
+function cloneJsonValue<T>(value: T): T {
+  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 }

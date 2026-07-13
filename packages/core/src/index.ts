@@ -5,6 +5,7 @@ export {
   type DocumentValidationError,
   type DocumentValidationResult,
   documentOpTarget,
+  SnapshotValidationError,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "./document-protocol.js";
@@ -29,6 +30,13 @@ export {
   resolveThemeFromCss,
 } from "./grid.js";
 export { formatNumber } from "./number-format.js";
+export {
+  createGridFromSnapshot,
+  MemoryPersistenceAdapter,
+  PersistenceError,
+  type PersistenceErrorCode,
+  type SnapshotGridOptions,
+} from "./persistence.js";
 export { REF_CYCLE } from "./reference.js";
 export { SheetwriteStore } from "./store.js";
 export type {
@@ -70,8 +78,13 @@ export type {
   LegacyDataSource,
   MergeRange,
   NamedRangeSnapshot,
+  OperationSource,
   Patch,
+  PersistenceAdapter,
+  PersistenceCommitRequest,
+  PersistenceCommitResponse,
   Range,
+  RemoteOperationOptions,
   ReplaceResult,
   ResolvedCell,
   RowData,
@@ -91,6 +104,7 @@ export type {
   ToolbarIcon,
   ToolbarItem,
   Transaction,
+  TransactionApplicationOptions,
   VisibleWindowView,
   Workbook,
   WorkbookSnapshot,

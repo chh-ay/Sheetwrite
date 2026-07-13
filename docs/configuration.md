@@ -66,6 +66,15 @@ the complete reducer path, including metadata and sheet lifecycle operations.
 Session-only grid options such as `renderer`, `readOnly`, local zoom, selection,
 scroll, search, and temporary highlights never belong in a snapshot.
 
+`createGridFromSnapshot(host, snapshot, options)` validates and hydrates every
+sheet before mounting. Hydration emits no changes, dirty patches, or undo entry.
+`grid.exportSnapshot()` uses bulk sheet reads and returns deterministic sparse
+blocks. `grid.applyRemoteOperations(operations)` emits a change with
+`source: "remote"` while skipping dirty state and undo history. Use
+`MemoryPersistenceAdapter` as an executable reference, not as durable storage.
+Adapter load/commit methods accept `AbortSignal`; failures use `PersistenceError`
+codes (`aborted`, `invalid-snapshot`, `not-found`, or `commit-rejected`).
+
 A `CellRenderer` paints (or returns a DOM node for) a single cell:
 
 ```ts
@@ -256,7 +265,7 @@ search (pass `null` to clear); `color` overrides the theme highlight color.
 
 | Event | Payload |
 | --- | --- |
-| `change` | `{ transaction: Transaction; changes: CellChange[]; dirty: Patch[]; epoch? }` |
+| `change` | `{ transaction; changes; dirty; commitReason; source: "local" \| "remote"; epoch? }` |
 | `selection` | `{ selection: Selection \| null }` |
 | `scroll` | `{ scrollTop: number; firstRow: number; lastRow: number }` |
 | `edit-begin` | `{ addr: CellAddress }` |
@@ -264,9 +273,13 @@ search (pass `null` to clear); `color` overrides the theme highlight color.
 | `search` | `SearchResult` — `{ query: string; matches: CellAddress[]; active: number }` |
 
 ```ts
-const off = grid.on("change", (e) => {
-  console.log(`${e.changes.length} cell(s) changed`);
-  // forward e.dirty to your backend, then grid.store.markClean(...)
+const off = grid.on("change", async (event) => {
+  if (event.source !== "local") return; // prevent remote-operation feedback
+  await adapter.commit({
+    documentId: "products",
+    operations: event.transaction.patches,
+  });
+  grid.store.markClean(event.transaction.patches);
 });
 // later
 off();

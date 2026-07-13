@@ -25,7 +25,7 @@ import "@sheetwrite/react/styles.css";
   ]}
   defaultRows={products}
   height={500}
-  onGridChange={({ changes }) => save(changes)}
+  onGridChange={(event) => event.source === "local" && save(event.transaction.patches)}
 />;
 ```
 

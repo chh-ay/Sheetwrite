@@ -19,6 +19,15 @@ export type DocumentValidationResult =
   | { ok: true; value: WorkbookSnapshot }
   | { ok: false; errors: DocumentValidationError[] };
 
+export class SnapshotValidationError extends Error {
+  readonly code = "invalid-snapshot";
+
+  constructor(readonly errors: readonly DocumentValidationError[]) {
+    super(errors[0]?.message ?? "Invalid workbook snapshot");
+    this.name = "SnapshotValidationError";
+  }
+}
+
 function integer(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }

@@ -91,7 +91,7 @@ interface Store {
   getWorkbook(): Workbook;
   getCell(addr: CellAddress): ResolvedCell;
   getVisibleWindow(sheet, rows: { start; end }, cols: readonly number[]): VisibleWindowView;
-  applyTransaction(tx: Transaction): ApplyTransactionResult; // queued, flushed at a barrier, never reentrant
+  applyTransaction(tx, { source?, markDirty?, commitReason? }): ApplyTransactionResult;
   on("change", fn): () => void;                              // returns an unsubscribe
   getDirty(): DocumentOp[];                                  // pending unsynced edits
   markClean(patches: DocumentOp[]): void;                     // clear dirty flags after the API confirms
@@ -132,14 +132,36 @@ const outcome = grid.store.applyTransaction({
 });
 ```
 
+Snapshot hydration is a separate, validated path: it creates every sheet handle,
+bulk-loads literal runs, installs formula/reference/style exceptions, then
+recomputes after the complete graph exists. It emits no user event, dirty patch,
+or undo entry. Export uses one bulk data-order read per sheet, ignores local
+sort/filter views and conditional render styles, and emits deterministic sparse
+blocks.
+
+```ts
+const saved = await adapter.load(documentId, signal);
+const grid = createGridFromSnapshot(host, saved);
+
+grid.on("change", async (event) => {
+  if (event.source !== "local") return;
+  await adapter.commit({ documentId, operations: event.transaction.patches });
+  grid.store.markClean(event.transaction.patches);
+});
+
+grid.applyRemoteOperations(incoming); // source "remote"; not dirty or undoable
+```
+
 Document state does **not** include selection, scroll position, editor/caret
 state, search results, temporary highlights, renderer choice, read-only policy,
 or local zoom. Those are session state. `Workbook.activeSheet` remains document
 metadata in schema 1.
 
 Applied storage transactions emit `change` with the filtered transaction,
-per-cell rollback data, accumulated dirty patches, and epoch. Conflicts and
-no-ops return explicit outcomes rather than throwing.
+per-cell rollback data, accumulated dirty patches, epoch, commit reason, and an
+explicit `source` (`local` or `remote`). Remote operations still update formulas
+and rendering, but do not re-enter outgoing persistence. Conflicts and no-ops
+return explicit outcomes rather than throwing.
 
 Sheet IDs remain stable across rename and reorder. Renaming rewrites canonical
 cross-sheet formula source while preserving the stable formula-engine handle.

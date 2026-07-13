@@ -21,7 +21,7 @@ import "@sheetwrite/react/styles.css";
   ]}
   defaultRows={products}
   height={500}
-  onGridChange={({ changes }) => save(changes)}
+  onGridChange={(event) => event.source === "local" && save(event.transaction.patches)}
 />;
 ```
 
@@ -70,6 +70,30 @@ const grid = createGrid(document.querySelector("#grid")!, {
 ```
 
 Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Getting started](docs/getting-started.md).
+
+## Persistence
+
+Snapshots are the authoritative, JSON-safe persistence boundary. Hosts own
+storage; core never embeds a database or endpoint:
+
+```ts
+import { createGridFromSnapshot } from "@sheetwrite/core";
+
+const snapshot = await adapter.load("products");
+const grid = createGridFromSnapshot(document.querySelector("#grid")!, snapshot);
+
+grid.on("change", async (event) => {
+  if (event.source !== "local") return;
+  await adapter.commit({
+    documentId: "products",
+    operations: event.transaction.patches,
+  });
+  grid.store.markClean(event.transaction.patches);
+});
+
+const backup = grid.exportSnapshot();
+grid.applyRemoteOperations(remoteOperations); // observable, not dirty or undoable
+```
 
 ## Packages
 

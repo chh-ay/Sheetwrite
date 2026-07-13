@@ -107,7 +107,7 @@ const stats = [
   ]{"}"}
   <span class="a">defaultRows</span>={"{"}products{"}"}
   <span class="a">height</span>={"{"}500{"}"}
-  <span class="a">onGridChange</span>={"{"}({"{"} changes {"}"}) =&gt; save(changes){"}"}
+  <span class="a">onGridChange</span>={"{"}(event) =&gt; event.source === <span class="s">"local"</span> &amp;&amp; save(event.transaction.patches){"}"}
 /&gt;</code></pre>
         </figure>
       </div>

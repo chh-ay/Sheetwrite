@@ -66,6 +66,11 @@ export class ReferenceGraph {
     return out;
   }
 
+  /** Re-resolve every live reference after an external formula barrier. */
+  refreshAll(literalAt: LiteralLookup): void {
+    this.recomputeMany([...this.target.keys()], literalAt);
+  }
+
   setRef(refAddr: CellAddress, targetAddr: CellAddress, literalAt: LiteralLookup): void {
     const key = cellKey(refAddr);
     this.removeRef(key);

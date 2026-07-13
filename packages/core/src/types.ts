@@ -267,6 +267,37 @@ export type ApplyTransactionResult =
   | { status: "conflict"; expectedEpoch: number; actualEpoch: number }
   | { status: "noop"; epoch: number; reason: "empty" | "out-of-bounds" };
 
+export type OperationSource = "local" | "remote";
+
+export interface TransactionApplicationOptions {
+  /** Distinguishes host persistence input from local user/API output. */
+  source?: OperationSource;
+  /** Defaults to true for local operations and false for remote operations. */
+  markDirty?: boolean;
+  /** Event classification; defaults to `api`. */
+  commitReason?: CommitReason;
+}
+
+export interface RemoteOperationOptions {
+  commitReason?: CommitReason;
+}
+
+export interface PersistenceCommitRequest {
+  documentId: string;
+  operations: readonly DocumentOp[];
+  signal?: AbortSignal;
+}
+
+export interface PersistenceCommitResponse {
+  outcome: ApplyTransactionResult;
+  snapshot: WorkbookSnapshot;
+}
+
+export interface PersistenceAdapter {
+  load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
+  commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
+}
+
 /**
  * An undoable transaction submitted through a Grid.
  *
@@ -319,6 +350,8 @@ export interface ChangeEvent {
   dirty: Patch[];
   /** What produced this commit — see {@link CommitReason}. */
   commitReason: CommitReason;
+  /** Remote input is observable but never belongs in outgoing local persistence. */
+  source: OperationSource;
   epoch?: number;
 }
 
@@ -397,12 +430,17 @@ export interface Store {
    * `Grid.applyTransaction` for normal host-driven edits.
    * Queued and flushed at a barrier — never reentrant.
    */
-  applyTransaction(tx: Transaction): ApplyTransactionResult;
+  applyTransaction(
+    tx: Transaction,
+    options?: TransactionApplicationOptions,
+  ): ApplyTransactionResult;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
   /** Pending unsynced edits. */
   getDirty(): Patch[];
   /** Clear dirty flags after the API confirms. */
   markClean(patches: Patch[]): void;
+  /** Deterministic, JSON-safe authoritative runtime document. */
+  exportSnapshot?(): WorkbookSnapshot;
   /** Displayed row count after any active sort/filter view. */
   viewRowCount(sheet: SheetId): number;
 }
@@ -787,6 +825,16 @@ export interface Grid {
    * bypass Grid history and policy.
    */
   applyTransaction(transaction: GridTransaction): void;
+  /** Deterministically export the complete authoritative workbook document. */
+  exportSnapshot(): WorkbookSnapshot;
+  /**
+   * Apply host-supplied operations without undo history or outgoing dirty state.
+   * The resulting change event has `source: "remote"`.
+   */
+  applyRemoteOperations(
+    operations: readonly DocumentOp[],
+    options?: RemoteOperationOptions,
+  ): ApplyTransactionResult;
   defineCellRenderer(name: string, renderer: CellRenderer): void;
   /** Column aggregate over the active sheet's data. */
   aggregate(col: number, op: AggregateOp): number;
