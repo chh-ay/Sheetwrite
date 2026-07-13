@@ -10,8 +10,8 @@ import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { downloadBytes, toCsv, toXlsx } from "./export.js";
-import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { FindBar } from "./find-bar.js";
+import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { RenderCoordinator } from "./render-coordinator.js";
@@ -46,7 +46,6 @@ import type {
   GridOptions,
   GridTransaction,
   HighlightRange,
-  MergeRange,
   MutationPolicyMode,
   Patch,
   PresenceOverlay,
@@ -64,7 +63,6 @@ import type {
   Sheet,
   SheetId,
   SheetSnapshot,
-  SnapshotCell,
   SortKey,
   Store,
   Theme,
