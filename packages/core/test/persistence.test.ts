@@ -229,6 +229,8 @@ describe("snapshot persistence boundary", () => {
     await expect(
       adapter.commit({
         documentId: "doc-1",
+        baseVersion: 7,
+        clientMutationId: "invalid-1",
         operations: [
           {
             op: "set",
@@ -241,6 +243,8 @@ describe("snapshot persistence boundary", () => {
 
     const response = await adapter.commit({
       documentId: "doc-1",
+      baseVersion: 7,
+      clientMutationId: "valid-1",
       operations: [
         {
           op: "set",
@@ -249,7 +253,7 @@ describe("snapshot persistence boundary", () => {
         },
       ],
     });
-    expect(response.outcome.status).toBe("applied");
+    expect(response.status).toBe("applied");
 
     const secondHost = document.createElement("div");
     document.body.appendChild(secondHost);
@@ -264,7 +268,13 @@ describe("snapshot persistence boundary", () => {
       code: "aborted",
     });
     await expect(
-      adapter.commit({ documentId: "doc-1", operations: [], signal: controller.signal }),
+      adapter.commit({
+        documentId: "doc-1",
+        baseVersion: 8,
+        clientMutationId: "aborted-1",
+        operations: [],
+        signal: controller.signal,
+      }),
     ).rejects.toMatchObject({ code: "aborted" });
   });
 });

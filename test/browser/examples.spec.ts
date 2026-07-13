@@ -113,6 +113,27 @@ test("theming example repaints when switching themes", async ({ page }) => {
   await expect.poll(sample, { message: "theme switch never repainted" }).not.toBe(light);
 });
 
+test("vue sync demo queues, retries, and acknowledges a stable mutation", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto(urlOf("vue"));
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+  const sync = page.getByTestId("sync");
+  await expect(sync).toContainText("All changes synced");
+
+  await page.getByRole("button", { name: /Edit visible row/i }).click();
+  await expect(sync).toContainText("1 pending mutation");
+
+  const acknowledge = page.getByRole("button", { name: /Acknowledge changes/i });
+  await acknowledge.click();
+  await expect(page.locator(".example-log")).toContainText("retry ready");
+  await expect(sync).toContainText("1 pending mutation");
+
+  await acknowledge.click();
+  await expect(sync).toContainText("All changes synced · server v1");
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("svelte example edits a cross-sheet formula through the shell bar", async ({ page }) => {
   await page.goto(urlOf("svelte"));
   await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });

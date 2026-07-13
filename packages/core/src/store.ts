@@ -165,6 +165,7 @@ export class SheetwriteStore implements Store {
   private readonly styles = new StyleDictionary();
   private readonly listeners = new Set<ChangeListener>();
   private dirty: Patch[] = [];
+  private dirtyTrackingSuspensions = 0;
   private epoch = 0;
   private readonly refs = new ReferenceGraph((addr, value) => this.writeRefShadow(addr, value));
   private readonly viewOrder = new Map<SheetId, Uint32Array>();
@@ -1058,7 +1059,7 @@ export class SheetwriteStore implements Store {
       this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
     }
 
-    if (markDirty) this.dirty.push(...appliedPatches);
+    if (markDirty && this.dirtyTrackingSuspensions === 0) this.dirty.push(...appliedPatches);
     this.epoch += 1;
 
     const transaction =
@@ -1956,6 +1957,17 @@ export class SheetwriteStore implements Store {
 
     const clean = new Set(patches);
     this.dirty = this.dirty.filter((p) => !clean.has(p));
+  }
+
+  suspendDirtyTracking(): () => void {
+    this.dirtyTrackingSuspensions += 1;
+    this.dirty = [];
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.dirtyTrackingSuspensions = Math.max(0, this.dirtyTrackingSuspensions - 1);
+    };
   }
 
   exportSnapshot(): WorkbookSnapshot {

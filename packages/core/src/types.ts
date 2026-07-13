@@ -282,20 +282,54 @@ export interface RemoteOperationOptions {
   commitReason?: CommitReason;
 }
 
-export interface PersistenceCommitRequest {
+export interface PendingCommit {
   documentId: string;
-  operations: readonly DocumentOp[];
+  baseVersion: number;
+  clientMutationId: string;
+  readonly operations: readonly DocumentOp[];
+}
+
+export type SyncMutationStatus = "pending" | "sending" | "conflicted";
+
+export interface SyncMutationRecord extends PendingCommit {
+  status: SyncMutationStatus;
+}
+
+export interface VersionedOperation {
+  version: number;
+  readonly operations: readonly DocumentOp[];
+  clientMutationId?: string;
+}
+
+export interface PersistenceCommitRequest extends PendingCommit {
   signal?: AbortSignal;
 }
 
-export interface PersistenceCommitResponse {
-  outcome: ApplyTransactionResult;
-  snapshot: WorkbookSnapshot;
-}
+export type PersistenceCommitResponse =
+  | {
+      status: "applied";
+      version: number;
+      clientMutationId: string;
+      canonicalOperations?: readonly DocumentOp[];
+    }
+  | { status: "duplicate"; version: number; clientMutationId: string }
+  | {
+      status: "conflict";
+      currentVersion: number;
+      operationsSinceBase?: readonly VersionedOperation[];
+      snapshot?: WorkbookSnapshot;
+    };
 
 export interface PersistenceAdapter {
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
+}
+
+export interface RemoteOperationSource {
+  subscribe(
+    listener: (operation: VersionedOperation) => void,
+    signal?: AbortSignal,
+  ): undefined | (() => void);
 }
 
 /**
@@ -439,6 +473,11 @@ export interface Store {
   getDirty(): Patch[];
   /** Clear dirty flags after the API confirms. */
   markClean(patches: Patch[]): void;
+  /**
+   * Let a mutation-ID coordinator own pending state instead of duplicating the
+   * legacy object-identity dirty queue. Returns a release function.
+   */
+  suspendDirtyTracking?(): () => void;
   /** Deterministic, JSON-safe authoritative runtime document. */
   exportSnapshot?(): WorkbookSnapshot;
   /** Displayed row count after any active sort/filter view. */

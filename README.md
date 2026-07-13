@@ -77,19 +77,17 @@ Snapshots are the authoritative, JSON-safe persistence boundary. Hosts own
 storage; core never embeds a database or endpoint:
 
 ```ts
-import { createGridFromSnapshot } from "@sheetwrite/core";
+import { createGridFromSnapshot, SyncCoordinator } from "@sheetwrite/core";
 
 const snapshot = await adapter.load("products");
 const grid = createGridFromSnapshot(document.querySelector("#grid")!, snapshot);
-
-grid.on("change", async (event) => {
-  if (event.source !== "local") return;
-  await adapter.commit({
-    documentId: "products",
-    operations: event.transaction.patches,
-  });
-  grid.store.markClean(event.transaction.patches);
+const sync = new SyncCoordinator(grid, adapter, {
+  documentId: "products",
+  serverVersion: snapshot.version ?? 0,
 });
+
+saveButton.onclick = () => void sync.sendNext(); // explicit host-controlled timing/retry
+sync.subscribe(remoteOperationSource);
 
 const backup = grid.exportSnapshot();
 grid.applyRemoteOperations(remoteOperations); // observable, not dirty or undoable

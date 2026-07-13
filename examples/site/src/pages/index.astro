@@ -34,9 +34,9 @@ const cards = [
     accent: "var(--color-fw-vue)",
     kicker: "Vue adapter",
     name: "Streaming sync console",
-    body: "A million virtual rows behind a latency-simulated paged datasource, a live grid-event pipeline, and the getDirty/markClean server-acknowledgement flow.",
+    body: "A million virtual rows behind a latency-simulated paged datasource, a live mutation-ID queue, and delayed server-version acknowledgements.",
     stat: "1M rows",
-    chips: ["DataSource", "getDirty", "markClean", "search"],
+    chips: ["DataSource", "SyncCoordinator", "mutation IDs", "search"],
   },
   {
     slug: "svelte",

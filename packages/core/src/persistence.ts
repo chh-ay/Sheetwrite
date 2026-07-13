@@ -7,6 +7,7 @@ import type {
   PersistenceAdapter,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
+  VersionedOperation,
   WorkbookSnapshot,
 } from "./types.js";
 
@@ -54,7 +55,16 @@ export function createGridFromSnapshot(
 
 /** Executable database-neutral reference adapter for tests, demos, and local workflows. */
 export class MemoryPersistenceAdapter implements PersistenceAdapter {
-  private readonly documents = new Map<string, WorkbookSnapshot>();
+  private readonly documents = new Map<
+    string,
+    {
+      snapshot: WorkbookSnapshot;
+      version: number;
+      initialVersion: number;
+      log: VersionedOperation[];
+      applied: Map<string, number>;
+    }
+  >();
 
   constructor(...snapshots: readonly WorkbookSnapshot[]) {
     for (const snapshot of snapshots) {
@@ -66,27 +76,56 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       if (!checked.value.documentId) {
         throw new PersistenceError("invalid-snapshot", "Memory snapshots require documentId");
       }
-      this.documents.set(checked.value.documentId, cloneSnapshot(checked.value));
+      const version = checked.value.version ?? 0;
+      this.documents.set(checked.value.documentId, {
+        snapshot: cloneSnapshot({ ...checked.value, version }),
+        version,
+        initialVersion: version,
+        log: [],
+        applied: new Map(),
+      });
     }
   }
 
   async load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
     throwIfAborted(signal);
-    const snapshot = this.documents.get(documentId);
-    if (!snapshot) throw new PersistenceError("not-found", `Unknown document: ${documentId}`);
+    const document = this.documents.get(documentId);
+    if (!document) throw new PersistenceError("not-found", `Unknown document: ${documentId}`);
     await Promise.resolve();
     throwIfAborted(signal);
-    return cloneSnapshot(snapshot);
+    return cloneSnapshot(document.snapshot);
   }
 
   async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
     throwIfAborted(request.signal);
-    const snapshot = this.documents.get(request.documentId);
-    if (!snapshot) {
+    const document = this.documents.get(request.documentId);
+    if (!document) {
       throw new PersistenceError("not-found", `Unknown document: ${request.documentId}`);
     }
+    const appliedVersion = document.applied.get(request.clientMutationId);
+    if (appliedVersion !== undefined) {
+      return {
+        status: "duplicate",
+        version: appliedVersion,
+        clientMutationId: request.clientMutationId,
+      };
+    }
+    if (request.baseVersion !== document.version) {
+      const operationsSinceBase =
+        request.baseVersion >= document.initialVersion
+          ? document.log.filter((entry) => entry.version > request.baseVersion)
+          : undefined;
+      return {
+        status: "conflict",
+        currentVersion: document.version,
+        ...(operationsSinceBase &&
+        operationsSinceBase.length === document.version - request.baseVersion
+          ? { operationsSinceBase: cloneJsonValue(operationsSinceBase) }
+          : { snapshot: cloneSnapshot(document.snapshot) }),
+      };
+    }
 
-    const store = SheetwriteStore.fromSnapshot(snapshot);
+    const store = SheetwriteStore.fromSnapshot(document.snapshot);
     try {
       const outcome = store.applyTransaction(
         { patches: request.operations.slice() },
@@ -98,10 +137,22 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       ) {
         throw new PersistenceError("commit-rejected", "Persistence commit was rejected");
       }
-      const next = store.exportSnapshot();
+      const version = document.version + 1;
+      const next = { ...store.exportSnapshot(), version };
       throwIfAborted(request.signal);
-      this.documents.set(request.documentId, cloneSnapshot(next));
-      return { outcome, snapshot: cloneSnapshot(next) };
+      document.snapshot = cloneSnapshot(next);
+      document.version = version;
+      document.applied.set(request.clientMutationId, version);
+      document.log.push({
+        version,
+        operations: cloneJsonValue(request.operations),
+        clientMutationId: request.clientMutationId,
+      });
+      return {
+        status: "applied",
+        version,
+        clientMutationId: request.clientMutationId,
+      };
     } finally {
       store.dispose();
     }
@@ -118,4 +169,8 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 function cloneSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
   return JSON.parse(JSON.stringify(snapshot)) as WorkbookSnapshot;
+}
+
+function cloneJsonValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }

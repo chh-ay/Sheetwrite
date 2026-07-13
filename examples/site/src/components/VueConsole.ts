@@ -2,15 +2,22 @@ import type {
   ChangeEvent,
   DataSource,
   DataSourcePage,
+  DocumentOp,
   Grid,
   GridEvents,
+  PersistenceAdapter,
+  PersistenceCommitRequest,
+  PersistenceCommitResponse,
   RowData,
   Selection,
   Theme,
+  VersionedOperation,
   Workbook,
+  WorkbookSnapshot,
 } from "@sheetwrite/core";
+import { SyncCoordinator } from "@sheetwrite/core";
 import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/vue";
-import { computed, defineComponent, h, ref, shallowRef } from "vue";
+import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef } from "vue";
 import "@sheetwrite/vue/styles.css";
 
 const SIMPLE_ROWS = [
@@ -22,11 +29,11 @@ const SIMPLE_COLUMNS = [
   { key: "price", title: "Price", type: "currency" as const },
 ];
 
-// ── Showcase: streaming datasource + transaction/sync pipeline ────────────────
+// ── Showcase: streaming datasource + versioned sync pipeline ─────────────────
 // One million rows are NEVER materialized up front: the grid asks a paged
-// `DataSource` for exactly the visible window (with overscan), placeholders
-// paint until each page resolves, and every committed edit flows through the
-// store's dirty queue until the "server" acknowledges it with `markClean`.
+// `DataSource` for exactly the visible window. Local document transactions enter
+// a mutation-ID queue; a delayed in-memory server rejects the first attempt so
+// the next explicit acknowledgement demonstrates a stable-ID retry.
 
 interface VueGridHandle {
   grid: Grid | null;
@@ -104,6 +111,70 @@ const GRID_CONFIG = { toolbar: true } as const;
 
 const integer = new Intl.NumberFormat("en-US");
 
+class DemoVersionedAdapter implements PersistenceAdapter {
+  private version = 0;
+  private failedFirstAttempt = false;
+  private readonly applied = new Map<string, number>();
+  private readonly log: VersionedOperation[] = [];
+
+  load(_documentId: string, _signal?: AbortSignal): Promise<WorkbookSnapshot> {
+    return Promise.reject(
+      new Error("The streaming demo starts from its datasource, not a snapshot"),
+    );
+  }
+
+  commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const duplicateVersion = this.applied.get(request.clientMutationId);
+        if (duplicateVersion !== undefined) {
+          resolve({
+            status: "duplicate",
+            version: duplicateVersion,
+            clientMutationId: request.clientMutationId,
+          });
+          return;
+        }
+        if (!this.failedFirstAttempt) {
+          this.failedFirstAttempt = true;
+          reject(new Error("simulated acknowledgement timeout — retry keeps the mutation ID"));
+          return;
+        }
+        if (request.baseVersion !== this.version) {
+          resolve({
+            status: "conflict",
+            currentVersion: this.version,
+            operationsSinceBase: this.log.filter(
+              (operation) => operation.version > request.baseVersion,
+            ),
+          });
+          return;
+        }
+        this.version += 1;
+        this.applied.set(request.clientMutationId, this.version);
+        this.log.push({
+          version: this.version,
+          clientMutationId: request.clientMutationId,
+          operations: JSON.parse(JSON.stringify(request.operations)) as DocumentOp[],
+        });
+        resolve({
+          status: "applied",
+          version: this.version,
+          clientMutationId: request.clientMutationId,
+        });
+      }, 450);
+      request.signal?.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          reject(new DOMException("Sync request aborted", "AbortError"));
+        },
+        { once: true },
+      );
+    });
+  }
+}
+
 const App = defineComponent({
   setup() {
     const gridComponent = shallowRef<VueGridHandle | null>(null);
@@ -112,12 +183,17 @@ const App = defineComponent({
     const frozen = ref(true);
     const viewWindow = ref({ first: 0, last: 0 });
     const pagesLoaded = ref(0);
-    const dirtyCount = ref(0);
+    const pendingCount = ref(0);
+    const serverVersion = ref(0);
+    const syncBusy = ref(false);
     const selection = ref("none");
     const log = ref<string[]>([]);
     const searchQuery = ref("");
 
     const gridOf = () => gridComponent.value?.grid ?? null;
+    const syncAdapter = new DemoVersionedAdapter();
+    let sync: SyncCoordinator | null = null;
+    let mutationSequence = 0;
 
     // Paint the first page immediately so navigation never lands on an empty
     // canvas. Later page requests retain visible latency for the streaming demo.
@@ -159,19 +235,32 @@ const App = defineComponent({
       log.value = [`${new Date().toISOString().slice(11, 19)}  ${line}`, ...log.value].slice(0, 12);
     }
 
-    function refreshDirty(): void {
-      dirtyCount.value = gridOf()?.store.getDirty().length ?? 0;
+    function refreshSync(): void {
+      pendingCount.value = sync?.pendingCount ?? 0;
+      serverVersion.value = sync?.serverVersion ?? 0;
     }
 
-    function acknowledge(): void {
-      const grid = gridOf();
-      if (!grid) return;
-      // A real host POSTs `getDirty()` patches, then confirms them; `markClean`
-      // drops exactly the acknowledged prefix from the dirty queue.
-      const patches = grid.store.getDirty();
-      grid.store.markClean(patches);
-      refreshDirty();
-      pushLog(`server ack: ${patches.length} patch(es) confirmed`);
+    async function acknowledge(): Promise<void> {
+      if (!sync || syncBusy.value) return;
+      const pending = sync.pendingCommits().find((mutation) => mutation.status === "pending");
+      if (!pending) return;
+      syncBusy.value = true;
+      pushLog(`send        ${pending.clientMutationId} at v${pending.baseVersion}`);
+      try {
+        const response = await sync.send(pending.clientMutationId);
+        if (response?.status === "conflict") {
+          pushLog(`conflict    server is v${response.currentVersion}; local work retained`);
+        } else if (response) {
+          pushLog(
+            `${response.status === "duplicate" ? "duplicate" : "server ack"}  ${pending.clientMutationId} → v${response.version}`,
+          );
+        }
+      } catch (error) {
+        pushLog(`retry ready ${pending.clientMutationId}: ${String(error)}`);
+      } finally {
+        syncBusy.value = false;
+        refreshSync();
+      }
     }
 
     function simulateEdit(): void {
@@ -191,7 +280,7 @@ const App = defineComponent({
           },
         ],
       });
-      refreshDirty();
+      refreshSync();
     }
 
     function simulateSearch(): void {
@@ -215,11 +304,16 @@ const App = defineComponent({
       );
 
     const syncLabel = computed(() =>
-      dirtyCount.value === 0 ? "All changes synced" : `${dirtyCount.value} unsynced patch(es)`,
+      syncBusy.value
+        ? `Sending mutation · server v${serverVersion.value}`
+        : pendingCount.value === 0
+          ? `All changes synced · server v${serverVersion.value}`
+          : `${pendingCount.value} pending mutation(s) · server v${serverVersion.value}`,
     );
 
     // The adapter owns client-side WASM initialization.
     const ready = ref(true);
+    onBeforeUnmount(() => sync?.destroy());
 
     return () =>
       !ready.value
@@ -244,6 +338,25 @@ const App = defineComponent({
                   style: "flex: 1; min-height: 0",
                   onReady: ({ grid }: { grid: Grid }) => {
                     grid.setFrozen(0, 1);
+                    sync?.destroy();
+                    sync = new SyncCoordinator(grid, syncAdapter, {
+                      documentId: "vue-stream",
+                      serverVersion: 0,
+                      createMutationId: () => `vue-${++mutationSequence}`,
+                    });
+                    sync.on((event) => {
+                      refreshSync();
+                      if (event.type === "pending") {
+                        pushLog(
+                          `queued      ${event.mutation.clientMutationId} at v${event.mutation.baseVersion}`,
+                        );
+                      } else if (event.type === "conflict") {
+                        pushLog(
+                          `conflict    local work retained at server v${event.response.currentVersion}`,
+                        );
+                      }
+                    });
+                    refreshSync();
                     pushLog(`grid ready — ${integer.format(ROWS)} virtual rows`);
                   },
                   onSelectionChange: (value: Selection | null) => {
@@ -263,9 +376,9 @@ const App = defineComponent({
                   },
                   onGridChange: (event: ChangeEvent) => {
                     pushLog(
-                      `change      ${event.changes.length} cell(s), epoch ${event.epoch ?? "-"}`,
+                      `${event.source.padEnd(11)} ${event.transaction.patches.length} operation(s), epoch ${event.epoch ?? "-"}`,
                     );
-                    refreshDirty();
+                    refreshSync();
                   },
                   onSearch: (result: GridEvents["search"]) => {
                     pushLog(
@@ -300,8 +413,8 @@ const App = defineComponent({
                   {
                     type: "button",
                     class: "acknowledge",
-                    disabled: dirtyCount.value === 0,
-                    onClick: acknowledge,
+                    disabled: pendingCount.value === 0 || syncBusy.value,
+                    onClick: () => void acknowledge(),
                   },
                   [actionIcon("m5 12 4 4L19 6"), h("span", [h("b", "3"), " Acknowledge changes"])],
                 ),

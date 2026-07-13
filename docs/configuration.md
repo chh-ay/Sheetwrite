@@ -70,10 +70,15 @@ scroll, search, and temporary highlights never belong in a snapshot.
 sheet before mounting. Hydration emits no changes, dirty patches, or undo entry.
 `grid.exportSnapshot()` uses bulk sheet reads and returns deterministic sparse
 blocks. `grid.applyRemoteOperations(operations)` emits a change with
-`source: "remote"` while skipping dirty state and undo history. Use
-`MemoryPersistenceAdapter` as an executable reference, not as durable storage.
-Adapter load/commit methods accept `AbortSignal`; failures use `PersistenceError`
-codes (`aborted`, `invalid-snapshot`, `not-found`, or `commit-rejected`).
+`source: "remote"` while skipping dirty state and undo history.
+`SyncCoordinator` queues local changes as immutable mutation records. Its
+`serverVersion` option is required and should come from the loaded snapshot.
+`sendNext()` and `retry(id)` are host-controlled; retries retain the original
+ID. `subscribe(source)` accepts a transport-neutral callback source and validates
+strict version order. Use `MemoryPersistenceAdapter` as an executable,
+server-sequenced reference—not as durable storage. Adapter methods accept
+`AbortSignal`; transport failures use `PersistenceError`, while version
+conflicts are typed commit responses that retain local work.
 
 A `CellRenderer` paints (or returns a DOM node for) a single cell:
 
@@ -273,14 +278,17 @@ search (pass `null` to clear); `color` overrides the theme highlight color.
 | `search` | `SearchResult` — `{ query: string; matches: CellAddress[]; active: number }` |
 
 ```ts
-const off = grid.on("change", async (event) => {
-  if (event.source !== "local") return; // prevent remote-operation feedback
-  await adapter.commit({
-    documentId: "products",
-    operations: event.transaction.patches,
-  });
-  grid.store.markClean(event.transaction.patches);
+const sync = new SyncCoordinator(grid, adapter, {
+  documentId: "products",
+  serverVersion: loadedSnapshot.version ?? 0,
 });
+const off = sync.on((event) => {
+  if (event.type === "conflict") showConflict(event.response);
+  if (event.type === "reload-required") requestFreshSnapshot();
+});
+
+saveButton.onclick = () => void sync.sendNext();
 // later
 off();
+sync.destroy();
 ```

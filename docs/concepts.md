@@ -98,8 +98,8 @@ interface Store {
 }
 ```
 
-`getDirty` / `markClean` exist so you can sync edits to a backend and then mark
-them confirmed.
+`getDirty` / `markClean` remain a legacy manual queue. They are not a network
+protocol: new synchronization should use `SyncCoordinator` mutation IDs.
 
 ## Document protocol and storage transactions
 
@@ -142,15 +142,28 @@ blocks.
 ```ts
 const saved = await adapter.load(documentId, signal);
 const grid = createGridFromSnapshot(host, saved);
-
-grid.on("change", async (event) => {
-  if (event.source !== "local") return;
-  await adapter.commit({ documentId, operations: event.transaction.patches });
-  grid.store.markClean(event.transaction.patches);
+const sync = new SyncCoordinator(grid, adapter, {
+  documentId,
+  serverVersion: saved.version ?? 0,
 });
 
-grid.applyRemoteOperations(incoming); // source "remote"; not dirty or undoable
+await sync.sendNext(); // host chooses send/retry timing
+sync.subscribe(remoteOperationSource);
 ```
+
+Each local transaction becomes one immutable `PendingCommit` with a stable
+`clientMutationId` and explicit `baseVersion`. Records move from `pending` to
+`sending`; an applied or duplicate response removes only the matching ID.
+Transport failure returns that record to `pending`, so a host retry sends the
+same ID. A conflict remains `conflicted` with its local operations intact and
+exposes server operations or a snapshot. `resumeAfterReload(snapshot)` only
+resets versions/status after the host has reloaded and reapplied local work—it
+does not invent a structural merge.
+
+Remote operations must arrive at exactly `serverVersion + 1`. Older versions and
+known mutation echoes are idempotently ignored; a gap emits `reload-required`
+instead of guessing. Canonical server operations apply with source `remote`, so
+they repaint/recompute without entering the outgoing queue.
 
 Document state does **not** include selection, scroll position, editor/caret
 state, search results, temporary highlights, renderer choice, read-only policy,

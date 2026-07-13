@@ -39,6 +39,11 @@ export {
 } from "./persistence.js";
 export { REF_CYCLE } from "./reference.js";
 export { SheetwriteStore } from "./store.js";
+export {
+  SyncCoordinator,
+  type SyncCoordinatorEvent,
+  type SyncCoordinatorOptions,
+} from "./sync.js";
 export type {
   AggregateOp,
   ApplyTransactionResult,
@@ -80,11 +85,13 @@ export type {
   NamedRangeSnapshot,
   OperationSource,
   Patch,
+  PendingCommit,
   PersistenceAdapter,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
   Range,
   RemoteOperationOptions,
+  RemoteOperationSource,
   ReplaceResult,
   ResolvedCell,
   RowData,
@@ -99,12 +106,15 @@ export type {
   SnapshotCell,
   SortKey,
   Store,
+  SyncMutationRecord,
+  SyncMutationStatus,
   Theme,
   ToolbarActionName,
   ToolbarIcon,
   ToolbarItem,
   Transaction,
   TransactionApplicationOptions,
+  VersionedOperation,
   VisibleWindowView,
   Workbook,
   WorkbookSnapshot,
