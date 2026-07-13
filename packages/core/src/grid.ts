@@ -5,13 +5,12 @@ import { fontFor, layoutTextLines } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
-import { ColumnIndex } from "./column-index.js";
 import { ContextMenu } from "./context-menu.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { downloadBytes, toCsv, toXlsx } from "./export.js";
-import { OffsetIndex, ScaledScroll } from "./fenwick.js";
+import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { FindBar } from "./find-bar.js";
 import { InputController } from "./input-controller.js";
 import { OverlayPainter } from "./overlay-painter.js";
@@ -74,7 +73,6 @@ import type {
   WorkbookSnapshot,
 } from "./types.js";
 import { ValidationEditor } from "./validation-editor.js";
-import { computeColumnWindow, computeWindow } from "./virtualization.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
 /** Chrome caps element height near here; beyond it the sizer is scaled. */
@@ -190,6 +188,7 @@ export class GridImpl implements Grid {
   private readonly styleActions: StyleActions;
   private readonly document: DocumentController;
   private readonly datasourceController: DatasourceController;
+  private readonly geometry: GeometryLayoutController;
   private readonly overlayPainter: OverlayPainter;
   private overscan: number;
   private readOnly: boolean;
@@ -205,11 +204,6 @@ export class GridImpl implements Grid {
   private config: GridConfig | undefined;
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
-  private rowTopsScratch = new Float64Array(0);
-  private rowHeightsScratch = new Float64Array(0);
-  private rowTopsView = this.rowTopsScratch;
-  private rowHeightsView = this.rowHeightsScratch;
-  private rowGeometryLength = 0;
   private readonly onContextMenu = (e: MouseEvent): void => {
     if (!this.contextMenu) return;
     e.preventDefault();
@@ -246,10 +240,6 @@ export class GridImpl implements Grid {
   /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
   private activeSheetCache: Sheet | null = null;
   private readonly virtualColumnTargets = new Map<SheetId, number>();
-  private index: OffsetIndex;
-  private scaled: ScaledScroll;
-  private colIndices: number[];
-  private columnIndex: ColumnIndex;
   private selection: SelectionModel;
   private readonly cellRevisions = new Map<string, number>();
   private destroyed = false;
@@ -342,14 +332,16 @@ export class GridImpl implements Grid {
     }
 
     const sheet = this.sheet();
-    this.colIndices = visibleColumns(sheet.columns);
-    this.columnIndex = buildColumnIndex(sheet, this.colIndices, this.zoom);
-    this.index = new OffsetIndex(sheet.rowCount, this.theme.rowHeight);
-    this.applyRowHeights(sheet);
-    this.scaled = new ScaledScroll(
-      this.index.totalHeight + this.theme.headerHeight,
+    this.geometry = new GeometryLayoutController(
+      {
+        sheet: () => this.sheet(),
+        activeSheet: () => this.activeSheet,
+        loadable: this.loadable,
+        theme: () => this.theme,
+        zoom: () => this.zoom,
+        maxElementHeight: MAX_ELEMENT_HEIGHT,
+      },
       host.clientHeight - this.tabBarHeight,
-      MAX_ELEMENT_HEIGHT,
     );
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
     this.datasourceController = new DatasourceController(
@@ -378,13 +370,11 @@ export class GridImpl implements Grid {
       activeSheet: () => this.activeSheet,
       sheet: (id) => this.sheet(id),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
-      viewportAnchor: () => {
-        const contentTop = this.scaled.toContent(this.scroller.scrollTop) + this.frozenHeight();
-        return {
-          row: this.index.rowAtOffset(contentTop).row,
-          col: this.colAtX(this.scroller.scrollLeft + this.frozenWidth()),
-        };
-      },
+      viewportAnchor: () =>
+        this.geometry.viewportAnchor(
+          this.geometry.toContent(this.scroller.scrollTop),
+          this.scroller.scrollLeft,
+        ),
       scrollToCell: (addr) => this.scrollToCell(addr),
       scheduleRender: () => this.scheduleRender(),
       emit: (result) => {
@@ -398,7 +388,7 @@ export class GridImpl implements Grid {
       selection: () => this.selection,
       activeSheet: () => this.activeSheet,
       sheet: () => this.sheet(),
-      colIndices: () => this.colIndices,
+      colIndices: () => this.geometry.columnIndices,
       readOnly: () => this.readOnly,
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
@@ -473,23 +463,22 @@ export class GridImpl implements Grid {
       activeSheet: () => this.activeSheet,
       sheet: () => this.sheet(),
       theme: () => this.theme,
-      colIndices: () => this.colIndices,
+      colIndices: () => this.geometry.columnIndices,
       firstCol: () => this.firstCol(),
       lastCol: () => this.lastCol(),
       nextVisibleCol: (col, dir) => this.nextVisibleCol(col, dir),
       colAtX: (contentX) => this.colAtX(contentX),
-      rowAtOffset: (contentY) => this.index.rowAtOffset(contentY).row,
-      rowCount: () => this.index.count,
-      contentTop: () => this.scaled.toContent(this.scroller.scrollTop),
+      rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
+      rowCount: () => this.geometry.rowCount,
+      contentTop: () => this.geometry.toContent(this.scroller.scrollTop),
       viewportH: () => this.viewportH(),
       colLeftOf: (col) => this.colLeftOf(col),
-      rowTop: (row) => this.index.offsetOf(row),
-      rowHeight: (row) => this.index.heightOf(row),
+      rowTop: (row) => this.geometry.rowOffset(row),
+      rowHeight: (row) => this.geometry.rowHeight(row),
       visibleRowWindow: () =>
-        computeWindow(
-          this.index,
-          this.scaled.toContent(this.scroller.scrollTop),
-          Math.max(0, this.viewportH() - this.theme.headerHeight),
+        this.geometry.visibleRowWindow(
+          this.geometry.toContent(this.scroller.scrollTop),
+          this.viewportH(),
           this.overscan,
         ),
       previewColumnWidth: (col, width) => {
@@ -530,7 +519,7 @@ export class GridImpl implements Grid {
       activeSheet: () => this.activeSheet,
       sheet: () => this.sheet(),
       selection: () => this.selection,
-      rowOffsetOf: (row) => this.index.offsetOf(row),
+      rowOffsetOf: (row) => this.geometry.rowOffset(row),
       freeze: () => ({
         fr: this.frozenRowCount(),
         frozenH: this.frozenHeight(),
@@ -559,7 +548,7 @@ export class GridImpl implements Grid {
       overlay: this.overlayPainter.element,
       viewport: this.viewportEl,
       rowCount: sheet.rowCount,
-      colCount: this.colIndices.length,
+      colCount: this.geometry.columnIndices.length,
       readOnly: this.readOnly,
       focusCell: () => this.selection.focusCell,
       noteAt: (row, col) =>
@@ -751,73 +740,43 @@ export class GridImpl implements Grid {
   }
 
   private firstCol(): number {
-    return this.colIndices[0] ?? 0;
+    return this.geometry.firstColumn();
   }
 
   private lastCol(): number {
-    return this.colIndices[this.colIndices.length - 1] ?? 0;
+    return this.geometry.lastColumn();
   }
 
   private colLeftOf(col: number): number {
-    return this.columnIndex.leftOf(col);
+    return this.geometry.columnLeft(col);
   }
 
   private colAtX(contentX: number): number {
-    return this.columnIndex.columnAtX(contentX);
+    return this.geometry.columnAtX(contentX);
   }
 
   private nextVisibleCol(col: number, dir: 1 | -1): number {
-    const pos = this.columnIndex.positionOf(col);
-    if (pos === -1) return col;
-    const next = pos + dir;
-    if (next < 0 || next >= this.colIndices.length) return col;
-    return this.colIndices[next]!;
+    return this.geometry.nextVisibleColumn(col, dir);
   }
 
-  // ── Frozen-pane geometry ─────────────────────────────────────────────────--
-
-  /** Frozen leading view rows, clamped to leave at least one scrollable row. */
   private frozenRowCount(): number {
-    const fr = this.sheet().frozenRows ?? 0;
-    return Math.max(0, Math.min(fr, Math.max(0, this.index.count - 1)));
+    return this.geometry.frozenRowCount();
   }
 
-  /** Frozen leading visible-column positions, clamped likewise. */
   private frozenColCount(): number {
-    const fc = this.sheet().frozenCols ?? 0;
-    return Math.max(0, Math.min(fc, Math.max(0, this.colIndices.length - 1)));
+    return this.geometry.frozenColumnCount();
   }
 
-  /** Pixel height of the frozen row band (0 when no rows are frozen). */
   private frozenHeight(): number {
-    const fr = this.frozenRowCount();
-    return fr > 0 ? this.index.offsetOf(fr) : 0;
+    return this.geometry.frozenHeight();
   }
 
-  /** Pixel width of the frozen column band (0 when no columns are frozen). */
   private frozenWidth(): number {
-    const fc = this.frozenColCount();
-    if (fc <= 0) return 0;
-    const firstBody = this.colIndices[fc];
-    return firstBody === undefined ? this.columnIndex.totalWidth : this.colLeftOf(firstBody);
+    return this.geometry.frozenWidth();
   }
 
-  /** First non-frozen column index; columns before it are pinned. */
   private firstBodyCol(): number {
-    const fc = this.frozenColCount();
-    return fc > 0 ? (this.colIndices[fc] ?? Number.MAX_SAFE_INTEGER) : 0;
-  }
-
-  /** Screen y of a view row's top edge; frozen rows ignore vertical scroll. */
-  private yOfRow(row: number, contentTop: number): number {
-    const scroll = row < this.frozenRowCount() ? 0 : contentTop;
-    return this.theme.headerHeight + this.index.offsetOf(row) - scroll;
-  }
-
-  /** Screen x of a column's left edge; frozen columns ignore horizontal scroll. */
-  private xOfCol(col: number, scrollLeft: number): number {
-    const frozen = this.frozenColCount() > 0 && col < this.firstBodyCol();
-    return this.theme.rowHeaderWidth + this.colLeftOf(col) - (frozen ? 0 : scrollLeft);
+    return this.geometry.firstBodyColumn();
   }
 
   private screenRect(
@@ -832,30 +791,25 @@ export class GridImpl implements Grid {
     h: number;
   } {
     const merge = this.mergeAnchorAt(row, col);
-    const r0 = merge?.r0 ?? row;
-    const c0 = merge?.c0 ?? col;
-    const r1 = merge?.r1 ?? row;
-    const c1 = merge?.c1 ?? col;
-    return {
-      x: this.xOfCol(c0, scrollLeft),
-      y: this.yOfRow(r0, contentTop),
-      w: this.colLeftOf(c1 + 1) - this.colLeftOf(c0),
-      h: this.index.offsetOf(r1 + 1) - this.index.offsetOf(r0),
-    };
+    return this.geometry.rangeRect(
+      {
+        sheet: this.activeSheet,
+        start: { row: merge?.r0 ?? row, col: merge?.c0 ?? col },
+        end: { row: merge?.r1 ?? row, col: merge?.c1 ?? col },
+      },
+      contentTop,
+      scrollLeft,
+    );
   }
 
-  /** Freeze-aware viewport-x → column content-x (frozen band ignores scroll). */
   private contentXAt(viewportX: number): number {
-    const xx = viewportX - this.theme.rowHeaderWidth;
-    const inFrozenBand = this.frozenColCount() > 0 && xx < this.frozenWidth();
-    return inFrozenBand ? xx : xx + this.scroller.scrollLeft;
+    const contentX = viewportX - this.theme.rowHeaderWidth;
+    const frozen = this.frozenColCount() > 0 && contentX < this.frozenWidth();
+    return frozen ? contentX : contentX + this.scroller.scrollLeft;
   }
 
-  /** Freeze-aware viewport-y → row content-y (frozen band ignores scroll). */
   private contentYAt(viewportY: number): number {
-    const yy = viewportY - this.theme.headerHeight;
-    const inFrozenBand = this.frozenRowCount() > 0 && yy < this.frozenHeight();
-    return inFrozenBand ? yy : yy + this.scaled.toContent(this.scroller.scrollTop);
+    return this.geometry.pointerContentY(viewportY, this.scroller.scrollTop);
   }
 
   private applyLayout(): void {
@@ -880,50 +834,31 @@ export class GridImpl implements Grid {
   }
 
   private syncSizer(): void {
-    this.scaled.update(this.index.totalHeight + this.theme.headerHeight, this.viewportH());
-    this.sizer.style.width = `${this.columnIndex.totalWidth + this.theme.rowHeaderWidth}px`;
-    this.sizer.style.height = `${this.scaled.sizerHeight}px`;
+    const size = this.geometry.layoutSize(this.viewportH());
+    this.sizer.style.width = `${size.width}px`;
+    this.sizer.style.height = `${size.height}px`;
   }
 
   private rebuildIndex(): void {
-    const sheet = this.sheet();
-    this.index = new OffsetIndex(sheet.rowCount, this.theme.rowHeight);
-    this.applyRowHeights(sheet);
-    this.datasourceController.resize(sheet.rowCount);
+    this.geometry.rebuildRows();
+    this.datasourceController.resize(this.geometry.rowCount);
     this.syncSizer();
   }
 
   private rebuildColumnIndex(): void {
-    const sheet = this.sheet();
-    this.colIndices = visibleColumns(sheet.columns);
-    this.columnIndex = buildColumnIndex(sheet, this.colIndices, this.zoom);
+    this.geometry.rebuildColumns();
     this.columnWindowStart = -1;
     this.columnWindowEnd = -1;
     this.windowedColIndices = [];
-    this.ariaMirror?.setColumnCount(this.colIndices.length);
-  }
-
-  private applyRowHeights(sheet: Sheet): void {
-    if (!sheet.rowHeights) return;
-    // Overrides persist in base units keyed by DATA row; the offset index is
-    // zoomed and VIEW-indexed, so map each override through the active view
-    // (identity without one; filtered-out rows have no view slot).
-    for (const [dataRow, h] of sheet.rowHeights) {
-      const viewRow = this.toViewRow(dataRow);
-      if (viewRow !== null && viewRow < this.index.count) {
-        this.index.setHeight(viewRow, h * this.zoom);
-      }
-    }
+    this.ariaMirror?.setColumnCount(this.geometry.columnIndices.length);
   }
 
   private toDataRow(viewRow: number): number {
-    return this.loadable?.dataRowAt(this.activeSheet, viewRow) ?? viewRow;
+    return this.geometry.toDataRow(viewRow);
   }
 
   private toViewRow(dataRow: number): number | null {
-    if (!this.loadable) return dataRow;
-
-    return this.loadable.viewRowOf(this.activeSheet, dataRow);
+    return this.geometry.toViewRow(dataRow);
   }
 
   private mergeAnchorAt(row: number, col: number): SelRect | null {
@@ -963,45 +898,31 @@ export class GridImpl implements Grid {
     const clientW = this.viewportEl.clientWidth;
     const headerHeight = this.theme.headerHeight;
     const bodyHeight = Math.max(0, clientH - headerHeight);
-    const contentTop = this.scaled.toContent(this.scroller.scrollTop);
+    const contentTop = this.geometry.toContent(this.scroller.scrollTop);
     const scrollLeft = this.scroller.scrollLeft;
 
-    const fr = this.frozenRowCount();
-    const fc = this.frozenColCount();
-    const frozenH = fr > 0 ? this.index.offsetOf(fr) : 0;
-    const frozenW = this.frozenWidth();
-    const usePanes = (fr > 0 || fc > 0) && this.renderer.paintPanes !== undefined;
-
-    const rawWin = computeWindow(
-      this.index,
-      contentTop + frozenH,
-      Math.max(0, bodyHeight - frozenH),
+    const cellViewportWidth = Math.max(0, clientW - this.theme.rowHeaderWidth);
+    const paintWindow = this.geometry.paintWindow(
+      contentTop,
+      scrollLeft,
+      bodyHeight,
+      cellViewportWidth,
       this.overscan,
     );
-    const win =
-      fr > 0 ? { start: Math.max(rawWin.start, fr), end: Math.max(rawWin.end, fr) } : rawWin;
-    const rowGeometry = this.rowGeometryForWindow(win);
+    const fr = paintWindow.frozenRows;
+    const fc = paintWindow.frozenColumns;
+    const frozenH = paintWindow.frozenHeight;
+    const frozenW = paintWindow.frozenWidth;
+    const win = paintWindow.rows;
+    const columnWin = paintWindow.columns;
+    const usePanes = (fr > 0 || fc > 0) && this.renderer.paintPanes !== undefined;
+    const rowGeometry = this.geometry.rowGeometry(win);
     if (fr > 0) this.datasourceController.ensureLoaded(0, fr);
     this.datasourceController.ensureLoaded(win.start, win.end);
-
-    const cellViewportWidth = Math.max(0, clientW - this.theme.rowHeaderWidth);
-    const rawColumnWin = computeColumnWindow(
-      this.columnIndex,
-      scrollLeft + frozenW,
-      Math.max(0, cellViewportWidth - frozenW),
-      this.overscan,
-    );
-    const columnWin =
-      fc > 0
-        ? {
-            start: Math.max(rawColumnWin.start, fc),
-            end: Math.max(rawColumnWin.end, fc),
-          }
-        : rawColumnWin;
     if (columnWin.start !== this.columnWindowStart || columnWin.end !== this.columnWindowEnd) {
       this.columnWindowStart = columnWin.start;
       this.columnWindowEnd = columnWin.end;
-      this.windowedColIndices = this.colIndices.slice(columnWin.start, columnWin.end);
+      this.windowedColIndices = this.geometry.columnIndices.slice(columnWin.start, columnWin.end);
       this.columnWindowSignature = this.windowedColIndices.join(",");
       this.ariaMirror.bumpVersion();
     }
@@ -1090,8 +1011,8 @@ export class GridImpl implements Grid {
     const bodyH = Math.max(0, clientH - ySplit);
 
     const frozenWin = { start: 0, end: fr };
-    const frozenCols = fc > 0 ? this.colIndices.slice(0, fc) : [];
-    const frozenGeometry = fr > 0 ? this.frozenRowGeometry(fr) : null;
+    const frozenCols = fc > 0 ? this.geometry.columnIndices.slice(0, fc) : [];
+    const frozenGeometry = fr > 0 ? this.geometry.frozenRowGeometry(fr) : null;
 
     const panes: PanePaint[] = [];
     if (fr > 0 && fc > 0) {
@@ -1141,57 +1062,6 @@ export class GridImpl implements Grid {
     return bodyView;
   }
 
-  /** Fresh row geometry for the (tiny) frozen band — never aliases the body scratch. */
-  private frozenRowGeometry(
-    fr: number,
-  ): { rowTops: Float64Array; rowHeights: Float64Array } | null {
-    const rowHeights = this.sheet().rowHeights;
-    if (!rowHeights || rowHeights.size === 0) return null;
-
-    const tops = new Float64Array(fr);
-    const heights = new Float64Array(fr);
-    let top = 0;
-    for (let i = 0; i < fr; i++) {
-      const height = this.index.heightOf(i);
-      tops[i] = top;
-      heights[i] = height;
-      top += height;
-    }
-    return { rowTops: tops, rowHeights: heights };
-  }
-
-  private rowGeometryForWindow(win: {
-    start: number;
-    end: number;
-  }): { rowTops: Float64Array; rowHeights: Float64Array } | null {
-    const rowHeights = this.sheet().rowHeights;
-    if (!rowHeights || rowHeights.size === 0) return null;
-
-    const count = Math.max(0, win.end - win.start);
-    if (this.rowTopsScratch.length < count) {
-      this.rowTopsScratch = new Float64Array(count);
-      this.rowHeightsScratch = new Float64Array(count);
-    }
-
-    if (this.rowGeometryLength !== count) {
-      this.rowTopsView = this.rowTopsScratch.subarray(0, count);
-      this.rowHeightsView = this.rowHeightsScratch.subarray(0, count);
-      this.rowGeometryLength = count;
-    }
-
-    // Consecutive tops differ by exactly the previous row's height, so one
-    // O(log n) offset lookup seeds a running sum instead of one per row.
-    let top = this.index.offsetOf(win.start);
-    for (let i = 0; i < count; i++) {
-      const height = this.index.heightOf(win.start + i);
-      this.rowTopsScratch[i] = top;
-      this.rowHeightsScratch[i] = height;
-      top += height;
-    }
-
-    return { rowTops: this.rowTopsView, rowHeights: this.rowHeightsView };
-  }
-
   private repositionEditor(contentTop: number, scrollLeft: number): void {
     const editorCell = this.editor.editingCell;
     if (editorCell) {
@@ -1223,7 +1093,7 @@ export class GridImpl implements Grid {
     const formula = this.loadable?.getFormula(dataAddr) ?? null;
     const current = this.store.getCell(dataAddr).resolved;
     const text = initial ?? formula ?? (current === null ? "" : String(current));
-    const contentTop = this.scaled.toContent(this.scroller.scrollTop);
+    const contentTop = this.geometry.toContent(this.scroller.scrollTop);
 
     this.selection.selectCell(editCell.row, editCell.col);
     this.scheduleRender();
@@ -1611,8 +1481,7 @@ export class GridImpl implements Grid {
     const sheet = this.sheet();
 
     this.rebuildColumnIndex();
-    this.index = new OffsetIndex(sheet.rowCount, this.theme.rowHeight);
-    this.applyRowHeights(sheet);
+    this.geometry.rebuildRows();
     this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
     this.datasourceController.reset(sheet.rowCount);
     this.scroller.scrollTop = 0;
@@ -1638,7 +1507,7 @@ export class GridImpl implements Grid {
   getCellInput(row: number, col: number): CellInputSnapshot | null {
     const sheet = this.sheet();
     const column = sheet.columns[col];
-    if (!column || row < 0 || row >= this.index.count) return null;
+    if (!column || row < 0 || row >= this.geometry.rowCount) return null;
 
     const cell = this.anchorCell(row, col);
     const address = {
@@ -1660,17 +1529,17 @@ export class GridImpl implements Grid {
     const fr = this.frozenRowCount();
     const frozenH = this.frozenHeight();
     if (addr.row >= fr) {
-      const top = this.index.offsetOf(addr.row);
-      const bottom = top + this.index.heightOf(addr.row);
+      const top = this.geometry.rowOffset(addr.row);
+      const bottom = top + this.geometry.rowHeight(addr.row);
       const bodyHeight = Math.max(0, this.viewportH() - this.theme.headerHeight);
-      const contentTop = this.scaled.toContent(this.scroller.scrollTop);
+      const contentTop = this.geometry.toContent(this.scroller.scrollTop);
 
       // Visible body band in content space: [contentTop + frozenH, contentTop + bodyHeight).
       let target = contentTop;
       if (top < contentTop + frozenH) target = top - frozenH;
       else if (bottom > contentTop + bodyHeight) target = bottom - bodyHeight;
       if (target !== contentTop) {
-        this.scroller.scrollTop = this.scaled.toScroll(Math.max(0, target));
+        this.scroller.scrollTop = this.geometry.toScroll(Math.max(0, target));
       }
     }
 
@@ -2389,8 +2258,7 @@ export class GridImpl implements Grid {
     const count = this.loadable
       ? this.loadable.viewRowCount(this.activeSheet)
       : this.sheet().rowCount;
-    this.index = new OffsetIndex(count, this.theme.rowHeight);
-    this.applyRowHeights(this.sheet());
+    this.geometry.rebuildRows(count);
     this.selection.clear();
     this.selection.setBounds(count, this.firstCol(), this.lastCol());
     this.scroller.scrollTop = 0;
@@ -2435,25 +2303,6 @@ export class GridImpl implements Grid {
     this.ariaMirror.destroy();
     this.host.classList.remove("sheetwrite");
   }
-}
-
-function visibleColumns(columns: readonly Column[]): number[] {
-  const out: number[] = [];
-  for (let c = 0; c < columns.length; c++) {
-    if (columns[c]!.visible !== false) out.push(c);
-  }
-  return out;
-}
-
-function buildColumnIndex(sheet: Sheet, colIndices: readonly number[], zoom: number): ColumnIndex {
-  const widths = new Array<number>(colIndices.length);
-  for (let i = 0; i < colIndices.length; i++) {
-    const col = colIndices[i]!;
-    // Display geometry is zoomed; `Column.width` itself stays in base units.
-    widths[i] = (sheet.columns[col]?.width ?? 0) * zoom;
-  }
-
-  return new ColumnIndex(colIndices, widths);
 }
 
 function appendPadColumns(columns: Column[], target: number): void {
