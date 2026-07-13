@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { validateWorkbookSnapshot } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { ChangeEvent, Transaction, Workbook } from "../src/types.js";
+import type { ChangeEvent, Transaction, Workbook, WorkbookSnapshot } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
@@ -759,6 +760,133 @@ describe("datasource row hydration", () => {
     expect(store.getCell(addr(0, 2)).resolved).toBe("later source");
     expect(store.getDirty()).toEqual([]);
     expect(changes).toBe(0);
+    store.dispose();
+  });
+});
+
+describe("stable formula sheet identity", () => {
+  function lifecycleWorkbook(): Workbook {
+    return {
+      activeSheet: "summary",
+      sheets: [
+        {
+          id: "source",
+          name: "Sales",
+          rowCount: 2,
+          columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
+        },
+        {
+          id: "summary",
+          name: "Summary",
+          rowCount: 2,
+          columns: [
+            { key: "result", header: "Result", width: 100, type: "number" },
+            { key: "next", header: "Next", width: 100, type: "number" },
+          ],
+        },
+      ],
+    };
+  }
+
+  it("renames resolved references canonically and supports inverse rename", () => {
+    const workbook = lifecycleWorkbook();
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "source", row: 0, col: 0 },
+          value: { kind: "literal", value: 4 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 0 },
+          value: { kind: "formula", src: "=Sales!A1+1" },
+        },
+      ],
+    });
+
+    expect(store.renameSheetFormulaIdentity("source", "Sales Data")).toBe(true);
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
+
+    expect(store.renameSheetFormulaIdentity("source", "O'Brien")).toBe(true);
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('O''Brien'!A1+1)");
+    workbook.sheets[0]!.name = "O'Brien";
+    const snapshot: WorkbookSnapshot = {
+      schemaVersion: 1,
+      workbook: { activeSheet: "summary" },
+      sheets: workbook.sheets.map((sheet, order) => ({
+        ...sheet,
+        order,
+        rowMeta: sheet.rowHeights
+          ? [...sheet.rowHeights].map(([row, height]) => [row, { height }])
+          : [],
+        cells:
+          sheet.id === "summary"
+            ? [
+                {
+                  startRow: 0,
+                  startCol: 0,
+                  rowCount: 1,
+                  colCount: 1,
+                  cells: [
+                    {
+                      rowOffset: 0,
+                      colOffset: 0,
+                      value: {
+                        kind: "formula",
+                        src: store.getFormula({ sheet: "summary", row: 0, col: 0 })!,
+                      },
+                    },
+                  ],
+                },
+              ]
+            : [],
+      })),
+    };
+    const roundTrip = validateWorkbookSnapshot(JSON.parse(JSON.stringify(snapshot)));
+    expect(roundTrip.ok).toBe(true);
+    if (!roundTrip.ok) throw new Error("renamed snapshot did not validate");
+    expect(roundTrip.value.sheets[1]?.cells[0]?.cells[0]?.value).toEqual({
+      kind: "formula",
+      src: "=('O''Brien'!A1+1)",
+    });
+    expect(store.renameSheetFormulaIdentity("source", "Sales")).toBe(true);
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(Sales!A1+1)");
+    store.dispose();
+  });
+
+  it("tombstones removed handles and repairs transitive dependencies", () => {
+    const workbook = lifecycleWorkbook();
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "source", row: 0, col: 0 },
+          value: { kind: "literal", value: 4 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 0 },
+          value: { kind: "formula", src: "=Sales!A1+1" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 1 },
+          value: { kind: "formula", src: "=A1+1" },
+        },
+      ],
+    });
+    expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe(6);
+
+    expect(store.removeSheetFormulaIdentity("source")).toBe(true);
+
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(#REF!+1)");
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
+    expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe("#REF!");
+    expect(store.removeSheetFormulaIdentity("source")).toBe(false);
     store.dispose();
   });
 });

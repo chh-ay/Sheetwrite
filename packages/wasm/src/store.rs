@@ -45,6 +45,7 @@ type InternMap = HashMap<u64, InternSlot, BuildHasherDefault<IdentityHasher>>;
 pub struct CellStore {
     pub(crate) sheets: Vec<SheetData>,
     pub(crate) sheet_names: Vec<String>,
+    pub(crate) sheet_alive: Vec<bool>,
     pub(crate) sheet_lookup: HashMap<String, usize>,
     pub(crate) strings: StringPool,
     pub(crate) string_lookup: InternMap,
@@ -59,6 +60,7 @@ impl CellStore {
         CellStore {
             sheets: Vec::new(),
             sheet_names: Vec::new(),
+            sheet_alive: Vec::new(),
             sheet_lookup: HashMap::new(),
             strings: StringPool::new(),
             string_lookup: InternMap::default(),
@@ -73,6 +75,7 @@ impl CellStore {
         let index = self.sheets.len();
         self.sheets.push(SheetData::new(n_cols, row_count));
         self.sheet_names.push(String::new());
+        self.sheet_alive.push(true);
         index
     }
 
@@ -81,14 +84,96 @@ impl CellStore {
         if sheet >= self.sheets.len() {
             return;
         }
-
-        let previous = std::mem::take(&mut self.sheet_names[sheet]);
-        if !previous.is_empty() {
-            self.sheet_lookup.remove(&previous);
+        if !self.sheet_alive[sheet] {
+            return;
         }
+
+        self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_string();
         self.sheet_lookup.insert(id.to_string(), sheet);
         self.sheet_lookup.insert(name.to_string(), sheet);
+    }
+
+    /// Rename a live stable sheet handle and rewrite every resolved formula AST reference.
+    #[wasm_bindgen(js_name = renameSheet)]
+    pub fn rename_sheet(&mut self, sheet: usize, id: &str, name: &str) -> bool {
+        if id.is_empty()
+            || name.is_empty()
+            || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+            || self
+                .sheet_lookup
+                .get(id)
+                .is_some_and(|existing| *existing != sheet)
+            || self
+                .sheet_lookup
+                .get(name)
+                .is_some_and(|existing| *existing != sheet)
+        {
+            return false;
+        }
+
+        let mut affected = Vec::new();
+        for (formula_sheet, data) in self.sheets.iter_mut().enumerate() {
+            if !self.sheet_alive[formula_sheet] {
+                continue;
+            }
+            let mut changed = false;
+            for entry in data.formulas.values_mut() {
+                changed |= entry.rename_sheet(sheet as u32, name, formula_sheet as u32);
+            }
+            if changed {
+                data.clear_dirty();
+                data.all_dirty = true;
+                affected.push(formula_sheet);
+            }
+        }
+        self.sheet_lookup.retain(|_, handle| *handle != sheet);
+        self.sheet_names[sheet] = name.to_string();
+        self.sheet_lookup.insert(id.to_string(), sheet);
+        self.sheet_lookup.insert(name.to_string(), sheet);
+        self.bump_formula_epoch();
+        for formula_sheet in affected {
+            self.recompute(formula_sheet);
+        }
+        true
+    }
+
+    /// Tombstone a stable sheet handle and invalidate every formula reference to it.
+    #[wasm_bindgen(js_name = removeSheet)]
+    pub fn remove_sheet(&mut self, sheet: usize) -> bool {
+        if !self.sheet_alive.get(sheet).copied().unwrap_or(false) {
+            return false;
+        }
+
+        let mut affected = Vec::new();
+        for (formula_sheet, data) in self.sheets.iter_mut().enumerate() {
+            if formula_sheet == sheet || !self.sheet_alive[formula_sheet] {
+                continue;
+            }
+            let mut changed = false;
+            for entry in data.formulas.values_mut() {
+                changed |= entry.invalidate_sheet(sheet as u32, formula_sheet as u32);
+            }
+            if changed {
+                data.clear_dirty();
+                data.all_dirty = true;
+                affected.push(formula_sheet);
+            }
+        }
+        self.sheet_lookup.retain(|_, handle| *handle != sheet);
+        self.sheet_names[sheet].clear();
+        self.sheets[sheet] = SheetData::new(0, 0);
+        self.sheet_alive[sheet] = false;
+        self.bump_formula_epoch();
+        for formula_sheet in affected {
+            self.recompute(formula_sheet);
+        }
+        true
+    }
+
+    #[wasm_bindgen(js_name = isSheetAlive)]
+    pub fn is_sheet_alive(&self, sheet: usize) -> bool {
+        self.sheet_alive.get(sheet).copied().unwrap_or(false)
     }
 
     #[wasm_bindgen(js_name = rowCount)]

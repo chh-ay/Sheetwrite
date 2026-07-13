@@ -803,6 +803,72 @@ pub fn serialize(ast: &Ast) -> String {
     out
 }
 
+fn sheet_name_needs_quotes(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return true;
+    };
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return true;
+    }
+    if chars.any(|ch| !(ch.is_ascii_alphanumeric() || ch == '_')) {
+        return true;
+    }
+    parse_a1(name).is_some()
+}
+
+/// Rewrite resolved references by stable numeric handle and regenerate quoting metadata.
+pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool {
+    let mut changed = false;
+    match ast {
+        Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) if sheet.handle == handle => {
+            sheet.name = name.to_string();
+            sheet.quoted = sheet_name_needs_quotes(name);
+            changed = true;
+        }
+        Ast::Func(_, args) => {
+            for arg in args {
+                changed |= rename_sheet_refs(arg, handle, name);
+            }
+        }
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            changed |= rename_sheet_refs(left, handle, name);
+            changed |= rename_sheet_refs(right, handle, name);
+        }
+        Ast::Neg(inner) => changed |= rename_sheet_refs(inner, handle, name),
+        _ => {}
+    }
+    changed
+}
+
+/// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
+pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
+    let invalid = matches!(
+        ast,
+        Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) if sheet.handle == handle
+    );
+    if invalid {
+        *ast = Ast::InvalidRef;
+        return true;
+    }
+
+    let mut changed = false;
+    match ast {
+        Ast::Func(_, args) => {
+            for arg in args {
+                changed |= invalidate_sheet_refs(arg, handle);
+            }
+        }
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            changed |= invalidate_sheet_refs(left, handle);
+            changed |= invalidate_sheet_refs(right, handle);
+        }
+        Ast::Neg(inner) => changed |= invalidate_sheet_refs(inner, handle),
+        _ => {}
+    }
+    changed
+}
+
 fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
         Ast::Num(value) => out.push_str(&value.to_string()),

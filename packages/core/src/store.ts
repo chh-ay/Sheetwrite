@@ -59,6 +59,9 @@ type ChangeListener = (event: ChangeEvent) => void;
 type RecomputingCellStore = CellStore & {
   recompute(sheet: number): void;
   setSheetName(sheet: number, id: string, name: string): void;
+  renameSheet(sheet: number, id: string, name: string): boolean;
+  removeSheet(sheet: number): boolean;
+  isSheetAlive(sheet: number): boolean;
   insertCols(sheet: number, at: number, count: number): void;
   formulaSource(sheet: number, row: number, col: number): string | undefined;
   setColumnStringsPacked(
@@ -1231,6 +1234,33 @@ export class SheetwriteStore implements Store {
 
     const clean = new Set(patches);
     this.dirty = this.dirty.filter((p) => !clean.has(p));
+  }
+
+  /** Rewrite resolved formula sheet identity without changing the stable WASM handle. */
+  renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
+    const handle = this.handleOf(sheet);
+    if (!this.wasm.renameSheet(handle, sheet, name)) return false;
+    this.syncFormulaSourcesFromWasm();
+    return true;
+  }
+
+  /** Tombstone a stable WASM handle and rewrite surviving formulas to `#REF!`. */
+  removeSheetFormulaIdentity(sheet: SheetId): boolean {
+    const handle = this.handleOf(sheet);
+    if (!this.wasm.removeSheet(handle)) return false;
+    this.syncFormulaSourcesFromWasm();
+    return true;
+  }
+
+  private syncFormulaSourcesFromWasm(): void {
+    for (const key of [...this.formulaSrc.keys()]) {
+      const addr = parseCellKey(key);
+      const handle = this.handles.get(addr.sheet);
+      const source =
+        handle === undefined ? undefined : this.wasm.formulaSource(handle, addr.row, addr.col);
+      if (source === undefined) this.formulaSrc.delete(key);
+      else this.formulaSrc.set(key, source);
+    }
   }
 
   /** Bulk-load datasource rows into a sheet. Hydration emits nothing and never becomes dirty. */

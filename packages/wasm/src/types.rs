@@ -1,6 +1,8 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
-use crate::calc::{serialize, shift_cols, shift_rows, Ast};
+use crate::calc::{
+    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast,
+};
 use std::rc::Rc;
 
 pub(crate) const KIND_EMPTY: u8 = 0;
@@ -267,6 +269,30 @@ impl FormulaEntry {
             self.source = serialize(ast);
             self.reads = ReadSet::from_ast(ast, formula_sheet);
         }
+    }
+
+    pub(crate) fn rename_sheet(&mut self, handle: u32, name: &str, formula_sheet: u32) -> bool {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !rename_sheet_refs(ast, handle, name) {
+            return false;
+        }
+        self.source = serialize(ast);
+        self.reads = ReadSet::from_ast(ast, formula_sheet);
+        true
+    }
+
+    pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !invalidate_sheet_refs(ast, handle) {
+            return false;
+        }
+        self.source = serialize(ast);
+        self.reads = ReadSet::from_ast(ast, formula_sheet);
+        true
     }
 }
 

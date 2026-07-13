@@ -382,6 +382,77 @@ fn quoted_sheet_names_work_in_formulas() {
 }
 
 #[test]
+fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(1, 2);
+    let summary = store.add_sheet(2, 2);
+    store.set_sheet_name(source, "sales", "Sales");
+    store.set_sheet_name(summary, "summary", "Summary");
+    store.set_number(source, 0, 0, 4.0, 0);
+    store.set_number(source, 1, 0, 6.0, 0);
+    store.set_formula(summary, 0, 0, "=Sales!A1+1", 0);
+    store.set_formula(summary, 0, 1, "=SUM(Sales!A1:A2)", 0);
+    store.recompute(summary);
+
+    assert!(store.rename_sheet(source, "sales", "Sales Data"));
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("=('Sales Data'!A1+1)")
+    );
+    assert_eq!(
+        store.formula_source(summary, 0, 1).as_deref(),
+        Some("=SUM('Sales Data'!A1:A2)")
+    );
+    assert_close(number(&store, summary, 0, 0), 5.0);
+    assert_close(number(&store, summary, 0, 1), 10.0);
+
+    assert!(store.rename_sheet(source, "sales", "O'Brien"));
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("=('O''Brien'!A1+1)")
+    );
+    assert!(store.is_sheet_alive(source));
+    assert!(store.is_sheet_alive(summary));
+}
+
+#[test]
+fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencies() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(1, 2);
+    let summary = store.add_sheet(3, 2);
+    store.set_sheet_name(source, "source", "Source");
+    store.set_sheet_name(summary, "summary", "Summary");
+    store.set_number(source, 0, 0, 4.0, 0);
+    store.set_formula(summary, 0, 0, "=Source!A1+1", 0);
+    store.set_formula(summary, 0, 1, "=A1+1", 0);
+    store.recompute(summary);
+    assert_close(number(&store, summary, 0, 1), 6.0);
+
+    store.set_formula(summary, 0, 2, "=SUM(Source!A1:A2)", 0);
+    assert!(store.remove_sheet(source));
+
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("=(#REF!+1)")
+    );
+    assert_eq!(string(&store, summary, 0, 0).as_deref(), Some("#REF!"));
+    assert_eq!(string(&store, summary, 0, 1).as_deref(), Some("#REF!"));
+    assert!(!store.is_sheet_alive(source));
+    assert!(store.is_sheet_alive(summary));
+    assert_eq!(store.row_count(source), 0);
+
+    let replacement = store.add_sheet(1, 1);
+    assert_eq!(
+        store.formula_source(summary, 0, 2).as_deref(),
+        Some("=SUM(#REF!)")
+    );
+    assert_eq!(string(&store, summary, 0, 2).as_deref(), Some("#REF!"));
+    assert_eq!(replacement, 2);
+    assert!(store.is_sheet_alive(replacement));
+    assert!(!store.remove_sheet(source));
+}
+
+#[test]
 fn oversized_range_returns_num_without_expansion() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, RANGE_CELL_LIMIT as usize + 1);
