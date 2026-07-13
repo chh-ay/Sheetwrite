@@ -83,7 +83,7 @@ function isScenario(value: string | undefined): value is Scenario {
 async function runProbe(scenario: Scenario): Promise<ProbeResult> {
   const bytes = readFileSync(WASM_PATH);
   await initSheetwrite(bytes);
-  const wasm = initSync(bytes);
+  const wasm = initSync({ module: bytes });
   Bun.gc(true);
   const wasmBefore = wasm.memory.buffer.byteLength;
   const store = new SheetwriteStore(workbook(), undefined, {

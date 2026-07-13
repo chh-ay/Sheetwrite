@@ -60,6 +60,30 @@ Both engines agree on the data (e.g. the `city = "Tokyo"` filter selects 146 of
 1000 rows, and `sum(amount)` matches to the cent on both), confirming the
 workloads are equivalent.
 
+### Formula-engine protocol
+
+`bun run --filter '@sheetwrite/bench' bench:formula` measures deterministic
+formula topologies from `src/formula-dataset.ts`; the reduced CI check is
+`bench:formula:smoke`. Every fixture runs one untimed correctness pass before
+sampling, validates representative results/errors after every timed iteration,
+and preserves all five raw samples plus median/p95 in
+`results/formula-results.json`. Formula memory is the exact WASM linear-memory
+delta from isolated 1K/10K/100K-formula subprocesses.
+
+The suite covers independent parse/load and first recompute, safe-depth linear
+chains, 100K fan-out, diamonds, shared/distinct ranges, cross-sheet ranges,
+scalar edits affecting 0/1/1K/100K formulas, topology removal/addition, cycles,
+removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
+100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
+below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
+
+Three sequential full runs on Bun 1.3.14 linux/x64 reproduced the 100K headline
+medians: parse/load 71.6–73.8 ms, first recompute 151–156 ms, fan-out edit
+107–119 ms, and scalar edit affecting 100K formulas 107–116 ms. Isolated memory
+was identical on all runs: 0.88 MiB (1K), 7.13 MiB (10K), and 59.56 MiB (100K).
+No focused optimization was justified; the observed large workloads scale
+linearly and remain well inside the declared gates.
+
 ### Honest asymmetries (declared, not hidden)
 
 - **Sheetwrite** keeps all cell data in **WASM linear memory** (a Rust columnar
