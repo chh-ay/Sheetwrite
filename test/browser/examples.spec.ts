@@ -70,6 +70,23 @@ for (const name of examplePages) {
   });
 }
 
+test("workbook XLSX backend preserves formulas in a browser build", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto(`http://localhost:${SITE_PORT}/test/xlsx/`);
+  const result = page.locator("#result");
+  await expect
+    .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
+    .not.toBe("running");
+
+  expect(
+    await result.getAttribute("data-status"),
+    (await result.textContent()) ?? "XLSX smoke returned no result text",
+  ).toBe("ready");
+  expect(await result.textContent()).toContain('"formula":"=Input!A1*2"');
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("example pages cross-link through the shared nav", async ({ page }) => {
   await page.goto(urlOf("vanilla"));
   await page.waitForSelector(".sw-nav");

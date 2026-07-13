@@ -114,96 +114,127 @@ reopened in a spreadsheet app.
 
 ### Standalone import/export functions
 
-The same machinery is exported for use without a `Grid`. Export functions take a
-`Store` (`grid.store`, or your own). Import functions produce `ColumnarData`.
+Sheetwrite exposes two intentionally different XLSX contracts:
+
+- **Table interchange**: `toXlsx` / `fromXlsx` (also exported as the explicit
+  aliases `toXlsxTable` / `fromXlsxTable`). This is the existing active-sheet,
+  first-row-header API used by `grid.exportXlsx`.
+- **Workbook round-trip**: `toXlsxWorkbook` / `fromXlsxWorkbook`. This consumes
+  and produces the same `WorkbookSnapshot` used by persistence, without adding
+  a header row.
+
+Import the optional XLSX subpath once to register both backends:
 
 ```ts
 import {
   downloadBytes,
   fromCsv,
-  fromXlsx,
+  fromXlsxTable,
+  fromXlsxWorkbook,
+  SheetwriteStore,
   toCsv,
   toTsv,
-  toXlsx,
+  toXlsxTable,
+  toXlsxWorkbook,
 } from "@sheetwrite/core";
-
-import "@sheetwrite/core/xlsx"; // registers default XLSX import/export backends
+import "@sheetwrite/core/xlsx";
 
 const dataFromCsv = fromCsv(csvText, columns);
-const dataFromXlsx = await fromXlsx(bytes);
+const tableBytes = await toXlsxTable(workbook, store);
+const dataFromTable = await fromXlsxTable(tableBytes);
 
-const csv = toCsv(sheet, store);                 // string (BOM + CRLF, injection-hardened)
-const tsv = toTsv(range, store);                 // string (Excel/Sheets clipboard TSV)
-const bytes = await toXlsx(workbook, store);     // Promise<Uint8Array>
+const workbookBytes = await toXlsxWorkbook(store.exportSnapshot(), {
+  maxCells: 250_000,
+  signal: abortController.signal,
+  onWarning: (warning) => console.warn(warning.code, warning.message),
+});
+const importedSnapshot = await fromXlsxWorkbook(workbookBytes);
+const importedStore = SheetwriteStore.fromSnapshot(importedSnapshot);
+
+const csv = toCsv(sheet, store); // string (BOM + CRLF, injection-hardened)
+const tsv = toTsv(range, store); // string (Excel/Sheets clipboard TSV)
 
 downloadBytes(csv, "sales.csv", "text/csv");
-downloadBytes(bytes, "sales.xlsx",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+downloadBytes(
+  workbookBytes,
+  "workbook.xlsx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+);
 ```
 
 | Function | Signature |
 | --- | --- |
 | `fromCsv` | `fromCsv(text: string, columns: readonly Column[]): ColumnarData` |
-| `fromXlsx` | `fromXlsx(data: ArrayBuffer \| Uint8Array): Promise<ColumnarData>` |
+| `fromXlsxTable` / `fromXlsx` | `(data: ArrayBuffer \| Uint8Array) => Promise<ColumnarData>` |
+| `fromXlsxWorkbook` | `(data: ArrayBuffer \| Uint8Array, options?: XlsxWorkbookOptions) => Promise<WorkbookSnapshot>` |
 | `toCsv` | `toCsv(sheet: Sheet, store: Store): string` |
 | `toTsv` | `toTsv(range: Range, store: Store): string` |
-| `toXlsx` | `toXlsx(workbook: Workbook, store: Store): Promise<Uint8Array>` |
+| `toXlsxTable` / `toXlsx` | `(workbook: Workbook, store: Store) => Promise<Uint8Array>` |
+| `toXlsxWorkbook` | `(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions) => Promise<Uint8Array>` |
 | `downloadBytes` | `downloadBytes(bytes: Uint8Array \| string, filename: string, mime: string): void` |
+
+`XlsxWorkbookOptions.maxCells` defaults to `1_000_000` populated cells. Export
+checks the bound before constructing the ExcelJS workbook; import checks it
+while converting parsed worksheets into a snapshot. `signal` is checked before
+and after parsing/serialization and between worksheets. ExcelJS itself does not
+offer mid-`load` or mid-`writeBuffer` cancellation, so hosts accepting untrusted
+files should also enforce a compressed input-byte limit before calling import.
+
+### XLSX compatibility
+
+| Feature | Table API | Workbook API |
+| --- | --- | --- |
+| Multiple worksheets and order | Active sheet only | Preserved |
+| First row | Synthesized column headers | Ordinary row; no header synthesis |
+| Formula source, including cross-sheet formulas | Exports resolved scalars | Preserved; workbook requests full recalculation on open |
+| Cell styles, borders, number/date formats | Preserved on active-sheet export | Preserved |
+| Merges, column widths, row heights | Preserved on active-sheet export | Preserved |
+| Frozen panes and active worksheet | Not round-tripped | Preserved |
+| Named ranges | Not represented | Preserved |
+| Sheetwrite conditional formats and row groups | Not represented | Preserved in Sheetwrite metadata; warning reports that no Excel rule/outline is emitted |
+| Boolean literals | Imported by the table reader | Imported as `TRUE` / `FALSE` text with a structured warning until boolean `CellScalar` support lands |
+| Rich text and hyperlinks | Reader-dependent flattening | Display text preserved with a structured warning |
+| Excel validation, protection, notes, images, tables, auto-filters, conditional formatting, and VBA | Not represented | Dropped with a structured `unsupported-feature` warning when detected |
+
+Workbook formulas are imported as formula source, not as cached results.
+Hydrating the returned snapshot with `SheetwriteStore.fromSnapshot` recompiles
+them into the WASM formula engine. No raw formula handles enter the serialized
+snapshot.
 
 ### XLSX backends
 
-XLSX import/export uses pluggable backends. `toXlsx`, `fromXlsx`, and therefore
-`grid.exportXlsx`, throw if no backend is registered:
+XLSX uses pluggable backends. Calling a table or workbook API without its
+backend throws a configuration error. The default implementations live only at
+the `@sheetwrite/core/xlsx` subpath, so the ordinary core entry does not load
+ExcelJS, `read-excel-file`, or `write-excel-file`.
 
-```txt
-Sheetwrite: no xlsx backend configured (import and register one first)
-Sheetwrite: no xlsx import backend configured (import and register one first)
-```
-
-The default backend lives at the `@sheetwrite/core/xlsx` subpath. Importing it
-registers itself as a side effect:
-
-```ts
-import "@sheetwrite/core/xlsx";
-```
-
-The default export writes the active sheet's visible columns, cell and header
-styles, number/date formats, merged regions, column widths, and row-height
-overrides. Multi-sheet export is not yet supported.
-
-The module also exports backend objects if you want to register them explicitly or
-wrap them:
+The subpath registers itself as a side effect and also exports all three backend
+objects for explicit registration or wrapping:
 
 ```ts
 import {
+  excelJsWorkbookBackend,
   readExcelFileImportBackend,
   writeExcelFileBackend,
 } from "@sheetwrite/core/xlsx";
 import {
   setXlsxBackend,
   setXlsxImportBackend,
+  setXlsxWorkbookBackend,
   type XlsxBackend,
   type XlsxImportBackend,
+  type XlsxWorkbookBackend,
 } from "@sheetwrite/core";
 
 setXlsxBackend(writeExcelFileBackend);
 setXlsxImportBackend(readExcelFileImportBackend);
+setXlsxWorkbookBackend(excelJsWorkbookBackend);
 ```
 
-To supply your own engine, implement the backend contracts and register them —
-nothing else changes:
-
-```ts
-interface XlsxBackend {
-  name: string;
-  toXlsx(workbook: Workbook, store: Store): Promise<Uint8Array>;
-}
-
-interface XlsxImportBackend {
-  name: string;
-  fromXlsx(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
-}
-```
+The workbook backend is ExcelJS 4.4 under its MIT license. Its browser-capable
+implementation preserves formula source, worksheets, styles, merges,
+dimensions, frozen views, and named ranges. The host can replace it by
+implementing `XlsxWorkbookBackend`; table backend contracts remain unchanged.
 
 ## See also
 

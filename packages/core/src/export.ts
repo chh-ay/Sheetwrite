@@ -4,10 +4,12 @@ import type {
   CellScalar,
   Column,
   ColumnarData,
+  Grid,
   Range,
   Sheet,
   Store,
   Workbook,
+  WorkbookSnapshot,
 } from "./types.js";
 
 function scalarToText(value: CellScalar): string {
@@ -292,4 +294,83 @@ export function fromXlsx(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> 
     );
   }
   return importBackend.fromXlsx(data);
+}
+
+// ── Workbook-level XLSX round-trip ───────────────────────────────────────────
+
+export interface XlsxWorkbookWarning {
+  code:
+    | "boolean-literal"
+    | "rich-text"
+    | "hyperlink"
+    | "unsupported-cell-value"
+    | "unsupported-feature";
+  message: string;
+  sheet?: string;
+  cell?: string;
+}
+
+export interface XlsxWorkbookOptions {
+  /** Abort before or between workbook model operations. */
+  signal?: AbortSignal;
+  /**
+   * Maximum populated cells accepted by the in-memory ExcelJS document model.
+   * Defaults to 1,000,000. Use a lower host-specific bound for constrained
+   * browsers; table APIs remain available for larger streaming interchange.
+   */
+  maxCells?: number;
+  onWarning?: (warning: XlsxWorkbookWarning) => void;
+}
+
+export interface XlsxWorkbookBackend {
+  name: string;
+  toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
+  fromXlsxWorkbook(
+    data: ArrayBuffer | Uint8Array,
+    options?: XlsxWorkbookOptions,
+  ): Promise<WorkbookSnapshot>;
+}
+
+let workbookBackend: XlsxWorkbookBackend | null = null;
+
+export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void {
+  workbookBackend = next;
+}
+
+/** Explicit compatibility name: first-row-header, first-sheet table export. */
+export const toXlsxTable = toXlsx;
+
+/** Explicit compatibility name: first-row-header, first-sheet table import. */
+export const fromXlsxTable = fromXlsx;
+
+function workbookSnapshotOf(
+  input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
+): WorkbookSnapshot {
+  return "schemaVersion" in input ? input : input.exportSnapshot();
+}
+
+/** Formula-preserving, multi-sheet workbook export through the optional XLSX backend. */
+export function toXlsxWorkbook(
+  input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
+  options?: XlsxWorkbookOptions,
+): Promise<Uint8Array> {
+  if (!workbookBackend) {
+    throw new Error(
+      "Sheetwrite: no workbook xlsx backend configured (import @sheetwrite/core/xlsx first)",
+    );
+  }
+  return workbookBackend.toXlsxWorkbook(workbookSnapshotOf(input), options);
+}
+
+/** Formula-preserving, multi-sheet workbook import through the optional XLSX backend. */
+export function fromXlsxWorkbook(
+  data: ArrayBuffer | Uint8Array,
+  options?: XlsxWorkbookOptions,
+): Promise<WorkbookSnapshot> {
+  if (!workbookBackend) {
+    throw new Error(
+      "Sheetwrite: no workbook xlsx backend configured (import @sheetwrite/core/xlsx first)",
+    );
+  }
+  return workbookBackend.fromXlsxWorkbook(data, options);
 }
