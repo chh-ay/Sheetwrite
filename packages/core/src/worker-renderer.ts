@@ -118,10 +118,13 @@ export class WorkerRenderer implements Renderer {
   private worker: Worker | null = null;
   private sharedCursor = 0;
   private readonly sharedRegions: Array<SharedRegion | undefined> = new Array(SHARED_REGION_COUNT);
+  private failed = false;
+  private frameGeneration = 0;
 
   constructor(
     private readonly workerUrl?: string | URL,
     private readonly options: WorkerRendererOptions = {},
+    private readonly onFailure?: (error: unknown) => void,
   ) {}
 
   mount(host: HTMLElement, theme: Theme): void {
@@ -129,6 +132,9 @@ export class WorkerRenderer implements Renderer {
     // is never transferred and the grid falls back to the main-thread renderer.
     const url = this.workerUrl ?? new URL("./worker.js", import.meta.url);
     const worker = new Worker(url, { type: "module" });
+    this.worker = worker;
+    worker.addEventListener("error", this.onWorkerError);
+    worker.addEventListener("message", this.onWorkerMessage);
 
     const canvas = document.createElement("canvas");
     canvas.className = "sheetwrite-canvas";
@@ -136,12 +142,17 @@ export class WorkerRenderer implements Renderer {
     canvas.style.top = "0";
     canvas.style.left = "0";
     canvas.style.pointerEvents = "none";
-    host.appendChild(canvas);
+    canvas.dataset.workerFrame = "0";
 
-    const offscreen = canvas.transferControlToOffscreen();
-    worker.postMessage({ type: "init", canvas: offscreen, theme }, [offscreen]);
-    this.canvas = canvas;
-    this.worker = worker;
+    try {
+      const offscreen = canvas.transferControlToOffscreen();
+      worker.postMessage({ type: "init", canvas: offscreen, theme }, [offscreen]);
+      host.appendChild(canvas);
+      this.canvas = canvas;
+    } catch (error) {
+      this.destroy();
+      throw error;
+    }
   }
 
   setLayout(layout: RenderLayout): void {
@@ -280,13 +291,44 @@ export class WorkerRenderer implements Renderer {
   }
 
   destroy(): void {
-    this.worker?.postMessage({ type: "destroy" });
-    this.worker?.terminate();
+    const worker = this.worker;
+    if (worker) {
+      worker.removeEventListener("error", this.onWorkerError);
+      worker.removeEventListener("message", this.onWorkerMessage);
+      worker.postMessage({ type: "destroy" });
+      worker.terminate();
+    }
     this.worker = null;
     this.canvas?.remove();
     this.canvas = null;
     this.sharedRegions.fill(undefined);
   }
+
+  private readonly onWorkerError = (event: ErrorEvent): void => {
+    if (this.failed) return;
+    this.failed = true;
+    event.preventDefault();
+    const error =
+      event.error instanceof Error
+        ? event.error
+        : new Error(event.message || "Sheetwrite: Worker renderer failed to load");
+    const onFailure = this.onFailure;
+    this.destroy();
+    onFailure?.(error);
+  };
+
+  private readonly onWorkerMessage = (event: MessageEvent<unknown>): void => {
+    if (
+      event.data === null ||
+      typeof event.data !== "object" ||
+      !("type" in event.data) ||
+      event.data.type !== "painted"
+    ) {
+      return;
+    }
+    this.frameGeneration++;
+    if (this.canvas) this.canvas.dataset.workerFrame = String(this.frameGeneration);
+  };
 
   private canUseSharedMemory(): boolean {
     return (

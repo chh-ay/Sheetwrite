@@ -184,17 +184,18 @@ function releaseSharedPackedView(msg: SharedPackedMessage): void {
   Atomics.store(new Int32Array(msg.shared.buffer, 0, 2), 0, 0);
 }
 
-function paintView(view: VisibleWindowView): void {
-  if (!ctx || !canvas || !layout || !theme) return;
+function paintView(view: VisibleWindowView): boolean {
+  if (!ctx || !canvas || !layout || !theme) return false;
   const damage = blitVerticalScroll(ctx, canvas, theme, lastViewport, viewport, dpr, lastDpr);
   paintFrame(ctx, view, layout, theme, viewport, dpr, NO_RENDERERS, damage);
   lastViewport = { ...viewport };
   lastDpr = dpr;
+  return true;
 }
 
 /** Paint one frame as clipped frozen panes; pane frames never blit. */
-function paintPanesFrame(msg: PanesMessage): void {
-  if (!ctx || !canvas || !layout || !theme) return;
+function paintPanesFrame(msg: PanesMessage): boolean {
+  if (!ctx || !canvas || !layout || !theme) return false;
   lastViewport = null;
 
   for (const pane of msg.panes) {
@@ -212,6 +213,11 @@ function paintPanesFrame(msg: PanesMessage): void {
   }
 
   paintFreezeDivider(ctx, theme, viewport, dpr, msg.divider);
+  return true;
+}
+
+function acknowledgeFrame(painted: boolean): void {
+  if (painted) postMessage({ type: "painted" });
 }
 
 addEventListener("message", (event: MessageEvent) => {
@@ -245,21 +251,24 @@ addEventListener("message", (event: MessageEvent) => {
       }
       break;
     case "paint":
-      paintView(msg.view);
+      acknowledgeFrame(paintView(msg.view));
       break;
     case "paintPacked":
-      paintView(unpackPackedView(msg));
+      acknowledgeFrame(paintView(unpackPackedView(msg)));
       break;
     case "paintPanes":
-      paintPanesFrame(msg);
+      acknowledgeFrame(paintPanesFrame(msg));
       break;
-    case "paintPackedShared":
+    case "paintPackedShared": {
+      let painted = false;
       try {
-        paintView(unpackSharedPackedView(msg));
+        painted = paintView(unpackSharedPackedView(msg));
       } finally {
         releaseSharedPackedView(msg);
       }
+      acknowledgeFrame(painted);
       break;
+    }
     case "destroy":
       ctx = null;
       canvas = null;

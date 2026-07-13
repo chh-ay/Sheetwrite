@@ -170,7 +170,7 @@ export class GridImpl implements Grid {
   private readonly host: HTMLElement;
   private readonly scroller: HTMLDivElement;
   private readonly sizer: HTMLDivElement;
-  private readonly renderer: Renderer;
+  private renderer: Renderer;
   private readonly editor: EditController;
   private readonly validationEditor: ValidationEditor;
   private readonly input: InputController;
@@ -631,25 +631,46 @@ export class GridImpl implements Grid {
   private createRenderer(opts: GridOptions, host: HTMLElement): Renderer {
     if (opts.renderer === "worker") {
       try {
-        const worker = new WorkerRenderer(opts.workerUrl);
+        let worker: WorkerRenderer;
+        worker = new WorkerRenderer(opts.workerUrl, {}, (error) => {
+          this.fallbackWorkerRenderer(worker, error);
+        });
         worker.mount(host, this.theme);
         this.activeRendererKind = "worker";
         return worker;
       } catch (error) {
-        // Worker unavailable (no OffscreenCanvas / bad URL / CSP) — fall back
-        // to the main-thread canvas renderer, observably: subscribers attach
-        // right after createGrid returns, so defer the emit one microtask.
-        queueMicrotask(() => {
-          for (const fn of this.listeners["renderer-fallback"]) {
-            fn({ requested: "worker", error });
-          }
-        });
+        // Worker unavailable (no OffscreenCanvas / construction blocked) —
+        // fall back observably after post-construction subscribers can attach.
+        this.emitRendererFallback(error);
       }
     }
     const canvas = new CanvasRenderer();
     canvas.mount(host, this.theme);
     this.activeRendererKind = "canvas";
     return canvas;
+  }
+
+  private fallbackWorkerRenderer(worker: WorkerRenderer, error: unknown): void {
+    if (this.destroyed || this.renderer !== worker || this.activeRendererKind !== "worker") return;
+
+    worker.destroy();
+    const canvas = new CanvasRenderer();
+    canvas.mount(this.viewportEl, this.theme);
+    canvas.setRenderers(this.customRenderers);
+    this.renderer = canvas;
+    this.activeRendererKind = "canvas";
+    this.applyLayout();
+    this.scheduleRender();
+    this.emitRendererFallback(error);
+  }
+
+  private emitRendererFallback(error: unknown): void {
+    queueMicrotask(() => {
+      if (this.destroyed) return;
+      for (const fn of this.listeners["renderer-fallback"]) {
+        fn({ requested: "worker", error });
+      }
+    });
   }
 
   rendererKind(): "canvas" | "worker" {

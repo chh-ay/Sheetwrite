@@ -155,6 +155,22 @@ async function stagePackage(
   return stagedManifest;
 }
 
+async function assertWorkerBundle(packageRoot: string, manifest: PackageManifest): Promise<void> {
+  if (manifest.name !== "@sheetwrite/core") return;
+
+  const result = await Bun.build({
+    entrypoints: [join(packageRoot, "dist/worker.js")],
+    format: "esm",
+    target: "browser",
+  });
+  if (!result.success || result.outputs.length === 0) {
+    const diagnostics = result.logs.map((log) => log.message).join("\n");
+    throw new Error(
+      `${manifest.name} packed Worker entry has an unresolvable module graph\n${diagnostics}`,
+    );
+  }
+}
+
 async function assertTarball(
   spec: PackageSpec,
   manifest: PackageManifest,
@@ -181,6 +197,8 @@ async function assertTarball(
   for (const target of collectExportTargets(packedManifest.exports)) {
     await access(join(packageRoot, target));
   }
+
+  await assertWorkerBundle(packageRoot, packedManifest);
 }
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-packed-consumer-"));

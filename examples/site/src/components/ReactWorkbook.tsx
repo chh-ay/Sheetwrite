@@ -148,6 +148,11 @@ function describeSelection(selection: Selection | null): string {
   return selection.kind;
 }
 
+function rendererFailureReason(error: unknown): string {
+  if (error instanceof Error && error.message.length > 0) return error.message;
+  return typeof error === "string" && error.length > 0 ? error : "Worker failed to load";
+}
+
 const SIMPLE_ROWS = [
   { name: "Notebook", price: 12.5 },
   { name: "Pen", price: 2.25 },
@@ -171,6 +176,10 @@ function App() {
   const [sortKey, setSortKey] = useState("none");
   const [useWorker, setUseWorker] = useState(false);
   const [activeRenderer, setActiveRenderer] = useState<"canvas" | "worker" | null>(null);
+  const [rendererFallback, setRendererFallback] = useState<{
+    count: number;
+    reason: string;
+  } | null>(null);
   const [overscan, setOverscan] = useState(2);
   const [highlight, setHighlight] = useState(9_500);
   // Conditional-format rules ride on the workbook, a documented reset boundary:
@@ -216,8 +225,12 @@ function App() {
       refreshStats(grid);
       setActiveRenderer(grid.rendererKind());
       rendererFallbackCleanup.current?.();
-      rendererFallbackCleanup.current = grid.on("renderer-fallback", () => {
+      rendererFallbackCleanup.current = grid.on("renderer-fallback", (event) => {
         setActiveRenderer(grid.rendererKind());
+        setRendererFallback((current) => ({
+          count: (current?.count ?? 0) + 1,
+          reason: rendererFailureReason(event.error),
+        }));
       });
     },
     [refreshStats],
@@ -346,6 +359,7 @@ function App() {
             onChange={(event) => {
               // Renderer changes recreate the grid: this is a documented reset boundary.
               setActiveRenderer(null);
+              setRendererFallback(null);
               setUseWorker(event.target.checked);
             }}
           />{" "}
@@ -361,8 +375,9 @@ function App() {
             onChange={(event) => setOverscan(Math.max(0, Number(event.target.value)))}
           />
         </label>
-        <output data-testid="renderer">
+        <output data-testid="renderer" data-fallback-count={rendererFallback?.count ?? 0}>
           Requested: {useWorker ? "worker" : "canvas"} · Active: {activeRenderer ?? "starting…"}
+          {rendererFallback ? ` · Fallback: ${rendererFallback.reason}` : ""}
         </output>
       </div>
       <div className="example-grid">
