@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { neutralizeInjection, parseTsv, toTsv } from "../src/clipboard.js";
-import { ClipboardController } from "../src/clipboard-controller.js";
+import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
 import { SelectionModel } from "../src/selection.js";
 import type { CellAddress, CellScalar, CellStyle, CellValue, Patch, Store } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
@@ -133,6 +133,19 @@ class FakeStore {
         }
       }
     }
+  }
+}
+
+class FakeClipboardItem {
+  readonly types: string[];
+
+  constructor(private readonly entries: Record<string, Blob>) {
+    this.types = Object.keys(entries);
+  }
+
+  getType(type: string): Promise<Blob> {
+    const value = this.entries[type];
+    return value ? Promise.resolve(value) : Promise.reject(new Error(`Missing type ${type}`));
   }
 }
 
@@ -284,7 +297,7 @@ describe("ClipboardController", () => {
     // Formula resolving to 15 at C1 (row 0, col 2).
     h.store.seed(0, 2, { kind: "formula", src: "=A1+B$2" }, 15);
     h.select(0, 2);
-    h.controller.copy();
+    await h.controller.copy();
 
     h.select(2, 2);
     await h.controller.pasteValues();
@@ -297,7 +310,7 @@ describe("ClipboardController", () => {
   it("copy carries styles; pasteValues drops them", async () => {
     h.store.seed(0, 0, { kind: "literal", value: "x" }, "x", { bold: true });
     h.select(0, 0);
-    h.controller.copy();
+    await h.controller.copy();
 
     h.select(5, 0);
     await h.controller.paste();
@@ -419,5 +432,104 @@ describe("ClipboardController", () => {
     } finally {
       if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);
     }
+  });
+  it("round-trips formulas and styles through the browser custom clipboard format", async () => {
+    Object.defineProperty(globalThis, "ClipboardItem", {
+      configurable: true,
+      value: FakeClipboardItem,
+    });
+    let written: FakeClipboardItem | null = null;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: (items: FakeClipboardItem[]) => {
+          written = items[0] ?? null;
+          return Promise.resolve();
+        },
+        read: () => Promise.resolve(written ? [written] : []),
+        writeText: () => Promise.reject(new Error("text fallback should not run")),
+        readText: () => Promise.reject(new Error("text fallback should not run")),
+      },
+    });
+    h.store.seed(0, 0, { kind: "formula", src: "=B1" }, 7, {
+      bold: true,
+      backgroundColor: "#abcdef",
+    });
+    h.select(0, 0);
+
+    await expect(h.controller.copy()).resolves.toBe("done");
+    // Assigned by the awaited clipboard.write callback; TS cannot follow that async side effect.
+    const captured = written as unknown as FakeClipboardItem;
+    const types = captured.types;
+    expect(types).toContain("text/plain");
+    expect(types).toContain("text/html");
+    expect(types).toContain(`web ${SHEETWRITE_CLIPBOARD_MIME}`);
+
+    h.select(2, 0);
+    await expect(h.controller.paste()).resolves.toBe("done");
+    expect(h.store.getFormula({ sheet: "s1", row: 2, col: 0 })).toBe("=B3");
+    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toEqual({
+      bold: true,
+      backgroundColor: "#abcdef",
+    });
+  });
+
+  it("falls back from an unavailable web custom format to safe HTML plus text", async () => {
+    Object.defineProperty(globalThis, "ClipboardItem", {
+      configurable: true,
+      value: FakeClipboardItem,
+    });
+    const writes: FakeClipboardItem[] = [];
+    let textWrites = 0;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: ([item]: FakeClipboardItem[]) => {
+          writes.push(item!);
+          return item!.types.some((type) => type.startsWith("web "))
+            ? Promise.reject(new Error("custom format unavailable"))
+            : Promise.resolve();
+        },
+        writeText: () => {
+          textWrites++;
+          return Promise.resolve();
+        },
+      },
+    });
+    h.store.seed(0, 0, { kind: "literal", value: "<safe>" }, "<safe>");
+    h.select(0, 0);
+
+    await expect(h.controller.copy()).resolves.toBe("done");
+    expect(writes).toHaveLength(2);
+    expect(writes[1]!.types.sort()).toEqual(["text/html", "text/plain"]);
+    expect(textWrites).toBe(0);
+  });
+
+  it("parses spreadsheet HTML as inert data and rejects executable formula families", async () => {
+    const html =
+      '<table><tbody><tr><td data-formula="=A1+1" style="font-weight:bold;color:#123456">2</td>' +
+      '<td data-formula="=WEBSERVICE(&quot;https://example.test&quot;)">' +
+      '<img src=x onerror="globalThis.__clipboardExecuted=true">=WEBSERVICE()</td></tr></tbody></table>';
+    const item = new FakeClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([item]),
+        readText: () => Promise.reject(new Error("HTML should be handled first")),
+      },
+    });
+    h.select(1, 0);
+
+    await expect(h.controller.paste()).resolves.toBe("done");
+    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 0 })).toBe("=A1+1");
+    expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).style).toMatchObject({
+      bold: true,
+      color: "#123456",
+    });
+    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
+    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toStartWith("'=WEBSERVICE()");
+    expect((globalThis as Record<string, unknown>).__clipboardExecuted).toBeUndefined();
   });
 });

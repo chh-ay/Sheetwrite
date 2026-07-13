@@ -156,7 +156,8 @@ function roundTripWorkbook(): WorkbookSnapshot {
             header: "When",
             width: 111,
             type: "date",
-            numberFormat: "yyyy-mm-dd",
+            numberFormat: "mmm d, yyyy h:mm AM/PM",
+            numberLocale: "en-US",
             headerStyle: { bold: true, backgroundColor: "#EEEEEE" },
             cellStyle: { align: "center" },
           },
@@ -165,7 +166,7 @@ function roundTripWorkbook(): WorkbookSnapshot {
             header: "Amount",
             width: 88,
             type: "currency",
-            numberFormat: "$#,##0.00",
+            numberFormat: '$#,##0.00;[Red]($#,##0.00);"-"',
           },
         ],
         frozenRows: 1,
@@ -184,6 +185,37 @@ function roundTripWorkbook(): WorkbookSnapshot {
           },
         ],
         rowGroups: [{ start: 0, end: 1, collapsed: false }],
+        validationRules: [
+          {
+            id: "amount-range",
+            range: {
+              sheet: "inputs",
+              start: { row: 0, col: 1 },
+              end: { row: 1, col: 1 },
+            },
+            condition: { kind: "number", min: 0, max: 10 },
+            policy: "reject",
+            helpText: "Enter an amount from 0 to 10",
+          },
+        ],
+        protectedRanges: [
+          {
+            id: "locked-date",
+            range: {
+              sheet: "inputs",
+              start: { row: 0, col: 0 },
+              end: { row: 1, col: 0 },
+            },
+          },
+        ],
+        notes: [
+          {
+            addr: { sheet: "inputs", row: 1, col: 0 },
+            text: "Imported source date",
+          },
+        ],
+        sortKeys: [{ col: 1, ascending: false }],
+        filters: [[1, { kind: "compare", op: "gte", value: 1 }]],
         cells: [
           {
             startRow: 0,
@@ -398,6 +430,16 @@ describe("workbook XLSX round-trip", () => {
     ]);
     expect(inspected.getWorksheet("Calc")!.getCell("A1").formula).toBe("SUM(Inputs!B1:B2)");
     expect(inspected.getWorksheet("__sheetwrite_meta__")!.state).toBe("veryHidden");
+    expect(inspected.getWorksheet("Inputs")!.getCell("A1").numFmt).toBe("mmm d, yyyy h:mm AM/PM");
+    expect(inspected.getWorksheet("Inputs")!.getCell("B1").numFmt).toBe(
+      '$#,##0.00;[Red]($#,##0.00);"-"',
+    );
+    expect(inspected.getWorksheet("Inputs")!.getCell("B1").dataValidation).toMatchObject({
+      type: "decimal",
+      operator: "between",
+      formulae: [0, 10],
+    });
+    expect(inspected.getWorksheet("Inputs")!.getCell("A2").note).toBe("Imported source date");
     const archive = await JSZip.loadAsync(bytes);
     const workbookXml = await archive.file("xl/workbook.xml")?.async("text");
     expect(workbookXml).toContain('fullCalcOnLoad="1"');
@@ -423,6 +465,11 @@ describe("workbook XLSX round-trip", () => {
     expect(inputs.merges).toEqual([{ r0: 2, c0: 0, r1: 2, c1: 1 }]);
     expect(inputs.conditionalFormats).toEqual(source.sheets[0]!.conditionalFormats);
     expect(inputs.rowGroups).toEqual(source.sheets[0]!.rowGroups);
+    expect(inputs.validationRules).toEqual(source.sheets[0]!.validationRules);
+    expect(inputs.protectedRanges).toEqual(source.sheets[0]!.protectedRanges);
+    expect(inputs.notes).toEqual(source.sheets[0]!.notes);
+    expect(inputs.sortKeys).toEqual(source.sheets[0]!.sortKeys);
+    expect(inputs.filters).toEqual(source.sheets[0]!.filters);
 
     const inputCells = inputs.cells[0]!.cells;
     expect(inputCells[0]!.value).toEqual({ kind: "literal", value: 45_000 });

@@ -86,26 +86,53 @@ Commit and navigation keys:
 While the IME is composing, keystrokes belong to the composition and are not
 treated as navigation. Editing emits `edit-begin` and `edit-commit` events.
 
-## Clipboard (TSV)
+## Clipboard interoperability
 
-Copy and cut serialize the focused rectangle to the system clipboard as TSV
-(tab-separated, with fields containing tabs/newlines/quotes quoted), matching
-Excel and Google Sheets. Cut also clears the copied cells.
+Copy and cut always produce injection-hardened TSV and, where the browser exposes
+`ClipboardItem`, also write sanitized `text/html` plus Sheetwrite's private
+`application/x-sheetwrite+json` payload. The private payload preserves formula
+source and cell styles for same-app round-trips. HTML contains only escaped table
+markup, plain cell text, safe `data-sheetwrite-formula` attributes, and a bounded
+style subset; no pasted HTML is inserted into the document.
 
-Paste reads TSV from the clipboard, parses it (handling quoted, multi-line
-fields), and writes a block anchored at the focused cell. Pasted strings are
-**injection-hardened**: a value beginning with `=`, `+`, `-`, `@`, tab, or CR is
-prefixed with a single quote so a pasted `=cmd|...` can not become an executable
-formula. Copy/cut/paste use the async Clipboard API (`navigator.clipboard`);
-paste is disabled when `readOnly`.
+Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then
+plain TSV. HTML parsing uses an inert `DOMParser` document and accepts only cell
+text, safe formula attributes, and supported inline styles. External formulas
+containing control characters are treated as text. TSV handles quoted,
+multi-line fields, matching Excel and Google Sheets. External text beginning
+with `=`, `+`, `-`, `@`, tab, or CR is prefixed with a single quote, so it cannot
+become an executable formula.
+
+`paste()` preserves supported formula/style data; `pasteValues()` intentionally
+writes resolved literals and drops formulas/styles. Cut clears its source only
+after the system clipboard accepts the payload. Paste is disabled when
+`readOnly`.
 
 `grid.actions.copy/cut/paste/pasteValues` return
 `Promise<ClipboardOutcome>` — `"done" | "unsupported" | "blocked" | "empty"` —
-and **never reject**: a missing API resolves `"unsupported"`, a
-permission/user-activation rejection resolves `"blocked"`, so a custom toolbar
-can show a "clipboard blocked" hint instead of tripping global error
-monitoring. Cut clears its source only after the system clipboard accepted the
-payload.
+and never reject. A missing API resolves `"unsupported"`; permission or
+user-activation rejection resolves `"blocked"`, so custom UI can surface the
+outcome without tripping global error monitoring.
+
+## Validation, protection, and notes
+
+`DataValidationRule` covers list, numeric range, date range, text-length, and
+checkbox conditions. Rules carry a stable ID, range, `reject` / `warn` / `allow`
+policy, optional blank handling, and help text. List rules open a keyboard-
+operable `listbox`; checkbox rules open a real ARIA `checkbox`. Arrow keys and
+typeahead change a list choice, Space toggles a checkbox, Enter commits, Tab
+commits and moves, and Escape cancels. Every mutation ingress—including paste,
+fill, clear, and host transactions—passes through the same validation boundary.
+
+`ProtectedRange` is serializable client policy metadata. Local writes are denied
+by default and can be allowed by a host `ProtectionResolver`; atomic mode rejects
+the whole transaction, while partial mode applies allowed operations and reports
+the rest. Remote operations bypass this UX policy. A server must enforce its own
+authorization.
+
+Plain-text notes use `setNote(addr, text)` / `getNote(addr)`. The focused cell's
+note is exposed as the ARIA description. Notes serialize, rebase with structural
+edits, participate in undo/redo, and round-trip through Sheetwrite XLSX metadata.
 
 ## Toolbar actions
 

@@ -1,5 +1,6 @@
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
 export { cellScalarToText, parseCellInput, parseCurrencyInput } from "./cell-input.js";
+export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
   type DocumentValidationError,
@@ -64,6 +65,7 @@ export type {
   CellFormat,
   CellInputSnapshot,
   CellLoadState,
+  CellNote,
   CellPaintContext,
   CellRenderer,
   CellScalar,
@@ -82,6 +84,8 @@ export type {
   DataSourcePage,
   DataSourceRequest,
   DataSourceStorageOptions,
+  DataValidationCondition,
+  DataValidationRule,
   DocumentOp,
   Grid,
   GridActions,
@@ -92,6 +96,8 @@ export type {
   HighlightRange,
   LegacyDataSource,
   MergeRange,
+  MutationIssue,
+  MutationPolicyMode,
   NamedRangeSnapshot,
   OperationSource,
   PackedCellBlock,
@@ -101,6 +107,9 @@ export type {
   PersistenceAdapter,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
+  ProtectedRange,
+  ProtectionRequest,
+  ProtectionResolver,
   QueryCapability,
   Range,
   RemoteOperationOptions,
@@ -127,6 +136,7 @@ export type {
   ToolbarItem,
   Transaction,
   TransactionApplicationOptions,
+  ValidationPolicy,
   VersionedOperation,
   VisibleWindowView,
   Workbook,

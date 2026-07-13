@@ -74,4 +74,32 @@ describe("formatNumber", () => {
     expect(dateToSerial(new Date(Date.UTC(1900, 2, 1)))).toBe(61);
     expect(serialToDate(60).toISOString()).toBe("1900-02-28T00:00:00.000Z");
   });
+
+  it("formats scientific notation with an explicit exponent width", () => {
+    expect(formatNumber(12_345, "0.00E+00")).toBe("1.23E+04");
+    expect(formatNumber(0.0012, "0.0E+000")).toBe("1.2E-003");
+  });
+
+  it("selects positive, negative, zero, and text sections", () => {
+    const code = '0.00;[Red](0.00);"none";"value: "@';
+    expect(formatNumber(2.5, code)).toBe("2.50");
+    expect(formatNumber(-2.5, code)).toBe("(2.50)");
+    expect(formatNumber(0, code)).toBe("none");
+    expect(formatNumber("draft", code)).toBe("value: draft");
+  });
+
+  it("supports quoted and escaped literal affixes", () => {
+    expect(formatNumber(12.5, '"USD "0.00\\!')).toBe("USD 12.50!");
+    expect(formatNumber(-12.5, '0.0;"loss "0.0')).toBe("loss 12.5");
+  });
+
+  it("uses the configured locale rather than the browser default", () => {
+    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
+  });
+
+  it("distinguishes month and minute tokens and renders names and AM/PM", () => {
+    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
+    expect(formatNumber(serial, "mmm d, yyyy h:mm:ss AM/PM")).toBe("Jul 4, 2024 3:06:07 PM");
+    expect(formatNumber(serial, "mmmm dd")).toBe("July 04");
+  });
 });

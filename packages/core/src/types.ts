@@ -82,6 +82,8 @@ export interface Column {
   type: CellFormat;
   /** Excel number-format code, e.g. "#,##0.00" */
   numberFormat?: string;
+  /** Explicit BCP 47 locale for separators; omitted keeps the deterministic default. */
+  numberLocale?: string;
   headerStyle?: CellStyle;
   cellStyle?: CellStyle;
   visible?: boolean;
@@ -113,6 +115,16 @@ export interface Sheet {
   rowGroups?: RowGroup[];
   /** Conditional styles folded into the bulk render-window style dictionary. */
   conditionalFormats?: ConditionalFormatRule[];
+  /** Serializable data-entry rules evaluated at the local mutation barrier. */
+  validationRules?: DataValidationRule[];
+  /** Client-side protected-range policy metadata; never server authorization. */
+  protectedRanges?: ProtectedRange[];
+  /** Simple cell notes. Discussion threads live outside the document model. */
+  notes?: CellNote[];
+  /** Persisted sort keys for the sheet's view. */
+  sortKeys?: SortKey[];
+  /** Persisted column filters as JSON-safe index/value tuples. */
+  filters?: Array<[col: number, filter: ColumnFilter]>;
   /** Persisted merged-cell regions; covered cells render/export from the anchor. */
   merges?: MergeRange[];
   /** Leading view rows pinned above the scrolling body (0/undefined = none). */
@@ -167,6 +179,70 @@ export interface NamedRangeSnapshot {
   scope?: SheetId;
   range: Range;
 }
+export type ValidationPolicy = "reject" | "warn" | "allow";
+
+export type DataValidationCondition =
+  | { kind: "list"; values: readonly CellScalar[]; allowCustom?: boolean }
+  | { kind: "number"; min?: number; max?: number }
+  | { kind: "date"; min?: number; max?: number }
+  | { kind: "textLength"; min?: number; max?: number }
+  | {
+      kind: "checkbox";
+      checkedValue?: CellScalar;
+      uncheckedValue?: CellScalar;
+    };
+
+/** One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled. */
+export interface DataValidationRule {
+  id: string;
+  range: Range;
+  condition: DataValidationCondition;
+  policy: ValidationPolicy;
+  allowBlank?: boolean;
+  helpText?: string;
+}
+
+/** Serializable client UX policy. A host resolver decides whether a local mutation may proceed. */
+export interface ProtectedRange {
+  id: string;
+  range: Range;
+  label?: string;
+  permissionKey?: string;
+}
+
+export interface CellNote {
+  addr: CellAddress;
+  text: string;
+}
+
+export type MutationPolicyMode = "atomic" | "partial";
+
+export interface ProtectionRequest {
+  protectedRange: Readonly<ProtectedRange>;
+  operation: Readonly<DocumentOp>;
+  commitReason: CommitReason;
+}
+
+export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny";
+
+export type MutationIssue =
+  | {
+      kind: "validation";
+      severity: "error" | "warning";
+      ruleId: string;
+      addr: CellAddress;
+      value: CellValue;
+      message: string;
+      operationIndex: number;
+    }
+  | {
+      kind: "protection";
+      severity: "error";
+      protectedRangeId: string;
+      range: Range;
+      operationIndex: number;
+      message: string;
+    };
 
 export interface RowMetadata {
   height?: number;
@@ -215,6 +291,11 @@ export interface SheetSnapshot {
   rowMeta?: Array<[row: number, meta: RowMetadata]>;
   merges?: MergeRange[];
   conditionalFormats?: ConditionalFormatRule[];
+  validationRules?: DataValidationRule[];
+  protectedRanges?: ProtectedRange[];
+  notes?: CellNote[];
+  sortKeys?: SortKey[];
+  filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   cells: CellBlock[];
 }
@@ -258,8 +339,15 @@ export type DocumentOp =
         frozenCols?: number;
         conditionalFormats?: ConditionalFormatRule[];
         rowGroups?: RowGroup[];
+        sortKeys?: SortKey[];
+        filters?: Array<[col: number, filter: ColumnFilter]>;
       };
     }
+  | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule }
+  | { op: "removeValidationRule"; sheet: SheetId; id: string }
+  | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange }
+  | { op: "removeProtectedRange"; sheet: SheetId; id: string }
+  | { op: "setNote"; addr: CellAddress; text: string | null }
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string; scope?: SheetId };
 
@@ -281,12 +369,23 @@ export interface Transaction {
 }
 
 export type ApplyTransactionResult =
-  | { status: "applied"; epoch: number; transaction: Transaction }
+  | {
+      status: "applied";
+      epoch: number;
+      transaction: Transaction;
+      warnings?: MutationIssue[];
+      rejections?: MutationIssue[];
+    }
   | { status: "conflict"; expectedEpoch: number; actualEpoch: number }
+  | {
+      status: "rejected";
+      epoch: number;
+      issues: MutationIssue[];
+    }
   | {
       status: "noop";
       epoch: number;
-      reason: "empty" | "out-of-bounds" | "incomplete-data";
+      reason: "empty" | "out-of-bounds" | "incomplete-data" | "read-only";
     };
 
 export type OperationSource = "local" | "remote";
@@ -509,6 +608,11 @@ export interface Store {
     tx: Transaction,
     options?: TransactionApplicationOptions,
   ): ApplyTransactionResult;
+  /**
+   * Configure host-owned protected-range permissions. The resolver is synchronous
+   * so every local mutation ingress shares one atomic commit barrier.
+   */
+  setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
   /** Pending unsynced edits. */
   getDirty(): Patch[];
@@ -673,6 +777,13 @@ export interface GridActions {
   insertColumnLeft(): void;
   insertColumnRight(): void;
   deleteColumn(): void;
+  hideRows(rows?: readonly number[]): void;
+  showRows(rows?: readonly number[]): void;
+  autoFitRows(): void;
+  hideColumns(cols?: readonly number[]): void;
+  showColumns(cols?: readonly number[]): void;
+  autoFitColumns(cols?: readonly number[]): void;
+  clearFilter(col?: number): void;
   /** Copy the focused rectangle to the system clipboard. Never rejects. */
   copy(): Promise<ClipboardOutcome>;
   /** Copy + clear the source (after the clipboard accepted). Never rejects. */
@@ -739,6 +850,13 @@ export type ContextMenuActionName =
   | "insertColumnLeft"
   | "insertColumnRight"
   | "deleteColumn"
+  | "hideRow"
+  | "showAllRows"
+  | "autoFitRow"
+  | "hideColumn"
+  | "showAllColumns"
+  | "autoFitColumn"
+  | "clearFilter"
   | "exportCsv"
   | "exportXlsx"
   | "separator";
@@ -812,6 +930,13 @@ export interface GridOptions {
   workerUrl?: string | URL;
   theme?: Partial<Theme>;
   readOnly?: boolean;
+  /**
+   * Host-owned client UX permission check. Servers must independently authorize
+   * every submitted operation; this resolver is not an authentication boundary.
+   */
+  protectionResolver?: ProtectionResolver;
+  /** Atomic rejects the transaction; partial skips denied operation objects. */
+  mutationPolicy?: MutationPolicyMode;
   /** Custom cell renderers registered up front; also see `Grid.defineCellRenderer`. */
   renderers?: Record<string, CellRenderer>;
   /** Rows rendered above/below the viewport to absorb fast scrolls. */
@@ -870,6 +995,7 @@ export interface GridEvents {
   "edit-begin": { addr: CellAddress };
   "edit-commit": { addr: CellAddress; value: CellValue };
   search: SearchResult;
+  "mutation-rejected": { issues: MutationIssue[] };
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
   /**
@@ -920,7 +1046,7 @@ export interface Grid {
    * Use `Store.applyTransaction` only for low-level writes that intentionally
    * bypass Grid history and policy.
    */
-  applyTransaction(transaction: GridTransaction): void;
+  applyTransaction(transaction: GridTransaction): ApplyTransactionResult;
   /** Deterministically export the complete authoritative workbook document. */
   exportSnapshot(): WorkbookSnapshot;
   /**
@@ -945,6 +1071,8 @@ export interface Grid {
    * and compose with the active sort and hidden rows.
    */
   setColumnFilter(col: number, filter: ColumnFilter | null): void;
+  /** Persisted multi-key sort of the active sheet. */
+  setSort(keys: readonly SortKey[]): ApplyTransactionResult;
   /** Active column filters on the active sheet, keyed by column index. */
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
   /**
@@ -958,6 +1086,12 @@ export interface Grid {
   showRows(rows?: readonly number[]): void;
   /** Currently hidden data rows on the active sheet. */
   hiddenRows(): readonly number[];
+  /** Hide columns through one bulk-safe metadata transaction. */
+  hideColumns(cols?: readonly number[]): void;
+  /** Show columns through one bulk-safe metadata transaction. */
+  showColumns(cols?: readonly number[]): void;
+  /** Currently hidden columns on the active sheet. */
+  hiddenColumns(): readonly number[];
   /** Define a collapsible row group over a data-row range (end-inclusive). */
   groupRows(start: number, end: number): void;
   /** Remove a row group (rows become visible if the group was collapsed). */
@@ -1008,6 +1142,13 @@ export interface Grid {
   renameSheet(id: SheetId, name: string): void;
   moveSheet(id: SheetId, toIndex: number): void;
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+  setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
+  removeValidationRule(id: string): ApplyTransactionResult;
+  setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
+  removeProtectedRange(id: string): ApplyTransactionResult;
+  setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
+  setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
+  getNote(addr: CellAddress): string | null;
   /**
    * Live-update the render window overscan (rows/cols painted beyond the
    * viewport); `undefined` restores the default.

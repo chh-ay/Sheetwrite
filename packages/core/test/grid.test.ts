@@ -1253,6 +1253,155 @@ describe("transactional document metadata", () => {
     store.dispose();
   });
 
+  it("histories validation, protection, notes, filters, and column visibility", () => {
+    const workbook = makeWorkbook(6);
+    const store = new SheetwriteStore(workbook, makeColumnarData(6));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const range = { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 3, col: 0 } };
+
+    expect(
+      grid.setValidationRule({
+        id: "status",
+        range,
+        condition: { kind: "list", values: ["Ready", "Blocked"] },
+        policy: "reject",
+      }).status,
+    ).toBe("applied");
+    expect(workbook.sheets[0]!.validationRules).toHaveLength(1);
+    grid.undo();
+    expect(workbook.sheets[0]!.validationRules).toEqual([]);
+    grid.redo();
+    expect(workbook.sheets[0]!.validationRules).toHaveLength(1);
+
+    grid.setProtectedRange({ id: "locked", range: { ...range, start: { row: 4, col: 0 } } });
+    expect(workbook.sheets[0]!.protectedRanges).toHaveLength(1);
+    grid.undo();
+    expect(workbook.sheets[0]!.protectedRanges).toEqual([]);
+
+    const noteAddr = { sheet: "s1", row: 2, col: 2 };
+    grid.setNote(noteAddr, "Check source");
+    expect(grid.getNote(noteAddr)).toBe("Check source");
+    grid.undo();
+    expect(grid.getNote(noteAddr)).toBeNull();
+    grid.redo();
+    expect(grid.getNote(noteAddr)).toBe("Check source");
+
+    grid.setColumnFilter(0, { kind: "contains", text: "Customer" });
+    expect(grid.getColumnFilters().get(0)).toEqual({ kind: "contains", text: "Customer" });
+    grid.undo();
+    expect(grid.getColumnFilters().has(0)).toBe(false);
+
+    grid.hideColumns([1]);
+    expect(grid.hiddenColumns()).toEqual([1]);
+    grid.undo();
+    expect(grid.hiddenColumns()).toEqual([]);
+    grid.actions.hideColumns([2]);
+    expect(grid.hiddenColumns()).toEqual([2]);
+    grid.actions.showColumns();
+    expect(grid.hiddenColumns()).toEqual([]);
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("emits structured mutation rejection events for protected and invalid writes", () => {
+    const workbook = makeWorkbook(3);
+    workbook.sheets[0]!.validationRules = [
+      {
+        id: "positive",
+        range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } },
+        condition: { kind: "number", min: 0 },
+        policy: "reject",
+      },
+    ];
+    workbook.sheets[0]!.protectedRanges = [
+      {
+        id: "locked",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
+      },
+    ];
+    const store = new SheetwriteStore(workbook);
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const events: string[][] = [];
+    grid.on("mutation-rejected", ({ issues }) => {
+      events.push(issues.map((issue) => issue.kind));
+    });
+
+    expect(
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 0, col: 0 },
+            value: { kind: "literal", value: "x" },
+          },
+        ],
+      }).status,
+    ).toBe("rejected");
+    expect(
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 0, col: 1 },
+            value: { kind: "literal", value: -1 },
+          },
+        ],
+      }).status,
+    ).toBe("rejected");
+    expect(events).toEqual([["protection"], ["validation"]]);
+
+    grid.setProtectionResolver(() => "allow");
+    expect(
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 0, col: 0 },
+            value: { kind: "literal", value: "x" },
+          },
+        ],
+      }).status,
+    ).toBe("applied");
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("exposes notes and whole-axis selection through the accessibility mirror", () => {
+    const workbook = makeWorkbook(5);
+    workbook.sheets[0]!.notes = [{ addr: { sheet: "s1", row: 0, col: 0 }, text: "Verify source" }];
+    const store = new SheetwriteStore(workbook, makeColumnarData(5));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+
+    const firstCell = host.querySelector('[role="gridcell"]');
+    expect(firstCell?.getAttribute("aria-description")).toBe("Note: Verify source");
+    expect(
+      [...host.querySelectorAll<HTMLElement>(".sheetwrite-overlay > div")].some((element) =>
+        element.style.clipPath.includes("polygon"),
+      ),
+    ).toBe(true);
+
+    grid.setSelection({ kind: "column", sheet: "s1", col: 1 });
+    grid.refresh();
+    const headers = [...host.querySelectorAll<HTMLElement>('[role="columnheader"]')];
+    expect(
+      headers.find((header) => header.textContent === "B")?.getAttribute("aria-selected"),
+    ).toBe("true");
+
+    grid.setSelection({ kind: "row", sheet: "s1", row: 3 });
+    grid.refresh();
+    expect(
+      host
+        .querySelector<HTMLElement>('[role="row"][aria-rowindex="5"]')
+        ?.getAttribute("aria-selected"),
+    ).toBe("true");
+
+    grid.destroy();
+    store.dispose();
+  });
+
   it("keeps every document metadata action inert in read-only mode", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -1274,6 +1423,19 @@ describe("transactional document metadata", () => {
     grid.addSheet({ id: "blocked", name: "Blocked" });
     grid.renameSheet("s1", "Blocked");
     grid.removeSheet("s1");
+    grid.setValidationRule({
+      id: "blocked-rule",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+      condition: { kind: "list", values: ["x"] },
+      policy: "reject",
+    });
+    grid.setProtectedRange({
+      id: "blocked-protection",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+    });
+    grid.setNote({ sheet: "s1", row: 0, col: 0 }, "blocked");
+    grid.hideColumns([1]);
+    grid.setColumnFilter(0, { kind: "contains", text: "blocked" });
 
     expect(changes).toBe(0);
     expect(workbook.sheets).toHaveLength(1);
@@ -1283,6 +1445,11 @@ describe("transactional document metadata", () => {
     expect(workbook.sheets[0]!.frozenRows).toBeUndefined();
     expect(workbook.sheets[0]!.rowGroups).toBeUndefined();
     expect(workbook.sheets[0]!.hiddenRows).toBeUndefined();
+    expect(workbook.sheets[0]!.validationRules).toBeUndefined();
+    expect(workbook.sheets[0]!.protectedRanges).toBeUndefined();
+    expect(workbook.sheets[0]!.notes).toBeUndefined();
+    expect(workbook.sheets[0]!.columns[1]!.visible).toBeUndefined();
+    expect(workbook.sheets[0]!.filters).toBeUndefined();
 
     grid.destroy();
     store.dispose();

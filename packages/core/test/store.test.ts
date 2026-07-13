@@ -1546,3 +1546,169 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 });
+
+describe("validation, protection, and notes metadata", () => {
+  it("applies reject, warn, and partial validation policy at the transaction boundary", () => {
+    const workbook = makeWorkbook(4);
+    workbook.sheets[0]!.validationRules = [
+      {
+        id: "amount-limit",
+        range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 3, col: 1 } },
+        condition: { kind: "number", min: 0, max: 10 },
+        policy: "reject",
+        allowBlank: false,
+      },
+    ];
+    const atomic = new SheetwriteStore(workbook);
+    const rejected = atomic.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 20 } },
+        { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "kept out" } },
+      ],
+    });
+    expect(rejected.status).toBe("rejected");
+    expect(rejected.status === "rejected" ? rejected.issues : []).toMatchObject([
+      { kind: "validation", ruleId: "amount-limit", operationIndex: 0 },
+    ]);
+    expect(atomic.getCell(addr(0, 0)).resolved).toBeNull();
+
+    atomic.applyTransaction({
+      patches: [
+        {
+          op: "setValidationRule",
+          sheet: "s1",
+          rule: { ...workbook.sheets[0]!.validationRules![0]!, policy: "warn" },
+        },
+      ],
+    });
+    const warned = atomic.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 1), value: { kind: "literal", value: 20 } }],
+    });
+    expect(warned.status).toBe("applied");
+    expect(warned.status === "applied" ? warned.warnings : []).toMatchObject([
+      { kind: "validation", ruleId: "amount-limit" },
+    ]);
+    expect(atomic.getCell(addr(0, 1)).resolved).toBe(20);
+    atomic.dispose();
+    workbook.sheets[0]!.validationRules![0]!.policy = "reject";
+
+    const partial = new SheetwriteStore(workbook, undefined, { mutationPolicy: "partial" });
+    const outcome = partial.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(1, 1), value: { kind: "literal", value: -1 } },
+        { op: "set", addr: addr(1, 0), value: { kind: "literal", value: "applied" } },
+      ],
+    });
+    expect(outcome.status).toBe("applied");
+    expect(outcome.status === "applied" ? outcome.transaction.patches : []).toHaveLength(1);
+    expect(outcome.status === "applied" ? outcome.rejections : []).toHaveLength(1);
+    expect(partial.getCell(addr(1, 1)).resolved).toBeNull();
+    expect(partial.getCell(addr(1, 0)).resolved).toBe("applied");
+
+    const clear = partial.applyTransaction({
+      patches: [
+        {
+          op: "clearRange",
+          range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 3, col: 1 } },
+        },
+      ],
+    });
+    const clearIssues =
+      clear.status === "rejected"
+        ? clear.issues
+        : clear.status === "applied"
+          ? (clear.rejections ?? [])
+          : [];
+    expect(clearIssues).toMatchObject([{ ruleId: "amount-limit" }]);
+    partial.dispose();
+  });
+
+  it("denies protected local mutations by default and delegates permission to the host", () => {
+    const workbook = makeWorkbook(3);
+    workbook.sheets[0]!.protectedRanges = [
+      {
+        id: "locked",
+        label: "Locked cells",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+      },
+    ];
+    const store = new SheetwriteStore(workbook);
+    const denied = store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "blocked" } }],
+    });
+    expect(denied.status).toBe("rejected");
+    expect(denied.status === "rejected" ? denied.issues : []).toMatchObject([
+      { kind: "protection", protectedRangeId: "locked", operationIndex: 0 },
+    ]);
+
+    const requests: string[] = [];
+    store.setProtectionResolver((request) => {
+      requests.push(`${request.commitReason}:${request.protectedRange.id}`);
+      return "allow";
+    });
+    expect(
+      store.applyTransaction(
+        {
+          patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "allowed" } }],
+        },
+        { commitReason: "edit-enter" },
+      ).status,
+    ).toBe("applied");
+    expect(requests).toEqual(["edit-enter:locked"]);
+
+    store.setProtectionResolver(() => "deny");
+    expect(
+      store.applyTransaction(
+        {
+          patches: [{ op: "set", addr: addr(0, 1), value: { kind: "literal", value: "server" } }],
+        },
+        { source: "remote" },
+      ).status,
+    ).toBe("applied");
+    store.dispose();
+  });
+
+  it("serializes and structurally rebases validation, protection, and note metadata", () => {
+    const workbook = makeWorkbook(4);
+    workbook.sheets[0]!.validationRules = [
+      {
+        id: "choices",
+        range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+        condition: { kind: "list", values: ["A", "B"] },
+        policy: "reject",
+      },
+    ];
+    workbook.sheets[0]!.protectedRanges = [
+      {
+        id: "protected",
+        range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      },
+    ];
+    workbook.sheets[0]!.notes = [{ addr: addr(2, 2), text: "Review this value" }];
+    const store = new SheetwriteStore(workbook);
+    store.setProtectionResolver(() => "allow");
+
+    store.applyTransaction({
+      patches: [{ op: "addRows", sheet: "s1", at: 1, count: 1 }],
+    });
+    const sheet = store.getWorkbook().sheets[0]!;
+    expect(sheet.validationRules![0]!.range).toMatchObject({
+      start: { row: 2, col: 0 },
+      end: { row: 3, col: 0 },
+    });
+    expect(sheet.protectedRanges![0]!.range).toMatchObject({
+      start: { row: 2, col: 1 },
+      end: { row: 3, col: 1 },
+    });
+    expect(sheet.notes).toEqual([{ addr: addr(3, 2), text: "Review this value" }]);
+
+    const snapshot = store.exportSnapshot();
+    expect(validateWorkbookSnapshot(snapshot).ok).toBe(true);
+    const restored = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(snapshot)));
+    expect(restored.getWorkbook().sheets[0]!.validationRules).toEqual(sheet.validationRules);
+    expect(restored.getWorkbook().sheets[0]!.protectedRanges).toEqual(sheet.protectedRanges);
+    expect(restored.getWorkbook().sheets[0]!.notes).toEqual(sheet.notes);
+    restored.dispose();
+    store.dispose();
+  });
+});

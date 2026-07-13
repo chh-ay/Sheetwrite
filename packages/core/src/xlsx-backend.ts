@@ -25,6 +25,7 @@ import type {
   CellValue,
   Column,
   ColumnarData,
+  DataValidationRule,
   MergeRange,
   SheetSnapshot,
   SnapshotCell,
@@ -34,6 +35,11 @@ import type {
 } from "./types.js";
 
 type XlsxCell = CellObject | null;
+type ExcelWorksheetWithValidations = ExcelJS.Worksheet & {
+  dataValidations: {
+    add(range: string, validation: ExcelJS.Cell["dataValidation"]): void;
+  };
+};
 
 const PIXELS_PER_CHARACTER = 7;
 const XLSX_WIDTH_PADDING = 5;
@@ -471,6 +477,74 @@ function setWorkbookCell(
   applyWorkbookStyle(cell, { ...column.cellStyle, ...source.style });
 }
 
+function workbookRangeA1(rule: DataValidationRule): string {
+  const row0 = Math.min(rule.range.start.row, rule.range.end.row);
+  const row1 = Math.max(rule.range.start.row, rule.range.end.row);
+  const col0 = Math.min(rule.range.start.col, rule.range.end.col);
+  const col1 = Math.max(rule.range.start.col, rule.range.end.col);
+  return `${colToA1(col0)}${row0 + 1}:${colToA1(col1)}${row1 + 1}`;
+}
+
+function workbookValidationOf(rule: DataValidationRule): ExcelJS.Cell["dataValidation"] | null {
+  const common = {
+    allowBlank: rule.allowBlank ?? true,
+    showInputMessage: Boolean(rule.helpText),
+    prompt: rule.helpText,
+    showErrorMessage: rule.policy === "reject",
+    error: rule.helpText ?? "The entered value does not satisfy this cell's validation rule.",
+  };
+  const condition = rule.condition;
+  if (condition.kind === "list") {
+    const list = condition.values
+      .map((value) =>
+        value === null
+          ? ""
+          : typeof value === "boolean"
+            ? value
+              ? "TRUE"
+              : "FALSE"
+            : String(value),
+      )
+      .join(",")
+      .replaceAll('"', '""');
+    if (list.length > 255) return null;
+    return { ...common, type: "list", formulae: [`"${list}"`] };
+  }
+  if (condition.kind === "checkbox") {
+    const checked = condition.checkedValue ?? true;
+    const unchecked = condition.uncheckedValue ?? false;
+    return {
+      ...common,
+      type: "list",
+      formulae: [`"${String(checked)},${String(unchecked)}"`],
+    };
+  }
+  const formulae =
+    condition.kind === "date"
+      ? [condition.min, condition.max]
+          .filter((value): value is number => value !== undefined)
+          .map(serialToDate)
+      : [condition.min, condition.max].filter((value): value is number => value !== undefined);
+  if (formulae.length === 0) return null;
+  const operator =
+    condition.min !== undefined && condition.max !== undefined
+      ? "between"
+      : condition.min !== undefined
+        ? "greaterThanOrEqual"
+        : "lessThanOrEqual";
+  return {
+    ...common,
+    type:
+      condition.kind === "date"
+        ? "date"
+        : condition.kind === "textLength"
+          ? "textLength"
+          : "decimal",
+    operator,
+    formulae,
+  };
+}
+
 function metadataSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
   return {
     ...snapshot,
@@ -575,6 +649,8 @@ async function toWorkbookXlsx(
   for (const sheet of ordered) {
     checkAbort(options);
     const worksheet = workbook.addWorksheet(sheet.name);
+    // ExcelJS exposes this range-native collection at runtime but omits it from Worksheet types.
+    const validationWorksheet = worksheet as ExcelWorksheetWithValidations;
     worksheet.columns = sheet.columns.map((column) => ({
       width: pxToChars(column.width),
       hidden: column.visible === false,
@@ -599,6 +675,21 @@ async function toWorkbookXlsx(
     }
     for (const merge of sheet.merges ?? []) {
       worksheet.mergeCells(merge.r0 + 1, merge.c0 + 1, merge.r1 + 1, merge.c1 + 1);
+    }
+    for (const rule of sheet.validationRules ?? []) {
+      const validation = workbookValidationOf(rule);
+      if (validation) {
+        validationWorksheet.dataValidations.add(workbookRangeA1(rule), validation);
+      } else {
+        warn(options, {
+          code: "unsupported-feature",
+          message: `Validation rule "${rule.id}" is preserved in Sheetwrite metadata but exceeds XLSX inline validation limits`,
+          sheet: sheet.name,
+        });
+      }
+    }
+    for (const note of sheet.notes ?? []) {
+      worksheet.getCell(note.addr.row + 1, note.addr.col + 1).note = note.text;
     }
     if (sheet.conditionalFormats?.length) {
       warn(options, {
@@ -908,18 +999,17 @@ async function fromWorkbookXlsx(
       });
     });
     if (meta && metadata) restoreMetadataReferences(cells, meta, metadata);
-    if (hasDataValidation) {
+    if (hasDataValidation && !meta?.validationRules?.length) {
       warn(options, {
         code: "unsupported-feature",
-        message:
-          "Excel data validation rules are not represented by WorkbookSnapshot and were dropped",
+        message: "Excel data validation rules could not be mapped safely and were dropped",
         sheet: worksheet.name,
       });
     }
-    if (hasNotes) {
+    if (hasNotes && !meta?.notes?.length) {
       warn(options, {
         code: "unsupported-feature",
-        message: "Excel cell notes are not represented by WorkbookSnapshot and were dropped",
+        message: "Excel cell notes could not be mapped safely and were dropped",
         sheet: worksheet.name,
       });
     }
@@ -944,11 +1034,10 @@ async function fromWorkbookXlsx(
         sheet: worksheet.name,
       });
     }
-    if (modelHasContent(worksheet.model, "sheetProtection")) {
+    if (modelHasContent(worksheet.model, "sheetProtection") && !meta?.protectedRanges?.length) {
       warn(options, {
         code: "unsupported-feature",
-        message:
-          "Excel worksheet protection is not represented by WorkbookSnapshot and was dropped",
+        message: "Excel worksheet protection could not be mapped to host-resolved protected ranges",
         sheet: worksheet.name,
       });
     }
@@ -999,6 +1088,11 @@ async function fromWorkbookXlsx(
         ? { conditionalFormats: structuredClone(meta.conditionalFormats) }
         : {}),
       ...(meta?.rowGroups ? { rowGroups: structuredClone(meta.rowGroups) } : {}),
+      ...(meta?.validationRules ? { validationRules: structuredClone(meta.validationRules) } : {}),
+      ...(meta?.protectedRanges ? { protectedRanges: structuredClone(meta.protectedRanges) } : {}),
+      ...(meta?.notes ? { notes: structuredClone(meta.notes) } : {}),
+      ...(meta?.sortKeys ? { sortKeys: structuredClone(meta.sortKeys) } : {}),
+      ...(meta?.filters ? { filters: structuredClone(meta.filters) } : {}),
       cells:
         cells.length > 0
           ? [{ startRow: 0, startCol: 0, rowCount, colCount: columns.length, cells }]

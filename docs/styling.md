@@ -226,17 +226,24 @@ const style: CellStyle = {
 
 ## Number formats
 
-A numeric/date column can carry an Excel-style `numberFormat` code. The same UTC
-serial value is used by the canvas renderer, formula `TEXT`, and XLSX I/O:
+A numeric/date column can carry an Excel-style `numberFormat` code and an explicit
+BCP 47 `numberLocale`. The same UTC serial value and locale are used by the
+canvas renderer, auto-fit measurement, and exported formatter:
 
 ```ts
-{ key: "amount", header: "Amount", width: 140, type: "number", numberFormat: "#,##0.00" }
+{
+  key: "amount",
+  header: "Amount",
+  width: 140,
+  type: "number",
+  numberFormat: "#,##0.00",
+  numberLocale: "de-DE",
+}
 { key: "day", header: "Day", width: 120, type: "date", numberFormat: "yyyy-mm-dd" }
 ```
 
-`formatNumber(value, code?)` is exported from `@sheetwrite/core`. It is a
-best-effort, cached renderer for common Excel patterns, not a complete Excel
-format engine:
+`formatNumber(value, code?, locale?)` is exported from `@sheetwrite/core`. It is
+a cached renderer for the supported Excel-style families:
 
 | Code | Example output |
 | --- | --- |
@@ -246,18 +253,26 @@ format engine:
 | `#,##0.00` | `1234.5` → `1,234.50` |
 | `0%` | `0.5` → `50%` |
 | `$#,##0.00` | `1234.5` → `$1,234.50` |
+| `0.00E+00` | `12345` → `1.23E+04` |
 | `yyyy-mm-dd` | serial `45351` → `2024-02-29` |
-| `dd/mm/yyyy hh:mm` | date serial with time → UTC date/time fields |
+| `mmm d, yyyy h:mm:ss AM/PM` | UTC serial → `Jul 4, 2024 3:06:07 PM` |
+| `0.00;[Red](0.00);"none";"value: "@` | positive / negative / zero / text sections |
 
-Numeric tokens support fixed decimals, grouping, percent scaling, and literal or
-`¤` currency prefixes/suffixes. Date/time tokens support numeric year, month,
-day, hour, minute, and second runs; `m` next to an hour/second is interpreted as
-minutes. UTC fields make rendering deterministic across host timezones.
+Numeric formats support fixed decimals, optional grouping, percent scaling,
+scientific exponents with explicit width, quoted/escaped literals, and currency
+prefixes/suffixes. Up to four semicolon sections select positive, negative, zero,
+and text output; color directives such as `[Red]` are accepted as formatting
+metadata but do not change canvas text color.
 
-Conditional sections, colors embedded in format strings, month/day names,
-fractions, and fractional seconds are not supported. Formula errors are explicit
-sentinels such as `#DIV/0!` and `#CYCLE!`; they are not non-finite numbers hidden
-by the number formatter. See [Formulas](./formulas.md#scalars-coercion-and-errors).
+Date/time formats support numeric and named month/day fields, 12/24-hour time,
+minutes, seconds, and AM/PM. Month/minute disambiguation follows neighboring time
+tokens. UTC fields make date rendering deterministic across host timezones.
+Locale-specific separators come from `numberLocale`, not ambient browser locale.
+
+Fractions, elapsed-time bracket tokens, and fractional seconds are not supported.
+Formula errors are explicit sentinels such as `#DIV/0!` and `#CYCLE!`; they are
+not non-finite numbers hidden by the formatter. See
+[Formulas](./formulas.md#scalars-coercion-and-errors).
 
 Native boolean values use the normal cell style model, render as uppercase
 `TRUE`/`FALSE`, and default to centered alignment unless `CellStyle.align`

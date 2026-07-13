@@ -41,6 +41,7 @@ import type {
   ConditionalFormatRule,
   DataSourcePage,
   DataSourceRequest,
+  DataValidationRule,
   DocumentOp,
   Grid,
   GridActions,
@@ -50,8 +51,11 @@ import type {
   GridTransaction,
   HighlightRange,
   MergeRange,
+  MutationPolicyMode,
   PanePaint,
   Patch,
+  ProtectedRange,
+  ProtectionResolver,
   Range,
   RemoteOperationOptions,
   Renderer,
@@ -72,6 +76,7 @@ import type {
   VisibleWindowView,
   WorkbookSnapshot,
 } from "./types.js";
+import { ValidationEditor } from "./validation-editor.js";
 import { computeColumnWindow, computeWindow } from "./virtualization.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
@@ -86,6 +91,14 @@ function scaleFontPx(font: string, zoom: number): string {
     /(\d+(?:\.\d+)?)px/g,
     (_, px: string) => `${Math.round(Number.parseFloat(px) * zoom * 10) / 10}px`,
   );
+}
+
+function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<Column> {
+  const previous: Partial<Column> = {};
+  for (const key of Object.keys(changed) as Array<keyof Column>) {
+    Reflect.set(previous, key, column[key]);
+  }
+  return previous;
 }
 
 export const DEFAULT_THEME: Theme = {
@@ -180,6 +193,7 @@ export class GridImpl implements Grid {
   private readonly sizer: HTMLDivElement;
   private readonly renderer: Renderer;
   private readonly editor: EditController;
+  private readonly validationEditor: ValidationEditor;
   private readonly input: InputController;
   private readonly ariaMirror: AriaMirror;
   private readonly searchController: SearchController;
@@ -233,6 +247,7 @@ export class GridImpl implements Grid {
     "active-sheet": new Set(),
     "renderer-fallback": new Set(),
     "datasource-error": new Set(),
+    "mutation-rejected": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -281,8 +296,11 @@ export class GridImpl implements Grid {
         storage: opts.datasourceStorage?.mode ?? "dense",
         chunkRows: opts.datasourceStorage?.chunkRows,
         cacheBytes: opts.datasourceStorage?.cacheBytes,
+        protectionResolver: opts.protectionResolver,
+        mutationPolicy: opts.mutationPolicy,
       });
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
+    this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
     this.ownsStore = ownsStore;
     const virtualTarget = padTarget(host, opts.minColumns);
     for (const sheet of workbook.sheets) {
@@ -420,6 +438,7 @@ export class GridImpl implements Grid {
       highlightCells: (ranges) => this.highlightCells(ranges),
       sheet: () => this.activeSheet,
     });
+    this.validationEditor = new ValidationEditor(this.viewportEl);
     this.input = new InputController({
       host,
       scroller: this.scroller,
@@ -501,7 +520,7 @@ export class GridImpl implements Grid {
       screenRect: (row, col, contentTop, scrollLeft) =>
         this.screenRect(row, col, contentTop, scrollLeft),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
-      isEditing: () => this.editor.isEditing,
+      isEditing: () => this.editor.isEditing || this.validationEditor.isEditing,
       fillTarget: () => this.input.fillPreview,
       fillHandleScreen: (contentTop, scrollLeft) =>
         this.input.fillHandleScreen(contentTop, scrollLeft),
@@ -521,6 +540,9 @@ export class GridImpl implements Grid {
       colCount: this.colIndices.length,
       readOnly: this.readOnly,
       focusCell: () => this.selection.focusCell,
+      noteAt: (row, col) =>
+        this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
+      selection: () => this.selection.toSelection(this.activeSheet),
     });
 
     if (this.tabBarHeight > 0) this.buildTabBar();
@@ -1230,10 +1252,16 @@ export class GridImpl implements Grid {
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
-    if (!this.editor.isEditing) return;
-    const cell = this.editor.editingCell;
-    if (!cell) return;
-    this.editor.position(this.screenRect(cell.row, cell.col, contentTop, scrollLeft));
+    const editorCell = this.editor.editingCell;
+    if (editorCell) {
+      this.editor.position(this.screenRect(editorCell.row, editorCell.col, contentTop, scrollLeft));
+    }
+    const validationCell = this.validationEditor.editingCell;
+    if (validationCell) {
+      this.validationEditor.position(
+        this.screenRect(validationCell.row, validationCell.col, contentTop, scrollLeft),
+      );
+    }
   }
 
   // ── editing ──────────────────────────────────────────────────────────────--
@@ -1263,6 +1291,34 @@ export class GridImpl implements Grid {
       fn({ addr: { sheet: this.activeSheet, row: editCell.row, col: editCell.col } });
     }
 
+    const validationRule = sheet.validationRules?.find(
+      (rule) =>
+        rule.range.sheet === dataAddr.sheet &&
+        dataAddr.row >= Math.min(rule.range.start.row, rule.range.end.row) &&
+        dataAddr.row <= Math.max(rule.range.start.row, rule.range.end.row) &&
+        dataAddr.col >= Math.min(rule.range.start.col, rule.range.end.col) &&
+        dataAddr.col <= Math.max(rule.range.start.col, rule.range.end.col) &&
+        (rule.condition.kind === "list" || rule.condition.kind === "checkbox"),
+    );
+    if (initial === undefined && validationRule) {
+      this.editor.cancel();
+      this.validationEditor.begin({
+        row: editCell.row,
+        col: editCell.col,
+        rule: validationRule,
+        current,
+        rect: this.screenRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
+        theme: this.theme,
+        onCommit: (value, navigate) =>
+          this.commitCellEdit(editCell.row, editCell.col, { kind: "literal", value }, navigate),
+        onCancel: () => {
+          this.host.focus();
+          this.scheduleRender();
+        },
+      });
+      return;
+    }
+    this.validationEditor.cancel(false);
     this.editor.begin({
       row: editCell.row,
       col: editCell.col,
@@ -1281,13 +1337,14 @@ export class GridImpl implements Grid {
 
   private commitEdit(row: number, col: number, raw: string, navigate: EditNavigate): void {
     const column = this.sheet().columns[col];
-    const value = parseCellInput(raw, column?.type ?? "text");
-    const dataRow = this.toDataRow(row);
+    this.commitCellEdit(row, col, parseCellInput(raw, column?.type ?? "text"), navigate);
+  }
 
-    // Enter commits "down", Tab commits sideways, blur commits "none".
+  private commitCellEdit(row: number, col: number, value: CellValue, navigate: EditNavigate): void {
+    const dataRow = this.toDataRow(row);
     const reason: CommitReason =
       navigate === "down" ? "edit-enter" : navigate === "none" ? "edit-blur" : "edit-tab";
-    this.commit(
+    const outcome = this.commit(
       [
         {
           op: "set",
@@ -1298,25 +1355,29 @@ export class GridImpl implements Grid {
       reason,
     );
 
-    for (const fn of this.listeners["edit-commit"]) {
-      fn({ addr: { sheet: this.activeSheet, row, col }, value });
+    if (outcome.status === "applied") {
+      for (const fn of this.listeners["edit-commit"]) {
+        fn({ addr: { sheet: this.activeSheet, row, col }, value });
+      }
+      this.moveAfterCommit(row, col, navigate);
     }
-
     this.host.focus();
-    this.moveAfterCommit(row, col, navigate);
     this.scheduleRender();
   }
 
-  private commit(patches: Patch[], reason: CommitReason): void {
-    if (this.readOnly) return;
-    if (patches.length === 0) return;
-    patches = this.materializeVirtualColumns(patches);
-    if (patches.some((patch) => this.loadable?.canApplyLocally(patch) === false)) return;
-
-    if (this.applyingHistory) {
-      this.storeApply(patches, reason);
-      return;
+  private commit(patches: Patch[], reason: CommitReason): ApplyTransactionResult {
+    if (this.readOnly) {
+      return { status: "noop", epoch: this.storeEpoch, reason: "read-only" };
     }
+    if (patches.length === 0) {
+      return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    }
+    patches = this.materializeVirtualColumns(patches);
+    if (patches.some((patch) => this.loadable?.canApplyLocally(patch) === false)) {
+      return { status: "noop", epoch: this.storeEpoch, reason: "incomplete-data" };
+    }
+
+    if (this.applyingHistory) return this.storeApply(patches, reason);
 
     const inverseByPatch = new Map<Patch, Array<Patch | HistoryPart>>();
     for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
@@ -1328,7 +1389,15 @@ export class GridImpl implements Grid {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
       }
-      return;
+      if (outcome.status === "rejected") {
+        for (const fn of this.listeners["mutation-rejected"]) fn({ issues: outcome.issues });
+      }
+      return outcome;
+    }
+    if (outcome.rejections?.length) {
+      for (const fn of this.listeners["mutation-rejected"]) {
+        fn({ issues: outcome.rejections });
+      }
     }
     const applied = outcome.transaction.patches;
     const appliedSet = new Set(applied);
@@ -1346,6 +1415,7 @@ export class GridImpl implements Grid {
     }
     for (const patch of applied) this.rebaseHistoryFor(patch);
     this.history.push(inverse, applied);
+    return outcome;
   }
 
   /** Thread the reason when the store is ours; injected stores stay 1-arg. */
@@ -1456,7 +1526,14 @@ export class GridImpl implements Grid {
         const sheet = this.sheetById(patch.sheet);
         const column = sheet?.columns[patch.col];
         return column
-          ? [{ op: "setColumn", sheet: patch.sheet, col: patch.col, patch: { ...column } }]
+          ? [
+              {
+                op: "setColumn",
+                sheet: patch.sheet,
+                col: patch.col,
+                patch: previousColumnPatch(column, patch.patch),
+              },
+            ]
           : [];
       }
       case "setRowMeta": {
@@ -1524,7 +1601,71 @@ export class GridImpl implements Grid {
                 patch.patch.rowGroups === undefined
                   ? undefined
                   : (sheet.rowGroups?.map((group) => ({ ...group })) ?? []),
+              sortKeys:
+                patch.patch.sortKeys === undefined
+                  ? undefined
+                  : (sheet.sortKeys?.map((key) => ({ ...key })) ?? []),
+              filters:
+                patch.patch.filters === undefined
+                  ? undefined
+                  : (sheet.filters?.map(([col, filter]) => [col, structuredClone(filter)]) ?? []),
             },
+          },
+        ];
+      }
+      case "setValidationRule": {
+        const previous = this.sheetById(patch.sheet)?.validationRules?.find(
+          (rule) => rule.id === patch.rule.id,
+        );
+        return previous
+          ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
+          : [{ op: "removeValidationRule", sheet: patch.sheet, id: patch.rule.id }];
+      }
+      case "removeValidationRule": {
+        const previous = this.sheetById(patch.sheet)?.validationRules?.find(
+          (rule) => rule.id === patch.id,
+        );
+        return previous
+          ? [{ op: "setValidationRule", sheet: patch.sheet, rule: structuredClone(previous) }]
+          : [];
+      }
+      case "setProtectedRange": {
+        const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
+          (range) => range.id === patch.protectedRange.id,
+        );
+        return previous
+          ? [
+              {
+                op: "setProtectedRange",
+                sheet: patch.sheet,
+                protectedRange: structuredClone(previous),
+              },
+            ]
+          : [{ op: "removeProtectedRange", sheet: patch.sheet, id: patch.protectedRange.id }];
+      }
+      case "removeProtectedRange": {
+        const previous = this.sheetById(patch.sheet)?.protectedRanges?.find(
+          (range) => range.id === patch.id,
+        );
+        return previous
+          ? [
+              {
+                op: "setProtectedRange",
+                sheet: patch.sheet,
+                protectedRange: structuredClone(previous),
+              },
+            ]
+          : [];
+      }
+      case "setNote": {
+        const previous = this.sheetById(patch.addr.sheet)?.notes?.find(
+          (note) => note.addr.row === patch.addr.row && note.addr.col === patch.addr.col,
+        );
+        return [
+          {
+            op: "setNote",
+            addr: { ...patch.addr },
+            text: previous?.text ?? null,
           },
         ];
       }
@@ -1704,6 +1845,11 @@ export class GridImpl implements Grid {
       rowMeta,
       merges: sheet.merges?.map((candidate) => ({ ...candidate })),
       conditionalFormats: sheet.conditionalFormats?.map((rule) => ({ ...rule })),
+      validationRules: structuredClone(sheet.validationRules),
+      protectedRanges: structuredClone(sheet.protectedRanges),
+      notes: structuredClone(sheet.notes),
+      sortKeys: structuredClone(sheet.sortKeys),
+      filters: structuredClone(sheet.filters),
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
       cells:
         cells.length === 0
@@ -1847,6 +1993,7 @@ export class GridImpl implements Grid {
   }
 
   private emitSelection(): void {
+    this.ariaMirror.bumpVersion();
     const sel = this.getSelection();
     for (const fn of this.listeners.selection) fn({ selection: sel });
   }
@@ -2074,6 +2221,7 @@ export class GridImpl implements Grid {
     for (const controller of this.loadControllers) controller.abort();
     this.loadControllers.clear();
     this.editor.cancel();
+    this.validationEditor.cancel();
     this.activeSheet = id;
     this.activeSheetCache = null;
     const sheet = this.sheet();
@@ -2194,7 +2342,10 @@ export class GridImpl implements Grid {
     if (readOnly === this.readOnly) return;
 
     this.readOnly = readOnly;
-    if (readOnly) this.editor.cancel();
+    if (readOnly) {
+      this.editor.cancel();
+      this.validationEditor.cancel();
+    }
     if (readOnly) this.host.setAttribute("aria-readonly", "true");
     else this.host.removeAttribute("aria-readonly");
 
@@ -2253,8 +2404,8 @@ export class GridImpl implements Grid {
     this.render();
   }
 
-  applyTransaction(transaction: GridTransaction): void {
-    this.commit(transaction.patches.slice(), "api");
+  applyTransaction(transaction: GridTransaction): ApplyTransactionResult {
+    return this.commit(transaction.patches.slice(), "api");
   }
 
   exportSnapshot(): WorkbookSnapshot {
@@ -2441,6 +2592,50 @@ export class GridImpl implements Grid {
     );
   }
 
+  setValidationRule(rule: DataValidationRule): ApplyTransactionResult {
+    return this.commit(
+      [{ op: "setValidationRule", sheet: this.activeSheet, rule: structuredClone(rule) }],
+      "api",
+    );
+  }
+
+  removeValidationRule(id: string): ApplyTransactionResult {
+    return this.commit([{ op: "removeValidationRule", sheet: this.activeSheet, id }], "api");
+  }
+
+  setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult {
+    return this.commit(
+      [
+        {
+          op: "setProtectedRange",
+          sheet: this.activeSheet,
+          protectedRange: structuredClone(protectedRange),
+        },
+      ],
+      "api",
+    );
+  }
+
+  removeProtectedRange(id: string): ApplyTransactionResult {
+    return this.commit([{ op: "removeProtectedRange", sheet: this.activeSheet, id }], "api");
+  }
+
+  setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void {
+    this.store.setProtectionResolver?.(resolver, mode);
+  }
+
+  setNote(addr: CellAddress, text: string | null): ApplyTransactionResult {
+    return this.commit([{ op: "setNote", addr: { ...addr }, text: text || null }], "api");
+  }
+
+  getNote(addr: CellAddress): string | null {
+    return (
+      this.sheetById(addr.sheet)?.notes?.find(
+        (note) => note.addr.row === addr.row && note.addr.col === addr.col,
+      )?.text ?? null
+    );
+  }
+
   private makeBlankColumns(at: number, count: number): Column[] {
     const used = new Set(this.sheet().columns.map((column) => column.key));
     const columns: Column[] = [];
@@ -2546,6 +2741,29 @@ export class GridImpl implements Grid {
         const f = this.selection.focusCell;
         if (f) this.removeColumns(f.col);
       },
+      hideRows: (rows) => {
+        const focus = this.selection.focusCell;
+        const targets = rows ?? (focus ? [this.toDataRow(focus.row)] : []);
+        this.hideRows(targets);
+      },
+      showRows: (rows) => this.showRows(rows),
+      autoFitRows: () => {
+        const focus = this.selection.focusCell;
+        if (!focus) return;
+        const row = this.toDataRow(focus.row);
+        this.autoFitRows({
+          sheet: this.activeSheet,
+          start: { row, col: 0 },
+          end: { row, col: Math.max(0, this.sheet().columns.length - 1) },
+        });
+      },
+      hideColumns: (cols) => this.hideColumns(cols),
+      showColumns: (cols) => this.showColumns(cols),
+      autoFitColumns: (cols) => this.autoFitColumns(cols),
+      clearFilter: (col) => {
+        const target = col ?? this.selection.focusCell?.col;
+        if (target !== undefined) this.setColumnFilter(target, null);
+      },
       copy: () => this.clipboard.copy(),
       cut: () => this.clipboard.cut(),
       paste: () => this.clipboard.paste(),
@@ -2572,32 +2790,65 @@ export class GridImpl implements Grid {
   }
 
   sortBy(col: number, ascending = true): void {
-    this.loadable?.sortBy(this.activeSheet, col, ascending);
-    this.applyView();
+    void this.setSort([{ col, ascending }]);
   }
 
   filterBy(col: number, needle: string): void {
-    this.loadable?.filterBy(this.activeSheet, col, needle);
-    this.applyView();
+    this.setColumnFilter(col, { kind: "contains", text: needle });
   }
 
   clearView(): void {
-    this.loadable?.clearView(this.activeSheet);
-    this.applyView();
+    const outcome = this.commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: this.activeSheet,
+          patch: { sortKeys: [], filters: [] },
+        },
+      ],
+      "structure",
+    );
+    if (outcome.status === "applied") this.applyView();
   }
 
   sortByMulti(keys: readonly SortKey[]): void {
-    this.loadable?.sortByMulti(this.activeSheet, keys);
-    this.applyView();
+    void this.setSort(keys);
+  }
+
+  setSort(keys: readonly SortKey[]): ApplyTransactionResult {
+    const outcome = this.commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: this.activeSheet,
+          patch: { sortKeys: keys.map((key) => ({ ...key })) },
+        },
+      ],
+      "structure",
+    );
+    if (outcome.status === "applied") this.applyView();
+    return outcome;
   }
 
   setColumnFilter(col: number, filter: ColumnFilter | null): void {
-    this.loadable?.setColumnFilter(this.activeSheet, col, filter);
-    this.applyView();
+    const filters = new Map(this.sheet().filters ?? []);
+    if (filter === null) filters.delete(col);
+    else filters.set(col, structuredClone(filter));
+    const outcome = this.commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: this.activeSheet,
+          patch: { filters: [...filters] },
+        },
+      ],
+      "structure",
+    );
+    if (outcome.status === "applied") this.applyView();
   }
 
   getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
-    return this.loadable?.columnFilters(this.activeSheet) ?? new Map();
+    return new Map(this.sheet().filters ?? this.loadable?.columnFilters(this.activeSheet) ?? []);
   }
 
   distinctValues(col: number, limit = 1000): CellScalar[] {
@@ -2639,6 +2890,43 @@ export class GridImpl implements Grid {
 
   hiddenRows(): readonly number[] {
     return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
+  }
+
+  hideColumns(cols?: readonly number[]): void {
+    const sheet = this.sheet();
+    const targets = cols ?? (this.selection.focusCell ? [this.selection.focusCell.col] : []);
+    const unique = [...new Set(targets)]
+      .filter(
+        (col) => col >= 0 && col < sheet.columns.length && sheet.columns[col]?.visible !== false,
+      )
+      .sort((left, right) => left - right);
+    let visibleCount = sheet.columns.reduce(
+      (count, column) => count + (column.visible === false ? 0 : 1),
+      0,
+    );
+    const patches: Patch[] = [];
+    for (const col of unique) {
+      if (visibleCount <= 1) break;
+      patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: false } });
+      visibleCount--;
+    }
+    this.commit(patches, "structure");
+  }
+
+  showColumns(cols?: readonly number[]): void {
+    const sheet = this.sheet();
+    const targets =
+      cols ?? sheet.columns.flatMap((column, col) => (column.visible === false ? [col] : []));
+    const patches: Patch[] = [];
+    for (const col of new Set(targets)) {
+      if (col < 0 || col >= sheet.columns.length || sheet.columns[col]?.visible !== false) continue;
+      patches.push({ op: "setColumn", sheet: this.activeSheet, col, patch: { visible: true } });
+    }
+    this.commit(patches, "structure");
+  }
+
+  hiddenColumns(): readonly number[] {
+    return this.sheet().columns.flatMap((column, col) => (column.visible === false ? [col] : []));
   }
 
   groupRows(start: number, end: number): void {
@@ -2754,6 +3042,7 @@ export class GridImpl implements Grid {
     this.loadControllers.clear();
     if (this.frame) (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
     this.editor.destroy();
+    this.validationEditor.destroy();
     this.input.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.scroller.removeEventListener("contextmenu", this.onContextMenu);

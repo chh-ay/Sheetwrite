@@ -1,6 +1,6 @@
 import { colToA1 } from "./a1.js";
 import type { CellRef } from "./selection.js";
-import type { VisibleWindowView } from "./types.js";
+import type { Selection, VisibleWindowView } from "./types.js";
 
 let ariaSeq = 0;
 
@@ -13,6 +13,8 @@ export interface AriaMirrorDeps {
   colCount: number;
   readOnly: boolean;
   focusCell: () => CellRef | null;
+  noteAt: (row: number, col: number) => string | null;
+  selection: () => Selection | null;
 }
 
 /**
@@ -23,6 +25,8 @@ export class AriaMirror {
   private readonly host: HTMLElement;
   private readonly aria: HTMLDivElement;
   private readonly focusCell: () => CellRef | null;
+  private readonly noteAt: (row: number, col: number) => string | null;
+  private readonly selection: () => Selection | null;
   private key = "";
   private version = 0;
 
@@ -42,6 +46,8 @@ export class AriaMirror {
   constructor(deps: AriaMirrorDeps) {
     this.host = deps.host;
     this.focusCell = deps.focusCell;
+    this.noteAt = deps.noteAt;
+    this.selection = deps.selection;
 
     const aria = document.createElement("div");
     aria.className = "sheetwrite-aria";
@@ -112,6 +118,9 @@ export class AriaMirror {
     nCols: number,
   ): void {
     const frag = document.createDocumentFragment();
+    const selection = this.selection();
+    const selectedColumn = selection?.kind === "column" ? selection.col : null;
+    const selectedRow = selection?.kind === "row" ? selection.row : null;
 
     this.headerCells = [];
     this.rowEls = [];
@@ -123,6 +132,7 @@ export class AriaMirror {
     for (let cj = 0; cj < nCols; cj++) {
       const cell = document.createElement("div");
       cell.setAttribute("role", "columnheader");
+      if (selectedColumn === view.cols[cj]) cell.setAttribute("aria-selected", "true");
       cell.setAttribute("aria-colindex", String(cj + 1));
       cell.textContent = colToA1(view.cols[cj]!);
       headRow.appendChild(cell);
@@ -133,6 +143,7 @@ export class AriaMirror {
     for (let ri = 0; ri < nRows; ri++) {
       const row = view.rows.start + ri;
       const rowEl = document.createElement("div");
+      if (selectedRow === row) rowEl.setAttribute("aria-selected", "true");
       rowEl.setAttribute("role", "row");
       rowEl.setAttribute("aria-rowindex", String(row + 2));
       for (let cj = 0; cj < nCols; cj++) {
@@ -143,6 +154,8 @@ export class AriaMirror {
         cell.id = `${this.aria.id}-${row}-${col}`;
         const v = view.values[ri * nCols + cj] ?? null;
         if (v !== null) cell.textContent = String(v);
+        const note = this.noteAt(row, col);
+        if (note) cell.setAttribute("aria-description", `Note: ${note}`);
         if (focus && focus.row === row && focus.col === col) {
           cell.setAttribute("aria-selected", "true");
         }
@@ -167,12 +180,22 @@ export class AriaMirror {
     nRows: number,
     nCols: number,
   ): void {
+    const selection = this.selection();
+    const selectedColumn = selection?.kind === "column" ? selection.col : null;
+    const selectedRow = selection?.kind === "row" ? selection.row : null;
     for (let cj = 0; cj < nCols; cj++) {
+      if (selectedColumn === view.cols[cj]) {
+        this.headerCells[cj]!.setAttribute("aria-selected", "true");
+      } else {
+        this.headerCells[cj]!.removeAttribute("aria-selected");
+      }
       this.headerCells[cj]!.textContent = colToA1(view.cols[cj]!);
     }
 
     for (let ri = 0; ri < nRows; ri++) {
       const row = view.rows.start + ri;
+      if (selectedRow === row) this.rowEls[ri]!.setAttribute("aria-selected", "true");
+      else this.rowEls[ri]!.removeAttribute("aria-selected");
       this.rowEls[ri]!.setAttribute("aria-rowindex", String(row + 2));
       for (let cj = 0; cj < nCols; cj++) {
         const col = view.cols[cj]!;
@@ -180,6 +203,9 @@ export class AriaMirror {
         cell.id = `${this.aria.id}-${row}-${col}`;
         const v = view.values[ri * nCols + cj] ?? null;
         cell.textContent = v !== null ? String(v) : "";
+        const note = this.noteAt(row, col);
+        if (note) cell.setAttribute("aria-description", `Note: ${note}`);
+        else cell.removeAttribute("aria-description");
         if (focus && focus.row === row && focus.col === col) {
           cell.setAttribute("aria-selected", "true");
         } else if (cell.hasAttribute("aria-selected")) {

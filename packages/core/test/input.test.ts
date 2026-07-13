@@ -112,6 +112,7 @@ function makeGrid(): {
   store: SheetwriteStore;
   workbook: Workbook;
   scroller: HTMLDivElement;
+  host: HTMLDivElement;
   capture: CaptureLog;
 } {
   const workbook = makeWorkbook(10);
@@ -120,7 +121,7 @@ function makeGrid(): {
   const grid = new GridImpl(host, { workbook }, store);
   const scroller = scrollerOf(host);
   const capture = stubCapture(scroller);
-  return { grid, store, workbook, scroller, capture };
+  return { grid, store, workbook, host, scroller, capture };
 }
 
 describe("pointer input: mouse parity", () => {
@@ -243,5 +244,92 @@ describe("pointer input: drag lifecycle", () => {
     if (sel?.kind === "range") {
       expect(sel.range).toMatchObject({ start: { row: 0, col: 0 }, end: { row: 1, col: 1 } });
     }
+  });
+});
+describe("validation through input mutation paths", () => {
+  it("rejects invalid external paste at the shared commit boundary", async () => {
+    const { grid, store } = makeGrid();
+    grid.setValidationRule({
+      id: "small-amount",
+      range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } },
+      condition: { kind: "number", max: 5 },
+      policy: "reject",
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    const before = store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved;
+    const rejected: string[] = [];
+    grid.on("mutation-rejected", ({ issues }) =>
+      rejected.push(...issues.map((issue) => issue.kind)),
+    );
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText: () => Promise.resolve("99") },
+    });
+
+    await expect(grid.actions.paste()).resolves.toBe("done");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(before);
+    expect(rejected).toEqual(["validation"]);
+    grid.destroy();
+  });
+
+  it("rejects an invalid fill without changing any target cell", () => {
+    const { grid, store, scroller, workbook } = makeGrid();
+    grid.setValidationRule({
+      id: "fill-choice",
+      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      condition: { kind: "list", values: [999] },
+      policy: "reject",
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    const before = [
+      store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved,
+      store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved,
+    ];
+
+    scroller.dispatchEvent(pointer("pointerdown", { ...fillHandlePoint(0, 1, workbook) }));
+    scroller.dispatchEvent(pointer("pointermove", { ...cellPoint(2, 1, workbook) }));
+    scroller.dispatchEvent(pointer("pointerup", { ...cellPoint(2, 1, workbook) }));
+
+    expect([
+      store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved,
+      store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved,
+    ]).toEqual(before);
+    grid.destroy();
+  });
+});
+
+describe("keyboard whole-axis selection", () => {
+  it("selects the focused column with Ctrl+Space", () => {
+    const { grid, host } = makeGrid();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 1 } });
+
+    const event = new KeyboardEvent("keydown", {
+      key: " ",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    host.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(grid.getSelection()).toEqual({ kind: "column", sheet: "s1", col: 1 });
+    grid.destroy();
+  });
+
+  it("selects the focused row with Shift+Space", () => {
+    const { grid, host } = makeGrid();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 1 } });
+
+    const event = new KeyboardEvent("keydown", {
+      key: " ",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    host.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(grid.getSelection()).toEqual({ kind: "row", sheet: "s1", row: 3 });
+    grid.destroy();
   });
 });

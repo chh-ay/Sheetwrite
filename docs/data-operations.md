@@ -192,9 +192,12 @@ files should also enforce a compressed input-byte limit before calling import.
 | Frozen panes and active worksheet | Not round-tripped | Preserved |
 | Named ranges | Not represented | Preserved |
 | Sheetwrite conditional formats and row groups | Not represented | Preserved in Sheetwrite metadata; warning reports that no Excel rule/outline is emitted |
-| Boolean literals | Imported by the table reader | Imported as `TRUE` / `FALSE` text with a structured warning until boolean `CellScalar` support lands |
+| Boolean literals | Imported by the table reader | Preserved as native booleans |
 | Rich text and hyperlinks | Reader-dependent flattening | Display text preserved with a structured warning |
-| Excel validation, protection, notes, images, tables, auto-filters, conditional formatting, and VBA | Not represented | Dropped with a structured `unsupported-feature` warning when detected |
+| Sheetwrite validation rules | Not represented | Preserved in Sheetwrite metadata; supported list/numeric/date/text-length rules also emit native Excel validation |
+| Protected ranges | Not represented | Preserved in Sheetwrite metadata; no Excel sheet-protection claim is made |
+| Cell notes | Not represented | Preserved in Sheetwrite metadata and emitted as native Excel notes |
+| External Excel validation, protection, notes, images, tables, auto-filters, conditional formatting, and VBA | Not represented | Features without Sheetwrite metadata are dropped with a structured `unsupported-feature` warning when detected |
 
 Workbook formulas are imported as formula source, not as cached results.
 Hydrating the returned snapshot with `SheetwriteStore.fromSnapshot` recompiles

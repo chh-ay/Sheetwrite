@@ -663,7 +663,7 @@ function paintCell(
         ? "TRUE"
         : "FALSE"
       : numeric
-        ? formatNumber(value, column?.numberFormat)
+        ? formatNumber(value, column?.numberFormat, column?.numberLocale)
         : value;
   const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
   if (numeric) {

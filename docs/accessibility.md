@@ -36,7 +36,9 @@ with a unique id (`sheetwrite-grid-<n>`) and `role="rowgroup"`. It contains:
   true row position (data row + 2, leaving index 1 for the letter header). Its
   cells are `role="gridcell"` with a 1-based `aria-colindex`, a stable id
   (`<gridId>-<row>-<col>`), and the cell's value as text.
-- The focused cell additionally carries `aria-selected="true"`, and its id is
+- Every visible cell covered by the current cell/range/multi selection carries
+  `aria-selected="true"`. A row selection marks its visible row; a column
+  selection marks both its header and visible cells. The focused cell's id is
   mirrored into the host's `aria-activedescendant`.
 
 Sketch of the emitted structure:
@@ -60,9 +62,11 @@ Sketch of the emitted structure:
 </div>
 ```
 
-As the keyboard moves the focus, `aria-selected` and the host's
-`aria-activedescendant` update to the new cell, and scrolling rebuilds the mirror
-for the new window.
+As keyboard or pointer input changes the selection, `aria-selected` and the
+host's `aria-activedescendant` update. Scrolling rebuilds the visible mirror.
+A focused cell note is connected through `aria-describedby` to hidden plain text.
+Validation list and checkbox editors use real `listbox` / `option` and `checkbox`
+semantics, with the rule help text as their accessible label.
 
 ## Limitation: the mirror reflects the visible window
 

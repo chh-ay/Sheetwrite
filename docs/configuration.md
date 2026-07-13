@@ -21,17 +21,18 @@ createGrid(host: HTMLElement, opts: GridOptions): Grid
 | `workerUrl` | `string \| URL` | `undefined` | Bundler-resolved worker entry for `renderer: "worker"`, e.g. `new URL("@sheetwrite/core/worker", import.meta.url)`. |
 | `theme` | `Partial<Theme>` | `undefined` | Overrides merged over `DEFAULT_THEME` and any `--sheetwrite-*` CSS vars. See [Styling](./styling.md). |
 | `readOnly` | `boolean` | `false` | When `true`, all mutating interactions (edit, clear, fill, paste, restyle) are disabled and the host gets `aria-readonly="true"`. |
+| `protectionResolver` | `ProtectionResolver` | `undefined` | Host callback for protected local mutations; no resolver means deny. Client-side UX policy only, never server authorization. |
+| `mutationPolicy` | `"atomic" \| "partial"` | `"atomic"` | Reject the whole local transaction on a denied protected operation, or apply allowed operations and report denied ones. |
 | `renderers` | `Record<string, CellRenderer>` | `{}` | Custom cell renderers registered up front; reference one by name via `Column.renderer`. Also see `defineCellRenderer`. |
 | `overscan` | `number` | `6` | Rows rendered above and below the viewport to absorb fast scrolls. |
 | `minColumns` | `number` | workbook width | Minimum rendered/store column count, including empty spreadsheet padding columns. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar (see below). Omit for no toolbar. |
 
-### Framework adapter update policy
-
 Framework adapters classify every `GridOptions` field centrally. `workbook`,
-`data`, and `datasource` create an `input-reset`; `renderer`, `workerUrl`, and
-`renderers` create a `renderer-reset`. `theme`, `readOnly`, `config`, `overscan`,
-and `minColumns` update the existing grid live. Readiness includes the resulting
+`data`, `datasource`, `datasourceStorage`, `protectionResolver`, and
+`mutationPolicy` create an `input-reset`; `renderer`, `workerUrl`, and `renderers`
+create a `renderer-reset`. `theme`, `readOnly`, `config`, `overscan`, and
+`minColumns` update the existing grid live. Readiness includes the resulting
 generation and reset reason.
 
 ### Datasource pages
@@ -164,6 +165,9 @@ interface Grid {
   hideRows(rows: readonly number[]): void;
   showRows(rows?: readonly number[]): void;
   hiddenRows(): readonly number[];
+  hideColumns(cols?: readonly number[]): void;
+  showColumns(cols?: readonly number[]): void;
+  hiddenColumns(): readonly number[];
   groupRows(start: number, end: number): void;
   ungroupRows(start: number, end: number): void;
   setGroupCollapsed(start: number, collapsed: boolean): void;
@@ -185,10 +189,19 @@ interface Grid {
   removeColumns(at: number, count?: number): void;
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
   styleRange(range: Range, style: Partial<CellStyle> | null): void;
+  setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
+  removeValidationRule(id: string): ApplyTransactionResult;
+  setProtectedRange(range: ProtectedRange): ApplyTransactionResult;
+  removeProtectedRange(id: string): ApplyTransactionResult;
+  setProtectionResolver(resolver?: ProtectionResolver, mode?: MutationPolicyMode): void;
+  setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
+  getNote(addr: CellAddress): string | null;
   beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void;
   dataEdge(row: number, col: number, dRow: number, dCol: number): number | null;
   setRowHeight(row: number, height: number): void;
   setColumnWidth(col: number, width: number): void;
+  autoFitRows(range?: Range): void;
+  autoFitColumns(cols?: readonly number[]): void;
   setFrozen(rows: number, cols?: number): void;
   setZoom(zoom: number): void;
   getZoom(): number;
@@ -212,6 +225,7 @@ interface Grid {
 | `filterBy` / `setColumnFilter` / `getColumnFilters` | Column filters that compose with sort, hidden rows, and row groups. |
 | `distinctValues(col, limit?)` | First-seen distinct values for building filter menus. |
 | `hideRows` / `showRows` / `hiddenRows` | Explicit row visibility separate from sort/filter state. |
+| `hideColumns` / `showColumns` / `hiddenColumns` | Bulk-safe persisted column visibility; omitted arguments target the focused column for hide and every column for show. |
 | `groupRows` / `ungroupRows` / `setGroupCollapsed` / `rowGroups` | Inclusive data-row groups with collapse state. |
 | `clearView()` | Clears sort/filter state; hidden rows and row groups remain. |
 | `setFrozen(rows, cols?)` | Pin leading view rows/columns while the body scrolls. |
@@ -225,9 +239,13 @@ interface Grid {
 | `insertRows` / `removeRows` / `insertColumns` / `removeColumns` | Structural edits through undoable patches. |
 | `highlightCells(ranges, color?)` | Highlight arbitrary ranges (`null` clears); `color` overrides the theme highlight. |
 | `styleRange(range, style)` | Merge or clear store-backed cell styles across a range. |
+| `setValidationRule` / `removeValidationRule` | Add, replace, or remove a serializable range validation rule. List and checkbox rules get accessible editors. |
+| `setProtectedRange` / `removeProtectedRange` / `setProtectionResolver` | Define protected-range metadata and host-owned local permission policy. This is not server authorization. |
+| `setNote` / `getNote` | Set, clear, or read a serializable plain-text cell note. |
 | `beginEdit(row, col, initial?, selectAll?)` | Open the inline editor at a view cell. |
 | `dataEdge(row, col, dRow, dCol)` | Ctrl+Arrow-style data-run jump target; vertical movement is view-aware under sort/filter. |
 | `setRowHeight(row, h)` / `setColumnWidth(col, w)` | Geometry APIs; row height is view-indexed and persists against the underlying data row. |
+| `autoFitRows(range?)` / `autoFitColumns(cols?)` | Explicit, undoable geometry fitting from bulk reads; auto-fit never runs during paint. |
 | `on(evt, fn)` | Subscribe to an event; returns an unsubscribe function. |
 | `refresh()` | Force a re-render (e.g. after mutating the workbook directly). |
 | `destroy()` | Tear down listeners, DOM, and ARIA attributes. |

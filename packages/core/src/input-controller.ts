@@ -392,7 +392,8 @@ export class InputController {
     for (let i = 0; i < values.length; i++) {
       const value = values[i] ?? null;
       if (value === null) texts.push("");
-      else if (typeof value === "number") texts.push(formatNumber(value, column.numberFormat));
+      else if (typeof value === "number")
+        texts.push(formatNumber(value, column.numberFormat, column.numberLocale));
       else if (typeof value === "boolean") texts.push(value ? "TRUE" : "FALSE");
       else texts.push(value);
     }
@@ -478,6 +479,20 @@ export class InputController {
 
     const selection = this.deps.selection();
     const focus = selection.focusCell;
+    if (focus && key === " " && mod) {
+      selection.selectColumn(focus.col);
+      this.deps.emitSelection();
+      this.deps.scheduleRender();
+      e.preventDefault();
+      return;
+    }
+    if (focus && key === " " && e.shiftKey) {
+      selection.selectRow(focus.row);
+      this.deps.emitSelection();
+      this.deps.scheduleRender();
+      e.preventDefault();
+      return;
+    }
     const sheet = this.deps.sheet();
     const theme = this.deps.theme();
     const pageRows = Math.max(

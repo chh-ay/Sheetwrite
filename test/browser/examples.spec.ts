@@ -186,6 +186,79 @@ test("vue paged datasource keeps one million rows allocation-lazy", async ({ pag
   expect((await stats())!.allocatedBytes).toBeLessThanOrEqual(32 * 1024 * 1024);
 });
 
+test("validation dropdown and checkbox editors are keyboard and ARIA operable", async ({
+  page,
+}) => {
+  await page.goto(urlOf("vue"));
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 0, col: 0 }).resolved,
+      ),
+    )
+    .not.toBe("#LOADING!");
+
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueGrid;
+    if (!grid) throw new Error("Vue grid is unavailable");
+    grid.setValidationRule({
+      id: "browser-list",
+      range: { sheet: "orders", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      condition: { kind: "list", values: [1, 2, 3] },
+      policy: "reject",
+      helpText: "Choose an order ID",
+    });
+    (
+      grid as Grid & {
+        beginEdit(row: number, col: number): void;
+      }
+    ).beginEdit(0, 0);
+  });
+
+  const list = page.getByRole("listbox", { name: "Choose an order ID" });
+  await expect(list).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 0, col: 0 }).resolved,
+      ),
+    )
+    .toBe(2);
+
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueGrid;
+    if (!grid) throw new Error("Vue grid is unavailable");
+    grid.setValidationRule({
+      id: "browser-checkbox",
+      range: { sheet: "orders", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
+      condition: { kind: "checkbox", checkedValue: true, uncheckedValue: false },
+      policy: "reject",
+    });
+    (
+      grid as Grid & {
+        beginEdit(row: number, col: number): void;
+      }
+    ).beginEdit(1, 0);
+  });
+
+  const checkbox = page.getByRole("checkbox", { name: "Toggle checkbox" });
+  await expect(checkbox).toBeVisible();
+  await page.keyboard.press(" ");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 1, col: 0 }).resolved,
+      ),
+    )
+    .toBe(true);
+});
+
 test("vue sync demo queues, retries, and acknowledges a stable mutation", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(urlOf("vue"));

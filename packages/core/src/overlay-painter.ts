@@ -112,6 +112,7 @@ export class OverlayPainter {
     const sheet = this.deps.sheet();
     this.cursor = 0;
     this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paintNotes(sheet, contentTop, scrollLeft, clientW, clientH);
 
     const selection = this.deps.selection();
     if (!selection.isEmpty) {
@@ -358,6 +359,33 @@ export class OverlayPainter {
     }
   }
 
+  private paintNotes(
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    for (const note of sheet.notes ?? []) {
+      const row = this.deps.toViewRow(note.addr.row);
+      if (row === null) continue;
+      const rect = this.deps.screenRect(row, note.addr.col, contentTop, scrollLeft);
+      if (rect.x + rect.w <= 0 || rect.y + rect.h <= 0 || rect.x >= clientW || rect.y >= clientH) {
+        continue;
+      }
+      const size = Math.min(8, rect.w, rect.h);
+      const indicator = this.acquireRect(
+        rect.x + rect.w - size,
+        rect.y,
+        size,
+        size,
+        "#f59e0b",
+        "transparent",
+      );
+      indicator.style.clipPath = "polygon(0 0, 100% 0, 100% 100%)";
+    }
+  }
+
   private readonly appendSelectionRect = (rect: SelRect): void => {
     const theme = this.paintTheme;
     const sheet = this.paintSheet;
@@ -514,6 +542,7 @@ export class OverlayPainter {
     }
     this.cursor++;
 
+    el.style.clipPath = "";
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
     el.style.width = `${Math.max(0, width)}px`;

@@ -22,11 +22,16 @@ import type {
   CommitReason,
   ConditionalFormatRule,
   DataCell,
+  DataValidationRule,
   MergeRange,
+  MutationIssue,
+  MutationPolicyMode,
   NamedRangeSnapshot,
   PackedCellBlock,
   PagedStoreStats,
   Patch,
+  ProtectedRange,
+  ProtectionResolver,
   QueryCapability,
   Range,
   ResolvedCell,
@@ -198,6 +203,8 @@ export interface SheetwriteStoreOptions {
   storage?: "dense" | "paged";
   chunkRows?: number;
   cacheBytes?: number;
+  protectionResolver?: ProtectionResolver;
+  mutationPolicy?: MutationPolicyMode;
 }
 
 export class IncompleteDataError extends Error {
@@ -279,6 +286,8 @@ export class SheetwriteStore implements Store {
   private readonly formulaSrc = new Map<string, string>();
   private readonly stringCache = new Map<number, string>();
   private readonly condRulesSynced = new Map<SheetId, string>();
+  private protectionResolver: ProtectionResolver | undefined;
+  private mutationPolicy: MutationPolicyMode;
 
   private documentId?: string;
   private documentVersion?: number;
@@ -291,6 +300,8 @@ export class SheetwriteStore implements Store {
     }
     this.workbook = workbook;
     this.storageOptions = options;
+    this.protectionResolver = options.protectionResolver;
+    this.mutationPolicy = options.mutationPolicy ?? "atomic";
     this.wasm = new CellStore() as RecomputingCellStore;
     for (const sheet of workbook.sheets) {
       const handle = this.allocateSheet(sheet.columns.length, sheet.rowCount);
@@ -304,6 +315,14 @@ export class SheetwriteStore implements Store {
       }
     }
     if (data) this.loadColumnar(workbook.activeSheet, data);
+  }
+
+  setProtectionResolver(
+    resolver: ProtectionResolver | undefined,
+    mode: MutationPolicyMode = this.mutationPolicy,
+  ): void {
+    this.protectionResolver = resolver;
+    this.mutationPolicy = mode;
   }
 
   private handleOf(sheet: SheetId): number {
@@ -394,20 +413,14 @@ export class SheetwriteStore implements Store {
   }
 
   canApplyLocally(patch: Patch): boolean {
-    const sheet =
-      patch.op === "set"
-        ? patch.addr.sheet
-        : patch.op === "setRange" ||
-            patch.op === "setBlock" ||
-            patch.op === "setRangeStyle" ||
-            patch.op === "clearRange"
-          ? patch.range.sheet
-          : patch.op === "setNamedRange" || patch.op === "removeNamedRange"
-            ? null
-            : patch.op === "addSheet"
-              ? patch.sheet.id
-              : patch.sheet;
+    const sheet = patchSheetId(patch);
     if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;
+    if (
+      patch.op === "setSheetMeta" &&
+      ((patch.patch.sortKeys?.length ?? 0) > 0 || (patch.patch.filters?.length ?? 0) > 0)
+    ) {
+      return this.queryCapability(sheet).status === "complete";
+    }
     if (patch.op === "setRangeStyle" || patch.op === "clearRange") {
       return this.isRangeFullyLoaded(patch.range);
     }
@@ -452,6 +465,11 @@ export class SheetwriteStore implements Store {
           hiddenRows: hiddenRows.size > 0 ? hiddenRows : undefined,
           merges: cloneJsonValue(source.merges),
           conditionalFormats: cloneJsonValue(source.conditionalFormats),
+          validationRules: cloneJsonValue(source.validationRules),
+          protectedRanges: cloneJsonValue(source.protectedRanges),
+          notes: cloneJsonValue(source.notes),
+          sortKeys: cloneJsonValue(source.sortKeys),
+          filters: cloneJsonValue(source.filters),
           rowGroups: cloneJsonValue(source.rowGroups),
         };
       }),
@@ -973,11 +991,18 @@ export class SheetwriteStore implements Store {
    */
   sortByMulti(sheet: SheetId, keys: readonly SortKey[]): void {
     if (keys.length > 0) this.requireCompleteQuery(sheet);
-    this.ensureViewState(sheet).sortKeys = keys.map((k) => ({
-      col: k.col,
-      ascending: k.ascending,
-    }));
-    this.recomputeView(sheet);
+    void this.applyTransaction(
+      {
+        patches: [
+          {
+            op: "setSheetMeta",
+            sheet,
+            patch: { sortKeys: keys.map((key) => ({ ...key })) },
+          },
+        ],
+      },
+      "structure",
+    );
   }
 
   /**
@@ -986,13 +1011,24 @@ export class SheetwriteStore implements Store {
    */
   setColumnFilter(sheet: SheetId, col: number, filter: ColumnFilter | null): void {
     if (filter !== null) this.requireCompleteQuery(sheet);
+    const filters = new Map(this.sheetMeta(sheet).filters ?? []);
     if (filter === null) {
-      const state = this.viewState.get(sheet);
-      if (!state?.filters.delete(col)) return;
+      if (!filters.delete(col)) return;
     } else {
-      this.ensureViewState(sheet).filters.set(col, filter);
+      filters.set(col, cloneJsonValue(filter));
     }
-    this.recomputeView(sheet);
+    void this.applyTransaction(
+      {
+        patches: [
+          {
+            op: "setSheetMeta",
+            sheet,
+            patch: { filters: [...filters] },
+          },
+        ],
+      },
+      "structure",
+    );
   }
 
   /** Substring "contains" filter on one column; compat shim over the filter path. */
@@ -1294,8 +1330,8 @@ export class SheetwriteStore implements Store {
     if (!state) {
       const meta = this.sheetMeta(sheet);
       state = {
-        sortKeys: [],
-        filters: new Map(),
+        sortKeys: meta.sortKeys?.map((key) => ({ ...key })) ?? [],
+        filters: new Map(meta.filters?.map(([col, filter]) => [col, cloneJsonValue(filter)]) ?? []),
         hiddenRows: new Set(meta.hiddenRows ?? []),
         groups: meta.rowGroups?.map((group) => ({ ...group })) ?? [],
       };
@@ -1371,12 +1407,20 @@ export class SheetwriteStore implements Store {
    * recomputed so any surviving hidden rows / collapsed groups still apply.
    */
   clearView(sheet: SheetId): void {
-    const state = this.viewState.get(sheet);
-    if (state) {
-      state.sortKeys = [];
-      state.filters.clear();
-    }
-    this.recomputeView(sheet);
+    const meta = this.sheetMeta(sheet);
+    if ((meta.sortKeys?.length ?? 0) === 0 && (meta.filters?.length ?? 0) === 0) return;
+    void this.applyTransaction(
+      {
+        patches: [
+          {
+            op: "setSheetMeta",
+            sheet,
+            patch: { sortKeys: [], filters: [] },
+          },
+        ],
+      },
+      "structure",
+    );
   }
 
   viewRowCount(sheet: SheetId): number {
@@ -1394,6 +1438,323 @@ export class SheetwriteStore implements Store {
     const additions = columns.slice(meta.columns.length);
     this.wasm.insertCols(this.handleOf(sheet), meta.columns.length, additions.length);
     meta.columns.push(...additions);
+  }
+
+  private evaluateLocalPolicy(
+    patches: readonly Patch[],
+    commitReason: CommitReason,
+  ): {
+    patches: Patch[];
+    warnings: MutationIssue[];
+    rejections: MutationIssue[];
+  } {
+    const allowed: Patch[] = [];
+    const warnings: MutationIssue[] = [];
+    const rejections: MutationIssue[] = [];
+    const rulesBySheet = new Map<SheetId, DataValidationRule[]>();
+    const protectionsBySheet = new Map<SheetId, ProtectedRange[]>();
+
+    const rulesFor = (sheet: SheetId): DataValidationRule[] => {
+      let rules = rulesBySheet.get(sheet);
+      if (!rules) {
+        rules = [
+          ...(this.workbook.sheets.find((item) => item.id === sheet)?.validationRules ?? []),
+        ];
+        rulesBySheet.set(sheet, rules);
+      }
+      return rules;
+    };
+    const protectionsFor = (sheet: SheetId): ProtectedRange[] => {
+      let ranges = protectionsBySheet.get(sheet);
+      if (!ranges) {
+        ranges = [
+          ...(this.workbook.sheets.find((item) => item.id === sheet)?.protectedRanges ?? []),
+        ];
+        protectionsBySheet.set(sheet, ranges);
+      }
+      return ranges;
+    };
+
+    for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
+      const patch = patches[operationIndex]!;
+      const patchIssues: MutationIssue[] = [];
+      const sheetId = patchSheetId(patch);
+      if (sheetId) {
+        patchIssues.push(
+          ...this.protectionIssues(patch, operationIndex, commitReason, protectionsFor(sheetId)),
+          ...this.validationIssues(patch, operationIndex, rulesFor(sheetId)),
+        );
+      }
+      warnings.push(...patchIssues.filter((issue) => issue.severity === "warning"));
+      const errors = patchIssues.filter((issue) => issue.severity === "error");
+      if (errors.length > 0) {
+        rejections.push(...errors);
+        continue;
+      }
+
+      allowed.push(patch);
+      if (patch.op === "setValidationRule") {
+        const rules = rulesFor(patch.sheet);
+        const index = rules.findIndex((rule) => rule.id === patch.rule.id);
+        if (index < 0) rules.push(patch.rule);
+        else rules[index] = patch.rule;
+      } else if (patch.op === "removeValidationRule") {
+        rulesBySheet.set(
+          patch.sheet,
+          rulesFor(patch.sheet).filter((rule) => rule.id !== patch.id),
+        );
+      } else if (patch.op === "setProtectedRange") {
+        const ranges = protectionsFor(patch.sheet);
+        const index = ranges.findIndex((range) => range.id === patch.protectedRange.id);
+        if (index < 0) ranges.push(patch.protectedRange);
+        else ranges[index] = patch.protectedRange;
+      } else if (patch.op === "removeProtectedRange") {
+        protectionsBySheet.set(
+          patch.sheet,
+          protectionsFor(patch.sheet).filter((range) => range.id !== patch.id),
+        );
+      }
+    }
+
+    return {
+      patches: this.mutationPolicy === "atomic" && rejections.length > 0 ? [] : allowed,
+      warnings,
+      rejections,
+    };
+  }
+
+  private protectionIssues(
+    patch: Patch,
+    operationIndex: number,
+    commitReason: CommitReason,
+    protectedRanges: readonly ProtectedRange[],
+  ): MutationIssue[] {
+    if (protectedRanges.length === 0) return [];
+    const affected = this.affectedRanges(patch);
+    if (affected.length === 0) return [];
+
+    const issues: MutationIssue[] = [];
+    const seen = new Set<string>();
+    for (const protectedRange of protectedRanges) {
+      if (
+        seen.has(protectedRange.id) ||
+        !affected.some((range) => rangesIntersect(range, protectedRange.range))
+      ) {
+        continue;
+      }
+      seen.add(protectedRange.id);
+      let allowed = false;
+      try {
+        allowed =
+          this.protectionResolver?.({
+            protectedRange,
+            operation: patch,
+            commitReason,
+          }) === "allow";
+      } catch {
+        allowed = false;
+      }
+      if (!allowed) {
+        issues.push({
+          kind: "protection",
+          severity: "error",
+          protectedRangeId: protectedRange.id,
+          range: normalizedRange(protectedRange.range),
+          operationIndex,
+          message: protectedRange.label
+            ? `Protected range "${protectedRange.label}" denied this mutation`
+            : `Protected range "${protectedRange.id}" denied this mutation`,
+        });
+      }
+    }
+    return issues;
+  }
+
+  private affectedRanges(patch: Patch): Range[] {
+    if (patch.op === "set") return [cellRange(patch.addr)];
+    if (
+      patch.op === "setRange" ||
+      patch.op === "setBlock" ||
+      patch.op === "setRangeStyle" ||
+      patch.op === "clearRange"
+    ) {
+      return [normalizedRange(patch.range)];
+    }
+    if (patch.op === "setNote") return [cellRange(patch.addr)];
+    if (patch.op === "addMerge" || patch.op === "removeMerge") {
+      return [
+        {
+          sheet: patch.sheet,
+          start: { row: patch.merge.r0, col: patch.merge.c0 },
+          end: { row: patch.merge.r1, col: patch.merge.c1 },
+        },
+      ];
+    }
+    if (patch.op === "setValidationRule") return [normalizedRange(patch.rule.range)];
+
+    const sheetId = patchSheetId(patch);
+    const sheet = sheetId
+      ? this.workbook.sheets.find((candidate) => candidate.id === sheetId)
+      : undefined;
+    if (!sheet || sheet.rowCount === 0 || sheet.columns.length === 0) return [];
+    if (patch.op === "setColumn") {
+      return [
+        {
+          sheet: patch.sheet,
+          start: { row: 0, col: patch.col },
+          end: { row: sheet.rowCount - 1, col: patch.col },
+        },
+      ];
+    }
+    if (patch.op === "setRowMeta") {
+      return [
+        {
+          sheet: patch.sheet,
+          start: { row: patch.row, col: 0 },
+          end: { row: patch.row, col: sheet.columns.length - 1 },
+        },
+      ];
+    }
+    if (
+      patch.op === "addRows" ||
+      patch.op === "removeRows" ||
+      patch.op === "moveRows" ||
+      patch.op === "addColumns" ||
+      patch.op === "removeColumns" ||
+      patch.op === "moveColumns" ||
+      patch.op === "removeSheet" ||
+      patch.op === "renameSheet" ||
+      patch.op === "moveSheet"
+    ) {
+      return [fullSheetRange(sheet)];
+    }
+    return [];
+  }
+
+  private validationIssues(
+    patch: Patch,
+    operationIndex: number,
+    rules: readonly DataValidationRule[],
+  ): MutationIssue[] {
+    if (rules.length === 0) return [];
+    const issues: MutationIssue[] = [];
+
+    if (patch.op === "set" && patch.value.kind === "literal") {
+      for (const rule of rules) {
+        if (
+          rule.policy === "allow" ||
+          !rangeContains(rule.range, patch.addr) ||
+          validationAccepts(rule, patch.value.value)
+        ) {
+          continue;
+        }
+        issues.push({
+          kind: "validation",
+          severity: rule.policy === "warn" ? "warning" : "error",
+          ruleId: rule.id,
+          addr: patch.addr,
+          value: patch.value,
+          operationIndex,
+          message: rule.helpText ?? validationMessage(rule),
+        });
+      }
+      return issues;
+    }
+
+    if (patch.op === "setRange") {
+      const range = normalizedRange(patch.range);
+      for (const cell of patch.cells) {
+        if (cell.value.kind !== "literal") continue;
+        const addr = {
+          sheet: range.sheet,
+          row: range.start.row + cell.rowOffset,
+          col: range.start.col + cell.colOffset,
+        };
+        for (const rule of rules) {
+          if (
+            rule.policy === "allow" ||
+            !rangeContains(rule.range, addr) ||
+            validationAccepts(rule, cell.value.value)
+          ) {
+            continue;
+          }
+          issues.push({
+            kind: "validation",
+            severity: rule.policy === "warn" ? "warning" : "error",
+            ruleId: rule.id,
+            addr,
+            value: cell.value,
+            operationIndex,
+            message: rule.helpText ?? validationMessage(rule),
+          });
+        }
+      }
+      return issues;
+    }
+
+    if (patch.op === "clearRange") {
+      const range = normalizedRange(patch.range);
+      for (const rule of rules) {
+        const ruleRange = normalizedRange(rule.range);
+        if (
+          rule.policy === "allow" ||
+          !rangesIntersect(range, ruleRange) ||
+          validationAccepts(rule, null)
+        ) {
+          continue;
+        }
+        const addr = {
+          sheet: range.sheet,
+          row: Math.max(range.start.row, ruleRange.start.row),
+          col: Math.max(range.start.col, ruleRange.start.col),
+        };
+        issues.push({
+          kind: "validation",
+          severity: rule.policy === "warn" ? "warning" : "error",
+          ruleId: rule.id,
+          addr,
+          value: { kind: "literal", value: null },
+          operationIndex,
+          message: rule.helpText ?? validationMessage(rule),
+        });
+      }
+      return issues;
+    }
+
+    if (patch.op !== "setBlock") return issues;
+    const range = normalizedRange(patch.range);
+    const formulaOffsets = new Set((patch.block.formulas ?? []).map(([offset]) => offset));
+    const refOffsets = new Set((patch.block.refs ?? []).map(([offset]) => offset));
+    for (const rule of rules) {
+      if (rule.policy === "allow" || rule.range.sheet !== range.sheet) continue;
+      const ruleRange = normalizedRange(rule.range);
+      const rowStart = Math.max(range.start.row, ruleRange.start.row);
+      const rowEnd = Math.min(range.end.row, ruleRange.end.row);
+      const colStart = Math.max(range.start.col, ruleRange.start.col);
+      const colEnd = Math.min(range.end.col, ruleRange.end.col);
+      if (rowStart > rowEnd || colStart > colEnd) continue;
+
+      for (let row = rowStart; row <= rowEnd; row++) {
+        const rowOffset = (row - range.start.row) * patch.block.colCount;
+        for (let col = colStart; col <= colEnd; col++) {
+          const offset = rowOffset + col - range.start.col;
+          if (formulaOffsets.has(offset) || refOffsets.has(offset)) continue;
+          const scalar = patch.block.values[offset] ?? null;
+          if (validationAccepts(rule, scalar)) continue;
+          const value: CellValue = { kind: "literal", value: scalar };
+          issues.push({
+            kind: "validation",
+            severity: rule.policy === "warn" ? "warning" : "error",
+            ruleId: rule.id,
+            addr: { sheet: range.sheet, row, col },
+            value,
+            operationIndex,
+            message: rule.helpText ?? validationMessage(rule),
+          });
+        }
+      }
+    }
+    return issues;
   }
 
   /**
@@ -1417,6 +1778,20 @@ export class SheetwriteStore implements Store {
     if (source === "local" && tx.patches.some((patch) => !this.canApplyLocally(patch))) {
       return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
     }
+    let effectiveTx = tx;
+    let policyWarnings: MutationIssue[] = [];
+    let policyRejections: MutationIssue[] = [];
+    if (source === "local") {
+      const policy = this.evaluateLocalPolicy(tx.patches, commitReason);
+      policyWarnings = policy.warnings;
+      policyRejections = policy.rejections;
+      if (policy.rejections.length > 0 && policy.patches.length === 0) {
+        return { status: "rejected", epoch: this.epoch, issues: policy.rejections };
+      }
+      if (policy.patches.length !== tx.patches.length) {
+        effectiveTx = { ...tx, patches: policy.patches };
+      }
+    }
 
     const hasListeners = this.listeners.size > 0;
     const changes: ChangeEvent["changes"] | null = hasListeners ? [] : null;
@@ -1426,11 +1801,11 @@ export class SheetwriteStore implements Store {
 
     if (source === "remote") this.wasm.beginPageLoad();
     try {
-      for (const patch of tx.patches) {
+      for (const patch of effectiveTx.patches) {
         if (!this.applyPatch(patch, changes)) continue;
         appliedPatches.push(patch);
 
-        if (patch.op === "set") touchedSheets.add(patch.addr.sheet);
+        if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
         else if (
           patch.op === "setRange" ||
           patch.op === "setBlock" ||
@@ -1467,7 +1842,7 @@ export class SheetwriteStore implements Store {
       return {
         status: "noop",
         epoch: this.epoch,
-        reason: tx.patches.length === 0 ? "empty" : "out-of-bounds",
+        reason: effectiveTx.patches.length === 0 ? "empty" : "out-of-bounds",
       };
     }
 
@@ -1489,10 +1864,18 @@ export class SheetwriteStore implements Store {
     this.epoch += 1;
 
     const transaction =
-      appliedPatches.length === tx.patches.length ? tx : { ...tx, patches: appliedPatches };
+      appliedPatches.length === effectiveTx.patches.length
+        ? effectiveTx
+        : { ...effectiveTx, patches: appliedPatches };
 
     if (!hasListeners) {
-      return { status: "applied", epoch: this.epoch, transaction };
+      return {
+        status: "applied",
+        epoch: this.epoch,
+        transaction,
+        ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
+        ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
+      };
     }
 
     const event: ChangeEvent = {
@@ -1504,7 +1887,13 @@ export class SheetwriteStore implements Store {
       epoch: this.epoch,
     };
     for (const fn of this.listeners) fn(event);
-    return { status: "applied", epoch: this.epoch, transaction };
+    return {
+      status: "applied",
+      epoch: this.epoch,
+      transaction,
+      ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
+      ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
+    };
   }
 
   private applyPatch(patch: Patch, changes: ChangeEvent["changes"] | null): boolean {
@@ -1856,6 +2245,79 @@ export class SheetwriteStore implements Store {
         this.recomputeView(patch.sheet);
         return true;
       }
+      case "setValidationRule": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const rule = {
+          ...patch.rule,
+          range: normalizedRange(patch.rule.range),
+          condition: cloneJsonValue(patch.rule.condition),
+        };
+        if (!validValidationRules(sheet, [rule]) || rule.range.sheet !== patch.sheet) return false;
+        const rules = sheet.validationRules ?? [];
+        const index = rules.findIndex((existing) => existing.id === rule.id);
+        if (index < 0) sheet.validationRules = [...rules, rule];
+        else {
+          const next = [...rules];
+          next[index] = rule;
+          sheet.validationRules = next;
+        }
+        return true;
+      }
+      case "removeValidationRule": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const rules = sheet.validationRules ?? [];
+        if (!rules.some((rule) => rule.id === patch.id)) return false;
+        sheet.validationRules = rules.filter((rule) => rule.id !== patch.id);
+        return true;
+      }
+      case "setProtectedRange": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const protectedRange = {
+          ...patch.protectedRange,
+          range: normalizedRange(patch.protectedRange.range),
+        };
+        if (
+          protectedRange.range.sheet !== patch.sheet ||
+          !validProtectedRanges(sheet, [protectedRange])
+        ) {
+          return false;
+        }
+        const ranges = sheet.protectedRanges ?? [];
+        const index = ranges.findIndex((existing) => existing.id === protectedRange.id);
+        if (index < 0) sheet.protectedRanges = [...ranges, protectedRange];
+        else {
+          const next = [...ranges];
+          next[index] = protectedRange;
+          sheet.protectedRanges = next;
+        }
+        return true;
+      }
+      case "removeProtectedRange": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const ranges = sheet.protectedRanges ?? [];
+        if (!ranges.some((range) => range.id === patch.id)) return false;
+        sheet.protectedRanges = ranges.filter((range) => range.id !== patch.id);
+        return true;
+      }
+      case "setNote": {
+        if (!this.isCellInBounds(patch.addr)) return false;
+        const sheet = this.sheetMeta(patch.addr.sheet);
+        const notes = sheet.notes ?? [];
+        const index = notes.findIndex(
+          (note) => note.addr.row === patch.addr.row && note.addr.col === patch.addr.col,
+        );
+        if (patch.text === null || patch.text.length === 0) {
+          if (index < 0) return false;
+          sheet.notes = [...notes.slice(0, index), ...notes.slice(index + 1)];
+        } else if (index < 0) {
+          sheet.notes = [...notes, { addr: { ...patch.addr }, text: patch.text }];
+        } else {
+          const next = [...notes];
+          next[index] = { addr: { ...patch.addr }, text: patch.text };
+          sheet.notes = next;
+        }
+        return true;
+      }
       case "addMerge": {
         const sheet = this.sheetMeta(patch.sheet);
         const merge = normalizeMerge(patch.merge);
@@ -1916,7 +2378,11 @@ export class SheetwriteStore implements Store {
               group.end >= sheet.rowCount,
           ) ||
           (patch.patch.conditionalFormats !== undefined &&
-            !validConditionalRules(sheet, patch.patch.conditionalFormats))
+            !validConditionalRules(sheet, patch.patch.conditionalFormats)) ||
+          (patch.patch.sortKeys !== undefined &&
+            !validSortAndFilters(sheet, patch.patch.sortKeys, patch.patch.filters ?? [])) ||
+          (patch.patch.filters !== undefined &&
+            !validSortAndFilters(sheet, patch.patch.sortKeys ?? [], patch.patch.filters))
         ) {
           return false;
         }
@@ -1931,6 +2397,21 @@ export class SheetwriteStore implements Store {
           sheet.rowGroups = patch.patch.rowGroups.map((group) => ({ ...group }));
           const state = this.ensureViewState(patch.sheet);
           state.groups = sheet.rowGroups.map((group) => ({ ...group }));
+          this.recomputeView(patch.sheet);
+        }
+        if (patch.patch.sortKeys !== undefined || patch.patch.filters !== undefined) {
+          const state = this.ensureViewState(patch.sheet);
+          if (patch.patch.sortKeys !== undefined) {
+            sheet.sortKeys = patch.patch.sortKeys.map((key) => ({ ...key }));
+            state.sortKeys = sheet.sortKeys.map((key) => ({ ...key }));
+          }
+          if (patch.patch.filters !== undefined) {
+            sheet.filters = patch.patch.filters.map(([col, filter]) => [
+              col,
+              cloneJsonValue(filter),
+            ]);
+            state.filters = new Map(sheet.filters);
+          }
           this.recomputeView(patch.sheet);
         }
         return true;
@@ -2027,6 +2508,9 @@ export class SheetwriteStore implements Store {
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter((namedRange) => namedRange.range.sheet === patch.sheet)
       .map((namedRange) => structuredClone(namedRange));
+    const movedValidationRules = cloneJsonValue(sheet.validationRules) ?? [];
+    const movedProtectedRanges = cloneJsonValue(sheet.protectedRanges) ?? [];
+    const movedNotes = cloneJsonValue(sheet.notes) ?? [];
     const cells = this.snapshotCells(
       patch.sheet,
       patch.from,
@@ -2070,6 +2554,17 @@ export class SheetwriteStore implements Store {
         );
       }
     }
+    const moveRow = (row: number) => moveIndex(row, patch.from, patch.count, patch.to);
+    sheet.validationRules = movedValidationRules
+      .map((rule) => rebaseRangeRows(rule, patch.sheet, moveRow))
+      .filter((rule): rule is DataValidationRule => rule !== null);
+    sheet.protectedRanges = movedProtectedRanges
+      .map((protectedRange) => rebaseRangeRows(protectedRange, patch.sheet, moveRow))
+      .filter((protectedRange): protectedRange is ProtectedRange => protectedRange !== null);
+    sheet.notes = movedNotes.map((note) => ({
+      ...note,
+      addr: { ...note.addr, row: moveRow(note.addr.row) },
+    }));
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.row, original.range.end.row, (row) =>
         moveIndex(row, patch.from, patch.count, patch.to),
@@ -2112,6 +2607,9 @@ export class SheetwriteStore implements Store {
     const movedNamedRanges = (this.workbook.namedRanges ?? [])
       .filter((namedRange) => namedRange.range.sheet === patch.sheet)
       .map((namedRange) => structuredClone(namedRange));
+    const movedValidationRules = cloneJsonValue(sheet.validationRules) ?? [];
+    const movedProtectedRanges = cloneJsonValue(sheet.protectedRanges) ?? [];
+    const movedNotes = cloneJsonValue(sheet.notes) ?? [];
     const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
     const cells = this.snapshotCells(
       patch.sheet,
@@ -2138,6 +2636,17 @@ export class SheetwriteStore implements Store {
         changes,
       );
     }
+    const moveCol = (col: number) => moveIndex(col, patch.from, patch.count, patch.to);
+    sheet.validationRules = movedValidationRules
+      .map((rule) => rebaseRangeCols(rule, patch.sheet, moveCol))
+      .filter((rule): rule is DataValidationRule => rule !== null);
+    sheet.protectedRanges = movedProtectedRanges
+      .map((protectedRange) => rebaseRangeCols(protectedRange, patch.sheet, moveCol))
+      .filter((protectedRange): protectedRange is ProtectedRange => protectedRange !== null);
+    sheet.notes = movedNotes.map((note) => ({
+      ...note,
+      addr: { ...note.addr, col: moveCol(note.addr.col) },
+    }));
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.col, original.range.end.col, (col) =>
         moveIndex(col, patch.from, patch.count, patch.to),
@@ -2188,6 +2697,11 @@ export class SheetwriteStore implements Store {
       frozenRows: snapshot.frozenRows,
       frozenCols: snapshot.frozenCols,
     };
+    candidate.validationRules = snapshot.validationRules;
+    candidate.protectedRanges = snapshot.protectedRanges;
+    candidate.notes = snapshot.notes;
+    candidate.sortKeys = snapshot.sortKeys;
+    candidate.filters = snapshot.filters;
     if (
       (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
       (snapshot.frozenCols !== undefined && snapshot.frozenCols > snapshot.columns.length) ||
@@ -2198,6 +2712,10 @@ export class SheetwriteStore implements Store {
         merges.slice(index + 1).some((other) => mergesOverlap(merge, other)),
       ) ||
       !validConditionalRules(candidate, snapshot.conditionalFormats ?? []) ||
+      !validValidationRules(candidate, snapshot.validationRules ?? []) ||
+      !validProtectedRanges(candidate, snapshot.protectedRanges ?? []) ||
+      !validNotes(candidate) ||
+      !validSortAndFilters(candidate, snapshot.sortKeys ?? [], snapshot.filters ?? []) ||
       (snapshot.rowMeta ?? []).some(
         ([row, meta]) =>
           !integerAt(row) ||
@@ -2242,6 +2760,11 @@ export class SheetwriteStore implements Store {
       frozenCols: snapshot.frozenCols,
       merges,
       conditionalFormats: snapshot.conditionalFormats?.map((rule) => ({ ...rule })),
+      validationRules: cloneJsonValue(snapshot.validationRules),
+      protectedRanges: cloneJsonValue(snapshot.protectedRanges),
+      notes: cloneJsonValue(snapshot.notes),
+      sortKeys: cloneJsonValue(snapshot.sortKeys),
+      filters: cloneJsonValue(snapshot.filters),
       rowGroups: snapshot.rowGroups?.map((group) => ({ ...group })),
       rowHeights: new Map(),
       hiddenRows: new Set(),
@@ -2357,6 +2880,19 @@ export class SheetwriteStore implements Store {
           : null;
       })
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    meta.validationRules = meta.validationRules
+      ?.map((rule) => rebaseRangeRows(rule, sheet, remap))
+      .filter((rule): rule is DataValidationRule => rule !== null);
+    meta.protectedRanges = meta.protectedRanges
+      ?.map((protectedRange) => rebaseRangeRows(protectedRange, sheet, remap))
+      .filter((protectedRange): protectedRange is ProtectedRange => protectedRange !== null);
+    meta.notes = meta.notes
+      ?.map((note) => {
+        if (note.addr.sheet !== sheet) return note;
+        const row = remap(note.addr.row);
+        return row === null ? null : { ...note, addr: { ...note.addr, row } };
+      })
+      .filter((note): note is NonNullable<Sheet["notes"]>[number] => note !== null);
     if (meta.frozenRows) {
       const boundary = remapSpan(0, meta.frozenRows - 1, remap);
       meta.frozenRows = boundary ? boundary[1] + 1 : 0;
@@ -2441,6 +2977,19 @@ export class SheetwriteStore implements Store {
           : null;
       })
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    meta.validationRules = meta.validationRules
+      ?.map((rule) => rebaseRangeCols(rule, sheet, remap))
+      .filter((rule): rule is DataValidationRule => rule !== null);
+    meta.protectedRanges = meta.protectedRanges
+      ?.map((protectedRange) => rebaseRangeCols(protectedRange, sheet, remap))
+      .filter((protectedRange): protectedRange is ProtectedRange => protectedRange !== null);
+    meta.notes = meta.notes
+      ?.map((note) => {
+        if (note.addr.sheet !== sheet) return note;
+        const col = remap(note.addr.col);
+        return col === null ? null : { ...note, addr: { ...note.addr, col } };
+      })
+      .filter((note): note is NonNullable<Sheet["notes"]>[number] => note !== null);
     if (meta.frozenCols) {
       const boundary = remapSpan(0, meta.frozenCols - 1, remap);
       meta.frozenCols = boundary ? boundary[1] + 1 : 0;
@@ -2479,6 +3028,9 @@ export class SheetwriteStore implements Store {
     if (state) {
       state.sortKeys = [];
       state.filters.clear();
+      const meta = this.sheetMeta(sheet);
+      meta.sortKeys = [];
+      meta.filters = [];
       if (state.hiddenRows.size > 0) {
         const next = new Set<number>();
         for (const row of state.hiddenRows) {
@@ -2510,6 +3062,9 @@ export class SheetwriteStore implements Store {
     if (state) {
       state.sortKeys = [];
       state.filters.clear();
+      const meta = this.sheetMeta(sheet);
+      meta.sortKeys = [];
+      meta.filters = [];
     }
     this.recomputeView(sheet);
   }
@@ -2707,6 +3262,15 @@ export class SheetwriteStore implements Store {
         ...(sheet.conditionalFormats?.length
           ? { conditionalFormats: cloneJsonValue(sheet.conditionalFormats) }
           : {}),
+        ...(sheet.validationRules?.length
+          ? { validationRules: cloneJsonValue(sheet.validationRules) }
+          : {}),
+        ...(sheet.protectedRanges?.length
+          ? { protectedRanges: cloneJsonValue(sheet.protectedRanges) }
+          : {}),
+        ...(sheet.notes?.length ? { notes: cloneJsonValue(sheet.notes) } : {}),
+        ...(sheet.sortKeys?.length ? { sortKeys: cloneJsonValue(sheet.sortKeys) } : {}),
+        ...(sheet.filters?.length ? { filters: cloneJsonValue(sheet.filters) } : {}),
         ...(sheet.rowGroups?.length ? { rowGroups: cloneJsonValue(sheet.rowGroups) } : {}),
         cells:
           cells.length > 0
@@ -3091,6 +3655,259 @@ function validConditionalRules(sheet: Sheet, rules: readonly ConditionalFormatRu
       range.end.col < sheet.columns.length
     );
   });
+}
+
+function validValidationRules(sheet: Sheet, rules: readonly DataValidationRule[]): boolean {
+  const ids = new Set<string>();
+  for (const rule of rules) {
+    if (!rule.id || ids.has(rule.id) || rule.range.sheet !== sheet.id) return false;
+    ids.add(rule.id);
+    const range = normalizedRange(rule.range);
+    if (
+      !integerAt(range.start.row) ||
+      !integerAt(range.start.col) ||
+      range.end.row >= sheet.rowCount ||
+      range.end.col >= sheet.columns.length ||
+      !["reject", "warn", "allow"].includes(rule.policy)
+    ) {
+      return false;
+    }
+    const condition = rule.condition;
+    if (condition.kind === "list") {
+      if (!Array.isArray(condition.values) || condition.values.length === 0) return false;
+    } else if (condition.kind === "number" || condition.kind === "date") {
+      if (
+        (condition.min !== undefined && !Number.isFinite(condition.min)) ||
+        (condition.max !== undefined && !Number.isFinite(condition.max)) ||
+        (condition.min !== undefined &&
+          condition.max !== undefined &&
+          condition.min > condition.max)
+      ) {
+        return false;
+      }
+    } else if (condition.kind === "textLength") {
+      if (
+        (condition.min !== undefined && !integerAt(condition.min)) ||
+        (condition.max !== undefined && !integerAt(condition.max)) ||
+        (condition.min !== undefined &&
+          condition.max !== undefined &&
+          condition.min > condition.max)
+      ) {
+        return false;
+      }
+    } else if (condition.kind !== "checkbox") {
+      return false;
+    }
+  }
+  return true;
+}
+
+function validProtectedRanges(sheet: Sheet, ranges: readonly ProtectedRange[]): boolean {
+  const ids = new Set<string>();
+  for (const protectedRange of ranges) {
+    const range = normalizedRange(protectedRange.range);
+    if (
+      !protectedRange.id ||
+      ids.has(protectedRange.id) ||
+      range.sheet !== sheet.id ||
+      !integerAt(range.start.row) ||
+      !integerAt(range.start.col) ||
+      range.end.row >= sheet.rowCount ||
+      range.end.col >= sheet.columns.length
+    ) {
+      return false;
+    }
+    ids.add(protectedRange.id);
+  }
+  return true;
+}
+
+function validNotes(sheet: Sheet): boolean {
+  const addresses = new Set<string>();
+  for (const note of sheet.notes ?? []) {
+    const key = `${note.addr.row}:${note.addr.col}`;
+    if (
+      note.addr.sheet !== sheet.id ||
+      !integerAt(note.addr.row) ||
+      !integerAt(note.addr.col) ||
+      note.addr.row >= sheet.rowCount ||
+      note.addr.col >= sheet.columns.length ||
+      typeof note.text !== "string" ||
+      note.text.length === 0 ||
+      addresses.has(key)
+    ) {
+      return false;
+    }
+    addresses.add(key);
+  }
+  return true;
+}
+
+function validSortAndFilters(
+  sheet: Sheet,
+  sortKeys: readonly SortKey[],
+  filters: readonly [number, ColumnFilter][],
+): boolean {
+  const sorted = new Set<number>();
+  for (const key of sortKeys) {
+    if (!integerAt(key.col) || key.col >= sheet.columns.length || sorted.has(key.col)) return false;
+    sorted.add(key.col);
+  }
+  const filtered = new Set<number>();
+  for (const [col, filter] of filters) {
+    if (!integerAt(col) || col >= sheet.columns.length || filtered.has(col)) return false;
+    filtered.add(col);
+    if (
+      filter.kind === "values"
+        ? !Array.isArray(filter.values)
+        : filter.kind === "contains"
+          ? typeof filter.text !== "string"
+          : filter.kind === "compare"
+            ? !["gt", "gte", "lt", "lte", "eq", "neq"].includes(filter.op) ||
+              !Number.isFinite(filter.value)
+            : filter.kind !== "empty" && filter.kind !== "nonEmpty"
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function patchSheetId(patch: Patch): SheetId | null {
+  switch (patch.op) {
+    case "set":
+    case "setNote":
+      return patch.addr.sheet;
+    case "setRange":
+    case "setBlock":
+    case "setRangeStyle":
+    case "clearRange":
+      return patch.range.sheet;
+    case "setNamedRange":
+    case "removeNamedRange":
+      return null;
+    case "addSheet":
+      return patch.sheet.id;
+    default:
+      return patch.sheet;
+  }
+}
+
+function cellRange(addr: CellAddress): Range {
+  return {
+    sheet: addr.sheet,
+    start: { row: addr.row, col: addr.col },
+    end: { row: addr.row, col: addr.col },
+  };
+}
+
+function fullSheetRange(sheet: Sheet): Range {
+  return {
+    sheet: sheet.id,
+    start: { row: 0, col: 0 },
+    end: { row: sheet.rowCount - 1, col: sheet.columns.length - 1 },
+  };
+}
+
+function rangesIntersect(left: Range, right: Range): boolean {
+  if (left.sheet !== right.sheet) return false;
+  const a = normalizedRange(left);
+  const b = normalizedRange(right);
+  return (
+    a.start.row <= b.end.row &&
+    b.start.row <= a.end.row &&
+    a.start.col <= b.end.col &&
+    b.start.col <= a.end.col
+  );
+}
+
+function rangeContains(range: Range, addr: CellAddress): boolean {
+  if (range.sheet !== addr.sheet) return false;
+  const normalized = normalizedRange(range);
+  return (
+    addr.row >= normalized.start.row &&
+    addr.row <= normalized.end.row &&
+    addr.col >= normalized.start.col &&
+    addr.col <= normalized.end.col
+  );
+}
+
+function rebaseRangeRows<T extends { range: Range }>(
+  item: T,
+  sheet: SheetId,
+  remap: (row: number) => number | null,
+): T | null {
+  if (item.range.sheet !== sheet) return item;
+  const span = remapSpan(item.range.start.row, item.range.end.row, remap);
+  if (!span) return null;
+  return {
+    ...item,
+    range: {
+      ...item.range,
+      start: { ...item.range.start, row: span[0] },
+      end: { ...item.range.end, row: span[1] },
+    },
+  };
+}
+
+function rebaseRangeCols<T extends { range: Range }>(
+  item: T,
+  sheet: SheetId,
+  remap: (col: number) => number | null,
+): T | null {
+  if (item.range.sheet !== sheet) return item;
+  const span = remapSpan(item.range.start.col, item.range.end.col, remap);
+  if (!span) return null;
+  return {
+    ...item,
+    range: {
+      ...item.range,
+      start: { ...item.range.start, col: span[0] },
+      end: { ...item.range.end, col: span[1] },
+    },
+  };
+}
+
+function validationAccepts(rule: DataValidationRule, value: CellScalar): boolean {
+  if (value === null && (rule.allowBlank ?? true)) return true;
+  const condition = rule.condition;
+  if (condition.kind === "list") {
+    return (
+      condition.allowCustom === true || condition.values.some((item) => Object.is(item, value))
+    );
+  }
+  if (condition.kind === "checkbox") {
+    const checked = condition.checkedValue ?? true;
+    const unchecked = condition.uncheckedValue ?? false;
+    return Object.is(value, checked) || Object.is(value, unchecked);
+  }
+  if (condition.kind === "textLength") {
+    if (typeof value !== "string") return false;
+    return (
+      (condition.min === undefined || value.length >= condition.min) &&
+      (condition.max === undefined || value.length <= condition.max)
+    );
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  return (
+    (condition.min === undefined || value >= condition.min) &&
+    (condition.max === undefined || value <= condition.max)
+  );
+}
+
+function validationMessage(rule: DataValidationRule): string {
+  switch (rule.condition.kind) {
+    case "list":
+      return "Value must match one of the allowed options";
+    case "number":
+      return "Value must be within the allowed numeric range";
+    case "date":
+      return "Date must be within the allowed range";
+    case "textLength":
+      return "Text length is outside the allowed range";
+    case "checkbox":
+      return "Value must be a valid checkbox state";
+  }
 }
 
 function remapSpan(

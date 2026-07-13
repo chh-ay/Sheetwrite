@@ -19,10 +19,17 @@ const DEFAULT_ITEMS: ContextMenuItem[] = [
   { action: "insertRowAbove" },
   { action: "insertRowBelow" },
   { action: "deleteRow" },
+  { action: "hideRow" },
+  { action: "showAllRows" },
+  { action: "autoFitRow" },
   { action: "separator" },
   { action: "insertColumnLeft" },
   { action: "insertColumnRight" },
   { action: "deleteColumn" },
+  { action: "hideColumn" },
+  { action: "showAllColumns" },
+  { action: "autoFitColumn" },
+  { action: "clearFilter" },
   { action: "separator" },
   { action: "merge" },
   { action: "unmerge" },
@@ -38,9 +45,16 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   insertRowAbove: "Insert row above",
   insertRowBelow: "Insert row below",
   deleteRow: "Delete row",
+  hideRow: "Hide row",
+  showAllRows: "Show all rows",
+  autoFitRow: "Auto-fit row",
   insertColumnLeft: "Insert column left",
   insertColumnRight: "Insert column right",
   deleteColumn: "Delete column",
+  hideColumn: "Hide column",
+  showAllColumns: "Show all columns",
+  autoFitColumn: "Auto-fit column",
+  clearFilter: "Clear column filter",
   exportCsv: "Export CSV",
   exportXlsx: "Export XLSX",
 };
@@ -69,12 +83,26 @@ function actionHandler(
       return () => actions.insertRowBelow();
     case "deleteRow":
       return () => actions.deleteRow();
+    case "hideRow":
+      return () => actions.hideRows();
+    case "showAllRows":
+      return () => actions.showRows();
+    case "autoFitRow":
+      return () => actions.autoFitRows();
     case "insertColumnLeft":
       return () => actions.insertColumnLeft();
     case "insertColumnRight":
       return () => actions.insertColumnRight();
     case "deleteColumn":
       return () => actions.deleteColumn();
+    case "hideColumn":
+      return () => actions.hideColumns();
+    case "showAllColumns":
+      return () => actions.showColumns();
+    case "autoFitColumn":
+      return () => actions.autoFitColumns();
+    case "clearFilter":
+      return () => actions.clearFilter();
     case "exportCsv":
       return () => actions.exportCsv();
     case "exportXlsx":

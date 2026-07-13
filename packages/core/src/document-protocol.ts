@@ -2,6 +2,7 @@ import type {
   DocumentOp,
   MergeRange,
   NamedRangeSnapshot,
+  Range,
   SheetSnapshot,
   WorkbookSnapshot,
 } from "./types.js";
@@ -49,6 +50,18 @@ function normalizedMerge(merge: MergeRange): MergeRange {
 
 function overlaps(a: MergeRange, b: MergeRange): boolean {
   return a.r0 <= b.r1 && b.r0 <= a.r1 && a.c0 <= b.c1 && b.c0 <= a.c1;
+}
+
+function rangeInSheet(range: Range | undefined, sheet: SheetSnapshot): boolean {
+  if (!range || range.sheet !== sheet.id) return false;
+  const { start, end } = range;
+  return (
+    !!start &&
+    !!end &&
+    [start.row, start.col, end.row, end.col].every(integer) &&
+    Math.max(start.row, end.row) < sheet.rowCount &&
+    Math.max(start.col, end.col) < sheet.columns.length
+  );
 }
 
 function hasNonSerializable(value: unknown, seen = new Set<object>()): boolean {
@@ -270,9 +283,130 @@ export function validateWorkbookSnapshot(input: unknown): DocumentValidationResu
         });
       }
     }
+    for (const [field, value] of [
+      ["validationRules", sheet.validationRules],
+      ["protectedRanges", sheet.protectedRanges],
+      ["notes", sheet.notes],
+      ["sortKeys", sheet.sortKeys],
+      ["filters", sheet.filters],
+    ] as const) {
+      if (value !== undefined && !Array.isArray(value)) {
+        errors.push({
+          path: `${path}.${field}`,
+          code: "invalid-value",
+          message: `${field} must be an array`,
+        });
+      }
+    }
+    const validationIds = new Set<string>();
+    for (const rule of Array.isArray(sheet.validationRules) ? sheet.validationRules : []) {
+      const condition = rule?.condition;
+      const validCondition =
+        condition?.kind === "list"
+          ? Array.isArray(condition.values) && condition.values.length > 0
+          : condition?.kind === "number" || condition?.kind === "date"
+            ? (condition.min === undefined || Number.isFinite(condition.min)) &&
+              (condition.max === undefined || Number.isFinite(condition.max)) &&
+              (condition.min === undefined ||
+                condition.max === undefined ||
+                condition.min <= condition.max)
+            : condition?.kind === "textLength"
+              ? (condition.min === undefined || integer(condition.min)) &&
+                (condition.max === undefined || integer(condition.max)) &&
+                (condition.min === undefined ||
+                  condition.max === undefined ||
+                  condition.min <= condition.max)
+              : condition?.kind === "checkbox";
+      if (
+        !rule?.id ||
+        validationIds.has(rule.id) ||
+        !rangeInSheet(rule.range, sheet) ||
+        !["reject", "warn", "allow"].includes(rule.policy) ||
+        !validCondition
+      ) {
+        errors.push({
+          path: `${path}.validationRules`,
+          code: validationIds.has(rule?.id ?? "") ? "duplicate-id" : "invalid-value",
+          message: "Validation rules need a unique ID, in-bounds range, policy, and condition",
+        });
+      }
+      if (rule?.id) validationIds.add(rule.id);
+    }
+    const protectionIds = new Set<string>();
+    for (const protectedRange of Array.isArray(sheet.protectedRanges)
+      ? sheet.protectedRanges
+      : []) {
+      if (
+        !protectedRange?.id ||
+        protectionIds.has(protectedRange.id) ||
+        !rangeInSheet(protectedRange.range, sheet)
+      ) {
+        errors.push({
+          path: `${path}.protectedRanges`,
+          code: protectionIds.has(protectedRange?.id ?? "") ? "duplicate-id" : "invalid-value",
+          message: "Protected ranges need a unique ID and in-bounds range",
+        });
+      }
+      if (protectedRange?.id) protectionIds.add(protectedRange.id);
+    }
+    const noteAddresses = new Set<string>();
+    for (const note of Array.isArray(sheet.notes) ? sheet.notes : []) {
+      const key = `${note?.addr?.row}:${note?.addr?.col}`;
+      if (
+        !note?.addr ||
+        note.addr.sheet !== sheet.id ||
+        !integer(note.addr.row) ||
+        !integer(note.addr.col) ||
+        note.addr.row >= sheet.rowCount ||
+        note.addr.col >= sheet.columns.length ||
+        typeof note.text !== "string" ||
+        note.text.length === 0 ||
+        noteAddresses.has(key)
+      ) {
+        errors.push({
+          path: `${path}.notes`,
+          code: noteAddresses.has(key) ? "duplicate-id" : "invalid-value",
+          message: "Notes need a unique in-bounds address and non-empty text",
+        });
+      }
+      noteAddresses.add(key);
+    }
+    const sortCols = new Set<number>();
+    for (const key of Array.isArray(sheet.sortKeys) ? sheet.sortKeys : []) {
+      if (!integer(key?.col) || key.col >= sheet.columns.length || sortCols.has(key.col)) {
+        errors.push({
+          path: `${path}.sortKeys`,
+          code: sortCols.has(key?.col) ? "duplicate-id" : "out-of-bounds",
+          message: "Sort keys need unique in-bounds columns",
+        });
+      }
+      if (integer(key?.col)) sortCols.add(key.col);
+    }
+    const filterCols = new Set<number>();
+    for (const entry of Array.isArray(sheet.filters) ? sheet.filters : []) {
+      const col = Array.isArray(entry) ? entry[0] : -1;
+      if (!integer(col) || col >= sheet.columns.length || filterCols.has(col)) {
+        errors.push({
+          path: `${path}.filters`,
+          code: filterCols.has(col) ? "duplicate-id" : "out-of-bounds",
+          message: "Filters need unique in-bounds columns",
+        });
+      }
+      if (integer(col)) filterCols.add(col);
+    }
     normalizedSheets.push({
       ...sheet,
       merges: merges.length > 0 ? merges : undefined,
+      validationRules: sheet.validationRules
+        ? [...sheet.validationRules].sort((a, b) => a.id.localeCompare(b.id))
+        : undefined,
+      protectedRanges: sheet.protectedRanges
+        ? [...sheet.protectedRanges].sort((a, b) => a.id.localeCompare(b.id))
+        : undefined,
+      notes: sheet.notes
+        ? [...sheet.notes].sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col)
+        : undefined,
+      filters: sheet.filters ? [...sheet.filters].sort((a, b) => a[0] - b[0]) : undefined,
       rowMeta: sheet.rowMeta ? [...sheet.rowMeta].sort((a, b) => a[0] - b[0]) : undefined,
       cells: sheet.cells.map((block) => ({
         ...block,
@@ -393,6 +527,8 @@ export function documentOpTarget(operation: DocumentOp): string {
   switch (operation.op) {
     case "set":
       return operation.addr.sheet;
+    case "setNote":
+      return operation.addr.sheet;
     case "setRange":
     case "setBlock":
     case "setRangeStyle":
@@ -412,6 +548,10 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "renameSheet":
     case "moveSheet":
     case "setSheetMeta":
+    case "setValidationRule":
+    case "removeValidationRule":
+    case "setProtectedRange":
+    case "removeProtectedRange":
       return operation.sheet;
     case "addSheet":
       return operation.sheet.id;

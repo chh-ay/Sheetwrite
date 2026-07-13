@@ -106,15 +106,16 @@ protocol: new synchronization should use `SyncCoordinator` mutation IDs.
 `WorkbookSnapshot` is the versioned, JSON-safe authoritative document. Schema 1
 contains sheet order and identity, stable column keys, literal/formula/reference
 cell inputs, sparse styles and row metadata, merges, frozen panes, conditional
-formats, row groups, hidden document metadata, and named-range extension points.
-Formula source is authoritative; resolved values are derived caches and are not
-serialized.
+formats, validation rules, protected ranges, notes, row groups, hidden document
+metadata, filters, sort keys, and named ranges. Formula source is authoritative;
+resolved values are derived caches and are not serialized.
 
 `DocumentOp` is the exhaustive plain-data mutation vocabulary for that document,
 and `Patch` is its backwards-compatible transaction name. Cells, ranges,
-rows/columns, merges, row metadata, frozen panes, conditional formats, row
-groups, named ranges, and sheet add/remove/rename/reorder operations all pass
-through the same reducer, change event, dirty state, and grid undo/redo history.
+rows/columns, merges, row metadata, frozen panes, conditional formats, validation,
+protection, notes, row groups, named ranges, and sheet lifecycle operations all
+pass through the same reducer, change event, dirty state, and grid undo/redo
+history.
 
 ```ts
 const checked = validateWorkbookSnapshot(JSON.parse(payload));
@@ -169,6 +170,14 @@ Document state does **not** include selection, scroll position, editor/caret
 state, search results, temporary highlights, renderer choice, read-only policy,
 or local zoom. Those are session state. `Workbook.activeSheet` remains document
 metadata in schema 1.
+
+Validation and protection run at the shared local transaction boundary, not only
+inside the inline editor. Validation policies can reject atomically, apply with a
+warning, or allow input. Protected ranges deny local writes unless the host's
+`ProtectionResolver` allows them; the default is deny. `atomic` mode rejects a
+transaction containing any denied operation, while `partial` mode filters denied
+operations and reports them in `rejections`. Protection is client UX policy, not
+server authorization. Remote operations intentionally bypass local protection.
 
 Applied storage transactions emit `change` with the filtered transaction,
 per-cell rollback data, accumulated dirty patches, epoch, commit reason, and an

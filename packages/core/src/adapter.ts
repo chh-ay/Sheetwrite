@@ -27,6 +27,8 @@ export const GRID_OPTION_POLICY = {
   renderer: "reset",
   workerUrl: "reset",
   renderers: "reset",
+  protectionResolver: "reset",
+  mutationPolicy: "reset",
   theme: "live",
   readOnly: "live",
   config: "live",

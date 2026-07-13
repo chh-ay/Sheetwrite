@@ -44,6 +44,193 @@ interface CapturedClipboard extends ClipboardSnapshot {
   clearPatches: Patch[];
 }
 
+export const SHEETWRITE_CLIPBOARD_MIME = "application/x-sheetwrite+json";
+const SHEETWRITE_WEB_CLIPBOARD_FORMAT = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function clipboardHtml(snapshot: ClipboardSnapshot): string {
+  let html = "<table><tbody>";
+  for (const row of snapshot.cells) {
+    html += "<tr>";
+    for (const cell of row) {
+      const style = cell.style;
+      const css: string[] = [];
+      if (style.bold) css.push("font-weight:bold");
+      if (style.italic) css.push("font-style:italic");
+      if (style.underline) css.push("text-decoration:underline");
+      if (style.strikethrough) css.push("text-decoration:line-through");
+      if (style.color) css.push(`color:${style.color}`);
+      if (style.backgroundColor) css.push(`background-color:${style.backgroundColor}`);
+      if (style.align) css.push(`text-align:${style.align}`);
+      const formula =
+        cell.value.kind === "formula"
+          ? ` data-sheetwrite-formula="${escapeHtml(cell.value.src)}"`
+          : "";
+      const styleAttr = css.length > 0 ? ` style="${escapeHtml(css.join(";"))}"` : "";
+      const text =
+        cell.resolved === null
+          ? ""
+          : typeof cell.resolved === "boolean"
+            ? cell.resolved
+              ? "TRUE"
+              : "FALSE"
+            : String(cell.resolved);
+      html += `<td${formula}${styleAttr}>${escapeHtml(text)}</td>`;
+    }
+    html += "</tr>";
+  }
+  return `${html}</tbody></table>`;
+}
+
+function clipboardJson(snapshot: ClipboardSnapshot): string {
+  return JSON.stringify({
+    version: 1,
+    anchor: snapshot.anchor,
+    cells: snapshot.cells,
+    tsv: snapshot.tsv,
+    cut: snapshot.cut,
+  });
+}
+
+function parseClipboardJson(text: string): ClipboardSnapshot | null {
+  try {
+    const value = JSON.parse(text) as Partial<ClipboardSnapshot> & { version?: unknown };
+    if (
+      value.version !== 1 ||
+      !value.anchor ||
+      !Number.isInteger(value.anchor.row) ||
+      !Number.isInteger(value.anchor.col) ||
+      !Array.isArray(value.cells) ||
+      typeof value.tsv !== "string" ||
+      typeof value.cut !== "boolean"
+    ) {
+      return null;
+    }
+    for (const row of value.cells) {
+      if (!Array.isArray(row)) return null;
+      for (const cell of row) {
+        if (
+          !cell ||
+          typeof cell !== "object" ||
+          !cell.value ||
+          typeof cell.value !== "object" ||
+          !["literal", "formula", "ref"].includes(cell.value.kind) ||
+          !(
+            cell.resolved === null ||
+            typeof cell.resolved === "string" ||
+            typeof cell.resolved === "number" ||
+            typeof cell.resolved === "boolean"
+          )
+        ) {
+          return null;
+        }
+      }
+    }
+    return value as ClipboardSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function safeExternalFormula(source: string | null): string | null {
+  if (!source?.startsWith("=")) return null;
+  for (const char of source) {
+    const codePoint = char.charCodeAt(0);
+    if (codePoint <= 0x1f || char === "[" || char === "]" || char === "{" || char === "}") {
+      return null;
+    }
+  }
+  if (/^=\s*(?:WEBSERVICE|IMPORTXML|IMPORTHTML|HYPERLINK|DDE|CMD|EXEC|SHELL)\b/i.test(source)) {
+    return null;
+  }
+  return source;
+}
+
+function spreadsheetFormula(cell: Element): string | null {
+  const direct =
+    cell.getAttribute("data-sheetwrite-formula") ??
+    cell.getAttribute("data-formula") ??
+    cell.getAttribute("x:fmla");
+  const safeDirect = safeExternalFormula(direct);
+  if (safeDirect) return safeDirect;
+  const sheets = cell.getAttribute("data-sheets-formula");
+  if (!sheets) return null;
+  try {
+    const parsed = JSON.parse(sheets) as unknown;
+    const source =
+      typeof parsed === "string"
+        ? parsed
+        : parsed && typeof parsed === "object"
+          ? Object.values(parsed as Record<string, unknown>).find(
+              (value): value is string => typeof value === "string" && value.startsWith("="),
+            )
+          : null;
+    return safeExternalFormula(source ?? null);
+  } catch {
+    return null;
+  }
+}
+
+function safeCssColor(value: string): string | undefined {
+  const color = value.trim();
+  if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
+  const rgb = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i.exec(color);
+  if (!rgb) return undefined;
+  const channels = rgb.slice(1, 4).map((channel) => Math.min(255, Number(channel)));
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function styleFromHtml(cell: HTMLElement): CellStyle | undefined {
+  const decoration = cell.style.textDecoration.toLowerCase();
+  const align = cell.style.textAlign;
+  const style: CellStyle = {
+    ...(cell.style.fontWeight === "bold" || Number(cell.style.fontWeight) >= 600
+      ? { bold: true }
+      : {}),
+    ...(cell.style.fontStyle === "italic" ? { italic: true } : {}),
+    ...(decoration.includes("underline") ? { underline: true } : {}),
+    ...(decoration.includes("line-through") ? { strikethrough: true } : {}),
+    ...(safeCssColor(cell.style.color) ? { color: safeCssColor(cell.style.color) } : {}),
+    ...(safeCssColor(cell.style.backgroundColor)
+      ? { backgroundColor: safeCssColor(cell.style.backgroundColor) }
+      : {}),
+    ...(align === "left" || align === "center" || align === "right" ? { align } : {}),
+    ...(cell.style.whiteSpace.includes("pre-wrap") ? { wrap: true } : {}),
+  };
+  return Object.keys(style).length > 0 ? style : undefined;
+}
+
+function parseClipboardHtml(html: string, valuesOnly: boolean): CellWrite[][] | null {
+  if (typeof DOMParser === "undefined") return null;
+  const document = new DOMParser().parseFromString(html, "text/html");
+  const table = document.querySelector("table");
+  if (!table) return null;
+  const grid: CellWrite[][] = [];
+  for (const row of table.querySelectorAll(
+    ":scope > thead > tr, :scope > tbody > tr, :scope > tr",
+  )) {
+    const values: CellWrite[] = [];
+    for (const cell of row.querySelectorAll(":scope > th, :scope > td")) {
+      const formula = valuesOnly ? null : spreadsheetFormula(cell);
+      values.push({
+        value: formula
+          ? { kind: "formula", src: formula }
+          : { kind: "literal", value: neutralizeInjection(cell.textContent ?? "") },
+        style: valuesOnly || !(cell instanceof HTMLElement) ? undefined : styleFromHtml(cell),
+      });
+    }
+    if (values.length > 0) grid.push(values);
+  }
+  return grid.length > 0 ? grid : null;
+}
+
 /** Re-anchor a copied value's relative A1 refs by (dRow, dCol); literals pass through. */
 function shiftValue(value: CellValue, dRow: number, dCol: number): CellValue {
   if (value.kind === "formula") {
@@ -73,37 +260,56 @@ export class ClipboardController {
   async copy(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(false);
     if (!snapshot) return "empty";
-    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return "unsupported";
-
-    try {
-      await navigator.clipboard.writeText(snapshot.tsv);
-    } catch {
-      return "blocked";
-    }
-
-    // Only a clipboard the system accepted may become the paste-match snapshot.
-    this.snapshot = snapshot;
-    return "done";
+    const outcome = await this.writeCaptured(snapshot);
+    if (outcome === "done") this.snapshot = snapshot;
+    return outcome;
   }
 
   async cut(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(true);
     if (!snapshot) return "empty";
-    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return "unsupported";
-
-    try {
-      await navigator.clipboard.writeText(snapshot.tsv);
-    } catch {
-      return "blocked";
-    }
-
+    const outcome = await this.writeCaptured(snapshot);
+    if (outcome !== "done") return outcome;
     if (this.deps.readOnly()) return "done";
-
     this.snapshot = snapshot;
     this.deps.commit(snapshot.clearPatches, "cut");
     return "done";
   }
 
+  private async writeCaptured(snapshot: ClipboardSnapshot): Promise<ClipboardOutcome> {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
+    const clipboard = navigator.clipboard;
+    if (typeof clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
+      const plain = new Blob([snapshot.tsv], { type: "text/plain" });
+      const html = new Blob([clipboardHtml(snapshot)], { type: "text/html" });
+      try {
+        await clipboard.write([
+          new ClipboardItem({
+            "text/plain": plain,
+            "text/html": html,
+            [SHEETWRITE_WEB_CLIPBOARD_FORMAT]: new Blob([clipboardJson(snapshot)], {
+              type: SHEETWRITE_CLIPBOARD_MIME,
+            }),
+          }),
+        ]);
+        return "done";
+      } catch {
+        try {
+          await clipboard.write([new ClipboardItem({ "text/plain": plain, "text/html": html })]);
+          return "done";
+        } catch {
+          // Retain the universally available text-only fallback.
+        }
+      }
+    }
+    if (typeof clipboard.writeText !== "function") return "unsupported";
+    try {
+      await clipboard.writeText(snapshot.tsv);
+      return "done";
+    } catch {
+      return "blocked";
+    }
+  }
   /**
    * Paste at the focus cell. Restores the internal snapshot's rich payload when
    * the system clipboard still holds its TSV (copy re-anchors formulas, cut keeps
@@ -126,23 +332,62 @@ export class ClipboardController {
     if (this.deps.readOnly()) return "empty";
     const focus = this.deps.selection().focusCell;
     if (!focus) return "empty";
-    if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return "unsupported";
+    if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
+    const clipboard = navigator.clipboard;
+    let richReadFailed = false;
 
-    let text: string;
+    if (typeof clipboard.read === "function") {
+      try {
+        const items = await clipboard.read();
+        for (const item of items) {
+          const customType = item.types.includes(SHEETWRITE_WEB_CLIPBOARD_FORMAT)
+            ? SHEETWRITE_WEB_CLIPBOARD_FORMAT
+            : item.types.includes(SHEETWRITE_CLIPBOARD_MIME)
+              ? SHEETWRITE_CLIPBOARD_MIME
+              : null;
+          if (!customType) continue;
+          const snapshot = parseClipboardJson(await (await item.getType(customType)).text());
+          if (!snapshot) continue;
+          this.pasteInternal(snapshot, focus, valuesOnly);
+          return "done";
+        }
+        for (const item of items) {
+          if (!item.types.includes("text/html")) continue;
+          const grid = parseClipboardHtml(
+            await (await item.getType("text/html")).text(),
+            valuesOnly,
+          );
+          if (!grid) continue;
+          this.pasteExternalHtml(grid, focus);
+          return "done";
+        }
+        for (const item of items) {
+          if (!item.types.includes("text/plain")) continue;
+          const text = await (await item.getType("text/plain")).text();
+          if (text.length === 0) return "empty";
+          const snapshot = this.snapshot;
+          if (snapshot && text === snapshot.tsv) this.pasteInternal(snapshot, focus, valuesOnly);
+          else this.pasteExternal(text, focus);
+          return "done";
+        }
+      } catch {
+        richReadFailed = true;
+      }
+    }
+
+    if (typeof clipboard.readText !== "function") {
+      return richReadFailed ? "blocked" : "unsupported";
+    }
     try {
-      text = await navigator.clipboard.readText();
+      const text = await clipboard.readText();
+      if (text.length === 0) return "empty";
+      const snapshot = this.snapshot;
+      if (snapshot && text === snapshot.tsv) this.pasteInternal(snapshot, focus, valuesOnly);
+      else this.pasteExternal(text, focus);
+      return "done";
     } catch {
       return "blocked";
     }
-    if (text.length === 0) return "empty";
-
-    const snapshot = this.snapshot;
-    if (snapshot && text === snapshot.tsv) {
-      this.pasteInternal(snapshot, focus, valuesOnly);
-      return "done";
-    }
-    this.pasteExternal(text, focus);
-    return "done";
   }
 
   // ── Rich paste ─────────────────────────────────────────────────────────────
@@ -161,6 +406,26 @@ export class ClipboardController {
         const cell = snapshot.cells[r]![c]!;
         if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
         return { value: shiftValue(cell.value, dRow, dCol), style: cell.style };
+      },
+    );
+  }
+
+  private pasteExternalHtml(grid: CellWrite[][], focus: CellRef): void {
+    const sheet = this.deps.sheet();
+    this.commitBlock(
+      focus,
+      grid.length,
+      (row) => grid[row]!.length,
+      (row, col, targetCol): CellWrite => {
+        const cell = grid[row]![col]!;
+        if (cell.value.kind !== "literal" || typeof cell.value.value !== "string") return cell;
+        return {
+          value: parseCellInput(
+            neutralizeInjection(cell.value.value),
+            sheet.columns[targetCol]?.type ?? "text",
+          ),
+          style: cell.style,
+        };
       },
     );
   }
