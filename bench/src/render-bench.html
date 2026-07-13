@@ -58,8 +58,8 @@
       }
       /* Both grids mount into an identically sized stage for parity. */
       #stage {
-        width: 1000px;
-        height: 600px;
+        width: 640px;
+        height: 480px;
         box-sizing: border-box;
         border-right: 1px solid #e5e5e5;
         position: relative;
@@ -82,31 +82,17 @@
   <body>
     <header>
       <strong>Sheetwrite vs Handsontable — browser render benchmark.</strong>
-      Mirrors Handsontable's <code>performance-lab</code> scenarios (view-scrolling,
-      editing, altering, arrow-keys-navigation) on both grids at large row counts.
-      Results are printed here and exposed on <code>window.__benchResults</code>.
+      Executes the versioned, correctness-checked render protocol. Automated runs expose
+      a typed <code>window.__benchResults</code> envelope keyed by an explicit run ID.
     </header>
     <div class="controls">
-      <label>Grid <select id="grid">
-        <option value="sheetwrite">Sheetwrite</option>
-        <option value="handsontable">Handsontable</option>
-      </select></label>
-      <label>Rows <select id="rows">
-        <option value="100000">100,000</option>
-        <option value="500000">500,000</option>
-        <option value="1000000">1,000,000</option>
-      </select></label>
-      <label>Samples <select id="samples">
-        <option value="100">100</option>
-        <option value="60">60</option>
-        <option value="30">30</option>
-      </select></label>
-      <button id="run" class="primary" type="button">Run</button>
+      <span>Configuration is supplied by <code>render-driver.ts</code>.</span>
+      <button id="run" class="primary" type="button">Rerun current query</button>
       <span id="status">idle</span>
     </div>
     <main>
       <div id="stage"></div>
-      <pre id="results">Pick a grid + row count and press Run, or load with ?grid=sheetwrite&amp;rows=100000&amp;auto=1</pre>
+      <pre id="results">Use the typed benchmark driver; direct automated URLs require runId and auto=1.</pre>
     </main>
     <script type="module" src="./render-bench.ts"></script>
   </body>

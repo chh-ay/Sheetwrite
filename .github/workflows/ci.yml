@@ -71,6 +71,9 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Benchmark harness typecheck
+        run: bun run --filter '@sheetwrite/bench' typecheck
+
       - name: Lint
         run: bun run lint
 
@@ -85,6 +88,9 @@ jobs:
 
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
+
+      - name: Render benchmark harness smoke
+        run: bun run --filter '@sheetwrite/bench' bench:render:smoke -- --engine sheetwrite
 
       - name: Browser smoke tests
         run: bun run test:browser

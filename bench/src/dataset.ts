@@ -157,3 +157,68 @@ export function toAoA(ds: ColumnarDataset): BenchRow[] {
   }
   return rows;
 }
+
+const FNV_OFFSET = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
+
+function hashByte(hash: number, byte: number): number {
+  return Math.imul(hash ^ (byte & 0xff), FNV_PRIME) >>> 0;
+}
+
+function hashInteger(hash: number, value: number): number {
+  let next = hash;
+  const integer = value | 0;
+  next = hashByte(next, integer);
+  next = hashByte(next, integer >>> 8);
+  next = hashByte(next, integer >>> 16);
+  return hashByte(next, integer >>> 24);
+}
+
+function hashString(hash: number, value: string): number {
+  let next = hashInteger(hashByte(hash, 0x73), value.length);
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    next = hashByte(next, code);
+    next = hashByte(next, code >>> 8);
+  }
+  return next;
+}
+
+function hashLogicalValue(hash: number, value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const cents = Math.round(value * 100);
+    return hashInteger(hashByte(hash, 0x6e), cents);
+  }
+  if (typeof value === "string") return hashString(hash, value);
+  if (typeof value === "boolean") return hashByte(hashByte(hash, 0x62), value ? 1 : 0);
+  if (value === null || value === undefined) return hashByte(hash, 0);
+  throw new TypeError(`unsupported logical benchmark value: ${String(value)}`);
+}
+
+function formatHash(hash: number): string {
+  return `fnv1a32:${hash.toString(16).padStart(8, "0")}`;
+}
+
+/**
+ * Hash every logical cell without materializing a second row-major dataset.
+ * Numeric values are encoded as integer cents, matching the generator's
+ * precision; strings are encoded as UTF-16 code units with field separators.
+ */
+export function datasetChecksum(ds: ColumnarDataset): string {
+  let hash = hashInteger(FNV_OFFSET, ds.rowCount);
+  for (let row = 0; row < ds.rowCount; row++) {
+    hash = hashLogicalValue(hashByte(hash, 0xff), ds.id[row]);
+    hash = hashLogicalValue(hashByte(hash, 0xff), ds.date[row]);
+    hash = hashLogicalValue(hashByte(hash, 0xff), ds.customer[row]);
+    hash = hashLogicalValue(hashByte(hash, 0xff), ds.city[row]);
+    hash = hashLogicalValue(hashByte(hash, 0xff), ds.amount[row]);
+  }
+  return formatHash(hash);
+}
+
+/** Small deterministic checkpoint hash for values observed through an adapter. */
+export function logicalValueChecksum(values: readonly unknown[]): string {
+  let hash = hashInteger(FNV_OFFSET, values.length);
+  for (const value of values) hash = hashLogicalValue(hashByte(hash, 0xff), value);
+  return formatHash(hash);
+}

@@ -70,6 +70,86 @@ export function summarize(samples: readonly number[]): Stat {
   };
 }
 
+/** Auditable aggregate timing sample for fast render operations. */
+export interface AggregateSample {
+  /** Total measured operation time, excluding setup and cleanup. */
+  readonly durationMs: number;
+  /** Number of identical logical operations included in the aggregate. */
+  readonly operationCount: number;
+  /** Aggregate duration divided by operation count. */
+  readonly perOperationMs: number;
+}
+
+/** Median absolute deviation around the sample median. */
+export function medianAbsoluteDeviation(samples: readonly number[]): number {
+  assertFiniteSample(samples);
+  const center = percentile(
+    [...samples].sort((a, b) => a - b),
+    0.5,
+  );
+  const deviations = samples.map((sample) => Math.abs(sample - center)).sort((a, b) => a - b);
+  return percentile(deviations, 0.5);
+}
+
+/** Strict render-benchmark summary: empty or non-finite samples are invalid. */
+export function summarizeFinite(
+  samples: readonly number[],
+): Pick<Stat, "median" | "p95" | "iters"> & { readonly mad: number } {
+  assertFiniteSample(samples);
+  const sorted = [...samples].sort((a, b) => a - b);
+  return {
+    median: percentile(sorted, 0.5),
+    p95: percentile(sorted, 0.95),
+    mad: medianAbsoluteDeviation(sorted),
+    iters: sorted.length,
+  };
+}
+
+function assertFiniteSample(samples: readonly number[]): void {
+  if (samples.length === 0) throw new RangeError("timing sample must not be empty");
+  for (const sample of samples) {
+    if (!Number.isFinite(sample) || sample < 0) {
+      throw new RangeError(`timing sample must contain finite non-negative values: ${sample}`);
+    }
+  }
+}
+
+/**
+ * Deterministic counterbalanced order. The seed fixes the first round and each
+ * subsequent round rotates that base order. Every engine occupies every order
+ * position once per complete rotation; with two engines this is AB/BA.
+ */
+export function counterbalancedOrder<T>(values: readonly T[], rounds: number, seed: number): T[][] {
+  if (values.length === 0) throw new RangeError("counterbalance requires at least one value");
+  if (!Number.isInteger(rounds) || rounds <= 0) {
+    throw new RangeError(`rounds must be a positive integer: ${rounds}`);
+  }
+
+  const base = [...values];
+  const rng = seededOrderRng(seed);
+  for (let index = base.length - 1; index > 0; index--) {
+    const swapWith = Math.floor(rng() * (index + 1));
+    [base[index], base[swapWith]] = [base[swapWith]!, base[index]!];
+  }
+
+  const orders = new Array<T[]>(rounds);
+  for (let round = 0; round < rounds; round++) {
+    const offset = round % base.length;
+    orders[round] = [...base.slice(offset), ...base.slice(0, offset)];
+  }
+  return orders;
+}
+
+function seededOrderRng(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+
 /** Knobs for a single measured workload. */
 export interface MeasureOptions {
   /** Untimed iterations run before sampling, to reach steady state. */

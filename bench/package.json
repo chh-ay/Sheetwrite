@@ -10,12 +10,16 @@
     "bench:paged": "bun run src/paged-bench.ts",
     "bench:formula": "bun run src/formula-bench.ts",
     "bench:formula:smoke": "bun run src/formula-bench.ts --smoke",
-    "bench:render": "bun src/render-bench.html",
+    "bench:render:prepare": "cd .. && bun run build:wasm && bun run --filter '@sheetwrite/core' build",
+    "bench:render": "bun run src/render-driver.ts",
+    "bench:render:smoke": "bun run src/render-driver.ts --smoke",
+    "bench:render:validate": "bun run src/render-driver.ts --validate results/render-results.json",
     "bench:check": "bun run src/check.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6",
+    "@playwright/test": "^1.61.1",
     "@types/bun": "^1.3.14",
     "typescript": "^7.0.2"
   },

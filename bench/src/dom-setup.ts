@@ -12,7 +12,7 @@
  */
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
-GlobalRegistrator.register();
+if (typeof globalThis.window === "undefined") GlobalRegistrator.register();
 
 // happy-dom leaves `window.frameElement` as `undefined`, but Handsontable's
 // `getParentWindow` relies on the spec value `null` for a top-level window —

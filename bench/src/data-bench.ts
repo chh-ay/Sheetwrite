@@ -38,7 +38,7 @@ import { readFileSync } from "node:fs";
 import type { Column, Workbook } from "@sheetwrite/core";
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import { initSync } from "@sheetwrite/wasm";
-import Handsontable from "handsontable";
+import type { CellValue, GridSettings, HotInstance } from "handsontable";
 import {
   AGG_COL,
   COL,
@@ -52,6 +52,7 @@ import {
   toAoA,
   toSheetwriteColumnar,
 } from "./dataset.js";
+import { createHandsontable } from "./handsontable-runtime.js";
 import { forceGc, type MeasureOptions, measure, mib, ms, type Stat, summarize } from "./stats.js";
 
 // ── Configuration ────────────────────────────────────────────────────────────
@@ -291,9 +292,9 @@ function warmSheetwriteDataPath(): void {
 // ── Handsontable harness ─────────────────────────────────────────────────────
 
 /** Equivalent Handsontable config: same columns, virtualization on, plugins enabled. */
-function hotOptions(data: unknown[][]): Handsontable.GridSettings {
+function hotOptions(data: CellValue[][]): GridSettings {
   return {
-    data: data as Handsontable.CellValue[][],
+    data,
     columns: COLUMNS.map((c, i) => ({ data: i, type: c.type === "number" ? "numeric" : "text" })),
     colHeaders: COLUMNS.map((c) => c.header),
     rowHeaders: true,
@@ -338,10 +339,10 @@ function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
   // data map + index and renders the viewport (all rows, headless). Destroyed
   // in the untimed teardown.
   stats.ingest = guard("ingest", () => {
-    let hot: Handsontable | undefined;
+    let hot: HotInstance | undefined;
     const stat = measure(
       () => {
-        hot = new Handsontable(host, hotOptions(toAoA(ds)));
+        hot = createHandsontable(host, hotOptions(toAoA(ds)));
       },
       {
         ...plan("ingest", rows),
@@ -356,7 +357,7 @@ function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
   });
 
   // Persistent instance for the remaining workloads.
-  const hot = new Handsontable(host, hotOptions(toAoA(ds)));
+  const hot = createHandsontable(host, hotOptions(toAoA(ds)));
 
   // (b) windowRead — read the same 50×5 range via getData at rotating offsets.
   const maxStart = Math.max(0, rows - WINDOW_ROWS);
@@ -475,7 +476,7 @@ function probeHandsontableMemory(rows: number): MemoryProfile {
   const data = toAoA(makeColumnar(rows));
   forceGc();
   const heap0 = process.memoryUsage().heapUsed;
-  const hot = new Handsontable(host, hotOptions(data));
+  const hot = createHandsontable(host, hotOptions(data));
   hot.getData(0, 0, 0, 4); // touch
   retain.push(hot);
   forceGc();

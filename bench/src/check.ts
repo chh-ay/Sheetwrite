@@ -2,8 +2,8 @@
  * Regression check for the committed data benchmark baseline.
  *
  * Runs three complete Sheetwrite rounds with the same harness as data-bench.ts,
- * compares the best median for every cell against the committed baseline, and
- * reports any workload whose best median is more than 20% slower.
+ * compares the median across every completed round against the committed
+ * baseline, and reports any workload whose aggregate median is more than 20% slower.
  */
 
 import { readFileSync } from "node:fs";
@@ -14,7 +14,7 @@ import {
   WORKLOADS,
   type Workload,
 } from "./data-bench.js";
-import { ms } from "./stats.js";
+import { ms, summarizeFinite } from "./stats.js";
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -85,7 +85,8 @@ export function compareSheetwriteMedians(
         medianForRound(2),
       ];
       const finiteMedians = roundMedians.filter((median): median is number => median !== undefined);
-      const freshMedian = finiteMedians.length === 0 ? undefined : Math.min(...finiteMedians);
+      const freshMedian =
+        finiteMedians.length === 0 ? undefined : summarizeFinite(finiteMedians).median;
       const ratio =
         base !== undefined && base > 0 && freshMedian !== undefined
           ? freshMedian / base
@@ -119,7 +120,7 @@ function status(row: ComparisonRow): string {
 function printTable(rows: readonly ComparisonRow[]): void {
   const lines: string[] = [];
   lines.push(
-    "| rows | workload | baseline | round 1 | round 2 | round 3 | best | absolute Δ | percent Δ | status |",
+    "| rows | workload | baseline | round 1 | round 2 | round 3 | round median | absolute Δ | percent Δ | status |",
   );
   lines.push("|---:|:--|---:|---:|---:|---:|---:|---:|---:|:--|");
   for (const row of rows) {

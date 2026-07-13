@@ -1,5 +1,6 @@
 [test]
 preload = ["./test-setup.ts", "./test-setup-svelte.ts"]
-# Bun's runner owns packages/*; Playwright specs under test/browser run through
-# `bun run test:browser` and must not be collected here.
-root = "packages"
+# Bun's runner owns packages/* and bench/*; Playwright specs under test/browser
+# run through `bun run test:browser` and must not be collected here.
+root = "."
+pathIgnorePatterns = ["test/browser/**"]

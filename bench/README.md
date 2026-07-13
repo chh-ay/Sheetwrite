@@ -115,24 +115,26 @@ and gate metadata remain in `results/formula-results.json`; the generated
 
 ### Render bench scenarios — adapted from Handsontable's own suite
 
-The browser bench mirrors the four scenarios in Handsontable's official
+The browser bench adapts the four scenario families in Handsontable's official
 performance suite, [`handsontable/performance-lab`](https://github.com/handsontable/performance-lab)
-(`master`), running each on **both** grids with perf-lab's protocol (warm up,
-then repeat each block `SAMPLE_SIZE = 100` times — see
-[`lib/config.js`](https://github.com/handsontable/performance-lab/blob/master/lib/config.js)):
+(`master`), but uses Sheetwrite's versioned auditable protocol. Each measured
+sample repeats one logical action until its aggregate measured duration reaches
+at least 100 ms. Declared aggregate warmups are excluded; every measured sample
+is retained, and median, linearly interpolated p95, and MAD use all valid samples.
 
 | Adapted spec | What we mirror |
 |---|---|
-| [`test/spec/view-scrolling.spec.js`](https://github.com/handsontable/performance-lab/blob/master/test/spec/view-scrolling.spec.js) | scroll the master viewport by `SCROLL_STEP = 50px` repeatedly (down from top-left, down from middle, right from top-left); per-step ms + frames over the 60fps budget |
+| [`test/spec/view-scrolling.spec.js`](https://github.com/handsontable/performance-lab/blob/master/test/spec/view-scrolling.spec.js) | scroll the master viewport by `SCROLL_STEP = 50px` repeatedly (down from top-left, down from middle, right from top-left); per-operation timing plus logical scroll checkpoints |
 | [`test/spec/editing.spec.js`](https://github.com/handsontable/performance-lab/blob/master/test/spec/editing.spec.js) | select + scroll a cell into view at top-left / middle / bottom-right, then open the editor (edit-open latency) and commit (edit-commit latency) |
 | [`test/spec/altering.spec.js`](https://github.com/handsontable/performance-lab/blob/master/test/spec/altering.spec.js) | insert / remove 5 rows at the top |
 | [`test/spec/arrow-keys-navigation.spec.js`](https://github.com/handsontable/performance-lab/blob/master/test/spec/arrow-keys-navigation.spec.js) | move the selection one cell (arrow-down from top-left, arrow-right from middle) |
 
 Sheetwrite's viewport is driven via its `.sheetwrite-scroller` element and its
 keyboard path (`Enter` → editor, arrows → navigation, `applyTransaction` with
-`addRows`/`removeRows` → altering); Handsontable via its `.ht_master .wtHolder`,
-`getActiveEditor()`, `alter()`, and selection API. Each grid gets the same
-seeded dataset, the same columns, the same 1000×600 stage, and virtualization on.
+`addRows`/`removeRows` → altering); Handsontable uses `.ht_master .wtHolder`,
+`getActiveEditor()`, `alter()`, and its selection API. Each engine runs in a
+separate fresh Chromium process with the same deterministic dataset, columns,
+640×480 stage, scenario actions, correctness checkpoints, and virtualization.
 
 ### Current benchmark scope and missing coverage
 
@@ -165,16 +167,19 @@ in an application benchmark.
 # results/data-results.{md,json}
 bun run bench:data
 
-# Browser render benchmark — serves the page; open it and press Run, or
-# drive it with URL params (one grid + size per load):
-bun run bench:render
-#   → http://localhost:<port>/src/render-bench.html?grid=sheetwrite&rows=100000&samples=100&auto=1
-#   → http://localhost:<port>/src/render-bench.html?grid=handsontable&rows=100000&samples=100&auto=1
-```
+# Build the supported WASM loader and core package once from a clean checkout:
+bun run bench:render:prepare
 
-The render page prints results in-page and exposes a typed
-`window.__benchResults` (and `window.__benchDone`) so an operator or driver can
-read them after load.
+# Full counterbalanced browser run; writes results/render-results.{json,md}:
+bun run bench:render
+
+# Isolated engine smokes:
+bun run bench:render:smoke -- --engine sheetwrite
+bun run bench:render:smoke -- --engine handsontable
+
+# Fail-closed schema, completeness, and byte-stable Markdown validation:
+bun run bench:render:validate
+```
 
 ─────────────────────────────────────────────────────────────────────────────
 
@@ -240,47 +245,22 @@ distant-page load at 0.756 ms (2.17 ms p95).
 
 ─────────────────────────────────────────────────────────────────────────────
 
-## Results — render (fresh browser capture)
+## Results — render (generated, auditable capture)
 
-Captured from `bun run bench:render` on 2026-07-13 at 15:50–15:53 UTC, core
-commit `844da4e`, Chrome 140 headless, 1100×760 viewport, on the linux/x64
-i9-12900H host above. Chromium's reported user agent was Windows because the
-automation browser applies a compatibility user agent. Values are median (p95)
-milliseconds over 100 samples; lower is better. These are one-run,
-runner-specific characterization numbers.
+The authoritative renderer evidence is
+[`results/render-results.json`](./results/render-results.json). It contains the
+protocol and environment metadata, counterbalanced process order, every raw
+sample and operation count, validation observations, memory deltas, launch
+attempts, structured failures, and the complete expected/observed matrix.
 
-| scenario | Sheetwrite 100k | HOT 100k | Sheetwrite 1M | HOT 1M |
-|---|---:|---:|---:|---:|
-| initial render / mount (ms) | 129 | 1128 | 531 | **crashed** |
-| scroll-down top-left (per 50px step) | 4.50 (7.41) | 0.40 (65.49) | 2.20 (3.30) | — |
-| scroll-down top-left, dropped frames /100 | 0 | 29 | 0 | — |
-| scroll-down middle | 5.95 (7.82) | 0.30 (73.28) | 2.10 (2.90) | — |
-| scroll-down middle, dropped frames /100 | 1 | 26 | 0 | — |
-| edit-open (middle) | 2.90 (3.81) | 3.90 (5.71) | 0.85 (1.10) | — |
-| edit-commit (middle) | 3.10 (3.91) | 165.40 (197.96) | 1.00 (1.70) | — |
-| insert 5 rows (top) | 6.70 (9.46) | 124.55 (284.71) | 20.90 (25.92) | — |
-| remove 5 rows (top) | 6.60 (10.34) | 125.00 (143.12) | 21.35 (37.97) | — |
-| arrow-down (top-left) | 3.85 (6.22) | 18.55 (43.42) | 1.70 (2.40) | — |
-| arrow-right (middle) | 2.15 (3.30) | 1.40 (2.60) | 0.70 (1.30) | — |
-| JS heap after mount (MiB) | 50.56 | 115.71 | 314.99 | — |
+[`results/render-results.md`](./results/render-results.md) is generated from that
+JSON and visibly marks failed or incomplete cells. Never edit it by hand. Run
+`bun run bench:render:validate` to prove the JSON schema, matrix completeness,
+run IDs, finite samples, summaries, and byte-stable derived Markdown.
 
-Handsontable at 1M rows failed during construction with
-`Maximum call stack size exceeded` and produced no scenario data. At 100K,
-Handsontable's median vertical scroll callback was shorter, but its 65–73 ms
-p95 and 26–29 dropped frames expose the tail cost; Sheetwrite's p95 stayed below
-8 ms with zero or one dropped frame. Handsontable also had the lower
-arrow-right median (1.40 vs 2.15 ms). Sheetwrite's measured advantages in this
-capture were mount, edit commit, row altering, arrow-down, tail scroll latency,
-and the completed 1M run. No claim extends beyond these scenarios.
-
-Capture procedure (per `(grid, rows)`):
-
-```
-serve  bun run bench:render            # → http://localhost:3000/
-open   /?grid=<sheetwrite|handsontable>&rows=<100000|500000|1000000>&samples=100&auto=1
-wait   until window.__benchDone === true
-read   window.__benchResults           # typed BenchResults; also logged as "[render-bench] {…}"
-```
+Absolute timings are machine-specific characterization data, not statistical
+significance claims. Inspect raw samples and validation/failure envelopes before
+quoting a result; do not treat an unavailable comparator as a Sheetwrite win.
 
 ─────────────────────────────────────────────────────────────────────────────
 
@@ -313,17 +293,22 @@ bench/
   src/
     dataset.ts            # seeded deterministic comparison data
     formula-dataset.ts    # deterministic formula topologies
-    stats.ts              # warm-up, timed sampling, median/p95 helpers
+    stats.ts              # warm-up, aggregate timing, median/p95/MAD, ordering
     dom-setup.ts           # happy-dom bootstrap for headless Handsontable
-    range-bench.ts        # large-range mutation and query timing
+    range-bench.ts         # large-range mutation and query timing
     data-bench.ts          # headless data-layer comparison
     paged-bench.ts         # isolated allocation-lazy storage probes
     formula-bench.ts       # correctness-gated formula timing/memory suite
-    render-bench.ts        # real-browser render scenarios and result contract
+    handsontable-runtime.ts # validated public runtime boundary
+    render-bench.ts        # browser adapters and page orchestration
+    render-scenarios.ts    # shared scenarios, checkpoints, aggregate timing
+    render-protocol.ts     # result schema, completeness, Markdown generator
+    render-driver.ts       # fresh-process Playwright runner and persistence
     render-bench.html      # render benchmark page shell
     check.ts               # regression checks against captured results
   results/
     data-results.{md,json} # generated by bench:data
     formula-results.{md,json} # generated by bench:formula[:smoke]
     paged-results.json     # generated by bench:paged
+    render-results.{md,json} # generated by bench:render
 ```

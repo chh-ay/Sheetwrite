@@ -1,31 +1,3 @@
-/**
- * Browser render benchmark: Sheetwrite vs Handsontable, at scale.
- *
- * This is the at-scale, apples-to-apples comparison. It runs in a real browser
- * (where Handsontable virtualizes against real layout — impossible headless)
- * and mirrors the four scenarios from Handsontable's own performance suite,
- * `handsontable/performance-lab` (master @ test/spec), on BOTH grids:
- *
- *   • view-scrolling.spec.js        → scroll the viewport by SCROLL_STEP (50px)
- *                                     repeatedly, from top-left and middle.
- *   • editing.spec.js               → select + scroll a cell into view at
- *                                     top-left / middle / bottom-right, then open
- *                                     the editor (edit-open latency) and commit.
- *   • altering.spec.js              → insert / remove rows at the top.
- *   • arrow-keys-navigation.spec.js → move the selection one cell at a time.
- *
- * Methodology mirrors perf-lab's runner: warm up, then repeat each timed block
- * SAMPLE_SIZE times (perf-lab uses 100 — lib/config.js) and reduce to robust
- * order statistics (median + p95). For scrolling we also count frames that blow
- * the 60fps budget (>16.67ms). Both grids get the same seeded dataset, the same
- * columns, the same identically-sized stage, and virtualization on.
- *
- * Each page load benchmarks ONE (grid, rows) combination, prints the result,
- * and exposes a typed `window.__benchResults` (plus `window.__benchDone`) so an
- * operator — or an automated driver — can read it after load. Drive it with
- * `?grid=sheetwrite&rows=100000&samples=100&auto=1`.
- */
-
 import {
   type Column,
   createGrid,
@@ -34,56 +6,51 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
-import Handsontable from "handsontable";
-// The built WASM binary, surfaced as an asset URL the browser fetches.
-import wasmUrl from "../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm" with { type: "file" };
+import type { CellValue, GridSettings, HotInstance } from "handsontable";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
-import { COLUMNS, type ColumnarDataset, makeColumnar, toAoA } from "./dataset.js";
-import { collect, type MeasureOptions, ms, summarize } from "./stats.js";
+import { COLUMNS, type ColumnarDataset, datasetChecksum, makeColumnar, toAoA } from "./dataset.js";
+import { createHandsontable } from "./handsontable-runtime.js";
+import {
+  type BrowserCombinationResult,
+  type EngineId,
+  type FailedScenario,
+  type FailureStage,
+  RENDER_MINIMUM_SAMPLE_MS,
+  RENDER_PROTOCOL_VERSION,
+  RENDER_SCENARIOS,
+  RENDER_VIEWPORT,
+  type ScenarioResult,
+} from "./render-protocol.js";
+import {
+  type CellSelection,
+  type RenderBenchAdapter,
+  runRenderScenario,
+  type ScrollObservation,
+} from "./render-scenarios.js";
 
 const SHEET = "bench";
-const SCROLL_STEP = 50; // px, matching performance-lab/test/spec/view-scrolling.spec.js
-const FRAME_BUDGET_MS = 1000 / 60; // 16.67ms — one frame at 60fps
+const SHEETWRITE_ROW_HEIGHT = 28;
+const HANDSONTABLE_ROW_HEIGHT = 23;
 
-type EngineId = "sheetwrite" | "handsontable";
-
-/** One measured scenario result. */
-interface ScenarioStat {
-  readonly id: string;
-  readonly group: "view-scrolling" | "editing" | "altering" | "arrow-keys-navigation";
-  readonly median: number;
-  readonly p95: number;
-  readonly mean: number;
-  readonly samples: number;
-  /** Scrolling only: steps that exceeded the 60fps frame budget. */
-  readonly droppedFrames?: number;
-}
-
-/** Full result object exposed on `window.__benchResults`. */
-interface BenchResults {
-  readonly grid: EngineId;
+interface PageConfiguration {
+  readonly engine: EngineId;
   readonly rows: number;
-  readonly cols: number;
-  readonly sampleSize: number;
-  readonly userAgent: string;
-  readonly timestamp: string;
-  /** Construct + first synchronous paint (ms). */
-  readonly initialRenderMs: number;
-  /** Best-effort JS heap after mount, MiB (Chrome `performance.memory`), or null. */
-  readonly heapAfterMountMiB: number | null;
-  readonly scenarios: ScenarioStat[];
+  readonly measuredSamples: number;
+  readonly warmupSamples: number;
+  readonly minimumSampleDurationMs: number;
+  readonly runId: string;
+  readonly round: number;
 }
 
 declare global {
   interface Window {
-    __benchResults?: BenchResults;
+    __benchResults?: BrowserCombinationResult;
     __benchDone?: boolean;
     __benchError?: string;
+    __benchStage?: FailureStage | "complete";
   }
 }
-
-// ── Small async / DOM helpers ────────────────────────────────────────────────
 
 function nextFrame(): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
@@ -92,118 +59,123 @@ function nextFrame(): Promise<void> {
 }
 
 function settle(): Promise<void> {
-  // Two frames: let any scheduled render flush and paint before we measure.
   const { promise, resolve } = Promise.withResolvers<void>();
   requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   return promise;
 }
 
-function dispatchKey(el: Element, key: string): void {
-  el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+function dispatchKey(element: Element, key: string): void {
+  element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 }
-
-/** Chrome-only `performance.memory.usedJSHeapSize`, narrowed without casts. */
-function usedJsHeapBytes(): number | null {
-  const perf: unknown = performance;
-  if (perf && typeof perf === "object" && "memory" in perf) {
-    const mem = perf.memory;
-    if (
-      mem &&
-      typeof mem === "object" &&
-      "usedJSHeapSize" in mem &&
-      typeof mem.usedJSHeapSize === "number"
-    ) {
-      return mem.usedJSHeapSize;
-    }
-  }
-  return null;
-}
-
-// ── Adapter contract ─────────────────────────────────────────────────────────
-
-/** A uniform surface over both grids so the scenarios stay engine-agnostic. */
-interface BenchAdapter {
-  readonly id: EngineId;
-  readonly rowCount: number;
-  readonly colCount: number;
-  /** Construct + initial paint; returns elapsed ms. */
-  mount(host: HTMLElement): number;
-  /** The element whose scrollTop/scrollLeft drives the viewport. */
-  scrollElement(): HTMLElement;
-  resetScroll(): void;
-  /** Force a synchronous repaint reflecting the current scroll offset. */
-  repaintScroll(el: HTMLElement): void;
-  /** Move + reveal a cell (no editor). */
-  selectAndReveal(row: number, col: number): void;
-  /** Open the in-cell editor at the current selection. */
-  openEditor(): void;
-  /** Cancel any open editor. */
-  closeEditor(): void;
-  /** Open editor, set a value, and commit it (end-to-end edit). */
-  editCommit(value: string): void;
-  /** Move the selection one cell in a direction and repaint. */
-  moveSelection(dir: "down" | "right"): void;
-  insertRows(at: number, count: number): void;
-  removeRows(at: number, count: number): void;
-  destroy(): void;
-}
-
-// ── Sheetwrite adapter ───────────────────────────────────────────────────────
 
 function makeWorkbook(rowCount: number): Workbook {
-  const columns: Column[] = COLUMNS.map((c) => ({
-    key: c.key,
-    header: c.header,
-    width: c.width,
-    type: c.type,
+  const columns: Column[] = COLUMNS.map((column) => ({
+    key: column.key,
+    header: column.header,
+    width: column.width,
+    type: column.type,
   }));
   return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
 }
 
-class SheetwriteAdapter implements BenchAdapter {
+class SheetwriteAdapter implements RenderBenchAdapter {
   readonly id = "sheetwrite" as const;
-  readonly rowCount: number;
+  readonly initialRowCount: number;
   readonly colCount = COLUMNS.length;
   private grid!: Grid;
   private host!: HTMLElement;
   private readonly data: { rowCount: number; columns: Record<string, ArrayLike<string | number>> };
 
-  constructor(ds: ColumnarDataset) {
-    this.rowCount = ds.rowCount;
+  constructor(dataset: ColumnarDataset) {
+    this.initialRowCount = dataset.rowCount;
     this.data = {
-      rowCount: ds.rowCount,
+      rowCount: dataset.rowCount,
       columns: {
-        id: ds.id,
-        date: ds.date,
-        customer: ds.customer,
-        city: ds.city,
-        amount: ds.amount,
+        id: dataset.id,
+        date: dataset.date,
+        customer: dataset.customer,
+        city: dataset.city,
+        amount: dataset.amount,
       },
     };
   }
 
-  mount(host: HTMLElement): number {
+  mount(host: HTMLElement): void {
     this.host = host;
-    const t0 = performance.now();
-    this.grid = createGrid(host, { workbook: makeWorkbook(this.rowCount), data: this.data });
-    return performance.now() - t0; // constructor renders synchronously
+    this.grid = createGrid(host, {
+      workbook: makeWorkbook(this.initialRowCount),
+      data: this.data,
+    });
   }
 
-  scrollElement(): HTMLElement {
-    const el = this.host.querySelector<HTMLElement>(".sheetwrite-scroller");
-    if (!el) throw new Error("sheetwrite-scroller not found");
-    return el;
+  isMountedAndAccessible(): boolean {
+    return (
+      this.host.isConnected &&
+      this.host.getAttribute("aria-label") !== null &&
+      this.host.querySelector("canvas") !== null &&
+      this.host.querySelector(".sheetwrite-scroller") !== null
+    );
   }
 
-  resetScroll(): void {
-    const el = this.scrollElement();
-    el.scrollTop = 0;
-    el.scrollLeft = 0;
+  rowCount(): number {
+    return this.grid.store.getWorkbook().sheets.find((sheet) => sheet.id === SHEET)?.rowCount ?? -1;
+  }
+
+  cellValue(row: number, col: number): unknown {
+    return this.grid.store.getCell({ sheet: SHEET, row, col }).resolved;
+  }
+
+  setCellValue(row: number, col: number, value: string | number | null): void {
+    this.grid.store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: SHEET, row, col },
+          value: { kind: "literal", value },
+        },
+      ],
+    });
     this.grid.refresh();
   }
 
-  repaintScroll(_el: HTMLElement): void {
-    this.grid.refresh(); // synchronous canvas repaint for the current scroll offset
+  selection(): CellSelection | null {
+    const selection = this.grid.getSelection();
+    return selection?.kind === "cell" ? { row: selection.addr.row, col: selection.addr.col } : null;
+  }
+
+  editorOpen(): boolean {
+    return this.host.querySelector(".sheetwrite-editor") !== null;
+  }
+
+  private scrollElement(): HTMLElement {
+    const element = this.host.querySelector<HTMLElement>(".sheetwrite-scroller");
+    if (!element) throw new Error("sheetwrite scroller is not mounted");
+    return element;
+  }
+
+  prepareScroll(axis: "top" | "left", startMiddle: boolean): void {
+    const element = this.scrollElement();
+    element.scrollTop = axis === "top" && startMiddle ? Math.floor(element.scrollHeight / 2) : 0;
+    element.scrollLeft = axis === "left" && startMiddle ? Math.floor(element.scrollWidth / 2) : 0;
+    this.grid.refresh();
+  }
+
+  scrollBy(axis: "top" | "left", pixels: number): void {
+    const element = this.scrollElement();
+    if (axis === "top") element.scrollTop += pixels;
+    else element.scrollLeft += pixels;
+    this.grid.refresh();
+  }
+
+  scrollObservation(): ScrollObservation {
+    const element = this.scrollElement();
+    return {
+      top: element.scrollTop,
+      left: element.scrollLeft,
+      maximumTop: Math.max(0, element.scrollHeight - element.clientHeight),
+      maximumLeft: Math.max(0, element.scrollWidth - element.clientWidth),
+      firstVisibleRow: Math.floor(element.scrollTop / SHEETWRITE_ROW_HEIGHT),
+    };
   }
 
   selectAndReveal(row: number, col: number): void {
@@ -214,25 +186,27 @@ class SheetwriteAdapter implements BenchAdapter {
 
   openEditor(): void {
     this.host.focus();
-    dispatchKey(this.host, "Enter"); // Enter → beginEdit (input-controller)
+    dispatchKey(this.host, "Enter");
+    if (!this.editorOpen()) throw new Error("Sheetwrite editor did not open");
   }
 
   closeEditor(): void {
-    const ta = this.host.querySelector<HTMLTextAreaElement>(".sheetwrite-editor");
-    if (ta) dispatchKey(ta, "Escape");
+    const editor = this.host.querySelector<HTMLTextAreaElement>(".sheetwrite-editor");
+    if (editor) dispatchKey(editor, "Escape");
   }
 
   editCommit(value: string): void {
     this.openEditor();
-    const ta = this.host.querySelector<HTMLTextAreaElement>(".sheetwrite-editor");
-    if (!ta) return;
-    ta.value = value;
-    dispatchKey(ta, "Enter"); // commit + navigate down
+    const editor = this.host.querySelector<HTMLTextAreaElement>(".sheetwrite-editor");
+    if (!editor) throw new Error("Sheetwrite editor disappeared before commit");
+    editor.value = value;
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    dispatchKey(editor, "Enter");
   }
 
-  moveSelection(dir: "down" | "right"): void {
+  moveSelection(direction: "down" | "right"): void {
     this.host.focus();
-    dispatchKey(this.host, dir === "down" ? "ArrowDown" : "ArrowRight");
+    dispatchKey(this.host, direction === "down" ? "ArrowDown" : "ArrowRight");
     this.grid.refresh();
   }
 
@@ -251,57 +225,114 @@ class SheetwriteAdapter implements BenchAdapter {
   }
 }
 
-// ── Handsontable adapter ─────────────────────────────────────────────────────
-
-class HandsontableAdapter implements BenchAdapter {
+class HandsontableAdapter implements RenderBenchAdapter {
   readonly id = "handsontable" as const;
-  readonly rowCount: number;
+  readonly initialRowCount: number;
   readonly colCount = COLUMNS.length;
-  private hot!: Handsontable;
+  private hot!: HotInstance;
   private host!: HTMLElement;
-  private readonly data: Handsontable.CellValue[][];
+  private readonly data: CellValue[][];
 
-  constructor(ds: ColumnarDataset) {
-    this.rowCount = ds.rowCount;
-    this.data = toAoA(ds) as Handsontable.CellValue[][];
+  constructor(dataset: ColumnarDataset) {
+    this.initialRowCount = dataset.rowCount;
+    this.data = toAoA(dataset);
   }
 
-  mount(host: HTMLElement): number {
+  mount(host: HTMLElement): void {
     host.classList.add("ht-theme-main");
     this.host = host;
-    const t0 = performance.now();
-    this.hot = new Handsontable(host, {
+    const settings: GridSettings = {
       data: this.data,
-      columns: COLUMNS.map((c, i) => ({ data: i, type: c.type === "number" ? "numeric" : "text" })),
-      colHeaders: COLUMNS.map((c) => c.header),
+      columns: COLUMNS.map((column, index) => ({
+        data: index,
+        type: column.type === "number" ? "numeric" : "text",
+      })),
+      colHeaders: COLUMNS.map((column) => column.header),
+      colWidths: COLUMNS.map((column) => column.width),
       rowHeaders: true,
       columnSorting: true,
       filters: true,
-      width: 1000,
-      height: 600,
+      width: RENDER_VIEWPORT.width,
+      height: RENDER_VIEWPORT.height,
       renderAllRows: false,
       autoColumnSize: false,
       autoRowSize: false,
       licenseKey: "non-commercial-and-evaluation",
-    });
-    return performance.now() - t0;
+    };
+    this.hot = createHandsontable(host, settings, [
+      "alter",
+      "countRows",
+      "destroy",
+      "getActiveEditor",
+      "getDataAtCell",
+      "getSelectedLast",
+      "scrollViewportTo",
+      "selectCell",
+      "setDataAtCell",
+    ]);
   }
 
-  scrollElement(): HTMLElement {
-    const el = this.host.querySelector<HTMLElement>(".ht_master .wtHolder");
-    if (!el) throw new Error(".ht_master .wtHolder not found");
-    return el;
+  isMountedAndAccessible(): boolean {
+    return (
+      this.host.isConnected &&
+      this.host.getAttribute("aria-label") !== null &&
+      this.host.querySelector(".ht_master") !== null &&
+      this.host.querySelector("table") !== null
+    );
   }
 
-  resetScroll(): void {
-    const el = this.scrollElement();
-    el.scrollTop = 0;
-    el.scrollLeft = 0;
-    el.dispatchEvent(new Event("scroll"));
+  rowCount(): number {
+    return this.hot.countRows();
   }
 
-  repaintScroll(el: HTMLElement): void {
-    el.dispatchEvent(new Event("scroll")); // Handsontable renders the new viewport in its scroll handler
+  cellValue(row: number, col: number): unknown {
+    return this.hot.getDataAtCell(row, col);
+  }
+
+  setCellValue(row: number, col: number, value: string | number | null): void {
+    this.hot.setDataAtCell(row, col, value, "benchmark-reset");
+  }
+
+  selection(): CellSelection | null {
+    const selection = this.hot.getSelectedLast();
+    const row = selection?.[0];
+    const col = selection?.[1];
+    return row === undefined || col === undefined ? null : { row, col };
+  }
+
+  editorOpen(): boolean {
+    return this.hot.getActiveEditor()?.isOpened() ?? false;
+  }
+
+  private scrollElement(): HTMLElement {
+    const element = this.host.querySelector<HTMLElement>(".ht_master .wtHolder");
+    if (!element) throw new Error("Handsontable scroller is not mounted");
+    return element;
+  }
+
+  prepareScroll(axis: "top" | "left", startMiddle: boolean): void {
+    const element = this.scrollElement();
+    element.scrollTop = axis === "top" && startMiddle ? Math.floor(element.scrollHeight / 2) : 0;
+    element.scrollLeft = axis === "left" && startMiddle ? Math.floor(element.scrollWidth / 2) : 0;
+    element.dispatchEvent(new Event("scroll"));
+  }
+
+  scrollBy(axis: "top" | "left", pixels: number): void {
+    const element = this.scrollElement();
+    if (axis === "top") element.scrollTop += pixels;
+    else element.scrollLeft += pixels;
+    element.dispatchEvent(new Event("scroll"));
+  }
+
+  scrollObservation(): ScrollObservation {
+    const element = this.scrollElement();
+    return {
+      top: element.scrollTop,
+      left: element.scrollLeft,
+      maximumTop: Math.max(0, element.scrollHeight - element.clientHeight),
+      maximumLeft: Math.max(0, element.scrollWidth - element.clientWidth),
+      firstVisibleRow: Math.floor(element.scrollTop / HANDSONTABLE_ROW_HEIGHT),
+    };
   }
 
   selectAndReveal(row: number, col: number): void {
@@ -310,28 +341,36 @@ class HandsontableAdapter implements BenchAdapter {
   }
 
   openEditor(): void {
-    this.hot.getActiveEditor()?.beginEditing();
+    const editor = this.hot.getActiveEditor();
+    if (!editor) throw new Error("Handsontable has no active editor");
+    editor.beginEditing();
+    if (!editor.isOpened()) throw new Error("Handsontable editor did not open");
   }
 
   closeEditor(): void {
-    this.hot.getActiveEditor()?.finishEditing(true); // restore original = cancel
+    const editor = this.hot.getActiveEditor();
+    if (editor?.isOpened()) editor.finishEditing(true);
   }
 
   editCommit(value: string): void {
-    const ed = this.hot.getActiveEditor();
-    if (!ed) return;
-    ed.beginEditing();
-    ed.setValue(value);
-    ed.finishEditing();
+    const editor = this.hot.getActiveEditor();
+    if (!editor) throw new Error("Handsontable has no active editor");
+    editor.beginEditing();
+    editor.setValue(value);
+    editor.finishEditing();
   }
 
-  moveSelection(dir: "down" | "right"): void {
-    const sel = this.hot.getSelectedLast();
-    if (!sel) return;
-    const r0 = sel[0] ?? 0;
-    const c0 = sel[1] ?? 0;
-    const row = dir === "down" ? Math.min(this.hot.countRows() - 1, r0 + 1) : r0;
-    const col = dir === "right" ? Math.min(this.hot.countCols() - 1, c0 + 1) : c0;
+  moveSelection(direction: "down" | "right"): void {
+    const selection = this.hot.getSelectedLast();
+    const selectedRow = selection?.[0];
+    const selectedCol = selection?.[1];
+    if (selectedRow === undefined || selectedCol === undefined) {
+      throw new Error("Handsontable has no active selection");
+    }
+    const row =
+      direction === "down" ? Math.min(this.hot.countRows() - 1, selectedRow + 1) : selectedRow;
+    const col =
+      direction === "right" ? Math.min(this.hot.countCols() - 1, selectedCol + 1) : selectedCol;
     this.hot.selectCell(row, col);
   }
 
@@ -348,286 +387,184 @@ class HandsontableAdapter implements BenchAdapter {
   }
 }
 
-// ── Scenario battery ─────────────────────────────────────────────────────────
-
-function statFrom(id: string, group: ScenarioStat["group"], samples: number[]): ScenarioStat {
-  const s = summarize(samples);
-  return { id, group, median: s.median, p95: s.p95, mean: s.mean, samples: s.iters };
-}
-
-function scrollScenario(
-  adapter: BenchAdapter,
-  id: string,
-  axis: "top" | "left",
-  startMiddle: boolean,
-  sampleSize: number,
-): ScenarioStat {
-  const el = adapter.scrollElement();
-  adapter.resetScroll();
-  if (startMiddle) {
-    if (axis === "top") el.scrollTop = Math.floor(el.scrollHeight / 2);
-    else el.scrollLeft = Math.floor(el.scrollWidth / 2);
-    adapter.repaintScroll(el);
-  }
-  const samples = collect(
-    () => {
-      if (axis === "top") el.scrollTop += SCROLL_STEP;
-      else el.scrollLeft += SCROLL_STEP;
-      adapter.repaintScroll(el);
-    },
-    { warmup: 10, iters: sampleSize },
-  );
-  const base = statFrom(id, "view-scrolling", samples);
-  const droppedFrames = samples.filter((d) => d > FRAME_BUDGET_MS).length;
-  return { ...base, droppedFrames };
-}
-
-function discreteScenario(
-  id: string,
-  group: ScenarioStat["group"],
-  fn: () => void,
-  sampleSize: number,
-  hooks: Pick<MeasureOptions, "before" | "after"> = {},
-): ScenarioStat {
-  const samples = collect(fn, { warmup: 5, iters: sampleSize, ...hooks });
-  return statFrom(id, group, samples);
-}
-
-async function runScenarios(adapter: BenchAdapter, sampleSize: number): Promise<ScenarioStat[]> {
-  const out: ScenarioStat[] = [];
-  const rows = adapter.rowCount;
-  const midRow = Math.floor(rows / 2);
-  const midCol = Math.floor(adapter.colCount / 2);
-  const lastRow = rows - 1;
-  const lastCol = adapter.colCount - 1;
-
-  // ── view-scrolling ──
-  out.push(scrollScenario(adapter, "scroll-down.top-left", "top", false, sampleSize));
-  await settle();
-  out.push(scrollScenario(adapter, "scroll-down.middle", "top", true, sampleSize));
-  await settle();
-  out.push(scrollScenario(adapter, "scroll-right.top-left", "left", false, sampleSize));
-  await settle();
-
-  // ── editing: edit-open latency at three positions ──
-  for (const [id, r, c] of [
-    ["edit-open.top-left", 2, 2],
-    ["edit-open.middle", midRow, midCol],
-    ["edit-open.bottom-right", lastRow, lastCol],
-  ] as const) {
-    adapter.selectAndReveal(r, c);
-    await settle();
-    out.push(
-      discreteScenario(id, "editing", () => adapter.openEditor(), sampleSize, {
-        before: () => adapter.selectAndReveal(r, c),
-        after: () => adapter.closeEditor(),
-      }),
-    );
-    adapter.closeEditor();
-    await settle();
-  }
-
-  // ── editing: edit-commit (open → type → commit) at the middle ──
-  adapter.selectAndReveal(midRow, midCol);
-  await settle();
-  out.push(
-    discreteScenario(
-      "edit-commit.middle",
-      "editing",
-      () => adapter.editCommit("12345"),
-      sampleSize,
-      {
-        before: () => adapter.selectAndReveal(midRow, midCol),
-      },
-    ),
-  );
-  await settle();
-
-  // ── altering: insert / remove 5 rows at the top ──
-  out.push(
-    discreteScenario(
-      "altering.insert-5-rows-top",
-      "altering",
-      () => adapter.insertRows(1, 5),
-      sampleSize,
-      {
-        after: () => adapter.removeRows(1, 5),
-      },
-    ),
-  );
-  await settle();
-  out.push(
-    discreteScenario(
-      "altering.remove-5-rows-top",
-      "altering",
-      () => adapter.removeRows(1, 5),
-      sampleSize,
-      {
-        before: () => adapter.insertRows(1, 5),
-      },
-    ),
-  );
-  await settle();
-
-  // ── arrow-keys-navigation ──
-  adapter.selectAndReveal(25, 0);
-  await settle();
-  out.push(
-    discreteScenario(
-      "arrow-down.top-left",
-      "arrow-keys-navigation",
-      () => adapter.moveSelection("down"),
-      sampleSize,
-    ),
-  );
-  adapter.selectAndReveal(midRow, midCol);
-  await settle();
-  out.push(
-    discreteScenario(
-      "arrow-right.middle",
-      "arrow-keys-navigation",
-      () => adapter.moveSelection("right"),
-      sampleSize,
-    ),
-  );
-
-  return out;
-}
-
-// ── Orchestration ────────────────────────────────────────────────────────────
-
-const status = document.getElementById("status");
-const resultsEl = document.getElementById("results");
-const stage = document.getElementById("stage");
+const statusElement = document.getElementById("status");
+const resultsElement = document.getElementById("results");
+const stageElement = document.getElementById("stage");
 
 function setStatus(text: string): void {
-  if (status) status.textContent = text;
+  if (statusElement) statusElement.textContent = text;
 }
 
-function renderResults(results: BenchResults): void {
-  const lines: string[] = [];
-  lines.push(`grid:   ${results.grid}`);
-  lines.push(
-    `rows:   ${results.rows.toLocaleString("en-US")}  ·  cols: ${results.cols}  ·  samples: ${results.sampleSize}`,
-  );
-  lines.push(`mount:  ${ms(results.initialRenderMs)} ms (construct + first paint)`);
-  lines.push(
-    `heap:   ${results.heapAfterMountMiB === null ? "n/a" : `${results.heapAfterMountMiB.toFixed(1)} MiB`} (post-mount, Chrome only)`,
-  );
-  lines.push("");
-  lines.push(
-    "scenario".padEnd(28) + "median".padStart(10) + "p95".padStart(10) + "dropped".padStart(10),
-  );
-  lines.push("─".repeat(58));
-  let group = "";
-  for (const s of results.scenarios) {
-    if (s.group !== group) {
-      group = s.group;
-      lines.push(`[${group}]`);
+function renderResults(result: BrowserCombinationResult): void {
+  if (!resultsElement) return;
+  const lines = [
+    `run: ${result.runId}`,
+    `engine: ${result.engine} · rows: ${result.rows.toLocaleString("en-US")} · round: ${result.round}`,
+    `dataset: ${result.datasetHash}`,
+    "",
+  ];
+  for (const scenario of result.results) {
+    if (scenario.status === "failed") {
+      lines.push(`${scenario.scenarioId.padEnd(32)} FAILED ${scenario.stage}: ${scenario.message}`);
+    } else {
+      lines.push(
+        `${scenario.scenarioId.padEnd(32)} median ${scenario.medianMs.toFixed(5)} ms · p95 ${scenario.p95Ms.toFixed(5)} · MAD ${scenario.madMs.toFixed(5)} · ${scenario.operationCount} ops`,
+      );
     }
-    const dropped = s.droppedFrames === undefined ? "" : String(s.droppedFrames);
-    lines.push(
-      `  ${s.id}`.padEnd(28) +
-        `${ms(s.median)}`.padStart(10) +
-        `${ms(s.p95)}`.padStart(10) +
-        dropped.padStart(10),
-    );
   }
-  if (resultsEl) resultsEl.textContent = lines.join("\n");
+  resultsElement.textContent = lines.join("\n");
 }
 
-async function run(grid: EngineId, rows: number, sampleSize: number): Promise<void> {
-  if (!stage) throw new Error("missing #stage");
-  setStatus(`building ${rows.toLocaleString("en-US")}-row dataset …`);
+function teardownFailures(results: readonly ScenarioResult[], error: unknown): ScenarioResult[] {
+  const normalized = error instanceof Error ? error : new Error(String(error));
+  return results.map(
+    (result): FailedScenario => ({
+      runId: result.runId,
+      round: result.round,
+      engine: result.engine,
+      rows: result.rows,
+      scenarioId: result.scenarioId,
+      group: result.group,
+      status: "failed",
+      stage: "teardown",
+      errorClass: normalized.name || "Error",
+      message: normalized.message,
+      timeout: false,
+      crash: false,
+      consoleErrors: result.status === "failed" ? result.consoleErrors : [],
+      pageErrors: result.status === "failed" ? result.pageErrors : [],
+      partialSamples: result.status === "success" ? result.rawSamples : result.partialSamples,
+      validation: result.validation,
+      memory: result.memory,
+    }),
+  );
+}
+
+async function run(configuration: PageConfiguration): Promise<void> {
+  if (!stageElement) throw new Error("benchmark page is missing #stage");
+  window.__benchStage = "build";
+  setStatus(`building ${configuration.rows.toLocaleString("en-US")}-row dataset`);
   await nextFrame();
+  if (configuration.engine === "sheetwrite") await initSheetwrite();
+  const dataset = makeColumnar(configuration.rows);
+  const hash = datasetChecksum(dataset);
 
-  const ds = makeColumnar(rows);
-
-  // Fresh host inside the stage for this run.
-  stage.replaceChildren();
+  stageElement.replaceChildren();
   const host = document.createElement("div");
-  host.style.width = "1000px";
-  host.style.height = "600px";
-  stage.appendChild(host);
+  host.style.width = `${RENDER_VIEWPORT.width}px`;
+  host.style.height = `${RENDER_VIEWPORT.height}px`;
+  host.tabIndex = 0;
+  host.setAttribute("role", "application");
+  host.setAttribute("aria-label", `${configuration.engine} benchmark grid`);
+  stageElement.appendChild(host);
 
-  const adapter: BenchAdapter =
-    grid === "sheetwrite" ? new SheetwriteAdapter(ds) : new HandsontableAdapter(ds);
-
-  setStatus(`mounting ${grid} …`);
-  await nextFrame();
-  const initialRenderMs = adapter.mount(host);
+  const adapter: RenderBenchAdapter =
+    configuration.engine === "sheetwrite"
+      ? new SheetwriteAdapter(dataset)
+      : new HandsontableAdapter(dataset);
+  window.__benchStage = "mount";
+  setStatus(`mounting ${configuration.engine}`);
+  adapter.mount(host);
   await settle();
-  const heapBytes = usedJsHeapBytes();
 
-  setStatus(`running scenarios (${grid}, ${rows.toLocaleString("en-US")} rows) …`);
-  const scenarios = await runScenarios(adapter, sampleSize);
-
-  const results: BenchResults = {
-    grid,
-    rows,
-    cols: COLUMNS.length,
-    sampleSize,
-    userAgent: navigator.userAgent,
-    timestamp: new Date().toISOString(),
-    initialRenderMs,
-    heapAfterMountMiB: heapBytes === null ? null : heapBytes / (1024 * 1024),
-    scenarios,
+  let output: BrowserCombinationResult = {
+    protocolVersion: RENDER_PROTOCOL_VERSION,
+    runId: configuration.runId,
+    round: configuration.round,
+    engine: configuration.engine,
+    rows: configuration.rows,
+    datasetHash: hash,
+    results: [],
   };
+  window.__benchResults = output;
 
-  window.__benchResults = results;
+  const results: ScenarioResult[] = [];
+  for (const scenario of RENDER_SCENARIOS) {
+    setStatus(`running ${scenario.id}`);
+    const result = runRenderScenario(adapter, dataset, scenario.id, {
+      runId: configuration.runId,
+      round: configuration.round,
+      warmupSamples: configuration.warmupSamples,
+      measuredSamples: configuration.measuredSamples,
+      minimumSampleDurationMs: configuration.minimumSampleDurationMs,
+      onStage: (stage) => {
+        window.__benchStage = stage;
+      },
+    });
+    results.push(result);
+    output = { ...output, results: [...results] };
+    window.__benchResults = output;
+    renderResults(output);
+    await settle();
+  }
+
+  window.__benchStage = "teardown";
+  try {
+    adapter.destroy();
+  } catch (error) {
+    output = { ...output, results: teardownFailures(results, error) };
+    window.__benchResults = output;
+  }
+  window.__benchStage = "complete";
   window.__benchDone = true;
-  renderResults(results);
-  setStatus(`done — ${grid} @ ${rows.toLocaleString("en-US")} rows`);
-  // eslint-disable-next-line no-console
-  console.log("[render-bench]", JSON.stringify(results));
+  renderResults(output);
+  setStatus(`done — ${configuration.engine} @ ${configuration.rows.toLocaleString("en-US")} rows`);
+  console.log("[render-bench]", JSON.stringify(output));
+}
+
+function positiveInteger(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function nonNegativeInteger(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function readConfiguration(params: URLSearchParams): PageConfiguration {
+  const engine = params.get("engine") === "handsontable" ? "handsontable" : "sheetwrite";
+  const runId = params.get("runId");
+  if (!runId) throw new Error("render benchmark requires a runId");
+  return {
+    engine,
+    rows: positiveInteger(params.get("rows"), 100_000),
+    measuredSamples: positiveInteger(params.get("samples"), 3),
+    warmupSamples: nonNegativeInteger(params.get("warmups"), 1),
+    minimumSampleDurationMs: Math.max(
+      RENDER_MINIMUM_SAMPLE_MS,
+      positiveInteger(params.get("minimumSampleMs"), RENDER_MINIMUM_SAMPLE_MS),
+    ),
+    runId,
+    round: positiveInteger(params.get("round"), 1),
+  };
 }
 
 async function boot(): Promise<void> {
-  await initSheetwrite(wasmUrl);
-
+  delete window.__benchResults;
+  delete window.__benchError;
+  delete window.__benchStage;
+  window.__benchDone = false;
   const params = new URLSearchParams(location.search);
-  const gridSel = document.getElementById("grid");
-  const rowsSel = document.getElementById("rows");
-  const samplesSel = document.getElementById("samples");
-  const runBtn = document.getElementById("run");
-
-  const readControls = (): { grid: EngineId; rows: number; samples: number } => {
-    const grid =
-      gridSel instanceof HTMLSelectElement && gridSel.value === "handsontable"
-        ? "handsontable"
-        : "sheetwrite";
-    const rows = rowsSel instanceof HTMLSelectElement ? Number(rowsSel.value) : 100_000;
-    const samples = samplesSel instanceof HTMLSelectElement ? Number(samplesSel.value) : 100;
-    return { grid, rows, samples };
-  };
-
-  // Reflect URL params into the controls.
-  const pGrid = params.get("grid");
-  const pRows = params.get("rows");
-  const pSamples = params.get("samples");
-  if (pGrid && gridSel instanceof HTMLSelectElement) gridSel.value = pGrid;
-  if (pRows && rowsSel instanceof HTMLSelectElement) rowsSel.value = pRows;
-  if (pSamples && samplesSel instanceof HTMLSelectElement) samplesSel.value = pSamples;
-
+  const runButton = document.getElementById("run");
   const launch = async (): Promise<void> => {
+    delete window.__benchResults;
+    delete window.__benchError;
     window.__benchDone = false;
-    const { grid, rows, samples } = readControls();
     try {
-      await run(grid, rows, samples);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      window.__benchError = message;
+      await run(readConfiguration(params));
+    } catch (error) {
+      const normalized = error instanceof Error ? error : new Error(String(error));
+      window.__benchError = normalized.message;
       window.__benchDone = true;
-      setStatus(`error: ${message}`);
-      if (resultsEl)
-        resultsEl.textContent = `error: ${message}\n${err instanceof Error ? err.stack : ""}`;
+      setStatus(`error: ${normalized.message}`);
+      if (resultsElement)
+        resultsElement.textContent = `${normalized.name}: ${normalized.message}\n${normalized.stack ?? ""}`;
     }
   };
-
-  runBtn?.addEventListener("click", () => void launch());
-
+  runButton?.addEventListener("click", () => void launch());
   if (params.get("auto") === "1") await launch();
-  else setStatus("ready");
+  else setStatus("ready — automated runs must provide runId and auto=1");
 }
 
 void boot();

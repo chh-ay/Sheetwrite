@@ -38,15 +38,15 @@ const baseline = {
   sheetwrite: Object.fromEntries(SHEETWRITE_ROWS.map((rows) => [rows, { stats: stats(10) }])),
 };
 
-test("records every round while comparing the best median", () => {
+test("records every round while comparing their aggregate median", () => {
   const comparisons = compareSheetwriteMedians(baseline, [round(13), round(11), round(12)]);
   expect(comparisons).toHaveLength(30);
   expect(comparisons[0]).toMatchObject({
     baselineMedian: 10,
     roundMedians: [13, 11, 12],
-    freshMedian: 11,
-    absoluteDelta: 1,
-    ratio: 1.1,
+    freshMedian: 12,
+    absoluteDelta: 2,
+    ratio: 1.2,
     regression: false,
   });
 });
