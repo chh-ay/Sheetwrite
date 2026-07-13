@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  type DocumentValidationError,
+  type DocumentValidationResult,
   documentOpTarget,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
@@ -91,6 +93,104 @@ function richSnapshot(): WorkbookSnapshot {
   };
 }
 
+function withoutTopLevel(key: string): unknown {
+  const snapshot = { ...richSnapshot() } as Record<string, unknown>;
+  delete snapshot[key];
+  return snapshot;
+}
+
+function withWorkbook(patch: Record<string, unknown>): unknown {
+  const snapshot = richSnapshot();
+  return { ...snapshot, workbook: { ...snapshot.workbook, ...patch } };
+}
+
+function withFirstSheet(patch: Record<string, unknown>): unknown {
+  const snapshot = richSnapshot();
+  return {
+    ...snapshot,
+    sheets: [{ ...snapshot.sheets[0]!, ...patch }, ...snapshot.sheets.slice(1)],
+  };
+}
+
+function withFirstBlock(patch: Record<string, unknown>): unknown {
+  const snapshot = richSnapshot();
+  const sheet = snapshot.sheets[0]!;
+  return {
+    ...snapshot,
+    sheets: [
+      {
+        ...sheet,
+        cells: [{ ...sheet.cells[0]!, ...patch }, ...sheet.cells.slice(1)],
+      },
+      ...snapshot.sheets.slice(1),
+    ],
+  };
+}
+
+function withoutFirstBlockField(key: string): unknown {
+  const snapshot = richSnapshot();
+  const sheet = snapshot.sheets[0]!;
+  const block = { ...sheet.cells[0]! } as Record<string, unknown>;
+  delete block[key];
+  return {
+    ...snapshot,
+    sheets: [{ ...sheet, cells: [block, ...sheet.cells.slice(1)] }, ...snapshot.sheets.slice(1)],
+  };
+}
+
+function withoutFirstCellField(key: string): unknown {
+  const snapshot = richSnapshot();
+  const sheet = snapshot.sheets[0]!;
+  const block = sheet.cells[0]!;
+  const cell = { ...block.cells[0]! } as Record<string, unknown>;
+  delete cell[key];
+  return {
+    ...snapshot,
+    sheets: [
+      {
+        ...sheet,
+        cells: [{ ...block, cells: [cell, ...block.cells.slice(1)] }, ...sheet.cells.slice(1)],
+      },
+      ...snapshot.sheets.slice(1),
+    ],
+  };
+}
+
+function withFirstCell(patch: Record<string, unknown>): unknown {
+  const snapshot = richSnapshot();
+  const sheet = snapshot.sheets[0]!;
+  const block = sheet.cells[0]!;
+  return {
+    ...snapshot,
+    sheets: [
+      {
+        ...sheet,
+        cells: [
+          {
+            ...block,
+            cells: [{ ...block.cells[0]!, ...patch }, ...block.cells.slice(1)],
+          },
+          ...sheet.cells.slice(1),
+        ],
+      },
+      ...snapshot.sheets.slice(1),
+    ],
+  };
+}
+
+function expectInvalid(
+  value: unknown,
+  expected: Pick<DocumentValidationError, "path" | "code">,
+): DocumentValidationResult {
+  let result: DocumentValidationResult | undefined;
+  expect(() => {
+    result = validateWorkbookSnapshot(value);
+  }).not.toThrow();
+  if (!result || result.ok) throw new Error("malformed snapshot unexpectedly accepted");
+  expect(result.errors).toContainEqual(expect.objectContaining(expected));
+  return result;
+}
+
 describe("workbook document protocol", () => {
   it("round-trips every authoritative field through JSON", () => {
     const parsed: unknown = JSON.parse(JSON.stringify(richSnapshot()));
@@ -111,6 +211,305 @@ describe("workbook document protocol", () => {
     expect(result.value).not.toHaveProperty("selection");
     expect(result.value).not.toHaveProperty("scrollTop");
     expect(result.value).not.toHaveProperty("zoom");
+  });
+
+  it("returns stable structured errors for every top-level trust-boundary value", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const inherited = Object.create({ inherited: true }) as Record<string, unknown>;
+    inherited.schemaVersion = WORKBOOK_SCHEMA_VERSION;
+    const nullPrototype = Object.create(null) as Record<string, unknown>;
+    nullPrototype.schemaVersion = WORKBOOK_SCHEMA_VERSION;
+    const hostileProxy = new Proxy(
+      {},
+      {
+        ownKeys(): never {
+          throw new Error("validator trusted proxy reflection");
+        },
+      },
+    );
+
+    const cases: Array<{
+      name: string;
+      value: unknown;
+      path: string;
+      code: DocumentValidationError["code"];
+    }> = [
+      { name: "null", value: null, path: "$", code: "invalid-value" },
+      { name: "undefined", value: undefined, path: "$", code: "non-serializable" },
+      { name: "string", value: "snapshot", path: "$", code: "invalid-value" },
+      { name: "number", value: 1, path: "$", code: "invalid-value" },
+      { name: "boolean", value: true, path: "$", code: "invalid-value" },
+      { name: "array", value: [], path: "$", code: "invalid-value" },
+      { name: "function", value: () => undefined, path: "$", code: "non-serializable" },
+      { name: "date", value: new Date(0), path: "$", code: "non-serializable" },
+      { name: "map", value: new Map(), path: "$", code: "non-serializable" },
+      { name: "set", value: new Set(), path: "$", code: "non-serializable" },
+      { name: "typed array", value: new Uint8Array(), path: "$", code: "non-serializable" },
+      { name: "cycle", value: cyclic, path: "self", code: "non-serializable" },
+      { name: "inherited prototype", value: inherited, path: "$", code: "non-serializable" },
+      { name: "null prototype", value: nullPrototype, path: "$", code: "non-serializable" },
+      { name: "hostile proxy", value: hostileProxy, path: "$", code: "invalid-value" },
+    ];
+
+    for (const testCase of cases) {
+      expectInvalid(testCase.value, { path: testCase.path, code: testCase.code });
+    }
+  });
+
+  it("rejects malformed containers without descending through them", () => {
+    const optionalContainers = [
+      "rowMeta",
+      "merges",
+      "conditionalFormats",
+      "validationRules",
+      "protectedRanges",
+      "notes",
+      "sortKeys",
+      "filters",
+      "rowGroups",
+    ];
+    const cases: Array<{ value: unknown; path: string }> = [
+      { value: withoutTopLevel("workbook"), path: "workbook" },
+      { value: { ...richSnapshot(), workbook: null }, path: "workbook" },
+      { value: { ...richSnapshot(), workbook: 1 }, path: "workbook" },
+      { value: withWorkbook({ activeSheet: null }), path: "workbook.activeSheet" },
+      { value: withoutTopLevel("sheets"), path: "sheets" },
+      { value: { ...richSnapshot(), sheets: null }, path: "sheets" },
+      { value: { ...richSnapshot(), sheets: "not-an-array" }, path: "sheets" },
+      { value: { ...richSnapshot(), sheets: [] }, path: "sheets" },
+      { value: { ...richSnapshot(), sheets: [null] }, path: "sheets[0]" },
+      { value: { ...richSnapshot(), sheets: [1] }, path: "sheets[0]" },
+      { value: withFirstSheet({ columns: null }), path: "sheets[0].columns" },
+      { value: withFirstSheet({ columns: [null] }), path: "sheets[0].columns[0]" },
+      { value: withFirstSheet({ cells: null }), path: "sheets[0].cells" },
+      { value: withFirstSheet({ cells: [null] }), path: "sheets[0].cells[0]" },
+      { value: withFirstBlock({ cells: null }), path: "sheets[0].cells[0].cells" },
+      { value: withFirstBlock({ cells: [null] }), path: "sheets[0].cells[0].cells[0]" },
+      { value: withoutFirstBlockField("cells"), path: "sheets[0].cells[0].cells" },
+      { value: withoutFirstCellField("value"), path: "sheets[0].cells[0].cells[0].value" },
+      ...optionalContainers.flatMap((field) => [
+        {
+          value: withFirstSheet({ [field]: null }),
+          path: `sheets[0].${field}`,
+        },
+        {
+          value: withFirstSheet({ [field]: [null] }),
+          path: `sheets[0].${field}[0]`,
+        },
+        {
+          value: withFirstSheet({ [field]: [1] }),
+          path: `sheets[0].${field}[0]`,
+        },
+      ]),
+    ];
+
+    for (const testCase of cases) {
+      expectInvalid(testCase.value, { path: testCase.path, code: "invalid-value" });
+    }
+  });
+
+  it("rejects malformed blocks, cells, ranges, values, and styles at exact paths", () => {
+    const sheet = richSnapshot().sheets[0]!;
+    const block = sheet.cells[0]!;
+    const cell = block.cells[0]!;
+    const conditionalFormat = {
+      range: { sheet: "sheet-b", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+      when: { kind: "greaterThan", value: 0 },
+      style: { bold: true },
+    };
+    const cases: Array<{ value: unknown; path: string; code?: DocumentValidationError["code"] }> = [
+      {
+        value: withFirstBlock({ startRow: 0.5 }),
+        path: "sheets[0].cells[0].startRow",
+      },
+      {
+        value: withFirstBlock({ rowCount: 0 }),
+        path: "sheets[0].cells[0].rowCount",
+      },
+      {
+        value: withFirstCell({ rowOffset: "0" }),
+        path: "sheets[0].cells[0].cells[0].rowOffset",
+      },
+      {
+        value: withFirstCell({ value: { kind: "unknown" } }),
+        path: "sheets[0].cells[0].cells[0].value.kind",
+      },
+      {
+        value: withFirstCell({ value: { kind: "formula", src: 1 } }),
+        path: "sheets[0].cells[0].cells[0].value.src",
+      },
+      {
+        value: withFirstCell({ value: { kind: "ref", target: null } }),
+        path: "sheets[0].cells[0].cells[0].value.target",
+      },
+      {
+        value: withFirstCell({ style: null }),
+        path: "sheets[0].cells[0].cells[0].style",
+      },
+      {
+        value: withFirstCell({ style: { bold: "yes" } }),
+        path: "sheets[0].cells[0].cells[0].style.bold",
+      },
+      {
+        value: withFirstSheet({
+          conditionalFormats: [{ ...conditionalFormat, range: null }],
+        }),
+        path: "sheets[0].conditionalFormats[0].range",
+      },
+      {
+        value: withFirstSheet({
+          conditionalFormats: [
+            {
+              ...conditionalFormat,
+              range: {
+                ...conditionalFormat.range,
+                start: { row: 0.25, col: 0 },
+              },
+            },
+          ],
+        }),
+        path: "sheets[0].conditionalFormats[0].range.start.row",
+      },
+      {
+        value: withFirstCell({
+          ...cell,
+          value: { kind: "ref", target: { sheet: "missing", row: 0, col: 0 } },
+        }),
+        path: "sheets[0].cells[0].cells[0].value.target",
+        code: "missing-reference",
+      },
+      {
+        value: withFirstCell({
+          ...cell,
+          value: { kind: "ref", target: { sheet: "sheet-b", row: 99, col: 0 } },
+        }),
+        path: "sheets[0].cells[0].cells[0].value.target",
+        code: "out-of-bounds",
+      },
+      {
+        value: withWorkbook({
+          namedRanges: [
+            {
+              name: "Missing",
+              range: { sheet: "missing", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+            },
+          ],
+        }),
+        path: "workbook.namedRanges[0].range",
+        code: "missing-reference",
+      },
+      {
+        value: withWorkbook({
+          namedRanges: [
+            {
+              name: "Outside",
+              range: { sheet: "sheet-b", start: { row: 0, col: 0 }, end: { row: 9, col: 0 } },
+            },
+          ],
+        }),
+        path: "workbook.namedRanges[0].range",
+        code: "out-of-bounds",
+      },
+    ];
+
+    for (const testCase of cases) {
+      expectInvalid(testCase.value, {
+        path: testCase.path,
+        code: testCase.code ?? "invalid-value",
+      });
+    }
+  });
+
+  it("rejects every value that is not closed under JSON serialization", () => {
+    const accessor = Object.create(Object.prototype) as Record<string, unknown>;
+    Object.defineProperty(accessor, "value", {
+      enumerable: true,
+      get(): never {
+        throw new Error("validator invoked an untrusted getter");
+      },
+    });
+    const sparse: unknown[] = [];
+    sparse.length = 1;
+    const nestedPrototype = Object.create({ inherited: true }) as Record<string, unknown>;
+    nestedPrototype.value = "unsafe";
+
+    const values: Array<{ value: unknown; path: string }> = [
+      { value: Number.NaN, path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: Number.POSITIVE_INFINITY, path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: Number.NEGATIVE_INFINITY, path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: undefined, path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: new Date(0), path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: Symbol("unsafe"), path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: 1n, path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: accessor, path: "sheets[0].cells[0].cells[0].value.value.value" },
+      { value: nestedPrototype, path: "sheets[0].cells[0].cells[0].value.value" },
+      { value: sparse, path: "sheets[0].cells[0].cells[0].value.value[0]" },
+    ];
+
+    for (const testCase of values) {
+      expectInvalid(withFirstCell({ value: { kind: "literal", value: testCase.value } }), {
+        path: testCase.path,
+        code: "non-serializable",
+      });
+    }
+
+    const metadataValues: Array<{ value: unknown; path: string }> = [
+      {
+        value: withFirstSheet({ rowMeta: [[0, { height: Number.NaN }]] }),
+        path: "sheets[0].rowMeta[0][1].height",
+      },
+      {
+        value: withFirstSheet({
+          columns: [
+            {
+              ...richSnapshot().sheets[0]!.columns[0]!,
+              headerStyle: { color: new Date(0) },
+            },
+          ],
+        }),
+        path: "sheets[0].columns[0].headerStyle.color",
+      },
+    ];
+    for (const testCase of metadataValues) {
+      expectInvalid(testCase.value, { path: testCase.path, code: "non-serializable" });
+    }
+  });
+
+  it("keeps every accepted snapshot semantically stable across a JSON round-trip", () => {
+    const snapshot = richSnapshot();
+    const sheet = snapshot.sheets[0]!;
+    sheet.cells[0]!.cells[0]!.value = { kind: "literal", value: true };
+    sheet.cells[0]!.cells[1]!.value = { kind: "literal", value: null };
+
+    const result = validateWorkbookSnapshot(snapshot);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("JSON-safe snapshot unexpectedly invalid");
+    const reparsed: unknown = JSON.parse(JSON.stringify(result.value));
+    expect(reparsed).toEqual(result.value);
+    const roundTrip = validateWorkbookSnapshot(reparsed);
+    expect(roundTrip).toEqual(result);
+    expect(validateWorkbookSnapshot(result.value)).toEqual(result);
+  });
+
+  it("returns results for a deterministic required-container replacement corpus", () => {
+    const replacements: unknown[] = [null, 0, false, "invalid"];
+    const factories: Array<(replacement: unknown) => unknown> = [
+      (replacement) => ({ ...richSnapshot(), workbook: replacement }),
+      (replacement) => ({ ...richSnapshot(), sheets: replacement }),
+      (replacement) => withFirstSheet({ columns: replacement }),
+      (replacement) => withFirstSheet({ cells: replacement }),
+      (replacement) => withFirstBlock({ cells: replacement }),
+      (replacement) => withFirstCell({ value: replacement }),
+    ];
+
+    for (const factory of factories) {
+      for (const replacement of replacements) {
+        const value = factory(replacement);
+        expect(() => validateWorkbookSnapshot(value)).not.toThrow();
+        expect(validateWorkbookSnapshot(value).ok).toBe(false);
+      }
+    }
   });
 
   it("returns structured errors for invalid identities, bounds, merges, and schemas", () => {

@@ -6,6 +6,7 @@ import {
   MemoryPersistenceAdapter,
   PersistenceError,
   SheetwriteStore,
+  SnapshotValidationError,
   type WorkbookSnapshot,
 } from "../src/index.js";
 import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.js";
@@ -186,6 +187,41 @@ describe("snapshot persistence boundary", () => {
       createGridFromSnapshot(invalidHost, { ...richSnapshot(), schemaVersion: 99 }),
     ).toThrow(PersistenceError);
     expect(invalidHost.childElementCount).toBe(0);
+  });
+
+  it("surfaces malformed snapshots as validation errors at public load boundaries", () => {
+    const malformed = { ...richSnapshot(), sheets: [null] };
+
+    let storeError: unknown;
+    try {
+      SheetwriteStore.fromSnapshot(malformed);
+    } catch (error) {
+      storeError = error;
+    }
+    expect(storeError).not.toBeInstanceOf(TypeError);
+    expect(storeError).toBeInstanceOf(SnapshotValidationError);
+    if (!(storeError instanceof SnapshotValidationError)) {
+      throw new Error("store did not expose snapshot validation details");
+    }
+    expect(storeError.errors).toContainEqual(
+      expect.objectContaining({ path: "sheets[0]", code: "invalid-value" }),
+    );
+
+    const host = document.createElement("div");
+    let gridError: unknown;
+    try {
+      createGridFromSnapshot(host, malformed);
+    } catch (error) {
+      gridError = error;
+    }
+    expect(gridError).not.toBeInstanceOf(TypeError);
+    expect(gridError).toBeInstanceOf(PersistenceError);
+    if (!(gridError instanceof PersistenceError)) {
+      throw new Error("grid did not wrap snapshot validation failure");
+    }
+    expect(gridError.code).toBe("invalid-snapshot");
+    expect(gridError.cause).toBeInstanceOf(SnapshotValidationError);
+    expect(host.childElementCount).toBe(0);
   });
 
   it("applies remote operations observably without dirty echo or local history", async () => {
