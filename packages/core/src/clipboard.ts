@@ -1,3 +1,4 @@
+import { cellScalarToText } from "./cell-input.js";
 import type { CellScalar, CellStyle, CellValue } from "./types.js";
 
 // Values beginning with any of these are neutralized on paste so a pasted
@@ -10,8 +11,7 @@ export function neutralizeInjection(value: string): string {
 
 function encodeField(value: CellScalar): string {
   if (value === null) return "";
-  const s = typeof value === "number" ? String(value) : value;
-  // Excel/Sheets quote a field that contains tab, newline, or a quote.
+  const s = cellScalarToText(value);
   if (/[\t\n\r"]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }

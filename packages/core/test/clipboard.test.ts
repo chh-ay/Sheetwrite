@@ -17,6 +17,7 @@ describe("clipboard TSV", () => {
   it("serializes a block, quoting fields with tabs/newlines/quotes", () => {
     expect(toTsv([["a", 1, null]])).toBe("a\t1\t");
     expect(toTsv([['q"x', "b\tc", "d\ne"]])).toBe('"q""x"\t"b\tc"\t"d\ne"');
+    expect(toTsv([[true, false]])).toBe("TRUE\tFALSE");
   });
 
   it("round-trips quoted TSV including embedded tabs/newlines", () => {

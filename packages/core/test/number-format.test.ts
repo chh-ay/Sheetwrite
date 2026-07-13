@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { dateToSerial, serialToDate } from "../src/date-serial.js";
 import { formatNumber } from "../src/number-format.js";
 
 describe("formatNumber", () => {
@@ -63,5 +64,14 @@ describe("formatNumber", () => {
       expect(first).toBe(expected);
       expect(second).toBe(expected);
     }
+  });
+
+  it("formats UTC date codes and preserves Excel's 1900 serial boundary", () => {
+    expect(formatNumber(45_351, "yyyy-mm-dd")).toBe("2024-02-29");
+    expect(formatNumber(45_351.75, "yyyy-mm-dd hh:mm:ss")).toBe("2024-02-29 18:00:00");
+    expect(dateToSerial(new Date(Date.UTC(1900, 0, 1)))).toBe(1);
+    expect(dateToSerial(new Date(Date.UTC(1900, 1, 28)))).toBe(59);
+    expect(dateToSerial(new Date(Date.UTC(1900, 2, 1)))).toBe(61);
+    expect(serialToDate(60).toISOString()).toBe("1900-02-28T00:00:00.000Z");
   });
 });

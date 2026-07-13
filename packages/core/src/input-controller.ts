@@ -393,6 +393,7 @@ export class InputController {
       const value = values[i] ?? null;
       if (value === null) texts.push("");
       else if (typeof value === "number") texts.push(formatNumber(value, column.numberFormat));
+      else if (typeof value === "boolean") texts.push(value ? "TRUE" : "FALSE");
       else texts.push(value);
     }
 

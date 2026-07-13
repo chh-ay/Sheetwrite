@@ -226,32 +226,42 @@ const style: CellStyle = {
 
 ## Number formats
 
-A numeric column can carry an Excel-style `numberFormat` code that controls how
-values render on screen (and matches the exported value):
+A numeric/date column can carry an Excel-style `numberFormat` code. The same UTC
+serial value is used by the canvas renderer, formula `TEXT`, and XLSX I/O:
 
 ```ts
 { key: "amount", header: "Amount", width: 140, type: "number", numberFormat: "#,##0.00" }
+{ key: "day", header: "Day", width: 120, type: "date", numberFormat: "yyyy-mm-dd" }
 ```
 
-`formatNumber(value, code?)` (exported from `@sheetwrite/core`) is the renderer
-behind it. It is a best-effort formatter for the common presets, not a full Excel
-engine:
+`formatNumber(value, code?)` is exported from `@sheetwrite/core`. It is a
+best-effort, cached renderer for common Excel patterns, not a complete Excel
+format engine:
 
-| Code | `1234.5` renders as |
+| Code | Example output |
 | --- | --- |
-| _(none)_ | `1,234.5` (locale default) |
-| `0` | `1235` |
-| `0.00` | `1234.50` |
-| `#,##0` | `1,235` |
-| `#,##0.00` | `1,234.50` |
-| `0%` | applied to `0.5` → `50%` |
-| `$#,##0.00` | `$1,234.50` |
+| _(none)_ | `1234.5` → locale-default `1,234.5` |
+| `0` | `1234.5` → `1235` |
+| `0.00` | `1234.5` → `1234.50` |
+| `#,##0.00` | `1234.5` → `1,234.50` |
+| `0%` | `0.5` → `50%` |
+| `$#,##0.00` | `1234.5` → `$1,234.50` |
+| `yyyy-mm-dd` | serial `45351` → `2024-02-29` |
+| `dd/mm/yyyy hh:mm` | date serial with time → UTC date/time fields |
 
-Supported tokens: fixed decimal places (count the `0`/`#` after the `.`),
-thousands grouping (a `,`), percent (`%`, which scales the value by 100), and a
-literal prefix/suffix (currency symbols, units). It does **not** support date
-codes or conditional sections. A non-finite value (including a formula cycle, see
-[Formulas](./formulas.md#cycle-detection)) renders as an empty string.
+Numeric tokens support fixed decimals, grouping, percent scaling, and literal or
+`¤` currency prefixes/suffixes. Date/time tokens support numeric year, month,
+day, hour, minute, and second runs; `m` next to an hour/second is interpreted as
+minutes. UTC fields make rendering deterministic across host timezones.
+
+Conditional sections, colors embedded in format strings, month/day names,
+fractions, and fractional seconds are not supported. Formula errors are explicit
+sentinels such as `#DIV/0!` and `#CYCLE!`; they are not non-finite numbers hidden
+by the number formatter. See [Formulas](./formulas.md#scalars-coercion-and-errors).
+
+Native boolean values use the normal cell style model, render as uppercase
+`TRUE`/`FALSE`, and default to centered alignment unless `CellStyle.align`
+overrides it.
 
 ## See also
 

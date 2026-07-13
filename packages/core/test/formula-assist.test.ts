@@ -64,11 +64,22 @@ afterEach(() => {
 
 describe("FORMULA_FUNCTIONS catalog", () => {
   it("mirrors the calc.rs table (all aliases, sorted, unique)", () => {
-    // 34 spellings = 33 functions with AVG/AVERAGE and CONCAT/CONCATENATE aliased.
-    expect(FORMULA_FUNCTIONS.length).toBe(34);
-    expect(new Set(FORMULA_FUNCTIONS).size).toBe(34);
+    // Every accepted spelling, including aliases and compatibility families.
+    expect(FORMULA_FUNCTIONS.length).toBe(53);
+    expect(new Set(FORMULA_FUNCTIONS).size).toBe(53);
     expect([...FORMULA_FUNCTIONS]).toEqual([...FORMULA_FUNCTIONS].sort());
-    for (const name of ["SUM", "AVG", "AVERAGE", "CONCAT", "CONCATENATE", "IFERROR", "EXACT"]) {
+    for (const name of [
+      "SUM",
+      "SUMIFS",
+      "AVG",
+      "AVERAGE",
+      "DATE",
+      "XLOOKUP",
+      "CONCAT",
+      "CONCATENATE",
+      "IFERROR",
+      "EXACT",
+    ]) {
       expect(FORMULA_FUNCTIONS).toContain(name);
     }
   });
@@ -120,12 +131,19 @@ describe("FormulaAssist autocomplete", () => {
     assist.attach(ta, THEME);
 
     expect(assist.isOpen).toBe(true);
-    expect(itemsOf(host)).toEqual(["SUM"]);
+    expect(itemsOf(host)).toEqual(["SUM", "SUMIF", "SUMIFS"]);
 
     ta.value = "=CO";
     ta.setSelectionRange(3, 3);
     assist.update();
-    expect(itemsOf(host)).toEqual(["CONCAT", "CONCATENATE", "COUNT", "COUNTA"]);
+    expect(itemsOf(host)).toEqual([
+      "CONCAT",
+      "CONCATENATE",
+      "COUNT",
+      "COUNTA",
+      "COUNTIF",
+      "COUNTIFS",
+    ]);
   });
 
   it("stays closed when the text is not a formula", () => {
@@ -181,10 +199,10 @@ describe("FormulaAssist autocomplete", () => {
 
     expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true);
     expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true); // wraps to last
-    expect(selectedItem(host)).toBe("COUNTA");
+    expect(selectedItem(host)).toBe("COUNTIFS");
 
     assist.handleKeyDown(keydown("Enter"));
-    expect(ta.value).toBe("=COUNTA(");
+    expect(ta.value).toBe("=COUNTIFS(");
   });
 
   it("ignores Arrow keys when the popup is closed (returns false)", () => {
@@ -316,7 +334,7 @@ describe("EditController with assist deps", () => {
     ta.setSelectionRange(3, 3);
     ta.dispatchEvent(new Event("input"));
     expect(host.querySelector(".sheetwrite-assist")).not.toBeNull();
-    expect(itemsOf(host)).toEqual(["SUM"]);
+    expect(itemsOf(host)).toEqual(["SUM", "SUMIF", "SUMIFS"]);
   });
 
   it("first Escape closes the popup, second cancels the edit and clears highlights", () => {

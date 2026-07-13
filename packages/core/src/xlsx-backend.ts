@@ -85,6 +85,7 @@ function cellOf(value: CellScalar, column: Column): XlsxCell {
     }
     return { type: Number, value, format: column.numberFormat };
   }
+  if (typeof value === "boolean") return { type: Boolean, value };
   if (typeof value === "string") return { type: String, value };
   return null;
 }
@@ -189,14 +190,14 @@ setXlsxBackend(writeExcelFileBackend);
 
 // ── xlsx import ──────────────────────────────────────────────────────────────
 
-// read-excel-file yields a `Date` for date-formatted cells, a `number` for
-// numbers, a `string` for text, and `null` for empty cells. Anything else (e.g.
-// a boolean) degrades to its string form so the value is never dropped.
+// read-excel-file yields a `Date` for date-formatted cells and native scalar
+// values for numbers, text, and booleans.
 function scalarOfCell(value: unknown): CellScalar {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return dateToSerial(value);
-  if (typeof value === "number") return value;
-  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
+    return value;
+  }
   return String(value);
 }
 
@@ -773,14 +774,7 @@ function valueFromExcelCell(
     return { kind: "literal", value };
   }
   if (typeof value === "boolean") {
-    warn(options, {
-      code: "boolean-literal",
-      message:
-        "Boolean cells are preserved as TRUE/FALSE text until boolean CellScalar support lands",
-      sheet,
-      cell: cell.address,
-    });
-    return { kind: "literal", value: value ? "TRUE" : "FALSE" };
+    return { kind: "literal", value };
   }
   if (typeof value === "object" && "richText" in value && Array.isArray(value.richText)) {
     warn(options, {

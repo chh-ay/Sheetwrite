@@ -1,5 +1,5 @@
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
-export { parseCellInput, parseCurrencyInput } from "./cell-input.js";
+export { cellScalarToText, parseCellInput, parseCurrencyInput } from "./cell-input.js";
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
   type DocumentValidationError,

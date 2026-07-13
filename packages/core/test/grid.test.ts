@@ -26,6 +26,7 @@ function makeFakeStore(
     },
     getFormula: () => null,
     getRefTarget: () => null,
+    recalculateVolatile: () => {},
     getVisibleWindow: (sheet, rows, cols) => {
       hooks.onWindow?.();
       const n = Math.max(0, (rows.end - rows.start) * cols.length);
@@ -1126,6 +1127,45 @@ describe("transactional document metadata", () => {
     expect(workbook.sheets[0]!.conditionalFormats).toEqual([]);
     grid.redo();
     expect(workbook.sheets[0]!.conditionalFormats).toEqual([rule]);
+
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "setNamedRange",
+          namedRange: {
+            name: "Totals",
+            range: {
+              sheet: "s1",
+              start: { row: 0, col: 1 },
+              end: { row: 2, col: 1 },
+            },
+          },
+        },
+        {
+          op: "setNamedRange",
+          namedRange: {
+            name: "Totals",
+            scope: "s1",
+            range: {
+              sheet: "s1",
+              start: { row: 0, col: 2 },
+              end: { row: 2, col: 2 },
+            },
+          },
+        },
+      ],
+    });
+    expect(workbook.namedRanges).toHaveLength(2);
+    grid.undo();
+    expect(workbook.namedRanges).toEqual([]);
+    grid.redo();
+    expect(workbook.namedRanges).toHaveLength(2);
+    grid.applyTransaction({
+      patches: [{ op: "removeNamedRange", name: "Totals", scope: "s1" }],
+    });
+    expect(workbook.namedRanges).toHaveLength(1);
+    grid.undo();
+    expect(workbook.namedRanges).toHaveLength(2);
 
     grid.groupRows(3, 5);
     grid.setGroupCollapsed(3, true);

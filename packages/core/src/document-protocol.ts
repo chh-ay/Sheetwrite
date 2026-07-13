@@ -1,4 +1,10 @@
-import type { DocumentOp, MergeRange, SheetSnapshot, WorkbookSnapshot } from "./types.js";
+import type {
+  DocumentOp,
+  MergeRange,
+  NamedRangeSnapshot,
+  SheetSnapshot,
+  WorkbookSnapshot,
+} from "./types.js";
 
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
 
@@ -307,11 +313,56 @@ export function validateWorkbookSnapshot(input: unknown): DocumentValidationResu
       }
     }
   }
-  for (const namedRange of candidate.workbook?.namedRanges ?? []) {
+  const rawNamedRanges = candidate.workbook?.namedRanges;
+  if (rawNamedRanges !== undefined && !Array.isArray(rawNamedRanges)) {
+    errors.push({
+      path: "workbook.namedRanges",
+      code: "invalid-value",
+      message: "namedRanges must be an array",
+    });
+  }
+  const namedRangeIds = new Set<string>();
+  for (const raw of Array.isArray(rawNamedRanges) ? rawNamedRanges : []) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      typeof raw.name !== "string" ||
+      !/^[A-Za-z_][A-Za-z0-9_]*$/.test(raw.name) ||
+      /^[A-Za-z]+\d+$/.test(raw.name) ||
+      /^(TRUE|FALSE)$/i.test(raw.name) ||
+      !raw.range ||
+      typeof raw.range !== "object"
+    ) {
+      errors.push({
+        path: "workbook.namedRanges",
+        code: "invalid-value",
+        message: "Named ranges need a formula-safe name and rectangular range",
+      });
+      continue;
+    }
+    const namedRange = raw as NamedRangeSnapshot;
+    const id = `${namedRange.scope ?? ""}\u0000${namedRange.name.toUpperCase()}`;
+    if (namedRangeIds.has(id)) {
+      errors.push({
+        path: `workbook.namedRanges.${namedRange.name}`,
+        code: "duplicate-id",
+        message: "Named range names must be unique within their scope",
+      });
+    }
+    namedRangeIds.add(id);
+    if (namedRange.scope !== undefined && !sheetById.has(namedRange.scope)) {
+      errors.push({
+        path: `workbook.namedRanges.${namedRange.name}.scope`,
+        code: "missing-reference",
+        message: "Named range scope sheet must exist",
+      });
+    }
     const targetSheet = sheetById.get(namedRange.range.sheet);
     const { start, end } = namedRange.range;
     const inBounds =
       targetSheet !== undefined &&
+      start !== undefined &&
+      end !== undefined &&
       [start.row, start.col, end.row, end.col].every(integer) &&
       Math.max(start.row, end.row) < targetSheet.rowCount &&
       Math.max(start.col, end.col) < targetSheet.columns.length;

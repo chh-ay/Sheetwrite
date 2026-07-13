@@ -1,5 +1,12 @@
 import { parseDateInput } from "./date-serial.js";
-import type { CellFormat, CellValue } from "./types.js";
+import type { CellFormat, CellScalar, CellValue } from "./types.js";
+
+/** Spreadsheet display text for a resolved scalar. */
+export function cellScalarToText(value: CellScalar): string {
+  if (value === null) return "";
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  return String(value);
+}
 
 /**
  * Coerce raw text input into a {@link CellValue}, following spreadsheet
@@ -17,6 +24,7 @@ import type { CellFormat, CellValue } from "./types.js";
  * Shared by the grid's inline editor and any host-built formula bar, so input
  * parsing is identical everywhere instead of re-derived per consumer.
  */
+
 export function parseCellInput(raw: string, type: CellFormat): CellValue {
   const trimmed = raw.trim();
 
@@ -26,6 +34,10 @@ export function parseCellInput(raw: string, type: CellFormat): CellValue {
 
   if (trimmed.length > 1 && trimmed.startsWith("=")) {
     return { kind: "formula", src: trimmed };
+  }
+
+  if (/^(TRUE|FALSE)$/i.test(trimmed)) {
+    return { kind: "literal", value: trimmed.toUpperCase() === "TRUE" };
   }
 
   if (type === "number" || type === "currency") {

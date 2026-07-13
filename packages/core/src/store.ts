@@ -1,4 +1,5 @@
 import { CellStore, isLoaded, type RangeSnapshot, type WindowView } from "@sheetwrite/wasm";
+import { dateToSerial } from "./date-serial.js";
 import {
   SnapshotValidationError,
   validateWorkbookSnapshot,
@@ -22,6 +23,7 @@ import type {
   ConditionalFormatRule,
   DataCell,
   MergeRange,
+  NamedRangeSnapshot,
   PackedCellBlock,
   PagedStoreStats,
   Patch,
@@ -46,6 +48,7 @@ import type {
 // Mirror of the WASM cell tags.
 const KIND_NUMBER = 1;
 const KIND_STRING = 2;
+const KIND_BOOL = 3;
 const KIND_FORMULA = 4;
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
@@ -81,6 +84,18 @@ type RecomputingCellStore = CellStore & {
   isSheetAlive(sheet: number): boolean;
   insertCols(sheet: number, at: number, count: number): void;
   formulaSource(sheet: number, row: number, col: number): string | undefined;
+  setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
+  recomputeVolatile(serial: number): void;
+  setNamedRange(
+    name: string,
+    scope: number,
+    sheet: number,
+    rowStart: number,
+    colStart: number,
+    rowEnd: number,
+    colEnd: number,
+  ): boolean;
+  removeNamedRange(name: string, scope: number): boolean;
   setColumnStringsPacked(
     sheet: number,
     col: number,
@@ -282,6 +297,12 @@ export class SheetwriteStore implements Store {
       this.wasm.setSheetName(handle, sheet.id, sheet.name);
       this.handles.set(sheet.id, handle);
     }
+    for (const namedRange of workbook.namedRanges ?? []) {
+      if (!this.syncNamedRange(namedRange)) {
+        this.wasm.free();
+        throw new Error(`invalid named range: ${namedRange.name}`);
+      }
+    }
     if (data) this.loadColumnar(workbook.activeSheet, data);
   }
 
@@ -289,6 +310,31 @@ export class SheetwriteStore implements Store {
     const handle = this.handles.get(sheet);
     if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
     return handle;
+  }
+
+  private namedRangeScope(scope: SheetId | undefined): number {
+    return scope === undefined ? -1 : this.handleOf(scope);
+  }
+
+  private syncNamedRange(namedRange: NamedRangeSnapshot): boolean {
+    const range = normalizedRange(namedRange.range);
+    return this.wasm.setNamedRange(
+      namedRange.name,
+      this.namedRangeScope(namedRange.scope),
+      this.handleOf(range.sheet),
+      range.start.row,
+      range.start.col,
+      range.end.row,
+      range.end.col,
+    );
+  }
+
+  private sameNamedRange(
+    namedRange: NamedRangeSnapshot,
+    name: string,
+    scope: SheetId | undefined,
+  ): boolean {
+    return namedRange.name.toUpperCase() === name.toUpperCase() && namedRange.scope === scope;
   }
 
   private allocateSheet(columns: number, rows: number): number {
@@ -439,6 +485,8 @@ export class SheetwriteStore implements Store {
       const style = this.wasm.styleIdAt(handle, addr.row, addr.col);
       if (typeof value === "number") {
         this.wasm.setNumber(handle, addr.row, addr.col, value, style);
+      } else if (typeof value === "boolean") {
+        this.wasm.setBool(handle, addr.row, addr.col, value, style);
       } else if (typeof value === "string") {
         this.wasm.setString(handle, addr.row, addr.col, value, style);
       } else {
@@ -649,6 +697,7 @@ export class SheetwriteStore implements Store {
     const cell = this.wasm.getCell(this.handleOf(addr.sheet), addr.row, addr.col);
     let resolved: CellScalar = null;
     if (cell.kind === KIND_NUMBER || cell.kind === KIND_FORMULA) resolved = cell.num;
+    else if (cell.kind === KIND_BOOL) resolved = cell.num !== 0;
     else if (cell.kind === KIND_STRING) resolved = cell.string ?? null;
     const style = this.styles.get(cell.style);
     cell.free();
@@ -670,6 +719,22 @@ export class SheetwriteStore implements Store {
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null {
     return this.refs.targetOf(cellKey(addr));
+  }
+
+  recalculateVolatile(now = new Date()): void {
+    const milliseconds = now.getTime();
+    if (!Number.isFinite(milliseconds)) throw new RangeError("invalid volatile recalculation date");
+    this.wasm.recomputeVolatile(dateToSerial(now));
+    this.epoch += 1;
+    const event: ChangeEvent = {
+      transaction: { patches: [] },
+      changes: [],
+      dirty: [],
+      commitReason: "api",
+      source: "local",
+      epoch: this.epoch,
+    };
+    for (const listener of this.listeners) listener(event);
   }
 
   /** Map a displayed row position to the backing data row under sort/filter. */
@@ -768,6 +833,8 @@ export class SheetwriteStore implements Store {
     for (let i = 0; i < kinds.length; i++) {
       if (kinds[i] === KIND_NUMBER) {
         values[i] = numbers[i] ?? null;
+      } else if (kinds[i] === KIND_BOOL) {
+        values[i] = (numbers[i] ?? 0) !== 0;
       } else if (kinds[i] === KIND_STRING) {
         const poolId = stringIds[i] ?? 0xffffffff;
         if (poolId !== 0xffffffff) {
@@ -957,6 +1024,7 @@ export class SheetwriteStore implements Store {
     for (let i = 0; i < kinds.length; i++) {
       if (kinds[i] === 1) out[i] = numbers[numberAt++] ?? null;
       else if (kinds[i] === 2) out[i] = texts[textAt++] ?? null;
+      else if (kinds[i] === 3) out[i] = (numbers[numberAt++] ?? 0) !== 0;
       else out[i] = null;
     }
     return out;
@@ -1147,6 +1215,9 @@ export class SheetwriteStore implements Store {
             else if (typeof value === "number") {
               valueNums.push(value);
               numberCount++;
+            } else if (typeof value === "boolean") {
+              valueTexts.push(value ? "\0TRUE" : "\0FALSE");
+              textCount++;
             } else {
               valueTexts.push(value);
               textCount++;
@@ -1462,6 +1533,7 @@ export class SheetwriteStore implements Store {
           if (key && hasRefs) this.refs.removeRef(key);
           const value = patch.value.value;
           if (typeof value === "number") this.wasm.setNumber(handle, row, col, value, styleId);
+          else if (typeof value === "boolean") this.wasm.setBool(handle, row, col, value, styleId);
           else if (typeof value === "string") this.wasm.setString(handle, row, col, value, styleId);
           else this.wasm.clearCell(handle, row, col, styleId);
           if (key && hasFormulaSources) this.formulaSrc.delete(key);
@@ -1557,6 +1629,10 @@ export class SheetwriteStore implements Store {
           } else if (typeof value === "number") {
             kinds[offset] = KIND_NUMBER;
             numbers[offset] = value;
+            texts[offset] = "";
+          } else if (typeof value === "boolean") {
+            kinds[offset] = KIND_BOOL;
+            numbers[offset] = value ? 1 : 0;
             texts[offset] = "";
           } else {
             kinds[offset] = KIND_STRING;
@@ -1860,23 +1936,40 @@ export class SheetwriteStore implements Store {
         return true;
       }
       case "setNamedRange": {
-        if (!this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.range.sheet)) {
+        if (
+          !this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.range.sheet) ||
+          (patch.namedRange.scope !== undefined &&
+            !this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.scope))
+        ) {
           return false;
         }
+        const namedRange = {
+          ...patch.namedRange,
+          range: normalizedRange(patch.namedRange.range),
+        };
+        if (!this.syncNamedRange(namedRange)) return false;
         const ranges = this.workbook.namedRanges ?? [];
-        const index = ranges.findIndex((range) => range.name === patch.namedRange.name);
-        if (index < 0) this.workbook.namedRanges = [...ranges, patch.namedRange];
+        const index = ranges.findIndex((range) =>
+          this.sameNamedRange(range, namedRange.name, namedRange.scope),
+        );
+        if (index < 0) this.workbook.namedRanges = [...ranges, namedRange];
         else {
           const next = [...ranges];
-          next[index] = patch.namedRange;
+          next[index] = namedRange;
           this.workbook.namedRanges = next;
         }
         return true;
       }
       case "removeNamedRange": {
         const ranges = this.workbook.namedRanges ?? [];
-        if (!ranges.some((range) => range.name === patch.name)) return false;
-        this.workbook.namedRanges = ranges.filter((range) => range.name !== patch.name);
+        if (!ranges.some((range) => this.sameNamedRange(range, patch.name, patch.scope))) {
+          return false;
+        }
+        if (!this.wasm.removeNamedRange(patch.name, this.namedRangeScope(patch.scope)))
+          return false;
+        this.workbook.namedRanges = ranges.filter(
+          (range) => !this.sameNamedRange(range, patch.name, patch.scope),
+        );
         return true;
       }
     }
@@ -1931,6 +2024,9 @@ export class SheetwriteStore implements Store {
       return false;
     }
     if (patch.from === patch.to) return true;
+    const movedNamedRanges = (this.workbook.namedRanges ?? [])
+      .filter((namedRange) => namedRange.range.sheet === patch.sheet)
+      .map((namedRange) => structuredClone(namedRange));
     const cells = this.snapshotCells(
       patch.sheet,
       patch.from,
@@ -1974,6 +2070,27 @@ export class SheetwriteStore implements Store {
         );
       }
     }
+    for (const original of movedNamedRanges) {
+      const span = remapSpan(original.range.start.row, original.range.end.row, (row) =>
+        moveIndex(row, patch.from, patch.count, patch.to),
+      );
+      if (!span) continue;
+      const namedRange: NamedRangeSnapshot = {
+        ...original,
+        range: {
+          ...original.range,
+          start: { ...original.range.start, row: span[0] },
+          end: { ...original.range.end, row: span[1] },
+        },
+      };
+      const ranges = this.workbook.namedRanges ?? [];
+      const index = ranges.findIndex((range) =>
+        this.sameNamedRange(range, namedRange.name, namedRange.scope),
+      );
+      if (index < 0) this.workbook.namedRanges = [...ranges, namedRange];
+      else ranges[index] = namedRange;
+      if (!this.syncNamedRange(namedRange)) return false;
+    }
     return true;
   }
 
@@ -1992,6 +2109,9 @@ export class SheetwriteStore implements Store {
       return false;
     }
     if (patch.from === patch.to) return true;
+    const movedNamedRanges = (this.workbook.namedRanges ?? [])
+      .filter((namedRange) => namedRange.range.sheet === patch.sheet)
+      .map((namedRange) => structuredClone(namedRange));
     const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
     const cells = this.snapshotCells(
       patch.sheet,
@@ -2017,6 +2137,27 @@ export class SheetwriteStore implements Store {
         },
         changes,
       );
+    }
+    for (const original of movedNamedRanges) {
+      const span = remapSpan(original.range.start.col, original.range.end.col, (col) =>
+        moveIndex(col, patch.from, patch.count, patch.to),
+      );
+      if (!span) continue;
+      const namedRange: NamedRangeSnapshot = {
+        ...original,
+        range: {
+          ...original.range,
+          start: { ...original.range.start, col: span[0] },
+          end: { ...original.range.end, col: span[1] },
+        },
+      };
+      const ranges = this.workbook.namedRanges ?? [];
+      const index = ranges.findIndex((range) =>
+        this.sameNamedRange(range, namedRange.name, namedRange.scope),
+      );
+      if (index < 0) this.workbook.namedRanges = [...ranges, namedRange];
+      else ranges[index] = namedRange;
+      if (!this.syncNamedRange(namedRange)) return false;
     }
     return true;
   }
@@ -2165,7 +2306,7 @@ export class SheetwriteStore implements Store {
         this.workbook.sheets[Math.min(index, this.workbook.sheets.length - 1)]!.id;
     }
     this.workbook.namedRanges = this.workbook.namedRanges?.filter(
-      (range) => range.range.sheet !== sheetId,
+      (range) => range.range.sheet !== sheetId && range.scope !== sheetId,
     );
     return true;
   }
@@ -2977,6 +3118,12 @@ function remapSpan(
     }
   }
   return [Math.min(mappedStart, mappedEnd), Math.max(mappedStart, mappedEnd)];
+}
+
+function moveIndex(index: number, from: number, count: number, to: number): number {
+  if (index >= from && index < from + count) return to + index - from;
+  const removed = index < from ? index : index - count;
+  return removed >= to ? removed + count : removed;
 }
 
 function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): string {

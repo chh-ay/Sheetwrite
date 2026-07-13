@@ -4,32 +4,32 @@
 // keep working unchanged; only rendering (a date `numberFormat`) and input parsing
 // need to know a column is a date.
 //
-// ── Why the 1899-12-30 epoch, and why UTC ────────────────────────────────────
-// Excel's 1900 date system has a well-known bug: it treats 1900 as a leap year,
-// so its serial 60 is the non-existent 1900-02-29. Anchoring at 1899-12-30 and
-// counting real proleptic-Gregorian days sidesteps the bug entirely — serial 1 is
-// 1899-12-31, serial 2 is 1900-01-01, and every serial ≥ 61 matches Excel exactly
-// (the discrepancy is confined to Jan/Feb 1900, which real data never uses).
+// ── Excel's leap-year compatibility and UTC ──────────────────────────────────
+// Excel's 1900 date system treats serial 60 as the non-existent 1900-02-29.
+// Real JavaScript Dates before 1900-03-01 use days since 1899-12-31; dates on or
+// after that cutoff receive one extra serial day. Serial 60 maps to the only
+// representable fallback (1900-02-28) when converted to a Date, while numeric
+// formula/XLSX paths can preserve the serial itself.
 //
-// All conversions use UTC (`Date.UTC` / `getUTC*`). A serial is an absolute count
-// of days, so the mapping must not depend on the host time zone: building or
-// reading a Date through local-time accessors would shift the calendar date by
-// the machine's offset (e.g. serial 46203 rendering as the 5th in UTC-5). Using
-// UTC throughout makes `dateToSerial`/`serialToDate` exact inverses on every host.
+// All conversions use UTC (`Date.UTC` / `getUTC*`) so host timezone offsets never
+// shift calendar dates.
 
-/** Epoch (day 0) in UTC milliseconds: 1899-12-30T00:00:00Z. */
-const EPOCH_MS = Date.UTC(1899, 11, 30);
+/** Real-date base used before Excel's synthetic leap day. */
+const EPOCH_MS = Date.UTC(1899, 11, 31);
+const LEAP_BUG_CUTOFF_MS = Date.UTC(1900, 2, 1);
 /** Milliseconds in one day; the serial ↔ ms scale factor. */
 const MS_PER_DAY = 86_400_000;
 
 /**
- * Convert a `Date` to its serial number (days since 1899-12-30, fractional part
- * = time of day). Operates on the Date's absolute instant, so it is the exact
- * inverse of {@link serialToDate}. Construct calendar dates with `Date.UTC(...)`
- * (or via {@link parseDateInput}) to avoid the host time zone offsetting the day.
+ * Convert a real UTC `Date` to the Excel 1900-system serial. It is the inverse
+ * of {@link serialToDate} except for synthetic serial 60, which JavaScript
+ * cannot represent as a Date. Construct calendar dates with `Date.UTC(...)`
+ * (or via {@link parseDateInput}) to avoid host-timezone shifts.
  */
 export function dateToSerial(date: Date): number {
-  return (date.getTime() - EPOCH_MS) / MS_PER_DAY;
+  const milliseconds = date.getTime();
+  const serial = (milliseconds - EPOCH_MS) / MS_PER_DAY;
+  return milliseconds >= LEAP_BUG_CUTOFF_MS ? serial + 1 : serial;
 }
 
 /**
@@ -38,7 +38,8 @@ export function dateToSerial(date: Date): number {
  * calendar fields are stable regardless of the host time zone.
  */
 export function serialToDate(serial: number): Date {
-  return new Date(EPOCH_MS + serial * MS_PER_DAY);
+  const realSerial = serial >= 60 ? serial - 1 : serial;
+  return new Date(EPOCH_MS + realSerial * MS_PER_DAY);
 }
 
 /**
@@ -69,7 +70,7 @@ function componentsToSerial(
     return null;
   }
 
-  return (ms - EPOCH_MS) / MS_PER_DAY;
+  return dateToSerial(new Date(ms));
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;

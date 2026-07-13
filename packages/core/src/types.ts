@@ -57,7 +57,7 @@ export interface ConditionalFormatRule {
 export type CellFormat = "text" | "number" | "date" | "currency";
 
 /** A scalar that can be displayed directly. */
-export type CellScalar = string | number | null;
+export type CellScalar = string | number | boolean | null;
 
 /**
  * A cell's persisted input: a literal, a cross-reference, or a formula.
@@ -160,9 +160,11 @@ export interface AddSheetInput {
   columns?: Column[];
 }
 
-/** Stable named range extension point; evaluation is introduced separately. */
+/** Workbook-global or sheet-scoped named range used by formulas and persistence. */
 export interface NamedRangeSnapshot {
   name: string;
+  /** Formula-context sheet whose local definition shadows the workbook definition. */
+  scope?: SheetId;
   range: Range;
 }
 
@@ -259,7 +261,7 @@ export type DocumentOp =
       };
     }
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
-  | { op: "removeNamedRange"; name: string };
+  | { op: "removeNamedRange"; name: string; scope?: SheetId };
 
 /** Backward-compatible transaction name for the one exhaustive document operation union. */
 export type Patch = DocumentOp;
@@ -480,6 +482,11 @@ export interface Store {
   getFormula(addr: CellAddress): string | null;
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null;
+  /**
+   * Recompute volatile formulas (`TODAY`/`NOW`) from one captured instant.
+   * The supplied Date is interpreted as an absolute UTC instant.
+   */
+  recalculateVolatile(now?: Date): void;
   /** Bulk read of a visible window; the only read a renderer should use per frame. */
   getVisibleWindow(
     sheet: SheetId,

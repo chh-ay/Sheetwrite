@@ -1,13 +1,14 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast,
+    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast, Func,
 };
 use std::rc::Rc;
 
 pub(crate) const KIND_EMPTY: u8 = 0;
 pub(crate) const KIND_NUMBER: u8 = 1;
 pub(crate) const KIND_STRING: u8 = 2;
+pub(crate) const KIND_BOOL: u8 = 3;
 pub(crate) const KIND_FORMULA: u8 = 4;
 
 pub(crate) const NO_STRING: u32 = u32::MAX;
@@ -49,7 +50,8 @@ pub(crate) enum FormulaError {
     Ref,
     Num,
     Value,
-    Error,
+    Name,
+    Na,
     Loading,
 }
 
@@ -61,12 +63,13 @@ impl FormulaError {
             FormulaError::Ref => "#REF!",
             FormulaError::Num => "#NUM!",
             FormulaError::Value => "#VALUE!",
-            FormulaError::Error => "#ERROR!",
+            FormulaError::Name => "#NAME?",
+            FormulaError::Na => "#N/A",
             FormulaError::Loading => "#LOADING!",
         }
     }
 
-    /// Dense slot index for per-window scratch tables (6 variants).
+    /// Dense slot index for per-window scratch tables.
     pub(crate) fn slot(self) -> usize {
         match self {
             FormulaError::Cycle => 0,
@@ -74,8 +77,9 @@ impl FormulaError {
             FormulaError::Ref => 2,
             FormulaError::Num => 3,
             FormulaError::Value => 4,
-            FormulaError::Error => 5,
-            FormulaError::Loading => 6,
+            FormulaError::Name => 5,
+            FormulaError::Na => 6,
+            FormulaError::Loading => 7,
         }
     }
 }
@@ -174,7 +178,14 @@ impl ReadSet {
             Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, _) => self.push_range(
                 CellRange::new(sheet.handle, *row_start, *col_start, *row_end, *col_end),
             ),
-            Ast::Func(_, args) => {
+            Ast::NamedRange(named) => self.push_range(CellRange::new(
+                named.sheet,
+                named.row_start,
+                named.col_start,
+                named.row_end,
+                named.col_end,
+            )),
+            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
                 for arg in args {
                     self.collect(arg, formula_sheet);
                 }
@@ -189,6 +200,8 @@ impl ReadSet {
             | Ast::InvalidRef
             | Ast::Str(_)
             | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
             | Ast::Num(_) => {}
         }
     }
@@ -213,6 +226,18 @@ pub(crate) enum FormulaValueKind {
     Bool,
 }
 
+fn ast_is_volatile(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::Today | Func::Now, _) => true,
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_is_volatile),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_is_volatile(left) || ast_is_volatile(right)
+        }
+        Ast::Neg(inner) => ast_is_volatile(inner),
+        _ => false,
+    }
+}
+
 /// Stored formula metadata: parsed AST, precomputed read-set, and last error.
 #[derive(Clone, Debug)]
 pub(crate) struct FormulaEntry {
@@ -221,28 +246,36 @@ pub(crate) struct FormulaEntry {
     pub(crate) reads: ReadSet,
     pub(crate) error: Option<FormulaError>,
     pub(crate) value_kind: FormulaValueKind,
+    pub(crate) volatile: bool,
 }
 
 impl FormulaEntry {
     pub(crate) fn parsed(ast: Ast, sheet: u32) -> Self {
         let source = serialize(&ast);
         let reads = ReadSet::from_ast(&ast, sheet);
+        let volatile = ast_is_volatile(&ast);
         Self {
             ast: Some(ast),
             source,
             reads,
             error: None,
             value_kind: FormulaValueKind::Number,
+            volatile,
         }
     }
 
     pub(crate) fn parse_error(source: &str) -> Self {
+        Self::error(source, FormulaError::Value)
+    }
+
+    pub(crate) fn error(source: &str, error: FormulaError) -> Self {
         Self {
             ast: None,
             source: source.to_string(),
             reads: ReadSet::default(),
-            error: Some(FormulaError::Error),
+            error: Some(error),
             value_kind: FormulaValueKind::Number,
+            volatile: false,
         }
     }
 

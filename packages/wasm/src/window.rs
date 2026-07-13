@@ -6,8 +6,8 @@ use crate::query::matches_needle;
 use crate::sheet::{formula_error_at, CondPred, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, FormulaError, StringPool, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
-    NO_STRING,
+    cell_key, FormulaError, FormulaValueKind, StringPool, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
+    KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 #[wasm_bindgen]
@@ -39,7 +39,7 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 7];
+        let mut error_slots = [-1i32; 8];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
@@ -115,7 +115,7 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 7];
+        let mut error_slots = [-1i32; 8];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
@@ -187,7 +187,7 @@ pub(crate) fn fill_window_cell(
     str_local: &mut [i32],
     style_local: &mut [u32],
     string_ids: &mut [u32],
-    error_slots: &mut [i32; 7],
+    error_slots: &mut [i32; 8],
     strings: &mut Vec<String>,
     style_dict: &mut Vec<u32>,
 ) {
@@ -202,7 +202,7 @@ pub(crate) fn fill_window_cell(
     style_local[dst] = local_style_index(sheet.style_at(src), style_dict);
 
     match stored_kind {
-        KIND_NUMBER => num[dst] = sheet.num_at(src),
+        KIND_NUMBER | KIND_BOOL => num[dst] = sheet.num_at(src),
         KIND_STRING => {
             let pool_id = sheet.str_id_at(src);
             if pool_id == NO_STRING {
@@ -217,13 +217,22 @@ pub(crate) fn fill_window_cell(
                 kind[dst] = KIND_STRING;
                 str_local[dst] = local_error_index(error, error_slots, strings);
             } else {
-                let pool_id = sheet.str_id_at(src);
-                if pool_id == NO_STRING {
-                    kind[dst] = KIND_NUMBER;
-                    num[dst] = sheet.num_at(src);
-                } else {
-                    kind[dst] = KIND_STRING;
-                    string_ids[dst] = pool_id;
+                let value_kind = cell_key(row, col)
+                    .and_then(|key| sheet.formulas.get(&key))
+                    .map(|entry| entry.value_kind);
+                match value_kind {
+                    Some(FormulaValueKind::Bool) => {
+                        kind[dst] = KIND_BOOL;
+                        num[dst] = sheet.num_at(src);
+                    }
+                    Some(FormulaValueKind::Text) => {
+                        kind[dst] = KIND_STRING;
+                        string_ids[dst] = sheet.str_id_at(src);
+                    }
+                    _ => {
+                        kind[dst] = KIND_NUMBER;
+                        num[dst] = sheet.num_at(src);
+                    }
                 }
             }
         }
@@ -246,7 +255,7 @@ pub(crate) fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32
 /// table (one per `FormulaError` variant), allocation-free.
 pub(crate) fn local_error_index(
     error: FormulaError,
-    slots: &mut [i32; 7],
+    slots: &mut [i32; 8],
     strings: &mut Vec<String>,
 ) -> i32 {
     let slot = &mut slots[error.slot()];

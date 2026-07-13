@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { parseCellInput } from "../src/cell-input.js";
+import { cellScalarToText, parseCellInput } from "../src/cell-input.js";
 
 describe("parseCellInput", () => {
   it("keeps cross-sheet links as formulas", () => {
@@ -21,5 +21,12 @@ describe("parseCellInput", () => {
       kind: "literal",
       value: 42.5,
     });
+  });
+
+  it("parses and formats native boolean literals using spreadsheet casing", () => {
+    expect(parseCellInput("true", "text")).toEqual({ kind: "literal", value: true });
+    expect(parseCellInput("FALSE", "number")).toEqual({ kind: "literal", value: false });
+    expect(cellScalarToText(true)).toBe("TRUE");
+    expect(cellScalarToText(false)).toBe("FALSE");
   });
 });

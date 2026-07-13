@@ -727,6 +727,291 @@ describe("SheetwriteStore", () => {
     store.hideRows("s1", [0, 1, 2, 3, 4, 5]);
     expect(store.viewRowCount("s1")).toBe(0);
   });
+
+  it("preserves boolean literals and formulas through windows, queries, and snapshots", () => {
+    const store = new SheetwriteStore(makeWorkbook(6));
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 0), value: { kind: "literal", value: false } },
+        { op: "set", addr: addr(1, 0), value: { kind: "literal", value: true } },
+        { op: "set", addr: addr(2, 0), value: { kind: "formula", src: "=1=1" } },
+        { op: "set", addr: addr(3, 0), value: { kind: "formula", src: "=1=2" } },
+        { op: "set", addr: addr(4, 0), value: { kind: "literal", value: 7 } },
+      ],
+    });
+
+    expect(store.getCell(addr(0, 0)).resolved).toBe(false);
+    expect(store.getCell(addr(2, 0)).resolved).toBe(true);
+    expect(store.getVisibleWindow("s1", { start: 0, end: 6 }, [0]).values).toEqual([
+      false,
+      true,
+      true,
+      false,
+      7,
+      null,
+    ]);
+    expect(store.distinctValues("s1", 0)).toEqual([false, true, 7, null]);
+
+    store.setColumnFilter("s1", 0, { kind: "values", values: [true] });
+    expect(store.getVisibleWindow("s1", { start: 0, end: 2 }, [0]).values).toEqual([true, true]);
+    store.setColumnFilter("s1", 0, null);
+    store.sortBy("s1", 0, true);
+    expect(store.getVisibleWindow("s1", { start: 0, end: 6 }, [0]).values).toEqual([
+      7,
+      false,
+      false,
+      true,
+      true,
+      null,
+    ]);
+
+    expect(
+      store
+        .exportSnapshot()
+        .sheets[0]!.cells.flatMap((block) => block.cells)
+        .find((cell) => cell.rowOffset === 0 && cell.colOffset === 0)?.value,
+    ).toEqual({ kind: "literal", value: false });
+    store.dispose();
+  });
+
+  it("evaluates criteria, lookup, date, and unknown function compatibility paths", () => {
+    const workbook: Workbook = {
+      activeSheet: "s1",
+      sheets: [
+        {
+          id: "s1",
+          name: "Sheet 1",
+          rowCount: 5,
+          columns: Array.from({ length: 10 }, (_, col) => ({
+            key: `c${col}`,
+            header: `C${col}`,
+            width: 80,
+            type: "number" as const,
+          })),
+        },
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 0), value: { kind: "literal", value: 1 } },
+        { op: "set", addr: addr(1, 0), value: { kind: "literal", value: 2 } },
+        { op: "set", addr: addr(2, 0), value: { kind: "literal", value: 3 } },
+        { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 10 } },
+        { op: "set", addr: addr(1, 1), value: { kind: "literal", value: 20 } },
+        { op: "set", addr: addr(2, 1), value: { kind: "literal", value: 30 } },
+        {
+          op: "set",
+          addr: addr(0, 2),
+          value: { kind: "formula", src: '=SUMIFS(B1:B3,A1:A3,">1")' },
+        },
+        {
+          op: "set",
+          addr: addr(0, 3),
+          value: { kind: "formula", src: "=VLOOKUP(2.5,A1:B3,2,TRUE)" },
+        },
+        {
+          op: "set",
+          addr: addr(0, 4),
+          value: { kind: "formula", src: "=XLOOKUP(9,A1:A3,B1:B3,,0)" },
+        },
+        {
+          op: "set",
+          addr: addr(0, 5),
+          value: { kind: "formula", src: '=TEXT(DATE(2024,2,29),"yyyy-mm-dd")' },
+        },
+        {
+          op: "set",
+          addr: addr(0, 6),
+          value: { kind: "formula", src: "=FUTUREFUNC(A1)" },
+        },
+      ],
+    });
+
+    expect(store.getCell(addr(0, 2)).resolved).toBe(50);
+    expect(store.getCell(addr(0, 3)).resolved).toBe(20);
+    expect(store.getCell(addr(0, 4)).resolved).toBe("#N/A");
+    expect(store.getCell(addr(0, 5)).resolved).toBe("2024-02-29");
+    expect(store.getCell(addr(0, 6)).resolved).toBe("#NAME?");
+    expect(store.getFormula(addr(0, 6))).toBe("=FUTUREFUNC(A1)");
+    store.dispose();
+  });
+
+  it("resolves scoped named ranges and recalculates volatile formulas from one instant", () => {
+    const columns = Array.from({ length: 4 }, (_, col) => ({
+      key: `c${col}`,
+      header: `C${col}`,
+      width: 80,
+      type: "number" as const,
+    }));
+    const workbook: Workbook = {
+      activeSheet: "summary",
+      sheets: [
+        { id: "data", name: "Data", rowCount: 4, columns },
+        { id: "summary", name: "Summary", rowCount: 2, columns },
+        { id: "other", name: "Other", rowCount: 1, columns },
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "data", row: 0, col: 0 },
+          value: { kind: "literal", value: 1 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "data", row: 1, col: 0 },
+          value: { kind: "literal", value: 2 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "data", row: 2, col: 0 },
+          value: { kind: "literal", value: 3 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "data", row: 0, col: 1 },
+          value: { kind: "literal", value: 10 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "data", row: 1, col: 1 },
+          value: { kind: "literal", value: 20 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "data", row: 2, col: 1 },
+          value: { kind: "literal", value: 30 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 0 },
+          value: { kind: "formula", src: "=SUM(Values)" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "other", row: 0, col: 0 },
+          value: { kind: "formula", src: "=SUM(Values)" },
+        },
+        {
+          op: "setNamedRange",
+          namedRange: {
+            name: "Values",
+            range: {
+              sheet: "data",
+              start: { row: 0, col: 0 },
+              end: { row: 2, col: 0 },
+            },
+          },
+        },
+        {
+          op: "setNamedRange",
+          namedRange: {
+            name: "Values",
+            scope: "summary",
+            range: {
+              sheet: "data",
+              start: { row: 0, col: 1 },
+              end: { row: 2, col: 1 },
+            },
+          },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 2 },
+          value: { kind: "formula", src: "=TODAY()" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 3 },
+          value: { kind: "formula", src: "=NOW()" },
+        },
+      ],
+    });
+
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(60);
+    expect(store.getCell({ sheet: "other", row: 0, col: 0 }).resolved).toBe(6);
+    let volatileEvents = 0;
+    store.on("change", (event) => {
+      if (event.transaction.patches.length === 0) volatileEvents += 1;
+    });
+    const now = new Date("2026-07-13T18:00:00.000Z");
+    const serial = now.getTime() / 86_400_000 + 25_569;
+    store.recalculateVolatile(now);
+    expect(store.getCell({ sheet: "summary", row: 0, col: 2 }).resolved).toBe(Math.floor(serial));
+    expect(store.getCell({ sheet: "summary", row: 0, col: 3 }).resolved).toBe(serial);
+    expect(volatileEvents).toBe(1);
+
+    store.applyTransaction({
+      patches: [{ op: "addRows", sheet: "data", at: 1, count: 1 }],
+    });
+    expect(store.getCell({ sheet: "other", row: 0, col: 0 }).resolved).toBe(6);
+    expect(store.exportSnapshot().workbook.namedRanges).toEqual([
+      {
+        name: "Values",
+        range: {
+          sheet: "data",
+          start: { row: 0, col: 0 },
+          end: { row: 3, col: 0 },
+        },
+      },
+      {
+        name: "Values",
+        scope: "summary",
+        range: {
+          sheet: "data",
+          start: { row: 0, col: 1 },
+          end: { row: 3, col: 1 },
+        },
+      },
+    ]);
+    const hydrated = SheetwriteStore.fromSnapshot(store.exportSnapshot());
+    expect(hydrated.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(60);
+    expect(hydrated.getCell({ sheet: "other", row: 0, col: 0 }).resolved).toBe(6);
+    hydrated.dispose();
+    store.applyTransaction({
+      patches: [{ op: "moveRows", sheet: "data", from: 0, count: 4, to: 1 }],
+    });
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(60);
+    expect(store.getCell({ sheet: "other", row: 0, col: 0 }).resolved).toBe(6);
+    expect(store.exportSnapshot().workbook.namedRanges?.map((range) => range.range)).toEqual([
+      {
+        sheet: "data",
+        start: { row: 1, col: 0 },
+        end: { row: 4, col: 0 },
+      },
+      {
+        sheet: "data",
+        start: { row: 1, col: 1 },
+        end: { row: 4, col: 1 },
+      },
+    ]);
+    store.applyTransaction({
+      patches: [{ op: "moveColumns", sheet: "data", from: 0, count: 2, to: 2 }],
+    });
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(60);
+    expect(store.getCell({ sheet: "other", row: 0, col: 0 }).resolved).toBe(6);
+    expect(store.exportSnapshot().workbook.namedRanges?.map((range) => range.range)).toEqual([
+      {
+        sheet: "data",
+        start: { row: 1, col: 2 },
+        end: { row: 4, col: 2 },
+      },
+      {
+        sheet: "data",
+        start: { row: 1, col: 3 },
+        end: { row: 4, col: 3 },
+      },
+    ]);
+
+    store.applyTransaction({
+      patches: [{ op: "removeNamedRange", name: "Values", scope: "summary" }],
+    });
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(6);
+    store.dispose();
+  });
 });
 
 describe("datasource row hydration", () => {

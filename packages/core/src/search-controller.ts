@@ -1,4 +1,4 @@
-import { parseCellInput } from "./cell-input.js";
+import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { replaceInText } from "./search-replace.js";
 import type { SheetwriteStore } from "./store.js";
 import type {
@@ -216,7 +216,7 @@ export class SearchController {
     if (this.deps.store.getFormula(addr) !== null) return null;
 
     const cell = this.deps.store.getCell(addr);
-    const text = cell.resolved === null ? "" : String(cell.resolved);
+    const text = cellScalarToText(cell.resolved);
     const next = replaceInText(text, this.searchQuery, replacement, this.searchOpts);
     if (next === null) return null;
 

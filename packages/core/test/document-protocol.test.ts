@@ -144,6 +144,48 @@ describe("workbook document protocol", () => {
     );
   });
 
+  it("validates named range scope, identity, and formula-safe names", () => {
+    const scoped = richSnapshot();
+    scoped.workbook.namedRanges!.push({
+      name: "Totals",
+      scope: "sheet-a",
+      range: { sheet: "sheet-a", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+    });
+    expect(validateWorkbookSnapshot(scoped).ok).toBe(true);
+
+    scoped.workbook.namedRanges!.push({
+      name: "totals",
+      scope: "sheet-a",
+      range: { sheet: "sheet-a", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+    });
+    const duplicate = validateWorkbookSnapshot(scoped);
+    expect(duplicate.ok).toBe(false);
+    if (duplicate.ok) throw new Error("duplicate named range unexpectedly accepted");
+    expect(duplicate.errors.map((error) => error.code)).toContain("duplicate-id");
+
+    const invalid = richSnapshot();
+    invalid.workbook.namedRanges = [
+      {
+        name: "A1",
+        scope: "missing",
+        range: { sheet: "sheet-a", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      },
+    ];
+    const invalidResult = validateWorkbookSnapshot(invalid);
+    expect(invalidResult.ok).toBe(false);
+    if (invalidResult.ok) throw new Error("invalid named range unexpectedly accepted");
+    expect(new Set(invalidResult.errors.map((error) => error.code))).toEqual(
+      new Set(["invalid-value"]),
+    );
+
+    const missingScope = richSnapshot();
+    missingScope.workbook.namedRanges![0]!.scope = "missing";
+    const missingScopeResult = validateWorkbookSnapshot(missingScope);
+    expect(missingScopeResult.ok).toBe(false);
+    if (missingScopeResult.ok) throw new Error("missing scope unexpectedly accepted");
+    expect(missingScopeResult.errors.map((error) => error.code)).toContain("missing-reference");
+  });
+
   it("keeps the operation union exhaustive, targetable, and JSON-only", () => {
     const operations: DocumentOp[] = [
       { op: "set", addr: { sheet: "s", row: 0, col: 0 }, value: { kind: "literal", value: 1 } },

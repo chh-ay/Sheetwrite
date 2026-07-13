@@ -3,7 +3,7 @@ import { colToA1 } from "./a1.js";
 import { AriaMirror } from "./aria-mirror.js";
 import { fontFor, layoutTextLines } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import { parseCellInput } from "./cell-input.js";
+import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { ColumnIndex } from "./column-index.js";
 import { ContextMenu } from "./context-menu.js";
@@ -1490,7 +1490,7 @@ export class GridImpl implements Grid {
           ...this.snapshotExternalFormulaAndRefs(patch.sheet),
         ];
         for (const namedRange of this.store.getWorkbook().namedRanges ?? []) {
-          if (namedRange.range.sheet === patch.sheet) {
+          if (namedRange.range.sheet === patch.sheet || namedRange.scope === patch.sheet) {
             restore.push({ op: "setNamedRange", namedRange: { ...namedRange } });
           }
         }
@@ -1531,15 +1531,28 @@ export class GridImpl implements Grid {
       case "setNamedRange": {
         const previous = this.store
           .getWorkbook()
-          .namedRanges?.find((range) => range.name === patch.namedRange.name);
+          .namedRanges?.find(
+            (range) =>
+              range.name.toUpperCase() === patch.namedRange.name.toUpperCase() &&
+              range.scope === patch.namedRange.scope,
+          );
         return previous
           ? [{ op: "setNamedRange", namedRange: { ...previous } }]
-          : [{ op: "removeNamedRange", name: patch.namedRange.name }];
+          : [
+              {
+                op: "removeNamedRange",
+                name: patch.namedRange.name,
+                scope: patch.namedRange.scope,
+              },
+            ];
       }
       case "removeNamedRange": {
         const previous = this.store
           .getWorkbook()
-          .namedRanges?.find((range) => range.name === patch.name);
+          .namedRanges?.find(
+            (range) =>
+              range.name.toUpperCase() === patch.name.toUpperCase() && range.scope === patch.scope,
+          );
         return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
       }
     }
@@ -1937,7 +1950,7 @@ export class GridImpl implements Grid {
         const column = sheet.columns[col]!;
         const cellStyle = view.styles[view.styleIds[(row - r0) * cols.length + ci]!] ?? {};
         const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
-        if (!style.wrap && !String(value).includes("\n")) continue;
+        if (!style.wrap && !cellScalarToText(value).includes("\n")) continue;
         const merge = merges.find((candidate) => candidate.r0 === row && candidate.c0 === col);
         const width = merge
           ? sheet.columns
@@ -1948,7 +1961,11 @@ export class GridImpl implements Grid {
           style.fontSize ??
           (Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") || 12);
         ctx.font = fontFor(this.baseTheme, style);
-        const lineCount = layoutTextLines(ctx, String(value), Math.max(0, width - 12)).length;
+        const lineCount = layoutTextLines(
+          ctx,
+          cellScalarToText(value),
+          Math.max(0, width - 12),
+        ).length;
         required = Math.max(required, Math.ceil(lineCount * fontPx * 1.2 + 8));
       }
       patches.push({
@@ -1991,7 +2008,7 @@ export class GridImpl implements Grid {
         const cellStyle = view.styles[view.styleIds[index]!] ?? {};
         const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
         ctx.font = fontFor(this.baseTheme, style);
-        for (const line of String(value).split("\n")) {
+        for (const line of cellScalarToText(value).split("\n")) {
           width = Math.max(width, ctx.measureText(line).width + 12);
         }
       }
@@ -2100,7 +2117,7 @@ export class GridImpl implements Grid {
     };
     const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
     const resolved = this.store.getCell(address).resolved;
-    const text = formula ?? (resolved === null ? "" : String(resolved));
+    const text = formula ?? cellScalarToText(resolved);
 
     return { address, text, format: column.type };
   }

@@ -7,8 +7,8 @@ use wasm_bindgen::prelude::*;
 use crate::sheet::{formula_error_at, payload_is_str, payload_num, payload_str_id, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, string_from_pool_ref, CellKey, FormulaError, StringPool, KIND_EMPTY, KIND_FORMULA,
-    KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringPool, KIND_BOOL,
+    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 #[wasm_bindgen]
@@ -438,6 +438,15 @@ impl CellStore {
                                     .iter()
                                     .any(|v| v == text);
                             }
+                        } else if kind == 3 {
+                            if let Some(value) = boolean_cell_value(data, index) {
+                                let expected = if value { "\0TRUE" } else { "\0FALSE" };
+                                hit |= value_texts
+                                    .get(text_offsets[i]..text_offsets[i] + tc)
+                                    .unwrap_or(&[])
+                                    .iter()
+                                    .any(|candidate| candidate == expected);
+                            }
                         }
                         hit
                     }
@@ -502,6 +511,10 @@ impl CellStore {
                     "s:{}",
                     resolved_text(data, &self.strings, index).unwrap_or("")
                 ),
+                3 => format!(
+                    "o:{}",
+                    u8::from(boolean_cell_value(data, index).unwrap_or(false))
+                ),
                 _ => "b".to_string(),
             };
             if !seen.insert(key) {
@@ -511,6 +524,13 @@ impl CellStore {
             if kind == 1 {
                 out.numbers
                     .push(numeric_cell_value(data, index).unwrap_or(0.0));
+            } else if kind == 3 {
+                out.numbers
+                    .push(if boolean_cell_value(data, index).unwrap_or(false) {
+                        1.0
+                    } else {
+                        0.0
+                    });
             } else if kind == 2 {
                 out.texts.push(
                     resolved_text(data, &self.strings, index)
@@ -558,21 +578,53 @@ fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
     match sheet.kind_at(index) {
         KIND_NUMBER => 1,
         KIND_STRING => 2,
+        KIND_BOOL => 3,
         KIND_FORMULA => {
             let Some(key) = key_for_index(sheet, index) else {
                 return 0;
             };
-            if formula_error_at(sheet, key).is_some() || sheet.str_id_at(index) != NO_STRING {
+            let Some(entry) = sheet.formulas.get(&key) else {
+                return 0;
+            };
+            if formula_error_at(sheet, key).is_some() {
                 2
             } else {
-                1
+                match entry.value_kind {
+                    FormulaValueKind::Number => 1,
+                    FormulaValueKind::Text => 2,
+                    FormulaValueKind::Bool => 3,
+                }
             }
         }
         _ => 0,
     }
 }
 
+fn boolean_text(value: bool) -> &'static str {
+    if value {
+        "TRUE"
+    } else {
+        "FALSE"
+    }
+}
+
+fn boolean_cell_value(sheet: &SheetData, index: usize) -> Option<bool> {
+    match sheet.kind_at(index) {
+        KIND_BOOL => Some(sheet.num_at(index) != 0.0),
+        KIND_FORMULA => {
+            let key = key_for_index(sheet, index)?;
+            let entry = sheet.formulas.get(&key)?;
+            (formula_error_at(sheet, key).is_none() && entry.value_kind == FormulaValueKind::Bool)
+                .then(|| sheet.num_at(index) != 0.0)
+        }
+        _ => None,
+    }
+}
+
 fn resolved_text<'a>(sheet: &SheetData, strings: &'a StringPool, index: usize) -> Option<&'a str> {
+    if let Some(value) = boolean_cell_value(sheet, index) {
+        return Some(boolean_text(value));
+    }
     match sheet.kind_at(index) {
         KIND_STRING | KIND_FORMULA if sheet.str_id_at(index) != NO_STRING => {
             string_from_pool_ref(strings, sheet.str_id_at(index))
@@ -613,7 +665,10 @@ pub(crate) fn numeric_cell_value(sheet: &SheetData, index: usize) -> Option<f64>
         KIND_NUMBER => Some(sheet.num_at(index)),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
-            if formula_error_at(sheet, key).is_none() && sheet.str_id_at(index) == NO_STRING {
+            let entry = sheet.formulas.get(&key)?;
+            if formula_error_at(sheet, key).is_none()
+                && entry.value_kind == FormulaValueKind::Number
+            {
                 Some(sheet.num_at(index))
             } else {
                 None
@@ -805,6 +860,9 @@ pub(crate) fn cell_matches_text(
     whole_cell: bool,
     cache: &mut MatchCache,
 ) -> bool {
+    if let Some(value) = boolean_cell_value(sheet, index) {
+        return matches_needle(boolean_text(value), needle, case_insensitive, whole_cell);
+    }
     match sheet.kind_at(index) {
         KIND_NUMBER => {
             number_matches_text(sheet.num_at(index), needle, case_insensitive, whole_cell)
@@ -1014,6 +1072,7 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ComparableCell<'a> {
     Number(OrderedNumber),
+    Bool(bool),
     Text(&'a str),
     Empty,
 }
@@ -1022,12 +1081,19 @@ impl<'a> ComparableCell<'a> {
     pub(crate) fn from_cell(sheet: &'a SheetData, strings: &'a StringPool, index: usize) -> Self {
         match sheet.kind_at(index) {
             KIND_NUMBER => ComparableCell::Number(OrderedNumber(sheet.num_at(index))),
+            KIND_BOOL => ComparableCell::Bool(sheet.num_at(index) != 0.0),
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
                     return ComparableCell::Empty;
                 };
                 if let Some(error) = formula_error_at(sheet, key) {
                     ComparableCell::Text(error.sentinel())
+                } else if sheet
+                    .formulas
+                    .get(&key)
+                    .is_some_and(|entry| entry.value_kind == FormulaValueKind::Bool)
+                {
+                    ComparableCell::Bool(sheet.num_at(index) != 0.0)
                 } else if let Some(text) = string_from_pool_ref(strings, sheet.str_id_at(index)) {
                     ComparableCell::Text(text)
                 } else {
@@ -1049,10 +1115,13 @@ impl<'a> ComparableCell<'a> {
         let stored_kind = unsafe { *sheet.kind.get_unchecked(index) };
         match stored_kind {
             // SAFETY: caller guarantees `index` is valid for all cell vectors;
-            // a NUMBER cell's payload is always canonical f64 bits.
+            // NUMBER and BOOL payloads are canonical f64 bits.
             KIND_NUMBER => ComparableCell::Number(OrderedNumber(f64::from_bits(unsafe {
                 sheet.payload_unchecked(index)
             }))),
+            KIND_BOOL => {
+                ComparableCell::Bool(payload_num(unsafe { sheet.payload_unchecked(index) }) != 0.0)
+            }
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
                     return ComparableCell::Empty;
@@ -1062,7 +1131,13 @@ impl<'a> ComparableCell<'a> {
                 } else {
                     // SAFETY: caller guarantees `index` is valid for all cell vectors.
                     let bits = unsafe { sheet.payload_unchecked(index) };
-                    if let Some(text) = string_from_pool_ref(strings, payload_str_id(bits)) {
+                    if sheet
+                        .formulas
+                        .get(&key)
+                        .is_some_and(|entry| entry.value_kind == FormulaValueKind::Bool)
+                    {
+                        ComparableCell::Bool(payload_num(bits) != 0.0)
+                    } else if let Some(text) = string_from_pool_ref(strings, payload_str_id(bits)) {
                         ComparableCell::Text(text)
                     } else {
                         ComparableCell::Number(OrderedNumber(payload_num(bits)))
@@ -1088,8 +1163,11 @@ impl Ord for ComparableCell<'_> {
             (_, ComparableCell::Empty) => Ordering::Less,
             (ComparableCell::Number(a), ComparableCell::Number(b)) => a.cmp(b),
             (ComparableCell::Text(a), ComparableCell::Text(b)) => a.cmp(b),
-            (ComparableCell::Number(_), ComparableCell::Text(_)) => Ordering::Less,
-            (ComparableCell::Text(_), ComparableCell::Number(_)) => Ordering::Greater,
+            (ComparableCell::Bool(a), ComparableCell::Bool(b)) => a.cmp(b),
+            (ComparableCell::Number(_), _) => Ordering::Less,
+            (_, ComparableCell::Number(_)) => Ordering::Greater,
+            (ComparableCell::Text(_), ComparableCell::Bool(_)) => Ordering::Less,
+            (ComparableCell::Bool(_), ComparableCell::Text(_)) => Ordering::Greater,
         }
     }
 }

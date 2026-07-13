@@ -551,9 +551,9 @@ describe("workbook XLSX round-trip", () => {
       onWarning: (warning) => warnings.push(warning.code),
     });
 
-    expect(warnings).toEqual(["boolean-literal", "rich-text", "hyperlink", "unsupported-feature"]);
+    expect(warnings).toEqual(["rich-text", "hyperlink", "unsupported-feature"]);
     expect(imported.sheets[0]!.cells[0]!.cells.map((cell) => cell.value)).toEqual([
-      { kind: "literal", value: "TRUE" },
+      { kind: "literal", value: true },
       { kind: "literal", value: "rich text" },
       { kind: "literal", value: "Sheetwrite" },
     ]);
@@ -569,5 +569,30 @@ describe("workbook XLSX round-trip", () => {
     await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toThrow(
       "maxCells is 1",
     );
+  });
+
+  it("round-trips native boolean literals without text coercion", async () => {
+    const source = roundTripWorkbook();
+    source.sheets[0]!.cells = [
+      {
+        startRow: 0,
+        startCol: 0,
+        rowCount: 1,
+        colCount: 1,
+        cells: [
+          {
+            rowOffset: 0,
+            colOffset: 0,
+            value: { kind: "literal", value: true },
+          },
+        ],
+      },
+    ];
+
+    const imported = await fromXlsxWorkbook(await toXlsxWorkbook(source));
+    expect(imported.sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
+      kind: "literal",
+      value: true,
+    });
   });
 });

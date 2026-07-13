@@ -1,3 +1,4 @@
+import { cellScalarToText } from "./cell-input.js";
 import { neutralizeInjection } from "./clipboard.js";
 import type {
   CellFormat,
@@ -11,12 +12,6 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "./types.js";
-
-function scalarToText(value: CellScalar): string {
-  if (value === null) return "";
-  if (typeof value === "number") return String(value);
-  return value;
-}
 
 function csvField(text: string): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -33,7 +28,7 @@ function tsvField(text: string): string {
  * through untouched — a negative number is a number, not an attack vector.
  */
 export function safeText(value: CellScalar): string {
-  return typeof value === "string" ? neutralizeInjection(value) : scalarToText(value);
+  return typeof value === "string" ? neutralizeInjection(value) : cellScalarToText(value);
 }
 
 /** Harden a column header (always text) exactly as a text cell value. */

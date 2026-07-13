@@ -342,6 +342,67 @@ function errorPropagationFixture(count: number): TimedFixture {
   };
 }
 
+function criteriaRangeFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, () => 1),
+    0,
+  );
+  const threshold = Math.floor(count / 2);
+  store.setFormula(sheet, 0, 2, `=SUMIF(A1:A${count},">=${threshold}",B1:B${count})`, 0);
+  store.recompute(sheet);
+  return {
+    run: () => {
+      store.setNumber(sheet, 0, 0, count, 0);
+      store.recompute(sheet);
+    },
+    check: () =>
+      assert(numberAt(store, sheet, 0, 2) === count - threshold + 1, `criteria range ${count}`),
+    dispose: () => store.free(),
+  };
+}
+
+function lookupRangeFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, (row) => row * 2),
+    0,
+  );
+  store.setNumber(sheet, 0, 2, 0, 0);
+  store.setFormula(sheet, 0, 3, `=XLOOKUP(C1,A1:A${count},B1:B${count})`, 0);
+  store.recompute(sheet);
+  return {
+    run: () => {
+      store.setNumber(sheet, 0, 2, count - 1, 0);
+      store.recompute(sheet);
+    },
+    check: () => assert(numberAt(store, sheet, 0, 3) === (count - 1) * 2, `lookup range ${count}`),
+    dispose: () => store.free(),
+  };
+}
+
 function runWorkloads(smoke: boolean): FormulaWorkloadResult[] {
   const results: FormulaWorkloadResult[] = [];
   const sizes = smoke ? ([1_000] as const) : FORMULA_SIZES;
@@ -381,6 +442,18 @@ function runWorkloads(smoke: boolean): FormulaWorkloadResult[] {
     collectFixture("cycles", 1_000, () => cycleFixture(1_000), samples),
     collectFixture("removed-sheet-ref", 1_000, () => refRemovalFixture(1_000), samples),
     collectFixture("error-propagation", 1_000, () => errorPropagationFixture(1_000), samples),
+    collectFixture(
+      "criteria-range-edit",
+      smoke ? 10_000 : 100_000,
+      () => criteriaRangeFixture(smoke ? 10_000 : 100_000),
+      samples,
+    ),
+    collectFixture(
+      "lookup-range-edit",
+      smoke ? 10_000 : 100_000,
+      () => lookupRangeFixture(smoke ? 10_000 : 100_000),
+      samples,
+    ),
   );
   return results;
 }
@@ -450,6 +523,12 @@ export function validateFormulaBenchmark(result: FormulaBenchmarkResult): void {
   );
   if (load100k) assert(load100k.stat.p95 < 5_000, "100K parse/load exceeded 5 seconds");
   if (recompute100k) assert(recompute100k.stat.p95 < 5_000, "100K recompute exceeded 5 seconds");
+  for (const id of ["criteria-range-edit", "lookup-range-edit"]) {
+    const workload = result.workloads.find(
+      (candidate) => candidate.id === id && candidate.size === 100_000,
+    );
+    if (workload) assert(workload.stat.p95 < 5_000, `100K ${id} exceeded 5 seconds`);
+  }
   for (const memory of result.memory) {
     assert(memory.wasmDeltaBytes >= 0, "negative memory delta");
     if (memory.formulas === 100_000) {
@@ -478,7 +557,7 @@ function markdown(result: FormulaBenchmarkResult): string {
   }
   lines.push(
     "",
-    "Gates use broad absolute ceilings (100K parse/recompute <5 s; 100K formula memory <256 MiB). Tiny timer-floor workloads are recorded but not ratio-gated.",
+    "Gates use broad absolute ceilings (100K parse/recompute/criteria/lookup <5 s; 100K formula memory <256 MiB). Tiny timer-floor workloads are recorded but not ratio-gated.",
     "",
   );
   return lines.join("\n");
@@ -500,7 +579,7 @@ async function runBenchmark(smoke: boolean): Promise<void> {
     gates: {
       passed: true,
       tolerance:
-        "100K parse/load and recompute p95 <5s; 100K formula WASM delta <256MiB; no timer-floor ratios",
+        "100K parse/load, recompute, criteria, and lookup p95 <5s; 100K formula WASM delta <256MiB; no timer-floor ratios",
     },
   };
   validateFormulaBenchmark(result);

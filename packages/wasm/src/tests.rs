@@ -208,8 +208,10 @@ fn text_functions_surface_string_and_boolean_values() {
     assert_eq!(string(&store, sheet, 8, 0).as_deref(), Some("mix"));
     assert_eq!(string(&store, sheet, 9, 0).as_deref(), Some("a b"));
     assert_eq!(string(&store, sheet, 10, 0).as_deref(), Some("12.35"));
-    assert_eq!(string(&store, sheet, 11, 0).as_deref(), Some("TRUE"));
-    assert_eq!(string(&store, sheet, 12, 0).as_deref(), Some("FALSE"));
+    assert_eq!(store.get_cell(sheet, 11, 0).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 11, 0), 1.0);
+    assert_eq!(store.get_cell(sheet, 12, 0).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 12, 0), 0.0);
 }
 
 #[test]
@@ -242,14 +244,17 @@ fn value_coercion_logic_iferror_and_comparisons() {
     assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("#VALUE!"));
     assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("yes"));
     assert_close(number(&store, sheet, 3, 1), 2.0);
-    assert_eq!(string(&store, sheet, 4, 1).as_deref(), Some("TRUE"));
-    assert_eq!(string(&store, sheet, 5, 1).as_deref(), Some("TRUE"));
-    assert_eq!(string(&store, sheet, 6, 1).as_deref(), Some("TRUE"));
+    for row in 4..=6 {
+        assert_eq!(store.get_cell(sheet, row, 1).kind(), KIND_BOOL);
+        assert_close(number(&store, sheet, row, 1), 1.0);
+    }
     assert_eq!(string(&store, sheet, 7, 1).as_deref(), Some("fallback"));
     assert_eq!(string(&store, sheet, 8, 1).as_deref(), Some("ok"));
     assert_close(number(&store, sheet, 9, 1), 4.0);
-    assert_eq!(string(&store, sheet, 10, 1).as_deref(), Some("TRUE"));
-    assert_eq!(string(&store, sheet, 11, 1).as_deref(), Some("TRUE"));
+    for row in 10..=11 {
+        assert_eq!(store.get_cell(sheet, row, 1).kind(), KIND_BOOL);
+        assert_close(number(&store, sheet, row, 1), 1.0);
+    }
 }
 
 #[test]
@@ -298,20 +303,17 @@ fn value_results_feed_dependencies_and_windows() {
 
     assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("hello"));
     assert_close(number(&store, sheet, 0, 1), 5.0);
-    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("TRUE"));
-    assert_eq!(string(&store, sheet, 0, 3).as_deref(), Some("FALSE"));
+    assert_eq!(store.get_cell(sheet, 0, 2).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 0, 2), 1.0);
+    assert_eq!(store.get_cell(sheet, 0, 3).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 0, 3), 0.0);
 
     let mut view = store.get_window(sheet, 0, 1, &[0, 1, 2, 3]);
     let kinds = view.take_kinds();
     let string_ids = view.take_string_ids();
     let pooled = store.pool_strings(&string_ids);
-    assert_eq!(
-        kinds,
-        vec![KIND_STRING, KIND_NUMBER, KIND_STRING, KIND_STRING]
-    );
+    assert_eq!(kinds, vec![KIND_STRING, KIND_NUMBER, KIND_BOOL, KIND_BOOL]);
     assert_eq!(pooled[0], "hello");
-    assert_eq!(pooled[2], "TRUE");
-    assert_eq!(pooled[3], "FALSE");
 
     store.set_formula(sheet, 0, 0, r#"="world""#, 3);
     store.recompute(sheet);
@@ -339,8 +341,164 @@ fn formula_errors_surface_as_sentinels() {
     assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("#DIV/0!"));
     assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("#REF!"));
     assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("#REF!"));
-    assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("#ERROR!"));
+    assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("#VALUE!"));
     assert_eq!(string(&store, sheet, 3, 1).as_deref(), Some("#VALUE!"));
+}
+
+#[test]
+fn date_time_functions_use_excel_serials_and_controlled_volatile_inputs() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(13, 1);
+    let formulas = [
+        (0, "=DATE(2024,2,29)"),
+        (1, "=DATEVALUE(\"2024-02-29\")"),
+        (2, "=DAY(A1)"),
+        (3, "=MONTH(A1)"),
+        (4, "=YEAR(A1)"),
+        (5, "=TEXT(A1,\"yyyy-mm-dd\")"),
+        (6, "=TODAY()"),
+        (7, "=NOW()"),
+        (8, "=DATE(1900,1,1)"),
+        (9, "=DATE(1900,2,29)"),
+        (10, "=DATE(1900,3,1)"),
+        (11, "=DATE(2024,13,1)"),
+        (12, "=DATE(1900,1,60)"),
+    ];
+    for (col, source) in formulas {
+        store.set_formula(sheet, 0, col, source, 0);
+    }
+    store.recompute_volatile(46_000.75);
+
+    assert_close(number(&store, sheet, 0, 0), 45_351.0);
+    assert_close(number(&store, sheet, 0, 1), 45_351.0);
+    assert_close(number(&store, sheet, 0, 2), 29.0);
+    assert_close(number(&store, sheet, 0, 3), 2.0);
+    assert_close(number(&store, sheet, 0, 4), 2024.0);
+    assert_eq!(string(&store, sheet, 0, 5).as_deref(), Some("2024-02-29"));
+    assert_close(number(&store, sheet, 0, 6), 46_000.0);
+    assert_close(number(&store, sheet, 0, 7), 46_000.75);
+    assert_close(number(&store, sheet, 0, 8), 1.0);
+    assert_close(number(&store, sheet, 0, 9), 60.0);
+    assert_close(number(&store, sheet, 0, 10), 61.0);
+    assert_close(number(&store, sheet, 0, 11), 45_658.0);
+    assert_close(number(&store, sheet, 0, 12), 60.0);
+}
+
+#[test]
+fn criteria_families_apply_wildcards_shapes_and_error_semantics() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(10, 5);
+    for (row, value) in [1.0, 2.0, 3.0, 4.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+    store.set_string(sheet, 4, 0, "alpha", 0);
+    for (row, value) in [10.0, 20.0, 30.0, 40.0, 50.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 1, value, 0);
+    }
+    let formulas = [
+        (0, "=COUNTIF(A1:A4,\">2\")"),
+        (1, "=SUMIF(A1:A4,\">2\",B1:B4)"),
+        (2, "=COUNTIFS(A1:A4,\">1\",B1:B4,\"<=30\")"),
+        (3, "=SUMIFS(B1:B4,A1:A4,\">1\",A1:A4,\"<4\")"),
+        (4, "=AVERAGEIF(A1:A4,\">2\",B1:B4)"),
+        (5, "=AVERAGEIFS(B1:B4,A1:A4,\">2\")"),
+        (6, "=COUNTIF(A1:A5,\"a*\")"),
+        (7, "=SUMIFS(B1:B3,A1:A4,\">0\")"),
+    ];
+    for (col, source) in formulas {
+        store.set_formula(sheet, 0, col + 2, source, 0);
+    }
+    store.recompute(sheet);
+
+    assert_close(number(&store, sheet, 0, 2), 2.0);
+    assert_close(number(&store, sheet, 0, 3), 70.0);
+    assert_close(number(&store, sheet, 0, 4), 2.0);
+    assert_close(number(&store, sheet, 0, 5), 50.0);
+    assert_close(number(&store, sheet, 0, 6), 35.0);
+    assert_close(number(&store, sheet, 0, 7), 35.0);
+    assert_close(number(&store, sheet, 0, 8), 1.0);
+    assert_eq!(string(&store, sheet, 0, 9).as_deref(), Some("#VALUE!"));
+}
+
+#[test]
+fn lookup_functions_cover_exact_approximate_reverse_and_not_found_paths() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(11, 6);
+    for (row, (key, value)) in [(1.0, 10.0), (2.0, 20.0), (3.0, 30.0)]
+        .into_iter()
+        .enumerate()
+    {
+        store.set_number(sheet, row, 0, key, 0);
+        store.set_number(sheet, row, 1, value, 0);
+    }
+    for (col, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
+        store.set_number(sheet, 4, col, value, 0);
+        store.set_number(sheet, 5, col, value * 10.0, 0);
+    }
+    let formulas = [
+        (2, "=INDEX(A1:B3,2,2)"),
+        (3, "=MATCH(2.5,A1:A3,1)"),
+        (4, "=VLOOKUP(2.5,A1:B3,2,TRUE)"),
+        (5, "=HLOOKUP(2.5,A5:C6,2,TRUE)"),
+        (6, "=XLOOKUP(2,A1:A3,B1:B3,\"missing\")"),
+        (7, "=XLOOKUP(9,A1:A3,B1:B3,\"missing\")"),
+        (8, "=MATCH(9,A1:A3,0)"),
+        (9, "=XLOOKUP(2.5,A1:A3,B1:B3,,1,-1)"),
+        (10, "=XLOOKUP(9,A1:A3,B1:B3,,0)"),
+    ];
+    for (col, source) in formulas {
+        store.set_formula(sheet, 0, col, source, 0);
+    }
+    store.recompute(sheet);
+
+    assert_close(number(&store, sheet, 0, 2), 20.0);
+    assert_close(number(&store, sheet, 0, 3), 2.0);
+    assert_close(number(&store, sheet, 0, 4), 20.0);
+    assert_close(number(&store, sheet, 0, 5), 20.0);
+    assert_close(number(&store, sheet, 0, 6), 20.0);
+    assert_eq!(string(&store, sheet, 0, 7).as_deref(), Some("missing"));
+    assert_eq!(string(&store, sheet, 0, 8).as_deref(), Some("#N/A"));
+    assert_close(number(&store, sheet, 0, 9), 30.0);
+    assert_eq!(string(&store, sheet, 0, 10).as_deref(), Some("#N/A"));
+}
+
+#[test]
+fn named_ranges_resolve_scope_rebase_delete_cycle_and_preserve_unknown_sources() {
+    let mut store = CellStore::new();
+    let data = store.add_sheet(2, 4);
+    let summary = store.add_sheet(4, 2);
+    let other = store.add_sheet(1, 1);
+    store.set_sheet_name(data, "data", "Data");
+    store.set_sheet_name(summary, "summary", "Summary");
+    store.set_sheet_name(other, "other", "Other");
+    for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
+        store.set_number(data, row, 0, value, 0);
+        store.set_number(data, row, 1, value * 10.0, 0);
+    }
+    store.set_formula(summary, 0, 0, "=SUM(Values)", 0);
+    store.set_formula(other, 0, 0, "=SUM(Values)", 0);
+    assert!(store.set_named_range("Values", -1, data, 0, 0, 2, 0));
+    assert!(store.set_named_range("Values", summary as i32, data, 0, 1, 2, 1));
+    assert_close(number(&store, summary, 0, 0), 60.0);
+    assert_close(number(&store, other, 0, 0), 6.0);
+
+    assert!(store.set_named_range("Self", summary as i32, summary, 0, 1, 0, 1));
+    store.set_formula(summary, 0, 1, "=SUM(Self)", 0);
+    store.set_formula(summary, 0, 2, "=UNSUPPORTED(A1)", 0);
+    store.recompute(summary);
+    assert_eq!(string(&store, summary, 0, 1).as_deref(), Some("#CYCLE!"));
+    assert_eq!(string(&store, summary, 0, 2).as_deref(), Some("#NAME?"));
+    assert_eq!(
+        store.formula_source(summary, 0, 2).as_deref(),
+        Some("=UNSUPPORTED(A1)")
+    );
+
+    store.add_rows(data, 1, 1);
+    store.recompute(other);
+    assert_close(number(&store, other, 0, 0), 6.0);
+    store.remove_rows(data, 0, 4);
+    store.recompute(other);
+    assert_eq!(string(&store, other, 0, 0).as_deref(), Some("#NAME?"));
 }
 
 #[test]
@@ -1181,6 +1339,44 @@ fn multi_query_entry_points_preserve_order_filters_distinctness_and_edges() {
     let order = [1, 3, 0, 2, 4];
     assert_eq!(store.data_edge_ordered(sheet, &order, 0, 0, 1, 0), 4);
     assert_eq!(store.data_edge_ordered(sheet, &order, 4, 0, -1, 0), 0);
+}
+
+#[test]
+fn boolean_queries_sort_filter_search_and_distinct_without_becoming_blanks() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 6);
+    store.set_bool(sheet, 0, 0, false, 0);
+    store.set_bool(sheet, 1, 0, true, 0);
+    store.set_formula(sheet, 2, 0, "=1=1", 0);
+    store.set_formula(sheet, 3, 0, "=1=2", 0);
+    store.set_number(sheet, 4, 0, 7.0, 0);
+    store.recompute(sheet);
+
+    assert_eq!(store.sort_rows(sheet, 0, true), vec![4, 0, 3, 1, 2, 5]);
+    assert_eq!(
+        store.filter_rows_multi(
+            sheet,
+            &[0],
+            &[0],
+            &[0],
+            &[0.0],
+            &[0],
+            &[1],
+            &[],
+            vec!["\0TRUE".to_string()],
+        ),
+        vec![1, 2]
+    );
+    assert_eq!(store.filter_rows(sheet, 0, "true"), vec![1, 2]);
+    assert_eq!(
+        store.search(sheet, &[0], "TRUE", true, true),
+        vec![1, 0, 2, 0]
+    );
+
+    let mut distinct = store.distinct_values(sheet, 0, 0);
+    assert_eq!(distinct.take_kinds(), vec![3, 3, 1, 0]);
+    assert_eq!(distinct.take_numbers(), vec![0.0, 1.0, 7.0]);
+    assert!(distinct.take_texts().is_empty());
 }
 
 #[test]

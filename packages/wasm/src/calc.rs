@@ -61,6 +61,25 @@ pub enum Func {
     Trim,
     Text,
     Exact,
+    Date,
+    DateValue,
+    Day,
+    Month,
+    Year,
+    Today,
+    Now,
+    CountIf,
+    CountIfs,
+    SumIf,
+    SumIfs,
+    AverageIf,
+    AverageIfs,
+    Index,
+    Match,
+    VLookup,
+    HLookup,
+    XLookup,
+    Na,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -99,10 +118,24 @@ pub struct RangeFlags {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct NamedRangeRef {
+    pub name: String,
+    pub scope: Option<u32>,
+    pub sheet: u32,
+    pub row_start: u32,
+    pub col_start: u32,
+    pub row_end: u32,
+    pub col_end: u32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
     Num(f64),
     Str(String),
     Bool(bool),
+    Missing,
+    Name(String),
+    NamedRange(NamedRangeRef),
     Cell(u32, u32, RefFlags),
     SheetCell(UnresolvedSheetRef, u32, u32, RefFlags),
     AbsCell(SheetRef, u32, u32, RefFlags),
@@ -111,6 +144,7 @@ pub enum Ast {
     AbsRange(SheetRef, u32, u32, u32, u32, RangeFlags),
     InvalidRef,
     Func(Func, Vec<Ast>),
+    UnknownFunc(String, Vec<Ast>),
     Bin(Op, Box<Ast>, Box<Ast>),
     Cmp(CmpOp, Box<Ast>, Box<Ast>),
     Neg(Box<Ast>),
@@ -288,9 +322,11 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, String> {
         } else if chars[i..].starts_with(&['#', 'R', 'E', 'F', '!']) {
             toks.push(Tok::InvalidRef);
             i += 5;
-        } else if c == '$' || c.is_ascii_alphabetic() {
+        } else if c == '$' || c == '_' || c.is_ascii_alphabetic() {
             let start = i;
-            while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '$') {
+            while i < chars.len()
+                && (chars[i].is_ascii_alphanumeric() || chars[i] == '$' || chars[i] == '_')
+            {
                 i += 1;
             }
             toks.push(Tok::Ident(chars[start..i].iter().collect(), false));
@@ -439,45 +475,68 @@ impl Parser {
         if let Some(Tok::LParen) = self.peek() {
             self.pos += 1;
             let func = match name.to_ascii_uppercase().as_str() {
-                "SUM" => Func::Sum,
-                "AVG" | "AVERAGE" => Func::Avg,
-                "MIN" => Func::Min,
-                "MAX" => Func::Max,
-                "COUNT" => Func::Count,
-                "IF" => Func::If,
-                "ABS" => Func::Abs,
-                "ROUND" => Func::Round,
-                "SQRT" => Func::Sqrt,
-                "MOD" => Func::Mod,
-                "POW" => Func::Pow,
-                "AND" => Func::And,
-                "OR" => Func::Or,
-                "NOT" => Func::Not,
-                "FLOOR" => Func::Floor,
-                "CEILING" => Func::Ceiling,
-                "INT" => Func::Int,
-                "TRUNC" => Func::Trunc,
-                "SIGN" => Func::Sign,
-                "PI" => Func::Pi,
-                "IFERROR" => Func::IfError,
-                "COUNTA" => Func::CountA,
-                "LEN" => Func::Len,
-                "LEFT" => Func::Left,
-                "RIGHT" => Func::Right,
-                "MID" => Func::Mid,
-                "CONCAT" => Func::Concat,
-                "CONCATENATE" => Func::Concatenate,
-                "UPPER" => Func::Upper,
-                "LOWER" => Func::Lower,
-                "TRIM" => Func::Trim,
-                "TEXT" => Func::Text,
-                "EXACT" => Func::Exact,
-                _ => return Err(format!("unknown function: {name}")),
+                "SUM" => Some(Func::Sum),
+                "AVG" | "AVERAGE" => Some(Func::Avg),
+                "MIN" => Some(Func::Min),
+                "MAX" => Some(Func::Max),
+                "COUNT" => Some(Func::Count),
+                "IF" => Some(Func::If),
+                "ABS" => Some(Func::Abs),
+                "ROUND" => Some(Func::Round),
+                "SQRT" => Some(Func::Sqrt),
+                "MOD" => Some(Func::Mod),
+                "POW" => Some(Func::Pow),
+                "AND" => Some(Func::And),
+                "OR" => Some(Func::Or),
+                "NOT" => Some(Func::Not),
+                "FLOOR" => Some(Func::Floor),
+                "CEILING" => Some(Func::Ceiling),
+                "INT" => Some(Func::Int),
+                "TRUNC" => Some(Func::Trunc),
+                "SIGN" => Some(Func::Sign),
+                "PI" => Some(Func::Pi),
+                "IFERROR" => Some(Func::IfError),
+                "COUNTA" => Some(Func::CountA),
+                "LEN" => Some(Func::Len),
+                "LEFT" => Some(Func::Left),
+                "RIGHT" => Some(Func::Right),
+                "MID" => Some(Func::Mid),
+                "CONCAT" => Some(Func::Concat),
+                "CONCATENATE" => Some(Func::Concatenate),
+                "UPPER" => Some(Func::Upper),
+                "LOWER" => Some(Func::Lower),
+                "TRIM" => Some(Func::Trim),
+                "TEXT" => Some(Func::Text),
+                "EXACT" => Some(Func::Exact),
+                "DATE" => Some(Func::Date),
+                "DATEVALUE" => Some(Func::DateValue),
+                "DAY" => Some(Func::Day),
+                "MONTH" => Some(Func::Month),
+                "YEAR" => Some(Func::Year),
+                "TODAY" => Some(Func::Today),
+                "NOW" => Some(Func::Now),
+                "COUNTIF" => Some(Func::CountIf),
+                "COUNTIFS" => Some(Func::CountIfs),
+                "SUMIF" => Some(Func::SumIf),
+                "SUMIFS" => Some(Func::SumIfs),
+                "AVERAGEIF" => Some(Func::AverageIf),
+                "AVERAGEIFS" => Some(Func::AverageIfs),
+                "INDEX" => Some(Func::Index),
+                "MATCH" => Some(Func::Match),
+                "VLOOKUP" => Some(Func::VLookup),
+                "HLOOKUP" => Some(Func::HLookup),
+                "XLOOKUP" => Some(Func::XLookup),
+                "NA" => Some(Func::Na),
+                _ => None,
             };
             let mut args = Vec::new();
             if self.peek() != Some(&Tok::RParen) {
                 loop {
-                    args.push(self.expr_at(depth + 1)?);
+                    if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
+                        args.push(Ast::Missing);
+                    } else {
+                        args.push(self.expr_at(depth + 1)?);
+                    }
                     match self.peek() {
                         Some(Tok::Comma) => {
                             self.pos += 1;
@@ -487,7 +546,10 @@ impl Parser {
                 }
             }
             match self.next() {
-                Some(Tok::RParen) => Ok(Ast::Func(func, args)),
+                Some(Tok::RParen) => Ok(match func {
+                    Some(func) => Ast::Func(func, args),
+                    None => Ast::UnknownFunc(name, args),
+                }),
                 _ => Err("expected )".into()),
             }
         } else {
@@ -497,8 +559,9 @@ impl Parser {
                 _ => {}
             }
 
-            let (row, col, flags) =
-                parse_a1(&name).ok_or_else(|| format!("bad cell ref: {name}"))?;
+            let Some((row, col, flags)) = parse_a1(&name) else {
+                return Ok(Ast::Name(name));
+            };
             if let Some(Tok::Colon) = self.peek() {
                 self.pos += 1;
                 match self.next() {
@@ -617,6 +680,13 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Ast::Func(func, resolved))
         }
+        Ast::UnknownFunc(name, args) => {
+            let resolved = args
+                .into_iter()
+                .map(|arg| resolve_sheet_refs(arg, resolve))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Ast::UnknownFunc(name, resolved))
+        }
         Ast::Bin(op, left, right) => Ok(Ast::Bin(
             op,
             Box::new(resolve_sheet_refs(*left, resolve)?),
@@ -629,6 +699,44 @@ where
         )),
         Ast::Neg(inner) => Ok(Ast::Neg(Box::new(resolve_sheet_refs(*inner, resolve)?))),
         other => Ok(other),
+    }
+}
+
+/// Resolve workbook/sheet-scoped names after sheet references have stable handles.
+pub fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
+where
+    F: Fn(&str, u32) -> Option<NamedRangeRef>,
+{
+    match ast {
+        Ast::Name(name) => resolve(&name, formula_sheet).map_or(Ast::Name(name), Ast::NamedRange),
+        Ast::Func(func, args) => Ast::Func(
+            func,
+            args.into_iter()
+                .map(|arg| resolve_named_ranges(arg, formula_sheet, resolve))
+                .collect(),
+        ),
+        Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
+            name,
+            args.into_iter()
+                .map(|arg| resolve_named_ranges(arg, formula_sheet, resolve))
+                .collect(),
+        ),
+        Ast::Bin(op, left, right) => Ast::Bin(
+            op,
+            Box::new(resolve_named_ranges(*left, formula_sheet, resolve)),
+            Box::new(resolve_named_ranges(*right, formula_sheet, resolve)),
+        ),
+        Ast::Cmp(op, left, right) => Ast::Cmp(
+            op,
+            Box::new(resolve_named_ranges(*left, formula_sheet, resolve)),
+            Box::new(resolve_named_ranges(*right, formula_sheet, resolve)),
+        ),
+        Ast::Neg(inner) => Ast::Neg(Box::new(resolve_named_ranges(
+            *inner,
+            formula_sheet,
+            resolve,
+        ))),
+        other => other,
     }
 }
 
@@ -703,7 +811,7 @@ fn rewrite_axis(
                 *ast = Ast::InvalidRef;
             }
         }
-        Ast::Func(_, args) => {
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
             for arg in args {
                 rewrite_axis(arg, axis, at, delta, formula_sheet, edited_sheet);
             }
@@ -731,7 +839,7 @@ fn shift_index(index: u32, at: u32, delta: i64) -> Option<u32> {
 }
 
 /// Shift or contract an inclusive range; deleting every target invalidates it.
-fn shift_range(start: u32, end: u32, at: u32, delta: i64) -> Option<(u32, u32)> {
+pub(crate) fn shift_range(start: u32, end: u32, at: u32, delta: i64) -> Option<(u32, u32)> {
     if delta >= 0 {
         let start = if start >= at {
             clamp_index(i64::from(start) + delta)
@@ -803,7 +911,7 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
             sheet.quoted = sheet_name_needs_quotes(name);
             changed = true;
         }
-        Ast::Func(_, args) => {
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
             for arg in args {
                 changed |= rename_sheet_refs(arg, handle, name);
             }
@@ -831,7 +939,7 @@ pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
 
     let mut changed = false;
     match ast {
-        Ast::Func(_, args) => {
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
             for arg in args {
                 changed |= invalidate_sheet_refs(arg, handle);
             }
@@ -855,6 +963,8 @@ fn write_ast(ast: &Ast, out: &mut String) {
             out.push('"');
         }
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+        Ast::Name(name) => out.push_str(name),
+        Ast::NamedRange(named) => out.push_str(&named.name),
         Ast::Cell(row, col, flags) => write_a1(*row, *col, *flags, out),
         Ast::SheetCell(sheet, row, col, flags) => {
             write_sheet_name(&sheet.name, sheet.quoted, out);
@@ -885,9 +995,21 @@ fn write_ast(ast: &Ast, out: &mut String) {
             out.push(':');
             write_a1(*r1, *c1, flags.end, out);
         }
+        Ast::Missing => {}
         Ast::InvalidRef => out.push_str("#REF!"),
         Ast::Func(func, args) => {
             out.push_str(func_name(*func));
+            out.push('(');
+            for (index, arg) in args.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                write_ast(arg, out);
+            }
+            out.push(')');
+        }
+        Ast::UnknownFunc(name, args) => {
+            out.push_str(name);
             out.push('(');
             for (index, arg) in args.iter().enumerate() {
                 if index > 0 {
@@ -1001,6 +1123,25 @@ fn func_name(func: Func) -> &'static str {
         Func::Trim => "TRIM",
         Func::Text => "TEXT",
         Func::Exact => "EXACT",
+        Func::Date => "DATE",
+        Func::DateValue => "DATEVALUE",
+        Func::Day => "DAY",
+        Func::Month => "MONTH",
+        Func::Year => "YEAR",
+        Func::Today => "TODAY",
+        Func::Now => "NOW",
+        Func::CountIf => "COUNTIF",
+        Func::CountIfs => "COUNTIFS",
+        Func::SumIf => "SUMIF",
+        Func::SumIfs => "SUMIFS",
+        Func::AverageIf => "AVERAGEIF",
+        Func::AverageIfs => "AVERAGEIFS",
+        Func::Index => "INDEX",
+        Func::Match => "MATCH",
+        Func::VLookup => "VLOOKUP",
+        Func::HLookup => "HLOOKUP",
+        Func::XLookup => "XLOOKUP",
+        Func::Na => "NA",
     }
 }
 

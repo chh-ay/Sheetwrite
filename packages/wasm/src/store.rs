@@ -5,15 +5,15 @@ use std::hash::{BuildHasherDefault, Hash, Hasher};
 
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{parse, resolve_sheet_refs};
-use crate::eval::{bool_text, DepIndex};
+use crate::calc::{parse, resolve_named_ranges, resolve_sheet_refs, shift_range, NamedRangeRef};
+use crate::eval::DepIndex;
 use crate::sheet::{
     formula_error_at, payload_num, payload_str_id, CondPred, CondRule, SheetData,
     DEFAULT_PAGE_CHUNK_ROWS,
 };
 use crate::types::{
     cell_key, string_from_pool, FormulaEntry, FormulaError, FormulaValueKind, StringPool,
-    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 pub(crate) enum InternSlot {
@@ -113,6 +113,8 @@ pub struct CellStore {
     pub(crate) formula_epoch: u64,
     pub(crate) dep_index: Option<DepIndex>,
     loading_page: usize,
+    named_ranges: HashMap<(Option<u32>, String), NamedRangeRef>,
+    pub(crate) volatile_serial: f64,
 }
 
 #[wasm_bindgen]
@@ -129,6 +131,8 @@ impl CellStore {
             formula_epoch: 0,
             dep_index: None,
             loading_page: 0,
+            named_ranges: HashMap::new(),
+            volatile_serial: 0.0,
         }
     }
     #[wasm_bindgen(js_name = snapshotNumbers)]
@@ -362,13 +366,23 @@ impl CellStore {
                 affected.push(formula_sheet);
             }
         }
+        let before_names = self.named_ranges.len();
+        self.named_ranges.retain(|(scope, _), definition| {
+            definition.sheet != sheet as u32 && *scope != Some(sheet as u32)
+        });
+        let removed_names = self.named_ranges.len() != before_names;
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet].clear();
         self.sheets[sheet] = SheetData::new(0, 0);
         self.sheet_alive[sheet] = false;
         self.bump_formula_epoch();
-        for formula_sheet in affected {
-            self.recompute(formula_sheet);
+        if removed_names {
+            self.refresh_named_formula_entries();
+            self.recompute_all_sheets();
+        } else {
+            for formula_sheet in affected {
+                self.recompute(formula_sheet);
+            }
         }
         true
     }
@@ -405,6 +419,33 @@ impl CellStore {
             let i = s.idx(row, col);
             s.set_kind(i, KIND_NUMBER);
             s.set_num(i, value);
+            s.set_style(i, style);
+            s.mark_cell_loaded(row, col, local_dirty);
+            let removed_formula = s.formulas.remove(&key).is_some();
+            s.dirty_cells.insert(key);
+            removed_formula
+        };
+        if removed_formula {
+            self.bump_formula_epoch();
+        }
+    }
+
+    #[wasm_bindgen(js_name = setBool)]
+    pub fn set_bool(&mut self, sheet: usize, row: usize, col: usize, value: bool, style: u32) {
+        let Some(key) = cell_key(row, col) else {
+            return;
+        };
+        let local_dirty = self.loading_page == 0;
+        let removed_formula = {
+            let Some(s) = self.sheets.get_mut(sheet) else {
+                return;
+            };
+            if !s.contains_cell(row, col) {
+                return;
+            }
+            let i = s.idx(row, col);
+            s.set_kind(i, KIND_BOOL);
+            s.set_num(i, f64::from(value));
             s.set_style(i, style);
             s.mark_cell_loaded(row, col, local_dirty);
             let removed_formula = s.formulas.remove(&key).is_some();
@@ -604,7 +645,7 @@ impl CellStore {
                 let index = base + row_offset;
                 s.set_kind(index, kinds[offset]);
                 match kinds[offset] {
-                    KIND_NUMBER => s.set_num(index, numbers[offset]),
+                    KIND_NUMBER | KIND_BOOL => s.set_num(index, numbers[offset]),
                     KIND_STRING => s.set_str(index, string_ids[offset]),
                     _ => {
                         s.set_kind(index, KIND_EMPTY);
@@ -1112,24 +1153,26 @@ impl CellStore {
                     style: s.style_at(i),
                 };
             }
-            if s.str_id_at(i) != NO_STRING {
-                let string = string_from_pool(&self.strings, s.str_id_at(i));
-                // A bool formula's numeric view is its truth (the payload
-                // holds the "TRUE"/"FALSE" display sentinel); text reads 0.0.
-                let num = if key
-                    .and_then(|key| s.formulas.get(&key))
-                    .is_some_and(|entry| entry.value_kind == FormulaValueKind::Bool)
-                {
-                    f64::from(string.as_deref() == Some(bool_text(true)))
-                } else {
-                    0.0
-                };
-                return CellOut {
-                    kind: KIND_STRING,
-                    num,
-                    string,
-                    style: s.style_at(i),
-                };
+            if let Some(entry) = key.and_then(|key| s.formulas.get(&key)) {
+                match entry.value_kind {
+                    FormulaValueKind::Bool => {
+                        return CellOut {
+                            kind: KIND_BOOL,
+                            num: s.num_at(i),
+                            string: None,
+                            style: s.style_at(i),
+                        };
+                    }
+                    FormulaValueKind::Text => {
+                        return CellOut {
+                            kind: KIND_STRING,
+                            num: 0.0,
+                            string: string_from_pool(&self.strings, s.str_id_at(i)),
+                            style: s.style_at(i),
+                        };
+                    }
+                    FormulaValueKind::Number => {}
+                }
             }
         }
 
@@ -1143,6 +1186,95 @@ impl CellStore {
             },
             style: s.style_at(i),
         }
+    }
+
+    #[wasm_bindgen(js_name = setNamedRange)]
+    pub fn set_named_range(
+        &mut self,
+        name: &str,
+        scope: i32,
+        sheet: usize,
+        row_start: usize,
+        col_start: usize,
+        row_end: usize,
+        col_end: usize,
+    ) -> bool {
+        let parsed_name = parse(name).ok();
+        if name.is_empty()
+            || !matches!(parsed_name, Some(crate::calc::Ast::Name(_)))
+            || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+            || row_start > row_end
+            || col_start > col_end
+            || row_end >= self.sheets[sheet].row_count
+            || col_end >= self.sheets[sheet].n_cols
+        {
+            return false;
+        }
+        let scope = if scope < 0 {
+            None
+        } else {
+            let scope = scope as usize;
+            if !self.sheet_alive.get(scope).copied().unwrap_or(false) {
+                return false;
+            }
+            Some(scope as u32)
+        };
+        let definition = NamedRangeRef {
+            name: name.to_string(),
+            scope,
+            sheet: sheet as u32,
+            row_start: row_start as u32,
+            col_start: col_start as u32,
+            row_end: row_end as u32,
+            col_end: col_end as u32,
+        };
+        self.named_ranges
+            .insert((scope, name.to_ascii_uppercase()), definition);
+        self.refresh_named_formula_entries();
+        self.recompute_all_sheets();
+        true
+    }
+
+    #[wasm_bindgen(js_name = removeNamedRange)]
+    pub fn remove_named_range(&mut self, name: &str, scope: i32) -> bool {
+        let scope = if scope < 0 { None } else { Some(scope as u32) };
+        if self
+            .named_ranges
+            .remove(&(scope, name.to_ascii_uppercase()))
+            .is_none()
+        {
+            return false;
+        }
+        self.refresh_named_formula_entries();
+        self.recompute_all_sheets();
+        true
+    }
+
+    /// Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
+    /// the 1899-12-30 epoch; only TODAY/NOW formulas and their dependents dirty.
+    #[wasm_bindgen(js_name = recomputeVolatile)]
+    pub fn recompute_volatile(&mut self, serial: f64) -> bool {
+        if !serial.is_finite() {
+            return false;
+        }
+        self.volatile_serial = serial;
+        let mut volatile_sheets = Vec::new();
+        for (sheet_index, sheet) in self.sheets.iter_mut().enumerate() {
+            let volatile_cells: Vec<_> = sheet
+                .formulas
+                .iter()
+                .filter_map(|(key, entry)| entry.volatile.then_some(*key))
+                .collect();
+            if volatile_cells.is_empty() {
+                continue;
+            }
+            sheet.dirty_cells.extend(volatile_cells);
+            volatile_sheets.push(sheet_index);
+        }
+        for sheet in volatile_sheets {
+            self.recompute_sheet(sheet);
+        }
+        true
     }
 
     /// Parse and store an arithmetic formula at `(row, col)`.
@@ -1171,14 +1303,7 @@ impl CellStore {
             return f64::NAN;
         }
 
-        let entry = match parse(src).and_then(|ast| {
-            resolve_sheet_refs(ast, &|name| {
-                self.sheet_lookup.get(name).map(|&idx| idx as u32)
-            })
-        }) {
-            Ok(ast) => FormulaEntry::parsed(ast, sheet as u32),
-            Err(_) => FormulaEntry::parse_error(src),
-        };
+        let entry = self.parse_formula_entry(src, sheet as u32);
         let local_dirty = self.loading_page == 0;
 
         let cached_value = {
@@ -1290,6 +1415,9 @@ impl CellStore {
             sheet.clear_dirty();
             sheet.all_dirty = true;
         }
+        if self.rebase_named_rows(edited_sheet, at, delta) {
+            self.refresh_named_formula_entries();
+        }
     }
 
     fn rewrite_formula_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
@@ -1302,6 +1430,9 @@ impl CellStore {
             sheet.clear_dirty();
             sheet.all_dirty = true;
         }
+        if self.rebase_named_cols(edited_sheet, at, delta) {
+            self.refresh_named_formula_entries();
+        }
     }
 
     pub(crate) fn bump_formula_epoch(&mut self) {
@@ -1313,6 +1444,115 @@ fn string_hash(s: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
     s.hash(&mut hasher);
     hasher.finish()
+}
+impl CellStore {
+    fn named_range(&self, name: &str, formula_sheet: u32) -> Option<NamedRangeRef> {
+        let normalized = name.to_ascii_uppercase();
+        self.named_ranges
+            .get(&(Some(formula_sheet), normalized.clone()))
+            .or_else(|| self.named_ranges.get(&(None, normalized)))
+            .cloned()
+    }
+
+    fn parse_formula_entry(&self, source: &str, formula_sheet: u32) -> FormulaEntry {
+        let ast = match parse(source) {
+            Ok(ast) => ast,
+            Err(_) => return FormulaEntry::parse_error(source),
+        };
+        let ast = match resolve_sheet_refs(ast, &|name| {
+            self.sheet_lookup.get(name).map(|&index| index as u32)
+        }) {
+            Ok(ast) => ast,
+            Err(_) => return FormulaEntry::error(source, FormulaError::Ref),
+        };
+        let ast = resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
+            self.named_range(name, sheet)
+        });
+        FormulaEntry::parsed(ast, formula_sheet)
+    }
+
+    fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
+        let mut removed = Vec::new();
+        let mut changed = false;
+        for (key, definition) in &mut self.named_ranges {
+            if definition.sheet != edited_sheet {
+                continue;
+            }
+            if let Some((start, end)) =
+                shift_range(definition.row_start, definition.row_end, at, delta)
+            {
+                definition.row_start = start;
+                definition.row_end = end;
+            } else {
+                removed.push(key.clone());
+            }
+            changed = true;
+        }
+        for key in removed {
+            self.named_ranges.remove(&key);
+        }
+        changed
+    }
+
+    fn rebase_named_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
+        let mut removed = Vec::new();
+        let mut changed = false;
+        for (key, definition) in &mut self.named_ranges {
+            if definition.sheet != edited_sheet {
+                continue;
+            }
+            if let Some((start, end)) =
+                shift_range(definition.col_start, definition.col_end, at, delta)
+            {
+                definition.col_start = start;
+                definition.col_end = end;
+            } else {
+                removed.push(key.clone());
+            }
+            changed = true;
+        }
+        for key in removed {
+            self.named_ranges.remove(&key);
+        }
+        changed
+    }
+
+    fn recompute_all_sheets(&mut self) {
+        for sheet in 0..self.sheets.len() {
+            if self.sheet_alive.get(sheet).copied().unwrap_or(false) {
+                self.recompute_sheet(sheet);
+            }
+        }
+    }
+
+    fn refresh_named_formula_entries(&mut self) {
+        for formula_sheet in 0..self.sheets.len() {
+            if !self
+                .sheet_alive
+                .get(formula_sheet)
+                .copied()
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let sources: Vec<_> = self.sheets[formula_sheet]
+                .formulas
+                .iter()
+                .map(|(key, entry)| (*key, entry.source.clone()))
+                .collect();
+            let refreshed: Vec<_> = sources
+                .into_iter()
+                .map(|(key, source)| (key, self.parse_formula_entry(&source, formula_sheet as u32)))
+                .collect();
+            let sheet = &mut self.sheets[formula_sheet];
+            for (key, entry) in refreshed {
+                sheet.formulas.insert(key, entry);
+            }
+            sheet.clear_dirty();
+            sheet.all_dirty = true;
+        }
+        self.bump_formula_epoch();
+    }
 }
 
 /// Result of a single-cell read.

@@ -651,9 +651,20 @@ function paintCell(
 
   const align =
     effective.align ??
-    (column?.type === "number" || column?.type === "currency" ? "right" : "left");
+    (typeof value === "boolean"
+      ? "center"
+      : column?.type === "number" || column?.type === "currency"
+        ? "right"
+        : "left");
   const numeric = typeof value === "number";
-  let text = numeric ? formatNumber(value, column?.numberFormat) : value;
+  let text =
+    typeof value === "boolean"
+      ? value
+        ? "TRUE"
+        : "FALSE"
+      : numeric
+        ? formatNumber(value, column?.numberFormat)
+        : value;
   const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {
