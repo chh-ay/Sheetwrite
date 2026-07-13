@@ -61,8 +61,8 @@ accepted and is normalized once when the grid is constructed.
 
 Use `WorkbookSnapshot` plus `validateWorkbookSnapshot()` at persistence
 boundaries. `schemaVersion: 1` rejects unsupported future schemas with
-structured errors. `DocumentOp` covers the complete document mutation model;
-the current `Patch` transaction type is its implemented cell/row/column subset.
+structured errors. `DocumentOp` and its backwards-compatible `Patch` alias cover
+the complete reducer path, including metadata and sheet lifecycle operations.
 Session-only grid options such as `renderer`, `readOnly`, local zoom, selection,
 scroll, search, and temporary highlights never belong in a snapshot.
 

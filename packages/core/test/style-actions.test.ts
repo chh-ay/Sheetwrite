@@ -22,7 +22,7 @@ function makeHarness() {
   const selection = new SelectionModel(100, 0, 2);
   const commits: Patch[][] = [];
 
-  let merges: SelRect[] = [];
+  const merges: SelRect[] = [];
 
   const actions = new StyleActions({
     store,
@@ -33,9 +33,6 @@ function makeHarness() {
     readOnly: () => false,
     theme: () => ({ fg: "#000000" }) as unknown as Theme,
     merges: () => merges,
-    setMerges: (next) => {
-      merges = next;
-    },
     anchorCell: (row, col) => ({ row, col }),
     toDataRow: (viewRow) => viewRow,
     commit: (patches) => {
@@ -44,7 +41,6 @@ function makeHarness() {
         if (p.op === "set") styles.set(keyOf(p.addr.row, p.addr.col), p.style ?? {});
       }
     },
-    applyLayout: () => {},
   });
 
   return { actions, selection, commits };
@@ -115,5 +111,36 @@ describe("StyleActions underline/strikethrough toggles", () => {
     actions.toggleStyle("underline");
 
     expect(commits).toHaveLength(0);
+  });
+});
+
+describe("StyleActions merge policy", () => {
+  it("keeps the anchor and clears every covered cell in one commit", () => {
+    const { actions, selection, commits } = makeHarness();
+    selection.selectCell(1, 0);
+    selection.extendTo(2, 1);
+
+    actions.mergeSelection();
+
+    expect(commits).toEqual([
+      [
+        { op: "addMerge", sheet: "s1", merge: { r0: 1, c0: 0, r1: 2, c1: 1 } },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 1 },
+          value: { kind: "literal", value: null },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 0 },
+          value: { kind: "literal", value: null },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 1 },
+          value: { kind: "literal", value: null },
+        },
+      ],
+    ]);
   });
 });

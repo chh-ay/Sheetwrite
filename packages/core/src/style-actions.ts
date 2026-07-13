@@ -11,11 +11,9 @@ export interface StyleActionsDeps {
   readOnly: () => boolean;
   theme: () => Theme;
   merges: () => SelRect[];
-  setMerges: (merges: SelRect[]) => void;
   anchorCell: (row: number, col: number) => { row: number; col: number };
   toDataRow: (viewRow: number) => number;
   commit: (patches: Patch[]) => void;
-  applyLayout: () => void;
 }
 
 /**
@@ -111,15 +109,44 @@ export class StyleActions {
     const sel = this.deps.selection().toSelection(activeSheet);
     if (sel?.kind !== "range") return;
     const { start, end } = sel.range;
-    const list = this.deps.merges();
-    list.push({
+    const merge = {
       r0: Math.min(start.row, end.row),
       c0: Math.min(start.col, end.col),
       r1: Math.max(start.row, end.row),
       c1: Math.max(start.col, end.col),
-    });
-    this.deps.setMerges(list);
-    this.deps.applyLayout();
+    };
+    if (merge.r0 === merge.r1 && merge.c0 === merge.c1) return;
+    const sheet = this.deps.sheet();
+    const frozenRows = sheet.frozenRows ?? 0;
+    const frozenCols = sheet.frozenCols ?? 0;
+    if (
+      (merge.r0 < frozenRows && merge.r1 >= frozenRows) ||
+      (merge.c0 < frozenCols && merge.c1 >= frozenCols) ||
+      this.deps
+        .merges()
+        .some(
+          (candidate) =>
+            merge.r0 <= candidate.r1 &&
+            candidate.r0 <= merge.r1 &&
+            merge.c0 <= candidate.c1 &&
+            candidate.c0 <= merge.c1,
+        )
+    ) {
+      return;
+    }
+
+    const patches: Patch[] = [{ op: "addMerge", sheet: activeSheet, merge }];
+    for (let row = merge.r0; row <= merge.r1; row++) {
+      for (let col = merge.c0; col <= merge.c1; col++) {
+        if (row === merge.r0 && col === merge.c0) continue;
+        patches.push({
+          op: "set",
+          addr: { sheet: activeSheet, row: this.deps.toDataRow(row), col },
+          value: { kind: "literal", value: null },
+        });
+      }
+    }
+    this.deps.commit(patches);
   }
 
   unmergeSelection(): void {
@@ -127,9 +154,14 @@ export class StyleActions {
     const f = this.deps.selection().focusCell;
     const list = this.deps.merges();
     if (!f || list.length === 0) return;
-    this.deps.setMerges(
-      list.filter((m) => !(f.row >= m.r0 && f.row <= m.r1 && f.col >= m.c0 && f.col <= m.c1)),
+    const merge = list.find(
+      (candidate) =>
+        f.row >= candidate.r0 &&
+        f.row <= candidate.r1 &&
+        f.col >= candidate.c0 &&
+        f.col <= candidate.c1,
     );
-    this.deps.applyLayout();
+    if (!merge) return;
+    this.deps.commit([{ op: "removeMerge", sheet: this.deps.activeSheet(), merge }]);
   }
 }

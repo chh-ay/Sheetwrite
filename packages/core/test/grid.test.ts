@@ -3,7 +3,14 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite, resolveThemeFromCss } from "..
 import { createGridController } from "../src/grid-controller.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.js";
-import type { CellScalar, DataSourceRequest, RowData, Store, Workbook } from "../src/types.js";
+import type {
+  CellScalar,
+  ChangeEvent,
+  DataSourceRequest,
+  RowData,
+  Store,
+  Workbook,
+} from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 /** A pure-JS Store double; `getCell` is a tripwire for hot-path misuse. */
@@ -393,7 +400,7 @@ describe("Grid editing (Layer 3)", () => {
     editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Merged anchor");
-    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(10.5);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBeNull();
 
     grid.destroy();
   });
@@ -946,6 +953,204 @@ describe("Grid auto-fit", () => {
 
     expect(workbook.sheets[0]!.rowHeights?.get(0)).toBeGreaterThan(28);
     expect(workbook.sheets[0]!.columns[0]!.width).toBeGreaterThan(originalWidth);
+    grid.destroy();
+    store.dispose();
+  });
+});
+
+describe("transactional document metadata", () => {
+  it("emits and histories merge, row height, freeze, conditional, and group operations", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const events: ChangeEvent[] = [];
+    grid.on("change", (event) => events.push(event));
+
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+    });
+    grid.actions.merge();
+    expect(events.at(-1)?.transaction.patches).toEqual([
+      { op: "addMerge", sheet: "s1", merge: { r0: 0, c0: 0, r1: 1, c1: 1 } },
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 0, col: 1 },
+        value: { kind: "literal", value: null },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 1, col: 0 },
+        value: { kind: "literal", value: null },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 1, col: 1 },
+        value: { kind: "literal", value: null },
+      },
+    ]);
+    expect(events.at(-1)?.dirty.some((patch) => patch.op === "addMerge")).toBe(true);
+    expect(workbook.sheets[0]!.merges).toEqual([{ r0: 0, c0: 0, r1: 1, c1: 1 }]);
+    grid.undo();
+    expect(workbook.sheets[0]!.merges).toEqual([]);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(10.5);
+    grid.redo();
+    expect(workbook.sheets[0]!.merges).toEqual([{ r0: 0, c0: 0, r1: 1, c1: 1 }]);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBeNull();
+
+    grid.setRowHeight(2, 44);
+    expect(events.at(-1)?.transaction.patches[0]).toEqual({
+      op: "setRowMeta",
+      sheet: "s1",
+      row: 2,
+      meta: { height: 44 },
+    });
+    expect(workbook.sheets[0]!.rowHeights?.get(2)).toBe(44);
+    grid.undo();
+    expect(workbook.sheets[0]!.rowHeights?.has(2)).toBe(false);
+    grid.redo();
+    expect(workbook.sheets[0]!.rowHeights?.get(2)).toBe(44);
+
+    grid.setFrozen(2, 1);
+    expect(events.at(-1)?.transaction.patches[0]).toMatchObject({
+      op: "setSheetMeta",
+      sheet: "s1",
+      patch: { frozenRows: 2, frozenCols: 1 },
+    });
+    grid.undo();
+    expect(workbook.sheets[0]).toMatchObject({ frozenRows: 0, frozenCols: 0 });
+    grid.redo();
+    expect(workbook.sheets[0]).toMatchObject({ frozenRows: 2, frozenCols: 1 });
+
+    const rule = {
+      range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 9, col: 1 } },
+      when: { kind: "greaterThan" as const, value: 10 },
+      style: { color: "#ff0000" },
+    };
+    grid.setConditionalFormats([rule]);
+    expect(workbook.sheets[0]!.conditionalFormats).toEqual([rule]);
+    grid.undo();
+    expect(workbook.sheets[0]!.conditionalFormats).toEqual([]);
+    grid.redo();
+    expect(workbook.sheets[0]!.conditionalFormats).toEqual([rule]);
+
+    grid.groupRows(3, 5);
+    grid.setGroupCollapsed(3, true);
+    expect(workbook.sheets[0]!.rowGroups).toEqual([{ start: 3, end: 5, collapsed: true }]);
+    expect(grid.store.viewRowCount("s1")).toBe(7);
+    grid.undo();
+    expect(workbook.sheets[0]!.rowGroups).toEqual([{ start: 3, end: 5, collapsed: false }]);
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("supports add, rename, reorder, remove, and lossless undo for cross-sheet formulas", () => {
+    const workbook: Workbook = {
+      activeSheet: "summary",
+      sheets: [
+        {
+          id: "source",
+          name: "Sales",
+          rowCount: 2,
+          columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
+        },
+        {
+          id: "summary",
+          name: "Summary",
+          rowCount: 2,
+          columns: [{ key: "result", header: "Result", width: 100, type: "number" }],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "source", row: 0, col: 0 },
+          value: { kind: "literal", value: 4 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 0 },
+          value: { kind: "formula", src: "=Sales!A1+1" },
+        },
+      ],
+    });
+    store.markClean(store.getDirty());
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const events: ChangeEvent[] = [];
+    grid.on("change", (event) => events.push(event));
+
+    const notes = grid.addSheet({ id: "notes", name: "Notes", rowCount: 3 });
+    expect(notes).toBe("notes");
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
+    expect(events.at(-1)?.transaction.patches[0]?.op).toBe("addSheet");
+    grid.undo();
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary"]);
+    grid.redo();
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
+
+    grid.renameSheet("source", "Sales Data");
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    grid.undo();
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(Sales!A1+1)");
+    grid.redo();
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+
+    grid.moveSheet("source", 1);
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "source", "notes"]);
+    grid.undo();
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
+
+    grid.removeSheet("source");
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=(#REF!+1)");
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
+    grid.undo();
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=('Sales Data'!A1+1)");
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
+    grid.redo();
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["summary", "notes"]);
+    expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe("#REF!");
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("keeps every document metadata action inert in read-only mode", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook, readOnly: true }, store);
+    let changes = 0;
+    grid.on("change", () => {
+      changes += 1;
+    });
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+    });
+
+    grid.actions.merge();
+    grid.setRowHeight(0, 99);
+    grid.setFrozen(2, 1);
+    grid.groupRows(1, 3);
+    grid.hideRows([1]);
+    grid.addSheet({ id: "blocked", name: "Blocked" });
+    grid.renameSheet("s1", "Blocked");
+    grid.removeSheet("s1");
+
+    expect(changes).toBe(0);
+    expect(workbook.sheets).toHaveLength(1);
+    expect(workbook.sheets[0]).toMatchObject({ name: "Sheet 1" });
+    expect(workbook.sheets[0]!.merges ?? []).toEqual([]);
+    expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
+    expect(workbook.sheets[0]!.frozenRows).toBeUndefined();
+    expect(workbook.sheets[0]!.rowGroups).toBeUndefined();
+    expect(workbook.sheets[0]!.hiddenRows).toBeUndefined();
+
     grid.destroy();
     store.dispose();
   });

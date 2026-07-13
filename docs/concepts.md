@@ -91,10 +91,10 @@ interface Store {
   getWorkbook(): Workbook;
   getCell(addr: CellAddress): ResolvedCell;
   getVisibleWindow(sheet, rows: { start; end }, cols: readonly number[]): VisibleWindowView;
-  applyTransaction(tx: Transaction): void;       // queued, flushed at a barrier, never reentrant
-  on("change", fn): () => void;                   // returns an unsubscribe
-  getDirty(): Patch[];                            // pending unsynced edits
-  markClean(patches: Patch[]): void;              // clear dirty flags after the API confirms
+  applyTransaction(tx: Transaction): ApplyTransactionResult; // queued, flushed at a barrier, never reentrant
+  on("change", fn): () => void;                              // returns an unsubscribe
+  getDirty(): DocumentOp[];                                  // pending unsynced edits
+  markClean(patches: DocumentOp[]): void;                     // clear dirty flags after the API confirms
 }
 ```
 
@@ -110,11 +110,11 @@ formats, row groups, hidden document metadata, and named-range extension points.
 Formula source is authoritative; resolved values are derived caches and are not
 serialized.
 
-`DocumentOp` is the exhaustive plain-data mutation vocabulary for that document.
-The existing `Patch` type is an `Extract<DocumentOp, ...>` subset implemented by
-the current store transaction path, so there is no second independently evolving
-operation union. Plan-level migrations route the remaining metadata operations
-through the same protocol.
+`DocumentOp` is the exhaustive plain-data mutation vocabulary for that document,
+and `Patch` is its backwards-compatible transaction name. Cells, ranges,
+rows/columns, merges, row metadata, frozen panes, conditional formats, row
+groups, named ranges, and sheet add/remove/rename/reorder operations all pass
+through the same reducer, change event, dirty state, and grid undo/redo history.
 
 ```ts
 const checked = validateWorkbookSnapshot(JSON.parse(payload));
@@ -140,6 +140,14 @@ metadata in schema 1.
 Applied storage transactions emit `change` with the filtered transaction,
 per-cell rollback data, accumulated dirty patches, and epoch. Conflicts and
 no-ops return explicit outcomes rather than throwing.
+
+Sheet IDs remain stable across rename and reorder. Renaming rewrites canonical
+cross-sheet formula source while preserving the stable formula-engine handle.
+Removing a referenced sheet rewrites dependents to `#REF!`; undo restores the
+sheet snapshot, formulas, styles, metadata, and dependencies. Removing the active
+sheet selects the nearest surviving sheet. The final sheet cannot be removed.
+All public document actions, including custom calls through `grid.actions`, are
+no-ops when the grid is read-only.
 
 ### Cell values
 

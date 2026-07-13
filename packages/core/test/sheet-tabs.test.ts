@@ -56,4 +56,34 @@ describe("SheetTabs", () => {
     tabs.destroy();
     expect(tabsOf(host)).toHaveLength(0);
   });
+
+  it("exposes accessible add, rename, remove, and reorder hooks", () => {
+    const actions: string[] = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onAdd: () => actions.push("add"),
+      onRename: (id) => actions.push(`rename:${id}`),
+      onRemove: (id) => actions.push(`remove:${id}`),
+      onMove: (id, to) => actions.push(`move:${id}:${to}`),
+    });
+    tabs.update(SHEETS, "b");
+    const buttons = tabsOf(host);
+    expect(buttons.at(-1)?.getAttribute("aria-label")).toBe("Add sheet");
+    buttons.at(-1)?.click();
+
+    buttons[1]!.focus();
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "F2", bubbles: true }));
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }),
+    );
+
+    expect(actions).toEqual(["add", "rename:b", "remove:b", "move:b:2"]);
+  });
 });

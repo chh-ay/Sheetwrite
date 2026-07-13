@@ -21,7 +21,9 @@ import { SheetwriteStore } from "./store.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import type {
+  AddSheetInput,
   AggregateOp,
+  ApplyTransactionResult,
   CellAddress,
   CellInputSnapshot,
   CellRenderer,
@@ -31,6 +33,7 @@ import type {
   Column,
   ColumnFilter,
   CommitReason,
+  ConditionalFormatRule,
   DataSourcePage,
   DataSourceRequest,
   Grid,
@@ -40,6 +43,7 @@ import type {
   GridOptions,
   GridTransaction,
   HighlightRange,
+  MergeRange,
   PanePaint,
   Patch,
   Range,
@@ -52,6 +56,8 @@ import type {
   Selection,
   Sheet,
   SheetId,
+  SheetSnapshot,
+  SnapshotCell,
   SortKey,
   Store,
   Theme,
@@ -344,16 +350,9 @@ export class GridImpl implements Grid {
       readOnly: () => this.readOnly,
       theme: () => this.theme,
       merges: () => this.sheet().merges ?? [],
-      setMerges: (merges) => {
-        this.sheet().merges = merges;
-      },
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches) => this.commit(patches, "style"),
-      applyLayout: () => {
-        this.applyLayout();
-        this.scheduleRender();
-      },
     });
 
     this.actions = this.buildActions();
@@ -508,32 +507,67 @@ export class GridImpl implements Grid {
       this.activeSheetCache = null;
       let shouldRebuildRows = false;
       let shouldRebuildColumns = false;
+      let shouldApplyLayout = false;
+      let sheetsChanged = false;
       for (const patch of event.transaction.patches) {
         if (patch.op === "set") {
           this.cellRevisions.set(
             `${patch.addr.sheet}:${patch.addr.row}:${patch.addr.col}`,
             this.storeEpoch,
           );
+        } else if (patch.op === "setRange" || patch.op === "clearRange") {
+          const range = patch.range;
+          for (
+            let row = Math.min(range.start.row, range.end.row);
+            row <= Math.max(range.start.row, range.end.row);
+            row++
+          ) {
+            for (
+              let col = Math.min(range.start.col, range.end.col);
+              col <= Math.max(range.start.col, range.end.col);
+              col++
+            ) {
+              this.cellRevisions.set(`${range.sheet}:${row}:${col}`, this.storeEpoch);
+            }
+          }
         }
-        if (patch.op === "addRows" || patch.op === "removeRows") {
+        if (
+          patch.op === "addRows" ||
+          patch.op === "removeRows" ||
+          patch.op === "moveRows" ||
+          (patch.op === "setRowMeta" && patch.sheet === this.activeSheet) ||
+          (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
+        ) {
           shouldRebuildRows = true;
         } else if (
           patch.op === "addColumns" ||
           patch.op === "removeColumns" ||
+          patch.op === "moveColumns" ||
           (patch.op === "setColumn" &&
             patch.sheet === this.activeSheet &&
             ("width" in patch.patch || "visible" in patch.patch))
         ) {
           shouldRebuildColumns = true;
         }
+        if (patch.op === "addMerge" || patch.op === "removeMerge" || patch.op === "setSheetMeta") {
+          shouldApplyLayout = true;
+        }
+        if (
+          patch.op === "addSheet" ||
+          patch.op === "removeSheet" ||
+          patch.op === "renameSheet" ||
+          patch.op === "moveSheet"
+        ) {
+          sheetsChanged = true;
+        }
       }
-      // One rebuild per transaction: a bulk insert/delete of m row patches
-      // would otherwise pay m full O(rows) index rebuilds.
+      if (!this.sheetById(this.activeSheet)) {
+        this.setActiveSheet(this.store.getWorkbook().activeSheet);
+      }
       if (shouldRebuildRows) this.rebuildIndex();
-      if (shouldRebuildColumns) {
-        this.rebuildColumnIndex();
-        this.applyLayout();
-      }
+      if (shouldRebuildColumns) this.rebuildColumnIndex();
+      if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
+      if (sheetsChanged) this.renderTabs();
       this.ariaMirror.bumpVersion();
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
@@ -605,7 +639,21 @@ export class GridImpl implements Grid {
     bar.style.height = `${this.tabBarHeight}px`;
     this.host.appendChild(bar);
     this.tabBar = bar;
-    this.sheetTabs = new SheetTabs(bar, { onActivate: (id) => this.setActiveSheet(id) });
+    this.sheetTabs = new SheetTabs(bar, {
+      onActivate: (id) => this.setActiveSheet(id),
+      onAdd: () => {
+        const id = this.addSheet({ name: `Sheet ${this.store.getWorkbook().sheets.length + 1}` });
+        if (this.sheetById(id)) this.setActiveSheet(id);
+      },
+      onRemove: (id) => this.removeSheet(id),
+      onRename: (id) => {
+        const sheet = this.sheetById(id);
+        if (!sheet) return;
+        const name = globalThis.prompt?.("Rename sheet", sheet.name)?.trim();
+        if (name) this.renameSheet(id, name);
+      },
+      onMove: (id, toIndex) => this.moveSheet(id, toIndex),
+    });
     this.syncTabBarTheme();
     this.renderTabs();
   }
@@ -1241,30 +1289,53 @@ export class GridImpl implements Grid {
       return;
     }
 
-    const inverse: Patch[] = [];
-    for (const patch of patches) inverse.push(...this.inversePatch(patch));
+    const inverseByPatch = new Map<Patch, Patch[]>();
+    for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
 
-    this.storeApply(patches, reason);
-    for (const patch of patches) this.rebaseHistoryFor(patch);
-    this.history.push(inverse, patches);
+    const outcome = this.storeApply(patches, reason);
+    if (outcome.status !== "applied") return;
+    const applied = outcome.transaction.patches;
+    const inverse: Patch[] = [];
+    for (const patch of applied) inverse.push(...(inverseByPatch.get(patch) ?? []));
+    for (const patch of applied) this.rebaseHistoryFor(patch);
+    this.history.push(inverse, applied);
   }
 
   /** Thread the reason when the store is ours; injected stores stay 1-arg. */
-  private storeApply(patches: Patch[], reason: CommitReason): void {
-    if (this.loadable) void this.loadable.applyTransaction({ patches }, reason);
-    else void this.store.applyTransaction({ patches });
+  private storeApply(patches: Patch[], reason: CommitReason): ApplyTransactionResult {
+    if (this.loadable) return this.loadable.applyTransaction({ patches }, reason);
+    return this.store.applyTransaction({ patches });
   }
 
   private inversePatch(patch: Patch): Patch[] {
     switch (patch.op) {
       case "set":
         return [this.inverseSetPatch(patch)];
+      case "setRange":
+      case "clearRange":
+        return [
+          {
+            op: "setRange",
+            range: patch.range,
+            cells: this.snapshotRangeCells(patch.range),
+          },
+        ];
       case "addRows":
         return [{ op: "removeRows", sheet: patch.sheet, at: patch.at, count: patch.count }];
       case "removeRows":
         return [
           { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
           ...this.snapshotRows(patch.sheet, patch.at, patch.count),
+        ];
+      case "moveRows":
+        return [
+          {
+            op: "moveRows",
+            sheet: patch.sheet,
+            from: patch.to,
+            count: patch.count,
+            to: patch.from,
+          },
         ];
       case "addColumns":
         return [
@@ -1285,12 +1356,105 @@ export class GridImpl implements Grid {
           },
           ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
         ];
+      case "moveColumns":
+        return [
+          {
+            op: "moveColumns",
+            sheet: patch.sheet,
+            from: patch.to,
+            count: patch.count,
+            to: patch.from,
+          },
+        ];
       case "setColumn": {
         const sheet = this.sheetById(patch.sheet);
         const column = sheet?.columns[patch.col];
         return column
           ? [{ op: "setColumn", sheet: patch.sheet, col: patch.col, patch: { ...column } }]
           : [];
+      }
+      case "setRowMeta": {
+        const sheet = this.sheetById(patch.sheet);
+        if (!sheet) return [];
+        const height = sheet.rowHeights?.get(patch.row);
+        const hidden = sheet.hiddenRows?.has(patch.row) ?? false;
+        return [
+          {
+            op: "setRowMeta",
+            sheet: patch.sheet,
+            row: patch.row,
+            meta: height === undefined && !hidden ? null : { height, hidden },
+          },
+        ];
+      }
+      case "addMerge":
+        return [
+          { op: "removeMerge", sheet: patch.sheet, merge: patch.merge },
+          ...this.snapshotCellsInMerge(patch.sheet, patch.merge),
+        ];
+      case "removeMerge":
+        return [{ op: "addMerge", sheet: patch.sheet, merge: patch.merge }];
+      case "addSheet":
+        return [{ op: "removeSheet", sheet: patch.sheet.id }];
+      case "removeSheet": {
+        const snapshot = this.snapshotSheet(patch.sheet);
+        if (!snapshot) return [];
+        const restore: Patch[] = [
+          { op: "addSheet", sheet: snapshot },
+          ...this.snapshotExternalFormulaAndRefs(patch.sheet),
+        ];
+        for (const namedRange of this.store.getWorkbook().namedRanges ?? []) {
+          if (namedRange.range.sheet === patch.sheet) {
+            restore.push({ op: "setNamedRange", namedRange: { ...namedRange } });
+          }
+        }
+        return restore;
+      }
+      case "renameSheet": {
+        const sheet = this.sheetById(patch.sheet);
+        return sheet ? [{ op: "renameSheet", sheet: patch.sheet, name: sheet.name }] : [];
+      }
+      case "moveSheet": {
+        const from = this.store.getWorkbook().sheets.findIndex((sheet) => sheet.id === patch.sheet);
+        return from < 0 ? [] : [{ op: "moveSheet", sheet: patch.sheet, to: from }];
+      }
+      case "setSheetMeta": {
+        const sheet = this.sheetById(patch.sheet);
+        if (!sheet) return [];
+        return [
+          {
+            op: "setSheetMeta",
+            sheet: patch.sheet,
+            patch: {
+              frozenRows:
+                patch.patch.frozenRows === undefined ? undefined : (sheet.frozenRows ?? 0),
+              frozenCols:
+                patch.patch.frozenCols === undefined ? undefined : (sheet.frozenCols ?? 0),
+              conditionalFormats:
+                patch.patch.conditionalFormats === undefined
+                  ? undefined
+                  : (sheet.conditionalFormats?.map((rule) => ({ ...rule })) ?? []),
+              rowGroups:
+                patch.patch.rowGroups === undefined
+                  ? undefined
+                  : (sheet.rowGroups?.map((group) => ({ ...group })) ?? []),
+            },
+          },
+        ];
+      }
+      case "setNamedRange": {
+        const previous = this.store
+          .getWorkbook()
+          .namedRanges?.find((range) => range.name === patch.namedRange.name);
+        return previous
+          ? [{ op: "setNamedRange", namedRange: { ...previous } }]
+          : [{ op: "removeNamedRange", name: patch.namedRange.name }];
+      }
+      case "removeNamedRange": {
+        const previous = this.store
+          .getWorkbook()
+          .namedRanges?.find((range) => range.name === patch.name);
+        return previous ? [{ op: "setNamedRange", namedRange: { ...previous } }] : [];
       }
     }
   }
@@ -1347,7 +1511,7 @@ export class GridImpl implements Grid {
     return patches;
   }
 
-  private snapshotCell(addr: CellAddress): Patch {
+  private snapshotCell(addr: CellAddress): Extract<Patch, { op: "set" }> {
     const formula = this.store.getFormula(addr);
     const refTarget = this.store.getRefTarget(addr);
     const cell = this.store.getCell(addr);
@@ -1357,6 +1521,109 @@ export class GridImpl implements Grid {
         ? { kind: "ref", target: refTarget }
         : { kind: "literal", value: cell.resolved };
     return { op: "set", addr, value, style: cell.style };
+  }
+
+  private snapshotRangeCells(range: Range): SnapshotCell[] {
+    const r0 = Math.min(range.start.row, range.end.row);
+    const r1 = Math.max(range.start.row, range.end.row);
+    const c0 = Math.min(range.start.col, range.end.col);
+    const c1 = Math.max(range.start.col, range.end.col);
+    const cells: SnapshotCell[] = [];
+    for (let row = r0; row <= r1; row++) {
+      for (let col = c0; col <= c1; col++) {
+        const patch = this.snapshotCell({ sheet: range.sheet, row, col });
+        cells.push({
+          rowOffset: row - r0,
+          colOffset: col - c0,
+          value: patch.value,
+          style: patch.style,
+        });
+      }
+    }
+    return cells;
+  }
+
+  private snapshotCellsInMerge(sheet: SheetId, merge: MergeRange): Patch[] {
+    const patches: Patch[] = [];
+    const r0 = Math.min(merge.r0, merge.r1);
+    const r1 = Math.max(merge.r0, merge.r1);
+    const c0 = Math.min(merge.c0, merge.c1);
+    const c1 = Math.max(merge.c0, merge.c1);
+    for (let row = r0; row <= r1; row++) {
+      for (let col = c0; col <= c1; col++) {
+        patches.push(this.snapshotCell({ sheet, row, col }));
+      }
+    }
+    return patches;
+  }
+
+  private snapshotSheet(id: SheetId): SheetSnapshot | null {
+    const sheet = this.sheetById(id);
+    if (!sheet) return null;
+    const cells: SnapshotCell[] = [];
+    for (let row = 0; row < sheet.rowCount; row++) {
+      for (let col = 0; col < sheet.columns.length; col++) {
+        const patch = this.snapshotCell({ sheet: id, row, col });
+        const literalEmpty = patch.value.kind === "literal" && patch.value.value === null;
+        if (literalEmpty && Object.keys(patch.style ?? {}).length === 0) continue;
+        cells.push({ rowOffset: row, colOffset: col, value: patch.value, style: patch.style });
+      }
+    }
+    const rowMeta: Array<[number, { height?: number; hidden?: boolean }]> = [];
+    const rows = new Set([
+      ...(sheet.rowHeights?.keys() ?? []),
+      ...(sheet.hiddenRows?.values() ?? []),
+    ]);
+    for (const row of [...rows].sort((left, right) => left - right)) {
+      rowMeta.push([
+        row,
+        {
+          height: sheet.rowHeights?.get(row),
+          hidden: sheet.hiddenRows?.has(row) || undefined,
+        },
+      ]);
+    }
+    return {
+      id: sheet.id,
+      name: sheet.name,
+      order: this.store.getWorkbook().sheets.findIndex((candidate) => candidate.id === id),
+      rowCount: sheet.rowCount,
+      columns: sheet.columns.map((column) => ({ ...column })),
+      frozenRows: sheet.frozenRows,
+      frozenCols: sheet.frozenCols,
+      rowMeta,
+      merges: sheet.merges?.map((candidate) => ({ ...candidate })),
+      conditionalFormats: sheet.conditionalFormats?.map((rule) => ({ ...rule })),
+      rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
+      cells:
+        cells.length === 0
+          ? []
+          : [
+              {
+                startRow: 0,
+                startCol: 0,
+                rowCount: sheet.rowCount,
+                colCount: sheet.columns.length,
+                cells,
+              },
+            ],
+    };
+  }
+
+  private snapshotExternalFormulaAndRefs(removedSheet: SheetId): Patch[] {
+    const patches: Patch[] = [];
+    for (const sheet of this.store.getWorkbook().sheets) {
+      if (sheet.id === removedSheet) continue;
+      for (let row = 0; row < sheet.rowCount; row++) {
+        for (let col = 0; col < sheet.columns.length; col++) {
+          const addr = { sheet: sheet.id, row, col };
+          if (this.store.getFormula(addr) || this.store.getRefTarget(addr)) {
+            patches.push(this.snapshotCell(addr));
+          }
+        }
+      }
+    }
+    return patches;
   }
 
   private rebaseHistoryFor(patch: Patch): void {
@@ -1531,8 +1798,8 @@ export class GridImpl implements Grid {
     const view = this.store.getVisibleWindow(this.activeSheet, { start: r0, end: r1 + 1 }, cols);
     const ctx = this.measurementContext();
     if (!ctx) return;
-    if (!sheet.rowHeights) sheet.rowHeights = new Map();
     const merges = sheet.merges ?? [];
+    const patches: Patch[] = [];
     for (let row = r0; row <= r1; row++) {
       let required = this.baseTheme.rowHeight;
       for (let ci = 0; ci < cols.length; ci++) {
@@ -1556,11 +1823,14 @@ export class GridImpl implements Grid {
         const lineCount = layoutTextLines(ctx, String(value), Math.max(0, width - 12)).length;
         required = Math.max(required, Math.ceil(lineCount * fontPx * 1.2 + 8));
       }
-      sheet.rowHeights.set(this.toDataRow(row), required);
+      patches.push({
+        op: "setRowMeta",
+        sheet: this.activeSheet,
+        row: this.toDataRow(row),
+        meta: { height: required },
+      });
     }
-    this.rebuildIndex();
-    this.paintEpoch += 1;
-    this.scheduleRender();
+    this.commit(patches, "structure");
   }
 
   autoFitColumns(cols?: readonly number[]): void {
@@ -1608,19 +1878,17 @@ export class GridImpl implements Grid {
   }
 
   setRowHeight(row: number, height: number): void {
-    const sheet = this.sheet();
-    if (!sheet.rowHeights) sheet.rowHeights = new Map();
-    // `row` is a VIEW row; overrides persist in base units keyed by DATA row
-    // (identity without an active view). The offset index is view-indexed and
-    // zoomed.
-    sheet.rowHeights.set(this.toDataRow(row), height);
-    this.index.setHeight(row, height * this.zoom);
-    // Row geometry feeds the painted frame but lives outside the store, so it
-    // must invalidate the paint signature itself or the resize stays invisible
-    // until some other input changes the signature.
-    this.paintEpoch += 1;
-    this.syncSizer();
-    this.scheduleRender();
+    this.commit(
+      [
+        {
+          op: "setRowMeta",
+          sheet: this.activeSheet,
+          row: this.toDataRow(row),
+          meta: { height: Math.max(1, height) },
+        },
+      ],
+      "structure",
+    );
   }
 
   setColumnWidth(col: number, width: number): void {
@@ -1883,12 +2151,19 @@ export class GridImpl implements Grid {
   }
 
   setFrozen(rows: number, cols = 0): void {
-    const sheet = this.sheet();
-    sheet.frozenRows = Math.max(0, Math.floor(rows));
-    sheet.frozenCols = Math.max(0, Math.floor(cols));
-    this.paintEpoch += 1;
-    this.syncSizer();
-    this.render();
+    this.commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: this.activeSheet,
+          patch: {
+            frozenRows: Math.max(0, Math.floor(rows)),
+            frozenCols: Math.max(0, Math.floor(cols)),
+          },
+        },
+      ],
+      "structure",
+    );
   }
 
   defineCellRenderer(name: string, renderer: CellRenderer): void {
@@ -1951,6 +2226,52 @@ export class GridImpl implements Grid {
         },
       ],
       "structure",
+    );
+  }
+
+  addSheet(input: AddSheetInput): SheetId {
+    if (this.readOnly) return this.activeSheet;
+    const used = new Set(this.store.getWorkbook().sheets.map((sheet) => sheet.id));
+    let id = input.id?.trim() || "sheet";
+    let suffix = 2;
+    while (used.has(id)) id = `${input.id?.trim() || "sheet"}-${suffix++}`;
+    const columns = input.columns?.map((column) => ({ ...column })) ?? [
+      { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "text" as const },
+    ];
+    const snapshot: SheetSnapshot = {
+      id,
+      name: input.name,
+      order: this.store.getWorkbook().sheets.length,
+      rowCount: input.rowCount ?? 100,
+      columns,
+      cells: [],
+    };
+    this.commit([{ op: "addSheet", sheet: snapshot }], "structure");
+    return id;
+  }
+
+  removeSheet(id: SheetId): void {
+    this.commit([{ op: "removeSheet", sheet: id }], "structure");
+  }
+
+  renameSheet(id: SheetId, name: string): void {
+    this.commit([{ op: "renameSheet", sheet: id, name }], "structure");
+  }
+
+  moveSheet(id: SheetId, toIndex: number): void {
+    this.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
+  }
+
+  setConditionalFormats(rules: readonly ConditionalFormatRule[]): void {
+    this.commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: this.activeSheet,
+          patch: { conditionalFormats: rules.map((rule) => ({ ...rule })) },
+        },
+      ],
+      "style",
     );
   }
 
@@ -2071,36 +2392,81 @@ export class GridImpl implements Grid {
   }
 
   hideRows(rows: readonly number[]): void {
-    this.loadable?.hideRows(this.activeSheet, rows);
+    const sheet = this.sheet();
+    const patches: Patch[] = [];
+    for (const row of new Set(rows)) {
+      if (row < 0 || row >= sheet.rowCount) continue;
+      patches.push({
+        op: "setRowMeta",
+        sheet: this.activeSheet,
+        row,
+        meta: { height: sheet.rowHeights?.get(row), hidden: true },
+      });
+    }
+    this.commit(patches, "structure");
     this.applyView();
   }
 
   showRows(rows?: readonly number[]): void {
-    this.loadable?.showRows(this.activeSheet, rows);
+    const sheet = this.sheet();
+    const targets = rows ?? [...(sheet.hiddenRows ?? [])];
+    const patches: Patch[] = [];
+    for (const row of new Set(targets)) {
+      if (row < 0 || row >= sheet.rowCount) continue;
+      patches.push({
+        op: "setRowMeta",
+        sheet: this.activeSheet,
+        row,
+        meta: { height: sheet.rowHeights?.get(row), hidden: false },
+      });
+    }
+    this.commit(patches, "structure");
     this.applyView();
   }
 
   hiddenRows(): readonly number[] {
-    return this.loadable?.hiddenRows(this.activeSheet) ?? [];
+    return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
   }
 
   groupRows(start: number, end: number): void {
-    this.loadable?.groupRows(this.activeSheet, start, end);
+    const sheet = this.sheet();
+    const group = { start: Math.min(start, end), end: Math.max(start, end), collapsed: false };
+    const groups = (sheet.rowGroups ?? []).filter(
+      (existing) => existing.start !== group.start || existing.end !== group.end,
+    );
+    this.commit(
+      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: [...groups, group] } }],
+      "structure",
+    );
     this.applyView();
   }
 
   ungroupRows(start: number, end: number): void {
-    this.loadable?.ungroupRows(this.activeSheet, start, end);
+    const r0 = Math.min(start, end);
+    const r1 = Math.max(start, end);
+    const groups = (this.sheet().rowGroups ?? []).filter(
+      (group) => group.start !== r0 || group.end !== r1,
+    );
+    this.commit(
+      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
+      "structure",
+    );
     this.applyView();
   }
 
   setGroupCollapsed(start: number, collapsed: boolean): void {
-    this.loadable?.setGroupCollapsed(this.activeSheet, start, collapsed);
+    const groups = (this.sheet().rowGroups ?? []).map((group) =>
+      group.start === start ? { ...group, collapsed } : group,
+    );
+    this.commit(
+      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
+      "structure",
+    );
     this.applyView();
   }
 
   rowGroups(): readonly RowGroup[] {
-    return this.loadable?.rowGroups(this.activeSheet) ?? [];
+    return this.sheet().rowGroups ?? [];
   }
 
   undo(): void {

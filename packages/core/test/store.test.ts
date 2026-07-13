@@ -890,3 +890,118 @@ describe("stable formula sheet identity", () => {
     store.dispose();
   });
 });
+
+describe("document metadata reducer validation", () => {
+  it("rejects overlapping, out-of-bounds, and frozen-boundary merges atomically", () => {
+    const workbook = makeWorkbook(5);
+    workbook.sheets[0]!.frozenRows = 1;
+    const store = new SheetwriteStore(workbook);
+
+    expect(
+      store.applyTransaction({
+        patches: [{ op: "addMerge", sheet: "s1", merge: { r0: 0, c0: 0, r1: 1, c1: 1 } }],
+      }),
+    ).toEqual({ status: "noop", epoch: 0, reason: "out-of-bounds" });
+    expect(workbook.sheets[0]!.merges).toBeUndefined();
+
+    const applied = store.applyTransaction({
+      patches: [{ op: "addMerge", sheet: "s1", merge: { r0: 1, c0: 0, r1: 2, c1: 1 } }],
+    });
+    expect(applied.status).toBe("applied");
+    expect(
+      store.applyTransaction({
+        patches: [
+          { op: "addMerge", sheet: "s1", merge: { r0: 2, c0: 1, r1: 3, c1: 2 } },
+          { op: "addMerge", sheet: "s1", merge: { r0: 99, c0: 0, r1: 100, c1: 1 } },
+        ],
+      }),
+    ).toEqual({ status: "noop", epoch: 1, reason: "out-of-bounds" });
+    expect(workbook.sheets[0]!.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
+    store.dispose();
+  });
+
+  it("emits plain-data metadata operations sufficient for reconstruction", () => {
+    const workbook = makeWorkbook(5);
+    const store = new SheetwriteStore(workbook);
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+    const operations: Transaction["patches"] = [
+      { op: "setRowMeta", sheet: "s1", row: 2, meta: { height: 40, hidden: true } },
+      {
+        op: "setSheetMeta",
+        sheet: "s1",
+        patch: {
+          frozenRows: 1,
+          frozenCols: 1,
+          rowGroups: [{ start: 2, end: 3, collapsed: true }],
+        },
+      },
+    ];
+
+    const result = store.applyTransaction({ patches: operations });
+
+    expect(result.status).toBe("applied");
+    expect(events).toHaveLength(1);
+    expect(events[0]?.transaction.patches).toEqual(operations);
+    expect(events[0]?.dirty).toEqual(operations);
+    expect(JSON.parse(JSON.stringify(events[0]?.transaction.patches))).toEqual(operations);
+    expect(workbook.sheets[0]).toMatchObject({ frozenRows: 1, frozenCols: 1 });
+    expect(workbook.sheets[0]!.rowHeights?.get(2)).toBe(40);
+    expect(workbook.sheets[0]!.hiddenRows?.has(2)).toBe(true);
+    expect(workbook.sheets[0]!.rowGroups).toEqual([{ start: 2, end: 3, collapsed: true }]);
+    store.dispose();
+  });
+
+  it("rebases document metadata with structural row and column operations", () => {
+    const workbook = makeWorkbook(5);
+    const sheet = workbook.sheets[0]!;
+    sheet.frozenRows = 1;
+    sheet.frozenCols = 1;
+    sheet.rowHeights = new Map([[2, 44]]);
+    sheet.hiddenRows = new Set([2]);
+    sheet.rowGroups = [{ start: 2, end: 3, collapsed: true }];
+    sheet.merges = [{ r0: 2, c0: 1, r1: 3, c1: 2 }];
+    sheet.conditionalFormats = [
+      {
+        range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 4, col: 2 } },
+        when: { kind: "greaterThan", value: 0 },
+        style: { bold: true },
+      },
+    ];
+    workbook.namedRanges = [
+      {
+        name: "Report",
+        range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 4, col: 2 } },
+      },
+    ];
+    const store = new SheetwriteStore(workbook);
+
+    expect(
+      store.applyTransaction({
+        patches: [
+          { op: "addRows", sheet: "s1", at: 1, count: 1 },
+          { op: "removeRows", sheet: "s1", at: 0, count: 1 },
+          { op: "removeColumns", sheet: "s1", at: 0, count: 1 },
+        ],
+      }).status,
+    ).toBe("applied");
+
+    expect(sheet.frozenRows).toBe(0);
+    expect(sheet.frozenCols).toBe(0);
+    expect([...sheet.rowHeights!]).toEqual([[2, 44]]);
+    expect([...sheet.hiddenRows!]).toEqual([2]);
+    expect(sheet.rowGroups).toEqual([{ start: 2, end: 3, collapsed: true }]);
+    expect(sheet.merges).toEqual([{ r0: 2, c0: 0, r1: 3, c1: 1 }]);
+    expect(sheet.conditionalFormats?.[0]?.range).toEqual({
+      sheet: "s1",
+      start: { row: 2, col: 0 },
+      end: { row: 4, col: 1 },
+    });
+    expect(workbook.namedRanges?.[0]?.range).toEqual({
+      sheet: "s1",
+      start: { row: 2, col: 0 },
+      end: { row: 4, col: 1 },
+    });
+    store.dispose();
+  });
+});

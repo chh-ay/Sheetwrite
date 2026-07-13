@@ -15,11 +15,15 @@ import type {
   CommitReason,
   ConditionalFormatRule,
   DataCell,
+  MergeRange,
   Patch,
+  Range,
   ResolvedCell,
   RowData,
   RowGroup,
+  Sheet,
   SheetId,
+  SheetSnapshot,
   SortKey,
   Store,
   Transaction,
@@ -584,60 +588,82 @@ export class SheetwriteStore implements Store {
 
   /** Hide the given data rows; they drop out of the view until shown again. */
   hideRows(sheet: SheetId, rows: readonly number[]): void {
-    if (rows.length === 0) return;
-    const hidden = this.ensureViewState(sheet).hiddenRows;
-    for (const row of rows) hidden.add(row);
-    this.recomputeView(sheet);
+    const meta = this.sheetMeta(sheet);
+    const patches: Patch[] = [];
+    for (const row of new Set(rows)) {
+      if (!integerAt(row) || row >= meta.rowCount) continue;
+      patches.push({
+        op: "setRowMeta",
+        sheet,
+        row,
+        meta: { height: meta.rowHeights?.get(row), hidden: true },
+      });
+    }
+    void this.applyTransaction({ patches }, "structure");
   }
 
   /** Show hidden rows — the given ones, or every hidden row when omitted. */
   showRows(sheet: SheetId, rows?: readonly number[]): void {
-    const state = this.viewState.get(sheet);
-    if (!state || state.hiddenRows.size === 0) return;
-    if (rows === undefined) state.hiddenRows.clear();
-    else for (const row of rows) state.hiddenRows.delete(row);
-    this.recomputeView(sheet);
+    const meta = this.sheetMeta(sheet);
+    const targets = rows ?? [...(meta.hiddenRows ?? [])];
+    const patches: Patch[] = [];
+    for (const row of new Set(targets)) {
+      if (!integerAt(row) || row >= meta.rowCount) continue;
+      patches.push({
+        op: "setRowMeta",
+        sheet,
+        row,
+        meta: { height: meta.rowHeights?.get(row), hidden: false },
+      });
+    }
+    void this.applyTransaction({ patches }, "structure");
   }
 
   /** The sheet's explicitly hidden data rows, ascending. */
   hiddenRows(sheet: SheetId): number[] {
-    const state = this.viewState.get(sheet);
-    if (!state) return [];
-    return [...state.hiddenRows].sort((a, b) => a - b);
+    return [...(this.sheetMeta(sheet).hiddenRows ?? [])].sort((a, b) => a - b);
   }
 
   /** Add a collapsible row group over the data-row range `[start, end]`. */
   groupRows(sheet: SheetId, start: number, end: number): void {
-    this.ensureViewState(sheet).groups.push({ start, end, collapsed: false });
-    this.recomputeView(sheet);
+    const meta = this.sheetMeta(sheet);
+    const group = { start: Math.min(start, end), end: Math.max(start, end), collapsed: false };
+    const groups = (meta.rowGroups ?? []).filter(
+      (existing) => existing.start !== group.start || existing.end !== group.end,
+    );
+    void this.applyTransaction(
+      { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: [...groups, group] } }] },
+      "structure",
+    );
   }
 
   /** Remove the group exactly matching `[start, end]`, if present. */
   ungroupRows(sheet: SheetId, start: number, end: number): void {
-    const state = this.viewState.get(sheet);
-    if (!state) return;
-    const before = state.groups.length;
-    state.groups = state.groups.filter((g) => g.start !== start || g.end !== end);
-    if (state.groups.length !== before) this.recomputeView(sheet);
+    const r0 = Math.min(start, end);
+    const r1 = Math.max(start, end);
+    const groups = (this.sheetMeta(sheet).rowGroups ?? []).filter(
+      (group) => group.start !== r0 || group.end !== r1,
+    );
+    void this.applyTransaction(
+      { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
+      "structure",
+    );
   }
 
   /** Collapse or expand every group that begins at `start`. */
   setGroupCollapsed(sheet: SheetId, start: number, collapsed: boolean): void {
-    const state = this.viewState.get(sheet);
-    if (!state) return;
-    let changed = false;
-    for (const group of state.groups) {
-      if (group.start === start && group.collapsed !== collapsed) {
-        group.collapsed = collapsed;
-        changed = true;
-      }
-    }
-    if (changed) this.recomputeView(sheet);
+    const groups = (this.sheetMeta(sheet).rowGroups ?? []).map((group) =>
+      group.start === start ? { ...group, collapsed } : group,
+    );
+    void this.applyTransaction(
+      { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
+      "structure",
+    );
   }
 
   /** Live view of a sheet's row groups. */
   rowGroups(sheet: SheetId): readonly RowGroup[] {
-    return this.viewState.get(sheet)?.groups ?? EMPTY_GROUPS;
+    return this.sheetMeta(sheet).rowGroups ?? EMPTY_GROUPS;
   }
 
   /**
@@ -818,7 +844,13 @@ export class SheetwriteStore implements Store {
   private ensureViewState(sheet: SheetId): ViewState {
     let state = this.viewState.get(sheet);
     if (!state) {
-      state = { sortKeys: [], filters: new Map(), hiddenRows: new Set(), groups: [] };
+      const meta = this.sheetMeta(sheet);
+      state = {
+        sortKeys: [],
+        filters: new Map(),
+        hiddenRows: new Set(meta.hiddenRows ?? []),
+        groups: meta.rowGroups?.map((group) => ({ ...group })) ?? [],
+      };
       this.viewState.set(sheet, state);
     }
     return state;
@@ -906,20 +938,30 @@ export class SheetwriteStore implements Store {
     let hasStructuralPatch = false;
 
     for (const patch of tx.patches) {
-      if (patch.op === "set" && !this.isCellInBounds(patch.addr)) continue;
-
-      this.applyPatch(patch, changes);
+      if (!this.applyPatch(patch, changes)) continue;
       appliedPatches.push(patch);
 
-      if (patch.op === "set") {
-        touchedSheets.add(patch.addr.sheet);
+      if (patch.op === "set") touchedSheets.add(patch.addr.sheet);
+      else if (patch.op === "setRange" || patch.op === "clearRange") {
+        touchedSheets.add(patch.range.sheet);
       } else if (
+        patch.op !== "setNamedRange" &&
+        patch.op !== "removeNamedRange" &&
+        patch.op !== "removeSheet"
+      ) {
+        const sheet = patch.op === "addSheet" ? patch.sheet.id : patch.sheet;
+        touchedSheets.add(sheet);
+      }
+      if (
         patch.op === "addRows" ||
         patch.op === "removeRows" ||
+        patch.op === "moveRows" ||
         patch.op === "addColumns" ||
-        patch.op === "removeColumns"
+        patch.op === "removeColumns" ||
+        patch.op === "moveColumns" ||
+        patch.op === "addSheet" ||
+        patch.op === "removeSheet"
       ) {
-        touchedSheets.add(patch.sheet);
         hasStructuralPatch = true;
       }
     }
@@ -964,9 +1006,10 @@ export class SheetwriteStore implements Store {
     return { status: "applied", epoch: this.epoch, transaction };
   }
 
-  private applyPatch(patch: Patch, changes: ChangeEvent["changes"] | null): void {
+  private applyPatch(patch: Patch, changes: ChangeEvent["changes"] | null): boolean {
     switch (patch.op) {
       case "set": {
+        if (!this.isCellInBounds(patch.addr)) return false;
         const before = changes ? this.getCell(patch.addr) : null;
         const styleId = this.styles.intern(patch.style);
         const handle = this.handleOf(patch.addr.sheet);
@@ -979,9 +1022,6 @@ export class SheetwriteStore implements Store {
         } else if (patch.value.kind === "ref") {
           const key = cellKey(patch.addr);
           const literalAt: LiteralLookup = (a) => this.rawCell(a).resolved;
-
-          // The graph tracks the edge; the resolved value is written through to
-          // WASM as a derived shadow literal (style set by clearCell first).
           this.wasm.clearCell(handle, row, col, styleId);
           this.formulaSrc.delete(key);
           this.refs.setRef(patch.addr, patch.value.target, literalAt);
@@ -989,7 +1029,6 @@ export class SheetwriteStore implements Store {
           const hasRefs = this.refs.hasRefs();
           const hasFormulaSources = this.formulaSrc.size > 0;
           const key = hasRefs || hasFormulaSources ? cellKey(patch.addr) : undefined;
-
           if (key && hasRefs) this.refs.removeRef(key);
           const value = patch.value.value;
           if (typeof value === "number") this.wasm.setNumber(handle, row, col, value, styleId);
@@ -1001,7 +1040,6 @@ export class SheetwriteStore implements Store {
             this.refs.onLiteralChanged(key, literalAt);
           }
         }
-
         if (changes && before) {
           changes.push({
             addr: patch.addr,
@@ -1011,57 +1049,624 @@ export class SheetwriteStore implements Store {
             newStyle: patch.style,
           });
         }
-        break;
+        return true;
+      }
+      case "setRange": {
+        const bounds = normalizedRange(patch.range);
+        const sheet = this.sheetMeta(bounds.sheet);
+        if (
+          bounds.start.row < 0 ||
+          bounds.start.col < 0 ||
+          bounds.end.row >= sheet.rowCount ||
+          bounds.end.col >= sheet.columns.length
+        ) {
+          return false;
+        }
+        if (
+          patch.cells.some(
+            (cell) =>
+              !integerAt(cell.rowOffset) ||
+              !integerAt(cell.colOffset) ||
+              bounds.start.row + cell.rowOffset > bounds.end.row ||
+              bounds.start.col + cell.colOffset > bounds.end.col,
+          )
+        ) {
+          return false;
+        }
+        for (const cell of patch.cells) {
+          const addr = {
+            sheet: bounds.sheet,
+            row: bounds.start.row + cell.rowOffset,
+            col: bounds.start.col + cell.colOffset,
+          };
+          this.applyPatch({ op: "set", addr, value: cell.value, style: cell.style }, changes);
+        }
+        return true;
+      }
+      case "clearRange": {
+        const bounds = normalizedRange(patch.range);
+        const sheet = this.sheetMeta(bounds.sheet);
+        if (
+          bounds.start.row < 0 ||
+          bounds.start.col < 0 ||
+          bounds.end.row >= sheet.rowCount ||
+          bounds.end.col >= sheet.columns.length
+        ) {
+          return false;
+        }
+        const clearContents = patch.contents ?? true;
+        const clearStyle = patch.style ?? true;
+        for (let row = bounds.start.row; row <= bounds.end.row; row++) {
+          for (let col = bounds.start.col; col <= bounds.end.col; col++) {
+            const addr = { sheet: bounds.sheet, row, col };
+            const cell = this.getCell(addr);
+            const value = clearContents
+              ? { kind: "literal" as const, value: null }
+              : this.valueAt(addr);
+            const style = clearStyle ? undefined : cell.style;
+            this.applyPatch({ op: "set", addr, value, style }, changes);
+          }
+        }
+        return true;
       }
       case "addRows": {
-        const { sheet, at, count } = patch;
-        this.wasm.addRows(this.handleOf(sheet), at, count);
-        this.sheetMeta(sheet).rowCount += count;
-        this.rebaseSheetRows(sheet, (row) => (row >= at ? row + count : row));
-        break;
+        const meta = this.sheetMeta(patch.sheet);
+        if (!integerAt(patch.at) || !positiveCount(patch.count) || patch.at > meta.rowCount) {
+          return false;
+        }
+        this.wasm.addRows(this.handleOf(patch.sheet), patch.at, patch.count);
+        meta.rowCount += patch.count;
+        this.rebaseSheetRows(patch.sheet, (row) => (row >= patch.at ? row + patch.count : row));
+        return true;
       }
       case "removeRows": {
-        const { sheet, at, count } = patch;
-        this.wasm.removeRows(this.handleOf(sheet), at, count);
-        const meta = this.sheetMeta(sheet);
-        meta.rowCount = Math.max(0, meta.rowCount - count);
-        this.rebaseSheetRows(sheet, (row) =>
-          row < at ? row : row < at + count ? null : row - count,
+        const meta = this.sheetMeta(patch.sheet);
+        if (
+          !integerAt(patch.at) ||
+          !positiveCount(patch.count) ||
+          patch.at + patch.count > meta.rowCount
+        ) {
+          return false;
+        }
+        this.wasm.removeRows(this.handleOf(patch.sheet), patch.at, patch.count);
+        meta.rowCount -= patch.count;
+        this.rebaseSheetRows(patch.sheet, (row) =>
+          row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
         );
-        break;
+        return true;
       }
+      case "moveRows":
+        return this.moveRows(patch, changes);
       case "addColumns": {
-        const { sheet, at, columns } = patch;
-        if (columns.length === 0) break;
-        const meta = this.sheetMeta(sheet);
-        const insertAt = Math.min(at, meta.columns.length);
-        this.wasm.insertCols(this.handleOf(sheet), insertAt, columns.length);
-        meta.columns.splice(insertAt, 0, ...columns);
-        this.rebaseSheetCols(sheet, (col) => (col >= insertAt ? col + columns.length : col));
-        break;
+        const meta = this.sheetMeta(patch.sheet);
+        if (
+          !integerAt(patch.at) ||
+          patch.at > meta.columns.length ||
+          patch.columns.length === 0 ||
+          !uniqueColumnKeys([...meta.columns, ...patch.columns])
+        ) {
+          return false;
+        }
+        this.wasm.insertCols(this.handleOf(patch.sheet), patch.at, patch.columns.length);
+        meta.columns.splice(patch.at, 0, ...patch.columns);
+        this.rebaseSheetCols(patch.sheet, (col) =>
+          col >= patch.at ? col + patch.columns.length : col,
+        );
+        return true;
       }
       case "removeColumns": {
-        const { sheet, at, count } = patch;
-        const meta = this.sheetMeta(sheet);
-        if (count === 0 || at >= meta.columns.length) break;
-        const removeCount = Math.min(count, meta.columns.length - at);
-        this.wasm.removeCols(this.handleOf(sheet), at, removeCount);
-        meta.columns.splice(at, removeCount);
-        this.rebaseSheetCols(sheet, (col) =>
-          col < at ? col : col < at + removeCount ? null : col - removeCount,
+        const meta = this.sheetMeta(patch.sheet);
+        if (
+          !integerAt(patch.at) ||
+          !positiveCount(patch.count) ||
+          patch.at + patch.count > meta.columns.length ||
+          patch.count === meta.columns.length
+        ) {
+          return false;
+        }
+        this.wasm.removeCols(this.handleOf(patch.sheet), patch.at, patch.count);
+        meta.columns.splice(patch.at, patch.count);
+        this.rebaseSheetCols(patch.sheet, (col) =>
+          col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
         );
-        break;
+        return true;
       }
+      case "moveColumns":
+        return this.moveColumns(patch, changes);
       case "setColumn": {
         const meta = this.sheetMeta(patch.sheet);
-        const col = meta.columns[patch.col];
-        if (col) meta.columns[patch.col] = { ...col, ...patch.patch };
-        break;
+        const column = meta.columns[patch.col];
+        if (!column) return false;
+        const next = { ...column, ...patch.patch };
+        if (
+          !Number.isFinite(next.width) ||
+          next.width < 0 ||
+          (next.key !== column.key && meta.columns.some((item) => item.key === next.key))
+        ) {
+          return false;
+        }
+        meta.columns[patch.col] = next;
+        return true;
+      }
+      case "setRowMeta": {
+        const sheet = this.sheetMeta(patch.sheet);
+        if (!integerAt(patch.row) || patch.row >= sheet.rowCount) return false;
+        if (
+          patch.meta?.height !== undefined &&
+          (!Number.isFinite(patch.meta.height) || patch.meta.height <= 0)
+        ) {
+          return false;
+        }
+        if (!sheet.rowHeights) sheet.rowHeights = new Map();
+        if (!sheet.hiddenRows) sheet.hiddenRows = new Set();
+        if (patch.meta?.height !== undefined) {
+          sheet.rowHeights.set(patch.row, patch.meta.height);
+        } else {
+          sheet.rowHeights.delete(patch.row);
+        }
+        if (patch.meta?.hidden) sheet.hiddenRows.add(patch.row);
+        else sheet.hiddenRows.delete(patch.row);
+        const state = this.ensureViewState(patch.sheet);
+        state.hiddenRows = new Set(sheet.hiddenRows);
+        this.recomputeView(patch.sheet);
+        return true;
+      }
+      case "addMerge": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const merge = normalizeMerge(patch.merge);
+        if (!validMerge(sheet, merge) || mergeCrossesFreeze(sheet, merge)) return false;
+        const merges = sheet.merges ?? [];
+        if (merges.some((existing) => mergesOverlap(existing, merge))) return false;
+        sheet.merges = [...merges, merge];
+        return true;
+      }
+      case "removeMerge": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const merge = normalizeMerge(patch.merge);
+        const merges = sheet.merges ?? [];
+        const index = merges.findIndex((existing) => sameMerge(existing, merge));
+        if (index < 0) return false;
+        sheet.merges = [...merges.slice(0, index), ...merges.slice(index + 1)];
+        return true;
+      }
+      case "addSheet":
+        return this.addSheetSnapshot(patch.sheet, changes);
+      case "removeSheet":
+        return this.removeSheetSnapshot(patch.sheet, changes);
+      case "renameSheet": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet || !patch.name.trim()) return false;
+        if (!this.renameSheetFormulaIdentity(patch.sheet, patch.name)) return false;
+        sheet.name = patch.name;
+        return true;
+      }
+      case "moveSheet": {
+        const from = this.workbook.sheets.findIndex((sheet) => sheet.id === patch.sheet);
+        if (from < 0 || !integerAt(patch.to) || patch.to >= this.workbook.sheets.length)
+          return false;
+        const [sheet] = this.workbook.sheets.splice(from, 1);
+        this.workbook.sheets.splice(patch.to, 0, sheet!);
+        return true;
+      }
+      case "setSheetMeta": {
+        const sheet = this.sheetMeta(patch.sheet);
+        if (
+          patch.patch.frozenRows !== undefined &&
+          (!integerAt(patch.patch.frozenRows) || patch.patch.frozenRows > sheet.rowCount)
+        ) {
+          return false;
+        }
+        if (
+          patch.patch.frozenCols !== undefined &&
+          (!integerAt(patch.patch.frozenCols) || patch.patch.frozenCols > sheet.columns.length)
+        ) {
+          return false;
+        }
+        if (
+          patch.patch.rowGroups?.some(
+            (group) =>
+              !integerAt(group.start) ||
+              !integerAt(group.end) ||
+              group.start > group.end ||
+              group.end >= sheet.rowCount,
+          ) ||
+          (patch.patch.conditionalFormats !== undefined &&
+            !validConditionalRules(sheet, patch.patch.conditionalFormats))
+        ) {
+          return false;
+        }
+        if (patch.patch.frozenRows !== undefined) sheet.frozenRows = patch.patch.frozenRows;
+        if (patch.patch.frozenCols !== undefined) sheet.frozenCols = patch.patch.frozenCols;
+        if (patch.patch.conditionalFormats !== undefined) {
+          sheet.conditionalFormats = patch.patch.conditionalFormats;
+          this.condRulesSynced.delete(patch.sheet);
+          this.syncConditionalRules(patch.sheet, this.handleOf(patch.sheet));
+        }
+        if (patch.patch.rowGroups !== undefined) {
+          sheet.rowGroups = patch.patch.rowGroups.map((group) => ({ ...group }));
+          const state = this.ensureViewState(patch.sheet);
+          state.groups = sheet.rowGroups.map((group) => ({ ...group }));
+          this.recomputeView(patch.sheet);
+        }
+        return true;
+      }
+      case "setNamedRange": {
+        if (!this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.range.sheet)) {
+          return false;
+        }
+        const ranges = this.workbook.namedRanges ?? [];
+        const index = ranges.findIndex((range) => range.name === patch.namedRange.name);
+        if (index < 0) this.workbook.namedRanges = [...ranges, patch.namedRange];
+        else {
+          const next = [...ranges];
+          next[index] = patch.namedRange;
+          this.workbook.namedRanges = next;
+        }
+        return true;
+      }
+      case "removeNamedRange": {
+        const ranges = this.workbook.namedRanges ?? [];
+        if (!ranges.some((range) => range.name === patch.name)) return false;
+        this.workbook.namedRanges = ranges.filter((range) => range.name !== patch.name);
+        return true;
       }
     }
   }
 
+  private valueAt(addr: CellAddress): CellValue {
+    const formula = this.getFormula(addr);
+    if (formula) return { kind: "formula", src: formula };
+    const target = this.getRefTarget(addr);
+    if (target) return { kind: "ref", target };
+    return { kind: "literal", value: this.getCell(addr).resolved };
+  }
+
+  private snapshotCells(
+    sheet: SheetId,
+    rowStart: number,
+    rowEnd: number,
+    colStart: number,
+    colEnd: number,
+  ): Array<Extract<Patch, { op: "set" }>> {
+    const patches: Array<Extract<Patch, { op: "set" }>> = [];
+    for (let row = rowStart; row < rowEnd; row++) {
+      for (let col = colStart; col < colEnd; col++) {
+        const addr = { sheet, row, col };
+        const cell = this.getCell(addr);
+        const value = this.valueAt(addr);
+        if (
+          value.kind === "literal" &&
+          value.value === null &&
+          Object.keys(cell.style).length === 0
+        ) {
+          continue;
+        }
+        patches.push({ op: "set", addr, value, style: cell.style });
+      }
+    }
+    return patches;
+  }
+
+  private moveRows(
+    patch: Extract<Patch, { op: "moveRows" }>,
+    changes: ChangeEvent["changes"] | null,
+  ): boolean {
+    const sheet = this.sheetMeta(patch.sheet);
+    if (
+      !integerAt(patch.from) ||
+      !integerAt(patch.to) ||
+      !positiveCount(patch.count) ||
+      patch.from + patch.count > sheet.rowCount ||
+      patch.to > sheet.rowCount - patch.count
+    ) {
+      return false;
+    }
+    if (patch.from === patch.to) return true;
+    const cells = this.snapshotCells(
+      patch.sheet,
+      patch.from,
+      patch.from + patch.count,
+      0,
+      sheet.columns.length,
+    );
+    const rowMeta = Array.from({ length: patch.count }, (_, offset) => {
+      const row = patch.from + offset;
+      const height = sheet.rowHeights?.get(row);
+      const hidden = sheet.hiddenRows?.has(row) ?? false;
+      return height === undefined && !hidden ? null : { height, hidden };
+    });
+    if (
+      !this.applyPatch(
+        { op: "removeRows", sheet: patch.sheet, at: patch.from, count: patch.count },
+        changes,
+      ) ||
+      !this.applyPatch(
+        { op: "addRows", sheet: patch.sheet, at: patch.to, count: patch.count },
+        changes,
+      )
+    ) {
+      return false;
+    }
+    for (const cell of cells) {
+      this.applyPatch(
+        {
+          ...cell,
+          addr: { ...cell.addr, row: patch.to + (cell.addr.row - patch.from) },
+        },
+        changes,
+      );
+    }
+    for (let offset = 0; offset < rowMeta.length; offset++) {
+      const meta = rowMeta[offset];
+      if (meta) {
+        this.applyPatch(
+          { op: "setRowMeta", sheet: patch.sheet, row: patch.to + offset, meta },
+          changes,
+        );
+      }
+    }
+    return true;
+  }
+
+  private moveColumns(
+    patch: Extract<Patch, { op: "moveColumns" }>,
+    changes: ChangeEvent["changes"] | null,
+  ): boolean {
+    const sheet = this.sheetMeta(patch.sheet);
+    if (
+      !integerAt(patch.from) ||
+      !integerAt(patch.to) ||
+      !positiveCount(patch.count) ||
+      patch.from + patch.count > sheet.columns.length ||
+      patch.to > sheet.columns.length - patch.count
+    ) {
+      return false;
+    }
+    if (patch.from === patch.to) return true;
+    const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
+    const cells = this.snapshotCells(
+      patch.sheet,
+      0,
+      sheet.rowCount,
+      patch.from,
+      patch.from + patch.count,
+    );
+    if (
+      !this.applyPatch(
+        { op: "removeColumns", sheet: patch.sheet, at: patch.from, count: patch.count },
+        changes,
+      ) ||
+      !this.applyPatch({ op: "addColumns", sheet: patch.sheet, at: patch.to, columns }, changes)
+    ) {
+      return false;
+    }
+    for (const cell of cells) {
+      this.applyPatch(
+        {
+          ...cell,
+          addr: { ...cell.addr, col: patch.to + (cell.addr.col - patch.from) },
+        },
+        changes,
+      );
+    }
+    return true;
+  }
+
+  private addSheetSnapshot(
+    snapshot: SheetSnapshot,
+    changes: ChangeEvent["changes"] | null,
+  ): boolean {
+    if (
+      !snapshot.id ||
+      this.handles.has(snapshot.id) ||
+      !integerAt(snapshot.order) ||
+      snapshot.order > this.workbook.sheets.length ||
+      !integerAt(snapshot.rowCount) ||
+      snapshot.columns.length === 0 ||
+      !uniqueColumnKeys(snapshot.columns) ||
+      !snapshot.name.trim() ||
+      this.workbook.sheets.some((sheet) => sheet.name === snapshot.name)
+    ) {
+      return false;
+    }
+    const merges = snapshot.merges?.map(normalizeMerge) ?? [];
+    const candidate: Sheet = {
+      id: snapshot.id,
+      name: snapshot.name,
+      rowCount: snapshot.rowCount,
+      columns: snapshot.columns,
+      frozenRows: snapshot.frozenRows,
+      frozenCols: snapshot.frozenCols,
+    };
+    if (
+      (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
+      (snapshot.frozenCols !== undefined && snapshot.frozenCols > snapshot.columns.length) ||
+      merges.some(
+        (merge) => !validMerge(candidate, merge) || mergeCrossesFreeze(candidate, merge),
+      ) ||
+      merges.some((merge, index) =>
+        merges.slice(index + 1).some((other) => mergesOverlap(merge, other)),
+      ) ||
+      !validConditionalRules(candidate, snapshot.conditionalFormats ?? []) ||
+      (snapshot.rowMeta ?? []).some(
+        ([row, meta]) =>
+          !integerAt(row) ||
+          row >= snapshot.rowCount ||
+          (meta.height !== undefined && (!Number.isFinite(meta.height) || meta.height <= 0)),
+      ) ||
+      (snapshot.rowGroups ?? []).some(
+        (group) =>
+          !integerAt(group.start) ||
+          !integerAt(group.end) ||
+          group.start > group.end ||
+          group.end >= snapshot.rowCount,
+      ) ||
+      snapshot.cells.some(
+        (block) =>
+          !integerAt(block.startRow) ||
+          !integerAt(block.startCol) ||
+          !positiveCount(block.rowCount) ||
+          !positiveCount(block.colCount) ||
+          block.startRow + block.rowCount > snapshot.rowCount ||
+          block.startCol + block.colCount > snapshot.columns.length ||
+          block.cells.some(
+            (cell) =>
+              !integerAt(cell.rowOffset) ||
+              !integerAt(cell.colOffset) ||
+              cell.rowOffset >= block.rowCount ||
+              cell.colOffset >= block.colCount,
+          ),
+      )
+    ) {
+      return false;
+    }
+    const handle = this.wasm.addSheet(snapshot.columns.length, snapshot.rowCount);
+    this.wasm.setSheetName(handle, snapshot.id, snapshot.name);
+    this.handles.set(snapshot.id, handle);
+    const sheet: Sheet = {
+      id: snapshot.id,
+      name: snapshot.name,
+      rowCount: snapshot.rowCount,
+      columns: snapshot.columns.map((column) => ({ ...column })),
+      frozenRows: snapshot.frozenRows,
+      frozenCols: snapshot.frozenCols,
+      merges,
+      conditionalFormats: snapshot.conditionalFormats?.map((rule) => ({ ...rule })),
+      rowGroups: snapshot.rowGroups?.map((group) => ({ ...group })),
+      rowHeights: new Map(),
+      hiddenRows: new Set(),
+    };
+    for (const [row, meta] of snapshot.rowMeta ?? []) {
+      if (meta.height !== undefined) sheet.rowHeights!.set(row, meta.height);
+      if (meta.hidden) sheet.hiddenRows!.add(row);
+    }
+    this.workbook.sheets.splice(snapshot.order, 0, sheet);
+    for (const block of snapshot.cells) {
+      for (const cell of block.cells) {
+        if (
+          !this.applyPatch(
+            {
+              op: "set",
+              addr: {
+                sheet: snapshot.id,
+                row: block.startRow + cell.rowOffset,
+                col: block.startCol + cell.colOffset,
+              },
+              value: cell.value,
+              style: cell.style,
+            },
+            changes,
+          )
+        ) {
+          return false;
+        }
+      }
+    }
+    this.condRulesSynced.delete(snapshot.id);
+    this.syncConditionalRules(snapshot.id, handle);
+    return true;
+  }
+
+  private removeSheetSnapshot(sheetId: SheetId, changes: ChangeEvent["changes"] | null): boolean {
+    const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheetId);
+    if (index < 0 || this.workbook.sheets.length <= 1) return false;
+    if (!this.removeSheetFormulaIdentity(sheetId)) return false;
+    for (const [source, target] of this.refs.entries()) {
+      if (source.sheet === sheetId) {
+        this.refs.removeRef(cellKey(source));
+      } else if (target.sheet === sheetId) {
+        this.applyPatch(
+          {
+            op: "set",
+            addr: source,
+            value: { kind: "literal", value: "#REF!" },
+            style: this.getCell(source).style,
+          },
+          changes,
+        );
+      }
+    }
+    this.handles.delete(sheetId);
+    this.viewState.delete(sheetId);
+    this.viewOrder.delete(sheetId);
+    this.condRulesSynced.delete(sheetId);
+    this.workbook.sheets.splice(index, 1);
+    if (this.workbook.activeSheet === sheetId) {
+      this.workbook.activeSheet =
+        this.workbook.sheets[Math.min(index, this.workbook.sheets.length - 1)]!.id;
+    }
+    this.workbook.namedRanges = this.workbook.namedRanges?.filter(
+      (range) => range.range.sheet !== sheetId,
+    );
+    return true;
+  }
+
   private rebaseSheetRows(sheet: SheetId, remap: (row: number) => number | null): void {
+    const meta = this.sheetMeta(sheet);
+    if (meta.rowHeights) {
+      const next = new Map<number, number>();
+      for (const [row, height] of meta.rowHeights) {
+        const mapped = remap(row);
+        if (mapped !== null) next.set(mapped, height);
+      }
+      meta.rowHeights = next;
+    }
+    if (meta.hiddenRows) {
+      const next = new Set<number>();
+      for (const row of meta.hiddenRows) {
+        const mapped = remap(row);
+        if (mapped !== null) next.add(mapped);
+      }
+      meta.hiddenRows = next;
+    }
+    meta.rowGroups = meta.rowGroups
+      ?.map((group) => {
+        const span = remapSpan(group.start, group.end, remap);
+        return span ? { ...group, start: span[0], end: span[1] } : null;
+      })
+      .filter((group): group is RowGroup => group !== null);
+    meta.merges = meta.merges
+      ?.map((merge) => {
+        const span = remapSpan(merge.r0, merge.r1, remap);
+        return span ? { ...merge, r0: span[0], r1: span[1] } : null;
+      })
+      .filter((merge): merge is MergeRange => merge !== null);
+    meta.conditionalFormats = meta.conditionalFormats
+      ?.map((rule) => {
+        if (rule.range.sheet !== sheet) return rule;
+        const span = remapSpan(rule.range.start.row, rule.range.end.row, remap);
+        return span
+          ? {
+              ...rule,
+              range: {
+                ...rule.range,
+                start: { ...rule.range.start, row: span[0] },
+                end: { ...rule.range.end, row: span[1] },
+              },
+            }
+          : null;
+      })
+      .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    if (meta.frozenRows) {
+      const boundary = remapSpan(0, meta.frozenRows - 1, remap);
+      meta.frozenRows = boundary ? boundary[1] + 1 : 0;
+    }
+    this.workbook.namedRanges = this.workbook.namedRanges
+      ?.map((namedRange) => {
+        if (namedRange.range.sheet !== sheet) return namedRange;
+        const span = remapSpan(namedRange.range.start.row, namedRange.range.end.row, remap);
+        return span
+          ? {
+              ...namedRange,
+              range: {
+                ...namedRange.range,
+                start: { ...namedRange.range.start, row: span[0] },
+                end: { ...namedRange.range.end, row: span[1] },
+              },
+            }
+          : null;
+      })
+      .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
     this.rebaseViewRows(sheet, remap);
     this.rebaseFormulaSources(sheet, remap);
 
@@ -1103,6 +1708,49 @@ export class SheetwriteStore implements Store {
   }
 
   private rebaseSheetCols(sheet: SheetId, remap: (col: number) => number | null): void {
+    const meta = this.sheetMeta(sheet);
+    meta.merges = meta.merges
+      ?.map((merge) => {
+        const span = remapSpan(merge.c0, merge.c1, remap);
+        return span ? { ...merge, c0: span[0], c1: span[1] } : null;
+      })
+      .filter((merge): merge is MergeRange => merge !== null);
+    meta.conditionalFormats = meta.conditionalFormats
+      ?.map((rule) => {
+        if (rule.range.sheet !== sheet) return rule;
+        const span = remapSpan(rule.range.start.col, rule.range.end.col, remap);
+        return span
+          ? {
+              ...rule,
+              range: {
+                ...rule.range,
+                start: { ...rule.range.start, col: span[0] },
+                end: { ...rule.range.end, col: span[1] },
+              },
+            }
+          : null;
+      })
+      .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    if (meta.frozenCols) {
+      const boundary = remapSpan(0, meta.frozenCols - 1, remap);
+      meta.frozenCols = boundary ? boundary[1] + 1 : 0;
+    }
+    this.workbook.namedRanges = this.workbook.namedRanges
+      ?.map((namedRange) => {
+        if (namedRange.range.sheet !== sheet) return namedRange;
+        const span = remapSpan(namedRange.range.start.col, namedRange.range.end.col, remap);
+        return span
+          ? {
+              ...namedRange,
+              range: {
+                ...namedRange.range,
+                start: { ...namedRange.range.start, col: span[0] },
+                end: { ...namedRange.range.end, col: span[1] },
+              },
+            }
+          : null;
+      })
+      .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
     this.rebaseViewCols(sheet);
     this.rebaseFormulaSourceCols(sheet, remap);
 
@@ -1422,8 +2070,123 @@ function stringArrayForRows(
   return source.length === rowCount ? source : source.slice(0, rowCount);
 }
 
+function integerAt(value: number): boolean {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function positiveCount(value: number): boolean {
+  return Number.isInteger(value) && value > 0;
+}
+
+function uniqueColumnKeys(columns: readonly Column[]): boolean {
+  const keys = new Set<string>();
+  for (const column of columns) {
+    if (!column.key || keys.has(column.key)) return false;
+    keys.add(column.key);
+  }
+  return true;
+}
+
+function normalizedRange(range: Range): Range {
+  return {
+    sheet: range.sheet,
+    start: {
+      row: Math.min(range.start.row, range.end.row),
+      col: Math.min(range.start.col, range.end.col),
+    },
+    end: {
+      row: Math.max(range.start.row, range.end.row),
+      col: Math.max(range.start.col, range.end.col),
+    },
+  };
+}
+
+function normalizeMerge(merge: MergeRange): MergeRange {
+  return {
+    r0: Math.min(merge.r0, merge.r1),
+    c0: Math.min(merge.c0, merge.c1),
+    r1: Math.max(merge.r0, merge.r1),
+    c1: Math.max(merge.c0, merge.c1),
+  };
+}
+
+function validMerge(sheet: Sheet, merge: MergeRange): boolean {
+  return (
+    [merge.r0, merge.c0, merge.r1, merge.c1].every(integerAt) &&
+    merge.r0 <= merge.r1 &&
+    merge.c0 <= merge.c1 &&
+    merge.r1 < sheet.rowCount &&
+    merge.c1 < sheet.columns.length &&
+    (merge.r0 !== merge.r1 || merge.c0 !== merge.c1)
+  );
+}
+
+function mergesOverlap(left: MergeRange, right: MergeRange): boolean {
+  return left.r0 <= right.r1 && right.r0 <= left.r1 && left.c0 <= right.c1 && right.c0 <= left.c1;
+}
+
+function sameMerge(left: MergeRange, right: MergeRange): boolean {
+  const normalized = normalizeMerge(left);
+  return (
+    normalized.r0 === right.r0 &&
+    normalized.c0 === right.c0 &&
+    normalized.r1 === right.r1 &&
+    normalized.c1 === right.c1
+  );
+}
+
+function mergeCrossesFreeze(sheet: Sheet, merge: MergeRange): boolean {
+  const frozenRows = sheet.frozenRows ?? 0;
+  const frozenCols = sheet.frozenCols ?? 0;
+  return (
+    (merge.r0 < frozenRows && merge.r1 >= frozenRows) ||
+    (merge.c0 < frozenCols && merge.c1 >= frozenCols)
+  );
+}
+
+function validConditionalRules(sheet: Sheet, rules: readonly ConditionalFormatRule[]): boolean {
+  return rules.every((rule) => {
+    if (rule.range.sheet !== sheet.id) return false;
+    const range = normalizedRange(rule.range);
+    return (
+      integerAt(range.start.row) &&
+      integerAt(range.start.col) &&
+      range.end.row < sheet.rowCount &&
+      range.end.col < sheet.columns.length
+    );
+  });
+}
+
+function remapSpan(
+  start: number,
+  end: number,
+  remap: (index: number) => number | null,
+): [number, number] | null {
+  const low = Math.min(start, end);
+  const high = Math.max(start, end);
+  let mappedStart: number | null = null;
+  for (let index = low; index <= high; index++) {
+    const mapped = remap(index);
+    if (mapped !== null) {
+      mappedStart = mapped;
+      break;
+    }
+  }
+  if (mappedStart === null) return null;
+  let mappedEnd = mappedStart;
+  for (let index = high; index >= low; index--) {
+    const mapped = remap(index);
+    if (mapped !== null) {
+      mappedEnd = mapped;
+      break;
+    }
+  }
+  return [Math.min(mappedStart, mappedEnd), Math.max(mappedStart, mappedEnd)];
+}
+
 function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): string {
   let signature = String(rules.length);
+
   for (const rule of rules) {
     const r0 = Math.min(rule.range.start.row, rule.range.end.row);
     const c0 = Math.min(rule.range.start.col, rule.range.end.col);

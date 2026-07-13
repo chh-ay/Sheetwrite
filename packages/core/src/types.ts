@@ -107,6 +107,10 @@ export interface Sheet {
   rowCount: number;
   /** Sparse per-row height overrides; default comes from the theme. */
   rowHeights?: Map<number, number>;
+  /** Persisted hidden data rows; runtime form is sparse and non-JSON. */
+  hiddenRows?: Set<number>;
+  /** Persisted collapsible row groups. */
+  rowGroups?: RowGroup[];
   /** Conditional styles folded into the bulk render-window style dictionary. */
   conditionalFormats?: ConditionalFormatRule[];
   /** Persisted merged-cell regions; covered cells render/export from the anchor. */
@@ -146,6 +150,14 @@ export interface RowGroup {
 export interface Workbook {
   sheets: Sheet[];
   activeSheet: SheetId;
+  namedRanges?: NamedRangeSnapshot[];
+}
+
+export interface AddSheetInput {
+  id?: SheetId;
+  name: string;
+  rowCount?: number;
+  columns?: Column[];
 }
 
 /** Stable named range extension point; evaluation is introduced separately. */
@@ -233,11 +245,8 @@ export type DocumentOp =
   | { op: "setNamedRange"; namedRange: NamedRangeSnapshot }
   | { op: "removeNamedRange"; name: string };
 
-/** The existing storage transaction is the implemented subset of the document protocol. */
-export type Patch = Extract<
-  DocumentOp,
-  { op: "set" | "addRows" | "removeRows" | "addColumns" | "removeColumns" | "setColumn" }
->;
+/** Backward-compatible transaction name for the one exhaustive document operation union. */
+export type Patch = DocumentOp;
 
 // ── Transactions & change events ─────────────────────────────────────────────
 
@@ -848,6 +857,13 @@ export interface Grid {
   removeRows(at: number, count?: number): void;
   insertColumns(at: number, count?: number): void;
   removeColumns(at: number, count?: number): void;
+  /** Add a sheet with a stable ID and make it available to the tab bar. */
+  addSheet(input: AddSheetInput): SheetId;
+  /** Remove a sheet; at least one sheet always remains. */
+  removeSheet(id: SheetId): void;
+  renameSheet(id: SheetId, name: string): void;
+  moveSheet(id: SheetId, toIndex: number): void;
+  setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
   /**
    * Live-update the render window overscan (rows/cols painted beyond the
    * viewport); `undefined` restores the default.
@@ -876,7 +892,7 @@ export interface Grid {
    * their own keymaps (`config.keyboard`).
    */
   dataEdge(row: number, col: number, dRow: number, dCol: number): number | null;
-  /** Set one row's display height (view metadata; repaints immediately, not undoable). */
+  /** Set one row's persistent display height through document history. */
   setRowHeight(row: number, height: number): void;
   /** Set one column's width via an undoable `setColumn` patch. */
   setColumnWidth(col: number, width: number): void;
