@@ -130,6 +130,16 @@ class FakeAdapter implements RenderBenchAdapter {
     };
   }
 
+  installMergeHeavy(): void {}
+
+  clearMergeHeavy(): void {}
+
+  resetMergeResources(): void {}
+
+  mergeResources() {
+    return { indexConstructions: 1, candidatesExamined: 4 };
+  }
+
   destroy(): void {
     this.mounted = false;
   }
@@ -216,6 +226,15 @@ describe("scenario correctness checkpoints", () => {
       compiledFormats: 2,
       numberFormatters: 1,
       dateTimeFormatters: 1,
+    });
+  });
+  test("validates merge-heavy output and structural index counters", () => {
+    const result = runRenderScenario(new FakeAdapter(), dataset, "merge-heavy.paint", options);
+    expect(result.status).toBe("success");
+    if (result.status !== "success") throw new Error(result.message);
+    expect(result.mergeResources).toEqual({
+      indexConstructions: 1,
+      candidatesExamined: 4,
     });
   });
 });

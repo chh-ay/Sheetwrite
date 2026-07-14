@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { paintFrame } from "../src/canvas-paint.js";
+import {
+  getMergeIndexResourceStatsForTest,
+  resetMergeIndexResourceStatsForTest,
+} from "../src/merge-index.js";
 import { dateToSerial } from "../src/date-serial.js";
 import {
   getNumberFormatResourceStatsForTest,
@@ -289,6 +293,32 @@ describe("paintFrame variable row heights", () => {
           line.y1 > HEADER_HEIGHT,
       ),
     ).toBe(false);
+  });
+
+  it("examines only visible merge intersections with thousands offscreen", () => {
+    const merges = Array.from({ length: 10_000 }, (_, index) => ({
+      r0: 10_000 + index * 2,
+      c0: 0,
+      r1: 10_000 + index * 2,
+      c1: 1,
+    }));
+    merges.push({ r0: 0, c0: 0, r1: 1, c1: 1 });
+    const layout = makeLayout(
+      [
+        { key: "a", header: "A", width: 100, type: "text" },
+        { key: "b", header: "B", width: 100, type: "text" },
+      ],
+      merges,
+    );
+    const view = makeView(new Uint32Array(6), [{}]);
+    resetMergeIndexResourceStatsForTest();
+
+    render(view, layout, UNIFORM_VIEWPORT);
+
+    expect(getMergeIndexResourceStatsForTest()).toMatchObject({
+      indexConstructions: 1,
+    });
+    expect(getMergeIndexResourceStatsForTest().candidatesExamined).toBeLessThanOrEqual(20);
   });
 
   it("draws the horizontal gridline at each row's geometric bottom", () => {

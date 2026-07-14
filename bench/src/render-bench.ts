@@ -11,6 +11,11 @@ import {
   getNumberFormatResourceStatsForTest,
   resetNumberFormatResourcesForTest,
 } from "../../packages/core/src/number-format.js";
+import {
+  getMergeIndexResourceStatsForTest,
+  prepareMergeIndex,
+  resetMergeIndexResourceStatsForTest,
+} from "../../packages/core/src/merge-index.js";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
@@ -235,6 +240,11 @@ class SheetwriteAdapter implements RenderBenchAdapter {
 
   repaint(): void {
     this.grid.refresh();
+    const coordinator = Reflect.get(this.grid, "renderCoordinator") as
+      | { invalidate(): void; renderNow(): void }
+      | undefined;
+    coordinator?.invalidate();
+    coordinator?.renderNow();
   }
 
   formattedSentinels(): readonly [string, string] {
@@ -248,6 +258,37 @@ class SheetwriteAdapter implements RenderBenchAdapter {
 
   formatResources(): RenderResourceMetrics {
     return getNumberFormatResourceStatsForTest();
+  }
+
+  installMergeHeavy(): void {
+    const count = Math.min(2_000, Math.floor(this.initialRowCount / 2));
+    this.grid.store.applyTransaction({
+      patches: Array.from({ length: count }, (_, index) => ({
+        op: "addMerge" as const,
+        sheet: SHEET,
+        merge: { r0: index * 2, c0: 0, r1: index * 2, c1: 1 },
+      })),
+    });
+  }
+
+  clearMergeHeavy(): void {
+    const merges = this.grid.store.getWorkbook().sheets.find((sheet) => sheet.id === SHEET)?.merges;
+    if (!merges || merges.length === 0) return;
+    this.grid.store.applyTransaction({
+      patches: merges.map((merge) => ({ op: "removeMerge" as const, sheet: SHEET, merge })),
+    });
+  }
+
+  resetMergeResources(): void {
+    resetMergeIndexResourceStatsForTest();
+  }
+
+  mergeResources() {
+    const merges = this.grid.store.getWorkbook().sheets.find((sheet) => sheet.id === SHEET)?.merges;
+    if (merges && merges.length > 0) {
+      prepareMergeIndex(merges).intersectingWindow(0, 20, [0, 1, 2, 3, 4]);
+    }
+    return getMergeIndexResourceStatsForTest();
   }
 
   destroy(): void {
@@ -300,6 +341,7 @@ class HandsontableAdapter implements RenderBenchAdapter {
       "scrollViewportTo",
       "selectCell",
       "setDataAtCell",
+      "updateSettings",
     ]);
   }
 
@@ -432,6 +474,30 @@ class HandsontableAdapter implements RenderBenchAdapter {
 
   formatResources(): RenderResourceMetrics {
     return getNumberFormatResourceStatsForTest();
+  }
+
+  installMergeHeavy(): void {
+    const count = Math.min(2_000, Math.floor(this.initialRowCount / 2));
+    this.hot.updateSettings({
+      mergeCells: Array.from({ length: count }, (_, index) => ({
+        row: index * 2,
+        col: 0,
+        rowspan: 1,
+        colspan: 2,
+      })),
+    });
+  }
+
+  clearMergeHeavy(): void {
+    this.hot.updateSettings({ mergeCells: [] });
+  }
+
+  resetMergeResources(): void {
+    resetMergeIndexResourceStatsForTest();
+  }
+
+  mergeResources() {
+    return getMergeIndexResourceStatsForTest();
   }
 
   destroy(): void {

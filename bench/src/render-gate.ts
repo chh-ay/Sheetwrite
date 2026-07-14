@@ -184,6 +184,21 @@ export function validateRenderGateArtifact(
         throw new Error(`${key}.resources does not match bounded formatter construction`);
       }
     }
+    if (result.scenarioId === "merge-heavy.paint") {
+      if (!result.mergeResources) throw new Error(`${key}.mergeResources is missing`);
+      const { indexConstructions, candidatesExamined } = result.mergeResources;
+      if (result.engine === "sheetwrite") {
+        if (
+          indexConstructions !== 1 ||
+          candidatesExamined <= 0 ||
+          candidatesExamined > (result.operationCount + 1) * 1_000
+        ) {
+          throw new Error(`${key}.mergeResources exceeded the visible-intersection budget`);
+        }
+      } else if (indexConstructions !== 0 || candidatesExamined !== 0) {
+        throw new Error(`${key}.mergeResources must be zero for the comparison engine`);
+      }
+    }
   }
   return artifact;
 }

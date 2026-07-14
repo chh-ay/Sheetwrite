@@ -13,6 +13,7 @@ import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
+import { prepareMergeIndex } from "./merge-index.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { RenderCoordinator } from "./render-coordinator.js";
@@ -909,13 +910,7 @@ export class GridImpl implements Grid {
     const merges = this.sheet().merges;
     if (!merges) return null;
 
-    for (const merge of merges) {
-      const insideRows = merge.r0 <= row && row <= merge.r1;
-      const insideCols = merge.c0 <= col && col <= merge.c1;
-      if (insideRows && insideCols) return merge;
-    }
-
-    return null;
+    return prepareMergeIndex(merges).anchorAt(row, col);
   }
 
   private anchorCell(row: number, col: number): CellRef {
@@ -1063,12 +1058,14 @@ export class GridImpl implements Grid {
     const patches: DocumentOp[] = [];
     const rects: SelRect[] = [];
     this.selection.forEachRect((rect) => rects.push(rect));
-    const intersectsMerge = (sheet.merges ?? []).some((merge) =>
+    const merges = sheet.merges;
+    const mergeIndex = merges ? prepareMergeIndex(merges) : null;
+    const intersectsMerge =
+      mergeIndex !== null &&
       rects.some(
         (rect) =>
-          rect.r0 <= merge.r1 && merge.r0 <= rect.r1 && rect.c0 <= merge.c1 && merge.c0 <= rect.c1,
-      ),
-    );
+          mergeIndex.intersectingWindow(rect.r0, rect.r1 + 1, [rect.c0, rect.c1]).length > 0,
+      );
     if (!intersectsMerge) {
       for (const rect of rects) {
         let runStart = this.toDataRow(rect.r0);

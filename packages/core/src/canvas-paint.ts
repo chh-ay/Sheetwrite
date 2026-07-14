@@ -1,4 +1,5 @@
 import { formatNumber } from "./number-format.js";
+import { prepareMergeIndex, type MergeRect } from "./merge-index.js";
 import type { CellAlign, CellBorder, CellScalar, CellStyle } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
@@ -21,8 +22,6 @@ const MERGE_KEY_STRIDE = 0x100000;
 
 /** Works against a main-thread or worker (OffscreenCanvas) 2D context. */
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-
-type MergeRect = { r0: number; c0: number; r1: number; c1: number };
 
 /**
  * Build the per-frame merge lookup. Every covered cell of every merge that
@@ -350,14 +349,18 @@ export function paintFrame(
   const styleCache = new Map<number, CellStyle>();
   const styleStride = view.styles.length || 1;
   const merges = layout.merges;
+  const mergeIndex = merges === undefined ? undefined : prepareMergeIndex(merges);
+  const visibleMerges = mergeIndex?.intersectingWindow(view.rows.start, view.rows.end, view.cols);
+  let minimumVisibleColumn = view.cols[0] ?? 0;
+  let maximumVisibleColumn = view.cols[0] ?? -1;
+  for (let index = 1; index < view.cols.length; index++) {
+    minimumVisibleColumn = Math.min(minimumVisibleColumn, view.cols[index]!);
+    maximumVisibleColumn = Math.max(maximumVisibleColumn, view.cols[index]!);
+  }
   const mergeMap =
-    merges !== undefined
-      ? buildMergeMap(merges, view.rows.start, view.rows.end, view.cols)
-      : undefined;
-  const mergesByColumn =
-    merges && merges.length > 0 ? [...merges].sort((a, b) => a.c0 - b.c0) : undefined;
-  const mergesByRow =
-    merges && merges.length > 0 ? [...merges].sort((a, b) => a.r0 - b.r0) : undefined;
+    visibleMerges === undefined
+      ? undefined
+      : buildMergeMap(visibleMerges, view.rows.start, view.rows.end, view.cols);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.save();
@@ -472,6 +475,11 @@ export function paintFrame(
     const lineY = Math.round(headerHeight + rowBottom - scrollTop) - 0.5;
     if (lineY < paintTop || lineY > paintBottom) continue;
     let cursorX = g;
+    const mergesByColumn = mergeIndex?.horizontalGaps(
+      row,
+      minimumVisibleColumn,
+      maximumVisibleColumn,
+    );
     if (mergesByColumn) {
       for (const merge of mergesByColumn) {
         if (merge.r0 > row || row >= merge.r1) continue;
@@ -500,6 +508,7 @@ export function paintFrame(
   ctx.beginPath();
   const appendVerticalGridline = (c: number, lineX: number): void => {
     if (lineX < g || lineX > width) return;
+    const mergesByRow = mergeIndex?.verticalGaps(c, view.rows.start, view.rows.end - 1);
     let cursorY = 0;
     if (mergesByRow) {
       for (const merge of mergesByRow) {

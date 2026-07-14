@@ -136,6 +136,14 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
                         },
                 }
               : {}),
+            ...(scenario.id === "merge-heavy.paint"
+              ? {
+                  mergeResources:
+                    engine === "sheetwrite"
+                      ? { indexConstructions: 1, candidatesExamined: 100 }
+                      : { indexConstructions: 0, candidatesExamined: 0 },
+                }
+              : {}),
           });
         }
       }

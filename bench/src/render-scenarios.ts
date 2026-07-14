@@ -6,6 +6,7 @@ import {
   type MemoryDelta,
   RENDER_SCENARIOS,
   type ScenarioId,
+  type MergeIndexResourceMetrics,
   type ScenarioIdentity,
   type ScenarioResult,
   type RenderResourceMetrics,
@@ -57,6 +58,10 @@ export interface RenderBenchAdapter {
   repaint(): void;
   formattedSentinels(): readonly [string, string];
   formatResources(): RenderResourceMetrics;
+  installMergeHeavy(): void;
+  clearMergeHeavy(): void;
+  resetMergeResources(): void;
+  mergeResources(): MergeIndexResourceMetrics;
   destroy(): void;
 }
 
@@ -267,6 +272,45 @@ function scenarioActions(
           }
         } finally {
           cleanup();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "merge-heavy.paint") {
+    adapter.installMergeHeavy();
+    adapter.resetMergeResources();
+    const action = (): void => adapter.repaint();
+    return {
+      prepare: () => {},
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          action();
+          checkpoint(
+            observations,
+            "merge-heavy.paint preserves anchor and covered-cell values",
+            JSON.stringify([dataset.id[0], adapter.id === "sheetwrite" ? dataset.date[0] : null]),
+            JSON.stringify([adapter.cellValue(0, 0), adapter.cellValue(0, 1)]),
+          );
+          if (adapter.id === "sheetwrite") {
+            const resources = adapter.mergeResources();
+            checkpoint(
+              observations,
+              "merge-heavy.paint prepares one revision index",
+              1,
+              resources.indexConstructions,
+            );
+            checkpoint(
+              observations,
+              "merge-heavy.paint examines visible merge candidates",
+              true,
+              resources.candidatesExamined > 0,
+            );
+          }
+        } finally {
+          adapter.clearMergeHeavy();
         }
       },
     };
@@ -602,6 +646,7 @@ export function runRenderScenario(
       validation,
       memory: memoryDelta(beforeBytes, afterBytes),
       resources: adapter.formatResources(),
+      mergeResources: adapter.mergeResources(),
     };
   } catch (error) {
     return failedScenario(

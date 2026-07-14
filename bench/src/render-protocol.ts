@@ -15,7 +15,8 @@ export type ScenarioGroup =
   | "editing"
   | "altering"
   | "arrow-keys-navigation"
-  | "formatting";
+  | "formatting"
+  | "merges";
 
 export const RENDER_SCENARIOS = [
   { id: "scroll-down.top-left", group: "view-scrolling" },
@@ -31,6 +32,7 @@ export const RENDER_SCENARIOS = [
   { id: "arrow-down.top-left", group: "arrow-keys-navigation" },
   { id: "arrow-right.middle", group: "arrow-keys-navigation" },
   { id: "formatted-paint.top-left", group: "formatting" },
+  { id: "merge-heavy.paint", group: "merges" },
 ] as const satisfies readonly { readonly id: string; readonly group: ScenarioGroup }[];
 
 export type ScenarioId = (typeof RENDER_SCENARIOS)[number]["id"];
@@ -74,6 +76,11 @@ export interface RenderResourceMetrics {
   readonly dateTimeFormatterCacheEntries: number;
 }
 
+export interface MergeIndexResourceMetrics {
+  readonly indexConstructions: number;
+  readonly candidatesExamined: number;
+}
+
 export interface MeasuredSample extends AggregateSample {
   readonly index: number;
 }
@@ -88,6 +95,7 @@ export interface SuccessfulScenario extends ScenarioIdentity {
   readonly validation: readonly ValidationObservation[];
   readonly memory: MemoryDelta;
   readonly resources?: RenderResourceMetrics;
+  readonly mergeResources?: MergeIndexResourceMetrics;
 }
 
 export interface FailedScenario extends ScenarioIdentity {
@@ -350,6 +358,14 @@ function parseResources(value: unknown, path: string): RenderResourceMetrics {
   };
 }
 
+function parseMergeResources(value: unknown, path: string): MergeIndexResourceMetrics {
+  const input = record(value, path);
+  return {
+    indexConstructions: integer(input.indexConstructions, `${path}.indexConstructions`, 0),
+    candidatesExamined: integer(input.candidatesExamined, `${path}.candidatesExamined`, 0),
+  };
+}
+
 function parseSample(value: unknown, path: string): MeasuredSample {
   const input = record(value, path);
   const durationMs = finite(input.durationMs, `${path}.durationMs`, 0);
@@ -375,7 +391,7 @@ function parseIdentity(value: Record<string, unknown>, path: string): ScenarioId
   );
   const group = enumValue(
     value.group,
-    ["view-scrolling", "editing", "altering", "arrow-keys-navigation", "formatting"],
+    ["view-scrolling", "editing", "altering", "arrow-keys-navigation", "formatting", "merges"],
     `${path}.group`,
   );
   if (group !== scenarioGroup(scenarioId)) {
@@ -472,6 +488,11 @@ export function parseScenarioResult(
     ...(input.resources === undefined
       ? {}
       : { resources: parseResources(input.resources, `${path}.resources`) }),
+    ...(input.mergeResources === undefined
+      ? {}
+      : {
+          mergeResources: parseMergeResources(input.mergeResources, `${path}.mergeResources`),
+        }),
   };
 }
 

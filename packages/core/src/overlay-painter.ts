@@ -1,3 +1,4 @@
+import { prepareMergeIndex } from "./merge-index.js";
 import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
@@ -464,10 +465,11 @@ export class OverlayPainter {
     let { r0, c0, r1, c1 } = rect;
     const merges = sheet.merges;
     if (merges) {
+      const mergeIndex = prepareMergeIndex(merges);
       let expanded: boolean;
       do {
         expanded = false;
-        for (const merge of merges) {
+        for (const merge of mergeIndex.intersectingWindow(r0, r1 + 1, [c0, c1])) {
           if (merge.r1 < r0 || merge.r0 > r1 || merge.c1 < c0 || merge.c0 > c1) continue;
           const nextR0 = Math.min(r0, merge.r0);
           const nextC0 = Math.min(c0, merge.c0);
