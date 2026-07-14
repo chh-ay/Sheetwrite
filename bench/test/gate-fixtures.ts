@@ -114,6 +114,28 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
               },
             ],
             memory: { beforeBytes: 1_000, afterBytes: 1_100, deltaBytes: 100 },
+            ...(scenario.id === "formatted-paint.top-left"
+              ? {
+                  resources:
+                    engine === "sheetwrite"
+                      ? {
+                          compiledFormats: 2,
+                          numberFormatters: 1,
+                          dateTimeFormatters: 1,
+                          formatCacheEntries: 2,
+                          numberFormatterCacheEntries: 1,
+                          dateTimeFormatterCacheEntries: 1,
+                        }
+                      : {
+                          compiledFormats: 0,
+                          numberFormatters: 0,
+                          dateTimeFormatters: 0,
+                          formatCacheEntries: 0,
+                          numberFormatterCacheEntries: 0,
+                          dateTimeFormatterCacheEntries: 0,
+                        },
+                }
+              : {}),
           });
         }
       }

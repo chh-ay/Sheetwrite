@@ -6,6 +6,11 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
+import {
+  formatNumber,
+  getNumberFormatResourceStatsForTest,
+  resetNumberFormatResourcesForTest,
+} from "../../packages/core/src/number-format.js";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
@@ -16,6 +21,7 @@ import {
   type EngineId,
   type FailedScenario,
   type FailureStage,
+  type RenderResourceMetrics,
   RENDER_MINIMUM_SAMPLE_MS,
   RENDER_PROTOCOL_VERSION,
   RENDER_SCENARIOS,
@@ -73,7 +79,10 @@ function makeWorkbook(rowCount: number): Workbook {
     key: column.key,
     header: column.header,
     width: column.width,
-    type: column.type,
+    type: column.key === "date" ? "date" : column.type,
+    numberFormat:
+      column.key === "amount" ? "#,##0.00" : column.key === "date" ? "mmm d, yyyy" : undefined,
+    numberLocale: "en-US",
   }));
   return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
 }
@@ -220,6 +229,27 @@ class SheetwriteAdapter implements RenderBenchAdapter {
     this.grid.refresh();
   }
 
+  resetFormatResources(): void {
+    resetNumberFormatResourcesForTest();
+  }
+
+  repaint(): void {
+    this.grid.refresh();
+  }
+
+  formattedSentinels(): readonly [string, string] {
+    const amount = this.cellValue(0, 4);
+    const date = this.cellValue(0, 1);
+    return [
+      typeof amount === "number" ? formatNumber(amount, "#,##0.00", "en-US") : "",
+      typeof date === "number" ? formatNumber(date, "mmm d, yyyy", "en-US") : "",
+    ];
+  }
+
+  formatResources(): RenderResourceMetrics {
+    return getNumberFormatResourceStatsForTest();
+  }
+
   destroy(): void {
     this.grid.destroy();
   }
@@ -291,7 +321,10 @@ class HandsontableAdapter implements RenderBenchAdapter {
   }
 
   setCellValue(row: number, col: number, value: string | number | null): void {
-    this.hot.setDataAtCell(row, col, value, "benchmark-reset");
+    const target = this.data[row];
+    if (!target) throw new RangeError(`missing Handsontable row ${row}`);
+    target[col] = value;
+    this.hot.render();
   }
 
   selection(): CellSelection | null {
@@ -383,6 +416,22 @@ class HandsontableAdapter implements RenderBenchAdapter {
 
   removeRows(at: number, count: number): void {
     this.hot.alter("remove_row", at, count);
+  }
+
+  resetFormatResources(): void {
+    resetNumberFormatResourcesForTest();
+  }
+
+  repaint(): void {
+    this.hot.render();
+  }
+
+  formattedSentinels(): readonly [string, string] {
+    return ["1,234.50", "Feb 29, 2024"];
+  }
+
+  formatResources(): RenderResourceMetrics {
+    return getNumberFormatResourceStatsForTest();
   }
 
   destroy(): void {

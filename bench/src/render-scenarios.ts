@@ -8,6 +8,7 @@ import {
   type ScenarioId,
   type ScenarioIdentity,
   type ScenarioResult,
+  type RenderResourceMetrics,
   scenarioGroup,
   type ValidationObservation,
 } from "./render-protocol.js";
@@ -52,6 +53,10 @@ export interface RenderBenchAdapter {
   moveSelection(direction: "down" | "right"): void;
   insertRows(at: number, count: number): void;
   removeRows(at: number, count: number): void;
+  resetFormatResources(): void;
+  repaint(): void;
+  formattedSentinels(): readonly [string, string];
+  formatResources(): RenderResourceMetrics;
   destroy(): void;
 }
 
@@ -199,6 +204,73 @@ function scenarioActions(
   const middleCol = Math.floor(adapter.colCount / 2);
   const lastRow = dataset.rowCount - 1;
   const lastCol = adapter.colCount - 1;
+
+  if (scenarioId === "formatted-paint.top-left") {
+    const originalDate = dataset.date[0]!;
+    const originalAmount = dataset.amount[0]!;
+    adapter.resetFormatResources();
+    const prepare = (): void => {
+      adapter.setCellValue(0, 1, 45_351);
+      adapter.setCellValue(0, 4, 1_234.5);
+    };
+    const action = (): void => adapter.repaint();
+    const cleanup = (): void => {
+      adapter.setCellValue(0, 1, originalDate);
+      adapter.setCellValue(0, 4, originalAmount);
+    };
+    return {
+      prepare,
+      action,
+      cleanup,
+      validateEffect: (observations) => {
+        prepare();
+        try {
+          action();
+          checkpoint(
+            observations,
+            "formatted-paint retains numeric amount input",
+            1_234.5,
+            adapter.cellValue(0, 4),
+          );
+          checkpoint(
+            observations,
+            "formatted-paint retains numeric date serial",
+            45_351,
+            adapter.cellValue(0, 1),
+          );
+          checkpoint(
+            observations,
+            "formatted-paint exact fixed-decimal and named-date sentinels",
+            '["1,234.50","Feb 29, 2024"]',
+            JSON.stringify(adapter.formattedSentinels()),
+          );
+          if (adapter.id === "sheetwrite") {
+            const resources = adapter.formatResources();
+            checkpoint(
+              observations,
+              "formatted-paint compiles two format codes",
+              2,
+              resources.compiledFormats,
+            );
+            checkpoint(
+              observations,
+              "formatted-paint constructs formatters by unique descriptor",
+              1,
+              resources.numberFormatters,
+            );
+            checkpoint(
+              observations,
+              "formatted-paint constructs one named-date formatter",
+              1,
+              resources.dateTimeFormatters,
+            );
+          }
+        } finally {
+          cleanup();
+        }
+      },
+    };
+  }
 
   if (
     scenarioId === "scroll-down.top-left" ||
@@ -495,6 +567,7 @@ export function runRenderScenario(
       madMs: summary.mad,
       validation,
       memory: memoryDelta(beforeBytes, afterBytes),
+      resources: adapter.formatResources(),
     };
   } catch (error) {
     return failedScenario(

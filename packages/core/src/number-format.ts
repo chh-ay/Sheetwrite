@@ -31,13 +31,38 @@ interface DateToken {
   text: string;
 }
 
-const descriptorCache = new Map<string, NumericDescriptor>();
-const dateFormatCache = new Map<string, DateToken[] | null>();
-const formatterCache = new Map<string, Intl.NumberFormat>();
-const defaultFormatterCache = new Map<string, Intl.NumberFormat>();
+interface CompiledSection {
+  readonly source: string;
+  readonly dateTokens: readonly DateToken[] | null;
+  readonly numeric: NumericDescriptor | null;
+  readonly literal: string;
+}
+
+interface CompiledFormat {
+  readonly sections: readonly CompiledSection[];
+}
+
+export interface NumberFormatResourceStats {
+  readonly compiledFormats: number;
+  readonly numberFormatters: number;
+  readonly dateTimeFormatters: number;
+  readonly formatCacheEntries: number;
+  readonly numberFormatterCacheEntries: number;
+  readonly dateTimeFormatterCacheEntries: number;
+}
+
+const FORMAT_CACHE_LIMIT = 256;
+const NUMBER_FORMATTER_CACHE_LIMIT = 128;
+const DATE_TIME_FORMATTER_CACHE_LIMIT = 64;
+const formatCache = new Map<string, CompiledFormat>();
+const numberFormatterCache = new Map<string, Intl.NumberFormat>();
+const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+let compiledFormats = 0;
+let numberFormatters = 0;
+let dateTimeFormatters = 0;
 let currencySymbol: string | undefined;
 
-function splitSections(code: string): string[] {
+function splitRawSections(code: string): string[] {
   const sections: string[] = [];
   let section = "";
   let quoted = false;
@@ -59,15 +84,51 @@ function splitSections(code: string): string[] {
   return sections.slice(0, 4);
 }
 
-function sectionFor(value: number, code: string): { section: string; magnitude: number } {
-  const sections = splitSections(code);
-  if (value > 0 || sections.length === 1) return { section: sections[0] ?? "", magnitude: value };
+function sectionFor(
+  value: number,
+  format: CompiledFormat,
+): { section: CompiledSection; magnitude: number } {
+  const sections = format.sections;
+  const fallback = sections[0]!;
+  if (value > 0 || sections.length === 1) return { section: fallback, magnitude: value };
   if (value < 0) {
     return sections[1] !== undefined
       ? { section: sections[1], magnitude: Math.abs(value) }
-      : { section: sections[0] ?? "", magnitude: value };
+      : { section: fallback, magnitude: value };
   }
-  return { section: sections[2] ?? sections[0] ?? "", magnitude: 0 };
+  return { section: sections[2] ?? fallback, magnitude: 0 };
+}
+
+function cacheValue<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): V {
+  cache.set(key, value);
+  if (cache.size > limit) {
+    const oldest = cache.keys().next();
+    if (!oldest.done) cache.delete(oldest.value);
+  }
+  return value;
+}
+
+/** Test-only deterministic formatter resource counters. */
+export function getNumberFormatResourceStatsForTest(): NumberFormatResourceStats {
+  return {
+    compiledFormats,
+    numberFormatters,
+    dateTimeFormatters,
+    formatCacheEntries: formatCache.size,
+    numberFormatterCacheEntries: numberFormatterCache.size,
+    dateTimeFormatterCacheEntries: dateTimeFormatterCache.size,
+  };
+}
+
+/** Test-only reset for isolated formatter resource assertions. */
+export function resetNumberFormatResourcesForTest(): void {
+  formatCache.clear();
+  numberFormatterCache.clear();
+  dateTimeFormatterCache.clear();
+  compiledFormats = 0;
+  numberFormatters = 0;
+  dateTimeFormatters = 0;
+  currencySymbol = undefined;
 }
 
 function decodeLiteral(source: string): string {
@@ -96,7 +157,7 @@ function decodeLiteral(source: string): string {
     }
     output += char;
   }
-  return output.replaceAll("¤", getCurrencySymbol());
+  return output.includes("¤") ? output.replaceAll("¤", getCurrencySymbol()) : output;
 }
 
 function placeholderBounds(section: string): [number, number] | null {
@@ -116,8 +177,6 @@ function placeholderBounds(section: string): [number, number] | null {
 }
 
 function parseNumericFormat(section: string): NumericDescriptor | null {
-  const cached = descriptorCache.get(section);
-  if (cached) return cached;
   const bounds = placeholderBounds(section);
   if (!bounds) return null;
   const [first, last] = bounds;
@@ -141,26 +200,42 @@ function parseNumericFormat(section: string): NumericDescriptor | null {
     scientific: exponent !== null,
     exponentDigits: exponent?.[1]?.length ?? 0,
   };
-  descriptorCache.set(section, descriptor);
   return descriptor;
 }
 
 function formatter(locale: string, decimals: number, grouped: boolean): Intl.NumberFormat {
-  const key = `${locale}:${decimals}:${grouped ? 1 : 0}`;
-  let value = formatterCache.get(key);
-  if (!value) {
-    value = new Intl.NumberFormat(locale, {
+  const key = `fixed:${locale}:${decimals}:${grouped ? 1 : 0}`;
+  const cached = numberFormatterCache.get(key);
+  if (cached) return cached;
+  numberFormatters += 1;
+  return cacheValue(
+    numberFormatterCache,
+    key,
+    new Intl.NumberFormat(locale, {
       useGrouping: grouped,
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
-    });
-    formatterCache.set(key, value);
-  }
-  return value;
+    }),
+    NUMBER_FORMATTER_CACHE_LIMIT,
+  );
+}
+
+function defaultFormatter(locale: string): Intl.NumberFormat {
+  const key = `default:${locale}`;
+  const cached = numberFormatterCache.get(key);
+  if (cached) return cached;
+  numberFormatters += 1;
+  return cacheValue(
+    numberFormatterCache,
+    key,
+    new Intl.NumberFormat(locale),
+    NUMBER_FORMATTER_CACHE_LIMIT,
+  );
 }
 
 function getCurrencySymbol(): string {
   if (currencySymbol === undefined) {
+    numberFormatters += 1;
     const parts = new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -229,8 +304,6 @@ function tokenizeDate(section: string): DateToken[] {
 }
 
 function compileDateFormat(section: string): DateToken[] | null {
-  const cached = dateFormatCache.get(section);
-  if (cached !== undefined) return cached;
   let visible = "";
   let quoted = false;
   for (let index = 0; index < section.length; index++) {
@@ -247,7 +320,6 @@ function compileDateFormat(section: string): DateToken[] | null {
     else if (!quoted) visible += char;
   }
   const tokens = /[ymdhs]/i.test(visible) && !/#/.test(visible) ? tokenizeDate(section) : null;
-  dateFormatCache.set(section, tokens);
   return tokens;
 }
 
@@ -267,8 +339,43 @@ function resolveMonthMinute(tokens: DateToken[]): void {
         break;
       }
     }
+
     if (minute) tokens[index]!.kind = "minute";
   }
+}
+
+function compileFormat(code: string): CompiledFormat {
+  const cached = formatCache.get(code);
+  if (cached) return cached;
+  const sections = splitRawSections(code).map(
+    (source): CompiledSection => ({
+      source,
+      dateTokens: compileDateFormat(source),
+      numeric: parseNumericFormat(source),
+      literal: decodeLiteral(source),
+    }),
+  );
+  const compiled = { sections };
+  compiledFormats += 1;
+  return cacheValue(formatCache, code, compiled, FORMAT_CACHE_LIMIT);
+}
+
+function calendarFormatter(
+  locale: string,
+  field: "month" | "weekday",
+  width: "long" | "short",
+): Intl.DateTimeFormat {
+  const key = `${locale}:${field}:${width}`;
+  const cached = dateTimeFormatterCache.get(key);
+  if (cached) return cached;
+  const options: Intl.DateTimeFormatOptions = { timeZone: "UTC", [field]: width };
+  dateTimeFormatters += 1;
+  return cacheValue(
+    dateTimeFormatterCache,
+    key,
+    new Intl.DateTimeFormat(locale, options),
+    DATE_TIME_FORMATTER_CACHE_LIMIT,
+  );
 }
 
 function renderDate(serial: number, tokens: readonly DateToken[], locale: string): string {
@@ -297,10 +404,11 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
         break;
       case "monthShort":
       case "monthLong":
-        output += new Intl.DateTimeFormat(locale, {
-          month: token.kind === "monthLong" ? "long" : "short",
-          timeZone: "UTC",
-        }).format(date);
+        output += calendarFormatter(
+          locale,
+          "month",
+          token.kind === "monthLong" ? "long" : "short",
+        ).format(date);
         break;
       case "minute":
         output += token.pad ? String(minute).padStart(2, "0") : String(minute);
@@ -310,10 +418,11 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
         break;
       case "weekdayShort":
       case "weekdayLong":
-        output += new Intl.DateTimeFormat(locale, {
-          weekday: token.kind === "weekdayLong" ? "long" : "short",
-          timeZone: "UTC",
-        }).format(date);
+        output += calendarFormatter(
+          locale,
+          "weekday",
+          token.kind === "weekdayLong" ? "long" : "short",
+        ).format(date);
         break;
       case "hour": {
         const hour = usesAmPm ? hour24 % 12 || 12 : hour24;
@@ -346,25 +455,17 @@ function formatScientific(value: number, decimals: number, exponentDigits: numbe
 export function formatNumber(value: number | string, code?: string, locale = "en-US"): string {
   if (typeof value === "string") {
     if (!code) return value;
-    const textSection = splitSections(code)[3];
-    return textSection === undefined ? value : decodeLiteral(textSection).replaceAll("@", value);
+    const textSection = compileFormat(code).sections[3];
+    return textSection === undefined ? value : textSection.literal.replaceAll("@", value);
   }
   if (!Number.isFinite(value)) return "";
-  if (!code) {
-    let formatter = defaultFormatterCache.get(locale);
-    if (!formatter) {
-      formatter = new Intl.NumberFormat(locale);
-      defaultFormatterCache.set(locale, formatter);
-    }
-    return formatter.format(value);
-  }
+  if (!code) return defaultFormatter(locale).format(value);
 
-  const { section, magnitude } = sectionFor(value, code);
-  const dateTokens = compileDateFormat(section);
-  if (dateTokens) return renderDate(magnitude, dateTokens, locale);
+  const { section, magnitude } = sectionFor(value, compileFormat(code));
+  if (section.dateTokens) return renderDate(magnitude, section.dateTokens, locale);
 
-  const descriptor = parseNumericFormat(section);
-  if (!descriptor) return decodeLiteral(section).replaceAll("@", "");
+  const descriptor = section.numeric;
+  if (!descriptor) return section.literal.replaceAll("@", "");
   const scaled = descriptor.percent ? magnitude * 100 : magnitude;
   const body = descriptor.scientific
     ? formatScientific(scaled, descriptor.decimals, descriptor.exponentDigits)

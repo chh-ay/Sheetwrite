@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { paintFrame } from "../src/canvas-paint.js";
+import { dateToSerial } from "../src/date-serial.js";
+import {
+  getNumberFormatResourceStatsForTest,
+  resetNumberFormatResourcesForTest,
+} from "../src/number-format.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
 
 // jsdom/happy-dom has no 2D canvas context, so paint against a recording stub
@@ -574,5 +579,50 @@ describe("paintFrame text decorations", () => {
     // Backgrounds/headers are full-height fills; a 1px-high rect would be a
     // stray decoration. None should exist.
     expect(ctx.fillRects.every((r) => r.h !== 1)).toBe(true);
+  });
+});
+
+describe("paintFrame compiled number formats", () => {
+  it("reuses fixed-decimal and named-date formatters across painted cells", () => {
+    resetNumberFormatResourcesForTest();
+    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      rows: { start: 0, end: 3 },
+      cols: [0, 1],
+      values: [1234.5, serial, 1234.5, serial, 1234.5, serial],
+      styleIds: new Uint32Array(6),
+      styles: [{}],
+    };
+    const layout = makeLayout([
+      {
+        key: "amount",
+        header: "Amount",
+        width: 120,
+        type: "number",
+        numberFormat: "#,##0.00",
+        numberLocale: "en-US",
+      },
+      {
+        key: "date",
+        header: "Date",
+        width: 120,
+        type: "date",
+        numberFormat: "mmmm d",
+        numberLocale: "en-US",
+      },
+    ]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    expect(ctx.fillTexts.filter((call) => call.text === "1,234.50")).toHaveLength(3);
+    expect(ctx.fillTexts.filter((call) => call.text === "July 4")).toHaveLength(3);
+    expect(getNumberFormatResourceStatsForTest()).toMatchObject({
+      compiledFormats: 2,
+      numberFormatters: 1,
+      dateTimeFormatters: 1,
+      formatCacheEntries: 2,
+      numberFormatterCacheEntries: 1,
+      dateTimeFormatterCacheEntries: 1,
+    });
   });
 });

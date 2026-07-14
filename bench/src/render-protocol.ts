@@ -10,7 +10,12 @@ export const RENDER_ORDER_SEED = 0x51c0ffee;
 export const ENGINE_IDS = ["sheetwrite", "handsontable"] as const;
 export type EngineId = (typeof ENGINE_IDS)[number];
 
-export type ScenarioGroup = "view-scrolling" | "editing" | "altering" | "arrow-keys-navigation";
+export type ScenarioGroup =
+  | "view-scrolling"
+  | "editing"
+  | "altering"
+  | "arrow-keys-navigation"
+  | "formatting";
 
 export const RENDER_SCENARIOS = [
   { id: "scroll-down.top-left", group: "view-scrolling" },
@@ -24,6 +29,7 @@ export const RENDER_SCENARIOS = [
   { id: "altering.remove-5-rows-top", group: "altering" },
   { id: "arrow-down.top-left", group: "arrow-keys-navigation" },
   { id: "arrow-right.middle", group: "arrow-keys-navigation" },
+  { id: "formatted-paint.top-left", group: "formatting" },
 ] as const satisfies readonly { readonly id: string; readonly group: ScenarioGroup }[];
 
 export type ScenarioId = (typeof RENDER_SCENARIOS)[number]["id"];
@@ -58,6 +64,15 @@ export interface MemoryDelta {
   readonly deltaBytes: number | null;
 }
 
+export interface RenderResourceMetrics {
+  readonly compiledFormats: number;
+  readonly numberFormatters: number;
+  readonly dateTimeFormatters: number;
+  readonly formatCacheEntries: number;
+  readonly numberFormatterCacheEntries: number;
+  readonly dateTimeFormatterCacheEntries: number;
+}
+
 export interface MeasuredSample extends AggregateSample {
   readonly index: number;
 }
@@ -71,6 +86,7 @@ export interface SuccessfulScenario extends ScenarioIdentity {
   readonly madMs: number;
   readonly validation: readonly ValidationObservation[];
   readonly memory: MemoryDelta;
+  readonly resources?: RenderResourceMetrics;
 }
 
 export interface FailedScenario extends ScenarioIdentity {
@@ -313,6 +329,26 @@ function parseMemory(value: unknown, path: string): MemoryDelta {
   return { beforeBytes, afterBytes, deltaBytes };
 }
 
+function parseResources(value: unknown, path: string): RenderResourceMetrics {
+  const input = record(value, path);
+  return {
+    compiledFormats: integer(input.compiledFormats, `${path}.compiledFormats`, 0),
+    numberFormatters: integer(input.numberFormatters, `${path}.numberFormatters`, 0),
+    dateTimeFormatters: integer(input.dateTimeFormatters, `${path}.dateTimeFormatters`, 0),
+    formatCacheEntries: integer(input.formatCacheEntries, `${path}.formatCacheEntries`, 0),
+    numberFormatterCacheEntries: integer(
+      input.numberFormatterCacheEntries,
+      `${path}.numberFormatterCacheEntries`,
+      0,
+    ),
+    dateTimeFormatterCacheEntries: integer(
+      input.dateTimeFormatterCacheEntries,
+      `${path}.dateTimeFormatterCacheEntries`,
+      0,
+    ),
+  };
+}
+
 function parseSample(value: unknown, path: string): MeasuredSample {
   const input = record(value, path);
   const durationMs = finite(input.durationMs, `${path}.durationMs`, 0);
@@ -338,7 +374,7 @@ function parseIdentity(value: Record<string, unknown>, path: string): ScenarioId
   );
   const group = enumValue(
     value.group,
-    ["view-scrolling", "editing", "altering", "arrow-keys-navigation"],
+    ["view-scrolling", "editing", "altering", "arrow-keys-navigation", "formatting"],
     `${path}.group`,
   );
   if (group !== scenarioGroup(scenarioId)) {
@@ -432,6 +468,9 @@ export function parseScenarioResult(
     madMs,
     validation,
     memory,
+    ...(input.resources === undefined
+      ? {}
+      : { resources: parseResources(input.resources, `${path}.resources`) }),
   };
 }
 

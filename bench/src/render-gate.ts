@@ -160,6 +160,30 @@ export function validateRenderGateArtifact(
     ) {
       throw new Error(`${key}.memory exceeded the broad renderer heap safety ceiling`);
     }
+    if (result.scenarioId === "formatted-paint.top-left") {
+      if (!result.resources) throw new Error(`${key}.resources is missing`);
+      const expected =
+        result.engine === "sheetwrite"
+          ? {
+              compiledFormats: 2,
+              numberFormatters: 1,
+              dateTimeFormatters: 1,
+              formatCacheEntries: 2,
+              numberFormatterCacheEntries: 1,
+              dateTimeFormatterCacheEntries: 1,
+            }
+          : {
+              compiledFormats: 0,
+              numberFormatters: 0,
+              dateTimeFormatters: 0,
+              formatCacheEntries: 0,
+              numberFormatterCacheEntries: 0,
+              dateTimeFormatterCacheEntries: 0,
+            };
+      if (JSON.stringify(result.resources) !== JSON.stringify(expected)) {
+        throw new Error(`${key}.resources does not match bounded formatter construction`);
+      }
+    }
   }
   return artifact;
 }

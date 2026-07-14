@@ -111,6 +111,25 @@ class FakeAdapter implements RenderBenchAdapter {
     this.values.splice(at, count);
   }
 
+  resetFormatResources(): void {}
+
+  repaint(): void {}
+
+  formattedSentinels(): readonly [string, string] {
+    return ["1,234.50", "Feb 29, 2024"];
+  }
+
+  formatResources() {
+    return {
+      compiledFormats: 2,
+      numberFormatters: 1,
+      dateTimeFormatters: 1,
+      formatCacheEntries: 2,
+      numberFormatterCacheEntries: 1,
+      dateTimeFormatterCacheEntries: 1,
+    };
+  }
+
   destroy(): void {
     this.mounted = false;
   }
@@ -163,5 +182,23 @@ describe("scenario correctness checkpoints", () => {
     expect(result.rawSamples[0]!.durationMs).toBeGreaterThanOrEqual(0.01);
     expect(Number.isFinite(result.medianMs)).toBe(true);
     expect(result.validation.every((observation) => observation.passed)).toBe(true);
+  });
+  test("validates formatted output and bounded formatter construction", () => {
+    const result = runRenderScenario(
+      new FakeAdapter(),
+      dataset,
+      "formatted-paint.top-left",
+      options,
+    );
+    expect(result.status).toBe("success");
+    if (result.status !== "success") throw new Error(result.message);
+    expect(result.validation.map((entry) => entry.checkpoint)).toContain(
+      "formatted-paint exact fixed-decimal and named-date sentinels",
+    );
+    expect(result.resources).toMatchObject({
+      compiledFormats: 2,
+      numberFormatters: 1,
+      dateTimeFormatters: 1,
+    });
   });
 });

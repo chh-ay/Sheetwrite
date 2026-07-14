@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
-import { formatNumber } from "../src/number-format.js";
+import {
+  formatNumber,
+  getNumberFormatResourceStatsForTest,
+  resetNumberFormatResourcesForTest,
+} from "../src/number-format.js";
 
 describe("formatNumber", () => {
   it("applies fixed decimals and thousands grouping", () => {
@@ -64,6 +68,45 @@ describe("formatNumber", () => {
       expect(first).toBe(expected);
       expect(second).toBe(expected);
     }
+  });
+
+  it("compiles repeated formats once and reuses named-date formatters across cells", () => {
+    resetNumberFormatResourcesForTest();
+    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
+    for (let cell = 0; cell < 1_000; cell++) {
+      expect(formatNumber(serial, "mmm d, yyyy dddd")).toBe("Jul 4, 2024 Thursday");
+    }
+
+    expect(getNumberFormatResourceStatsForTest()).toMatchObject({
+      compiledFormats: 1,
+      numberFormatters: 0,
+      dateTimeFormatters: 2,
+      formatCacheEntries: 1,
+      dateTimeFormatterCacheEntries: 2,
+    });
+  });
+
+  it("deterministically bounds host-controlled format and Intl cache diversity", () => {
+    resetNumberFormatResourcesForTest();
+    for (let index = 0; index < 300; index++) {
+      expect(formatNumber(12.5, `0.00" format-${index}"`)).toBe(`12.50 format-${index}`);
+    }
+    for (let index = 0; index < 140; index++) {
+      formatNumber(1_000, undefined, `en-US-x-cache-${index}`);
+    }
+    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
+    for (let index = 0; index < 40; index++) {
+      formatNumber(serial, "mmm dddd", `en-US-x-date-${index}`);
+    }
+
+    expect(getNumberFormatResourceStatsForTest()).toEqual({
+      compiledFormats: 301,
+      numberFormatters: 141,
+      dateTimeFormatters: 80,
+      formatCacheEntries: 256,
+      numberFormatterCacheEntries: 128,
+      dateTimeFormatterCacheEntries: 64,
+    });
   });
 
   it("formats UTC date codes and preserves Excel's 1900 serial boundary", () => {

@@ -165,7 +165,7 @@ describe("render artifact validation", () => {
     });
     expect(parsed.completeness.complete).toBe(true);
     expect(parsed.completeness.successful).toBe(true);
-    expect(parsed.results).toHaveLength(44);
+    expect(parsed.results).toHaveLength(2 * 2 * RENDER_SCENARIOS.length);
   });
 
   test("records bounded launch retries instead of hiding infrastructure failures", () => {
