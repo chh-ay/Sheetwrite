@@ -664,8 +664,187 @@ function normalizedMerge(merge: MergeRange): MergeRange {
   };
 }
 
-function overlaps(a: MergeRange, b: MergeRange): boolean {
-  return a.r0 <= b.r1 && b.r0 <= a.r1 && a.c0 <= b.c1 && b.c0 <= a.c1;
+interface IndexedMerge extends MergeRange {
+  index: number;
+}
+
+interface MergeIntervalNode {
+  rect: IndexedMerge;
+  left: MergeIntervalNode | null;
+  right: MergeIntervalNode | null;
+  height: number;
+  maxC1: number;
+  minIndex: number;
+  maxIndex: number;
+}
+
+export interface MergeValidationStats {
+  normalized: number;
+  nodeVisits: number;
+  errors: number;
+}
+
+let lastMergeValidationStats: MergeValidationStats = {
+  normalized: 0,
+  nodeVisits: 0,
+  errors: 0,
+};
+
+export function getLastMergeValidationStatsForTest(): MergeValidationStats {
+  return { ...lastMergeValidationStats };
+}
+
+function mergeNodeHeight(node: MergeIntervalNode | null): number {
+  return node?.height ?? 0;
+}
+
+function updateMergeNode(node: MergeIntervalNode): MergeIntervalNode {
+  node.height = Math.max(mergeNodeHeight(node.left), mergeNodeHeight(node.right)) + 1;
+  node.maxC1 = Math.max(node.rect.c1, node.left?.maxC1 ?? -1, node.right?.maxC1 ?? -1);
+  node.minIndex = Math.min(
+    node.rect.index,
+    node.left?.minIndex ?? Number.POSITIVE_INFINITY,
+    node.right?.minIndex ?? Number.POSITIVE_INFINITY,
+  );
+  node.maxIndex = Math.max(node.rect.index, node.left?.maxIndex ?? -1, node.right?.maxIndex ?? -1);
+  return node;
+}
+
+function rotateMergeRight(root: MergeIntervalNode): MergeIntervalNode {
+  const pivot = root.left!;
+  root.left = pivot.right;
+  pivot.right = updateMergeNode(root);
+  return updateMergeNode(pivot);
+}
+
+function rotateMergeLeft(root: MergeIntervalNode): MergeIntervalNode {
+  const pivot = root.right!;
+  root.right = pivot.left;
+  pivot.left = updateMergeNode(root);
+  return updateMergeNode(pivot);
+}
+
+function balanceMergeNode(node: MergeIntervalNode): MergeIntervalNode {
+  updateMergeNode(node);
+  const balance = mergeNodeHeight(node.left) - mergeNodeHeight(node.right);
+  if (balance > 1) {
+    if (mergeNodeHeight(node.left!.left) < mergeNodeHeight(node.left!.right)) {
+      node.left = rotateMergeLeft(node.left!);
+    }
+    return rotateMergeRight(node);
+  }
+  if (balance < -1) {
+    if (mergeNodeHeight(node.right!.right) < mergeNodeHeight(node.right!.left)) {
+      node.right = rotateMergeRight(node.right!);
+    }
+    return rotateMergeLeft(node);
+  }
+  return node;
+}
+
+function compareIndexedMerge(left: IndexedMerge, right: IndexedMerge): number {
+  return left.c0 - right.c0 || left.index - right.index;
+}
+
+function insertMergeNode(node: MergeIntervalNode | null, rect: IndexedMerge): MergeIntervalNode {
+  if (!node) {
+    return {
+      rect,
+      left: null,
+      right: null,
+      height: 1,
+      maxC1: rect.c1,
+      minIndex: rect.index,
+      maxIndex: rect.index,
+    };
+  }
+  if (compareIndexedMerge(rect, node.rect) < 0) node.left = insertMergeNode(node.left, rect);
+  else node.right = insertMergeNode(node.right, rect);
+  return balanceMergeNode(node);
+}
+
+function removeMergeNode(
+  node: MergeIntervalNode | null,
+  rect: IndexedMerge,
+): MergeIntervalNode | null {
+  if (!node) return null;
+  const order = compareIndexedMerge(rect, node.rect);
+  if (order < 0) node.left = removeMergeNode(node.left, rect);
+  else if (order > 0) node.right = removeMergeNode(node.right, rect);
+  else {
+    if (!node.left) return node.right;
+    if (!node.right) return node.left;
+    let successor = node.right;
+    while (successor.left) successor = successor.left;
+    node.rect = successor.rect;
+    node.right = removeMergeNode(node.right, successor.rect);
+  }
+  return balanceMergeNode(node);
+}
+
+function lowerIndexOverlap(
+  node: MergeIntervalNode | null,
+  rect: IndexedMerge,
+): IndexedMerge | null {
+  if (!node || node.maxC1 < rect.c0 || node.minIndex >= rect.index) return null;
+  lastMergeValidationStats.nodeVisits += 1;
+  const left = lowerIndexOverlap(node.left, rect);
+  if (left) return left;
+  if (node.rect.index < rect.index && node.rect.c0 <= rect.c1 && node.rect.c1 >= rect.c0) {
+    return node.rect;
+  }
+  if (node.rect.c0 > rect.c1) return null;
+  return lowerIndexOverlap(node.right, rect);
+}
+
+function higherIndexOverlap(
+  node: MergeIntervalNode | null,
+  rect: IndexedMerge,
+): IndexedMerge | null {
+  if (!node || node.maxC1 < rect.c0 || node.maxIndex <= rect.index) return null;
+  lastMergeValidationStats.nodeVisits += 1;
+  const left = higherIndexOverlap(node.left, rect);
+  if (left) return left;
+  if (node.rect.index > rect.index && node.rect.c0 <= rect.c1 && node.rect.c1 >= rect.c0) {
+    return node.rect;
+  }
+  if (node.rect.c0 > rect.c1) return null;
+  return higherIndexOverlap(node.right, rect);
+}
+
+function overlappingMergeIndices(merges: readonly MergeRange[]): boolean[] {
+  const indexed: IndexedMerge[] = merges.map((merge, index) => ({ ...merge, index }));
+  const starts = indexed
+    .slice()
+    .sort((left, right) => left.r0 - right.r0 || left.index - right.index);
+  const ends = indexed
+    .slice()
+    .sort((left, right) => left.r1 - right.r1 || left.index - right.index);
+  const overlapping = new Array<boolean>(merges.length).fill(false);
+  let active: MergeIntervalNode | null = null;
+  let unflagged: MergeIntervalNode | null = null;
+  let endIndex = 0;
+
+  for (const rect of starts) {
+    while ((ends[endIndex]?.r1 ?? Number.POSITIVE_INFINITY) < rect.r0) {
+      const expired = ends[endIndex++]!;
+      active = removeMergeNode(active, expired);
+      unflagged = removeMergeNode(unflagged, expired);
+    }
+
+    if (lowerIndexOverlap(active, rect)) overlapping[rect.index] = true;
+    let later = higherIndexOverlap(unflagged, rect);
+    while (later) {
+      overlapping[later.index] = true;
+      unflagged = removeMergeNode(unflagged, later);
+      later = higherIndexOverlap(unflagged, rect);
+    }
+
+    active = insertMergeNode(active, rect);
+    if (!overlapping[rect.index]) unflagged = insertMergeNode(unflagged, rect);
+  }
+
+  return overlapping;
 }
 
 function rangeInSheet(range: Range, sheet: SheetSnapshot): boolean {
@@ -678,6 +857,7 @@ function rangeInSheet(range: Range, sheet: SheetSnapshot): boolean {
 
 function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const errors: DocumentValidationError[] = [];
+  lastMergeValidationStats = { normalized: 0, nodeVisits: 0, errors: 0 };
   const candidate = recordAt(input, "$", errors);
   if (!candidate) return { ok: false, errors };
 
@@ -765,14 +945,23 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const merges: MergeRange[] = [];
     for (let mergeIndex = 0; mergeIndex < (sheet.merges?.length ?? 0); mergeIndex++) {
       const merge = normalizedMerge(sheet.merges![mergeIndex]!);
+      lastMergeValidationStats.normalized += 1;
       const mergePath = `${path}.merges[${mergeIndex}]`;
       if (merge.r1 >= sheet.rowCount || merge.c1 >= sheet.columns.length) {
         invalid(errors, mergePath, "Merge lies outside the sheet", "out-of-bounds");
       }
-      if (merges.some((existing) => overlaps(existing, merge))) {
-        invalid(errors, mergePath, "Merged regions may not overlap", "overlapping-merge");
-      }
       merges.push(merge);
+    }
+    const overlappingMerges = overlappingMergeIndices(merges);
+    for (let mergeIndex = 0; mergeIndex < overlappingMerges.length; mergeIndex++) {
+      if (!overlappingMerges[mergeIndex]) continue;
+      lastMergeValidationStats.errors += 1;
+      invalid(
+        errors,
+        `${path}.merges[${mergeIndex}]`,
+        "Merged regions may not overlap",
+        "overlapping-merge",
+      );
     }
 
     const occupied = new Set<string>();

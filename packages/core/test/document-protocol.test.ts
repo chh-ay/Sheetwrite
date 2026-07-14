@@ -3,6 +3,7 @@ import {
   type DocumentValidationError,
   type DocumentValidationResult,
   documentOpTarget,
+  getLastMergeValidationStatsForTest,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../src/document-protocol.js";
@@ -88,6 +89,34 @@ function richSnapshot(): WorkbookSnapshot {
             ],
           },
         ],
+      },
+    ],
+  };
+}
+
+function mergeSnapshot(
+  merges: NonNullable<WorkbookSnapshot["sheets"][number]["merges"]>,
+  rowCount: number,
+  columnCount: number,
+): WorkbookSnapshot {
+  return {
+    schemaVersion: WORKBOOK_SCHEMA_VERSION,
+    documentId: "merge-validation",
+    workbook: { activeSheet: "s" },
+    sheets: [
+      {
+        id: "s",
+        name: "Merges",
+        order: 0,
+        rowCount,
+        columns: Array.from({ length: columnCount }, (_, index) => ({
+          key: `c${index}`,
+          header: `C${index}`,
+          width: 80,
+          type: "text" as const,
+        })),
+        merges,
+        cells: [],
       },
     ],
   };
@@ -541,6 +570,83 @@ describe("workbook document protocol", () => {
     expect(new Set(result.errors.map((error) => error.code))).toEqual(
       new Set(["duplicate-id", "overlapping-merge", "out-of-bounds"]),
     );
+  });
+
+  it("accepts unsorted disjoint merges whose row or column edges only touch", () => {
+    const merges = [
+      { r0: 2, c0: 2, r1: 3, c1: 3 },
+      { r0: 0, c0: 0, r1: 0, c1: 0 },
+      { r0: 1, c0: 0, r1: 1, c1: 0 },
+      { r0: 0, c0: 1, r1: 0, c1: 1 },
+    ];
+    const result = validateWorkbookSnapshot(mergeSnapshot(merges, 4, 4));
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("disjoint merges unexpectedly rejected");
+    expect(result.value.sheets[0]?.merges).toEqual(merges);
+  });
+
+  it("reports containment and partial overlap at the later input path", () => {
+    for (const merges of [
+      [
+        { r0: 0, c0: 0, r1: 4, c1: 4 },
+        { r0: 1, c0: 1, r1: 2, c1: 2 },
+      ],
+      [
+        { r0: 0, c0: 0, r1: 2, c1: 2 },
+        { r0: 2, c0: 1, r1: 3, c1: 3 },
+      ],
+    ]) {
+      const result = validateWorkbookSnapshot(mergeSnapshot(merges, 5, 5));
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("overlapping merges unexpectedly accepted");
+      expect(result.errors.filter((error) => error.code === "overlapping-merge")).toEqual([
+        {
+          path: "sheets[0].merges[1]",
+          code: "overlapping-merge",
+          message: "Merged regions may not overlap",
+        },
+      ]);
+    }
+  });
+
+  it("keeps out-of-bounds and overlap errors on the same later merge", () => {
+    const result = validateWorkbookSnapshot(
+      mergeSnapshot(
+        [
+          { r0: 0, c0: 0, r1: 1, c1: 1 },
+          { r0: 1, c0: 1, r1: 9, c1: 9 },
+        ],
+        4,
+        4,
+      ),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("invalid merges unexpectedly accepted");
+    expect(
+      result.errors
+        .filter((error) => error.path === "sheets[0].merges[1]")
+        .map((error) => error.code),
+    ).toEqual(["out-of-bounds", "overlapping-merge"]);
+  });
+
+  it("bounds structural merge-index work for 1K, 4K, and 16K valid corpora", () => {
+    for (const count of [1_000, 4_000, 16_000]) {
+      const columns = 128;
+      const merges = Array.from({ length: count }, (_, index) => ({
+        r0: Math.floor(index / columns),
+        c0: index % columns,
+        r1: Math.floor(index / columns),
+        c1: index % columns,
+      })).reverse();
+      const result = validateWorkbookSnapshot(
+        mergeSnapshot(merges, Math.ceil(count / columns), columns),
+      );
+      expect(result.ok).toBe(true);
+      const stats = getLastMergeValidationStatsForTest();
+      expect(stats.normalized).toBe(count);
+      expect(stats.errors).toBe(0);
+      expect(stats.nodeVisits).toBeLessThan(count * (Math.ceil(Math.log2(count)) + 1) * 12);
+    }
   });
 
   it("validates named range scope, identity, and formula-safe names", () => {
