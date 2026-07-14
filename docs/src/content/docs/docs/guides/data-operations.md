@@ -123,6 +123,11 @@ CSV is written UTF-8 with a BOM and CRLF line endings, and string values are
 prefixed with a single quote so it cannot become an executable formula when
 reopened in a spreadsheet app.
 
+Clipboard formulas and references retain their rich behavior only for a
+copy/cut pasted back through the same live Sheetwrite grid controller. Rich
+payloads from another controller or application, including spreadsheet HTML,
+paste as injection-neutralized text; `pasteValues` uses resolved literals.
+
 ### Standalone import/export functions
 
 Sheetwrite exposes two intentionally different XLSX contracts:

@@ -1,4 +1,4 @@
-import { shiftA1Refs } from "./a1.js";
+import { cellA1, shiftA1Refs } from "./a1.js";
 import { parseCellInput } from "./cell-input.js";
 import {
   type ClipboardCell,
@@ -35,6 +35,16 @@ interface CellWrite {
 interface CapturedClipboard extends ClipboardSnapshot {
   /** Exact source addresses captured before an asynchronous cut writes the clipboard. */
   clearPatches: DocumentOp[];
+}
+
+interface ClipboardEnvelope {
+  token: string;
+  snapshot: ClipboardSnapshot;
+}
+
+interface TrustedClipboard {
+  token: string;
+  snapshot: ClipboardSnapshot;
 }
 
 /** Private-format MIME type used for rich Sheetwrite clipboard payloads. */
@@ -83,9 +93,10 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
   return `${html}</tbody></table>`;
 }
 
-function clipboardJson(snapshot: ClipboardSnapshot): string {
+function clipboardJson(snapshot: ClipboardSnapshot, token: string): string {
   return JSON.stringify({
-    version: 1,
+    version: 2,
+    token,
     anchor: snapshot.anchor,
     cells: snapshot.cells,
     tsv: snapshot.tsv,
@@ -93,56 +104,181 @@ function clipboardJson(snapshot: ClipboardSnapshot): string {
   });
 }
 
-function parseClipboardJson(text: string): ClipboardSnapshot | null {
+function parseClipboardJson(text: string): ClipboardEnvelope | null {
   try {
-    const value = JSON.parse(text) as Partial<ClipboardSnapshot> & { version?: unknown };
+    const value = JSON.parse(text) as {
+      version?: unknown;
+      token?: unknown;
+      anchor?: { row?: unknown; col?: unknown };
+      cells?: unknown;
+      tsv?: unknown;
+      cut?: unknown;
+    };
     if (
-      value.version !== 1 ||
+      value.version !== 2 ||
+      typeof value.token !== "string" ||
+      value.token.length < 16 ||
+      value.token.length > 256 ||
       !value.anchor ||
-      !Number.isInteger(value.anchor.row) ||
-      !Number.isInteger(value.anchor.col) ||
+      !Number.isSafeInteger(value.anchor.row) ||
+      !Number.isSafeInteger(value.anchor.col) ||
       !Array.isArray(value.cells) ||
       typeof value.tsv !== "string" ||
       typeof value.cut !== "boolean"
     ) {
       return null;
     }
-    for (const row of value.cells) {
-      if (!Array.isArray(row)) return null;
-      for (const cell of row) {
+
+    const cells: ClipboardCell[][] = [];
+    for (const inputRow of value.cells) {
+      if (!Array.isArray(inputRow)) return null;
+      const row: ClipboardCell[] = [];
+      for (const inputCell of inputRow) {
+        if (!inputCell || typeof inputCell !== "object") return null;
+        const cell = inputCell as {
+          value?: unknown;
+          resolved?: unknown;
+          style?: unknown;
+        };
+        const resolved = cell.resolved;
         if (
-          !cell ||
-          typeof cell !== "object" ||
-          !cell.value ||
-          typeof cell.value !== "object" ||
-          !["literal", "formula", "ref"].includes(cell.value.kind) ||
           !(
-            cell.resolved === null ||
-            typeof cell.resolved === "string" ||
-            typeof cell.resolved === "number" ||
-            typeof cell.resolved === "boolean"
+            resolved === null ||
+            typeof resolved === "string" ||
+            (typeof resolved === "number" && Number.isFinite(resolved)) ||
+            typeof resolved === "boolean"
           )
         ) {
           return null;
         }
+        const cellValue = parseClipboardValue(cell.value);
+        if (!cellValue) return null;
+        row.push({
+          value: cellValue,
+          resolved,
+          style: safeClipboardStyle(cell.style),
+        });
       }
+      cells.push(row);
     }
-    return value as ClipboardSnapshot;
+
+    return {
+      token: value.token,
+      snapshot: {
+        anchor: { row: value.anchor.row as number, col: value.anchor.col as number },
+        cells,
+        tsv: value.tsv,
+        cut: value.cut,
+      },
+    };
   } catch {
     return null;
   }
 }
 
-function safeExternalFormula(source: string | null): string | null {
+function parseClipboardValue(value: unknown): CellValue | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as {
+    kind?: unknown;
+    value?: unknown;
+    src?: unknown;
+    target?: { sheet?: unknown; row?: unknown; col?: unknown };
+  };
+  if (candidate.kind === "literal") {
+    const literal = candidate.value;
+    return literal === null ||
+      typeof literal === "string" ||
+      (typeof literal === "number" && Number.isFinite(literal)) ||
+      typeof literal === "boolean"
+      ? { kind: "literal", value: literal }
+      : null;
+  }
+  if (candidate.kind === "formula") {
+    return typeof candidate.src === "string" && candidate.src.startsWith("=")
+      ? { kind: "formula", src: candidate.src }
+      : null;
+  }
+  if (candidate.kind === "ref") {
+    const target = candidate.target;
+    return target &&
+      typeof target.sheet === "string" &&
+      target.sheet.length > 0 &&
+      Number.isSafeInteger(target.row) &&
+      Number.isSafeInteger(target.col)
+      ? {
+          kind: "ref",
+          target: { sheet: target.sheet, row: target.row as number, col: target.col as number },
+        }
+      : null;
+  }
+  return null;
+}
+
+function safeClipboardStyle(value: unknown): CellStyle {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const input = value as Record<string, unknown>;
+  const style: CellStyle = {};
+  for (const key of ["bold", "italic", "underline", "strikethrough", "wrap"] as const) {
+    if (typeof input[key] === "boolean") style[key] = input[key];
+  }
+  if (
+    typeof input.fontSize === "number" &&
+    Number.isFinite(input.fontSize) &&
+    input.fontSize > 0 &&
+    input.fontSize <= 512
+  ) {
+    style.fontSize = input.fontSize;
+  }
+  if (typeof input.color === "string") style.color = safeCssColor(input.color);
+  if (typeof input.backgroundColor === "string") {
+    style.backgroundColor = safeCssColor(input.backgroundColor);
+  }
+  if (input.align === "left" || input.align === "center" || input.align === "right") {
+    style.align = input.align;
+  }
+  if (input.border && typeof input.border === "object" && !Array.isArray(input.border)) {
+    const borders: NonNullable<CellStyle["border"]> = {};
+    const borderInput = input.border as Record<string, unknown>;
+    for (const side of ["all", "top", "right", "bottom", "left"] as const) {
+      const candidate = borderInput[side];
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+      const borderValue = candidate as Record<string, unknown>;
+      const border: NonNullable<NonNullable<CellStyle["border"]>[typeof side]> = {};
+      if (typeof borderValue.color === "string") border.color = safeCssColor(borderValue.color);
+      if (
+        typeof borderValue.width === "number" &&
+        Number.isFinite(borderValue.width) &&
+        borderValue.width >= 0 &&
+        borderValue.width <= 64
+      ) {
+        border.width = borderValue.width;
+      }
+      if (
+        borderValue.style === "solid" ||
+        borderValue.style === "dashed" ||
+        borderValue.style === "dotted"
+      ) {
+        border.style = borderValue.style;
+      }
+      if (Object.keys(border).length > 0) borders[side] = border;
+    }
+    if (Object.keys(borders).length > 0) style.border = borders;
+  }
+  return style;
+}
+
+function createClipboardToken(): string {
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  let token = "";
+  for (const byte of bytes) token += byte.toString(16).padStart(2, "0");
+  return token;
+}
+
+function externalFormulaSource(source: string | null): string | null {
   if (!source?.startsWith("=")) return null;
   for (const char of source) {
-    const codePoint = char.charCodeAt(0);
-    if (codePoint <= 0x1f || char === "[" || char === "]" || char === "{" || char === "}") {
-      return null;
-    }
-  }
-  if (/^=\s*(?:WEBSERVICE|IMPORTXML|IMPORTHTML|HYPERLINK|DDE|CMD|EXEC|SHELL)\b/i.test(source)) {
-    return null;
+    if (char.charCodeAt(0) <= 0x1f) return null;
   }
   return source;
 }
@@ -152,7 +288,7 @@ function spreadsheetFormula(cell: Element): string | null {
     cell.getAttribute("data-sheetwrite-formula") ??
     cell.getAttribute("data-formula") ??
     cell.getAttribute("x:fmla");
-  const safeDirect = safeExternalFormula(direct);
+  const safeDirect = externalFormulaSource(direct);
   if (safeDirect) return safeDirect;
   const sheets = cell.getAttribute("data-sheets-formula");
   if (!sheets) return null;
@@ -166,7 +302,7 @@ function spreadsheetFormula(cell: Element): string | null {
               (value): value is string => typeof value === "string" && value.startsWith("="),
             )
           : null;
-    return safeExternalFormula(source ?? null);
+    return externalFormulaSource(source ?? null);
   } catch {
     return null;
   }
@@ -234,18 +370,15 @@ function shiftValue(value: CellValue, dRow: number, dCol: number): CellValue {
 }
 
 /**
- * Translates between the current selection and clipboard payloads. Copy/cut write
- * TSV to the system clipboard (external interop, unchanged) and additionally keep
- * an internal snapshot: when paste sees that same TSV back it restores the rich
- * payload — formulas re-anchored, styles carried — Google-Sheets style; otherwise
- * it parses the external TSV as neutralized literals. Preserves the grid's
- * view-row mapping and paste injection neutralization throughout.
+ * Translates between the current selection and clipboard payloads. Formula/ref
+ * fidelity is restored only when a versioned private envelope carries the
+ * controller's current in-memory token. Every other clipboard source is inert.
  */
 export class ClipboardController {
   private readonly deps: ClipboardControllerDeps;
 
-  /** The last copy/cut payload, matched against the system clipboard on paste. */
-  private snapshot: ClipboardSnapshot | null = null;
+  /** Last rich copy/cut and its unguessable in-memory provenance token. */
+  private trusted: TrustedClipboard | null = null;
 
   constructor(deps: ClipboardControllerDeps) {
     this.deps = deps;
@@ -254,23 +387,28 @@ export class ClipboardController {
   async copy(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(false);
     if (!snapshot) return "empty";
-    const outcome = await this.writeCaptured(snapshot);
-    if (outcome === "done") this.snapshot = snapshot;
+    const token = createClipboardToken();
+    const outcome = await this.writeCaptured(snapshot, token);
+    if (outcome === "done") this.trusted = { snapshot, token };
     return outcome;
   }
 
   async cut(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(true);
     if (!snapshot) return "empty";
-    const outcome = await this.writeCaptured(snapshot);
+    const token = createClipboardToken();
+    const outcome = await this.writeCaptured(snapshot, token);
     if (outcome !== "done") return outcome;
+    this.trusted = { snapshot, token };
     if (this.deps.readOnly()) return "done";
-    this.snapshot = snapshot;
     this.deps.commit(snapshot.clearPatches, "cut");
     return "done";
   }
 
-  private async writeCaptured(snapshot: ClipboardSnapshot): Promise<ClipboardOutcome> {
+  private async writeCaptured(
+    snapshot: ClipboardSnapshot,
+    token: string,
+  ): Promise<ClipboardOutcome> {
     if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
     const clipboard = navigator.clipboard;
     if (typeof clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
@@ -281,7 +419,7 @@ export class ClipboardController {
           new ClipboardItem({
             "text/plain": plain,
             "text/html": html,
-            [SHEETWRITE_WEB_CLIPBOARD_FORMAT]: new Blob([clipboardJson(snapshot)], {
+            [SHEETWRITE_WEB_CLIPBOARD_FORMAT]: new Blob([clipboardJson(snapshot, token)], {
               type: SHEETWRITE_CLIPBOARD_MIME,
             }),
           }),
@@ -305,10 +443,8 @@ export class ClipboardController {
     }
   }
   /**
-   * Paste at the focus cell. Restores the internal snapshot's rich payload when
-   * the system clipboard still holds its TSV (copy re-anchors formulas, cut keeps
-   * them verbatim; styles carried either way); otherwise parses external TSV as
-   * neutralized literals.
+   * Paste at the focus cell. Only the current controller's token restores rich
+   * formulas/refs; custom, HTML, and plain external inputs are inert.
    */
   paste(): Promise<ClipboardOutcome> {
     return this.pasteFrom(false);
@@ -340,9 +476,13 @@ export class ClipboardController {
               ? SHEETWRITE_CLIPBOARD_MIME
               : null;
           if (!customType) continue;
-          const snapshot = parseClipboardJson(await (await item.getType(customType)).text());
-          if (!snapshot) continue;
-          this.pasteInternal(snapshot, focus, valuesOnly);
+          const envelope = parseClipboardJson(await (await item.getType(customType)).text());
+          if (!envelope) continue;
+          if (this.trusted?.token === envelope.token) {
+            this.pasteInternal(this.trusted.snapshot, focus, valuesOnly);
+          } else {
+            this.pasteExternalSnapshot(envelope.snapshot, focus, valuesOnly);
+          }
           return "done";
         }
         for (const item of items) {
@@ -359,9 +499,7 @@ export class ClipboardController {
           if (!item.types.includes("text/plain")) continue;
           const text = await (await item.getType("text/plain")).text();
           if (text.length === 0) return "empty";
-          const snapshot = this.snapshot;
-          if (snapshot && text === snapshot.tsv) this.pasteInternal(snapshot, focus, valuesOnly);
-          else this.pasteExternal(text, focus);
+          this.pasteExternal(text, focus);
           return "done";
         }
       } catch {
@@ -375,9 +513,7 @@ export class ClipboardController {
     try {
       const text = await clipboard.readText();
       if (text.length === 0) return "empty";
-      const snapshot = this.snapshot;
-      if (snapshot && text === snapshot.tsv) this.pasteInternal(snapshot, focus, valuesOnly);
-      else this.pasteExternal(text, focus);
+      this.pasteExternal(text, focus);
       return "done";
     } catch {
       return "blocked";
@@ -404,6 +540,40 @@ export class ClipboardController {
     );
   }
 
+  private pasteExternalSnapshot(
+    snapshot: ClipboardSnapshot,
+    focus: CellRef,
+    valuesOnly: boolean,
+  ): void {
+    const sheet = this.deps.sheet();
+    this.commitBlock(
+      focus,
+      snapshot.cells.length,
+      (row) => snapshot.cells[row]!.length,
+      (row, col, targetCol): CellWrite => {
+        const cell = snapshot.cells[row]![col]!;
+        if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
+        if (cell.value.kind === "literal" && typeof cell.value.value !== "string") {
+          return { value: cell.value, style: cell.style };
+        }
+        let source: string;
+        if (cell.value.kind === "formula") source = cell.value.src;
+        else if (cell.value.kind === "ref") {
+          source = `=${cell.value.target.sheet}!${cellA1(cell.value.target.row, cell.value.target.col)}`;
+        } else {
+          source = cell.value.value as string;
+        }
+        return {
+          value: parseCellInput(
+            neutralizeInjection(source),
+            sheet.columns[targetCol]?.type ?? "text",
+          ),
+          style: cell.style,
+        };
+      },
+    );
+  }
+
   private pasteExternalHtml(grid: CellWrite[][], focus: CellRef): void {
     const sheet = this.deps.sheet();
     this.commitBlock(
@@ -412,10 +582,17 @@ export class ClipboardController {
       (row) => grid[row]!.length,
       (row, col, targetCol): CellWrite => {
         const cell = grid[row]![col]!;
-        if (cell.value.kind !== "literal" || typeof cell.value.value !== "string") return cell;
+        if (cell.value.kind === "literal" && typeof cell.value.value !== "string") return cell;
+        let source: string;
+        if (cell.value.kind === "formula") source = cell.value.src;
+        else if (cell.value.kind === "ref") {
+          source = `=${cell.value.target.sheet}!${cellA1(cell.value.target.row, cell.value.target.col)}`;
+        } else {
+          source = cell.value.value as string;
+        }
         return {
           value: parseCellInput(
-            neutralizeInjection(cell.value.value),
+            neutralizeInjection(source),
             sheet.columns[targetCol]?.type ?? "text",
           ),
           style: cell.style,

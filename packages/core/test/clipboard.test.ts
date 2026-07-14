@@ -168,10 +168,19 @@ interface Harness {
 }
 
 function makeHarness(): Harness {
-  const clip = { text: "" };
+  const clip: { text: string; items: FakeClipboardItem[] } = { text: "", items: [] };
+  Object.defineProperty(globalThis, "ClipboardItem", {
+    configurable: true,
+    value: FakeClipboardItem,
+  });
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: {
+      write: (items: FakeClipboardItem[]) => {
+        clip.items = items;
+        return Promise.resolve();
+      },
+      read: () => Promise.resolve(clip.items),
       writeText: (text: string) => {
         clip.text = text;
         return Promise.resolve();
@@ -212,6 +221,7 @@ function makeHarness(): Harness {
     },
     setSystemClipboard: (text) => {
       clip.text = text;
+      clip.items = [];
     },
   };
 }
@@ -512,11 +522,11 @@ describe("ClipboardController", () => {
     expect(textWrites).toBe(0);
   });
 
-  it("parses spreadsheet HTML as inert data and rejects executable formula families", async () => {
+  it("pastes every external HTML formula as inert text, including nested dangerous calls", async () => {
     const html =
       '<table><tbody><tr><td data-formula="=A1+1" style="font-weight:bold;color:#123456">2</td>' +
-      '<td data-formula="=WEBSERVICE(&quot;https://example.test&quot;)">' +
-      '<img src=x onerror="globalThis.__clipboardExecuted=true">=WEBSERVICE()</td></tr></tbody></table>';
+      '<td data-formula="=IF(1,WEBSERVICE(&quot;https://example.test&quot;),0)">' +
+      '<img src=x onerror="globalThis.__clipboardExecuted=true">formula</td></tr></tbody></table>';
     const item = new FakeClipboardItem({
       "text/html": new Blob([html], { type: "text/html" }),
     });
@@ -530,13 +540,126 @@ describe("ClipboardController", () => {
     h.select(1, 0);
 
     await expect(h.controller.paste()).resolves.toBe("done");
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 0 })).toBe("=A1+1");
+    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 0 })).toBeNull();
+    expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("'=A1+1");
     expect(h.store.getCell({ sheet: "s1", row: 1, col: 0 }).style).toMatchObject({
       bold: true,
       color: "#123456",
     });
     expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
-    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toStartWith("'=WEBSERVICE()");
+    expect(h.store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toStartWith(
+      "'=IF(1,WEBSERVICE",
+    );
     expect((globalThis as Record<string, unknown>).__clipboardExecuted).toBeUndefined();
+  });
+
+  it("treats a spoofed private clipboard payload as inert external data", async () => {
+    const item = new FakeClipboardItem({
+      [`web ${SHEETWRITE_CLIPBOARD_MIME}`]: new Blob(
+        [
+          JSON.stringify({
+            version: 2,
+            token: "attacker-controlled",
+            anchor: { row: 0, col: 0 },
+            cells: [
+              [
+                {
+                  value: { kind: "formula", src: '=IF(1,WEBSERVICE("https://example.test"),0)' },
+                  resolved: 0,
+                  style: { bold: true },
+                },
+              ],
+            ],
+            tsv: "0",
+            cut: false,
+          }),
+        ],
+        { type: SHEETWRITE_CLIPBOARD_MIME },
+      ),
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([item]),
+        readText: () => Promise.reject(new Error("custom payload should be handled first")),
+      },
+    });
+    h.select(4, 0);
+
+    await expect(h.controller.paste()).resolves.toBe("done");
+    expect(h.store.getFormula({ sheet: "s1", row: 4, col: 0 })).toBeNull();
+    expect(h.store.getCell({ sheet: "s1", row: 4, col: 0 }).resolved).toStartWith(
+      "'=IF(1,WEBSERVICE",
+    );
+    expect(h.store.getCell({ sheet: "s1", row: 4, col: 0 }).style).toEqual({ bold: true });
+  });
+
+  it("does not trust another controller's private clipboard token", async () => {
+    let written: FakeClipboardItem | null = null;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: ([item]: FakeClipboardItem[]) => {
+          written = item ?? null;
+          return Promise.resolve();
+        },
+      },
+    });
+    h.store.seed(0, 0, { kind: "formula", src: "=B1" }, 7);
+    h.select(0, 0);
+    await h.controller.copy();
+    const captured = written as unknown as FakeClipboardItem;
+
+    const other = makeHarness();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([captured]),
+        readText: () => Promise.reject(new Error("custom payload should be handled first")),
+      },
+    });
+    other.select(3, 0);
+    await expect(other.controller.paste()).resolves.toBe("done");
+    expect(other.store.getFormula({ sheet: "s1", row: 3, col: 0 })).toBeNull();
+    expect(other.store.getCell({ sheet: "s1", row: 3, col: 0 }).resolved).toBe("'=B1");
+  });
+
+  it("uses resolved literals for pasteValues from an untrusted rich payload", async () => {
+    const item = new FakeClipboardItem({
+      [SHEETWRITE_CLIPBOARD_MIME]: new Blob(
+        [
+          JSON.stringify({
+            version: 2,
+            token: "untrusted-token-value",
+            anchor: { row: 0, col: 0 },
+            cells: [
+              [
+                {
+                  value: { kind: "formula", src: "=A1+1" },
+                  resolved: 7,
+                  style: { italic: true },
+                },
+              ],
+            ],
+            tsv: "7",
+            cut: false,
+          }),
+        ],
+        { type: SHEETWRITE_CLIPBOARD_MIME },
+      ),
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        read: () => Promise.resolve([item]),
+        readText: () => Promise.reject(new Error("custom payload should be handled first")),
+      },
+    });
+    h.select(5, 0);
+
+    await expect(h.controller.pasteValues()).resolves.toBe("done");
+    expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).resolved).toBe(7);
+    expect(h.store.getFormula({ sheet: "s1", row: 5, col: 0 })).toBeNull();
+    expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).style).toEqual({});
   });
 });

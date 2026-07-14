@@ -502,6 +502,20 @@ describe("workbook XLSX round-trip", () => {
     }
   });
 
+  it("exports neutralized external formula text as an inert cell value", async () => {
+    const source = roundTripWorkbook();
+    source.sheets[1]!.cells[0]!.cells[0]!.value = {
+      kind: "literal",
+      value: `'=IF(1,WEBSERVICE("https://example.test"),0)`,
+    };
+    const bytes = await toXlsxWorkbook(source);
+    const inspected = new ExcelJS.Workbook();
+    await inspected.xlsx.load(bytes.buffer as ArrayBuffer);
+    const cell = inspected.getWorksheet("Calc")!.getCell("A1");
+    expect(cell.formula).toBeUndefined();
+    expect(cell.value).toBe(`'=IF(1,WEBSERVICE("https://example.test"),0)`);
+  });
+
   it("expands shared-formula slaves instead of importing cached literals", async () => {
     const fixture = new ExcelJS.Workbook();
     const sheet = fixture.addWorksheet("Shared");
