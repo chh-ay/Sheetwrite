@@ -183,6 +183,23 @@ describe("scenario correctness checkpoints", () => {
     expect(Number.isFinite(result.medianMs)).toBe(true);
     expect(result.validation.every((observation) => observation.passed)).toBe(true);
   });
+  test("keeps one-pixel smooth scrolling inside the same logical window", () => {
+    const result = runRenderScenario(
+      new FakeAdapter(),
+      dataset,
+      "scroll-smooth.same-window",
+      options,
+    );
+    expect(result.status).toBe("success");
+    if (result.status !== "success") throw new Error(result.message);
+    expect(result.validation).toContainEqual(
+      expect.objectContaining({
+        checkpoint: "scroll-smooth.same-window keeps the logical row window",
+        passed: true,
+      }),
+    );
+  });
+
   test("validates formatted output and bounded formatter construction", () => {
     const result = runRenderScenario(
       new FakeAdapter(),

@@ -30,24 +30,34 @@ export interface RenderCoordinatorOptions {
 /** Sole owner of frame scheduling, paint-window caches, and renderer/overlay updates. */
 export class RenderCoordinator {
   private frame = 0;
-  private invalidationEpoch = 0;
+  private paintInvalidationEpoch = 0;
+  private dataInvalidationEpoch = 0;
   private columnWindowStart = -1;
   private columnWindowEnd = -1;
   private windowedColumnIndices: readonly number[] = [];
   private columnWindowSignature = "";
+  private lastDataSignature = "";
   private lastPaintSignature = "";
   private lastPaintView: VisibleWindowView | null = null;
+  private cachedPaneViews: VisibleWindowView[] = [];
   private readonly paneValuePools: CellScalar[][] = [];
   private destroyed = false;
 
   constructor(private readonly options: RenderCoordinatorOptions) {}
 
   get geometryVersion(): number {
-    return this.options.storeEpoch() + this.invalidationEpoch;
+    return this.options.storeEpoch() + this.paintInvalidationEpoch + this.dataInvalidationEpoch;
   }
 
+  /** Invalidates pixel/layout paint state without discarding stable data windows. */
   invalidate(): void {
-    this.invalidationEpoch += 1;
+    this.paintInvalidationEpoch += 1;
+  }
+
+  /** Invalidates logical row/column contents or order and all dependent paint state. */
+  invalidateData(): void {
+    this.dataInvalidationEpoch += 1;
+    this.paintInvalidationEpoch += 1;
   }
 
   invalidateColumns(): void {
@@ -55,7 +65,7 @@ export class RenderCoordinator {
     this.columnWindowEnd = -1;
     this.windowedColumnIndices = [];
     this.columnWindowSignature = "";
-    this.invalidate();
+    this.invalidateData();
   }
 
   schedule(): void {
@@ -86,6 +96,9 @@ export class RenderCoordinator {
       this.frame = 0;
     }
     this.lastPaintView = null;
+    this.cachedPaneViews = [];
+    this.lastDataSignature = "";
+    this.lastPaintSignature = "";
   }
 
   private render(): void {
@@ -130,7 +143,7 @@ export class RenderCoordinator {
       scrollLeft,
       width: clientWidth,
       height: clientHeight,
-      contentRevision: storeEpoch + this.invalidationEpoch,
+      contentRevision: storeEpoch + this.dataInvalidationEpoch + this.paintInvalidationEpoch,
     };
     if (rowGeometry) {
       viewport.rowTops = rowGeometry.rowTops;
@@ -138,38 +151,47 @@ export class RenderCoordinator {
     }
     this.options.renderer().setViewport(viewport);
 
-    const paintSignature =
+    const dataSignature =
       `${this.options.activeSheet()}|${rows.start}|${rows.end}|${this.columnWindowSignature}` +
-      `|${contentTop}|${scrollLeft}|${clientWidth}|${clientHeight}|${storeEpoch}` +
-      `|${this.invalidationEpoch}|${frozenRows}|${frozenColumns}|${this.options.zoom()}`;
+      `|${storeEpoch}|${this.dataInvalidationEpoch}|${frozenRows}|${frozenColumns}`;
+    const paintSignature =
+      `${dataSignature}|${contentTop}|${scrollLeft}|${clientWidth}|${clientHeight}` +
+      `|${this.paintInvalidationEpoch}|${frozenHeight}|${frozenWidth}|${this.options.zoom()}`;
+    const refreshData = this.lastPaintView === null || dataSignature !== this.lastDataSignature;
+    const repaint = refreshData || paintSignature !== this.lastPaintSignature;
 
-    let view = this.lastPaintView;
-    if (!view || paintSignature !== this.lastPaintSignature) {
-      if (usePanes) {
-        view = this.paintFrozenPanes(
-          rows,
-          this.windowedColumnIndices,
-          frozenRows,
-          frozenColumns,
-          frozenHeight,
-          frozenWidth,
-          contentTop,
-          scrollLeft,
-          clientWidth,
-          clientHeight,
-          rowGeometry,
-        );
-      } else {
-        view = this.options.store.getVisibleWindow(
+    let view: VisibleWindowView;
+    if (usePanes) {
+      view = this.paintFrozenPanes(
+        rows,
+        this.windowedColumnIndices,
+        frozenRows,
+        frozenColumns,
+        frozenHeight,
+        frozenWidth,
+        contentTop,
+        scrollLeft,
+        clientWidth,
+        clientHeight,
+        rowGeometry,
+        refreshData,
+        repaint,
+      );
+    } else {
+      if (refreshData) {
+        this.cachedPaneViews = [];
+        this.lastPaintView = this.options.store.getVisibleWindow(
           this.options.activeSheet(),
           rows,
           this.windowedColumnIndices,
         );
-        this.options.renderer().paint(view);
       }
-      this.lastPaintView = view;
-      this.lastPaintSignature = paintSignature;
+      view = this.lastPaintView!;
+      if (repaint) this.options.renderer().paint(view);
     }
+    this.lastPaintView = view;
+    this.lastDataSignature = dataSignature;
+    this.lastPaintSignature = paintSignature;
     this.options.ariaMirror.update(view);
     this.options.overlayPainter.paint(contentTop, scrollLeft, clientWidth, clientHeight);
     this.options.repositionEditor(contentTop, scrollLeft);
@@ -192,6 +214,8 @@ export class RenderCoordinator {
     clientWidth: number,
     clientHeight: number,
     bodyGeometry: { rowTops: Float64Array; rowHeights: Float64Array } | null,
+    refreshData: boolean,
+    repaint: boolean,
   ): VisibleWindowView {
     const theme = this.options.theme();
     const gutter = theme.rowHeaderWidth;
@@ -204,17 +228,25 @@ export class RenderCoordinator {
     const frozenGeometry =
       frozenRows > 0 ? this.options.geometry.frozenRowGeometry(frozenRows) : null;
     const panes: PanePaint[] = [];
+    const paneView = (
+      rows: { start: number; end: number },
+      columns: readonly number[],
+    ): VisibleWindowView => {
+      const slot = panes.length;
+      let view = this.cachedPaneViews[slot];
+      if (refreshData || !view) {
+        view = this.retainPaneView(
+          this.options.store.getVisibleWindow(this.options.activeSheet(), rows, columns),
+          slot,
+        );
+        this.cachedPaneViews[slot] = view;
+      }
+      return view;
+    };
 
     if (frozenRows > 0 && frozenColumns > 0) {
       panes.push({
-        view: this.retainPaneView(
-          this.options.store.getVisibleWindow(
-            this.options.activeSheet(),
-            frozenRowWindow,
-            frozenColumnIndices,
-          ),
-          panes.length,
-        ),
+        view: paneView(frozenRowWindow, frozenColumnIndices),
         clip: { x: 0, y: 0, w: xSplit, h: ySplit },
         scrollTop: 0,
         scrollLeft: 0,
@@ -224,14 +256,7 @@ export class RenderCoordinator {
     }
     if (frozenRows > 0) {
       panes.push({
-        view: this.retainPaneView(
-          this.options.store.getVisibleWindow(
-            this.options.activeSheet(),
-            frozenRowWindow,
-            bodyColumns,
-          ),
-          panes.length,
-        ),
+        view: paneView(frozenRowWindow, bodyColumns),
         clip: { x: xSplit, y: 0, w: Math.max(0, clientWidth - xSplit), h: ySplit },
         scrollTop: 0,
         scrollLeft,
@@ -241,14 +266,7 @@ export class RenderCoordinator {
     }
     if (frozenColumns > 0) {
       panes.push({
-        view: this.retainPaneView(
-          this.options.store.getVisibleWindow(
-            this.options.activeSheet(),
-            bodyRows,
-            frozenColumnIndices,
-          ),
-          panes.length,
-        ),
+        view: paneView(bodyRows, frozenColumnIndices),
         clip: { x: 0, y: ySplit, w: xSplit, h: Math.max(0, clientHeight - ySplit) },
         scrollTop: contentTop,
         scrollLeft: 0,
@@ -257,10 +275,7 @@ export class RenderCoordinator {
       });
     }
 
-    const bodyView = this.retainPaneView(
-      this.options.store.getVisibleWindow(this.options.activeSheet(), bodyRows, bodyColumns),
-      panes.length,
-    );
+    const bodyView = paneView(bodyRows, bodyColumns);
     panes.push({
       view: bodyView,
       clip: {
@@ -274,10 +289,13 @@ export class RenderCoordinator {
       rowTops: bodyGeometry?.rowTops,
       rowHeights: bodyGeometry?.rowHeights,
     });
-    this.options.renderer().paintPanes?.(panes, {
-      x: frozenColumns > 0 ? xSplit - 0.5 : null,
-      y: frozenRows > 0 ? ySplit - 0.5 : null,
-    });
+    this.cachedPaneViews.length = panes.length;
+    if (repaint) {
+      this.options.renderer().paintPanes?.(panes, {
+        x: frozenColumns > 0 ? xSplit - 0.5 : null,
+        y: frozenRows > 0 ? ySplit - 0.5 : null,
+      });
+    }
     return bodyView;
   }
 

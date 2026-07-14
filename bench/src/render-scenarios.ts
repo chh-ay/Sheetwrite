@@ -272,6 +272,40 @@ function scenarioActions(
     };
   }
 
+  if (scenarioId === "scroll-smooth.same-window") {
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => adapter.scrollBy("top", 1);
+    return {
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        prepare();
+        const before = adapter.scrollObservation();
+        action();
+        const after = adapter.scrollObservation();
+        checkpoint(
+          observations,
+          "scroll-smooth.same-window moves exactly one pixel",
+          Math.min(before.maximumTop, before.top + 1),
+          after.top,
+        );
+        checkpoint(
+          observations,
+          "scroll-smooth.same-window keeps the logical row window",
+          before.firstVisibleRow,
+          after.firstVisibleRow,
+        );
+        checkpoint(
+          observations,
+          "scroll-smooth.same-window preserves painted-value sentinels",
+          JSON.stringify([dataset.id[0], dataset.amount[0]]),
+          JSON.stringify([adapter.cellValue(0, 0), adapter.cellValue(0, 4)]),
+        );
+      },
+    };
+  }
+
   if (
     scenarioId === "scroll-down.top-left" ||
     scenarioId === "scroll-down.middle" ||

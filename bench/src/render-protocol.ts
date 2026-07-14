@@ -20,6 +20,7 @@ export type ScenarioGroup =
 export const RENDER_SCENARIOS = [
   { id: "scroll-down.top-left", group: "view-scrolling" },
   { id: "scroll-down.middle", group: "view-scrolling" },
+  { id: "scroll-smooth.same-window", group: "view-scrolling" },
   { id: "scroll-right.top-left", group: "view-scrolling" },
   { id: "edit-open.top-left", group: "editing" },
   { id: "edit-open.middle", group: "editing" },

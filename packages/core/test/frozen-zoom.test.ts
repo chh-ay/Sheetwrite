@@ -254,6 +254,57 @@ describe("frozen panes", () => {
     grid.destroy();
   });
 
+  it("reuses all frozen-pane data windows for pixel-only scroll frames", () => {
+    const { workbook, data } = makeGridSheet(50, 12, 100);
+    const store = new SheetwriteStore(workbook, data);
+    const originalGetVisibleWindow = store.getVisibleWindow.bind(store);
+    let windowReads = 0;
+    expect(
+      Reflect.set(
+        store,
+        "getVisibleWindow",
+        (...args: Parameters<SheetwriteStore["getVisibleWindow"]>) => {
+          windowReads += 1;
+          return originalGetVisibleWindow(...args);
+        },
+      ),
+    ).toBe(true);
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, overscan: 0 }, store);
+    const viewport = host.querySelector(".sheetwrite-viewport");
+    if (!(viewport instanceof HTMLDivElement)) throw new Error("expected grid viewport");
+    Object.defineProperty(viewport, "clientWidth", { value: 700, configurable: true });
+    const recorder = makeRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+
+    const scroller = scrollerOf(host);
+    Object.defineProperty(scroller, "scrollTop", {
+      value: 120,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(scroller, "scrollLeft", {
+      value: 200,
+      writable: true,
+      configurable: true,
+    });
+    windowReads = 0;
+    grid.setFrozen(2, 1);
+    expect(windowReads).toBe(4);
+
+    scroller.scrollTop += 1;
+    scroller.scrollLeft += 1;
+    grid.refresh();
+    expect(windowReads).toBe(4);
+    expect(recorder.paneFrames).toHaveLength(2);
+
+    scroller.scrollTop += 24;
+    grid.refresh();
+    expect(windowReads).toBe(8);
+
+    grid.destroy();
+  });
+
   // Contract: unfreezing (setFrozen(0,0)) drops the pane path — the next frame
   // is a plain paint() and no new pane frame is emitted.
   it("reverts to plain paint() when nothing is frozen", () => {

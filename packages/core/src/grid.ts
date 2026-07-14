@@ -2370,9 +2370,9 @@ export class GridImpl implements Grid {
     this.selection.setBounds(count, this.firstCol(), this.lastCol());
     this.scroller.scrollTop = 0;
     // The view permutation lives outside the store, so it must invalidate the
-    // paint signature itself — a view change with an identical window/scroll
-    // (e.g. sorting while already at the top) would otherwise paint stale.
-    this.renderCoordinator.invalidate();
+    // data signature itself — a view change with an identical window/scroll
+    // (e.g. sorting while already at the top) would otherwise reuse stale rows.
+    this.renderCoordinator.invalidateData();
     this.syncSizer();
     this.render();
   }

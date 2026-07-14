@@ -7,7 +7,7 @@ import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import type { OverlayPainter } from "../src/overlay-painter.js";
 import { RenderCoordinator } from "../src/render-coordinator.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { Renderer, Viewport, VisibleWindowView } from "../src/types.js";
+import type { Renderer, Store, Viewport, VisibleWindowView } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -221,8 +221,18 @@ describe("GeometryLayoutController", () => {
 });
 
 describe("RenderCoordinator", () => {
-  it("coalesces animation frames and invalidates cached paints", () => {
+  it("separates pixel repaints from logical data-window invalidation", () => {
     const store = new SheetwriteStore(makeWorkbook(8));
+    let windowReads = 0;
+    let scrollTop = 0;
+    let scrollLeft = 0;
+    let storeEpoch = 0;
+    const countedStore = {
+      getVisibleWindow: (...args: Parameters<Store["getVisibleWindow"]>) => {
+        windowReads += 1;
+        return store.getVisibleWindow(...args);
+      },
+    } as unknown as Store;
     const sheet = store.getWorkbook().sheets[0]!;
     const geometry = new GeometryLayoutController(
       {
@@ -287,16 +297,16 @@ describe("RenderCoordinator", () => {
       ariaMirror: aria,
       geometry,
       datasource,
-      store,
+      store: countedStore,
       activeSheet: () => "s1",
       theme: () => DEFAULT_THEME,
       overscan: () => 0,
       zoom: () => 1,
-      storeEpoch: () => 0,
+      storeEpoch: () => storeEpoch,
       viewportHeight: () => 180,
       viewportWidth: () => 420,
-      scrollTop: () => 0,
-      scrollLeft: () => 0,
+      scrollTop: () => scrollTop,
+      scrollLeft: () => scrollLeft,
       repositionEditor: () => {},
       emitScroll: () => {},
     });
@@ -310,11 +320,37 @@ describe("RenderCoordinator", () => {
       expect(viewports).toHaveLength(1);
       expect(overlayPaints).toBe(1);
       expect(ariaUpdates).toBe(1);
+      expect(windowReads).toBe(1);
 
       coordinator.invalidate();
       coordinator.renderNow();
       expect(paints).toHaveLength(2);
       expect(viewports[1]?.contentRevision).toBe(1);
+      expect(windowReads).toBe(1);
+
+      scrollTop = 1;
+      coordinator.renderNow();
+      scrollLeft = 1;
+      coordinator.renderNow();
+      expect(paints).toHaveLength(4);
+      expect(windowReads).toBe(1);
+
+      scrollTop = DEFAULT_THEME.rowHeight + 1;
+      coordinator.renderNow();
+      expect(windowReads).toBe(2);
+
+      storeEpoch += 1;
+      coordinator.renderNow();
+      expect(windowReads).toBe(3);
+
+      coordinator.invalidateData();
+      coordinator.renderNow();
+      expect(windowReads).toBe(4);
+
+      const paintsBeforeDestroy = paints.length;
+      coordinator.destroy();
+      coordinator.renderNow();
+      expect(paints).toHaveLength(paintsBeforeDestroy);
     } finally {
       coordinator.destroy();
       datasource.destroy();
