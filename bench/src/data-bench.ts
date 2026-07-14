@@ -37,7 +37,7 @@ import "./dom-setup.js";
 import { readFileSync } from "node:fs";
 import type { Column, Workbook } from "@sheetwrite/core";
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
-import { initSync } from "@sheetwrite/wasm";
+import { CellStore, initSync } from "@sheetwrite/wasm";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 import {
   AGG_COL,
@@ -82,7 +82,17 @@ const WINDOW_READ_BATCH = 32;
 const SMALL_AGGREGATE_BATCH = 128;
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
 
-export const WORKLOADS = ["ingest", "windowRead", "edit", "sort", "filter", "aggregate"] as const;
+export const WORKLOADS = [
+  "ingest",
+  "windowRead",
+  "edit",
+  "sort",
+  "filter",
+  "multiFilter",
+  "distinctLow",
+  "distinctHigh",
+  "aggregate",
+] as const;
 export type Workload = (typeof WORKLOADS)[number];
 export type EngineId = "sheetwrite" | "handsontable";
 
@@ -93,6 +103,9 @@ const WORKLOAD_LABELS: Record<Workload, string> = {
   sort: "Sort by amount (numeric)",
   filter: `Filter city contains "${FILTER_NEEDLE}"`,
   aggregate: "Sum amount (aggregate)",
+  multiFilter: "Compose city and customer contains filters",
+  distinctLow: "Distinct low-cardinality city values",
+  distinctHigh: "Distinct high-cardinality customer values",
 };
 
 /** Per-workload iteration plan; expensive at-scale ops sample fewer times. */
@@ -109,6 +122,9 @@ function plan(workload: Workload, rows: number): IterationPlan {
       return atScale ? { warmup: 1, iters: 5, gcBetween: true } : { warmup: 1, iters: 15 };
     case "sort":
     case "filter":
+    case "multiFilter":
+    case "distinctLow":
+    case "distinctHigh":
       return atScale
         ? { warmup: 1, iters: 5, gcBetween: true }
         : { warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
@@ -147,11 +163,20 @@ export interface MemoryProfile {
   readonly wasmDeltaBytes: number | null;
 }
 
+export interface QueryResourceMetrics {
+  readonly composedFilterMatches: number;
+  readonly containsCacheConstructions: number;
+  readonly lowDistinctCount: number;
+  readonly highDistinctCount: number;
+  readonly ownedDistinctStrings: number;
+}
+
 /** Timed workloads for one engine at one row count. */
 export interface TimedEngineResult {
   readonly rows: number;
   readonly stats: Record<Workload, Stat>;
   readonly notes: Partial<Record<Workload, string>>;
+  readonly queryResources: QueryResourceMetrics | null;
 }
 
 /** All measured workloads for one engine at one row count. */
@@ -242,6 +267,29 @@ export function validateDataBenchmark(
           throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
         }
       }
+      if (engine === "sheetwrite") {
+        const resources = row.queryResources;
+        if (!resources) throw new Error(`${engine} ${rows} query resources are missing`);
+        for (const [name, value] of Object.entries(resources)) {
+          assertFiniteNonNegative(value, `${engine} ${rows} queryResources.${name}`);
+          if (!Number.isInteger(value)) {
+            throw new Error(`${engine} ${rows} queryResources.${name} must be an integer`);
+          }
+        }
+        if (
+          resources.composedFilterMatches <= 0 ||
+          resources.composedFilterMatches > rows ||
+          resources.containsCacheConstructions !== 2 ||
+          resources.lowDistinctCount !== 7 ||
+          resources.highDistinctCount !== rows ||
+          resources.ownedDistinctStrings !==
+            resources.lowDistinctCount + resources.highDistinctCount
+        ) {
+          throw new Error(`${engine} ${rows} query resource counters violate structural bounds`);
+        }
+      } else if (row.queryResources !== null) {
+        throw new Error(`${engine} ${rows} queryResources must be null`);
+      }
       const memoryKey = dataMatrixKey(engine, rows, "memory");
       assertFiniteNonNegative(row.memory.heapDeltaBytes, `${memoryKey}.heapDeltaBytes`);
       if (row.memory.heapDeltaBytes >= 2 * 1024 * 1024 * 1024) {
@@ -272,6 +320,51 @@ function makeWorkbook(rowCount: number): Workbook {
     type: c.type,
   }));
   return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
+}
+
+function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
+  const store = new CellStore();
+  try {
+    const sheet = store.addSheet(2, ds.rowCount);
+    for (const [col, values] of [ds.city, ds.customer].entries()) {
+      store.setColumnStringsPacked(
+        sheet,
+        col,
+        0,
+        values.join(""),
+        Uint32Array.from(values, (value) => value.length),
+        0,
+      );
+    }
+    store.resetQueryResourceStats();
+    const matched = store.filterRowsMulti(
+      sheet,
+      Uint32Array.of(0, 1),
+      Uint8Array.of(1, 1),
+      Uint8Array.of(0, 0),
+      new Float64Array(2),
+      new Uint32Array(2),
+      Uint32Array.of(1, 1),
+      new Float64Array(),
+      ["o", "Customer"],
+    );
+    const low = store.distinctValues(sheet, 0, 0);
+    const high = store.distinctValues(sheet, 1, 0);
+    const lowDistinctCount = low.takeKinds().length;
+    const highDistinctCount = high.takeKinds().length;
+    low.free();
+    high.free();
+    const stats = store.queryResourceStats();
+    return {
+      composedFilterMatches: matched.length,
+      containsCacheConstructions: stats[0] ?? 0,
+      lowDistinctCount,
+      highDistinctCount,
+      ownedDistinctStrings: stats[1] ?? 0,
+    };
+  } finally {
+    store.free();
+  }
 }
 
 function benchSheetwrite(ds: ColumnarDataset, columnar: SheetwriteColumnar): TimedEngineResult {
@@ -345,6 +438,33 @@ function benchSheetwrite(ds: ColumnarDataset, columnar: SheetwriteColumnar): Tim
     ...reset,
   });
 
+  store.setColumnFilter(SHEET, COL.city, { kind: "contains", text: "o" });
+  stats.multiFilter = measure(
+    () => store.setColumnFilter(SHEET, COL.customer, { kind: "contains", text: "Customer" }),
+    {
+      ...plan("multiFilter", rows),
+      after: () => store.setColumnFilter(SHEET, COL.customer, null),
+    },
+  );
+  store.clearView(SHEET);
+
+  let distinctSink = 0;
+  stats.distinctLow = measure(
+    () => {
+      distinctSink = store.distinctValues(SHEET, COL.city, 0).length;
+    },
+    plan("distinctLow", rows),
+  );
+  stats.distinctHigh = measure(
+    () => {
+      distinctSink = store.distinctValues(SHEET, COL.customer, 0).length;
+    },
+    plan("distinctHigh", rows),
+  );
+
+  const queryResources = probeQueryResources(ds);
+  store.clearView(SHEET);
+  void distinctSink;
   // (f) aggregate — WASM column sum.
   let aggSink = 0;
   stats.aggregate = measureBatched(
@@ -357,7 +477,7 @@ function benchSheetwrite(ds: ColumnarDataset, columnar: SheetwriteColumnar): Tim
   void aggSink;
 
   store.dispose();
-  return { rows, stats, notes: {} };
+  return { rows, stats, notes: {}, queryResources };
 }
 function warmSheetwriteDataPath(): void {
   const rows = 10_000;
@@ -532,6 +652,42 @@ function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
     ),
   );
 
+  stats.multiFilter = guard("multiFilter", () =>
+    measure(
+      () => {
+        filters.clearConditions();
+        filters.addCondition(COL.city, "contains", ["o"]);
+        filters.addCondition(COL.customer, "contains", ["Customer"]);
+        filters.filter();
+      },
+      {
+        ...plan("multiFilter", rows),
+        after: () => {
+          filters.clearConditions();
+          filters.filter();
+        },
+      },
+    ),
+  );
+  let distinctSink = 0;
+  stats.distinctLow = guard("distinctLow", () =>
+    measure(
+      () => {
+        distinctSink = new Set(hot.getSourceDataAtCol(COL.city)).size;
+      },
+      plan("distinctLow", rows),
+    ),
+  );
+  stats.distinctHigh = guard("distinctHigh", () =>
+    measure(
+      () => {
+        distinctSink = new Set(hot.getSourceDataAtCol(COL.customer)).size;
+      },
+      plan("distinctHigh", rows),
+    ),
+  );
+  void distinctSink;
+
   // (f) aggregate — no native column aggregate; sum the source column in JS.
   notes.aggregate = "no native aggregate API — summed in plain JS over getSourceDataAtCol";
   let aggSink = 0;
@@ -549,7 +705,7 @@ function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
   void aggSink;
 
   hot.destroy();
-  return { rows, stats, notes };
+  return { rows, stats, notes, queryResources: null };
 }
 
 // ── Memory probes (isolated subprocess) ──────────────────────────────────────

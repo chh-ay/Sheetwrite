@@ -17,6 +17,7 @@ interface FixtureOptions {
   readonly invalidP95?: boolean;
   readonly impossibleSummary?: boolean;
   readonly omitMemory?: boolean;
+  readonly invalidQueryResources?: boolean;
 }
 
 function engineResult(rows: number, options: FixtureOptions = {}): EngineResult {
@@ -32,7 +33,18 @@ function engineResult(rows: number, options: FixtureOptions = {}): EngineResult 
   }
   if (options.unexpectedWorkload) statsByKey.notDeclared = summarize([1]);
   const stats = statsByKey as EngineResult["stats"];
-  const rowWithoutMemory = { rows, stats, notes: {} };
+  const rowWithoutMemory = {
+    rows,
+    stats,
+    notes: {},
+    queryResources: {
+      composedFilterMatches: 500,
+      containsCacheConstructions: options.invalidQueryResources ? rows : 2,
+      lowDistinctCount: 7,
+      highDistinctCount: rows,
+      ownedDistinctStrings: rows + 7,
+    },
+  };
   if (options.omitMemory) {
     const incompleteRow = rowWithoutMemory as EngineResult;
     return incompleteRow;
@@ -86,6 +98,12 @@ describe("data benchmark exact matrix", () => {
     expect(() => validateDataBenchmark(smokeFixture({ impossibleSummary: true }), "smoke")).toThrow(
       "engine=sheetwrite;rows=1000;metric=ingest.stat contains an impossible finite summary",
     );
+  });
+
+  test("requires bounded query resources and exact distinct sentinels", () => {
+    expect(() =>
+      validateDataBenchmark(smokeFixture({ invalidQueryResources: true }), "smoke"),
+    ).toThrow("query resource counters violate structural bounds");
   });
 
   test("keeps full and smoke matrices distinct", () => {

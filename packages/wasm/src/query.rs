@@ -1,6 +1,8 @@
 //! Whole-column queries: sort, filter, search, aggregate — cache-local scans.
 
+use std::cell::Cell;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
 
@@ -11,8 +13,30 @@ use crate::types::{
     KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
+#[derive(Hash, Eq, PartialEq)]
+enum DistinctKey<'a> {
+    Blank,
+    Number(u64),
+    Bool(bool),
+    Text(&'a str),
+}
+
+thread_local! {
+    static QUERY_STATS: Cell<[u64; 2]> = const { Cell::new([0, 0]) };
+}
+
 #[wasm_bindgen]
 impl CellStore {
+    /// `[contains cache constructions, owned distinct strings]`.
+    #[wasm_bindgen(js_name = queryResourceStats)]
+    pub fn query_resource_stats(&self) -> Vec<f64> {
+        QUERY_STATS.with(|stats| stats.get().into_iter().map(|value| value as f64).collect())
+    }
+
+    #[wasm_bindgen(js_name = resetQueryResourceStats)]
+    pub fn reset_query_resource_stats(&self) {
+        QUERY_STATS.with(|stats| stats.set([0, 0]));
+    }
     /// Column aggregate over numeric cells. op: 0 sum, 1 avg, 2 min, 3 max, 4 count.
     #[wasm_bindgen(js_name = aggregate)]
     pub fn aggregate(&self, sheet: usize, col: usize, op: u8) -> f64 {
@@ -413,6 +437,20 @@ impl CellStore {
             no = no.saturating_add(num_counts.get(i).copied().unwrap_or(0) as usize);
             to = to.saturating_add(text_counts.get(i).copied().unwrap_or(0) as usize);
         }
+        let mut cache_index = vec![usize::MAX; kinds.len()];
+        let mut match_caches = Vec::with_capacity(kinds.iter().filter(|&&kind| kind == 1).count());
+        for (index, &kind) in kinds.iter().enumerate() {
+            if kind != 1 {
+                continue;
+            }
+            cache_index[index] = match_caches.len();
+            match_caches.push(MatchCache::new());
+        }
+        QUERY_STATS.with(|stats| {
+            let mut current = stats.get();
+            current[0] = current[0].saturating_add(match_caches.len() as u64);
+            stats.set(current);
+        });
         let mut out = Vec::new();
         'rows: for row in 0..data.row_count {
             for i in 0..cols.len() {
@@ -455,7 +493,6 @@ impl CellStore {
                             .get(text_offsets[i])
                             .map(String::as_str)
                             .unwrap_or("");
-                        let mut cache = MatchCache::new();
                         cell_matches_text(
                             data,
                             &self.strings,
@@ -463,7 +500,7 @@ impl CellStore {
                             needle,
                             flags.get(i).copied().unwrap_or(0) == 0,
                             false,
-                            &mut cache,
+                            &mut match_caches[cache_index[i]],
                         )
                     }
                     2 => numeric_cell_value(data, index).is_some_and(|value| {
@@ -498,24 +535,22 @@ impl CellStore {
         if col >= data.n_cols {
             return out;
         }
-        let mut seen = std::collections::HashSet::new();
+        let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
         for row in 0..data.row_count {
             let index = col * data.row_count + row;
             let kind = resolved_kind(data, index);
+            let text = if kind == 2 {
+                resolved_text(data, &self.strings, index).unwrap_or("")
+            } else {
+                ""
+            };
             let key = match kind {
-                1 => format!(
-                    "n:{}",
-                    numeric_cell_value(data, index).unwrap_or(0.0).to_bits()
+                1 => DistinctKey::Number(
+                    numeric_cell_value(data, index).unwrap_or(0.0).to_bits(),
                 ),
-                2 => format!(
-                    "s:{}",
-                    resolved_text(data, &self.strings, index).unwrap_or("")
-                ),
-                3 => format!(
-                    "o:{}",
-                    u8::from(boolean_cell_value(data, index).unwrap_or(false))
-                ),
-                _ => "b".to_string(),
+                2 => DistinctKey::Text(text),
+                3 => DistinctKey::Bool(boolean_cell_value(data, index).unwrap_or(false)),
+                _ => DistinctKey::Blank,
             };
             if !seen.insert(key) {
                 continue;
@@ -532,11 +567,12 @@ impl CellStore {
                         0.0
                     });
             } else if kind == 2 {
-                out.texts.push(
-                    resolved_text(data, &self.strings, index)
-                        .unwrap_or("")
-                        .to_string(),
-                );
+                out.texts.push(text.to_owned());
+                QUERY_STATS.with(|stats| {
+                    let mut current = stats.get();
+                    current[1] = current[1].saturating_add(1);
+                    stats.set(current);
+                });
             }
             if limit != 0 && out.kinds.len() >= limit {
                 break;

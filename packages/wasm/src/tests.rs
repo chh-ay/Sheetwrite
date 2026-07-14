@@ -1624,6 +1624,60 @@ fn multi_query_entry_points_preserve_order_filters_distinctness_and_edges() {
 }
 
 #[test]
+fn composed_contains_caches_and_distinct_keys_have_structural_bounds() {
+    let mut store = CellStore::new();
+    let rows = 2_000;
+    let sheet = store.add_sheet(4, rows);
+    for row in 0..rows {
+        store.set_string(sheet, row, 0, "Alpha", 0);
+        store.set_string(sheet, row, 1, "Beta", 0);
+        store.set_string(sheet, row, 2, &format!("item-{row}"), 0);
+    }
+    store.set_number(sheet, 0, 3, -0.0, 0);
+    store.set_number(sheet, 1, 3, 0.0, 0);
+    store.set_bool(sheet, 2, 3, false, 0);
+    store.set_bool(sheet, 3, 3, true, 0);
+
+    store.reset_query_resource_stats();
+    assert_eq!(
+        store.filter_rows_multi(
+            sheet,
+            &[0, 1],
+            &[1, 1],
+            &[0, 0],
+            &[0.0, 0.0],
+            &[0, 0],
+            &[1, 1],
+            &[],
+            vec!["alp".to_string(), "bet".to_string()],
+        ),
+        (0..rows as u32).collect::<Vec<_>>()
+    );
+    assert_eq!(store.query_resource_stats(), vec![2.0, 0.0]);
+
+    let mut repeated = store.distinct_values(sheet, 0, 0);
+    assert_eq!(repeated.take_texts(), vec!["Alpha"]);
+    assert_eq!(store.query_resource_stats(), vec![2.0, 1.0]);
+
+    store.reset_query_resource_stats();
+    let mut capped = store.distinct_values(sheet, 2, 10);
+    assert_eq!(capped.take_texts().len(), 10);
+    assert_eq!(store.query_resource_stats(), vec![0.0, 10.0]);
+
+    store.reset_query_resource_stats();
+    let mut high_cardinality = store.distinct_values(sheet, 2, 0);
+    assert_eq!(high_cardinality.take_texts().len(), rows);
+    assert_eq!(store.query_resource_stats(), vec![0.0, rows as f64]);
+
+    let mut typed = store.distinct_values(sheet, 3, 0);
+    assert_eq!(typed.take_kinds(), vec![1, 1, 3, 3, 0]);
+    let numbers = typed.take_numbers();
+    assert_eq!(numbers[0].to_bits(), (-0.0f64).to_bits());
+    assert_eq!(numbers[1].to_bits(), 0.0f64.to_bits());
+    assert_eq!(&numbers[2..], &[0.0, 1.0]);
+}
+
+#[test]
 fn boolean_queries_sort_filter_search_and_distinct_without_becoming_blanks() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(1, 6);
