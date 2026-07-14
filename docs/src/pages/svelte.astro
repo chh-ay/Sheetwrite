@@ -1,0 +1,41 @@
+---
+import DemoHeader from "@/components/DemoHeader.astro";
+import SvelteWorkbook from "@/components/SvelteWorkbook.svelte";
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout
+  title="Sheetwrite — Svelte formula workbook"
+  description="500 =SUM row formulas plus cross-sheet Summary aggregates, edited through the composable @sheetwrite/core/shell pieces with Svelte 5 runes."
+  active="svelte"
+>
+  <DemoHeader
+    accent="var(--color-fw-svelte)"
+    kicker="Svelte 5 adapter"
+    title="Formula workbook + composable shell"
+  >
+    Edit 500 live <code>=SUM(B:E)</code> formulas and cross-sheet Summary totals through the same
+    grid. The formula bar and toolbar come from framework-neutral <code>core/shell</code>; row
+    insertions rewrite affected formulas automatically.
+  </DemoHeader>
+  <div id="app">
+    <SvelteWorkbook client:only="svelte" />
+  </div>
+
+  <style is:global>
+    #app {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+    #app > astro-island {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+    }
+    #app main {
+      flex: 1;
+      min-width: 0;
+    }
+  </style>
+</Layout>

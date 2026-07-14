@@ -19,7 +19,7 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
   fixtureRoots.push(root);
   await mkdir(join(root, "packages"), { recursive: true });
   await mkdir(join(root, "bench"), { recursive: true });
-  await mkdir(join(root, "examples/site"), { recursive: true });
+  await mkdir(join(root, "docs"), { recursive: true });
   const dependencies: Readonly<Record<string, readonly string[]>> = {
     "@sheetwrite/wasm": [],
     "@sheetwrite/core": ["@sheetwrite/wasm"],
@@ -63,8 +63,8 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
     `${JSON.stringify({ name: "@sheetwrite/bench", scripts: { typecheck: "typecheck" } })}\n`,
   );
   await writeFile(
-    join(root, "examples/site/package.json"),
-    `${JSON.stringify({ name: "@sheetwrite/example-site", scripts: { typecheck: "typecheck" } })}\n`,
+    join(root, "docs/package.json"),
+    `${JSON.stringify({ name: "@sheetwrite/docs-site", scripts: { typecheck: "typecheck" } })}\n`,
   );
   return root;
 }
@@ -127,7 +127,7 @@ describe("canonical workspace graph", () => {
     expect(TYPECHECK_NODES.map((node) => node.id)).toEqual([
       ...PUBLISHABLE_PACKAGE_ORDER.map((name) => `typecheck:${name}`),
       "typecheck:@sheetwrite/bench",
-      "typecheck:@sheetwrite/example-site",
+      "typecheck:@sheetwrite/docs-site",
       "typecheck:verification",
       "typecheck:consumer-nodenext",
     ]);

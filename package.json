@@ -9,6 +9,7 @@
   "workspaces": [
     "packages/*",
     "examples/*",
+    "docs",
     "bench"
   ],
   "engines": {
@@ -17,6 +18,8 @@
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",
     "api:check": "bun scripts/public-api.ts check",
+    "docs:generate": "bun scripts/docs.ts generate",
+    "docs:check": "bun scripts/docs.ts check",
     "check:cycles": "bun scripts/check-import-cycles.ts",
     "audit:js": "bun scripts/dependency-audit.ts",
     "browser:install": "playwright install --with-deps chromium",
@@ -41,10 +44,10 @@
     "verify:bundlers": "node test/bundler-fixtures/run.mjs",
     "verify:node-esm": "node scripts/verify-node-esm.mjs",
     "verify:nodenext-types": "tsc --noEmit -p test/consumer-nodenext",
-    "examples": "bun run build:packages && bun run --filter '@sheetwrite/example-site' dev",
+    "examples": "bun run build:packages && bun run --filter '@sheetwrite/docs-site' dev",
     "toolchain:install-wasm-pack": "bun scripts/install-wasm-pack.ts",
     "test:browser": "playwright test --config test/browser/playwright.config.ts",
-    "test:tooling": "bun test scripts/toolchain-contract.test.ts scripts/workspace-tooling.test.ts scripts/dependency-audit.test.ts scripts/verify-clean-build.test.ts scripts/size-report.test.ts",
+    "test:tooling": "bun test scripts/toolchain-contract.test.ts scripts/workspace-tooling.test.ts scripts/dependency-audit.test.ts scripts/verify-clean-build.test.ts scripts/size-report.test.ts scripts/public-api.test.ts scripts/docs.test.ts",
     "test:coverage:ts": "bun scripts/coverage.ts ts",
     "test:coverage:rust": "bun scripts/coverage.ts rust",
     "test:coverage": "bun run test:coverage:ts && bun run test:coverage:rust",

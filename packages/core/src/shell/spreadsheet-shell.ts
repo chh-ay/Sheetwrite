@@ -18,6 +18,7 @@ import { createFormulaBar, createNameBox, type ShellPiece } from "./formula-cont
 import { createSelectionStatus } from "./selection-status.js";
 import { createToolbar } from "./toolbar-factory.js";
 
+/** Host elements and feature options used to create a spreadsheet shell. */
 export interface SpreadsheetShellOptions {
   /** Options for the single grid the shell owns. `initSheetwrite` must already be awaited. */
   grid: GridOptions;
@@ -29,6 +30,7 @@ export interface SpreadsheetShellOptions {
   onReady?: (grid: Grid) => void;
 }
 
+/** Disposable controller for the framework-neutral spreadsheet shell. */
 export interface SpreadsheetShell {
   /** The single grid the shell owns; use it for data, search, and actions. */
   readonly grid: Grid;

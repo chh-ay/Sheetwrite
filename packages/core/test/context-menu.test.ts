@@ -51,7 +51,13 @@ describe("ContextMenu", () => {
         { label: "No action" },
       ],
     };
-    const menu = new ContextMenu(host, config, DEFAULT_THEME, actions, {} as Grid);
+    const grid = {} as Grid;
+    const menu = new ContextMenu(host, config, DEFAULT_THEME, actions, grid);
+    menu.open({
+      cell: null,
+      clientX: 0,
+      clientY: 0,
+    });
     const rows = [...host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu-item")];
 
     for (const row of rows) row.click();
@@ -90,26 +96,88 @@ describe("ContextMenu", () => {
     );
     const element = host.querySelector<HTMLElement>(".sheetwrite-context-menu")!;
 
-    menu.open(-10, -20, cell);
+    const open = (x: number, y: number, address: CellAddress | null): void => {
+      menu.open({
+        cell: address,
+        clientX: x,
+        clientY: y,
+      });
+    };
+    open(-10, -20, cell);
     expect(element.style.left).toBe("0px");
     expect(element.style.top).toBe("0px");
     host.querySelector<HTMLElement>(".sheetwrite-context-menu-item")!.click();
     expect(received).toEqual([cell]);
 
-    menu.open(20, 20, null);
+    open(20, 20, null);
     document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     expect(element.style.display).toBe("none");
-    menu.open(20, 20, null);
+    open(20, 20, null);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(element.style.display).toBe("none");
-    menu.open(20, 20, null);
+    open(20, 20, null);
     window.dispatchEvent(new Event("resize"));
     expect(element.style.display).toBe("none");
-    menu.open(20, 20, null);
+    open(20, 20, null);
     window.dispatchEvent(new Event("scroll"));
     expect(element.style.display).toBe("none");
 
     menu.destroy();
     expect(host.querySelector(".sheetwrite-context-menu")).toBeNull();
+  });
+
+  it("resolves dynamic visibility, disabled state, shortcuts, and separators per request", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = {} as Grid;
+    const selected: CellAddress[] = [];
+    const menu = new ContextMenu(
+      host,
+      {
+        contextMenu: (request) => [
+          { action: "separator" },
+          { label: "Hidden", visible: false },
+          { action: "separator" },
+          {
+            id: "inspect",
+            label: `Inspect row ${request.cell?.row ?? "none"}`,
+            shortcut: "Ctrl+I",
+            disabled: request.cell?.row === 4,
+            onClick: (_grid, address) => {
+              if (address) selected.push(address);
+            },
+          },
+          { action: "separator" },
+          { action: "separator" },
+        ],
+      },
+      DEFAULT_THEME,
+      {} as GridActions,
+      grid,
+    );
+
+    menu.open({
+      cell: { sheet: "s1", row: 4, col: 2 },
+      clientX: 10,
+      clientY: 20,
+    });
+    expect(host.querySelectorAll(".sheetwrite-context-menu-sep")).toHaveLength(0);
+    const disabled = host.querySelector<HTMLElement>("[data-context-menu-item=inspect]")!;
+    expect(disabled.textContent).toBe("Inspect row 4Ctrl+I");
+    expect(disabled.getAttribute("aria-disabled")).toBe("true");
+    disabled.click();
+    expect(selected).toHaveLength(0);
+
+    menu.open({
+      cell: { sheet: "s1", row: 3, col: 1 },
+      clientX: 10,
+      clientY: 20,
+    });
+    const enabled = host.querySelector<HTMLElement>("[data-context-menu-item=inspect]")!;
+    expect(enabled.hasAttribute("aria-disabled")).toBe(false);
+    enabled.click();
+    expect(selected).toEqual([{ sheet: "s1", row: 3, col: 1 }]);
+
+    menu.destroy();
   });
 });

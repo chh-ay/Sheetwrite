@@ -54,13 +54,16 @@ export interface VisibleWindowView {
   localStrings?: readonly string[];
 }
 
+/** Authoritative source value, evaluated value, style, and load state for a cell. */
 export interface ResolvedCell {
   resolved: CellScalar;
   style: CellStyle;
 }
 
+/** Datasource loading state for a resolved cell. */
 export type CellLoadState = "unloaded" | "loaded-empty" | "loaded-value" | "local-edit";
 
+/** Allocation and load statistics for one paged datasource sheet. */
 export interface PagedStoreStats {
   chunks: number;
   loadedCells: number;
@@ -69,10 +72,12 @@ export interface PagedStoreStats {
   fullyLoaded: boolean;
 }
 
+/** Whether a query is complete for the currently loaded datasource pages. */
 export type QueryCapability =
   | { status: "complete" }
   | { status: "incomplete"; loadedCells: number; totalCells: number };
 
+/** Columnar workbook storage, query, transaction, and subscription contract. */
 export interface Store {
   getWorkbook(): Workbook;
   /**

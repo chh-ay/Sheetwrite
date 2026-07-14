@@ -14,7 +14,8 @@
       "!**/.astro",
       "!**/*.d.ts",
       "!**/*.svelte",
-      "!bench/results"
+      "!bench/results",
+      "!docs/src/generated"
     ]
   },
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
@@ -56,6 +57,16 @@
           "correctness": {
             "noUnusedImports": "off",
             "noUnusedVariables": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["docs/src/styles/**/*.css"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDescendingSpecificity": "off"
           }
         }
       }

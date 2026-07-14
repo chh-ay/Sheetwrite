@@ -6,6 +6,7 @@ const RECORD_SCHEMA_VERSION = 1;
 const DEFAULT_DATABASE = "sheetwrite-offline";
 const DEFAULT_STORE = "pending-commits";
 
+/** Stable category for an IndexedDB pending-storage failure. */
 export type IndexedDbPendingCommitStorageErrorCode =
   | "unavailable"
   | "blocked"
@@ -14,6 +15,7 @@ export type IndexedDbPendingCommitStorageErrorCode =
   | "unsupported-schema"
   | "transaction";
 
+/** Typed IndexedDB failure raised by durable pending-commit storage. */
 export class IndexedDbPendingCommitStorageError extends Error {
   constructor(
     readonly code: IndexedDbPendingCommitStorageErrorCode,
@@ -25,6 +27,7 @@ export class IndexedDbPendingCommitStorageError extends Error {
   }
 }
 
+/** Database and store naming options for durable pending commits. */
 export interface IndexedDbPendingCommitStorageOptions {
   databaseName?: string;
   storeName?: string;

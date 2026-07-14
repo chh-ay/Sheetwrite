@@ -44,7 +44,7 @@ The bindable `grid` is published before `onReady({ grid, generation, reason })` 
 
 Grid events are `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, and `onActiveSheetChange`. Native host change/scroll handlers remain available.
 
-For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See the repository [getting-started](../../docs/getting-started.md) and [offline/collaboration](../../docs/collaboration.md) guides for explicit assets and durable sync.
+For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](../../docs/src/content/docs/docs/start/installation.md), [Svelte integration](../../docs/src/content/docs/docs/frameworks/svelte.md), and [collaboration](../../docs/src/content/docs/docs/guides/collaboration.md).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
 XLSX export, install `@sheetwrite/xlsx` and import

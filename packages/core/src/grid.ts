@@ -100,6 +100,7 @@ function scaleFontPx(font: string, zoom: number): string {
   );
 }
 
+/** Default canvas theme used before CSS and explicit theme overrides. */
 export const DEFAULT_THEME: Theme = {
   font: "13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
   bg: "#ffffff",
@@ -169,6 +170,7 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
   return theme;
 }
 
+/** Creates and mounts an imperative Grid in the supplied host element. */
 export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
   if (!isLoaded()) {
     throw new Error("Sheetwrite: await initSheetwrite() before createGrid()");
@@ -221,15 +223,18 @@ export class GridImpl implements Grid {
     if (!this.contextMenu) return;
     e.preventDefault();
 
-    const cell = this.input.cellAtPointer(e.clientX, e.clientY);
-    if (cell && !this.selection.contains(cell.row, cell.col)) {
-      this.selection.selectCell(cell.row, cell.col);
+    const addr = this.getCellAtPoint(e.clientX, e.clientY);
+    if (addr && !this.selection.contains(addr.row, addr.col)) {
+      this.selection.selectCell(addr.row, addr.col);
       this.emitSelection();
       this.scheduleRender();
     }
 
-    const addr = cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
-    this.contextMenu.open(e.clientX, e.clientY, addr);
+    this.contextMenu.open({
+      cell: addr,
+      clientX: e.clientX,
+      clientY: e.clientY,
+    });
   };
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
@@ -1572,6 +1577,11 @@ export class GridImpl implements Grid {
 
   getActiveSheet(): SheetId {
     return this.activeSheet;
+  }
+
+  getCellAtPoint(clientX: number, clientY: number): CellAddress | null {
+    const cell = this.input.cellAtPointer(clientX, clientY);
+    return cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
   }
 
   /**

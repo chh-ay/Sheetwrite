@@ -36,6 +36,7 @@ function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
   else if (ref) ref.current = grid;
 }
 
+/** Advanced framework adapter props for workbook data or datasource ownership. */
 export interface SheetwriteGridProps
   extends GridOptions,
     GridAdapterEventHandlers,
@@ -48,6 +49,7 @@ export interface SheetwriteGridProps
   fill?: true;
 }
 
+/** Advanced framework component for workbook data or datasource input. */
 export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
   function SheetwriteGrid(props, ref): ReactElement {
     const {
@@ -227,6 +229,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
   },
 );
 
+/** Simple framework adapter props for columns and default row objects. */
 export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
   SheetwriteGridProps,
   "workbook" | "data" | "datasource" | "height" | "fill"
@@ -247,6 +250,7 @@ const SheetwriteComponent = forwardRef<Grid, SheetwriteProps<Record<string, Cell
   },
 );
 
+/** Simple framework component that owns initialization and Grid lifetime. */
 export const Sheetwrite = SheetwriteComponent as <Row extends Record<string, CellScalar>>(
   props: SheetwriteProps<Row> & { ref?: ForwardedRef<Grid> },
 ) => ReactElement;

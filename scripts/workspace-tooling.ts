@@ -50,8 +50,16 @@ export const PACKAGE_TYPECHECK_NODES: readonly CommandNode[] = PACKAGE_TYPECHECK
 
 export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
   {
-    id: "build:@sheetwrite/example-site",
-    command: ["bun", "run", "--filter", "@sheetwrite/example-site", "build"],
+    id: "generate:docs",
+    command: ["bun", "run", "docs:generate"],
+  },
+  {
+    id: "check:docs",
+    command: ["bun", "run", "docs:check"],
+  },
+  {
+    id: "build:@sheetwrite/docs-site",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs-site", "build"],
   },
   {
     id: "verify:example-xlsx-isolation",
@@ -61,8 +69,8 @@ export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
 
 export const EXAMPLE_TYPECHECK_NODES: readonly CommandNode[] = [
   {
-    id: "typecheck:@sheetwrite/example-site",
-    command: ["bun", "run", "--filter", "@sheetwrite/example-site", "typecheck"],
+    id: "typecheck:@sheetwrite/docs-site",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs-site", "typecheck"],
     diagnosticPolicy: "astro",
   },
 ];
@@ -228,7 +236,7 @@ export function validateWorkspaceGraph(
     }
   }
 
-  for (const relativePath of ["bench/package.json", "examples/site/package.json"]) {
+  for (const relativePath of ["bench/package.json", "docs/package.json"]) {
     const manifest = readManifest(resolve(root, relativePath));
     if (!manifest.scripts?.typecheck) {
       throw new Error(`${manifest.name ?? relativePath} must declare a typecheck script`);

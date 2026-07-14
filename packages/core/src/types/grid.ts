@@ -102,6 +102,7 @@ export interface GridActions {
   redo(): void;
 }
 
+/** Built-in action names accepted by custom toolbar items. */
 export type ToolbarActionName =
   | "bold"
   | "italic"
@@ -124,8 +125,10 @@ export type ToolbarActionName =
   | "redo"
   | "separator";
 
+/** Text, DOM node, or node factory used as toolbar icon content. */
 export type ToolbarIcon = string | Node | (() => Node);
 
+/** Built-in, separator, or custom callback item in the grid toolbar. */
 export interface ToolbarItem {
   /** Built-in action to bind (or "separator"). Omit when supplying `onClick`. */
   action?: ToolbarActionName;
@@ -140,6 +143,7 @@ export interface ToolbarItem {
   title?: string;
 }
 
+/** Built-in action names accepted by custom context-menu rows. */
 export type ContextMenuActionName =
   | "cut"
   | "copy"
@@ -164,14 +168,38 @@ export type ContextMenuActionName =
   | "exportXlsx"
   | "separator";
 
+/** Cell and viewport coordinates resolved for one bundled context-menu opening. */
+export interface ContextMenuContext {
+  /** Right-clicked cell, or null when the pointer is outside the cell body. */
+  readonly cell: CellAddress | null;
+  /** Viewport-relative browser pointer coordinate. */
+  readonly clientX: number;
+  /** Viewport-relative browser pointer coordinate. */
+  readonly clientY: number;
+}
+
+/** Built-in, separator, or custom callback row in the right-click menu. */
 export interface ContextMenuItem {
+  /** Stable host identifier, exposed as `data-context-menu-item`. */
+  id?: string;
   /** Built-in action to bind (or "separator"). Omit when supplying `onClick`. */
   action?: ContextMenuActionName;
   /** Custom click handler; receives the grid and the right-clicked cell (null if none). */
   onClick?: (grid: Grid, cell: CellAddress | null) => void;
   /** Menu row text. Defaults per action. */
   label?: string;
+  /** Optional shortcut hint rendered beside the label. */
+  shortcut?: string;
+  /** Static or request-aware visibility. Hidden separators are normalized. */
+  visible?: boolean | ((context: ContextMenuContext) => boolean);
+  /** Static or context-aware disabled state. */
+  disabled?: boolean | ((context: ContextMenuContext) => boolean);
 }
+
+/** Static rows or a context-aware factory evaluated each time the menu opens. */
+export type ContextMenuItems =
+  | readonly ContextMenuItem[]
+  | ((context: ContextMenuContext) => readonly ContextMenuItem[]);
 
 /**
  * Toolbar / feature configuration. When `config` is set the built-in toolbar is
@@ -194,8 +222,8 @@ export interface GridConfig {
   export?: boolean;
   /** Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons. */
   icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
-  /** Right-click cell context menu: enabled (true), disabled (false), or a custom item list. */
-  contextMenu?: boolean | ContextMenuItem[];
+  /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
+  contextMenu?: boolean | ContextMenuItems;
   /** Show undo/redo controls in the built-in toolbar (default true). */
   undo?: boolean;
   /** Built-in Ctrl+F find widget: enabled (true, default) or disabled (false). */
@@ -213,6 +241,7 @@ export interface GridConfig {
   keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) => boolean);
 }
 
+/** Workbook, data, rendering, policy, and built-in UI options used to create a Grid. */
 export interface GridOptions {
   workbook: Workbook;
   data?: ColumnarData;
@@ -226,7 +255,7 @@ export interface GridOptions {
    * import.meta.url)` is NOT reliable. Either copy
    * `@sheetwrite/core/dist/worker.js` to your public assets and pass its URL
    * string (works everywhere), or use your bundler's dependency-worker import
-   * if it has one (see docs/worker-rendering.md). If omitted or the worker
+   * if it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker
    * can't be constructed, the grid falls back to the main-thread canvas
    * renderer and emits `renderer-fallback` once.
    */
@@ -249,6 +278,7 @@ export interface GridOptions {
   config?: GridConfig;
 }
 
+/** Case, whole-cell, sheet, and column constraints for grid search. */
 export interface SearchOptions {
   /** Case-sensitive match (default false). */
   matchCase?: boolean;
@@ -260,6 +290,7 @@ export interface SearchOptions {
   columns?: number[];
 }
 
+/** Ordered matches and active index produced by a grid search. */
 export interface SearchResult {
   query: string;
   /** Matching cells in row-major order. */
@@ -268,6 +299,7 @@ export interface SearchResult {
   active: number;
 }
 
+/** Replacement count and refreshed search state returned by replace-all. */
 export interface ReplaceResult {
   /** How many cells were rewritten. */
   replaced: number;
@@ -291,6 +323,7 @@ export interface CellInputSnapshot {
   readonly format: CellFormat;
 }
 
+/** Payload map for events emitted by a Grid. */
 export interface GridEvents {
   change: ChangeEvent;
   selection: { selection: Selection | null };
@@ -309,12 +342,18 @@ export interface GridEvents {
   "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: unknown };
 }
 
+/** Imperative grid handle for document commands, events, rendering, and teardown. */
 export interface Grid {
   readonly store: Store;
   /** Imperative action surface for binding custom toolbars/menus. */
   readonly actions: GridActions;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
+  /**
+   * Resolve browser viewport coordinates to an active-sheet cell for host-owned
+   * menus and interactions. Returns null outside the cell body.
+   */
+  getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
   /** Id of the currently visible sheet. */
   getActiveSheet(): SheetId;
   /**

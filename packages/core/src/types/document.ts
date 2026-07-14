@@ -4,6 +4,7 @@
 import type { CellScalar, CellStyle, CellValue, Column, ConditionalFormatRule } from "./cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 
+/** Workbook sheet schema used when creating a live grid. */
 export interface Sheet {
   id: SheetId;
   name: string;
@@ -62,6 +63,7 @@ export interface RowGroup {
   collapsed: boolean;
 }
 
+/** Live workbook schema containing ordered sheets and the active sheet ID. */
 export interface Workbook {
   sheets: Sheet[];
   activeSheet: SheetId;
@@ -82,8 +84,10 @@ export interface NamedRangeSnapshot {
   scope?: SheetId;
   range: Range;
 }
+/** Reject-or-warn policy attached to a data-validation rule. */
 export type ValidationPolicy = "reject" | "warn" | "allow";
 
+/** Serializable condition enforced by a data-validation rule. */
 export type DataValidationCondition =
   | { kind: "list"; values: readonly CellScalar[]; allowCustom?: boolean }
   | { kind: "number"; min?: number; max?: number }
@@ -113,11 +117,13 @@ export interface ProtectedRange {
   permissionKey?: string;
 }
 
+/** Serializable plain-text note anchored to a cell. */
 export interface CellNote {
   addr: CellAddress;
   text: string;
 }
 
+/** Atomic or partial handling for locally denied operations. */
 export type MutationPolicyMode = "atomic" | "partial";
 
 /**
@@ -145,14 +151,17 @@ export type CommitReason =
   /** `store.applyTransaction` from host code / unclassified. */
   | "api";
 
+/** Local operation and protected-range context supplied to the host policy. */
 export interface ProtectionRequest {
   protectedRange: Readonly<ProtectedRange>;
   operation: Readonly<DocumentOp>;
   commitReason: CommitReason;
 }
 
+/** Host-owned client UX permission callback for protected mutations. */
 export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny";
 
+/** Structured warning or rejection produced while applying an operation. */
 export type MutationIssue =
   | {
       kind: "validation";
@@ -172,11 +181,13 @@ export type MutationIssue =
       message: string;
     };
 
+/** Persistent display and grouping metadata for one document row. */
 export interface RowMetadata {
   height?: number;
   hidden?: boolean;
 }
 
+/** Serializable cell value and optional style inside a snapshot block. */
 export interface SnapshotCell {
   rowOffset: number;
   colOffset: number;
@@ -207,6 +218,7 @@ export interface CellBlock {
   cells: SnapshotCell[];
 }
 
+/** Serializable complete state for one workbook sheet. */
 export interface SheetSnapshot {
   id: SheetId;
   name: string;
@@ -228,6 +240,7 @@ export interface SheetSnapshot {
   cells: CellBlock[];
 }
 
+/** Schema-versioned serializable workbook document. */
 export interface WorkbookSnapshot {
   schemaVersion: 1;
   documentId?: string;
@@ -239,6 +252,7 @@ export interface WorkbookSnapshot {
   sheets: SheetSnapshot[];
 }
 
+/** Exhaustive serializable operation union for workbook mutations. */
 export type DocumentOp =
   | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle }
   | { op: "setRange"; range: Range; cells: SnapshotCell[] }

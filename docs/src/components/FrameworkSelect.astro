@@ -1,0 +1,64 @@
+---
+const frameworks = [
+  { label: "Vanilla", href: "/docs/frameworks/vanilla/" },
+  { label: "React", href: "/docs/frameworks/react/" },
+  { label: "Vue", href: "/docs/frameworks/vue/" },
+  { label: "Svelte", href: "/docs/frameworks/svelte/" },
+] as const;
+const current = frameworks.find(({ href }) => Astro.url.pathname.startsWith(href))?.label ?? "";
+---
+
+<div class="sw-framework-menu">
+  <details data-framework-menu data-current={current}>
+    <summary aria-label="Choose framework">
+      <span data-framework-label>{current || "Framework"}</span>
+    </summary>
+    <nav class="sw-framework-options" aria-label="Framework guides">
+      {frameworks.map(({ label, href }) => (
+        <a
+          href={href}
+          data-framework={label}
+          aria-current={label === current ? "page" : undefined}
+        >
+          {label}
+        </a>
+      ))}
+    </nav>
+  </details>
+</div>
+
+<script>
+  const menus = [...document.querySelectorAll<HTMLDetailsElement>("[data-framework-menu]")];
+  const storageKey = "sheetwrite-docs-framework";
+  const current = menus.find((menu) => menu.dataset.current)?.dataset.current;
+  const selected = current || localStorage.getItem(storageKey);
+
+  if (current) localStorage.setItem(storageKey, current);
+  if (selected) {
+    for (const menu of menus) {
+      const label = menu.querySelector<HTMLElement>("[data-framework-label]");
+      const link = menu.querySelector<HTMLAnchorElement>(`[data-framework="${selected}"]`);
+      if (!label || !link) continue;
+      label.textContent = selected;
+      link.dataset.selected = "";
+    }
+  }
+
+  for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-framework]")) {
+    link.addEventListener("click", () => {
+      if (link.dataset.framework) localStorage.setItem(storageKey, link.dataset.framework);
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    for (const menu of menus) {
+      if (event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      for (const menu of menus) menu.open = false;
+    }
+  });
+</script>

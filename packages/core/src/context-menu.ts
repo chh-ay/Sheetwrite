@@ -1,6 +1,6 @@
-import type { CellAddress } from "./types/coordinates.js";
 import type {
   ContextMenuActionName,
+  ContextMenuContext,
   ContextMenuItem,
   Grid,
   GridActions,
@@ -113,13 +113,14 @@ function actionHandler(
 }
 
 /**
- * Floating right-click menu. Rows are built once in the constructor; `open` only
- * repositions and shows. Global dismiss listeners live only while the menu is open.
+ * Floating right-click menu. Dynamic rows are resolved for each opening;
+ * global dismiss listeners live only while the menu is open.
  */
 export class ContextMenu {
   private readonly el: HTMLDivElement;
+  private readonly config: GridConfig;
+  private readonly actions: GridActions;
   private readonly grid: Grid;
-  private cell: CellAddress | null = null;
 
   constructor(
     host: HTMLElement,
@@ -128,12 +129,15 @@ export class ContextMenu {
     actions: GridActions,
     grid: Grid,
   ) {
+    this.config = config;
+    this.actions = actions;
     this.grid = grid;
 
     seedWidgetTheme(host, theme);
 
     const menu = document.createElement("div");
     menu.className = "sheetwrite-context-menu";
+    menu.setAttribute("role", "menu");
     // Fixed positioning + visibility toggle are behavior; cosmetics live in styles.css.
     menu.style.position = "fixed";
     menu.style.display = "none";
@@ -141,49 +145,18 @@ export class ContextMenu {
     // Keep grid focus so selection-based actions act on the right cells.
     menu.addEventListener("mousedown", (e) => e.preventDefault());
 
-    const separator = (): HTMLDivElement => {
-      const s = document.createElement("div");
-      s.className = "sheetwrite-context-menu-sep";
-      return s;
-    };
-
-    const row = (item: ContextMenuItem): HTMLDivElement => {
-      const el = document.createElement("div");
-      el.className = "sheetwrite-context-menu-item";
-
-      const action = item.action;
-      el.textContent =
-        item.label ?? (action && action !== "separator" ? (DEFAULT_LABEL[action] ?? action) : "");
-
-      const onClick = item.onClick;
-      const run = onClick ? () => onClick(this.grid, this.cell) : actionHandler(action, actions);
-
-      el.addEventListener("click", () => {
-        run();
-        this.close();
-      });
-
-      return el;
-    };
-
-    const items = Array.isArray(config.contextMenu) ? config.contextMenu : DEFAULT_ITEMS;
-
-    for (const item of items) {
-      menu.appendChild(item.action === "separator" ? separator() : row(item));
-    }
-
     host.appendChild(menu);
     this.el = menu;
   }
 
-  open(x: number, y: number, cell: CellAddress | null): void {
-    this.cell = cell;
+  open(context: ContextMenuContext): void {
+    this.render(context);
 
     const menu = this.el;
     menu.style.display = "block";
 
-    const clampedX = Math.max(0, Math.min(x, window.innerWidth - menu.offsetWidth));
-    const clampedY = Math.max(0, Math.min(y, window.innerHeight - menu.offsetHeight));
+    const clampedX = Math.max(0, Math.min(context.clientX, window.innerWidth - menu.offsetWidth));
+    const clampedY = Math.max(0, Math.min(context.clientY, window.innerHeight - menu.offsetHeight));
 
     menu.style.left = `${clampedX}px`;
     menu.style.top = `${clampedY}px`;
@@ -201,6 +174,72 @@ export class ContextMenu {
     this.el.remove();
   }
 
+  private render(context: ContextMenuContext): void {
+    const configured = this.config.contextMenu;
+    const items =
+      typeof configured === "function"
+        ? configured(context)
+        : Array.isArray(configured)
+          ? configured
+          : DEFAULT_ITEMS;
+    const normalized: ContextMenuItem[] = [];
+    for (const item of items) {
+      const visible =
+        typeof item.visible === "function" ? item.visible(context) : item.visible !== false;
+      if (!visible) continue;
+      if (item.action === "separator") {
+        if (normalized.length === 0 || normalized.at(-1)?.action === "separator") continue;
+      }
+      normalized.push(item);
+    }
+    if (normalized.at(-1)?.action === "separator") normalized.pop();
+
+    this.el.replaceChildren();
+    for (const item of normalized) {
+      if (item.action === "separator") {
+        const separator = document.createElement("div");
+        separator.className = "sheetwrite-context-menu-sep";
+        separator.setAttribute("role", "separator");
+        this.el.appendChild(separator);
+        continue;
+      }
+
+      const row = document.createElement("div");
+      row.className = "sheetwrite-context-menu-item";
+      row.setAttribute("role", "menuitem");
+      if (item.id) row.dataset.contextMenuItem = item.id;
+
+      const disabled =
+        typeof item.disabled === "function" ? item.disabled(context) : item.disabled === true;
+      if (disabled) {
+        row.classList.add("sheetwrite-context-menu-item-disabled");
+        row.setAttribute("aria-disabled", "true");
+      }
+
+      const label = document.createElement("span");
+      const action = item.action;
+      label.textContent = item.label ?? (action ? (DEFAULT_LABEL[action] ?? action) : "");
+      row.appendChild(label);
+
+      if (item.shortcut) {
+        const shortcut = document.createElement("span");
+        shortcut.className = "sheetwrite-context-menu-shortcut";
+        shortcut.textContent = item.shortcut;
+        row.appendChild(shortcut);
+      }
+
+      const run = item.onClick
+        ? () => item.onClick?.(this.grid, context.cell)
+        : actionHandler(action, this.actions);
+      row.addEventListener("click", () => {
+        if (disabled) return;
+        run();
+        this.close();
+      });
+      this.el.appendChild(row);
+    }
+  }
+
   private readonly onPointerDown = (e: PointerEvent): void => {
     if (!this.el.contains(e.target as Node)) this.close();
   };
@@ -216,7 +255,10 @@ export class ContextMenu {
   private addDismissListeners(): void {
     document.addEventListener("pointerdown", this.onPointerDown, true);
     document.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("scroll", this.onDismiss, { capture: true, once: true });
+    window.addEventListener("scroll", this.onDismiss, {
+      capture: true,
+      once: true,
+    });
     window.addEventListener("resize", this.onDismiss, { once: true });
   }
 

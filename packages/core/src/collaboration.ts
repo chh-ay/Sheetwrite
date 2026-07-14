@@ -3,12 +3,14 @@ import type { PresenceOverlay, Range, Selection } from "./types/coordinates.js";
 import type { Sheet, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 
+/** Public collaborator identity attached to presence updates. */
 export interface PresenceActor {
   id: string;
   displayName?: string;
   color?: string;
 }
 
+/** Ephemeral collaborator selection and activity update. */
 export interface PresenceMessage {
   actor: PresenceActor;
   activeSheet: string;
@@ -16,6 +18,7 @@ export interface PresenceMessage {
   sentAt: number;
 }
 
+/** Host transport contract for ephemeral presence messages. */
 export interface PresenceTransport {
   publish(message: PresenceMessage, signal?: AbortSignal): void | Promise<void>;
   subscribe(
@@ -24,6 +27,7 @@ export interface PresenceTransport {
   ): undefined | (() => void);
 }
 
+/** Controls which ephemeral collaborator details may be transmitted. */
 export interface PresencePrivacyOptions {
   shareDisplayName?: boolean;
   shareSelection?: boolean;
@@ -31,6 +35,7 @@ export interface PresencePrivacyOptions {
   allowActor?: (actor: Readonly<PresenceActor>) => boolean;
 }
 
+/** Identity, privacy, and timing options for presence coordination. */
 export interface PresenceCoordinatorOptions {
   actor: PresenceActor;
   privacy?: PresencePrivacyOptions;
@@ -41,6 +46,7 @@ export interface PresenceCoordinatorOptions {
   now?: () => number;
 }
 
+/** Connection or actor transition emitted by presence coordination. */
 export type PresenceCoordinatorEvent =
   | { type: "published"; message: PresenceMessage }
   | { type: "updated"; actorId: string }
@@ -213,6 +219,7 @@ export class PresenceCoordinator {
   }
 }
 
+/** Host-provided metadata describing a saved workbook revision. */
 export interface RevisionSummary {
   version: number;
   createdAt: string;
@@ -220,6 +227,7 @@ export interface RevisionSummary {
   label?: string;
 }
 
+/** Versioned restore request submitted to a revision adapter. */
 export interface RevisionRestoreRequest {
   documentId: string;
   targetVersion: number;
@@ -228,6 +236,7 @@ export interface RevisionRestoreRequest {
   signal?: AbortSignal;
 }
 
+/** Applied or conflict acknowledgement for a revision restore. */
 export type RevisionRestoreResponse =
   | {
       status: "applied";
@@ -238,6 +247,7 @@ export type RevisionRestoreResponse =
   | { status: "duplicate"; version: number; clientMutationId: string }
   | { status: "conflict"; currentVersion: number };
 
+/** Host persistence contract for revision history and restore. */
 export interface RevisionAdapter {
   listRevisions(documentId: string, signal?: AbortSignal): Promise<readonly RevisionSummary[]>;
   loadRevision(documentId: string, version: number, signal?: AbortSignal): Promise<unknown>;
@@ -245,12 +255,14 @@ export interface RevisionAdapter {
   restoreRevision(request: RevisionRestoreRequest): Promise<RevisionRestoreResponse>;
 }
 
+/** Document identity and version options for revision coordination. */
 export interface RevisionCoordinatorOptions {
   documentId: string;
   serverVersion: number;
   migrateSnapshot?: (snapshot: unknown) => unknown;
 }
 
+/** State or restore transition emitted by revision coordination. */
 export type RevisionCoordinatorEvent =
   | { type: "restored"; targetVersion: number; version: number }
   | { type: "conflict"; targetVersion: number; currentVersion: number }
@@ -258,6 +270,7 @@ export type RevisionCoordinatorEvent =
 
 type RevisionListener = (event: RevisionCoordinatorEvent) => void;
 
+/** Coordinates listing and restoring host-owned workbook revisions. */
 export class RevisionCoordinator {
   private readonly abortController = new AbortController();
   private readonly listeners = new Set<RevisionListener>();
@@ -336,16 +349,19 @@ export class RevisionCoordinator {
   }
 }
 
+/** Stable host-provided identity displayed on a comment message. */
 export interface CommentAuthorRef {
   id: string;
   displayName?: string;
   avatarUrl?: string;
 }
 
+/** Document location to which a comment thread is attached. */
 export type CommentAnchor =
   | { kind: "cell"; address: { sheet: string; row: number; col: number } }
   | { kind: "range"; range: Range };
 
+/** One immutable author message in a comment thread. */
 export interface CommentMessage {
   id: string;
   author: CommentAuthorRef;
@@ -354,6 +370,7 @@ export interface CommentMessage {
   editedAt?: string;
 }
 
+/** Versioned discussion anchored to a document location. */
 export interface CommentThread {
   id: string;
   documentId: string;
@@ -365,6 +382,7 @@ export interface CommentThread {
   resolvedAt?: string;
 }
 
+/** Serializable operation that creates or updates comment state. */
 export type CommentMutation =
   | {
       kind: "create";
@@ -376,6 +394,7 @@ export type CommentMutation =
   | { kind: "reply"; threadId: string; messageId: string; body: string }
   | { kind: "resolve"; threadId: string; resolved: boolean };
 
+/** Versioned comment mutation submitted to a host adapter. */
 export interface CommentMutationRequest {
   documentId: string;
   baseVersion: number;
@@ -384,6 +403,7 @@ export interface CommentMutationRequest {
   signal?: AbortSignal;
 }
 
+/** Applied, duplicate, or conflict acknowledgement for a comment mutation. */
 export type CommentMutationResponse =
   | {
       status: "applied";
@@ -394,17 +414,20 @@ export type CommentMutationResponse =
   | { status: "duplicate"; version: number; clientMutationId: string }
   | { status: "conflict"; currentVersion: number };
 
+/** Versioned comment-thread listing returned by a host adapter. */
 export interface CommentListResult {
   version: number;
   threads: readonly CommentThread[];
 }
 
+/** Comment mutation paired with its assigned server version. */
 export interface VersionedCommentEvent {
   version: number;
   thread: CommentThread;
   clientMutationId?: string;
 }
 
+/** Host persistence contract for versioned comment threads. */
 export interface CommentAdapter {
   listComments(documentId: string, signal?: AbortSignal): Promise<CommentListResult>;
   mutateComment(request: CommentMutationRequest): Promise<CommentMutationResponse>;
@@ -415,11 +438,13 @@ export interface CommentAdapter {
   ): undefined | (() => void);
 }
 
+/** Document identity and initial version for comment coordination. */
 export interface CommentCoordinatorOptions {
   documentId: string;
   serverVersion?: number;
 }
 
+/** State transition emitted by the comment coordinator. */
 export type CommentCoordinatorEvent =
   | { type: "loaded"; version: number; threads: readonly CommentThread[] }
   | { type: "changed"; version: number; thread: CommentThread }

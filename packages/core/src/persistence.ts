@@ -10,10 +10,13 @@ import type {
   VersionedOperation,
 } from "./types/transaction.js";
 
+/** Grid creation options accepted when hydrating a validated snapshot. */
 export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data">;
 
+/** Stable category for a persistence failure. */
 export type PersistenceErrorCode = "aborted" | "invalid-snapshot" | "not-found" | "commit-rejected";
 
+/** Typed failure raised by persistence and synchronization flows. */
 export class PersistenceError extends Error {
   constructor(
     readonly code: PersistenceErrorCode,

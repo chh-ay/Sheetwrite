@@ -19,6 +19,7 @@ export {
 
 import type { GridController } from "./grid-controller.js";
 
+/** Classification of adapter options as live-updatable or reset-sensitive. */
 export const GRID_OPTION_POLICY = {
   workbook: "reset",
   data: "reset",
@@ -36,15 +37,19 @@ export const GRID_OPTION_POLICY = {
   minColumns: "live",
 } as const satisfies Record<keyof GridOptions, "reset" | "live">;
 
+/** Reset-sensitive input change that requires an adapter to replace its Grid. */
 export type GridResetReason = "input-reset" | "renderer-reset";
+/** Reason an adapter published a ready Grid generation. */
 export type GridReadyReason = "initial" | GridResetReason;
 
+/** Grid handle, generation, and reason published after adapter initialization. */
 export interface GridReadyEvent {
   grid: Grid;
   generation: number;
   reason: GridReadyReason;
 }
 
+/** Framework-neutral readiness, change, and error callbacks shared by adapters. */
 export interface GridAdapterEventHandlers {
   onGridChange?: (event: ChangeEvent) => void;
   onSelectionChange?: (selection: Selection | null) => void;
@@ -57,20 +62,24 @@ export interface GridAdapterEventHandlers {
   onInitializationError?: (error: unknown) => void;
 }
 
+/** Optional explicit WASM source and initialization error callback for adapters. */
 export interface SheetwriteInitializationProps {
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
   onInitializationError?: (error: unknown) => void;
 }
 
+/** Explicit width and height accepted by framework adapters. */
 export type GridSizeProps =
   | { height: number | string; fill?: never }
   | { fill: true; height?: never };
 
+/** Optional width and height accepted by advanced framework adapters. */
 export interface OptionalGridSizeProps {
   height?: number | string;
   fill?: true;
 }
 
+/** Converts adapter size props into a host element style object. */
 export function gridSizeStyle(size: OptionalGridSizeProps): Record<string, string> {
   if (size.fill) return { width: "100%", height: "100%", minHeight: "0" };
   if (size.height !== undefined) {
@@ -84,6 +93,7 @@ export function gridSizeStyle(size: OptionalGridSizeProps): Record<string, strin
 
 const GRID_OPTION_KEYS = Object.keys(GRID_OPTION_POLICY) as Array<keyof GridOptions>;
 
+/** Extracts advanced GridOptions from framework adapter props. */
 export function extractGridOptions(source: Record<string, unknown>): GridOptions {
   const options: Partial<GridOptions> = {};
   for (const key of GRID_OPTION_KEYS) {
@@ -92,6 +102,7 @@ export function extractGridOptions(source: Record<string, unknown>): GridOptions
   return options as GridOptions;
 }
 
+/** Returns the first reset-sensitive adapter input that changed, if any. */
 export function getGridResetReason(
   previous: GridOptions,
   next: GridOptions,
@@ -105,6 +116,7 @@ export function getGridResetReason(
   return null;
 }
 
+/** Applies live-updatable adapter option changes to an existing Grid. */
 export function applyChangedLiveGridOptions(
   controller: GridController,
   previous: GridOptions,
@@ -117,8 +129,10 @@ export function applyChangedLiveGridOptions(
   if (previous.minColumns !== next.minColumns) controller.setMinColumns(next.minColumns);
 }
 
+/** Default pixel width assigned to simple adapter columns. */
 export const DEFAULT_SIMPLE_COLUMN_WIDTH = 120;
 
+/** Column definition accepted by the adapters’ simple row-object API. */
 export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   key: keyof Row & string;
   title: string;
@@ -130,17 +144,20 @@ export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   visible?: boolean;
 }
 
+/** Framework-neutral simple columns, rows, sizing, and grid options. */
 export interface SimpleSheetwriteOptions<Row extends Record<string, CellScalar>> {
   columns: readonly SimpleColumn<Row>[];
   defaultRows: readonly Row[];
   sheetName?: string;
 }
 
+/** Normalized workbook and columnar data produced from simple adapter props. */
 export interface SimpleGridInput {
   workbook: Workbook;
   data: ColumnarData;
 }
 
+/** Converts simple columns and row objects into canonical workbook and columnar input. */
 export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
   options: SimpleSheetwriteOptions<Row>,
 ): SimpleGridInput {

@@ -1,0 +1,42 @@
+{
+  "name": "@sheetwrite/docs-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "bun ../scripts/docs.ts generate && astro build",
+    "preview": "astro preview",
+    "typecheck": "bun ../scripts/docs.ts generate && astro check"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/space-grotesk": "^5.2.10",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@sheetwrite/core": "workspace:*",
+    "@sheetwrite/react": "workspace:*",
+    "@sheetwrite/svelte": "workspace:*",
+    "@sheetwrite/vue": "workspace:*",
+    "@sheetwrite/wasm": "workspace:*",
+    "@sheetwrite/xlsx": "workspace:*",
+    "@tailwindcss/vite": "^4.3.2",
+    "react": "^19",
+    "react-dom": "^19",
+    "svelte": "^5",
+    "tailwindcss": "^4.3.2",
+    "vue": "^3.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9",
+    "@astrojs/react": "^5.0.7",
+    "@astrojs/sitemap": "^3.7.2",
+    "@astrojs/starlight": "0.40.0",
+    "@astrojs/svelte": "^8.1.2",
+    "@astrojs/vue": "^6.0.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "astro": "^6.4.8",
+    "typescript": "^6",
+    "vite": "^7.3.6"
+  }
+}

@@ -1,8 +1,10 @@
 // Coordinate, range, selection, and presence contracts for @sheetwrite/core.
 // No runtime values live here.
 
+/** Stable identifier used to address a workbook sheet. */
 export type SheetId = string;
 
+/** Zero-based address of one cell on a stable sheet ID. */
 export interface CellAddress {
   sheet: SheetId;
   row: number;
@@ -17,6 +19,7 @@ export interface MergeRange {
   c1: number;
 }
 
+/** Inclusive rectangular cell range on a stable sheet ID. */
 export interface Range {
   sheet: SheetId;
   start: { row: number; col: number };
@@ -41,6 +44,7 @@ export interface PresenceOverlay {
   ranges: readonly Range[];
 }
 
+/** Current cell, range, row, column, or multi-range selection. */
 export type Selection =
   | { kind: "cell"; addr: CellAddress }
   | { kind: "range"; range: Range }

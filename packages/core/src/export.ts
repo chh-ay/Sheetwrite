@@ -236,6 +236,7 @@ export interface XlsxTableExportBackend {
 
 let tableExportBackend: XlsxTableExportBackend | null = null;
 
+/** Registers the optional table XLSX export implementation used by core. */
 export function setXlsxTableExportBackend(next: XlsxTableExportBackend): void {
   tableExportBackend = next;
 }
@@ -246,6 +247,7 @@ function missingXlsxBackend(functionName: string): Error {
   );
 }
 
+/** Exports a table model through the registered optional XLSX backend. */
 export function toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array> {
   if (!tableExportBackend) throw missingXlsxBackend("toXlsxTable");
   return tableExportBackend.toXlsxTable(workbook, store);
@@ -265,6 +267,7 @@ export interface XlsxTableImportBackend {
 
 let tableImportBackend: XlsxTableImportBackend | null = null;
 
+/** Registers the optional table XLSX import implementation used by core. */
 export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
   tableImportBackend = next;
 }
@@ -282,6 +285,7 @@ export function fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarD
 
 // ── Workbook-level XLSX round-trip ───────────────────────────────────────────
 
+/** Structured fidelity warning emitted during workbook XLSX conversion. */
 export interface XlsxWorkbookWarning {
   code:
     | "boolean-literal"
@@ -294,6 +298,7 @@ export interface XlsxWorkbookWarning {
   cell?: string;
 }
 
+/** Workbook XLSX conversion options passed to the registered backend. */
 export interface XlsxWorkbookOptions {
   /** Abort before or between workbook model operations. */
   signal?: AbortSignal;
@@ -306,6 +311,7 @@ export interface XlsxWorkbookOptions {
   onWarning?: (warning: XlsxWorkbookWarning) => void;
 }
 
+/** Optional backend contract for complete workbook XLSX interchange. */
 export interface XlsxWorkbookBackend {
   name: string;
   toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
@@ -317,6 +323,7 @@ export interface XlsxWorkbookBackend {
 
 let workbookBackend: XlsxWorkbookBackend | null = null;
 
+/** Registers the optional workbook XLSX implementation used by core. */
 export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void {
   workbookBackend = next;
 }

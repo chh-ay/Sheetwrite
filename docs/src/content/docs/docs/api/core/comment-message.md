@@ -1,0 +1,63 @@
+---
+title: "CommentMessage | @sheetwrite/core"
+description: "One immutable author message in a comment thread."
+tableOfContents: false
+---
+<!-- api-export:@sheetwrite/core|.|CommentMessage -->
+[← @sheetwrite/core](/docs/api/core/)
+
+<span class="api-status">interface</span>
+
+One immutable author message in a comment thread.
+
+<dl class="api-metadata">
+<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L365</code></dd></div>
+</dl>
+
+## Members <span class="api-count">5</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="comment-message-id" data-pagefind-weight="1">
+<summary><code>id</code></summary>
+<pre><code>id: string;</code></pre>
+</details>
+
+<details class="api-member" id="comment-message-author" data-pagefind-weight="1">
+<summary><code>author</code></summary>
+<pre><code>author: CommentAuthorRef;</code></pre>
+</details>
+
+<details class="api-member" id="comment-message-body" data-pagefind-weight="1">
+<summary><code>body</code></summary>
+<pre><code>body: string;</code></pre>
+</details>
+
+<details class="api-member" id="comment-message-created-at" data-pagefind-weight="1">
+<summary><code>createdAt</code></summary>
+<pre><code>createdAt: string;</code></pre>
+</details>
+
+<details class="api-member" id="comment-message-edited-at" data-pagefind-weight="1">
+<summary><code>editedAt</code></summary>
+<pre><code>editedAt?: string;</code></pre>
+</details>
+</div>
+
+## Declaration
+
+<details class="api-declaration">
+<summary>View full TypeScript declaration</summary>
+
+```ts generated title="TypeScript declaration"
+export interface CommentMessage {
+    id: string;
+    author: CommentAuthorRef;
+    body: string;
+    createdAt: string;
+    editedAt?: string;
+}
+```
+
+</details>

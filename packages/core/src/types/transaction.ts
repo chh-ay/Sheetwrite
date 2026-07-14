@@ -17,6 +17,7 @@ export interface Transaction {
   epoch?: number;
 }
 
+/** Outcome of applying a document transaction, including conflict, rejection, and no-op states. */
 export type ApplyTransactionResult =
   | {
       status: "applied";
@@ -37,8 +38,10 @@ export type ApplyTransactionResult =
       reason: "empty" | "out-of-bounds" | "incomplete-data" | "read-only";
     };
 
+/** Whether a committed change originated locally or from remote host input. */
 export type OperationSource = "local" | "remote";
 
+/** Source and commit classification used when applying a transaction. */
 export interface TransactionApplicationOptions {
   /** Distinguishes host persistence input from local user/API output. */
   source?: OperationSource;
@@ -46,10 +49,12 @@ export interface TransactionApplicationOptions {
   commitReason?: CommitReason;
 }
 
+/** Classification metadata for host-supplied remote operations. */
 export interface RemoteOperationOptions {
   commitReason?: CommitReason;
 }
 
+/** Immutable local operation batch awaiting a host acknowledgement. */
 export interface PendingCommit {
   documentId: string;
   baseVersion: number;
@@ -57,6 +62,7 @@ export interface PendingCommit {
   readonly operations: readonly DocumentOp[];
 }
 
+/** Lifecycle state of one local mutation in the synchronization queue. */
 export type SyncMutationStatus =
   | "persisting"
   | "pending"
@@ -64,20 +70,24 @@ export type SyncMutationStatus =
   | "conflicted"
   | "storage-error";
 
+/** Pending commit paired with its current synchronization status. */
 export interface SyncMutationRecord extends PendingCommit {
   status: SyncMutationStatus;
 }
 
+/** Remote document operations paired with a contiguous server version. */
 export interface VersionedOperation {
   version: number;
   readonly operations: readonly DocumentOp[];
   clientMutationId?: string;
 }
 
+/** Cancellable pending commit submitted to a persistence adapter. */
 export interface PersistenceCommitRequest extends PendingCommit {
   signal?: AbortSignal;
 }
 
+/** Applied, duplicate, or conflict acknowledgement from persistence. */
 export type PersistenceCommitResponse =
   | {
       status: "applied";
@@ -93,11 +103,13 @@ export type PersistenceCommitResponse =
       snapshot?: WorkbookSnapshot;
     };
 
+/** Host load and commit contract for versioned workbook persistence. */
 export interface PersistenceAdapter {
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
 }
 
+/** Host subscription contract for ordered versioned operations. */
 export interface RemoteOperationSource {
   subscribe(
     listener: (operation: VersionedOperation) => void,

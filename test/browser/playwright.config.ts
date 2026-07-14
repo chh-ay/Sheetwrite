@@ -15,7 +15,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: `bun run --filter '@sheetwrite/example-site' preview --host 127.0.0.1 --port ${SITE_PORT}`,
+    command: `bun run --filter '@sheetwrite/docs-site' preview --host 127.0.0.1 --port ${SITE_PORT}`,
     url: `http://localhost:${SITE_PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,

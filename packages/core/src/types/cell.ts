@@ -3,8 +3,10 @@
 
 import type { CellAddress, Range } from "./coordinates.js";
 
+/** Horizontal text alignment supported by cell styles. */
 export type CellAlign = "left" | "center" | "right";
 
+/** Visual border applied to one or more sides of a cell. */
 export interface CellBorder {
   /** hex color, e.g. "#111111" */
   color?: string;
@@ -21,6 +23,7 @@ export interface CellBorders {
   left?: CellBorder;
 }
 
+/** Serializable formatting applied to a cell or used as a column default. */
 export interface CellStyle {
   bold?: boolean;
   italic?: boolean;
@@ -36,12 +39,14 @@ export interface CellStyle {
   border?: CellBorders;
 }
 
+/** Predicate used to decide whether a conditional format applies. */
 export type ConditionalFormatPredicate =
   | { kind: "greaterThan"; value: number }
   | { kind: "lessThan"; value: number }
   | { kind: "equal"; value: CellScalar }
   | { kind: "contains"; text: string; matchCase?: boolean };
 
+/** Ordered condition and style applied to a cell range. */
 export interface ConditionalFormatRule {
   range: Range;
   when: ConditionalFormatPredicate;
@@ -69,6 +74,7 @@ export type CellValue =
   | { kind: "ref"; target: CellAddress }
   | { kind: "formula"; src: string };
 
+/** Schema and default presentation for one workbook column. */
 export interface Column {
   key: string;
   header: string;

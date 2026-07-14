@@ -101,6 +101,7 @@ export interface SheetwriteStoreOptions {
   mutationPolicy?: MutationPolicyMode;
 }
 
+/** Error thrown when an operation requires datasource cells that are not loaded. */
 export class IncompleteDataError extends Error {
   readonly capability: Extract<QueryCapability, { status: "incomplete" }>;
 

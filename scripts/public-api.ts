@@ -4,11 +4,14 @@ import { join, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 
+export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";
+
 export interface ApiExport {
   name: string;
   kind: string;
   signature: string;
   owners: string[];
+  source: string;
   jsDocTags: string[];
   documentation: string;
 }
@@ -18,6 +21,7 @@ export interface ApiEntryPoint {
   target: string;
   source?: string;
   kind: "typescript" | "asset";
+  classification: ApiEntryClassification;
   exports: ApiExport[];
 }
 
@@ -37,9 +41,11 @@ export interface ApiIssue {
     | "duplicate-export"
     | "forbidden-export"
     | "malformed-report"
+    | "missing-documentation"
     | "missing-export"
     | "parse-error"
     | "manifest-drift"
+    | "unclassified-entry"
     | "wrong-owner"
     | "unresolved-entry";
   message: string;
@@ -61,6 +67,7 @@ interface ResolvedEntry {
   target: string;
   source?: string;
   kind: "typescript" | "asset";
+  classification: ApiEntryClassification;
 }
 
 const FORBIDDEN_EXPORTS = new Set([
@@ -90,6 +97,14 @@ const REQUIRED_CORE_EXPORTS = new Set([
   "XlsxWorkbookBackend",
   "setXlsxWorkbookBackend",
 ]);
+
+const SUPPORTED_PACKAGES: Readonly<Record<string, true>> = {
+  "@sheetwrite/core": true,
+  "@sheetwrite/react": true,
+  "@sheetwrite/svelte": true,
+  "@sheetwrite/vue": true,
+  "@sheetwrite/xlsx": true,
+};
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -145,8 +160,6 @@ function isTypescriptTarget(target: string): boolean {
 async function resolveSource(packageRoot: string, target: string): Promise<string | undefined> {
   const normalized = target.replace(/^\.\//, "");
   const published = resolve(packageRoot, normalized);
-  if (await exists(published)) return published;
-
   const sourceCandidates: string[] = [];
   if (normalized.startsWith("dist/")) {
     const sourcePath = normalized.slice("dist/".length);
@@ -164,6 +177,7 @@ async function resolveSource(packageRoot: string, target: string): Promise<strin
   for (const candidate of sourceCandidates) {
     if (await exists(candidate)) return candidate;
   }
+  if (await exists(published)) return published;
   return undefined;
 }
 
@@ -183,24 +197,50 @@ async function packageDirectories(repositoryRoot: string): Promise<string[]> {
   return directories.sort();
 }
 
+function classifyEntry(
+  packageName: string,
+  subpath: string,
+  kind: "typescript" | "asset",
+): ApiEntryClassification | undefined {
+  if (kind === "asset") return "asset";
+  if (packageName === "@sheetwrite/core" && subpath === "./testing") return "test-only";
+  if (packageName === "@sheetwrite/wasm" && subpath === ".") return "internal";
+  if (SUPPORTED_PACKAGES[packageName] === true) return "supported";
+  return undefined;
+}
+
 async function resolveEntries(
   packageRoot: string,
   manifest: PackageJson,
-): Promise<ResolvedEntry[]> {
+): Promise<{ entries: ResolvedEntry[]; issues: ApiIssue[] }> {
   const entries: ResolvedEntry[] = [];
+  const issues: ApiIssue[] = [];
+  const packageName = manifest.name ?? "";
   for (const [subpath, target] of exportedSubpaths(manifest)) {
-    if (!isTypescriptTarget(target)) {
-      entries.push({ subpath, target, kind: "asset" });
+    const kind = isTypescriptTarget(target) ? "typescript" : "asset";
+    const classification = classifyEntry(packageName, subpath, kind);
+    if (classification === undefined) {
+      issues.push({
+        code: "unclassified-entry",
+        message: `${packageName} ${subpath} (${target}) has no public API classification`,
+        package: packageName,
+        entryPoint: subpath,
+      });
+      continue;
+    }
+    if (kind === "asset") {
+      entries.push({ subpath, target, kind, classification });
       continue;
     }
     entries.push({
       subpath,
       target,
       source: await resolveSource(packageRoot, target),
-      kind: "typescript",
+      kind,
+      classification,
     });
   }
-  return entries;
+  return { entries, issues };
 }
 
 function normalizeText(text: string): string {
@@ -419,11 +459,20 @@ function analyzeEntry(
     .getExportsOfModule(moduleSymbol)
     .map((exported): ApiExport => {
       const target = resolvedSymbol(exported, checker);
+      const declarations = target.getDeclarations() ?? [];
       const owners = new Set(
-        (target.getDeclarations() ?? []).map((declaration) =>
+        declarations.map((declaration) =>
           posix(relative(packageRoot, declaration.getSourceFile().fileName)),
         ),
       );
+      const declaration = declarations[0];
+      const source =
+        declaration === undefined
+          ? ""
+          : `${posix(relative(packageRoot, declaration.getSourceFile().fileName))}#L${
+              declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart())
+                .line + 1
+            }`;
       const tags = new Set([...collectTags(exported, checker), ...collectTags(target, checker)]);
       const documentation = [exported, target]
         .map((symbol) => ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim())
@@ -433,6 +482,7 @@ function analyzeEntry(
         kind: symbolKind(target),
         signature: declarationSignature(target, checker),
         owners: [...owners].sort(),
+        source,
         jsDocTags: [...tags].sort(),
         documentation: documentation.join("\n\n"),
       };
@@ -458,6 +508,15 @@ function analyzeEntry(
         symbol: apiExport.name,
       });
     }
+    if (entry.classification === "supported" && apiExport.documentation.trim().length === 0) {
+      issues.push({
+        code: "missing-documentation",
+        message: `${packageName} ${entry.subpath} export ${apiExport.name} has no source JSDoc summary`,
+        package: packageName,
+        entryPoint: entry.subpath,
+        symbol: apiExport.name,
+      });
+    }
   }
 
   return {
@@ -466,6 +525,7 @@ function analyzeEntry(
       target: entry.target,
       source: posix(relative(packageRoot, entry.source)),
       kind: entry.kind,
+      classification: entry.classification,
       exports: apiExports,
     },
     issues,
@@ -492,6 +552,14 @@ export function validateManifest(value: unknown): ApiIssue[] {
       if (typeof entry.subpath !== "string" || !Array.isArray(entry.exports)) {
         return malformed(`${pkg.name} contains a partial entry point`);
       }
+      if (
+        entry.classification !== "supported" &&
+        entry.classification !== "internal" &&
+        entry.classification !== "asset" &&
+        entry.classification !== "test-only"
+      ) {
+        return malformed(`${pkg.name} ${entry.subpath} has no valid classification`);
+      }
       const names = new Set<string>();
       for (const apiExport of entry.exports) {
         if (
@@ -499,6 +567,7 @@ export function validateManifest(value: unknown): ApiIssue[] {
           typeof apiExport.kind !== "string" ||
           typeof apiExport.signature !== "string" ||
           !Array.isArray(apiExport.owners) ||
+          typeof apiExport.source !== "string" ||
           !Array.isArray(apiExport.jsDocTags) ||
           typeof apiExport.documentation !== "string"
         ) {
@@ -513,7 +582,7 @@ export function validateManifest(value: unknown): ApiIssue[] {
   return [];
 }
 export const PUBLIC_API_BASELINE_SHA256 =
-  "3d74c6ae014fb74d2283d6543ed037cdf13065d1ddb91a6bf80284d07128ebb5";
+  "6d7803019a05454bc22bdc64cc9bf3193bf18c7ead8c07c6f49a8c1cde7a1ec5";
 
 export function publicApiDigest(manifest: PublicApiManifest): string {
   return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
@@ -543,9 +612,10 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<{
   for (const packageRoot of await packageDirectories(repositoryRoot)) {
     const packageManifest = await readJson<PackageJson>(join(packageRoot, "package.json"));
     if (packageManifest.name === undefined || packageManifest.private === true) continue;
-    const resolvedEntries = await resolveEntries(packageRoot, packageManifest);
+    const resolved = await resolveEntries(packageRoot, packageManifest);
+    issues.push(...resolved.issues);
     const entryPoints: ApiEntryPoint[] = [];
-    for (const entry of resolvedEntries) {
+    for (const entry of resolved.entries) {
       if (entry.kind === "asset") {
         entryPoints.push({ ...entry, exports: [] });
         continue;
@@ -554,7 +624,7 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<{
       entryPoints.push(analyzed.entry);
       issues.push(...analyzed.issues);
     }
-    packages.push({ name: packageManifest.name, entryPoints });
+    if (entryPoints.length > 0) packages.push({ name: packageManifest.name, entryPoints });
   }
 
   const manifest: PublicApiManifest = { formatVersion: 2, packages };

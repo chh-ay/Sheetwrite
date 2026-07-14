@@ -2,6 +2,7 @@ import type { CellValue } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
 
+/** Stable conservative-rebase conflict category. */
 export type RebaseConflictCode =
   | "overlapping-edit"
   | "sheet-removed"
@@ -10,6 +11,7 @@ export type RebaseConflictCode =
   | "structural-overlap"
   | "unsupported-structural";
 
+/** Reason and affected operations for an unsafe document rebase. */
 export interface RebaseConflict {
   code: RebaseConflictCode;
   localOperationIndex: number;
@@ -17,6 +19,7 @@ export interface RebaseConflict {
   message: string;
 }
 
+/** Successful rebased operations or a conservative rebase conflict. */
 export type DocumentRebaseResult =
   | { status: "rebased"; operations: readonly DocumentOp[] }
   | { status: "conflict"; conflict: RebaseConflict };

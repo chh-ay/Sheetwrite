@@ -1,8 +1,10 @@
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type { DocumentOp, SheetSnapshot, WorkbookSnapshot } from "./types/document.js";
 
+/** Current workbook snapshot schema version accepted by Sheetwrite. */
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
 
+/** Path-qualified validation failure for a document operation. */
 export interface DocumentValidationError {
   path: string;
   code:
@@ -16,10 +18,12 @@ export interface DocumentValidationError {
   message: string;
 }
 
+/** Success or structured errors returned by document validation. */
 export type DocumentValidationResult =
   | { ok: true; value: WorkbookSnapshot }
   | { ok: false; errors: DocumentValidationError[] };
 
+/** Path-qualified schema failure found while validating an untrusted snapshot. */
 export class SnapshotValidationError extends Error {
   readonly code = "invalid-snapshot";
 

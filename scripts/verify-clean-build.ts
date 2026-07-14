@@ -19,8 +19,8 @@ const GENERATED_OUTPUTS = [
   "packages/xlsx/dist",
   "packages/react/dist",
   "packages/vue/dist",
-  "examples/site/dist",
-  "examples/site/.astro",
+  "docs/dist",
+  "docs/.astro",
 ] as const;
 
 const RUNTIME_ENTRY_PATHS = [

@@ -1,0 +1,75 @@
+---
+title: "SpreadsheetShell | @sheetwrite/core/shell"
+description: "Disposable controller for the framework-neutral spreadsheet shell."
+tableOfContents: false
+---
+<!-- api-export:@sheetwrite/core|./shell|SpreadsheetShell -->
+[← @sheetwrite/core/shell](/docs/api/core-shell/)
+
+<span class="api-status">interface</span>
+
+Disposable controller for the framework-neutral spreadsheet shell.
+
+<dl class="api-metadata">
+<div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/shell/spreadsheet-shell.ts#L34</code></dd></div>
+</dl>
+
+## Members <span class="api-count">7</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="spreadsheet-shell-grid" data-pagefind-weight="1">
+<summary><code>grid</code></summary>
+<pre><code>readonly grid: Grid;</code></pre>
+</details>
+
+<details class="api-member" id="spreadsheet-shell-element" data-pagefind-weight="1">
+<summary><code>element</code></summary>
+<pre><code>readonly element: HTMLElement;</code></pre>
+</details>
+
+<details class="api-member" id="spreadsheet-shell-set-theme" data-pagefind-weight="1">
+<summary><code>setTheme</code></summary>
+<pre><code>setTheme(theme: Partial&lt;Theme&gt;): void;</code></pre>
+</details>
+
+<details class="api-member" id="spreadsheet-shell-set-read-only" data-pagefind-weight="1">
+<summary><code>setReadOnly</code></summary>
+<pre><code>setReadOnly(readOnly: boolean): void;</code></pre>
+</details>
+
+<details class="api-member" id="spreadsheet-shell-set-grid-config" data-pagefind-weight="1">
+<summary><code>setGridConfig</code></summary>
+<pre><code>setGridConfig(config: GridConfig | undefined): void;</code></pre>
+</details>
+
+<details class="api-member" id="spreadsheet-shell-set-active-sheet" data-pagefind-weight="1">
+<summary><code>setActiveSheet</code></summary>
+<pre><code>setActiveSheet(id: SheetId): void;</code></pre>
+</details>
+
+<details class="api-member" id="spreadsheet-shell-destroy" data-pagefind-weight="1">
+<summary><code>destroy</code></summary>
+<pre><code>destroy(): void;</code></pre>
+</details>
+</div>
+
+## Declaration
+
+<details class="api-declaration">
+<summary>View full TypeScript declaration</summary>
+
+```ts generated title="TypeScript declaration"
+export interface SpreadsheetShell {
+    readonly grid: Grid;
+    readonly element: HTMLElement;
+    setTheme(theme: Partial<Theme>): void;
+    setReadOnly(readOnly: boolean): void;
+    setGridConfig(config: GridConfig | undefined): void;
+    setActiveSheet(id: SheetId): void;
+    destroy(): void;
+}
+```
+
+</details>

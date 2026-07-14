@@ -287,14 +287,28 @@
 }
 
 .sheetwrite-context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   padding: 5px 14px;
   cursor: pointer;
   white-space: nowrap;
   background: transparent;
 }
 
-.sheetwrite-context-menu-item:hover {
+.sheetwrite-context-menu-item:hover:not(.sheetwrite-context-menu-item-disabled) {
   background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-context-menu-item-disabled {
+  cursor: default;
+  opacity: var(--sheetwrite-menu-disabled-opacity, 0.5);
+}
+
+.sheetwrite-context-menu-shortcut {
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 0.9em;
 }
 
 .sheetwrite-context-menu-sep {

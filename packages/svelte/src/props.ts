@@ -8,6 +8,7 @@ import type {
 import type { Snippet } from "svelte";
 import type { HTMLAttributes } from "svelte/elements";
 
+/** Advanced framework adapter props for workbook data or datasource ownership. */
 export interface SheetwriteGridProps
   extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | "children">,
     GridAdapterEventHandlers,
@@ -32,6 +33,7 @@ export interface SheetwriteGridProps
   grid?: Grid;
 }
 
+/** Simple framework adapter props for columns and default row objects. */
 export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
   SheetwriteGridProps,
   "workbook" | "data" | "datasource" | "height" | "fill"

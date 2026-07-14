@@ -14,19 +14,33 @@ const roots: string[] = [];
 const canonicalDeclarations = `
 /** Canonical document operation. */
 export type DocumentOp = { op: "set" };
+/** Cancellable host datasource contract. */
 export interface DataSource { getRows(request: unknown): Promise<unknown>; }
+/** Committed grid change payload. */
 export interface ChangeEvent { transaction: { patches: DocumentOp[] }; }
+/** Low-level transaction store. */
 export interface Store { applyTransaction(tx: { patches: DocumentOp[] }): void; }
+/** Optional table export backend. */
 export interface XlsxTableExportBackend { toXlsxTable(): Promise<Uint8Array>; }
+/** Optional table import backend. */
 export interface XlsxTableImportBackend { fromXlsxTable(): Promise<unknown>; }
+/** Optional workbook backend. */
 export interface XlsxWorkbookBackend { toXlsxWorkbook(): Promise<Uint8Array>; }
+/** Exports a table through the registered backend. */
 export declare function toXlsxTable(): Promise<Uint8Array>;
+/** Imports a table through the registered backend. */
 export declare function fromXlsxTable(): Promise<unknown>;
+/** Registers table export. */
 export declare function setXlsxTableExportBackend(backend: XlsxTableExportBackend): void;
+/** Registers table import. */
 export declare function setXlsxTableImportBackend(backend: XlsxTableImportBackend): void;
+/** Exports a workbook through the registered backend. */
 export declare function toXlsxWorkbook(): Promise<Uint8Array>;
+/** Imports a workbook through the registered backend. */
 export declare function fromXlsxWorkbook(): Promise<unknown>;
+/** Registers workbook interchange. */
 export declare function setXlsxWorkbookBackend(backend: XlsxWorkbookBackend): void;
+/** Generic public fixture type. */
 export interface Box<T extends string = string> { value: T; }
 `;
 
@@ -122,6 +136,30 @@ describe("public API policy", () => {
     );
     const result = await analyzePublicApi(root);
     expect(result.issues).toContainEqual(expect.objectContaining({ code: "unresolved-entry" }));
+  });
+
+  it("reports an exact unclassified package entry point", async () => {
+    const root = await fixture();
+    const packageRoot = join(root, "packages/unknown");
+    await mkdir(packageRoot, { recursive: true });
+    await writeFile(
+      join(packageRoot, "package.json"),
+      JSON.stringify({
+        name: "@sheetwrite/unknown",
+        exports: { ".": { types: "./index.d.ts", default: "./index.js" } },
+      }),
+    );
+    await writeFile(
+      join(packageRoot, "index.d.ts"),
+      "/** Unknown fixture. */\nexport type Unknown = true;\n",
+    );
+    const result = await analyzePublicApi(root);
+    expect(result.issues).toContainEqual({
+      code: "unclassified-entry",
+      message: "@sheetwrite/unknown . (./index.d.ts) has no public API classification",
+      package: "@sheetwrite/unknown",
+      entryPoint: ".",
+    });
   });
 
   it("rejects malformed or partial reports", () => {

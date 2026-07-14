@@ -4,6 +4,7 @@
 import type { CellScalar, CellStyle, Column } from "./cell.js";
 import type { VisibleWindowView } from "./store.js";
 
+/** Resolved canvas colors, typography, and geometry used for painting. */
 export interface Theme {
   font: string;
   bg: string;
@@ -25,6 +26,7 @@ export interface Theme {
   highlight: string;
 }
 
+/** Read-only cell and canvas geometry supplied to a custom renderer. */
 export interface CellPaintContext {
   value: CellScalar;
   x: number;
@@ -35,6 +37,7 @@ export interface CellPaintContext {
   style: CellStyle;
 }
 
+/** Custom cell renderer hooks for the main-thread canvas or DOM overlay. */
 export interface CellRenderer {
   canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
   dom?(c: CellPaintContext): HTMLElement;

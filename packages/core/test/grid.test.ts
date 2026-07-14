@@ -670,6 +670,24 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
+  it("resolves pointer coordinates for host-owned context menus", () => {
+    const workbook = makeWorkbook(10);
+    const store = makeFakeStore(workbook);
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, config: { contextMenu: false } }, store);
+    const point = cellPoint(2, 1, workbook);
+
+    expect(grid.getCellAtPoint(point.clientX, point.clientY)).toEqual({
+      sheet: "s1",
+      row: 2,
+      col: 1,
+    });
+    expect(grid.getCellAtPoint(0, 0)).toBeNull();
+    expect(host.querySelector(".sheetwrite-context-menu")).toBeNull();
+
+    grid.destroy();
+  });
+
   it("skips chrome rebuild for a shallowly-equal config object", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));

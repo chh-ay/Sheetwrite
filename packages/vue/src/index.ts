@@ -37,6 +37,7 @@ import {
   watch,
 } from "vue";
 
+/** Imperative Grid handle exposed by the Vue advanced component. */
 export interface SheetwriteGridExpose {
   grid: Grid | null;
 }
@@ -232,10 +233,12 @@ const SheetwriteGridComponent = defineComponent({
   },
 });
 
+/** Advanced framework component for workbook data or datasource input. */
 export const SheetwriteGrid = SheetwriteGridComponent as typeof SheetwriteGridComponent & {
   new (): InstanceType<typeof SheetwriteGridComponent> & SheetwriteGridExpose;
 };
 
+/** Simple framework component that owns initialization and Grid lifetime. */
 export const Sheetwrite = defineComponent({
   name: "SheetwriteComponent",
   inheritAttrs: false,

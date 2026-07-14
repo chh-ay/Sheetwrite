@@ -46,7 +46,7 @@ The exposed `grid` handle is published before `@ready="({ grid, generation, reas
 
 Events are `grid-change`, `viewport-change`, `selection-change`, `edit-begin`, `edit-commit`, `search`, `active-sheet-change`, `ready`, and `initialization-error`. Native DOM change/scroll listeners remain available on the host.
 
-For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See the repository [getting-started](../../docs/getting-started.md) and [offline/collaboration](../../docs/collaboration.md) guides for explicit assets and durable sync.
+For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](../../docs/src/content/docs/docs/start/installation.md), [Vue integration](../../docs/src/content/docs/docs/frameworks/vue.md), and [collaboration](../../docs/src/content/docs/docs/guides/collaboration.md).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
 XLSX export, install `@sheetwrite/xlsx` and import

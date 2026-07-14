@@ -37,6 +37,7 @@ interface CapturedClipboard extends ClipboardSnapshot {
   clearPatches: DocumentOp[];
 }
 
+/** Private-format MIME type used for rich Sheetwrite clipboard payloads. */
 export const SHEETWRITE_CLIPBOARD_MIME = "application/x-sheetwrite+json";
 const SHEETWRITE_WEB_CLIPBOARD_FORMAT = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
 

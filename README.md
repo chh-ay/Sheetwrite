@@ -73,7 +73,7 @@ const grid = createGrid(document.querySelector("#grid")!, {
 });
 ```
 
-Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Getting started](docs/getting-started.md).
+Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Installation](docs/src/content/docs/docs/start/installation.md).
 
 ## Optional XLSX backend
 
@@ -101,8 +101,8 @@ first-row-header, first-sheet interchange; `toXlsxWorkbook` /
 `fromXlsxWorkbook` preserve multi-sheet snapshots and formula source through
 the in-memory workbook backend. Calling any XLSX function without registration
 throws an error naming the exact package and registration import. CSV and TSV
-remain core-only. See [Data operations](docs/data-operations.md#export) for
-limits and compatibility.
+remain core-only. See [XLSX and export](docs/src/content/docs/docs/guides/xlsx-export.md)
+for limits and compatibility.
 
 ## Persistence
 
@@ -127,9 +127,9 @@ const backup = grid.exportSnapshot();
 grid.applyRemoteOperations(remoteOperations); // observable, not dirty or undoable
 ```
 
-See [Offline and collaboration](docs/collaboration.md) for a complete HTTP
-adapter, database-neutral snapshot/operation-log schema, IndexedDB pending queue,
-conflict reload, conservative rebase, presence, comments, and revisions.
+See [Persistence and collaboration](docs/src/content/docs/docs/guides/collaboration.md)
+for the host adapter, pending queue, conflict reload, conservative rebase,
+presence, comments, and revisions.
 
 ## Packages
 
@@ -195,4 +195,4 @@ packed declarations and source maps separately from browser raw, gzip, and
 Brotli transfer bytes. Never resolve a breach by removing required tests,
 types, licenses, provenance, or debugging artifacts.
 
-See `docs/` for configuration, framework integration, worker rendering, export, accessibility, and performance guidance.
+Browse the canonical [documentation site source](docs/src/content/docs/docs/index.md) for routed guides, live-example links, evidence, and the generated API reference.

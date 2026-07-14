@@ -70,6 +70,7 @@ function pxToChars(px: number): number {
   return Math.max(1, Math.round((px - XLSX_WIDTH_PADDING) / PIXELS_PER_CHARACTER));
 }
 
+/** Tabular workbook model exchanged with the optional XLSX table backend. */
 export interface XlsxModel {
   data: SheetData;
   options: SheetOptions<Blob>;

@@ -16,7 +16,9 @@ export interface PendingCommitStorage {
   remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Promise<void>;
 }
 
+/** Host-controlled online state reported by synchronization. */
 export type SyncConnectionState = "offline" | "connecting" | "online" | "error" | "destroyed";
+/** Current persistence activity reported by a sync coordinator. */
 export type SyncActivityState =
   | "hydrating"
   | "idle"
@@ -27,6 +29,7 @@ export type SyncActivityState =
   | "error"
   | "destroyed";
 
+/** Immutable observable synchronization state. */
 export interface SyncStateSnapshot {
   connection: SyncConnectionState;
   activity: SyncActivityState;
@@ -34,6 +37,7 @@ export interface SyncStateSnapshot {
   serverVersion: number;
 }
 
+/** Contiguous-version recovery request produced when remote input skips ahead. */
 export interface SyncVersionGapRequest {
   documentId: string;
   expectedVersion: number;
@@ -41,6 +45,7 @@ export interface SyncVersionGapRequest {
   signal: AbortSignal;
 }
 
+/** Document, version, durability, and online options for synchronization. */
 export interface SyncCoordinatorOptions {
   documentId: string;
   serverVersion: number;
@@ -56,6 +61,7 @@ export interface SyncCoordinatorOptions {
   ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>;
 }
 
+/** Queue, version, connection, or error transition emitted by synchronization. */
 export type SyncCoordinatorEvent =
   | { type: "state"; state: SyncStateSnapshot }
   | { type: "restored"; pending: readonly SyncMutationRecord[] }

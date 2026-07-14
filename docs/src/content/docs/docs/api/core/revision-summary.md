@@ -1,0 +1,57 @@
+---
+title: "RevisionSummary | @sheetwrite/core"
+description: "Host-provided metadata describing a saved workbook revision."
+tableOfContents: false
+---
+<!-- api-export:@sheetwrite/core|.|RevisionSummary -->
+[← @sheetwrite/core](/docs/api/core/)
+
+<span class="api-status">interface</span>
+
+Host-provided metadata describing a saved workbook revision.
+
+<dl class="api-metadata">
+<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L223</code></dd></div>
+</dl>
+
+## Members <span class="api-count">4</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="revision-summary-version" data-pagefind-weight="1">
+<summary><code>version</code></summary>
+<pre><code>version: number;</code></pre>
+</details>
+
+<details class="api-member" id="revision-summary-created-at" data-pagefind-weight="1">
+<summary><code>createdAt</code></summary>
+<pre><code>createdAt: string;</code></pre>
+</details>
+
+<details class="api-member" id="revision-summary-actor" data-pagefind-weight="1">
+<summary><code>actor</code></summary>
+<pre><code>actor?: PresenceActor;</code></pre>
+</details>
+
+<details class="api-member" id="revision-summary-label" data-pagefind-weight="1">
+<summary><code>label</code></summary>
+<pre><code>label?: string;</code></pre>
+</details>
+</div>
+
+## Declaration
+
+<details class="api-declaration">
+<summary>View full TypeScript declaration</summary>
+
+```ts generated title="TypeScript declaration"
+export interface RevisionSummary {
+    version: number;
+    createdAt: string;
+    actor?: PresenceActor;
+    label?: string;
+}
+```
+
+</details>

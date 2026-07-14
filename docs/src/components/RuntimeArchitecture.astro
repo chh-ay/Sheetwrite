@@ -1,0 +1,267 @@
+<section class="sw-architecture" aria-label="Sheetwrite runtime ownership and data flow">
+  <header class="sw-architecture-intro">
+    <div>
+      <span class="sw-architecture-eyebrow">Composition root</span>
+      <strong>Grid host</strong>
+    </div>
+    <code>role="grid" · .sheetwrite · tabindex="0"</code>
+  </header>
+
+  <div class="sw-architecture-connector" aria-hidden="true"><span>owns</span></div>
+
+  <div class="sw-architecture-surfaces">
+    <article class="sw-architecture-card">
+      <span class="sw-architecture-eyebrow">UI chrome</span>
+      <strong>Controls</strong>
+      <ul>
+        <li>Optional toolbar</li>
+        <li>Sheet tabs for multi-sheet workbooks</li>
+      </ul>
+    </article>
+
+    <article class="sw-architecture-card sw-architecture-viewport">
+      <span class="sw-architecture-eyebrow">Render surface</span>
+      <strong>Viewport</strong>
+      <div class="sw-architecture-parts">
+        <span>Native scroller + sizer</span>
+        <span class="is-primary">Canvas or worker renderer</span>
+        <span>Selection + fill overlay</span>
+      </div>
+    </article>
+
+    <article class="sw-architecture-card">
+      <span class="sw-architecture-eyebrow">Accessibility</span>
+      <strong>ARIA mirror</strong>
+      <ul>
+        <li>Screen-reader only</li>
+        <li><code>role="rowgroup"</code></li>
+      </ul>
+    </article>
+  </div>
+
+  <div class="sw-architecture-connector" aria-hidden="true">
+    <span>one getVisibleWindow() per painted pane</span>
+  </div>
+
+  <div class="sw-architecture-engine-flow">
+    <article class="sw-architecture-card is-core">
+      <span class="sw-architecture-eyebrow">TypeScript core</span>
+      <strong>SheetwriteStore</strong>
+      <p>Sequences document transactions and exposes bulk resolved windows.</p>
+    </article>
+
+    <div class="sw-architecture-ffi" aria-label="Foreign function interface">
+      <span>FFI</span>
+      <i aria-hidden="true">→</i>
+    </div>
+
+    <article class="sw-architecture-card is-engine">
+      <span class="sw-architecture-eyebrow">Rust / WebAssembly</span>
+      <strong>Columnar engine</strong>
+      <p>Owns typed cell storage, formula evaluation, and the calculation DAG.</p>
+    </article>
+  </div>
+</section>
+
+<style>
+  .sw-architecture,
+  .sw-architecture * {
+    box-sizing: border-box;
+  }
+
+  .sw-architecture {
+    margin-block: var(--sw-space-6) var(--sw-space-7);
+    border: var(--sw-line) solid var(--sw-border-strong);
+    border-radius: var(--sw-radius-lg);
+    padding: clamp(var(--sw-space-4), 2.5vw, var(--sw-space-7));
+    background:
+      linear-gradient(var(--sw-grid-line) var(--sw-line), transparent var(--sw-line)),
+      linear-gradient(90deg, var(--sw-grid-line) var(--sw-line), transparent var(--sw-line)),
+      var(--sw-surface-code);
+    background-size: var(--sw-grid-size) var(--sw-grid-size);
+    box-shadow: 0 var(--sw-space-2) 0 var(--sw-surface-raised);
+  }
+
+  .sw-architecture-intro {
+    display: flex;
+    max-width: 36rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sw-space-4);
+    margin-inline: auto;
+    border: var(--sw-line) solid color-mix(in srgb, var(--sw-brand) 70%, var(--sw-border));
+    border-radius: var(--sw-radius-md);
+    padding: var(--sw-space-4) var(--sw-space-5);
+    background: color-mix(in srgb, var(--sw-brand) 10%, var(--sw-surface-raised));
+  }
+
+  .sw-architecture-intro > div,
+  .sw-architecture-card {
+    display: grid;
+    gap: var(--sw-space-2);
+  }
+
+  .sw-architecture-intro strong,
+  .sw-architecture-card strong {
+    color: var(--sw-text);
+    font: 650 var(--sw-text-lg) / 1.2 var(--sw-font-display);
+  }
+
+  .sw-architecture-intro code {
+    color: var(--sw-text-muted);
+    font-size: var(--sw-text-xs);
+    white-space: nowrap;
+  }
+
+  .sw-architecture-eyebrow {
+    color: var(--sw-text-subtle);
+    font: 650 0.625rem/1 var(--sw-font-code);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .sw-architecture-connector {
+    display: grid;
+    min-height: 3rem;
+    justify-items: center;
+    color: var(--sw-text-subtle);
+    font: 600 var(--sw-text-xs) / 1 var(--sw-font-code);
+  }
+
+  .sw-architecture-connector::before {
+    width: var(--sw-line);
+    min-height: var(--sw-space-4);
+    background: var(--sw-border-strong);
+    content: "";
+  }
+
+  .sw-architecture-connector span {
+    align-self: center;
+    border: var(--sw-line) solid var(--sw-border);
+    border-radius: var(--sw-radius-pill);
+    padding: var(--sw-space-1) var(--sw-space-3);
+    background: var(--sw-surface-code);
+  }
+
+  .sw-architecture-surfaces {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(20rem, 1.6fr) minmax(0, 0.85fr);
+    gap: var(--sw-space-4);
+    align-items: stretch;
+  }
+
+  .sw-architecture-card {
+    min-width: 0;
+    align-content: start;
+    border: var(--sw-line) solid var(--sw-border);
+    border-radius: var(--sw-radius-md);
+    padding: var(--sw-space-4);
+    background: color-mix(in srgb, var(--sw-surface-raised) 92%, transparent);
+  }
+
+  .sw-architecture-card :is(p, ul) {
+    margin: 0;
+    color: var(--sw-text-muted);
+    font-size: var(--sw-text-sm);
+    line-height: 1.5;
+  }
+
+  .sw-architecture-card ul {
+    padding-inline-start: var(--sw-space-4);
+  }
+
+  .sw-architecture-viewport {
+    border-color: color-mix(in srgb, var(--sw-code-type) 72%, var(--sw-border));
+  }
+
+  .sw-architecture-parts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sw-space-2);
+    margin-top: var(--sw-space-2);
+  }
+
+  .sw-architecture-parts span {
+    display: grid;
+    min-height: 4.5rem;
+    place-items: center;
+    border: var(--sw-line) solid var(--sw-border);
+    border-radius: var(--sw-radius-sm);
+    padding: var(--sw-space-3);
+    background: var(--sw-surface-canvas);
+    color: var(--sw-text-muted);
+    font-size: var(--sw-text-xs);
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  .sw-architecture-parts .is-primary {
+    border-color: var(--sw-code-type);
+    color: var(--sw-text);
+  }
+
+  .sw-architecture-engine-flow {
+    display: grid;
+    max-width: 56rem;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--sw-space-3);
+    margin-inline: auto;
+  }
+
+  .sw-architecture-card.is-core {
+    border-color: var(--sw-code-type);
+  }
+
+  .sw-architecture-card.is-engine {
+    border-color: var(--sw-brand);
+    background: color-mix(in srgb, var(--sw-brand) 9%, var(--sw-surface-raised));
+  }
+
+  .sw-architecture-ffi {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: var(--sw-space-1);
+    color: var(--sw-text-subtle);
+    font: 650 var(--sw-text-xs) / 1 var(--sw-font-code);
+  }
+
+  .sw-architecture-ffi i {
+    color: var(--sw-border-strong);
+    font: 400 1.5rem/1 var(--sw-font-body);
+  }
+
+  @media (max-width: 52rem) {
+    .sw-architecture-surfaces {
+      grid-template-columns: 1fr;
+    }
+
+    .sw-architecture-parts {
+      grid-template-columns: 1fr;
+    }
+
+    .sw-architecture-parts span {
+      min-height: auto;
+    }
+  }
+
+  @media (max-width: 34rem) {
+    .sw-architecture-intro {
+      align-items: start;
+      flex-direction: column;
+    }
+
+    .sw-architecture-intro code {
+      white-space: normal;
+    }
+
+    .sw-architecture-engine-flow {
+      grid-template-columns: 1fr;
+    }
+
+    .sw-architecture-ffi i {
+      transform: rotate(90deg);
+    }
+  }
+</style>
