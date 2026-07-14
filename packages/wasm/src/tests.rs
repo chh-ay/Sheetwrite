@@ -89,6 +89,46 @@ fn sheet_resize_rows_preserves_overlap_and_drops_oob_formulas() {
 }
 
 #[test]
+fn sheet_noops_overflow_and_paged_load_state_preserve_invariants() {
+    let overflow = SheetData::new(usize::MAX, 2);
+    assert_eq!((overflow.n_cols, overflow.row_count), (0, 0));
+
+    let mut dense = SheetData::new(2, 2);
+    put_number(&mut dense, 1, 1, 9.0);
+    dense.resize_rows(2);
+    dense.insert_rows(0, 1, 0);
+    dense.delete_rows(0, 2, 1);
+    dense.delete_rows(0, 0, 0);
+    dense.insert_cols(0, 1, 0);
+    dense.delete_cols(0, 2, 1);
+    dense.delete_cols(0, 0, 0);
+    assert_close(dense.num_at(dense.idx(1, 1)), 9.0);
+
+    dense.dirty_cells.extend((0..5_000).map(|row| (row, 0)));
+    assert!(dense.dirty_cells.capacity() > 4_096);
+    dense.clear_dirty();
+    assert!(dense.dirty_cells.is_empty());
+    assert!(dense.dirty_cells.capacity() <= 4_096);
+
+    let mut paged = SheetData::new_paged(2, 2, 1, 0);
+    assert!(!paged.is_fully_loaded());
+    assert!(!paged.range_fully_loaded(0, 0, 1, 1));
+    for col in 0..2 {
+        for row in 0..2 {
+            paged.mark_cell_loaded(row, col, true);
+        }
+    }
+    assert!(paged.is_fully_loaded());
+    assert!(paged.range_fully_loaded(0, 0, 1, 1));
+    assert!(paged.is_cell_dirty(1, 1));
+    paged.mark_range_clean(0, 2, 0, 2);
+    assert!(!paged.is_cell_dirty(1, 1));
+    paged.pin_range(1, 1, &[0]);
+    paged.pin_range(0, 2, &[0, 1]);
+    assert_eq!(paged.paged_stats().map(|stats| stats.1), Some(4));
+}
+
+#[test]
 fn formulas_cover_functions_ranges_and_comparisons() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(6, 32);
@@ -346,6 +386,72 @@ fn formula_errors_surface_as_sentinels() {
 }
 
 #[test]
+fn builtin_argument_errors_and_numeric_boundaries_propagate_without_panics() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(48, 1);
+    let error_formulas = [
+        ("=ROUND(\"x\",2)", "#VALUE!"),
+        ("=ROUND(1,\"x\")", "#VALUE!"),
+        ("=ROUND(1,400)", "#NUM!"),
+        ("=MOD(\"x\",2)", "#VALUE!"),
+        ("=MOD(1,\"x\")", "#VALUE!"),
+        ("=POW(\"x\",2)", "#VALUE!"),
+        ("=POW(2,\"x\")", "#VALUE!"),
+        ("=FLOOR(\"x\",1)", "#VALUE!"),
+        ("=FLOOR(1,\"x\")", "#VALUE!"),
+        ("=FLOOR(1,0)", "#DIV/0!"),
+        ("=CEILING(\"x\",1)", "#VALUE!"),
+        ("=CEILING(1,\"x\")", "#VALUE!"),
+        ("=CEILING(1,0)", "#DIV/0!"),
+        ("=TRUNC(\"x\",1)", "#VALUE!"),
+        ("=TRUNC(1,\"x\")", "#VALUE!"),
+        ("=TRUNC(1,400)", "#NUM!"),
+        ("=AND(TRUE,\"not-bool\")", "#VALUE!"),
+        ("=OR(FALSE,\"not-bool\")", "#VALUE!"),
+        ("=NOT(\"not-bool\")", "#VALUE!"),
+        ("=LEN(1/0)", "#DIV/0!"),
+        ("=LEFT(\"abc\",-1)", "#VALUE!"),
+        ("=RIGHT(\"abc\",-1)", "#VALUE!"),
+        ("=MID(\"abc\",0,1)", "#VALUE!"),
+        ("=MID(\"abc\",1,-1)", "#VALUE!"),
+        ("=CONCAT(\"ok\",1/0)", "#DIV/0!"),
+        ("=UPPER(1/0)", "#DIV/0!"),
+        ("=LOWER(1/0)", "#DIV/0!"),
+        ("=TRIM(1/0)", "#DIV/0!"),
+        ("=TEXT(1,1/0)", "#DIV/0!"),
+        ("=DATE(\"x\",1,1)", "#VALUE!"),
+        ("=DATE(2024,\"x\",1)", "#VALUE!"),
+        ("=DATE(2024,1,\"x\")", "#VALUE!"),
+        ("=DATEVALUE(\"not-a-date\")", "#VALUE!"),
+        ("=DAY(1/0)", "#DIV/0!"),
+        ("=EXACT(1/0,\"x\")", "#DIV/0!"),
+        ("=EXACT(\"x\",1/0)", "#DIV/0!"),
+    ];
+    for (col, (formula, _)) in error_formulas.iter().enumerate() {
+        store.set_formula(sheet, 0, col, formula, 0);
+    }
+    store.set_formula(sheet, 0, 36, "=AVG()", 0);
+    store.set_formula(sheet, 0, 37, "=MIN()", 0);
+    store.set_formula(sheet, 0, 38, "=MAX()", 0);
+    store.set_formula(sheet, 0, 39, "=SIGN(9)", 0);
+    store.set_formula(sheet, 0, 40, "=SIGN(0)", 0);
+    store.recompute(sheet);
+
+    for (col, (formula, expected)) in error_formulas.iter().enumerate() {
+        assert_eq!(
+            string(&store, sheet, 0, col).as_deref(),
+            Some(*expected),
+            "{formula}"
+        );
+    }
+    for col in 36..=38 {
+        assert_close(number(&store, sheet, 0, col), 0.0);
+    }
+    assert_close(number(&store, sheet, 0, 39), 1.0);
+    assert_close(number(&store, sheet, 0, 40), 0.0);
+}
+
+#[test]
 fn date_time_functions_use_excel_serials_and_controlled_volatile_inputs() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(13, 1);
@@ -463,8 +569,135 @@ fn lookup_functions_cover_exact_approximate_reverse_and_not_found_paths() {
 }
 
 #[test]
+fn criteria_and_lookup_validation_preserves_error_precedence_and_shapes() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(48, 3);
+    for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+        store.set_number(sheet, row, 1, value * 10.0, 0);
+    }
+    let errors = [
+        ("=TODAY(1)", "#VALUE!"),
+        ("=COUNTIF(A1:A2)", "#VALUE!"),
+        ("=COUNTIF(1,\">0\")", "#VALUE!"),
+        ("=COUNTIF(A1:A2,1/0)", "#DIV/0!"),
+        ("=COUNTIFS()", "#VALUE!"),
+        ("=COUNTIFS(A1:A2,\">0\",B1:B3,\">0\")", "#VALUE!"),
+        ("=SUMIF(A1:A2)", "#VALUE!"),
+        ("=SUMIF(1,\">0\")", "#VALUE!"),
+        ("=SUMIF(A1:A2,\">0\",B1:B3)", "#VALUE!"),
+        ("=SUMIFS(A1:A2)", "#VALUE!"),
+        ("=SUMIFS(A1:A2,B1:B3,\">0\")", "#VALUE!"),
+        ("=AVERAGEIF(A1:A2,\">9\")", "#DIV/0!"),
+        ("=INDEX(A1:B2)", "#VALUE!"),
+        ("=INDEX(A1:B2,0,1)", "#VALUE!"),
+        ("=INDEX(A1:B2,1)", "#VALUE!"),
+        ("=INDEX(A1:B2,9,1)", "#REF!"),
+        ("=MATCH(1,A1:B2,0)", "#N/A"),
+        ("=MATCH(1,A1:A2,9)", "#VALUE!"),
+        ("=MATCH(1/0,A1:A2)", "#DIV/0!"),
+        ("=MATCH(1,1)", "#VALUE!"),
+        ("=VLOOKUP(1,A1:B2)", "#VALUE!"),
+        ("=VLOOKUP(1/0,A1:B2,2)", "#DIV/0!"),
+        ("=VLOOKUP(1,1,2)", "#VALUE!"),
+        ("=VLOOKUP(1,A1:B2,0)", "#VALUE!"),
+        ("=VLOOKUP(1,A1:B2,2,\"bad\")", "#VALUE!"),
+        ("=VLOOKUP(9,A1:B2,2,FALSE)", "#N/A"),
+        ("=VLOOKUP(1,A1:B2,9,FALSE)", "#REF!"),
+        ("=XLOOKUP(1,A1:A2)", "#VALUE!"),
+        ("=XLOOKUP(1/0,A1:A2,B1:B2)", "#DIV/0!"),
+        ("=XLOOKUP(1,1,B1:B2)", "#VALUE!"),
+        ("=XLOOKUP(1,A1:A2,B1:B3)", "#VALUE!"),
+        ("=XLOOKUP(1,A1:A2,B1:B2,,9)", "#VALUE!"),
+        ("=XLOOKUP(1,A1:A2,B1:B2,,,0)", "#VALUE!"),
+        ("=XLOOKUP(9,A1:A2,B1:B2)", "#N/A"),
+    ];
+    for (offset, (formula, _)) in errors.iter().enumerate() {
+        store.set_formula(sheet, 0, offset + 2, formula, 0);
+    }
+    store.set_formula(sheet, 0, 36, "=IF(FALSE,1)", 0);
+    store.set_formula(sheet, 0, 37, "=IFERROR(1/0)", 0);
+    store.recompute(sheet);
+
+    for (offset, (formula, expected)) in errors.iter().enumerate() {
+        assert_eq!(
+            string(&store, sheet, 0, offset + 2).as_deref(),
+            Some(*expected),
+            "{formula}"
+        );
+    }
+    assert_close(number(&store, sheet, 0, 36), 0.0);
+    assert_close(number(&store, sheet, 0, 37), 0.0);
+}
+#[test]
+fn criteria_wildcards_approximate_lookup_and_empty_logic_follow_spreadsheet_semantics() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(24, 4);
+    for (row, value) in ["Alpha", "a*", "ax", "a~b"].into_iter().enumerate() {
+        store.set_string(sheet, row, 0, value, 0);
+    }
+    for (row, value) in [1.0, 2.0, 3.0, 4.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 1, value, 0);
+        store.set_number(sheet, row, 2, 4.0 - row as f64, 0);
+    }
+    let numeric_formulas = [
+        "=COUNTIF(A1:A4,\"a?\")",
+        "=COUNTIF(A1:A4,\"a~*\")",
+        "=COUNTIF(A1:A4,\"a~b\")",
+        "=COUNTIF(B1:B4,\">=2\")",
+        "=COUNTIF(B1:B4,\"<=2\")",
+        "=COUNTIF(B1:B4,\"<>2\")",
+        "=COUNTIF(B1:B4,\"=2\")",
+        "=SUMIF(B1:B4,\">2\")",
+        "=XLOOKUP(\"a*\",A1:A4,B1:B4,,2)",
+        "=XLOOKUP(2.5,B1:B4,B1:B4,,-1,2)",
+        "=XLOOKUP(2.5,B1:B4,B1:B4,,1,2)",
+        "=MATCH(2.5,C1:C4,-1)",
+        "=AND()",
+        "=OR()",
+    ];
+    for (offset, formula) in numeric_formulas.iter().enumerate() {
+        store.set_formula(sheet, 0, offset + 3, formula, 0);
+    }
+    let errors = [
+        ("=AVG(\"x\")", "#VALUE!"),
+        ("=MIN(\"x\")", "#VALUE!"),
+        ("=MAX(\"x\")", "#VALUE!"),
+        ("=LEFT(1/0,1)", "#DIV/0!"),
+        ("=RIGHT(1/0,1)", "#DIV/0!"),
+        ("=MID(1/0,1,1)", "#DIV/0!"),
+        ("=MID(\"x\",1,1/0)", "#DIV/0!"),
+        ("=NA()", "#N/A"),
+    ];
+    for (offset, (formula, _)) in errors.iter().enumerate() {
+        store.set_formula(sheet, 1, offset + 3, formula, 0);
+    }
+    store.recompute(sheet);
+
+    let expected = [
+        2.0, 1.0, 1.0, 3.0, 2.0, 3.0, 1.0, 7.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0,
+    ];
+    for (offset, value) in expected.into_iter().enumerate() {
+        let actual = number(&store, sheet, 0, offset + 3);
+        assert!(
+            (actual - value).abs() < 1e-9,
+            "{} expected {value}, got {actual}",
+            numeric_formulas[offset]
+        );
+    }
+    for (offset, (formula, expected)) in errors.iter().enumerate() {
+        assert_eq!(
+            string(&store, sheet, 1, offset + 3).as_deref(),
+            Some(*expected),
+            "{formula}"
+        );
+    }
+}
+
+#[test]
 fn named_ranges_resolve_scope_rebase_delete_cycle_and_preserve_unknown_sources() {
     let mut store = CellStore::new();
+
     let data = store.add_sheet(2, 4);
     let summary = store.add_sheet(4, 2);
     let other = store.add_sheet(1, 1);
@@ -643,6 +876,7 @@ fn public_api_bounds_checks_do_not_panic() {
     let sheet = store.add_sheet(2, 2);
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let snapshot = store.capture_range(sheet, 0, 0, 1, 1).unwrap();
         store.set_number(99, 0, 0, 1.0, 0);
         store.set_number(sheet, 9, 0, 1.0, 0);
         store.set_string(sheet, 0, 9, "x", 0);
@@ -654,6 +888,54 @@ fn public_api_bounds_checks_do_not_panic() {
         store.remove_rows(99, 0, 1);
 
         assert_eq!(store.get_cell(99, 0, 0).kind(), KIND_EMPTY);
+        store.insert_cols(99, 0, 1);
+        store.remove_cols(99, 0, 1);
+        store.set_sheet_name(99, "missing", "Missing");
+        store.mark_range_clean(99, 0, 1, 0, 1);
+        store.pin_range(99, 0, 1, &[0]);
+        store.set_bool(99, 0, 0, true, 0);
+        store.set_conditional_rules(99, &[], &[], &[], Vec::new(), &[]);
+        store.end_page_load();
+
+        assert!(!store.is_paged(99));
+        assert_eq!(store.paged_stats(99), vec![0.0; 5]);
+        assert_eq!(store.paged_stats(sheet), vec![0.0, 0.0, 0.0, 0.0, 1.0]);
+        assert_eq!(store.cell_state(99, 0, 0), 0);
+        assert_eq!(store.cell_state(sheet, 9, 9), 0);
+        assert!(!store.is_fully_loaded(99));
+        assert!(store.is_fully_loaded(sheet));
+        assert!(!store.range_fully_loaded(99, 0, 0, 0, 0));
+        assert_eq!(store.row_count(99), 0);
+        assert_eq!(store.col_count(99), 0);
+        assert_eq!(store.style_id_at(99, 0, 0), 0);
+        assert_eq!(store.style_id_at(sheet, 9, 9), 0);
+        assert!(!store.set_block(
+            99,
+            0,
+            0,
+            1,
+            1,
+            &[KIND_EMPTY],
+            &[0.0],
+            vec![String::new()],
+            &[0],
+        ));
+        assert!(!store.clear_range(99, 0, 0, 0, 0, true, true));
+        assert!(store.range_style_ids(99, 0, 0, 0, 0).is_empty());
+        assert!(!store.remap_range_styles(99, 0, 0, 0, 0, &[], &[]));
+        assert!(store.capture_range(99, 0, 0, 1, 1).is_none());
+        assert!(!store.restore_range(99, 0, 0, &snapshot));
+        assert!(!store.rename_sheet(99, "missing", "Missing"));
+        assert!(!store.remove_sheet(99));
+        assert!(!store.set_named_range("", -1, sheet, 0, 0, 0, 0));
+        assert!(!store.remove_named_range("missing", -1));
+        assert!(!store.recompute_volatile(f64::NAN));
+        assert!(store.set_formula(99, 0, 0, "=1", 0).is_nan());
+        assert_eq!(store.formula_source(99, 0, 0), None);
+        assert_eq!(
+            store.pool_strings(&[NO_STRING, u32::MAX]),
+            vec![String::new(), String::new()]
+        );
         assert_eq!(store.get_cell(sheet, 9, 0).kind(), KIND_EMPTY);
         assert_eq!(store.aggregate(99, 0, 0), 0.0);
         assert_eq!(store.aggregate(sheet, 9, 0), 0.0);
@@ -1380,6 +1662,42 @@ fn boolean_queries_sort_filter_search_and_distinct_without_becoming_blanks() {
 }
 
 #[test]
+fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 6);
+    store.set_formula(sheet, 0, 0, "=1/0", 0);
+    store.set_formula(sheet, 1, 0, "=\"beta\"", 0);
+    store.set_formula(sheet, 2, 0, "=TRUE", 0);
+    store.set_string(sheet, 3, 0, "alpha", 0);
+    store.set_number(sheet, 4, 0, 7.0, 0);
+
+    store.set_formula(sheet, 0, 1, "=1/0", 0);
+    store.set_formula(sheet, 1, 1, "=2+3", 0);
+    store.set_number(sheet, 2, 1, 7.0, 0);
+    store.recompute(sheet);
+
+    assert_eq!(store.sort_rows(sheet, 0, true), vec![4, 0, 3, 1, 2, 5]);
+    assert_eq!(store.sort_rows(sheet, 0, false), vec![5, 2, 1, 3, 0, 4]);
+    assert_close(store.aggregate(sheet, 1, 0), 12.0);
+    assert_close(store.aggregate(sheet, 1, 1), 6.0);
+    assert_close(store.aggregate(sheet, 1, 2), 5.0);
+    assert_eq!(
+        store.search(sheet, &[0], "#DIV/0!", false, true),
+        vec![0, 0]
+    );
+    assert_eq!(store.search(sheet, &[0], "beta", false, true), vec![1, 0]);
+    assert!(store
+        .search(sheet, &[u32::MAX], "x", true, false)
+        .is_empty());
+    assert!(store.search(sheet, &[0], "", true, false).is_empty());
+    assert_close(store.aggregate(sheet, 1, 3), 7.0);
+    assert_close(store.aggregate(sheet, 1, 4), 2.0);
+    for op in 0..=4 {
+        assert_close(store.aggregate(sheet, 2, op), 0.0);
+    }
+}
+
+#[test]
 fn range_native_block_clear_and_style_remap_preserve_column_major_semantics() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 3);
@@ -1467,6 +1785,18 @@ fn opaque_range_snapshot_restores_values_formulas_and_styles() {
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
     assert_eq!(snapshot.formula_offsets(), vec![1, 0]);
     assert_eq!(snapshot.formula_sources(), vec!["=(A1+1)"]);
+    assert_eq!(snapshot.kinds().len(), 6);
+    assert_eq!(snapshot.style_ids(), vec![11, 12, 0, 0, 0, 13]);
+    assert!(snapshot.byte_length() >= 6 * (1 + std::mem::size_of::<u64>()));
+    let snapshot_numbers = store.snapshot_numbers(&snapshot);
+    let snapshot_texts = store.snapshot_texts(&snapshot);
+    assert_close(snapshot_numbers[0], 5.0);
+    assert_eq!(snapshot_texts[5], "tail");
+    let first = store.get_cell(sheet, 0, 0);
+    assert_close(first.num(), 5.0);
+    assert_eq!(first.style(), 11);
+    assert_eq!(first.string(), None);
+    assert_eq!(CellStore::default().row_count(0), 0);
     assert!(store.clear_range(sheet, 0, 0, 2, 1, true, true));
     assert!(store.restore_range(sheet, 0, 0, &snapshot));
     store.recompute(sheet);
@@ -1594,4 +1924,147 @@ fn paged_structural_edits_remap_loaded_cells_without_dense_allocation() {
     assert_eq!(store.col_count(sheet), 2);
     assert_eq!(store.cell_state(sheet, 2, 0), 0);
     assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("r2"));
+}
+
+#[test]
+fn formula_ast_boundaries_preserve_blank_comparison_and_named_cell_semantics() {
+    let mut no_formulas = CellStore::new();
+    let empty_sheet = no_formulas.add_sheet(1, 1);
+    no_formulas.set_number(empty_sheet, 0, 0, 1.0, 0);
+    no_formulas.recompute(empty_sheet);
+    no_formulas.recompute(empty_sheet);
+    no_formulas.recompute(99);
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(20, 2);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    assert!(store.set_named_range("Single", -1, sheet, 0, 0, 0, 0));
+    let numeric_formulas = [
+        "=5-2",
+        "=3*4",
+        "=8/2",
+        "=1<>2",
+        "=1<=1",
+        "=2>=1",
+        "=SUM(A1)",
+        "=Single",
+        "=IF(TRUE,,1)",
+        "=IFERROR()",
+    ];
+    for (offset, formula) in numeric_formulas.iter().enumerate() {
+        store.set_formula(sheet, 0, offset + 2, formula, 0);
+    }
+    let errors = [
+        ("=A1:A2", "#VALUE!"),
+        ("=-(1/0)", "#DIV/0!"),
+        ("=IF()", "#VALUE!"),
+        ("=IF(1/0,1,2)", "#DIV/0!"),
+    ];
+    for (offset, (formula, _)) in errors.iter().enumerate() {
+        store.set_formula(sheet, 1, offset + 2, formula, 0);
+    }
+    store.recompute(sheet);
+
+    let expected = [3.0, 12.0, 4.0, 1.0, 1.0, 1.0, 5.0, 5.0, 0.0, 0.0];
+    for (offset, value) in expected.into_iter().enumerate() {
+        assert_close(number(&store, sheet, 0, offset + 2), value);
+    }
+    for (offset, (formula, expected)) in errors.iter().enumerate() {
+        assert_eq!(
+            string(&store, sheet, 1, offset + 2).as_deref(),
+            Some(*expected),
+            "{formula}"
+        );
+    }
+}
+
+#[test]
+fn multi_filter_kinds_and_numeric_operators_match_resolved_cell_values() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 6);
+    store.set_number(sheet, 0, 0, 1.0, 0);
+    store.set_number(sheet, 1, 0, 2.0, 0);
+    store.set_string(sheet, 2, 0, "Alpha", 0);
+    store.set_bool(sheet, 3, 0, true, 0);
+    store.set_formula(sheet, 5, 0, "=1/0", 0);
+    store.recompute(sheet);
+
+    assert_eq!(
+        store.filter_rows_multi(sheet, &[0], &[0], &[0], &[], &[1], &[0], &[2.0], vec![]),
+        vec![1]
+    );
+    assert_eq!(
+        store.filter_rows_multi(
+            sheet,
+            &[0],
+            &[0],
+            &[0],
+            &[],
+            &[0],
+            &[1],
+            &[],
+            vec!["Alpha".to_string()],
+        ),
+        vec![2]
+    );
+    assert_eq!(
+        store.filter_rows_multi(
+            sheet,
+            &[0],
+            &[0],
+            &[0],
+            &[],
+            &[0],
+            &[1],
+            &[],
+            vec!["\0TRUE".to_string()],
+        ),
+        vec![3]
+    );
+    assert_eq!(
+        store.filter_rows_multi(sheet, &[0], &[0], &[1], &[], &[0], &[0], &[], vec![]),
+        vec![4]
+    );
+    assert_eq!(
+        store.filter_rows_multi(
+            sheet,
+            &[0],
+            &[1],
+            &[0],
+            &[],
+            &[0],
+            &[1],
+            &[],
+            vec!["div/0".to_string()],
+        ),
+        vec![5]
+    );
+
+    let numeric =
+        |flag| store.filter_rows_multi(sheet, &[0], &[2], &[flag], &[1.0], &[0], &[0], &[], vec![]);
+    assert_eq!(numeric(0), vec![1]);
+    assert_eq!(numeric(1), vec![0, 1]);
+    assert!(numeric(2).is_empty());
+    assert_eq!(numeric(3), vec![0]);
+    assert_eq!(numeric(4), vec![0]);
+    assert_eq!(numeric(5), vec![1]);
+    assert_eq!(
+        store.filter_rows_multi(sheet, &[0], &[3], &[], &[], &[], &[], &[], vec![]),
+        vec![4]
+    );
+    assert_eq!(
+        store.filter_rows_multi(sheet, &[0], &[4], &[], &[], &[], &[], &[], vec![]),
+        vec![0, 1, 2, 3, 5]
+    );
+    assert!(store
+        .filter_rows_multi(sheet, &[0], &[99], &[], &[], &[], &[], &[], vec![])
+        .is_empty());
+
+    let mut limited = store.distinct_values(sheet, 0, 2);
+    assert_eq!(limited.take_kinds().len(), 2);
+    assert_eq!(
+        store.sort_rows_multi(sheet, &[0], &[], &[u32::MAX, 1, 0]),
+        vec![0, 1]
+    );
+    assert_eq!(store.data_edge_ordered(sheet, &[0, 1], 0, 0, 0, 1), 0);
 }

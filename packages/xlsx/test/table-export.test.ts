@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import type { Workbook } from "@sheetwrite/core";
 import { initSheetwrite, SheetwriteStore, toXlsxTable } from "@sheetwrite/core";
 import type { CellObject } from "write-excel-file/universal";
-import { buildXlsxModel, registerXlsxBackends } from "../src/index.js";
+import { buildXlsxModel, registerXlsxBackends, xlsxStyleOf } from "../src/index.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -139,6 +139,67 @@ describe("table XLSX export", () => {
 
     expect(model.options.sheet).toBe("S");
     expect(model.data[2]![0]).toMatchObject({ height: 42 });
+    store.dispose();
+  });
+  it("maps border/text decoration variants and date/boolean cells without lossy coercion", () => {
+    expect(
+      xlsxStyleOf({
+        underline: true,
+        strikethrough: true,
+        italic: true,
+        align: "right",
+        border: {
+          left: { color: "#111111", style: "dashed" },
+          right: { style: "dotted" },
+          top: { width: 2 },
+          all: { width: 1 },
+        },
+      }),
+    ).toMatchObject({
+      textDecoration: { underline: true, strikethrough: true },
+      fontStyle: "italic",
+      align: "right",
+      leftBorderColor: "#111111",
+      leftBorderStyle: "dashed",
+      rightBorderStyle: "dotted",
+      topBorderStyle: "medium",
+      bottomBorderStyle: "thin",
+    });
+    expect(xlsxStyleOf({ strikethrough: true })).toMatchObject({
+      textDecoration: { strikethrough: true },
+    });
+    expect(xlsxStyleOf(undefined)).toEqual({});
+
+    const source = workbook();
+    source.sheets[0]!.columns[0]!.type = "date";
+    const store = new SheetwriteStore(source);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s", row: 0, col: 0 },
+          value: { kind: "literal", value: 45_351 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s", row: 0, col: 1 },
+          value: { kind: "literal", value: true },
+        },
+      ],
+    });
+    const data = buildXlsxModel(store.getWorkbook(), store)!.data;
+    expect(data[1]![0]).toMatchObject({
+      type: Date,
+      value: new Date(Date.UTC(2024, 1, 29)),
+    });
+    expect(data[1]![1]).toMatchObject({ type: Boolean, value: true });
+    store.dispose();
+  });
+
+  it("returns null only when no active or fallback sheet exists", () => {
+    const empty: Workbook = { activeSheet: "missing", sheets: [] };
+    const store = new SheetwriteStore(workbook());
+    expect(buildXlsxModel(empty, store)).toBeNull();
     store.dispose();
   });
 });

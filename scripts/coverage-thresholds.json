@@ -1,0 +1,924 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "path": "packages/core/src/a1.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/adapter.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/aria-mirror.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 97,
+        "functions": 88
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/canvas-paint.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 91,
+        "functions": 89
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/canvas-renderer.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 88
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/cell-input.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/clipboard-controller.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 100,
+        "functions": 92
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/clipboard.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 96,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/collaboration.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 97,
+        "functions": 88
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/column-index.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/context-menu.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 97
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/datasource-controller.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/date-serial.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 98,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/document-controller.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 100,
+        "functions": 76
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/document-protocol.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 96,
+        "functions": 89
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/editor.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 85,
+        "functions": 70
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/export.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 98,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/fenwick.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 96,
+        "functions": 94
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/fill-series.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/find-bar.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/formula-assist.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 98,
+        "functions": 95
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/geometry-layout-controller.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 94,
+        "functions": 97
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/grid-controller.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 94,
+        "functions": 85
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/grid.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 88,
+        "functions": 78
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/history.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 94,
+        "functions": 88
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/index.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/indexeddb.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 95,
+        "functions": 85
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/input-controller.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 87,
+        "functions": 84
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/mutation-revision-index.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 91
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/number-format.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 93,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/overlay-painter.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 94,
+        "functions": 94
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/persistence.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/rebase.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/reference.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/render-coordinator.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 100,
+        "functions": 90
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/resize.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/search-controller.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 89,
+        "functions": 81
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/search-replace.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/selection.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/sheet-tabs.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/shell.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/shell/formula-controls.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 93,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/shell/grid-binding.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 76,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/shell/selection-status.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/shell/spreadsheet-shell.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 95,
+        "functions": 83
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/shell/toolbar-factory.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/store.ts",
+      "language": "typescript",
+      "tier": "B",
+      "metrics": {
+        "lines": 97,
+        "functions": 85
+      },
+      "owner": "core-runtime",
+      "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/style-actions.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 85,
+        "functions": 70
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/style-dictionary.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 75
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/sync.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 91,
+        "functions": 85
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/testing.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 96,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/toolbar.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 82
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/types.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "core-runtime",
+      "rationale": "Type-only public contracts have no emitted runtime statements",
+      "exclusion": {
+        "reason": "Type-only module is verified by package and consumer typechecks",
+        "command": "bun run typecheck"
+      }
+    },
+    {
+      "path": "packages/core/src/validation-editor.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 97,
+        "functions": 76
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/virtualization.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 97,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/widget-theme.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/core/src/worker-renderer.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/core/src/worker.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {},
+      "owner": "core-runtime",
+      "rationale": "Dedicated Worker entrypoint requires a real Worker environment",
+      "exclusion": {
+        "reason": "Bun unit coverage cannot execute the browser Worker entrypoint faithfully",
+        "command": "bun test packages/core/test/worker-renderer.test.ts packages/core/test/worker-fallback.test.ts && bun run test:browser"
+      }
+    },
+    {
+      "path": "packages/react/src/index.tsx",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 92,
+        "functions": 75
+      },
+      "owner": "react-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/svelte/src/Grid.svelte",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "svelte-runtime",
+      "rationale": "Runtime helper or public integration surface",
+      "exclusion": {
+        "reason": "Compiled Svelte template coverage does not map faithfully to this source file",
+        "command": "bun test packages/svelte/test && bun run test:browser"
+      }
+    },
+    {
+      "path": "packages/svelte/src/Sheetwrite.svelte",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "svelte-runtime",
+      "rationale": "Runtime helper or public integration surface",
+      "exclusion": {
+        "reason": "Compiled Svelte template coverage does not map faithfully to this source file",
+        "command": "bun test packages/svelte/test && bun run test:browser"
+      }
+    },
+    {
+      "path": "packages/svelte/src/index.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "svelte-runtime",
+      "rationale": "Framework package entrypoint is validated through compiled Svelte consumers",
+      "exclusion": {
+        "reason": "Bun coverage does not map the Svelte entrypoint and compiled templates faithfully",
+        "command": "bun test packages/svelte/test && bun run test:browser"
+      }
+    },
+    {
+      "path": "packages/svelte/src/props.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "svelte-runtime",
+      "rationale": "Svelte component prop declarations are compile-time contracts",
+      "exclusion": {
+        "reason": "Type-only Svelte props are verified by package typecheck and framework conformance",
+        "command": "bun run typecheck && bun test packages/svelte/test"
+      }
+    },
+    {
+      "path": "packages/vue/src/index.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 85,
+        "functions": 73
+      },
+      "owner": "vue-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/wasm/loader-browser.mjs",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "wasm-runtime",
+      "rationale": "Browser-specific loader entrypoint requires browser module loading semantics",
+      "exclusion": {
+        "reason": "The browser loader is covered by real browser initialization contracts",
+        "command": "bun test packages/core/test/wasm-loader.test.mjs && bun run test:browser"
+      }
+    },
+    {
+      "path": "packages/wasm/loader-node.mjs",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/wasm/loader-state.mjs",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Runtime helper or public integration surface"
+    },
+    {
+      "path": "packages/wasm/loader.mjs",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {},
+      "owner": "wasm-runtime",
+      "rationale": "Conditional loader export is an environment and bundler boundary",
+      "exclusion": {
+        "reason": "Conditional export selection is verified by Node and browser consumer contracts",
+        "command": "bun test packages/core/test/wasm-loader.test.mjs && bun run test:browser"
+      }
+    },
+    {
+      "path": "packages/xlsx/src/index.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/register.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {},
+      "owner": "xlsx-runtime",
+      "rationale": "Side-effect registration entrypoint delegates to the tested idempotent registrar",
+      "exclusion": {
+        "reason": "The one-line entrypoint is covered through the explicit registration contract",
+        "command": "bun test packages/xlsx/test/registration.test.ts"
+      }
+    },
+    {
+      "path": "packages/xlsx/src/registration.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/table-export.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/table-import.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 95,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/workbook.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 90,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/wasm/src/calc.rs",
+      "language": "rust",
+      "tier": "A",
+      "metrics": {
+        "lines": 92,
+        "functions": 85,
+        "regions": 89
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    },
+    {
+      "path": "packages/wasm/src/eval.rs",
+      "language": "rust",
+      "tier": "A",
+      "metrics": {
+        "lines": 90,
+        "functions": 99,
+        "regions": 88
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    },
+    {
+      "path": "packages/wasm/src/lib.rs",
+      "language": "rust",
+      "tier": "C",
+      "metrics": {},
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract",
+      "exclusion": {
+        "reason": "Module wiring only; behavior is covered through crate contract tests",
+        "command": "cargo test --manifest-path packages/wasm/Cargo.toml"
+      }
+    },
+    {
+      "path": "packages/wasm/src/query.rs",
+      "language": "rust",
+      "tier": "A",
+      "metrics": {
+        "lines": 90,
+        "functions": 94,
+        "regions": 90
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    },
+    {
+      "path": "packages/wasm/src/sheet.rs",
+      "language": "rust",
+      "tier": "A",
+      "metrics": {
+        "lines": 90,
+        "functions": 97,
+        "regions": 86
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    },
+    {
+      "path": "packages/wasm/src/store.rs",
+      "language": "rust",
+      "tier": "A",
+      "metrics": {
+        "lines": 90,
+        "functions": 95,
+        "regions": 90
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    },
+    {
+      "path": "packages/wasm/src/types.rs",
+      "language": "rust",
+      "tier": "B",
+      "metrics": {
+        "lines": 94,
+        "functions": 100,
+        "regions": 94
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    },
+    {
+      "path": "packages/wasm/src/window.rs",
+      "language": "rust",
+      "tier": "B",
+      "metrics": {
+        "lines": 96,
+        "functions": 96,
+        "regions": 93
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    }
+  ]
+}

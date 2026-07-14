@@ -32,10 +32,9 @@ describe("DocumentController", () => {
     const address = { sheet: "s1", row: 1, col: 0 };
 
     expect(
-      controller.commit(
-        [{ op: "set", addr: address, value: { kind: "literal", value: "Ada" } }],
-        "api",
-      ).status,
+      controller.applyTransaction({
+        patches: [{ op: "set", addr: address, value: { kind: "literal", value: "Ada" } }],
+      }).status,
     ).toBe("applied");
     expect(store.getCell(address).resolved).toBe("Ada");
 
@@ -44,6 +43,90 @@ describe("DocumentController", () => {
     controller.redo();
     expect(store.getCell(address).resolved).toBe("Ada");
     expect(historyApplications).toBe(2);
+
+    controller.destroy();
+    store.dispose();
+  });
+  it("captures structural and range inverses for Store implementations without compact history", () => {
+    const store = new SheetwriteStore(makeWorkbook(4));
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 0 },
+          value: { kind: "literal", value: "row-one" },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 1 },
+          value: { kind: "formula", src: "=A2" },
+        },
+      ],
+    });
+    const controller = new DocumentController({
+      store,
+      // A custom Store has no compact SheetwriteStore range snapshots. The
+      // controller must still construct complete serializable inverses.
+      loadable: null,
+      readOnly: () => false,
+      epoch: () => 0,
+      materializeVirtualColumns: (patches) => patches,
+      onMutationRejected: () => {},
+      onHistoryApplied: () => {},
+    });
+
+    expect(
+      controller.commit([{ op: "removeRows", sheet: "s1", at: 1, count: 2 }], "api").status,
+    ).toBe("applied");
+    controller.undo();
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 })).toMatchObject({
+      resolved: "row-one",
+      style: { bold: true },
+    });
+    expect(store.getFormula({ sheet: "s1", row: 2, col: 1 })).toBe("=A2");
+
+    expect(
+      controller.commit([{ op: "removeColumns", sheet: "s1", at: 0, count: 2 }], "api").status,
+    ).toBe("applied");
+    controller.undo();
+    expect(
+      store
+        .getWorkbook()
+        .sheets[0]!.columns.slice(0, 2)
+        .map(({ key }) => key),
+    ).toEqual(["name", "amount"]);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("row-one");
+
+    const range = {
+      sheet: "s1",
+      start: { row: 2, col: 1 },
+      end: { row: 1, col: 0 },
+    };
+    expect(controller.commit([{ op: "clearRange", range }], "api").status).toBe("applied");
+    controller.undo();
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("row-one");
+    expect(store.getFormula({ sheet: "s1", row: 2, col: 1 })).toBe("=A2");
+
+    const namedRange = {
+      name: "Selection",
+      scope: "s1",
+      range: { ...range, start: range.end, end: range.start },
+    };
+    expect(controller.commit([{ op: "setNamedRange", namedRange }], "api").status).toBe("applied");
+    expect(
+      controller.commit(
+        [{ op: "setNamedRange", namedRange: { ...namedRange, name: "selection" } }],
+        "api",
+      ).status,
+    ).toBe("applied");
+    controller.undo();
+    expect(store.getWorkbook().namedRanges).toEqual([namedRange]);
+    expect(
+      controller.commit([{ op: "removeNamedRange", name: "SELECTION", scope: "s1" }], "api").status,
+    ).toBe("applied");
+    controller.undo();
+    expect(store.getWorkbook().namedRanges).toEqual([namedRange]);
 
     controller.destroy();
     store.dispose();

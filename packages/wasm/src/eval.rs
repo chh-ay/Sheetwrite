@@ -1191,30 +1191,31 @@ fn wildcard_tokens(pattern: &str) -> Option<Vec<WildcardToken>> {
     let mut tokens = Vec::new();
     let normalized = pattern.to_lowercase();
     let mut chars = normalized.chars().peekable();
-    let mut wildcard = false;
+    let mut has_pattern_syntax = false;
     while let Some(ch) = chars.next() {
         match ch {
-            '~' => {
-                if let Some(literal) = chars.next() {
+            '~' => match chars.peek().copied() {
+                Some(literal @ ('*' | '?' | '~')) => {
+                    has_pattern_syntax = true;
+                    chars.next();
                     tokens.push(WildcardToken::Literal(literal));
-                } else {
-                    tokens.push(WildcardToken::Literal('~'));
                 }
-            }
+                _ => tokens.push(WildcardToken::Literal('~')),
+            },
             '*' => {
-                wildcard = true;
+                has_pattern_syntax = true;
                 if !matches!(tokens.last(), Some(WildcardToken::AnyMany)) {
                     tokens.push(WildcardToken::AnyMany);
                 }
             }
             '?' => {
-                wildcard = true;
+                has_pattern_syntax = true;
                 tokens.push(WildcardToken::AnyOne);
             }
             literal => tokens.push(WildcardToken::Literal(literal)),
         }
     }
-    wildcard.then_some(tokens)
+    has_pattern_syntax.then_some(tokens)
 }
 
 fn wildcard_matches(pattern: &[WildcardToken], value: &str) -> bool {

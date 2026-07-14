@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { dateToSerial, serialToDate } from "../src/date-serial.js";
+import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
 import { formatNumber } from "../src/number-format.js";
 
 describe("formatNumber", () => {
@@ -73,6 +73,31 @@ describe("formatNumber", () => {
     expect(dateToSerial(new Date(Date.UTC(1900, 1, 28)))).toBe(59);
     expect(dateToSerial(new Date(Date.UTC(1900, 2, 1)))).toBe(61);
     expect(serialToDate(60).toISOString()).toBe("1900-02-28T00:00:00.000Z");
+  });
+
+  it("parses supported UTC calendar forms and rejects ambiguous invalid components", () => {
+    const leapDay = dateToSerial(new Date(Date.UTC(2024, 1, 29)));
+    expect(parseDateInput(" 2024-02-29 ")).toBe(leapDay);
+    expect(parseDateInput("2024-02-29 12:30")).toBe(leapDay + 12.5 / 24);
+    expect(parseDateInput("2024-02-29T23:59:58")).toBe(
+      leapDay + (23 * 3600 + 59 * 60 + 58) / 86_400,
+    );
+    expect(parseDateInput("31/01/2024")).toBe(dateToSerial(new Date(Date.UTC(2024, 0, 31))));
+    expect(parseDateInput("01/31/2024")).toBe(dateToSerial(new Date(Date.UTC(2024, 0, 31))));
+    expect(parseDateInput("04/05/2024")).toBe(dateToSerial(new Date(Date.UTC(2024, 3, 5))));
+
+    for (const invalid of [
+      "2023-02-29",
+      "2024-13-01",
+      "2024-01-32",
+      "2024-01-01 24:00",
+      "2024-01-01 12:60",
+      "13/14/2024",
+      "99-01-01",
+      "not a date",
+    ]) {
+      expect(parseDateInput(invalid), invalid).toBeNull();
+    }
   });
 
   it("formats scientific notation with an explicit exponent width", () => {

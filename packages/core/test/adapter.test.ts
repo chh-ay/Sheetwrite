@@ -6,8 +6,10 @@ import {
 import {
   applyChangedLiveGridOptions,
   createSimpleGridInput,
+  extractGridOptions,
   GRID_OPTION_POLICY,
   getGridResetReason,
+  gridSizeStyle,
 } from "../src/adapter.js";
 import type { GridController } from "../src/grid-controller.js";
 import type { GridOptions } from "../src/types.js";
@@ -84,6 +86,25 @@ describe("shared adapter option policy", () => {
     calls.length = 0;
     applyChangedLiveGridOptions(controller, next, next);
     expect(calls).toEqual([]);
+  });
+  it("extracts only supported grid options and normalizes explicit host sizing", () => {
+    const workbook = makeWorkbook(1);
+    expect(
+      extractGridOptions({
+        workbook,
+        readOnly: true,
+        className: "host-only",
+        onReady: () => {},
+      }),
+    ).toEqual({ workbook, readOnly: true });
+    expect(gridSizeStyle({ fill: true })).toEqual({
+      width: "100%",
+      height: "100%",
+      minHeight: "0",
+    });
+    expect(gridSizeStyle({ height: 320 })).toEqual({ width: "100%", height: "320px" });
+    expect(gridSizeStyle({ height: "40vh" })).toEqual({ width: "100%", height: "40vh" });
+    expect(gridSizeStyle({})).toEqual({});
   });
 });
 

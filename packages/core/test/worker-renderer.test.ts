@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { VisibleWindowView } from "../src/types.js";
+import type { PanePaint, RenderLayout, Theme, VisibleWindowView } from "../src/types.js";
 import { WorkerRenderer } from "../src/worker-renderer.js";
 
 class RecordingWorker {
@@ -161,5 +161,127 @@ describe("WorkerRenderer", () => {
     const fallback = worker.messages[2]!;
     expect(fallback.message).toMatchObject({ type: "paintPacked", sheet: "s1" });
     expect(fallback.transfer?.length).toBe(6);
+  });
+  it("serializes packed and generic frozen panes with the exact transferable buffers", () => {
+    const renderer = new WorkerRenderer();
+    const worker = new RecordingWorker();
+    expect(Reflect.set(renderer, "worker", worker)).toBe(true);
+    const packed = makePackedView();
+    const generic: VisibleWindowView = {
+      sheet: "s1",
+      rows: { start: 1, end: 2 },
+      cols: [0],
+      values: ["fallback"],
+      styleIds: new Uint32Array([0]),
+      styles: [{}],
+    };
+    const panes: PanePaint[] = [
+      {
+        view: packed,
+        clip: { x: 0, y: 0, w: 100, h: 40 },
+        scrollTop: 0,
+        scrollLeft: 0,
+        rowTops: new Float64Array([0]),
+        rowHeights: new Float64Array([24]),
+      },
+      {
+        view: generic,
+        clip: { x: 100, y: 0, w: 200, h: 40 },
+        scrollTop: 20,
+        scrollLeft: 10,
+      },
+    ];
+
+    renderer.paintPanes(panes, { x: 100, y: null });
+
+    expect(worker.messages).toHaveLength(1);
+    expect(worker.messages[0]!.message).toMatchObject({
+      type: "paintPanes",
+      divider: { x: 100, y: null },
+      panes: [
+        {
+          packed: { sheet: "s1" },
+          view: undefined,
+          clip: panes[0]!.clip,
+          scrollTop: 0,
+          scrollLeft: 0,
+        },
+        {
+          packed: undefined,
+          view: generic,
+          clip: panes[1]!.clip,
+          scrollTop: 20,
+          scrollLeft: 10,
+        },
+      ],
+    });
+    expect(worker.messages[0]!.transfer).toEqual([
+      packed.valueKinds!.buffer,
+      packed.numberValues!.buffer,
+      packed.stringPoolIds!.buffer,
+      packed.stringLocalIds!.buffer,
+      packed.styleIds.buffer,
+      packed.stringPoolUpdateIds!.buffer,
+    ]);
+  });
+
+  it("forwards lifecycle state and accepts only painted Worker acknowledgements", () => {
+    const renderer = new WorkerRenderer();
+    const worker = new RecordingWorker();
+    const canvas = document.createElement("canvas");
+    expect(Reflect.set(renderer, "worker", worker)).toBe(true);
+    expect(Reflect.set(renderer, "canvas", canvas)).toBe(true);
+
+    const layout: RenderLayout = {
+      columns: [],
+      rowHeight: 20,
+      headerHeight: 24,
+      totalRows: 0,
+    };
+    const theme: Theme = {
+      font: "12px sans-serif",
+      bg: "#fff",
+      fg: "#111",
+      gridLine: "#ddd",
+      headerBg: "#eee",
+      headerFg: "#222",
+      selection: "#def",
+      selectionBorder: "#08f",
+      rowHeight: 20,
+      headerHeight: 24,
+      rowHeaderWidth: 40,
+      searchMatch: "#ff0",
+      searchActiveMatch: "#fa0",
+      highlight: "#cfc",
+    };
+    renderer.setLayout(layout);
+    renderer.setTheme(theme);
+    renderer.setViewport({ width: 640, height: 480, scrollTop: 12, scrollLeft: 8 });
+    renderer.paintPanes([], { x: null, y: null });
+    expect(canvas.style.width).toBe("640px");
+    expect(canvas.style.height).toBe("480px");
+    expect(worker.messages.map(({ message }) => message)).toEqual([
+      { type: "layout", layout },
+      { type: "theme", theme },
+      {
+        type: "viewport",
+        viewport: { width: 640, height: 480, scrollTop: 12, scrollLeft: 8 },
+        dpr: globalThis.devicePixelRatio ?? 1,
+      },
+      { type: "paintPanes", panes: [], divider: { x: null, y: null } },
+    ]);
+
+    const onMessage = Reflect.get(renderer, "onWorkerMessage") as (
+      event: MessageEvent<unknown>,
+    ) => void;
+    onMessage(new MessageEvent("message", { data: null }));
+    onMessage(new MessageEvent("message", { data: { type: "ignored" } }));
+    expect(canvas.dataset.workerFrame).toBeUndefined();
+    onMessage(new MessageEvent("message", { data: { type: "painted" } }));
+    onMessage(new MessageEvent("message", { data: { type: "painted" } }));
+    expect(canvas.dataset.workerFrame).toBe("2");
+
+    const detached = new WorkerRenderer();
+    detached.paintPanes([], { x: null, y: null });
   });
 });

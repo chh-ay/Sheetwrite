@@ -157,6 +157,42 @@ describe("createToolbar", () => {
     grid.destroy();
     store.dispose();
   });
+  it("moves keyboard focus within toolbar bounds and ignores unrelated keys", () => {
+    const host = mountHost();
+    const grid = {} as Grid;
+    const piece = createToolbar(host, grid, {
+      label: "Editing",
+      items: [
+        { onClick: () => {}, title: "One" },
+        { onClick: () => {}, title: "Two" },
+        { onClick: () => {}, title: "Three" },
+      ],
+    });
+    try {
+      const controls = [...piece.element.querySelectorAll<HTMLButtonElement>("button")];
+      controls[1]!.focus();
+      for (const [key, expected] of [
+        ["ArrowLeft", 0],
+        ["ArrowRight", 1],
+        ["End", 2],
+        ["ArrowRight", 2],
+        ["Home", 0],
+        ["ArrowLeft", 0],
+      ] as const) {
+        piece.element.dispatchEvent(
+          new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+        );
+        expect(document.activeElement, key).toBe(controls[expected]!);
+      }
+      piece.element.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      expect(document.activeElement).toBe(controls[0]!);
+      expect(piece.element.getAttribute("role")).toBe("toolbar");
+      expect(piece.element.getAttribute("aria-label")).toBe("Editing");
+    } finally {
+      piece.destroy();
+      host.remove();
+    }
+  });
 });
 
 describe("createNameBox", () => {
@@ -362,6 +398,15 @@ describe("createSpreadsheetShell", () => {
     shell.setGridConfig({ toolbar: true, tabs: true, find: false });
     expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
     expect(host.querySelector(".sheetwrite-tabbar")).toBeNull();
+
+    shell.setTheme({ bg: "#123456" });
+    expect(
+      host
+        .querySelector<HTMLElement>(".sheetwrite-shell")
+        ?.style.getPropertyValue("--sheetwrite-widget-bg"),
+    ).toBe("#123456");
+    shell.setActiveSheet("s1");
+    expect(shell.grid.getActiveSheet()).toBe("s1");
 
     shell.destroy();
   });

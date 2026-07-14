@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { Workbook, WorkbookSnapshot } from "@sheetwrite/core";
+import type { DataValidationCondition, Workbook, WorkbookSnapshot } from "@sheetwrite/core";
 import {
   dateToSerial,
   fromXlsxTable,
@@ -342,6 +342,10 @@ describe("workbook XLSX round-trip", () => {
       "duplicate XLSX sheet name: Inputs",
     );
 
+    const invalidName = roundTripWorkbook();
+    invalidName.sheets[0]!.name = "Bad/Name";
+    await expect(toXlsxWorkbook(invalidName)).rejects.toThrow("invalid XLSX sheet name: Bad/Name");
+
     const emptySheet: WorkbookSnapshot = {
       schemaVersion: 1,
       workbook: { activeSheet: "empty" },
@@ -548,6 +552,94 @@ describe("workbook XLSX round-trip", () => {
         src: "=1/0",
       },
     );
+  });
+
+  it("round-trips compact and alpha colors with per-side border styles", async () => {
+    const source = roundTripWorkbook();
+    source.sheets[0]!.cells[0]!.cells[0]!.style = {
+      color: "#abc",
+      backgroundColor: "#11223344",
+      border: {
+        top: { color: "#123456", style: "dotted" },
+        right: { color: "#654321", style: "solid", width: 2 },
+        bottom: { color: "not-a-color", style: "solid" },
+      },
+    };
+    const imported = await fromXlsxWorkbook(await toXlsxWorkbook(source));
+    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toMatchObject({
+      color: "#AABBCC",
+      backgroundColor: "#223344",
+      border: {
+        top: { color: "#123456", style: "dotted" },
+        right: { color: "#654321", style: "solid", width: 2 },
+      },
+    });
+    await expect(toXlsxWorkbook(source, { maxCells: 0 })).rejects.toThrow(
+      "maxCells must be a positive integer",
+    );
+    await expect(toXlsxWorkbook(source, { maxCells: 1.5 })).rejects.toThrow(
+      "maxCells must be a positive integer",
+    );
+  });
+
+  it("maps every supported validation shape and warns when an inline list is too large", async () => {
+    const source = roundTripWorkbook();
+    const conditions: DataValidationCondition[] = [
+      { kind: "list", values: [null, true, false, 'a"b'] },
+      { kind: "checkbox", checkedValue: "yes", uncheckedValue: 0 },
+      { kind: "date", min: 1, max: 2 },
+      { kind: "textLength", min: 2 },
+      { kind: "number", max: 10 },
+      { kind: "list", values: ["x".repeat(256)] },
+    ];
+    source.sheets[0]!.validationRules = conditions.map((condition, index) => {
+      const row = Math.floor(index / 2);
+      const col = index % 2;
+      return {
+        id: `validation-${index}`,
+        range: {
+          sheet: "inputs",
+          start: { row, col },
+          end: { row, col },
+        },
+        condition,
+        policy: "reject",
+        allowBlank: false,
+        helpText: "Contract validation",
+      };
+    });
+    const warnings: string[] = [];
+    const bytes = await toXlsxWorkbook(source, {
+      onWarning: (warning) => warnings.push(warning.code),
+    });
+    const inspected = new ExcelJS.Workbook();
+    type ExcelLoadInput = Parameters<typeof inspected.xlsx.load>[0];
+    await inspected.xlsx.load(bytes as unknown as ExcelLoadInput);
+    const sheet = inspected.getWorksheet("Inputs")!;
+
+    expect(sheet.getCell("A1").dataValidation).toMatchObject({
+      type: "list",
+    });
+    expect(sheet.getCell("B1").dataValidation).toMatchObject({
+      type: "list",
+      formulae: ['"yes,0"'],
+    });
+    expect(sheet.getCell("A2").dataValidation).toMatchObject({
+      type: "date",
+      operator: "between",
+    });
+    expect(sheet.getCell("B2").dataValidation).toMatchObject({
+      type: "textLength",
+      operator: "greaterThanOrEqual",
+      formulae: [2],
+    });
+    expect(sheet.getCell("A3").dataValidation).toMatchObject({
+      type: "decimal",
+      operator: "lessThanOrEqual",
+      formulae: [10],
+    });
+    expect(sheet.getCell("B3").dataValidation).toBeUndefined();
+    expect(warnings).toContain("unsupported-feature");
   });
 
   it("reports lossy external cell values and enforces cancellation and allocation limits", async () => {

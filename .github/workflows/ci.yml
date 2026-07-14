@@ -15,6 +15,7 @@ env:
   WASM_TARGET: "wasm32-unknown-unknown"
   WASM_PACK_VERSION: "0.15.0"
   CARGO_AUDIT_VERSION: "0.22.2"
+  CARGO_LLVM_COV_VERSION: "0.8.7"
 
 jobs:
   build-and-test:
@@ -49,12 +50,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             ~/.cargo/bin/cargo-audit
+            ~/.cargo/bin/cargo-llvm-cov
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
             packages/wasm/target
-          key: ${{ runner.os }}-cargo-rust-${{ env.RUST_VERSION }}-${{ env.WASM_TARGET }}-wasm-pack-${{ env.WASM_PACK_VERSION }}-audit-${{ env.CARGO_AUDIT_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-rust-${{ env.RUST_VERSION }}-${{ env.WASM_TARGET }}-wasm-pack-${{ env.WASM_PACK_VERSION }}-audit-${{ env.CARGO_AUDIT_VERSION }}-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-rust-${{ env.RUST_VERSION }}-${{ env.WASM_TARGET }}-wasm-pack-${{ env.WASM_PACK_VERSION }}-audit-${{ env.CARGO_AUDIT_VERSION }}-
+            ${{ runner.os }}-cargo-rust-${{ env.RUST_VERSION }}-${{ env.WASM_TARGET }}-wasm-pack-${{ env.WASM_PACK_VERSION }}-audit-${{ env.CARGO_AUDIT_VERSION }}-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}-
 
       - name: Cache Bun downloads
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -73,18 +75,25 @@ jobs:
       - name: Install pinned cargo-audit
         run: cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
 
+      - name: Install pinned cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
+
       - name: Print toolchain contract
         run: |
           bun --version
           rustc --version
           wasm-pack --version
           cargo audit --version
+          cargo llvm-cov --version
 
       - name: Install Playwright Chromium
         run: bun run browser:install
 
       - name: Run canonical non-browser verification graph
         run: bun run verify:ci
+
+      - name: Enforce source coverage
+        run: bun run test:coverage
 
       - name: Browser smoke tests
         run: bun run test:browser

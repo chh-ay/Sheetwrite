@@ -34,13 +34,18 @@ describe("contributor and CI toolchain contract", () => {
     expect(workflow).toContain("bun-version: 1.3.14");
   });
 
-  it("pins Rust, its WASM target, wasm-pack, and cargo-audit", () => {
+  it("pins Rust, its WASM target, wasm-pack, cargo-audit, and coverage tooling", () => {
     expect(rustToolchain).toContain('channel = "1.96.0"');
+    expect(rustToolchain).toContain('components = ["llvm-tools-preview"]');
     expect(rustToolchain).toContain('targets = ["wasm32-unknown-unknown"]');
     expect(workflow).toContain('RUST_VERSION: "1.96.0"');
     expect(workflow).toContain('WASM_TARGET: "wasm32-unknown-unknown"');
     expect(workflow).toContain(`WASM_PACK_VERSION: "${WASM_PACK_VERSION}"`);
     expect(workflow).toContain('CARGO_AUDIT_VERSION: "0.22.2"');
+    expect(workflow).toContain('CARGO_LLVM_COV_VERSION: "0.8.7"');
+    expect(workflow).toContain(
+      'cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked',
+    );
     expect(workflow).not.toMatch(/curl[^\n]*\|\s*(?:ba)?sh/);
   });
 
@@ -69,6 +74,7 @@ describe("contributor and CI toolchain contract", () => {
       "bun scripts/install-wasm-pack.ts",
       "bun run browser:install",
       "bun run verify:ci",
+      "bun run test:coverage",
       "bun run test:browser",
       "bun run changeset:status -- --since=origin/develop",
     ];
