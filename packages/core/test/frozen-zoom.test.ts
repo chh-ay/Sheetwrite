@@ -212,6 +212,48 @@ describe("frozen panes", () => {
     grid.destroy();
   });
 
+  it("retains exact scalar values for equal-sized adjacent panes", () => {
+    const { workbook, data } = makeGridSheet(50, 12, 100);
+    const store = new SheetwriteStore(workbook, data);
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, overscan: 0 }, store);
+    const viewport = host.querySelector(".sheetwrite-viewport");
+    if (!(viewport instanceof HTMLDivElement)) throw new Error("expected grid viewport");
+    Object.defineProperty(viewport, "clientWidth", { value: 700, configurable: true });
+    const recorder = makeRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+
+    const scroller = scrollerOf(host);
+    Object.defineProperty(scroller, "scrollTop", {
+      value: 120,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(scroller, "scrollLeft", {
+      value: 200,
+      writable: true,
+      configurable: true,
+    });
+
+    grid.setFrozen(2, 1);
+    const frame = recorder.paneFrames.at(-1);
+    expect(frame).toBeDefined();
+    if (!frame) throw new Error("expected a pane frame");
+    const [, top, left] = frame.panes as [PanePaint, PanePaint, PanePaint, PanePaint];
+
+    expect(top.view.values.length).toBe(left.view.values.length);
+    expect(top.view.values).not.toBe(left.view.values);
+    for (const pane of frame.panes) {
+      const expected: string[] = [];
+      for (let row = pane.view.rows.start; row < pane.view.rows.end; row++) {
+        for (const col of pane.view.cols) expected.push(`r${row}c${col}`);
+      }
+      expect(pane.view.values).toEqual(expected);
+    }
+
+    grid.destroy();
+  });
+
   // Contract: unfreezing (setFrozen(0,0)) drops the pane path — the next frame
   // is a plain paint() and no new pane frame is emitted.
   it("reverts to plain paint() when nothing is frozen", () => {

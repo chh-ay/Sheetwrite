@@ -1,4 +1,5 @@
 import type { AriaMirror } from "./aria-mirror.js";
+import type { CellScalar } from "./types/cell.js";
 import type { DatasourceController } from "./datasource-controller.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
@@ -36,6 +37,7 @@ export class RenderCoordinator {
   private columnWindowSignature = "";
   private lastPaintSignature = "";
   private lastPaintView: VisibleWindowView | null = null;
+  private readonly paneValuePools: CellScalar[][] = [];
   private destroyed = false;
 
   constructor(private readonly options: RenderCoordinatorOptions) {}
@@ -205,10 +207,13 @@ export class RenderCoordinator {
 
     if (frozenRows > 0 && frozenColumns > 0) {
       panes.push({
-        view: this.options.store.getVisibleWindow(
-          this.options.activeSheet(),
-          frozenRowWindow,
-          frozenColumnIndices,
+        view: this.retainPaneView(
+          this.options.store.getVisibleWindow(
+            this.options.activeSheet(),
+            frozenRowWindow,
+            frozenColumnIndices,
+          ),
+          panes.length,
         ),
         clip: { x: 0, y: 0, w: xSplit, h: ySplit },
         scrollTop: 0,
@@ -219,10 +224,13 @@ export class RenderCoordinator {
     }
     if (frozenRows > 0) {
       panes.push({
-        view: this.options.store.getVisibleWindow(
-          this.options.activeSheet(),
-          frozenRowWindow,
-          bodyColumns,
+        view: this.retainPaneView(
+          this.options.store.getVisibleWindow(
+            this.options.activeSheet(),
+            frozenRowWindow,
+            bodyColumns,
+          ),
+          panes.length,
         ),
         clip: { x: xSplit, y: 0, w: Math.max(0, clientWidth - xSplit), h: ySplit },
         scrollTop: 0,
@@ -233,10 +241,13 @@ export class RenderCoordinator {
     }
     if (frozenColumns > 0) {
       panes.push({
-        view: this.options.store.getVisibleWindow(
-          this.options.activeSheet(),
-          bodyRows,
-          frozenColumnIndices,
+        view: this.retainPaneView(
+          this.options.store.getVisibleWindow(
+            this.options.activeSheet(),
+            bodyRows,
+            frozenColumnIndices,
+          ),
+          panes.length,
         ),
         clip: { x: 0, y: ySplit, w: xSplit, h: Math.max(0, clientHeight - ySplit) },
         scrollTop: contentTop,
@@ -246,10 +257,9 @@ export class RenderCoordinator {
       });
     }
 
-    const bodyView = this.options.store.getVisibleWindow(
-      this.options.activeSheet(),
-      bodyRows,
-      bodyColumns,
+    const bodyView = this.retainPaneView(
+      this.options.store.getVisibleWindow(this.options.activeSheet(), bodyRows, bodyColumns),
+      panes.length,
     );
     panes.push({
       view: bodyView,
@@ -269,5 +279,15 @@ export class RenderCoordinator {
       y: frozenRows > 0 ? ySplit - 0.5 : null,
     });
     return bodyView;
+  }
+
+  private retainPaneView(view: VisibleWindowView, slot: number): VisibleWindowView {
+    let values = this.paneValuePools[slot];
+    if (!values || values.length !== view.values.length) {
+      values = new Array<CellScalar>(view.values.length);
+      this.paneValuePools[slot] = values;
+    }
+    for (let index = 0; index < values.length; index++) values[index] = view.values[index] ?? null;
+    return { ...view, values };
   }
 }

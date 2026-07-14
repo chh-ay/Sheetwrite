@@ -131,7 +131,7 @@ describe("Grid render hot path", () => {
     const grid = new GridImpl(host, { workbook }, store);
 
     expect(getCellCalls).toBe(0);
-    expect(getWindowCalls).toBeGreaterThan(0);
+    expect(getWindowCalls).toBe(1);
     const ctx = host.querySelector("canvas")?.getContext("2d") as unknown as RecordingContext2D;
     expect(ctx.calls.fillText).toBeGreaterThan(0);
 
