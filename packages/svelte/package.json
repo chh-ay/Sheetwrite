@@ -28,7 +28,8 @@
     "provenance": true
   },
   "scripts": {
-    "prepublishOnly": "bun run typecheck",
+    "build": "bun run typecheck",
+    "prepublishOnly": "bun run build",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "peerDependencies": {

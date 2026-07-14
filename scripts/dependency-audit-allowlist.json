@@ -1,0 +1,8 @@
+{
+  "policy": {
+    "scope": "Every dependency in the frozen Bun lockfile (a strict superset of production dependencies)",
+    "failSeverities": ["high", "critical"],
+    "allowanceRequirements": ["advisory", "package", "owner", "reason", "expires"]
+  },
+  "allowlist": []
+}

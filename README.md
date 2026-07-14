@@ -144,13 +144,44 @@ conflict reload, conservative rebase, presence, comments, and revisions.
 
 ## Development
 
+Contributor and CI tooling is pinned to Bun 1.3.14, Rust 1.96.0 with the
+`wasm32-unknown-unknown` target, wasm-pack 0.15.0, and cargo-audit 0.22.2.
+The Bun engine range in `package.json` describes supported consumers; the
+`packageManager` field and `rust-toolchain.toml` define the exact contributor
+toolchain.
+
 ```sh
-bun install
-bun run build:wasm
+bun install --frozen-lockfile
+bun run toolchain:install-wasm-pack
+cargo install cargo-audit --version 0.22.2 --locked
+```
+
+The canonical clean-output proof builds in a temporary source export and never
+deletes working-tree files:
+
+```sh
+bun run verify:clean-build
+```
+
+For the complete local CI graph, install Chromium once, then run the ordered
+non-browser graph and browser gate. `browser:install` installs the Playwright
+browser and its operating-system dependencies.
+
+```sh
+bun run browser:install
+bun run verify:ci
+bun run test:browser
+```
+
+Focused contributor commands remain available:
+
+```sh
+bun run build:packages
 bun run typecheck
-bun test
-bun run build
 bun run lint
+bun test
+bun run build:examples
+bun run verify:packed
 bun run verify:bundlers
 ```
 
