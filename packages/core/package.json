@@ -14,7 +14,6 @@
   ],
   "sideEffects": [
     "*.css",
-    "./dist/xlsx-backend.js",
     "./dist/worker.js"
   ],
   "main": "./dist/index.js",
@@ -36,10 +35,6 @@
     "./shell": {
       "types": "./dist/shell.d.ts",
       "default": "./dist/shell.js"
-    },
-    "./xlsx": {
-      "types": "./dist/xlsx-backend.d.ts",
-      "default": "./dist/xlsx-backend.js"
     },
     "./worker": {
       "types": "./dist/worker.d.ts",
@@ -67,12 +62,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@sheetwrite/wasm": "workspace:*",
-    "exceljs": "^4.4.0",
-    "read-excel-file": "^9.3.1",
-    "write-excel-file": "^4.1.1"
-  },
-  "devDependencies": {
-    "jszip": "3.10.1"
+    "@sheetwrite/wasm": "workspace:*"
   }
 }

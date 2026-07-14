@@ -246,12 +246,14 @@ export function setXlsxTableExportBackend(next: XlsxTableExportBackend): void {
   tableExportBackend = next;
 }
 
+function missingXlsxBackend(functionName: string): Error {
+  return new Error(
+    `Sheetwrite: XLSX backend not registered. Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling ${functionName}.`,
+  );
+}
+
 export function toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array> {
-  if (!tableExportBackend) {
-    throw new Error(
-      "Sheetwrite: no table xlsx export backend configured (import @sheetwrite/core/xlsx first)",
-    );
-  }
+  if (!tableExportBackend) throw missingXlsxBackend("toXlsxTable");
   return tableExportBackend.toXlsxTable(workbook, store);
 }
 
@@ -280,11 +282,7 @@ export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
  * verbatim, and empty cells become `null`.
  */
 export function fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
-  if (!tableImportBackend) {
-    throw new Error(
-      "Sheetwrite: no table xlsx import backend configured (import @sheetwrite/core/xlsx first)",
-    );
-  }
+  if (!tableImportBackend) throw missingXlsxBackend("fromXlsxTable");
   return tableImportBackend.fromXlsxTable(data);
 }
 
@@ -340,11 +338,7 @@ export function toXlsxWorkbook(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  if (!workbookBackend) {
-    throw new Error(
-      "Sheetwrite: no workbook xlsx backend configured (import @sheetwrite/core/xlsx first)",
-    );
-  }
+  if (!workbookBackend) throw missingXlsxBackend("toXlsxWorkbook");
   return workbookBackend.toXlsxWorkbook(workbookSnapshotOf(input), options);
 }
 
@@ -353,10 +347,6 @@ export function fromXlsxWorkbook(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
-  if (!workbookBackend) {
-    throw new Error(
-      "Sheetwrite: no workbook xlsx backend configured (import @sheetwrite/core/xlsx first)",
-    );
-  }
+  if (!workbookBackend) throw missingXlsxBackend("fromXlsxWorkbook");
   return workbookBackend.fromXlsxWorkbook(data, options);
 }

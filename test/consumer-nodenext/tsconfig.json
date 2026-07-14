@@ -14,7 +14,8 @@
     "paths": {
       "@sheetwrite/core": ["../../packages/core/dist/index.d.ts"],
       "@sheetwrite/core/adapter": ["../../packages/core/dist/adapter.d.ts"],
-      "@sheetwrite/core/xlsx": ["../../packages/core/dist/xlsx-backend.d.ts"]
+      "@sheetwrite/xlsx": ["../../packages/xlsx/dist/index.d.ts"],
+      "@sheetwrite/xlsx/register": ["../../packages/xlsx/dist/register.d.ts"]
     }
   },
   "include": ["main.ts"]

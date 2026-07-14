@@ -75,6 +75,35 @@ const grid = createGrid(document.querySelector("#grid")!, {
 
 Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Getting started](docs/getting-started.md).
 
+## Optional XLSX backend
+
+Core and every framework adapter install without ExcelJS,
+`read-excel-file`, or `write-excel-file`. Add the concrete backend only when
+the application chooses XLSX support:
+
+```sh
+bun add @sheetwrite/xlsx
+```
+
+```ts
+import "@sheetwrite/xlsx/register";
+import {
+  fromXlsxTable,
+  fromXlsxWorkbook,
+  toXlsxTable,
+  toXlsxWorkbook,
+} from "@sheetwrite/core";
+```
+
+`grid.exportXlsx()` and framework toolbar XLSX actions use the table backend and
+therefore require registration. `toXlsxTable` / `fromXlsxTable` provide
+first-row-header, first-sheet interchange; `toXlsxWorkbook` /
+`fromXlsxWorkbook` preserve multi-sheet snapshots and formula source through
+the in-memory workbook backend. Calling any XLSX function without registration
+throws an error naming the exact package and registration import. CSV and TSV
+remain core-only. See [Data operations](docs/data-operations.md#export) for
+limits and compatibility.
+
 ## Persistence
 
 Snapshots are the authoritative, JSON-safe persistence boundary. Hosts own
@@ -107,6 +136,7 @@ conflict reload, conservative rebase, presence, comments, and revisions.
 | Package | Purpose |
 |---|---|
 | `@sheetwrite/core` | Imperative grid, store, formulas, views, export, theming |
+| `@sheetwrite/xlsx` | Optional concrete XLSX table/workbook backends and explicit registration |
 | `@sheetwrite/react` | React `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/vue` | Vue `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |

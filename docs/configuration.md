@@ -160,6 +160,10 @@ createGrid(host, { workbook });                            // no toolbar (config
 ¹ "Default `true`" means: when you supply a `config` object at all. With no
 `config` there is no toolbar.
 
+The export flag always enables CSV. Its XLSX button requires an explicit
+optional installation and `import "@sheetwrite/xlsx/register"` before use; the
+framework packages do not install an XLSX backend.
+
 Every control acts on the current selection — see [Interaction](./interaction.md).
 
 ### Feature flags

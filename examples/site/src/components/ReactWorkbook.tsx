@@ -7,7 +7,6 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 import workerUrl from "@sheetwrite/core/worker?worker&url";
-import "@sheetwrite/core/xlsx";
 import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -441,7 +440,14 @@ function App() {
         <button type="button" onClick={() => gridRef.current?.exportCsv("sales.csv")}>
           CSV
         </button>
-        <button type="button" onClick={() => void gridRef.current?.exportXlsx("sales.xlsx")}>
+        <button
+          type="button"
+          onClick={async () => {
+            // Dynamic import keeps the optional XLSX backend out of the default page chunk.
+            await import("@sheetwrite/xlsx/register");
+            await gridRef.current?.exportXlsx("sales.xlsx");
+          }}
+        >
           XLSX
         </button>
       </div>

@@ -4,12 +4,9 @@
 <pre id="result" data-status="running">running</pre>
 
 <script>
-  import {
-    fromXlsxWorkbook,
-    toXlsxWorkbook,
-    type WorkbookSnapshot,
-  } from "@sheetwrite/core";
-  import "@sheetwrite/core/xlsx";
+  import { fromXlsxWorkbook, toXlsxWorkbook } from "@sheetwrite/core";
+  import type { WorkbookSnapshot } from "@sheetwrite/core";
+  import "@sheetwrite/xlsx/register";
 
   const result = document.querySelector("#result");
   if (!(result instanceof HTMLPreElement)) {

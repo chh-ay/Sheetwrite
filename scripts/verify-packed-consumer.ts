@@ -1,10 +1,11 @@
 import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 interface PackageManifest {
   name: string;
   version: string;
+  license?: unknown;
   files?: string[];
   exports?: unknown;
   dependencies?: Record<string, string>;
@@ -13,6 +14,8 @@ interface PackageManifest {
 
 interface PackResult {
   filename: string;
+  size: number;
+  unpackedSize: number;
   files: Array<{ path: string }>;
 }
 
@@ -23,6 +26,25 @@ interface PackageSpec {
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const fixtureRoot = join(repositoryRoot, "test/consumer");
+const excelPackages = ["exceljs", "read-excel-file", "write-excel-file"] as const;
+const mitCompatibleLicenses: Record<string, true> = {
+  "0BSD": true,
+  "Apache-2.0": true,
+  "BSD-2-Clause": true,
+  "BSD-3-Clause": true,
+  "BlueOak-1.0.0": true,
+  "CC0-1.0": true,
+  ISC: true,
+  MIT: true,
+  "MIT/X11": true,
+  Unlicense: true,
+  Zlib: true,
+};
+// The 0.1.1 tarball predates its package.json license field. Debian records the
+// upstream MIT grant and source commit: https://sources.debian.org/copyright/license/node-buffers/0.1.1-2/
+const auditedLicenseOverrides: Record<string, string> = {
+  "buffers@0.1.1": "MIT",
+};
 const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/core",
@@ -38,8 +60,6 @@ const packageSpecs: PackageSpec[] = [
       "dist/shell.d.ts",
       "dist/shell.js",
       "shell.css",
-      "dist/xlsx-backend.d.ts",
-      "dist/xlsx-backend.js",
       "styles.css",
     ],
   },
@@ -54,6 +74,29 @@ const packageSpecs: PackageSpec[] = [
       "pkg/sheetwrite_wasm.js",
       "pkg/sheetwrite_wasm_bg.wasm",
       "pkg/sheetwrite_wasm_bg.wasm.d.ts",
+    ],
+  },
+  {
+    directory: "packages/xlsx",
+    requiredFiles: [
+      "LICENSE",
+      "README.md",
+      "dist/index.d.ts",
+      "dist/index.d.ts.map",
+      "dist/index.js",
+      "dist/index.js.map",
+      "dist/register.d.ts",
+      "dist/register.d.ts.map",
+      "dist/register.js",
+      "dist/register.js.map",
+      "dist/registration.d.ts",
+      "dist/registration.js",
+      "dist/table-export.d.ts",
+      "dist/table-export.js",
+      "dist/table-import.d.ts",
+      "dist/table-import.js",
+      "dist/workbook.d.ts",
+      "dist/workbook.js",
     ],
   },
   {
@@ -185,6 +228,29 @@ async function assertTarball(
     }
   }
 
+  if (manifest.name === "@sheetwrite/xlsx") {
+    for (const path of packedFiles) {
+      if (path.startsWith("src/") || path.startsWith("test/") || path.startsWith("node_modules/")) {
+        throw new Error(`${manifest.name} tarball contains forbidden path ${path}`);
+      }
+    }
+  }
+  if (
+    manifest.name === "@sheetwrite/core" &&
+    [...packedFiles].some((path) => path.includes("xlsx-backend"))
+  ) {
+    throw new Error("@sheetwrite/core tarball still contains the removed XLSX backend");
+  }
+  for (const dependency of excelPackages) {
+    const ownsDependency = manifest.dependencies?.[dependency] !== undefined;
+    if (manifest.name === "@sheetwrite/xlsx" && !ownsDependency) {
+      throw new Error(`${manifest.name} must declare ${dependency}`);
+    }
+    if (manifest.name !== "@sheetwrite/xlsx" && ownsDependency) {
+      throw new Error(`${manifest.name} must not declare ${dependency}`);
+    }
+  }
+
   await mkdir(extractRoot, { recursive: true });
   await run(["tar", "-xzf", tarballPath, "-C", extractRoot], repositoryRoot);
   const packageRoot = join(extractRoot, "package");
@@ -199,6 +265,113 @@ async function assertTarball(
   }
 
   await assertWorkerBundle(packageRoot, packedManifest);
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function verifyNoExcelClosure(
+  name: string,
+  packageName: string,
+  tarballs: ReadonlyMap<string, string>,
+  temporaryRoot: string,
+): Promise<void> {
+  const root = join(temporaryRoot, `without-xlsx-${name}`);
+  await mkdir(root, { recursive: true });
+  const dependencies: Record<string, string> = {};
+  for (const localPackage of new Set([packageName, "@sheetwrite/core", "@sheetwrite/wasm"])) {
+    const tarball = tarballs.get(localPackage);
+    if (tarball === undefined) throw new Error(`Missing tarball for ${localPackage}`);
+    dependencies[localPackage] = `file:${tarball}`;
+  }
+  await writeFile(
+    join(root, "package.json"),
+    `${JSON.stringify({ name: `sheetwrite-${name}-without-xlsx`, private: true, type: "module", dependencies }, null, 2)}\n`,
+  );
+  await run(["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund"], root);
+
+  const lock = await readFile(join(root, "package-lock.json"), "utf8");
+  for (const dependency of excelPackages) {
+    if (lock.includes(`node_modules/${dependency}`)) {
+      throw new Error(`${packageName} package-lock unexpectedly contains ${dependency}`);
+    }
+    if (await pathExists(join(root, "node_modules", ...dependency.split("/")))) {
+      throw new Error(`${packageName} node_modules unexpectedly contains ${dependency}`);
+    }
+  }
+
+  const adapterProbe =
+    packageName === "@sheetwrite/svelte"
+      ? "const Entry = Core;"
+      : `// Dynamic import intentionally checks the selected packed adapter entry.
+         const Entry = await import(${JSON.stringify(packageName)});`;
+  const runtime = `
+    import * as Core from "@sheetwrite/core";
+    ${adapterProbe}
+    if (typeof Core.createGrid !== "function" || Object.keys(Entry).length === 0) {
+      throw new Error("packed core or adapter entry failed to load");
+    }
+  `;
+  await run(["node", "--input-type=module", "--eval", runtime], root);
+}
+
+async function resolveRuntimeDependency(
+  name: string,
+  packageRoot: string,
+  consumerRoot: string,
+): Promise<string> {
+  let current = packageRoot;
+  while (current.startsWith(consumerRoot)) {
+    const candidate = join(current, "node_modules", ...name.split("/"));
+    if (await pathExists(join(candidate, "package.json"))) return candidate;
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  throw new Error(`Unable to resolve runtime dependency ${name} from ${packageRoot}`);
+}
+
+async function auditRuntimeLicenses(consumerRoot: string): Promise<number> {
+  const queue = [join(consumerRoot, "node_modules", "@sheetwrite", "xlsx")];
+  const visited = new Set<string>();
+  while (queue.length > 0) {
+    const packageRoot = queue.pop()!;
+    if (visited.has(packageRoot)) continue;
+    visited.add(packageRoot);
+    const manifest = await readJson<PackageManifest>(join(packageRoot, "package.json"));
+    const declaredLicense =
+      typeof manifest.license === "string"
+        ? manifest.license
+        : manifest.license &&
+            typeof manifest.license === "object" &&
+            "type" in manifest.license &&
+            typeof manifest.license.type === "string"
+          ? manifest.license.type
+          : "";
+    const rawLicense =
+      declaredLicense || auditedLicenseOverrides[`${manifest.name}@${manifest.version}`] || "";
+    const alternatives = rawLicense.replace(/[()]/g, "").split(/\s+OR\s+/);
+    const compatible = alternatives.some((alternative) =>
+      alternative
+        .split(/\s+AND\s+/)
+        .every((license) => mitCompatibleLicenses[license.trim()] === true),
+    );
+    if (!compatible) {
+      throw new Error(
+        `${manifest.name} has unresolved or incompatible license ${rawLicense || "<missing>"}`,
+      );
+    }
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      queue.push(await resolveRuntimeDependency(dependency, packageRoot, consumerRoot));
+    }
+  }
+  return visited.size;
 }
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-packed-consumer-"));
@@ -222,6 +395,7 @@ try {
     sourceManifests.map((manifest) => [manifest.name, manifest.version] as const),
   );
   const tarballs = new Map<string, string>();
+  const packageSizes = new Map<string, { packed: number; unpacked: number }>();
 
   for (const spec of packageSpecs) {
     const manifest = await stagePackage(spec, stageRoot, versions);
@@ -243,7 +417,15 @@ try {
       join(extractRoot, basename(spec.directory)),
     );
     tarballs.set(manifest.name, tarballPath);
+    packageSizes.set(manifest.name, { packed: result.size, unpacked: result.unpackedSize });
   }
+
+  await Promise.all([
+    verifyNoExcelClosure("core", "@sheetwrite/core", tarballs, temporaryRoot),
+    verifyNoExcelClosure("react", "@sheetwrite/react", tarballs, temporaryRoot),
+    verifyNoExcelClosure("vue", "@sheetwrite/vue", tarballs, temporaryRoot),
+    verifyNoExcelClosure("svelte", "@sheetwrite/svelte", tarballs, temporaryRoot),
+  ]);
 
   await cp(fixtureRoot, consumerRoot, { recursive: true });
   const consumerManifest = await readJson<PackageManifest>(join(consumerRoot, "package.json"));
@@ -264,6 +446,7 @@ try {
     ["npm", "ls", "@sheetwrite/core", "@sheetwrite/wasm", "react", "svelte", "vue"],
     consumerRoot,
   );
+  const auditedLicenseCount = await auditRuntimeLicenses(consumerRoot);
   await run(["npm", "run", "typecheck"], consumerRoot);
   await run(["npm", "run", "bundle"], consumerRoot);
   await run(["npm", "run", "bundle:svelte"], consumerRoot);
@@ -285,6 +468,10 @@ try {
     throw new Error("Vite consumer bundle does not contain the compiled Svelte adapter");
   }
 
+  for (const [name, size] of packageSizes) {
+    console.log(`${name}: packed=${size.packed}B unpacked=${size.unpacked}B`);
+  }
+  console.log(`Audited ${auditedLicenseCount} MIT-compatible XLSX runtime package licenses`);
   console.log("Packed tarball consumer verification passed");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });

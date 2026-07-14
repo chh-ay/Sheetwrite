@@ -31,7 +31,8 @@ import {
   toXlsxTable,
 } from "@sheetwrite/core";
 import { createGridController } from "@sheetwrite/core/adapter";
-import "@sheetwrite/core/xlsx";
+import * as Xlsx from "@sheetwrite/xlsx";
+import "@sheetwrite/xlsx/register";
 
 // Removed pre-release names must stay absent from packed declarations.
 // @ts-expect-error `Patch` was removed in favor of `DocumentOp`.
@@ -109,6 +110,7 @@ void toXlsxTable;
 void fromXlsxTable;
 void datasource;
 void operation;
+void Xlsx.registerXlsxBackends;
 
 const positionalDatasource: DataSource = {
   // @ts-expect-error positional datasource implementations are not accepted.

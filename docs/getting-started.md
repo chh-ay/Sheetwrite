@@ -91,4 +91,8 @@ React uses `fallback`; Vue and Svelte use their fallback content/slot convention
 
 ## Advanced feature assets
 
-Worker rendering and XLSX export remain explicit advanced features. Import worker and XLSX entrypoints from `@sheetwrite/core`; see [Worker rendering](./worker-rendering.md) and the export documentation.
+Worker rendering and XLSX export remain explicit advanced features. Import the
+worker entry from `@sheetwrite/core/worker`. XLSX requires the separate
+`@sheetwrite/xlsx` package and `import "@sheetwrite/xlsx/register"` before a
+toolbar or programmatic export; see [Worker rendering](./worker-rendering.md)
+and the [export documentation](./data-operations.md#export).

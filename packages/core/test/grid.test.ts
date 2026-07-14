@@ -1,4 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import type { XlsxTableExportBackend } from "../src/export.js";
+import { setXlsxTableExportBackend } from "../src/export.js";
 import {
   AUTO_FIT_CHUNK_CELLS,
   DEFAULT_THEME,
@@ -1053,6 +1055,36 @@ describe("Grid.setMinColumns", () => {
     expect(() => paged.exportCsv("partial.csv")).toThrow(/unloaded datasource cells/);
     dense.destroy();
     paged.destroy();
+  });
+
+  it("routes Grid.exportXlsx through the registered table backend", async () => {
+    const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
+    const grid = new GridImpl(mountHost(), { workbook: store.getWorkbook() }, store);
+    const expected = new Error("fake XLSX export reached");
+    let receivedWorkbook: Workbook | undefined;
+    let receivedStore: Store | undefined;
+    const backend: XlsxTableExportBackend = {
+      name: "fake-grid-export",
+      toXlsxTable: async (workbook, actualStore) => {
+        receivedWorkbook = workbook;
+        receivedStore = actualStore;
+        throw expected;
+      },
+    };
+
+    setXlsxTableExportBackend(null as never);
+    await expect(grid.exportXlsx("missing.xlsx")).rejects.toThrow(
+      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
+    );
+    setXlsxTableExportBackend(backend);
+    try {
+      await expect(grid.exportXlsx("fake.xlsx")).rejects.toBe(expected);
+      expect(receivedWorkbook).toBe(store.getWorkbook());
+      expect(receivedStore).toBe(store);
+    } finally {
+      setXlsxTableExportBackend(null as never);
+      grid.destroy();
+    }
   });
 });
 

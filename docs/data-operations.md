@@ -99,10 +99,18 @@ and fonts; workbook widths/heights remain in base units.
 
 ## Export
 
-The grid can download the active sheet directly. CSV is synchronous; XLSX is async
-because the backend produces bytes asynchronously.
+The grid can download the active sheet directly. CSV is synchronous; XLSX is
+async because the optional backend produces bytes asynchronously. Install and
+register `@sheetwrite/xlsx` before enabling a framework toolbar export action
+or calling `grid.exportXlsx`:
+
+```sh
+npm install @sheetwrite/xlsx
+```
 
 ```ts
+import "@sheetwrite/xlsx/register";
+
 grid.exportCsv("sales.csv");
 await grid.exportXlsx("sales.xlsx");
 ```
@@ -122,8 +130,7 @@ Sheetwrite exposes two intentionally different XLSX contracts:
   and produces the same `WorkbookSnapshot` used by persistence, without adding
   a header row.
 
-Import the optional XLSX subpath once to register both backends:
-
+Register the optional XLSX package once before using either contract:
 ```ts
 import {
   downloadBytes,
@@ -136,7 +143,7 @@ import {
   toXlsxTable,
   toXlsxWorkbook,
 } from "@sheetwrite/core";
-import "@sheetwrite/core/xlsx";
+import "@sheetwrite/xlsx/register";
 
 const dataFromCsv = fromCsv(csvText, columns);
 const tableBytes = await toXlsxTable(workbook, store);
@@ -206,19 +213,23 @@ snapshot.
 ### XLSX backends
 
 XLSX uses pluggable backends. Calling a table or workbook API without its
-backend throws a configuration error. The default implementations live only at
-the `@sheetwrite/core/xlsx` subpath, so the ordinary core entry does not load
-ExcelJS, `read-excel-file`, or `write-excel-file`.
+backend throws a configuration error that names both remedies: install
+`@sheetwrite/xlsx`, then import `@sheetwrite/xlsx/register` before calling the
+function. The ordinary core entry does not resolve ExcelJS, `read-excel-file`,
+or `write-excel-file`.
 
-The subpath registers itself as a side effect and also exports all three backend
-objects for explicit registration or wrapping:
+`@sheetwrite/xlsx` is the only concrete implementation package. Its root entry
+is side-effect free and exports `registerXlsxBackends()` plus the three named
+backend instances for explicit registration or wrapping. The `./register`
+entry performs idempotent registration:
 
 ```ts
 import {
   excelJsWorkbookBackend,
   readExcelFileTableImportBackend,
+  registerXlsxBackends,
   writeExcelFileTableExportBackend,
-} from "@sheetwrite/core/xlsx";
+} from "@sheetwrite/xlsx";
 import {
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
@@ -228,6 +239,9 @@ import {
   type XlsxWorkbookBackend,
 } from "@sheetwrite/core";
 
+registerXlsxBackends();
+
+// Or compose individual concrete backends explicitly.
 setXlsxTableExportBackend(writeExcelFileTableExportBackend);
 setXlsxTableImportBackend(readExcelFileTableImportBackend);
 setXlsxWorkbookBackend(excelJsWorkbookBackend);

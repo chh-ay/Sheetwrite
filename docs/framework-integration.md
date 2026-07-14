@@ -128,4 +128,10 @@ grid. See [Offline and collaboration](./collaboration.md).
 
 ## Advanced features
 
-`SheetwriteGrid` keeps renderer, worker URL, custom renderer, datasource, and workbook control. Worker and XLSX assets remain explicit `@sheetwrite/core` feature imports. The adapter packages re-export ordinary core types needed by quick starts, but do not expose WASM internals.
+`SheetwriteGrid` keeps renderer, worker URL, custom renderer, datasource, and
+workbook control. Worker assets remain an explicit `@sheetwrite/core/worker`
+feature import. XLSX is a separate optional installation: framework toolbar
+XLSX actions require `@sheetwrite/xlsx` and
+`import "@sheetwrite/xlsx/register"` (or a lazy import immediately before the
+action). The adapter packages do not install the concrete XLSX implementation
+and re-export only the ordinary core types needed by quick starts.

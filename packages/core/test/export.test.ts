@@ -1,20 +1,28 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { CellObject } from "write-excel-file/universal";
+import type {
+  XlsxTableExportBackend,
+  XlsxTableImportBackend,
+  XlsxWorkbookBackend,
+  XlsxWorkbookOptions,
+} from "../src/export.js";
 import {
   downloadBytes,
   fromCsv,
+  fromXlsxTable,
+  fromXlsxWorkbook,
   parseCsv,
   safeHeader,
+  setXlsxTableExportBackend,
+  setXlsxTableImportBackend,
+  setXlsxWorkbookBackend,
   toCsv,
   toTsv,
   toXlsxTable,
+  toXlsxWorkbook,
 } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { Workbook } from "../src/types.js";
-// side-effect import registers the write-excel-file backend
-import "../src/xlsx-backend.js";
-import { buildXlsxModel } from "../src/xlsx-backend.js";
+import type { Workbook, WorkbookSnapshot } from "../src/types.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -38,6 +46,29 @@ function workbook(): Workbook {
 }
 
 describe("export", () => {
+  it("imports core without resolving any concrete Excel package", async () => {
+    const script = `
+      Bun.plugin({
+        name: "forbid-excel-packages",
+        setup(build) {
+          build.onResolve(
+            { filter: /^(exceljs|read-excel-file|write-excel-file)/ },
+            (args) => { throw new Error(\`core resolved forbidden package \${args.path}\`); },
+          );
+        },
+      });
+      // Dynamic import is required so the resolver tripwire is installed first.
+      await import("./packages/core/src/index.ts");
+    `;
+    const child = Bun.spawn(["bun", "--eval", script], {
+      cwd: new URL("../../../", import.meta.url).pathname,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+  });
   it("csv: BOM + CRLF + header + injection hardening + quoting", () => {
     const store = new SheetwriteStore(workbook());
     store.applyTransaction({
@@ -76,113 +107,98 @@ describe("export", () => {
     );
   });
 
-  it("xlsx: write-excel-file backend produces a valid zip container", async () => {
+  it("reports the exact optional package remedy when no XLSX backend is registered", () => {
     const store = new SheetwriteStore(workbook());
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "hi" },
-        },
-      ],
-    });
-    const bytes = await toXlsxTable(store.getWorkbook(), store);
-    expect(bytes.length).toBeGreaterThan(0);
-    expect(bytes[0]).toBe(0x50); // 'P'
-    expect(bytes[1]).toBe(0x4b); // 'K' — zip magic
+    setXlsxTableExportBackend(null as never);
+    setXlsxTableImportBackend(null as never);
+    setXlsxWorkbookBackend(null as never);
+
+    expect(() => toXlsxTable(store.getWorkbook(), store)).toThrow(
+      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
+    );
+    expect(() => fromXlsxTable(new Uint8Array())).toThrow(
+      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling fromXlsxTable.",
+    );
+    const snapshot: WorkbookSnapshot = {
+      schemaVersion: 1,
+      workbook: { activeSheet: "s" },
+      sheets: [],
+    };
+    expect(() => toXlsxWorkbook(snapshot)).toThrow(
+      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxWorkbook.",
+    );
+    expect(() => fromXlsxWorkbook(new Uint8Array())).toThrow(
+      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling fromXlsxWorkbook.",
+    );
+    store.dispose();
   });
 
-  it("xlsx model carries header and cell styles with per-cell precedence", () => {
-    const wb = workbook();
-    const column = wb.sheets[0]!.columns[0]!;
-    column.headerStyle = { bold: true };
-    column.cellStyle = { color: "#112233", bold: true };
-    const store = new SheetwriteStore(wb);
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "styled" },
-          style: { bold: false, backgroundColor: "#ff0000", fontSize: 18, wrap: true },
-        },
-      ],
-    });
+  it("forwards table and workbook calls through independently injected backends", async () => {
+    const store = new SheetwriteStore(workbook());
+    const input = new Uint8Array([9, 8, 7]);
+    const snapshot: WorkbookSnapshot = {
+      schemaVersion: 1,
+      workbook: { activeSheet: "s" },
+      sheets: [],
+    };
+    const options: XlsxWorkbookOptions = { maxCells: 17 };
+    let exportedSnapshot: WorkbookSnapshot | undefined;
+    let exportedOptions: XlsxWorkbookOptions | undefined;
+    let importedOptions: XlsxWorkbookOptions | undefined;
 
-    const model = buildXlsxModel(store.getWorkbook(), store)!;
-    expect(model.data[0]![0]).toMatchObject({ fontWeight: "bold" });
-    expect(model.data[1]![0]).toMatchObject({
-      value: "styled",
-      textColor: "#112233",
-      backgroundColor: "#ff0000",
-      fontSize: 18,
-      wrap: true,
-    });
-    expect((model.data[1]![0] as CellObject).fontWeight).toBeUndefined();
-  });
+    const tableExportBackend: XlsxTableExportBackend = {
+      name: "fake-table-export",
+      toXlsxTable: async (actualWorkbook, actualStore) => {
+        expect(actualWorkbook).toBe(store.getWorkbook());
+        expect(actualStore).toBe(store);
+        return new Uint8Array([1, 2, 3]);
+      },
+    };
+    const tableImportBackend: XlsxTableImportBackend = {
+      name: "fake-table-import",
+      fromXlsxTable: async (actualInput) => {
+        expect(actualInput).toBe(input);
+        return { rowCount: 1, columns: { Imported: ["yes"] } };
+      },
+    };
+    const workbookBackend: XlsxWorkbookBackend = {
+      name: "fake-workbook",
+      toXlsxWorkbook: async (actualSnapshot, actualOptions) => {
+        exportedSnapshot = actualSnapshot;
+        exportedOptions = actualOptions;
+        return new Uint8Array([4, 5, 6]);
+      },
+      fromXlsxWorkbook: async (actualInput, actualOptions) => {
+        expect(actualInput).toBe(input);
+        importedOptions = actualOptions;
+        return snapshot;
+      },
+    };
 
-  it("xlsx model emits merge spans and null covered cells", () => {
-    const wb = workbook();
-    wb.sheets[0]!.merges = [{ r0: 0, c0: 0, r1: 1, c1: 1 }];
-    const store = new SheetwriteStore(wb);
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "anchor" },
-        },
-      ],
-    });
-
-    const data = buildXlsxModel(store.getWorkbook(), store)!.data;
-    expect(data[1]![0]).toMatchObject({ value: "anchor", columnSpan: 2, rowSpan: 2 });
-    expect(data[1]![1]).toBeNull();
-    expect(data[2]![0]).toBeNull();
-    expect(data[2]![1]).toBeNull();
-  });
-
-  it("xlsx model carries number formats on numeric body cells", () => {
-    const wb = workbook();
-    wb.sheets[0]!.columns[1]!.numberFormat = "#,##0.00";
-    const store = new SheetwriteStore(wb);
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 1 },
-          value: { kind: "literal", value: 1234.5 },
-        },
-      ],
-    });
-
-    expect(buildXlsxModel(store.getWorkbook(), store)!.data[1]![1]).toMatchObject({
-      value: 1234.5,
-      format: "#,##0.00",
-    });
-  });
-
-  it("xlsx model excludes hidden columns from data and width options", () => {
-    const wb = workbook();
-    wb.sheets[0]!.columns[0]!.visible = false;
-    wb.sheets[0]!.columns[1]!.width = 75;
-    const store = new SheetwriteStore(wb);
-    const model = buildXlsxModel(store.getWorkbook(), store)!;
-
-    expect(model.data[0]).toHaveLength(1);
-    expect(model.data[0]![0]).toMatchObject({ value: "B" });
-    expect(model.options.columns).toEqual([{ width: 10 }]);
-  });
-
-  it("xlsx model carries row heights and sheet name", () => {
-    const wb = workbook();
-    wb.sheets[0]!.rowHeights = new Map([[1, 42]]);
-    const store = new SheetwriteStore(wb);
-    const model = buildXlsxModel(store.getWorkbook(), store)!;
-
-    expect(model.options.sheet).toBe("S");
-    expect(model.data[2]![0]).toMatchObject({ height: 42 });
+    setXlsxTableExportBackend(tableExportBackend);
+    setXlsxTableImportBackend(tableImportBackend);
+    setXlsxWorkbookBackend(workbookBackend);
+    try {
+      await expect(toXlsxTable(store.getWorkbook(), store)).resolves.toEqual(
+        new Uint8Array([1, 2, 3]),
+      );
+      await expect(fromXlsxTable(input)).resolves.toEqual({
+        rowCount: 1,
+        columns: { Imported: ["yes"] },
+      });
+      await expect(toXlsxWorkbook({ exportSnapshot: () => snapshot }, options)).resolves.toEqual(
+        new Uint8Array([4, 5, 6]),
+      );
+      await expect(fromXlsxWorkbook(input, options)).resolves.toBe(snapshot);
+      expect(exportedSnapshot).toBe(snapshot);
+      expect(exportedOptions).toBe(options);
+      expect(importedOptions).toBe(options);
+    } finally {
+      setXlsxTableExportBackend(null as never);
+      setXlsxTableImportBackend(null as never);
+      setXlsxWorkbookBackend(null as never);
+      store.dispose();
+    }
   });
 
   it("csv: a cell value beginning with a formula char is neutralized", () => {

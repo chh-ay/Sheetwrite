@@ -47,6 +47,7 @@
         "@sheetwrite/svelte": "workspace:*",
         "@sheetwrite/vue": "workspace:*",
         "@sheetwrite/wasm": "workspace:*",
+        "@sheetwrite/xlsx": "workspace:*",
         "@tailwindcss/vite": "^4.3.2",
         "react": "^19",
         "react-dom": "^19",
@@ -71,12 +72,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@sheetwrite/wasm": "workspace:*",
-        "exceljs": "^4.4.0",
-        "read-excel-file": "^9.3.1",
-        "write-excel-file": "^4.1.1",
-      },
-      "devDependencies": {
-        "jszip": "3.10.1",
       },
     },
     "packages/react": {
@@ -116,6 +111,19 @@
     "packages/wasm": {
       "name": "@sheetwrite/wasm",
       "version": "0.1.0",
+    },
+    "packages/xlsx": {
+      "name": "@sheetwrite/xlsx",
+      "version": "0.1.0",
+      "dependencies": {
+        "@sheetwrite/core": "workspace:*",
+        "exceljs": "^4.4.0",
+        "read-excel-file": "^9.3.1",
+        "write-excel-file": "^4.1.1",
+      },
+      "devDependencies": {
+        "jszip": "3.10.1",
+      },
     },
   },
   "trustedDependencies": [
@@ -445,6 +453,8 @@
     "@sheetwrite/vue": ["@sheetwrite/vue@workspace:packages/vue"],
 
     "@sheetwrite/wasm": ["@sheetwrite/wasm@workspace:packages/wasm"],
+
+    "@sheetwrite/xlsx": ["@sheetwrite/xlsx@workspace:packages/xlsx"],
 
     "@shikijs/core": ["@shikijs/core@4.3.1", "", { "dependencies": { "@shikijs/primitive": "4.3.1", "@shikijs/types": "4.3.1", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.4", "hast-util-to-html": "^9.0.5" } }, "sha512-ANMDxuaPsNMdDC1m4vfvhlDmJweMwkE5XitTwrq2rWHx5jM+dlm4MmHt2PP6t0uejfR77SuhrhJ0zEijIF/uhA=="],
 
