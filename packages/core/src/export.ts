@@ -184,7 +184,7 @@ export function fromCsv(text: string, columns: readonly Column[]): ColumnarData 
   const rowCount = body.length;
 
   // One output array per declared column, sized to the body up front.
-  const result: Record<string, CellScalar[]> = {};
+  const result: Record<string, CellScalar[]> = Object.create(null);
   for (const column of columns) {
     result[column.key] = new Array<CellScalar>(rowCount);
   }

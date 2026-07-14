@@ -34,14 +34,14 @@ function toArrayBuffer(data: ArrayBuffer | Uint8Array): ArrayBuffer {
 
 async function fromXlsxTableBytes(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
   const rows = await readSheet(toArrayBuffer(data), { trim: false });
-  if (rows.length === 0) return { rowCount: 0, columns: {} };
+  const columns: Record<string, CellScalar[]> = Object.create(null);
+  if (rows.length === 0) return { rowCount: 0, columns };
 
   const header = rows[0] ?? [];
   const keys = headerKeys(header);
   const columnCount = keys.length;
   const body = rows.slice(1);
   const rowCount = body.length;
-  const columns: Record<string, CellScalar[]> = {};
   for (const key of keys) columns[key] = new Array<CellScalar>(rowCount);
 
   for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {

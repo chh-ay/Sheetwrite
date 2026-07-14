@@ -105,6 +105,53 @@ describe("table XLSX interchange", () => {
     // `trim: false` keeps surrounding whitespace verbatim.
     expect(data.columns.Note![0]).toBe("  spaced  ");
   });
+
+  it("preserves reserved and duplicate headers as enumerable own properties", async () => {
+    const fixture = new ExcelJS.Workbook();
+    const sheet = fixture.addWorksheet("Reserved");
+    sheet.addRow(["__proto__", "__proto__", "constructor", "ordinary"]);
+    sheet.addRow(["first", "second", "third", "fourth"]);
+    const bytes = await fixture.xlsx.writeBuffer();
+    const data = await fromXlsxTable(new Uint8Array(bytes));
+
+    expect(Object.getPrototypeOf(data.columns)).toBeNull();
+    expect(Object.keys(data.columns)).toEqual([
+      "__proto__",
+      "__proto___2",
+      "constructor",
+      "ordinary",
+    ]);
+    expect(Object.hasOwn(data.columns, "__proto__")).toBe(true);
+    expect(data.columns.__proto__).toEqual(["first"]);
+    expect(data.columns.__proto___2).toEqual(["second"]);
+    expect(data.columns.constructor).toEqual(["third"]);
+    expect(JSON.stringify(data.columns)).toBe(
+      '{"__proto__":["first"],"__proto___2":["second"],"constructor":["third"],"ordinary":["fourth"]}',
+    );
+
+    const imported = new SheetwriteStore(
+      {
+        activeSheet: "reserved",
+        sheets: [
+          {
+            id: "reserved",
+            name: "Reserved",
+            rowCount: 1,
+            columns: Object.keys(data.columns).map((key) => ({
+              key,
+              header: key,
+              width: 100,
+              type: "text",
+            })),
+          },
+        ],
+      },
+      data,
+    );
+    expect(imported.getCell({ sheet: "reserved", row: 0, col: 0 }).resolved).toBe("first");
+    expect(imported.getCell({ sheet: "reserved", row: 0, col: 2 }).resolved).toBe("third");
+    imported.dispose();
+  });
 });
 
 function roundTripWorkbook(): WorkbookSnapshot {

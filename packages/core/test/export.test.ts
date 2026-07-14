@@ -22,7 +22,7 @@ import {
 } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { Workbook, WorkbookSnapshot } from "../src/types.js";
+import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -331,6 +331,42 @@ describe("export", () => {
     expect(data.rowCount).toBe(3);
     expect(Array.from(data.columns.a!)).toEqual(["hello", "a,b", "multi\nline"]);
     expect(Array.from(data.columns.b!)).toEqual([42, -5, 0]);
+  });
+
+  it("csv import preserves reserved declared keys as enumerable own properties", () => {
+    const columns: Column[] = [
+      { key: "__proto__", header: "Prototype", width: 100, type: "text" },
+      { key: "constructor", header: "Constructor", width: 100, type: "text" },
+      { key: "ordinary", header: "Ordinary", width: 100, type: "text" },
+    ];
+    const data = fromCsv("Prototype,Constructor,Ordinary\r\nalpha,beta,gamma", columns);
+
+    expect(Object.getPrototypeOf(data.columns)).toBeNull();
+    expect(Object.keys(data.columns)).toEqual(["__proto__", "constructor", "ordinary"]);
+    expect(Object.hasOwn(data.columns, "__proto__")).toBe(true);
+    expect(data.columns.__proto__).toEqual(["alpha"]);
+    expect(data.columns.constructor).toEqual(["beta"]);
+    expect(JSON.stringify(data.columns)).toBe(
+      '{"__proto__":["alpha"],"constructor":["beta"],"ordinary":["gamma"]}',
+    );
+
+    const imported = new SheetwriteStore(
+      {
+        activeSheet: "reserved",
+        sheets: [
+          {
+            id: "reserved",
+            name: "Reserved",
+            rowCount: 1,
+            columns,
+          },
+        ],
+      },
+      data,
+    );
+    expect(imported.getCell({ sheet: "reserved", row: 0, col: 0 }).resolved).toBe("alpha");
+    expect(imported.getCell({ sheet: "reserved", row: 0, col: 1 }).resolved).toBe("beta");
+    imported.dispose();
   });
 });
 
