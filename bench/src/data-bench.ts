@@ -52,6 +52,16 @@ import {
   toAoA,
   toSheetwriteColumnar,
 } from "./dataset.js";
+import {
+  assertFiniteNonNegative,
+  assertGateIdentity,
+  type BenchmarkMode,
+  type GateIdentity,
+  MATRIX_IDS,
+  PERFORMANCE_GATE_PROTOCOL_VERSION,
+  validateExactMatrix,
+  validateStat,
+} from "./gate-protocol.js";
 import { createHandsontable } from "./handsontable-runtime.js";
 import { forceGc, type MeasureOptions, measure, mib, ms, type Stat, summarize } from "./stats.js";
 
@@ -60,7 +70,7 @@ import { forceGc, type MeasureOptions, measure, mib, ms, type Stat, summarize } 
 /** Sheetwrite is measured across the full range; its store scales to 1M. */
 export const SHEETWRITE_ROWS = [1_000, 10_000, 100_000, 500_000, 1_000_000] as const;
 /** Handsontable headless ceiling — larger sizes render every row (infeasible). */
-const HANDSONTABLE_ROWS = [1_000, 10_000] as const;
+export const HANDSONTABLE_ROWS = [1_000, 10_000] as const;
 /** Sizes where both engines run headlessly → the apples-to-apples head-to-head. */
 const HEAD_TO_HEAD_ROWS = [1_000, 10_000] as const;
 
@@ -74,7 +84,7 @@ const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", imp
 
 export const WORKLOADS = ["ingest", "windowRead", "edit", "sort", "filter", "aggregate"] as const;
 export type Workload = (typeof WORKLOADS)[number];
-type EngineId = "sheetwrite" | "handsontable";
+export type EngineId = "sheetwrite" | "handsontable";
 
 const WORKLOAD_LABELS: Record<Workload, string> = {
   ingest: "Ingest N rows",
@@ -130,7 +140,7 @@ function measureBatched(fn: () => void, opts: MeasureOptions, batch: number): St
 // ── Result types ─────────────────────────────────────────────────────────────
 
 /** Memory attributable to holding N rows in one engine, sampled in isolation. */
-interface MemoryProfile {
+export interface MemoryProfile {
   /** process.memoryUsage().heapUsed delta around a single ingest (bytes). */
   readonly heapDeltaBytes: number;
   /** WASM linear-memory delta (bytes); null for engines without WASM. */
@@ -145,8 +155,111 @@ export interface TimedEngineResult {
 }
 
 /** All measured workloads for one engine at one row count. */
-interface EngineResult extends TimedEngineResult {
+export interface EngineResult extends TimedEngineResult {
   readonly memory: MemoryProfile;
+}
+
+export interface DataBenchmarkResult extends GateIdentity {
+  readonly meta: {
+    readonly bun: string;
+    readonly platform: string;
+    readonly arch: string;
+    readonly sheetwriteRows: readonly number[];
+    readonly handsontableRows: readonly number[];
+  };
+  readonly sheetwrite: Readonly<Record<string, EngineResult>>;
+  readonly handsontable: Readonly<Record<string, EngineResult>>;
+}
+
+export function dataMatrixKey(engine: EngineId, rows: number, metric: Workload | "memory"): string {
+  return `engine=${engine};rows=${rows};metric=${metric}`;
+}
+
+export function expectedDataMatrixKeys(mode: BenchmarkMode): string[] {
+  const keys: string[] = [];
+  const engines: readonly [EngineId, readonly number[]][] =
+    mode === "smoke"
+      ? [["sheetwrite", [1_000]]]
+      : [
+          ["sheetwrite", SHEETWRITE_ROWS],
+          ["handsontable", HANDSONTABLE_ROWS],
+        ];
+  for (const [engine, rowsList] of engines) {
+    for (const rows of rowsList) {
+      for (const workload of WORKLOADS) keys.push(dataMatrixKey(engine, rows, workload));
+      keys.push(dataMatrixKey(engine, rows, "memory"));
+    }
+  }
+  return keys;
+}
+
+export function validateDataBenchmark(
+  result: DataBenchmarkResult,
+  expectedMode: BenchmarkMode = result.mode,
+): void {
+  assertGateIdentity("data", expectedMode, result);
+  for (const field of ["bun", "platform", "arch"] as const) {
+    if (typeof result.meta[field] !== "string" || result.meta[field].length === 0) {
+      throw new Error(`data metadata.${field} must be a non-empty string`);
+    }
+  }
+  const expectedSheetwriteRows = expectedMode === "smoke" ? [1_000] : [...SHEETWRITE_ROWS];
+  const expectedHandsontableRows = expectedMode === "smoke" ? [] : [...HANDSONTABLE_ROWS];
+  if (
+    JSON.stringify(result.meta.sheetwriteRows) !== JSON.stringify(expectedSheetwriteRows) ||
+    JSON.stringify(result.meta.handsontableRows) !== JSON.stringify(expectedHandsontableRows)
+  ) {
+    throw new Error(`data ${expectedMode} metadata does not match its declared row matrices`);
+  }
+
+  const resultFamilies = [
+    ["sheetwrite", result.sheetwrite],
+    ["handsontable", result.handsontable],
+  ] as const;
+  const observedKeys: string[] = [];
+  for (const [engine, records] of resultFamilies) {
+    for (const [rowsText, row] of Object.entries(records)) {
+      const rows = Number(rowsText);
+      if (!Number.isInteger(rows) || rows <= 0 || row.rows !== rows) {
+        throw new Error(`data ${engine} row identity is malformed: ${rowsText}`);
+      }
+      for (const workload of Object.keys(row.stats)) {
+        observedKeys.push(dataMatrixKey(engine, rows, workload as Workload));
+      }
+      if (row.memory !== undefined) observedKeys.push(dataMatrixKey(engine, rows, "memory"));
+    }
+  }
+  validateExactMatrix("data", expectedDataMatrixKeys(expectedMode), observedKeys);
+
+  for (const [engine, records] of resultFamilies) {
+    for (const [rowsText, row] of Object.entries(records)) {
+      const rows = Number(rowsText);
+      for (const workload of WORKLOADS) {
+        const key = dataMatrixKey(engine, rows, workload);
+        const stat = row.stats[workload];
+        validateStat(stat, `${key}.stat`);
+        if (stat.p95 >= 30_000) {
+          throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
+        }
+      }
+      const memoryKey = dataMatrixKey(engine, rows, "memory");
+      assertFiniteNonNegative(row.memory.heapDeltaBytes, `${memoryKey}.heapDeltaBytes`);
+      if (row.memory.heapDeltaBytes >= 2 * 1024 * 1024 * 1024) {
+        throw new Error(`${memoryKey} exceeded the 2 GiB heap safety ceiling`);
+      }
+      if (engine === "sheetwrite") {
+        if (row.memory.wasmDeltaBytes === null) {
+          throw new Error(`${memoryKey}.wasmDeltaBytes is missing`);
+        }
+        assertFiniteNonNegative(row.memory.wasmDeltaBytes, `${memoryKey}.wasmDeltaBytes`);
+        if (row.memory.wasmDeltaBytes >= 1024 * 1024 * 1024) {
+          throw new Error(`${memoryKey} exceeded the 1 GiB WASM safety ceiling`);
+        }
+      } else if (row.memory.wasmDeltaBytes !== null) {
+        throw new Error(`${memoryKey}.wasmDeltaBytes must be null for handsontable`);
+      }
+    }
+  }
 }
 
 // ── Sheetwrite harness ───────────────────────────────────────────────────────
@@ -496,21 +609,26 @@ function probeMemory(engine: EngineId, rows: number): MemoryProfile {
     .split("\n")
     .filter((l) => l.trim().startsWith("{"))
     .at(-1);
-  if (!last) return { heapDeltaBytes: Number.NaN, wasmDeltaBytes: null };
+  if (proc.exitCode !== 0) {
+    throw new Error(`${engine} ${rows} memory probe exited ${proc.exitCode}`);
+  }
+  if (!last) throw new Error(`${engine} ${rows} memory probe returned no JSON`);
   const parsed: unknown = JSON.parse(last);
   if (
-    parsed &&
-    typeof parsed === "object" &&
-    "heapDeltaBytes" in parsed &&
-    typeof parsed.heapDeltaBytes === "number"
+    !parsed ||
+    typeof parsed !== "object" ||
+    !("heapDeltaBytes" in parsed && typeof parsed.heapDeltaBytes === "number") ||
+    !(
+      "wasmDeltaBytes" in parsed &&
+      (typeof parsed.wasmDeltaBytes === "number" || parsed.wasmDeltaBytes === null)
+    )
   ) {
-    const wasm =
-      "wasmDeltaBytes" in parsed && typeof parsed.wasmDeltaBytes === "number"
-        ? parsed.wasmDeltaBytes
-        : null;
-    return { heapDeltaBytes: parsed.heapDeltaBytes, wasmDeltaBytes: wasm };
+    throw new Error(`${engine} ${rows} memory probe returned a malformed record`);
   }
-  return { heapDeltaBytes: Number.NaN, wasmDeltaBytes: null };
+  return {
+    heapDeltaBytes: parsed.heapDeltaBytes,
+    wasmDeltaBytes: parsed.wasmDeltaBytes,
+  };
 }
 
 async function runMemMode(): Promise<void> {
@@ -596,6 +714,38 @@ export async function runSheetwriteDataBench(
   return results;
 }
 
+function dataResult(
+  mode: BenchmarkMode,
+  sheetwrite: ReadonlyMap<number, EngineResult>,
+  handsontable: ReadonlyMap<number, EngineResult>,
+): DataBenchmarkResult {
+  return {
+    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
+    mode,
+    matrixId: MATRIX_IDS.data[mode],
+    meta: {
+      bun: Bun.version,
+      platform: process.platform,
+      arch: process.arch,
+      sheetwriteRows: [...sheetwrite.keys()],
+      handsontableRows: [...handsontable.keys()],
+    },
+    sheetwrite: Object.fromEntries(sheetwrite),
+    handsontable: Object.fromEntries(handsontable),
+  };
+}
+
+async function runSmokeBench(): Promise<void> {
+  const timed = await runSheetwriteDataBench([1_000]);
+  const sheetwrite = new Map<number, EngineResult>();
+  const result = timed.get(1_000);
+  if (!result) throw new Error("data smoke omitted the declared 1000-row result");
+  sheetwrite.set(1_000, { ...result, memory: probeMemory("sheetwrite", 1_000) });
+  const smoke = dataResult("smoke", sheetwrite, new Map());
+  validateDataBenchmark(smoke, "smoke");
+  console.log(JSON.stringify(smoke));
+}
+
 async function runFullBench(): Promise<void> {
   const timedSw = await runSheetwriteDataBench();
 
@@ -676,21 +826,9 @@ async function runFullBench(): Promise<void> {
   const report = out.join("\n");
   console.log(report);
 
-  const json = JSON.stringify(
-    {
-      meta: {
-        bun: Bun.version,
-        platform: process.platform,
-        arch: process.arch,
-        sheetwriteRows: SHEETWRITE_ROWS,
-        handsontableRows: HANDSONTABLE_ROWS,
-      },
-      sheetwrite: Object.fromEntries(sw),
-      handsontable: Object.fromEntries(hot),
-    },
-    null,
-    2,
-  );
+  const result = dataResult("full", sw, hot);
+  validateDataBenchmark(result, "full");
+  const json = JSON.stringify(result, null, 2);
   await Bun.write(new URL("../results/data-results.json", import.meta.url).pathname, json);
   await Bun.write(new URL("../results/data-results.md", import.meta.url).pathname, `${report}\n`);
   process.stderr.write("\n✔ wrote results/data-results.json and results/data-results.md\n");
@@ -701,6 +839,8 @@ async function runFullBench(): Promise<void> {
 if (import.meta.main) {
   if (process.argv.includes("--mem")) {
     await runMemMode();
+  } else if (process.argv.includes("--smoke")) {
+    await runSmokeBench();
   } else {
     await runFullBench();
   }

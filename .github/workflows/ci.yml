@@ -80,6 +80,9 @@ jobs:
       - name: Test
         run: bun test
 
+      - name: Benchmark gate unit tests
+        run: bun test bench/test
+
       - name: Build examples site
         run: bun run build:examples
 
@@ -89,8 +92,16 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
-      - name: Render benchmark harness smoke
-        run: bun run --filter '@sheetwrite/bench' bench:render:smoke -- --engine sheetwrite
+      - name: Deterministic performance and memory gates
+        run: bun run --filter '@sheetwrite/bench' bench:verify
+
+      - name: Upload performance gate evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-gate-evidence
+          path: test-results/performance-gates/
+          if-no-files-found: ignore
 
       - name: Browser smoke tests
         run: bun run test:browser

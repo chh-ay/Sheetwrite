@@ -5,6 +5,7 @@ export const RENDER_PROTOCOL_VERSION = 1;
 export const RENDER_MINIMUM_SAMPLE_MS = 100;
 export const RENDER_MAX_LAUNCH_ATTEMPTS = 2;
 export const RENDER_VIEWPORT = { width: 640, height: 480 } as const;
+export const RENDER_ORDER_SEED = 0x51c0ffee;
 
 export const ENGINE_IDS = ["sheetwrite", "handsontable"] as const;
 export type EngineId = (typeof ENGINE_IDS)[number];
@@ -229,7 +230,7 @@ export function summarizeCompleteness(
   };
 }
 
-interface ParseOptions {
+export interface ParseRenderOptions {
   readonly expectedRunId?: string;
   readonly nowMs?: number;
   readonly maxAgeMs?: number;
@@ -559,7 +560,7 @@ function equalStringArrays(left: readonly string[], right: readonly string[]): b
 
 export function parseRenderArtifact(
   value: unknown,
-  options: ParseOptions = {},
+  options: ParseRenderOptions = {},
 ): RenderBenchmarkArtifact {
   const input = record(value, "artifact");
   const protocolVersion = integer(input.protocolVersion, "artifact.protocolVersion", 1);
@@ -675,7 +676,7 @@ export function parseRenderArtifact(
 
 export function parseRenderArtifactJson(
   json: string,
-  options: ParseOptions = {},
+  options: ParseRenderOptions = {},
 ): RenderBenchmarkArtifact {
   return parseRenderArtifact(JSON.parse(json) as unknown, options);
 }

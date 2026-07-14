@@ -9,10 +9,20 @@ import {
   linearChain,
   sharedRangeFormulas,
 } from "./formula-dataset.js";
+import {
+  assertFiniteNonNegative,
+  assertGateIdentity,
+  type BenchmarkMode,
+  type GateIdentity,
+  MATRIX_IDS,
+  PERFORMANCE_GATE_PROTOCOL_VERSION,
+  validateExactMatrix,
+  validateRawStat,
+} from "./gate-protocol.js";
 import { forceGc, mib, ms, now, type Stat, summarize } from "./stats.js";
 
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
-const FORMULA_SIZES = [1_000, 10_000, 100_000] as const;
+export const FORMULA_SIZES = [1_000, 10_000, 100_000] as const;
 const DEFAULT_SAMPLES = 5;
 
 export interface FormulaWorkloadResult {
@@ -27,7 +37,7 @@ export interface FormulaMemoryResult {
   wasmDeltaBytes: number;
 }
 
-export interface FormulaBenchmarkResult {
+export interface FormulaBenchmarkResult extends GateIdentity {
   meta: {
     bun: string;
     platform: string;
@@ -37,6 +47,49 @@ export interface FormulaBenchmarkResult {
   workloads: FormulaWorkloadResult[];
   memory: FormulaMemoryResult[];
   gates: { passed: true; tolerance: string };
+}
+
+export function formulaWorkloadKey(workload: Pick<FormulaWorkloadResult, "id" | "size">): string {
+  return `workload=${workload.id};size=${workload.size}`;
+}
+
+export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
+  const smoke = mode === "smoke";
+  const keys: string[] = [];
+  for (const size of smoke ? [1_000] : FORMULA_SIZES) {
+    keys.push(
+      formulaWorkloadKey({ id: "independent-parse-load", size }),
+      formulaWorkloadKey({ id: "independent-first-recompute", size }),
+    );
+  }
+  for (const size of smoke ? [8, 32] : [8, 16, 32, 64]) {
+    keys.push(formulaWorkloadKey({ id: "linear-chain", size }));
+  }
+  const large = smoke ? 1_000 : 100_000;
+  keys.push(
+    formulaWorkloadKey({ id: "wide-fan-out-edit", size: 1_000 }),
+    ...(smoke ? [] : [formulaWorkloadKey({ id: "wide-fan-out-edit", size: large })]),
+    formulaWorkloadKey({ id: "diamond-edit", size: 32 }),
+    formulaWorkloadKey({ id: "shared-range-edit", size: 1_000 }),
+    formulaWorkloadKey({ id: "distinct-range-edit", size: 1_000 }),
+    formulaWorkloadKey({ id: "cross-sheet-range-edit", size: 1_000 }),
+    formulaWorkloadKey({ id: "scalar-edit-affects-0", size: 1_000 }),
+    formulaWorkloadKey({ id: "scalar-edit-affects-1", size: 1 }),
+    formulaWorkloadKey({ id: "scalar-edit-affects-1000", size: 1_000 }),
+    formulaWorkloadKey({ id: "scalar-edit-affects-100000", size: large }),
+    formulaWorkloadKey({ id: "topology-remove-add", size: smoke ? 1_000 : 10_000 }),
+    formulaWorkloadKey({ id: "cycles", size: 1_000 }),
+    formulaWorkloadKey({ id: "removed-sheet-ref", size: 1_000 }),
+    formulaWorkloadKey({ id: "error-propagation", size: 1_000 }),
+    formulaWorkloadKey({ id: "criteria-range-edit", size: smoke ? 10_000 : 100_000 }),
+    formulaWorkloadKey({ id: "lookup-range-edit", size: smoke ? 10_000 : 100_000 }),
+  );
+  return keys;
+}
+
+export function expectedFormulaMemoryKeys(mode: BenchmarkMode): string[] {
+  const sizes = mode === "smoke" ? [1_000] : FORMULA_SIZES;
+  return sizes.map((formulas) => `memory=formulas=${formulas}`);
 }
 
 interface TimedFixture {
@@ -424,7 +477,9 @@ function runWorkloads(smoke: boolean): FormulaWorkloadResult[] {
   const large = smoke ? 1_000 : 100_000;
   results.push(
     collectFixture("wide-fan-out-edit", 1_000, () => fanOutEditFixture(1_000), samples),
-    collectFixture("wide-fan-out-edit", large, () => fanOutEditFixture(large), samples),
+    ...(smoke
+      ? []
+      : [collectFixture("wide-fan-out-edit", large, () => fanOutEditFixture(large), samples)]),
     collectFixture("diamond-edit", 32, () => diamondFixture(32), samples),
     collectFixture("shared-range-edit", 1_000, () => sharedRangeFixture(1_000), samples),
     collectFixture("distinct-range-edit", 1_000, () => distinctRangeFixture(1_000), samples),
@@ -506,33 +561,86 @@ function runMemoryMode(formulas: number): FormulaMemoryResult {
   return { formulas, wasmDeltaBytes: wasm.memory.buffer.byteLength - before };
 }
 
-export function validateFormulaBenchmark(result: FormulaBenchmarkResult): void {
-  assert(result.workloads.length > 0, "no workloads");
-  for (const workload of result.workloads) {
-    assert(workload.samplesMs.length === workload.stat.iters, `${workload.id} sample count`);
-    assert(
-      workload.samplesMs.every((sample) => Number.isFinite(sample) && sample >= 0),
-      `${workload.id} invalid timing`,
-    );
+export function validateFormulaBenchmark(
+  result: FormulaBenchmarkResult,
+  expectedMode: BenchmarkMode = result.mode,
+): void {
+  assertGateIdentity("formula", expectedMode, result);
+  for (const field of ["bun", "platform", "arch"] as const) {
+    if (typeof result.meta[field] !== "string" || result.meta[field].length === 0) {
+      throw new Error(`formula metadata.${field} must be a non-empty string`);
+    }
   }
-  const load100k = result.workloads.find(
-    (workload) => workload.id === "independent-parse-load" && workload.size === 100_000,
-  );
-  const recompute100k = result.workloads.find(
-    (workload) => workload.id === "independent-first-recompute" && workload.size === 100_000,
-  );
-  if (load100k) assert(load100k.stat.p95 < 5_000, "100K parse/load exceeded 5 seconds");
-  if (recompute100k) assert(recompute100k.stat.p95 < 5_000, "100K recompute exceeded 5 seconds");
-  for (const id of ["criteria-range-edit", "lookup-range-edit"]) {
-    const workload = result.workloads.find(
-      (candidate) => candidate.id === id && candidate.size === 100_000,
-    );
-    if (workload) assert(workload.stat.p95 < 5_000, `100K ${id} exceeded 5 seconds`);
+  if (
+    typeof result.meta.timestamp !== "string" ||
+    !Number.isFinite(Date.parse(result.meta.timestamp))
+  ) {
+    throw new Error("formula metadata.timestamp must be an ISO timestamp");
+  }
+  for (const workload of result.workloads) {
+    if (
+      typeof workload.id !== "string" ||
+      workload.id.length === 0 ||
+      !Number.isInteger(workload.size) ||
+      workload.size <= 0
+    ) {
+      throw new Error("formula workload contains a malformed identity");
+    }
   }
   for (const memory of result.memory) {
-    assert(memory.wasmDeltaBytes >= 0, "negative memory delta");
-    if (memory.formulas === 100_000) {
-      assert(memory.wasmDeltaBytes < 256 * 1024 * 1024, "100K formulas exceeded 256 MiB");
+    if (!Number.isInteger(memory.formulas) || memory.formulas <= 0) {
+      throw new Error("formula memory contains a malformed identity");
+    }
+  }
+  if (
+    result.gates?.passed !== true ||
+    typeof result.gates.tolerance !== "string" ||
+    result.gates.tolerance.length === 0
+  ) {
+    throw new Error("formula result does not contain a successful gate record");
+  }
+  validateExactMatrix(
+    "formula workload",
+    expectedFormulaWorkloadKeys(expectedMode),
+    result.workloads.map(formulaWorkloadKey),
+  );
+  validateExactMatrix(
+    "formula memory",
+    expectedFormulaMemoryKeys(expectedMode),
+    result.memory.map((memory) => `memory=formulas=${memory.formulas}`),
+  );
+
+  for (const workload of result.workloads) {
+    const key = formulaWorkloadKey(workload);
+    validateRawStat(workload.samplesMs, workload.stat, key);
+    if (workload.stat.p95 >= 30_000) {
+      throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
+    }
+  }
+  for (const memory of result.memory) {
+    const key = `memory=formulas=${memory.formulas}`;
+    assertFiniteNonNegative(memory.wasmDeltaBytes, `${key}.wasmDeltaBytes`);
+    if (memory.wasmDeltaBytes >= 512 * 1024 * 1024) {
+      throw new Error(`${key} exceeded the 512 MiB absolute safety ceiling`);
+    }
+  }
+
+  if (expectedMode === "full") {
+    for (const id of [
+      "independent-parse-load",
+      "independent-first-recompute",
+      "criteria-range-edit",
+      "lookup-range-edit",
+    ]) {
+      const key = formulaWorkloadKey({ id, size: 100_000 });
+      const workload = result.workloads.find((candidate) => formulaWorkloadKey(candidate) === key)!;
+      if (workload.stat.p95 >= 5_000) {
+        throw new Error(`${key} exceeded the 5 second 100K safety ceiling`);
+      }
+    }
+    const memory100k = result.memory.find((memory) => memory.formulas === 100_000)!;
+    if (memory100k.wasmDeltaBytes >= 256 * 1024 * 1024) {
+      throw new Error("memory=formulas=100000 exceeded the 256 MiB safety ceiling");
     }
   }
 }
@@ -567,7 +675,11 @@ async function runBenchmark(smoke: boolean): Promise<void> {
   initSync({ module: readFileSync(WASM_PATH) });
   const workloads = runWorkloads(smoke);
   const memory = smoke ? [probeMemory(1_000)] : FORMULA_SIZES.map(probeMemory);
+  const mode: BenchmarkMode = smoke ? "smoke" : "full";
   const result: FormulaBenchmarkResult = {
+    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
+    mode,
+    matrixId: MATRIX_IDS.formula[mode],
     meta: {
       bun: Bun.version,
       platform: process.platform,
@@ -579,7 +691,7 @@ async function runBenchmark(smoke: boolean): Promise<void> {
     gates: {
       passed: true,
       tolerance:
-        "100K parse/load, recompute, criteria, and lookup p95 <5s; 100K formula WASM delta <256MiB; no timer-floor ratios",
+        "exact declared matrix; finite raw samples; broad 30s/512MiB ceilings; full 100K parse/load, recompute, criteria, and lookup p95 <5s and formula WASM delta <256MiB",
     },
   };
   validateFormulaBenchmark(result);

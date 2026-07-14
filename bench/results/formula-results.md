@@ -4,32 +4,32 @@ Bun 1.3.14 · linux/x64 · median (p95) ms · raw samples in JSON.
 
 | workload | size | median (p95) ms | samples |
 |---|---:|---:|---:|
-| independent-parse-load | 1,000 | 2.44 (4.26) | 5 |
-| independent-first-recompute | 1,000 | 1.75 (1.94) | 5 |
-| independent-parse-load | 10,000 | 11.05 (14.86) | 5 |
-| independent-first-recompute | 10,000 | 14.25 (16.51) | 5 |
-| independent-parse-load | 100,000 | 75.58 (87.92) | 5 |
-| independent-first-recompute | 100,000 | 173 (227) | 5 |
-| linear-chain | 8 | 0.013 (0.028) | 5 |
-| linear-chain | 16 | 0.025 (0.030) | 5 |
-| linear-chain | 32 | 0.046 (0.057) | 5 |
-| linear-chain | 64 | 0.073 (0.074) | 5 |
-| wide-fan-out-edit | 1,000 | 0.805 (0.991) | 5 |
-| wide-fan-out-edit | 100,000 | 136 (146) | 5 |
-| diamond-edit | 32 | 0.099 (0.107) | 5 |
-| shared-range-edit | 1,000 | 3.02 (3.36) | 5 |
-| distinct-range-edit | 1,000 | 0.013 (0.025) | 5 |
-| cross-sheet-range-edit | 1,000 | 2.23 (4.02) | 5 |
-| scalar-edit-affects-0 | 1,000 | 0.005 (0.008) | 5 |
-| scalar-edit-affects-1 | 1 | 0.005 (0.006) | 5 |
-| scalar-edit-affects-1000 | 1,000 | 0.636 (1.53) | 5 |
-| scalar-edit-affects-100000 | 100,000 | 115 (124) | 5 |
-| topology-remove-add | 10,000 | 9.23 (14.96) | 5 |
-| cycles | 1,000 | 1.69 (2.40) | 5 |
-| removed-sheet-ref | 1,000 | 0.724 (1.03) | 5 |
-| error-propagation | 1,000 | 0.946 (1.76) | 5 |
-| criteria-range-edit | 100,000 | 5.59 (5.75) | 5 |
-| lookup-range-edit | 100,000 | 6.18 (6.71) | 5 |
+| independent-parse-load | 1,000 | 1.50 (3.33) | 5 |
+| independent-first-recompute | 1,000 | 1.10 (1.79) | 5 |
+| independent-parse-load | 10,000 | 7.87 (9.80) | 5 |
+| independent-first-recompute | 10,000 | 9.51 (11.39) | 5 |
+| independent-parse-load | 100,000 | 87.17 (90.58) | 5 |
+| independent-first-recompute | 100,000 | 155 (163) | 5 |
+| linear-chain | 8 | 0.020 (0.035) | 5 |
+| linear-chain | 16 | 0.026 (0.032) | 5 |
+| linear-chain | 32 | 0.044 (0.047) | 5 |
+| linear-chain | 64 | 0.070 (0.073) | 5 |
+| wide-fan-out-edit | 1,000 | 0.640 (0.751) | 5 |
+| wide-fan-out-edit | 100,000 | 116 (118) | 5 |
+| diamond-edit | 32 | 0.102 (0.239) | 5 |
+| shared-range-edit | 1,000 | 3.34 (5.34) | 5 |
+| distinct-range-edit | 1,000 | 0.014 (0.024) | 5 |
+| cross-sheet-range-edit | 1,000 | 2.02 (2.19) | 5 |
+| scalar-edit-affects-0 | 1,000 | 0.003 (0.004) | 5 |
+| scalar-edit-affects-1 | 1 | 0.004 (0.007) | 5 |
+| scalar-edit-affects-1000 | 1,000 | 0.832 (0.964) | 5 |
+| scalar-edit-affects-100000 | 100,000 | 114 (118) | 5 |
+| topology-remove-add | 10,000 | 11.11 (11.41) | 5 |
+| cycles | 1,000 | 1.84 (2.07) | 5 |
+| removed-sheet-ref | 1,000 | 0.690 (0.733) | 5 |
+| error-propagation | 1,000 | 0.979 (0.989) | 5 |
+| criteria-range-edit | 100,000 | 4.83 (5.63) | 5 |
+| lookup-range-edit | 100,000 | 5.15 (5.92) | 5 |
 
 ## Isolated formula memory
 

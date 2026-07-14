@@ -6,15 +6,20 @@
   "description": "Performance comparison benchmarks: Sheetwrite vs Handsontable.",
   "scripts": {
     "bench:data": "bun run src/data-bench.ts",
+    "bench:data:smoke": "bun run src/data-bench.ts --smoke",
     "bench:range": "bun run src/range-bench.ts",
     "bench:paged": "bun run src/paged-bench.ts",
+    "bench:paged:smoke": "bun run src/paged-bench.ts --smoke",
     "bench:formula": "bun run src/formula-bench.ts",
     "bench:formula:smoke": "bun run src/formula-bench.ts --smoke",
     "bench:render:prepare": "cd .. && bun run build:wasm && bun run --filter '@sheetwrite/core' build",
     "bench:render": "bun run src/render-driver.ts",
     "bench:render:smoke": "bun run src/render-driver.ts --smoke",
-    "bench:render:validate": "bun run src/render-driver.ts --validate results/render-results.json",
+    "bench:render:validate": "bun run src/render-driver.ts --validate results/render-results.json --gate-mode full",
+    "bench:verify": "bun run src/verify.ts",
     "bench:check": "bun run src/check.ts",
+    "bench:baseline:candidate": "bun run src/generate-baseline.ts",
+    "test:gates": "bun test test",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

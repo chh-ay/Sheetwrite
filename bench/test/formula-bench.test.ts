@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { type FormulaBenchmarkResult, validateFormulaBenchmark } from "../src/formula-bench.js";
+import {
+  expectedFormulaMemoryKeys,
+  expectedFormulaWorkloadKeys,
+  type FormulaBenchmarkResult,
+  validateFormulaBenchmark,
+} from "../src/formula-bench.js";
 import {
   diamondFormulas,
   distinctRangeFormulas,
@@ -8,7 +13,33 @@ import {
   linearChain,
   sharedRangeFormulas,
 } from "../src/formula-dataset.js";
+import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import { summarize } from "../src/stats.js";
+
+function formulaFixture(mode: "full" | "smoke" = "smoke"): FormulaBenchmarkResult {
+  const samples = [1, 2, 3];
+  return {
+    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
+    mode,
+    matrixId: MATRIX_IDS.formula[mode],
+    meta: { bun: "test", platform: "test", arch: "test", timestamp: "2026-07-13T00:00:00Z" },
+    workloads: expectedFormulaWorkloadKeys(mode).map((key) => {
+      const match = /^workload=(.*);size=(\d+)$/u.exec(key);
+      if (!match) throw new Error(`invalid fixture key ${key}`);
+      return {
+        id: match[1]!,
+        size: Number(match[2]),
+        samplesMs: [...samples],
+        stat: summarize(samples),
+      };
+    }),
+    memory: expectedFormulaMemoryKeys(mode).map((key) => ({
+      formulas: Number(key.slice("memory=formulas=".length)),
+      wasmDeltaBytes: 1024,
+    })),
+    gates: { passed: true, tolerance: "test" },
+  };
+}
 
 describe("formula benchmark datasets", () => {
   it("builds deterministic independent, chain, and fan-out formulas", () => {
@@ -43,27 +74,63 @@ describe("formula benchmark datasets", () => {
 });
 
 describe("formula benchmark result validation", () => {
-  const valid = (): FormulaBenchmarkResult => ({
-    meta: { bun: "test", platform: "test", arch: "test", timestamp: "2026-07-13T00:00:00Z" },
-    workloads: [
-      {
-        id: "fixture",
-        size: 1,
-        samplesMs: [1, 2, 3],
-        stat: summarize([1, 2, 3]),
-      },
-    ],
-    memory: [{ formulas: 1_000, wasmDeltaBytes: 1024 }],
-    gates: { passed: true, tolerance: "test" },
+  it("accepts exact finite full and smoke matrices", () => {
+    expect(() => validateFormulaBenchmark(formulaFixture("smoke"), "smoke")).not.toThrow();
+    expect(() => validateFormulaBenchmark(formulaFixture("full"), "full")).not.toThrow();
   });
 
-  it("accepts finite raw samples consistent with their summary", () => {
-    expect(() => validateFormulaBenchmark(valid())).not.toThrow();
+  it("rejects missing, duplicate, unexpected, and non-finite workload cells by exact key", () => {
+    const missing = formulaFixture();
+    const missingKey = expectedFormulaWorkloadKeys("smoke")[0]!;
+    missing.workloads.shift();
+    expect(() => validateFormulaBenchmark(missing, "smoke")).toThrow(`missing ${missingKey}`);
+
+    const duplicate = formulaFixture();
+    const duplicateKey = expectedFormulaWorkloadKeys("smoke")[0]!;
+    duplicate.workloads.push(structuredClone(duplicate.workloads[0]!));
+    expect(() => validateFormulaBenchmark(duplicate, "smoke")).toThrow(`duplicate ${duplicateKey}`);
+
+    const unexpected = formulaFixture();
+    unexpected.workloads.push({
+      id: "not-declared",
+      size: 7,
+      samplesMs: [1],
+      stat: summarize([1]),
+    });
+    expect(() => validateFormulaBenchmark(unexpected, "smoke")).toThrow(
+      "unexpected workload=not-declared;size=7",
+    );
+
+    const invalid = formulaFixture();
+    invalid.workloads[0]!.samplesMs[0] = Number.NaN;
+    expect(() => validateFormulaBenchmark(invalid, "smoke")).toThrow(/finite and non-negative/);
+
+    const malformed = formulaFixture();
+    Object.defineProperty(malformed.workloads[0]!, "size", { value: "1000" });
+    expect(() => validateFormulaBenchmark(malformed, "smoke")).toThrow(
+      "formula workload contains a malformed identity",
+    );
   });
 
-  it("rejects missing and non-finite raw samples", () => {
-    const result = valid();
-    result.workloads[0]!.samplesMs[1] = Number.NaN;
-    expect(() => validateFormulaBenchmark(result)).toThrow(/invalid timing/);
+  it("fails completeness before evaluating a missing 100K threshold cell or memory sample", () => {
+    const missingWorkload = formulaFixture("full");
+    missingWorkload.workloads = missingWorkload.workloads.filter(
+      (entry) => !(entry.id === "independent-parse-load" && entry.size === 100_000),
+    );
+    expect(() => validateFormulaBenchmark(missingWorkload, "full")).toThrow(
+      "missing workload=independent-parse-load;size=100000",
+    );
+
+    const missingMemory = formulaFixture("full");
+    missingMemory.memory = missingMemory.memory.filter((entry) => entry.formulas !== 100_000);
+    expect(() => validateFormulaBenchmark(missingMemory, "full")).toThrow(
+      "missing memory=formulas=100000",
+    );
+  });
+
+  it("does not allow smoke protocol evidence to satisfy the full validator", () => {
+    expect(() => validateFormulaBenchmark(formulaFixture("smoke"), "full")).toThrow(
+      "formula mode mismatch",
+    );
   });
 });

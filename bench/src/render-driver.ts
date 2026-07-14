@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "@playwright/test";
 import { DEFAULT_SEED, datasetChecksum, makeColumnar } from "./dataset.js";
+import type { BenchmarkMode } from "./gate-protocol.js";
 import benchmarkPage from "./render-bench.html";
+import { validateRenderGateArtifact } from "./render-gate.js";
 import {
   type BrowserCombinationResult,
   type BrowserLaunchAttempt,
@@ -15,6 +17,7 @@ import {
   parseScenarioResult,
   RENDER_MAX_LAUNCH_ATTEMPTS,
   RENDER_MINIMUM_SAMPLE_MS,
+  RENDER_ORDER_SEED,
   RENDER_PROTOCOL_VERSION,
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
@@ -31,7 +34,6 @@ const BENCH_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const REPOSITORY_ROOT = resolve(BENCH_ROOT, "..");
 const DEFAULT_JSON_PATH = resolve(BENCH_ROOT, "results/render-results.json");
 const DEFAULT_MARKDOWN_PATH = resolve(BENCH_ROOT, "results/render-results.md");
-const DEFAULT_ORDER_SEED = 0x51c0ffee;
 
 interface DriverConfiguration {
   readonly smoke: boolean;
@@ -529,9 +531,15 @@ function stableJson(value: RenderBenchmarkArtifact): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-async function validateExistingArtifact(path: string): Promise<void> {
+async function validateExistingArtifact(
+  path: string,
+  gateMode: BenchmarkMode | undefined,
+): Promise<void> {
   const json = await Bun.file(path).text();
-  const artifact = parseRenderArtifactJson(json);
+  const value: unknown = JSON.parse(json);
+  const artifact = gateMode
+    ? validateRenderGateArtifact(value, gateMode)
+    : parseRenderArtifactJson(json);
   const markdownPath = path.replace(/\.json$/u, ".md");
   const expectedMarkdown = renderBenchmarkMarkdown(artifact);
   const observedMarkdown = await Bun.file(markdownPath).text();
@@ -546,7 +554,16 @@ async function validateExistingArtifact(path: string): Promise<void> {
 async function runDriver(args: readonly string[]): Promise<void> {
   const validatePath = argumentValue(args, "--validate");
   if (validatePath) {
-    await validateExistingArtifact(resolve(process.cwd(), validatePath));
+    const modeArgument = argumentValue(args, "--gate-mode");
+    const gateMode =
+      modeArgument === undefined
+        ? undefined
+        : modeArgument === "full" || modeArgument === "smoke"
+          ? modeArgument
+          : (() => {
+              throw new TypeError("--gate-mode must be full or smoke");
+            })();
+    await validateExistingArtifact(resolve(process.cwd(), validatePath), gateMode);
     return;
   }
 
@@ -555,7 +572,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
   const engineOrder = counterbalancedOrder(
     configuration.engines,
     configuration.rounds,
-    DEFAULT_ORDER_SEED,
+    RENDER_ORDER_SEED,
   );
   const datasetHashes: Record<string, string> = {};
   for (const rows of configuration.rows) {
@@ -640,7 +657,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
       warmupSamples: configuration.warmupSamples,
       minimumSampleDurationMs: configuration.minimumSampleDurationMs,
       rounds: configuration.rounds,
-      orderSeed: DEFAULT_ORDER_SEED,
+      orderSeed: RENDER_ORDER_SEED,
       engineOrder,
       launchAttempts,
     },
