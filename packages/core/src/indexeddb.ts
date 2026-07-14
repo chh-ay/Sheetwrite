@@ -43,6 +43,14 @@ interface QueueMeta {
   nextSequence: number;
 }
 
+interface DatabaseOpenAttempt {
+  readonly promise: Promise<IDBDatabase>;
+  readonly resolve: (database: IDBDatabase) => void;
+  readonly reject: (error: unknown) => void;
+  active: boolean;
+  settled: boolean;
+  database?: IDBDatabase;
+}
 /**
  * Browser-only durable pending queue. Import it from `@sheetwrite/core/browser`;
  * the package's root entrypoint never evaluates IndexedDB globals.
@@ -51,7 +59,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
   private readonly databaseName: string;
   private readonly storeName: string;
   private readonly metaStoreName: string;
-  private databasePromise?: Promise<IDBDatabase>;
+  private databaseAttempt?: DatabaseOpenAttempt;
 
   constructor(options: IndexedDbPendingCommitStorageOptions = {}) {
     this.databaseName = options.databaseName ?? DEFAULT_DATABASE;
@@ -153,8 +161,25 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
   }
 
   close(): void {
-    void this.databasePromise?.then((database) => database.close());
-    this.databasePromise = undefined;
+    const attempt = this.databaseAttempt;
+    if (!attempt) return;
+    this.databaseAttempt = undefined;
+    attempt.active = false;
+    if (attempt.database) {
+      attempt.database.close();
+    } else if (!attempt.settled) {
+      attempt.settled = true;
+      attempt.reject(
+        new IndexedDbPendingCommitStorageError(
+          "aborted",
+          `IndexedDB open for ${this.databaseName} was closed`,
+        ),
+      );
+    }
+    void attempt.promise.then(
+      () => undefined,
+      () => undefined,
+    );
   }
 
   private async readCurrent(
@@ -183,42 +208,70 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
         "IndexedDB is unavailable; use a host PendingCommitStorage adapter",
       );
     }
-    if (this.databasePromise) return this.databasePromise;
+    if (this.databaseAttempt) return this.databaseAttempt.promise;
 
-    this.databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(this.databaseName, DATABASE_VERSION);
-      request.onupgradeneeded = () => {
-        const database = request.result;
-        const transaction = request.transaction;
-        if (!transaction) return;
-        const store = database.objectStoreNames.contains(this.storeName)
-          ? transaction.objectStore(this.storeName)
-          : database.createObjectStore(this.storeName, {
-              keyPath: ["documentId", "clientMutationId"],
-            });
-        if (!store.indexNames.contains("by-document")) {
-          store.createIndex("by-document", "documentId", { unique: false });
-        }
-        if (!database.objectStoreNames.contains(this.metaStoreName)) {
-          database.createObjectStore(this.metaStoreName, { keyPath: "documentId" });
-        }
+    const deferred = Promise.withResolvers<IDBDatabase>();
+    const attempt: DatabaseOpenAttempt = {
+      promise: deferred.promise,
+      resolve: deferred.resolve,
+      reject: deferred.reject,
+      active: true,
+      settled: false,
+    };
+    this.databaseAttempt = attempt;
+    const request = indexedDB.open(this.databaseName, DATABASE_VERSION);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      const transaction = request.transaction;
+      if (!transaction) return;
+      const store = database.objectStoreNames.contains(this.storeName)
+        ? transaction.objectStore(this.storeName)
+        : database.createObjectStore(this.storeName, {
+            keyPath: ["documentId", "clientMutationId"],
+          });
+      if (!store.indexNames.contains("by-document")) {
+        store.createIndex("by-document", "documentId", { unique: false });
+      }
+      if (!database.objectStoreNames.contains(this.metaStoreName)) {
+        database.createObjectStore(this.metaStoreName, { keyPath: "documentId" });
+      }
+    };
+    request.onblocked = () => {
+      this.rejectOpenAttempt(
+        attempt,
+        new IndexedDbPendingCommitStorageError(
+          "blocked",
+          `IndexedDB upgrade for ${this.databaseName} is blocked by another tab`,
+        ),
+      );
+    };
+    request.onerror = () => {
+      this.rejectOpenAttempt(attempt, storageError(request.error, "Unable to open IndexedDB"));
+    };
+    request.onsuccess = () => {
+      const database = request.result;
+      if (!attempt.active || this.databaseAttempt !== attempt) {
+        database.close();
+        return;
+      }
+      attempt.database = database;
+      attempt.settled = true;
+      database.onversionchange = () => {
+        database.close();
+        attempt.active = false;
+        if (this.databaseAttempt === attempt) this.databaseAttempt = undefined;
       };
-      request.onblocked = () => {
-        reject(
-          new IndexedDbPendingCommitStorageError(
-            "blocked",
-            `IndexedDB upgrade for ${this.databaseName} is blocked by another tab`,
-          ),
-        );
-      };
-      request.onerror = () => reject(storageError(request.error, "Unable to open IndexedDB"));
-      request.onsuccess = () => {
-        const database = request.result;
-        database.onversionchange = () => database.close();
-        resolve(database);
-      };
-    });
-    return this.databasePromise;
+      attempt.resolve(database);
+    };
+    return attempt.promise;
+  }
+
+  private rejectOpenAttempt(attempt: DatabaseOpenAttempt, error: unknown): void {
+    if (!attempt.active || attempt.settled) return;
+    attempt.active = false;
+    attempt.settled = true;
+    if (this.databaseAttempt === attempt) this.databaseAttempt = undefined;
+    attempt.reject(error);
   }
 }
 

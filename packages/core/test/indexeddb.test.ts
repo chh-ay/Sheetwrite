@@ -50,6 +50,86 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   return promise;
 }
 
+function controlledVersionChangeEvent(type: string): IDBVersionChangeEvent {
+  // Bun lacks this DOM constructor; handlers under test do not inspect version fields.
+  const event = new Event(type);
+  return event as IDBVersionChangeEvent;
+}
+
+class ControlledDatabase {
+  closeCalls = 0;
+  onversionchange: ((this: IDBDatabase, event: IDBVersionChangeEvent) => unknown) | null = null;
+
+  close(): void {
+    this.closeCalls++;
+  }
+
+  transaction(): IDBTransaction {
+    throw new Error("controlled database transaction");
+  }
+
+  asDatabase(): IDBDatabase {
+    // Lifecycle tests deliberately expose only the IDBDatabase surface used by open().
+    return this as unknown as IDBDatabase;
+  }
+
+  versionchange(): void {
+    const database = this.asDatabase();
+    this.onversionchange?.call(database, controlledVersionChangeEvent("versionchange"));
+  }
+}
+
+class ControlledOpenRequest {
+  result!: IDBDatabase;
+  error: DOMException | null = null;
+  transaction: IDBTransaction | null = null;
+  onblocked: ((this: IDBOpenDBRequest, event: IDBVersionChangeEvent) => unknown) | null = null;
+  onerror: ((this: IDBRequest, event: Event) => unknown) | null = null;
+  onsuccess: ((this: IDBRequest, event: Event) => unknown) | null = null;
+  onupgradeneeded: ((this: IDBOpenDBRequest, event: IDBVersionChangeEvent) => unknown) | null =
+    null;
+
+  blocked(): void {
+    const request = this.asRequest();
+    this.onblocked?.call(request, controlledVersionChangeEvent("blocked"));
+  }
+
+  failed(message = "controlled open failure"): void {
+    this.error = new DOMException(message, "UnknownError");
+    const request = this.asRequest();
+    this.onerror?.call(request, new Event("error"));
+  }
+
+  succeeded(database: ControlledDatabase): void {
+    this.result = database.asDatabase();
+    const request = this.asRequest();
+    this.onsuccess?.call(request, new Event("success"));
+  }
+
+  private asRequest(): IDBOpenDBRequest {
+    // Lifecycle tests deliberately expose only the IDBOpenDBRequest callbacks used by open().
+    return this as unknown as IDBOpenDBRequest;
+  }
+}
+
+class ControlledIndexedDbFactory {
+  readonly requests: ControlledOpenRequest[] = [];
+
+  open(): IDBOpenDBRequest {
+    const request = new ControlledOpenRequest();
+    this.requests.push(request);
+    // Lifecycle tests deliberately expose only the IDBFactory.open contract.
+    return request as unknown as IDBOpenDBRequest;
+  }
+}
+
+function installControlledFactory(): ControlledIndexedDbFactory {
+  const factory = new ControlledIndexedDbFactory();
+  const indexedDbFactory = factory as unknown as IDBFactory;
+  Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: indexedDbFactory });
+  return factory;
+}
+
 async function seedRecord(databaseName: string, record: Record<string, unknown>): Promise<void> {
   const request = indexedDB.open(databaseName, 1);
   request.onupgradeneeded = () => {
@@ -188,5 +268,89 @@ describe("IndexedDbPendingCommitStorage", () => {
       ),
     );
     storage.close();
+  });
+  it("closes a blocked attempt's late database and permits a retry", async () => {
+    const factory = installControlledFactory();
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: "blocked-open" });
+    const blockedLoad = storage.load("document-a");
+    const blockedRequest = factory.requests[0]!;
+    blockedRequest.blocked();
+    await expect(blockedLoad).rejects.toMatchObject({ code: "blocked" });
+
+    const lateDatabase = new ControlledDatabase();
+    blockedRequest.succeeded(lateDatabase);
+    await Promise.resolve();
+    expect(lateDatabase.closeCalls).toBe(1);
+
+    const retry = storage.load("document-a");
+    expect(factory.requests).toHaveLength(2);
+    factory.requests[1]!.failed("retry failure");
+    await expect(retry).rejects.toMatchObject({
+      code: "transaction",
+      cause: expect.objectContaining({ message: "retry failure" }),
+    });
+    storage.close();
+  });
+
+  it("clears a failed open so the next operation starts a fresh attempt", async () => {
+    const factory = installControlledFactory();
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: "retry-open" });
+    const first = storage.load("document-a");
+    factory.requests[0]!.failed();
+    await expect(first).rejects.toMatchObject({ code: "transaction" });
+
+    const second = storage.load("document-a");
+    expect(factory.requests).toHaveLength(2);
+    factory.requests[1]!.failed("second failure");
+    await expect(second).rejects.toMatchObject({ code: "transaction" });
+    storage.close();
+  });
+
+  it("rejects close during open and closes a database delivered afterward", async () => {
+    const factory = installControlledFactory();
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: "close-during-open" });
+    const load = storage.load("document-a");
+    const request = factory.requests[0]!;
+    storage.close();
+    const lateDatabase = new ControlledDatabase();
+    request.succeeded(lateDatabase);
+
+    await expect(load).rejects.toMatchObject({ code: "aborted" });
+    expect(lateDatabase.closeCalls).toBe(1);
+  });
+
+  it("consumes close after rejection without retaining a late connection", async () => {
+    const factory = installControlledFactory();
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: "close-after-rejection" });
+    const load = storage.load("document-a");
+    const request = factory.requests[0]!;
+    request.blocked();
+    await expect(load).rejects.toMatchObject({ code: "blocked" });
+    storage.close();
+
+    const lateDatabase = new ControlledDatabase();
+    request.succeeded(lateDatabase);
+    await Promise.resolve();
+    expect(lateDatabase.closeCalls).toBe(1);
+  });
+
+  it("drops a versionchanged connection and successfully starts a replacement open", async () => {
+    const factory = installControlledFactory();
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: "versionchange-open" });
+    const firstLoad = storage.load("document-a");
+    const firstDatabase = new ControlledDatabase();
+    factory.requests[0]!.succeeded(firstDatabase);
+    await expect(firstLoad).rejects.toThrow("controlled database transaction");
+
+    firstDatabase.versionchange();
+    expect(firstDatabase.closeCalls).toBe(1);
+    const reopenedLoad = storage.load("document-a");
+    expect(factory.requests).toHaveLength(2);
+    const replacement = new ControlledDatabase();
+    factory.requests[1]!.succeeded(replacement);
+    await expect(reopenedLoad).rejects.toThrow("controlled database transaction");
+    storage.close();
+    await Promise.resolve();
+    expect(replacement.closeCalls).toBe(1);
   });
 });
