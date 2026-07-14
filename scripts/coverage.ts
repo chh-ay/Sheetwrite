@@ -98,6 +98,10 @@ async function outputOf(command: readonly string[], root: string): Promise<strin
   return stdout.trim();
 }
 
+function entrySourcePaths(entry: CoverageThresholdEntry): readonly string[] {
+  return entry.members ?? [entry.path];
+}
+
 function ratio(counts: { covered: number; total: number }): string {
   const percent = counts.total === 0 ? 100 : (counts.covered * 100) / counts.total;
   return `${percent.toFixed(2)}% (${counts.covered}/${counts.total})`;
@@ -107,7 +111,9 @@ function printTable(
   records: readonly CoverageRecord[],
   entries: readonly CoverageThresholdEntry[],
 ): void {
-  const entryByPath = new Map(entries.map((entry) => [entry.path, entry]));
+  const entryByPath = new Map(
+    entries.flatMap((entry) => entrySourcePaths(entry).map((path) => [path, entry] as const)),
+  );
   console.log(
     "Tier  Source                                                   Lines              Functions          Regions",
   );
@@ -139,10 +145,11 @@ function uncoveredDiagnostics(
   const sections: string[] = [];
   for (const entry of entries) {
     if (entry.exclusion || (entry.tier !== "A" && entry.tier !== "B")) continue;
-    const record = recordByPath.get(entry.path);
-    sections.push(
-      `${entry.tier} ${entry.path}\n  uncovered lines: ${record ? lineRanges(record.uncoveredLines) || "none" : "MISSING RECORD"}`,
-    );
+    const diagnostics = entrySourcePaths(entry).map((path) => {
+      const record = recordByPath.get(path);
+      return `  ${path}: ${record ? lineRanges(record.uncoveredLines) || "none" : "MISSING RECORD"}`;
+    });
+    sections.push(`${entry.tier} ${entry.path}\n${diagnostics.join("\n")}`);
   }
   return `${sections.join("\n")}\n`;
 }
@@ -238,7 +245,7 @@ export async function runTypeScriptCoverage(root = resolve(import.meta.dir, ".."
   const runtimePaths = await discoverRuntimePaths(root, "typescript");
   const entries = manifest.entries.filter((entry) => entry.language === "typescript");
   const scoredPaths = new Set(
-    entries.filter((entry) => !entry.exclusion).map((entry) => entry.path),
+    entries.filter((entry) => !entry.exclusion).flatMap((entry) => entrySourcePaths(entry)),
   );
   const records = filterRuntimeRecords(rawRecords, scoredPaths);
   await writeArtifacts({ root, language: "typescript", artifactRoot, records, entries });
@@ -284,7 +291,7 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
   const runtimePaths = await discoverRuntimePaths(root, "rust");
   const entries = manifest.entries.filter((entry) => entry.language === "rust");
   const scoredPaths = new Set(
-    entries.filter((entry) => !entry.exclusion).map((entry) => entry.path),
+    entries.filter((entry) => !entry.exclusion).flatMap((entry) => entrySourcePaths(entry)),
   );
   const lcovText = await readFile(resolve(root, rawRoot, "lcov.info"), "utf8");
   const lcovRecords = parseLcov(lcovText, root, "recompute");

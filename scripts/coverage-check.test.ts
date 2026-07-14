@@ -70,7 +70,7 @@ function record(
 }
 
 function runtimePaths(entries: readonly CoverageThresholdEntry[]): string[] {
-  return entries.map((entry) => entry.path);
+  return entries.flatMap((entry) => entry.members ?? [entry.path]);
 }
 
 describe("LCOV parser", () => {
@@ -301,19 +301,53 @@ describe("risk floors", () => {
   });
 });
 
+describe("aggregate risk floors", () => {
+  it("classifies split modules once and enforces the prior combined floor", () => {
+    const group: CoverageThresholdEntry = {
+      ...scored("packages/core/src/store/**", { lines: 90, functions: 85 }),
+      members: ["packages/core/src/store/facade.ts", "packages/core/src/store/engine.ts"],
+    };
+    const manifest = manifestFor("typescript", [group]);
+    const paths = runtimePaths(manifest.entries);
+    const records = [
+      record(group.members[0]!, { covered: 98, total: 100 }),
+      record(group.members[1]!, { covered: 82, total: 100 }),
+    ];
+    expect(
+      evaluateCoveragePolicy({
+        manifest,
+        language: "typescript",
+        records,
+        runtimePaths: paths,
+      }).records,
+    ).toHaveLength(2);
+    expect(() =>
+      evaluateCoveragePolicy({
+        manifest,
+        language: "typescript",
+        records: [records[0]!, record(group.members[1]!, { covered: 81, total: 100 })],
+        runtimePaths: paths,
+      }),
+    ).toThrow("below 90%");
+  });
+});
+
 describe("manifest schema", () => {
   it("rejects unjustified exclusions, empty ownership, and unsupported schema versions", () => {
     const base = exclusion("packages/core/src/types.ts");
     expect(() =>
       parseCoverageManifest({
-        schemaVersion: 1,
+        schemaVersion: COVERAGE_SCHEMA_VERSION,
         entries: [{ ...base, exclusion: { reason: "type-only", command: "" } }],
       }),
     ).toThrow("command must be non-empty");
     expect(() =>
-      parseCoverageManifest({ schemaVersion: 1, entries: [{ ...base, owner: "" }] }),
+      parseCoverageManifest({
+        schemaVersion: COVERAGE_SCHEMA_VERSION,
+        entries: [{ ...base, owner: "" }],
+      }),
     ).toThrow("owner must be non-empty");
-    expect(() => parseCoverageManifest({ schemaVersion: 2, entries: [] })).toThrow(
+    expect(() => parseCoverageManifest({ schemaVersion: 1, entries: [] })).toThrow(
       "Unsupported coverage threshold schema version",
     );
   });

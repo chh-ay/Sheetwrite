@@ -31,6 +31,7 @@ export interface CoverageExclusion {
 
 export interface CoverageThresholdEntry {
   readonly path: string;
+  readonly members?: readonly string[];
   readonly language: CoverageLanguage;
   readonly tier: CoverageTier;
   readonly metrics: CoverageFloor;
@@ -48,7 +49,7 @@ export interface LcovRecord extends CoverageRecord {
   readonly lineCounts: ReadonlyMap<number, number>;
 }
 
-export const COVERAGE_SCHEMA_VERSION = 1;
+export const COVERAGE_SCHEMA_VERSION = 2;
 export const TIER_MINIMUMS: Readonly<
   Record<CoverageTier, Readonly<Record<CoverageMetricName, number>>>
 > = {
@@ -88,7 +89,14 @@ export const REQUIRED_RISK_PATHS = [
   "packages/xlsx/src/table-import.ts",
   "packages/xlsx/src/workbook.ts",
   "packages/wasm/src/calc.rs",
-  "packages/wasm/src/eval.rs",
+  "packages/wasm/src/eval/mod.rs",
+  "packages/wasm/src/eval/criteria.rs",
+  "packages/wasm/src/eval/date.rs",
+  "packages/wasm/src/eval/dependency.rs",
+  "packages/wasm/src/eval/functions.rs",
+  "packages/wasm/src/eval/lookup.rs",
+  "packages/wasm/src/eval/matrix.rs",
+  "packages/wasm/src/eval/value.rs",
   "packages/wasm/src/query.rs",
   "packages/wasm/src/sheet.rs",
   "packages/wasm/src/store.rs",
@@ -452,6 +460,17 @@ function validateText(value: unknown, label: string): asserts value is string {
     throw new Error(`${label} must be non-empty`);
 }
 
+function validateRepositoryPath(value: unknown, label: string): asserts value is string {
+  validateText(value, label);
+  if (value.startsWith("/") || value.includes("\\") || value.includes("..")) {
+    throw new Error(`${label} must be repository-relative`);
+  }
+}
+
+function entrySourcePaths(entry: CoverageThresholdEntry): readonly string[] {
+  return entry.members ?? [entry.path];
+}
+
 export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
   assertRecord(raw, "Coverage threshold manifest");
   if (raw.schemaVersion !== COVERAGE_SCHEMA_VERSION) {
@@ -459,15 +478,33 @@ export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
   }
   if (!Array.isArray(raw.entries))
     throw new Error("Coverage threshold manifest entries must be an array");
-  const paths = new Set<string>();
+  const entryIds = new Set<string>();
+  const classifiedPaths = new Set<string>();
   const entries = raw.entries.map((value, index): CoverageThresholdEntry => {
     assertRecord(value, `Coverage threshold entry ${index}`);
-    validateText(value.path, `Coverage threshold entry ${index} path`);
-    if (value.path.startsWith("/") || value.path.includes("\\") || value.path.includes("..")) {
-      throw new Error(`Coverage threshold entry ${index} path must be repository-relative`);
+    validateRepositoryPath(value.path, `Coverage threshold entry ${index} path`);
+    if (entryIds.has(value.path))
+      throw new Error(`Duplicate coverage threshold entry: ${value.path}`);
+    entryIds.add(value.path);
+    let members: string[] | undefined;
+    if (value.members !== undefined) {
+      if (!Array.isArray(value.members) || value.members.length === 0) {
+        throw new Error(`Coverage threshold entry ${value.path} members must be a non-empty array`);
+      }
+      members = value.members.map((member, memberIndex) => {
+        validateRepositoryPath(
+          member,
+          `Coverage threshold entry ${value.path} member ${memberIndex}`,
+        );
+        return member;
+      });
     }
-    if (paths.has(value.path)) throw new Error(`Duplicate coverage threshold entry: ${value.path}`);
-    paths.add(value.path);
+    for (const sourcePath of members ?? [value.path]) {
+      if (classifiedPaths.has(sourcePath)) {
+        throw new Error(`Duplicate coverage source classification: ${sourcePath}`);
+      }
+      classifiedPaths.add(sourcePath);
+    }
     if (value.language !== "typescript" && value.language !== "rust") {
       throw new Error(`Coverage threshold entry ${value.path} has an invalid language`);
     }
@@ -506,6 +543,7 @@ export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
     }
     return {
       path: value.path,
+      ...(members ? { members } : {}),
       language: value.language,
       tier: value.tier,
       metrics,
@@ -535,6 +573,35 @@ function meetsFloor(counts: CoverageCounts, floor: number): boolean {
   return counts.covered * 100 >= floor * counts.total;
 }
 
+function aggregateCoverageRecords(
+  entry: CoverageThresholdEntry,
+  recordByPath: ReadonlyMap<string, CoverageRecord>,
+): CoverageRecord {
+  const records = entrySourcePaths(entry).map((path) => {
+    const record = recordByPath.get(path);
+    if (!record) throw new Error(`Coverage report is missing scored source: ${path}`);
+    return record;
+  });
+  const sum = (metric: CoverageMetricName): CoverageCounts | undefined => {
+    const counts = records.map((record) => metricCounts(record, metric));
+    if (counts.some((value) => value === undefined)) return undefined;
+    return counts.reduce<CoverageCounts>(
+      (total, value) => ({
+        covered: total.covered + (value?.covered ?? 0),
+        total: total.total + (value?.total ?? 0),
+      }),
+      { covered: 0, total: 0 },
+    );
+  };
+  return {
+    path: entry.path,
+    lines: sum("lines") ?? { covered: 0, total: 0 },
+    functions: sum("functions") ?? { covered: 0, total: 0 },
+    ...(sum("regions") ? { regions: sum("regions") } : {}),
+    uncoveredLines: [],
+  };
+}
+
 export interface CoveragePolicyResult {
   readonly records: readonly CoverageRecord[];
   readonly entries: readonly CoverageThresholdEntry[];
@@ -549,7 +616,7 @@ export function evaluateCoveragePolicy(options: {
   const { manifest, language, records } = options;
   const runtimePaths = new Set(options.runtimePaths);
   const entries = manifest.entries.filter((entry) => entry.language === language);
-  const manifestPaths = new Set(entries.map((entry) => entry.path));
+  const manifestPaths = new Set(entries.flatMap((entry) => entrySourcePaths(entry)));
 
   for (const required of REQUIRED_RISK_PATHS) {
     const expectedLanguage: CoverageLanguage = required.endsWith(".rs") ? "rust" : "typescript";
@@ -561,10 +628,13 @@ export function evaluateCoveragePolicy(options: {
     if (!manifestPaths.has(path)) throw new Error(`Unclassified runtime source file: ${path}`);
   }
   for (const entry of entries) {
-    if (!runtimePaths.has(entry.path))
-      throw new Error(`Coverage threshold has no runtime source file: ${entry.path}`);
-    if (!entry.exclusion && isCoverageContamination(entry.path)) {
-      throw new Error(`Generated/test output entered scored coverage: ${entry.path}`);
+    for (const sourcePath of entrySourcePaths(entry)) {
+      if (!runtimePaths.has(sourcePath)) {
+        throw new Error(`Coverage threshold has no runtime source file: ${sourcePath}`);
+      }
+      if (!entry.exclusion && isCoverageContamination(sourcePath)) {
+        throw new Error(`Generated/test output entered scored coverage: ${sourcePath}`);
+      }
     }
   }
 
@@ -583,8 +653,7 @@ export function evaluateCoveragePolicy(options: {
 
   for (const entry of entries) {
     if (entry.exclusion) continue;
-    const record = recordByPath.get(entry.path);
-    if (!record) throw new Error(`Coverage report is missing scored source: ${entry.path}`);
+    const record = aggregateCoverageRecords(entry, recordByPath);
     for (const metric of ["lines", "functions", "regions"] as const) {
       const floor = entry.metrics[metric];
       if (floor === undefined) continue;

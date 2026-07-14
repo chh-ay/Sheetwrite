@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "entries": [
     {
       "path": "packages/core/src/a1.ts",
@@ -837,7 +837,17 @@
       "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
     },
     {
-      "path": "packages/wasm/src/eval.rs",
+      "path": "packages/wasm/src/eval/**",
+      "members": [
+        "packages/wasm/src/eval/mod.rs",
+        "packages/wasm/src/eval/criteria.rs",
+        "packages/wasm/src/eval/date.rs",
+        "packages/wasm/src/eval/dependency.rs",
+        "packages/wasm/src/eval/functions.rs",
+        "packages/wasm/src/eval/lookup.rs",
+        "packages/wasm/src/eval/matrix.rs",
+        "packages/wasm/src/eval/value.rs"
+      ],
       "language": "rust",
       "tier": "A",
       "metrics": {
@@ -846,7 +856,7 @@
         "regions": 88
       },
       "owner": "wasm-runtime",
-      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+      "rationale": "Combined evaluator coverage preserves the pre-split formula runtime floor"
     },
     {
       "path": "packages/wasm/src/lib.rs",
