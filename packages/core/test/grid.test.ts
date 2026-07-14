@@ -1078,6 +1078,8 @@ describe("Grid.setMinColumns", () => {
   it("routes Grid.exportXlsx through the registered table backend", async () => {
     const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
     const grid = new GridImpl(mountHost(), { workbook: store.getWorkbook() }, store);
+    const actionErrors: unknown[] = [];
+    grid.on("export-error", (event) => actionErrors.push(event));
     const expected = new Error("fake XLSX export reached");
     let receivedWorkbook: Workbook | undefined;
     let receivedStore: Store | undefined;
@@ -1099,9 +1101,123 @@ describe("Grid.setMinColumns", () => {
       await expect(grid.exportXlsx("fake.xlsx")).rejects.toBe(expected);
       expect(receivedWorkbook).toBe(store.getWorkbook());
       expect(receivedStore).toBe(store);
+      expect(actionErrors).toEqual([]);
     } finally {
       setXlsxTableExportBackend(null as never);
       grid.destroy();
+    }
+  });
+
+  it("emits one export-error for built-in toolbar and context-menu XLSX failures", async () => {
+    const host = mountHost();
+    const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
+    const grid = new GridImpl(
+      host,
+      {
+        workbook: store.getWorkbook(),
+        config: {
+          toolbar: true,
+          export: true,
+          contextMenu: [{ action: "exportXlsx" }],
+        },
+      },
+      store,
+    );
+    const expected = new Error("built-in XLSX failure");
+    const events: Array<{ format: "xlsx"; error: unknown }> = [];
+    grid.on("export-error", (event) => events.push(event));
+    setXlsxTableExportBackend(null as never);
+    grid.actions.exportXlsx();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.format).toBe("xlsx");
+    const missingBackendError = events[0]?.error;
+    expect(missingBackendError).toBeInstanceOf(Error);
+    if (!(missingBackendError instanceof Error)) throw new Error("Expected XLSX backend error");
+    expect(missingBackendError.message).toContain(
+      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
+    );
+    events.length = 0;
+    setXlsxTableExportBackend({
+      name: "rejecting-built-in-export",
+      toXlsxTable: async () => {
+        throw expected;
+      },
+    });
+
+    try {
+      host.querySelector<HTMLButtonElement>('[title="Export XLSX"]')!.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(events).toEqual([{ format: "xlsx", error: expected }]);
+
+      const viewport = host.querySelector<HTMLElement>(".sheetwrite-scroller")!;
+      viewport.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          clientX: 100,
+          clientY: 100,
+        }),
+      );
+      host.querySelector<HTMLElement>(".sheetwrite-context-menu-item")!.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(events).toEqual([
+        { format: "xlsx", error: expected },
+        { format: "xlsx", error: expected },
+      ]);
+    } finally {
+      setXlsxTableExportBackend(null as never);
+      grid.destroy();
+      store.dispose();
+    }
+  });
+
+  it("guards table XLSX export by the backend-selected active sheet only", async () => {
+    const workbook = makeWorkbook(5);
+    workbook.sheets.push({
+      id: "inactive",
+      name: "Inactive",
+      rowCount: 5,
+      columns: workbook.sheets[0]!.columns.map((column) => ({ ...column })),
+    });
+    const store = new SheetwriteStore(workbook, undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1024,
+    });
+    store.loadRows(
+      "s1",
+      0,
+      Array.from({ length: 5 }, (_, row) => ({
+        name: `Customer ${row}`,
+        amount: row * 10 + 0.5,
+        city: "Tokyo",
+      })),
+    );
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const reachedBackend = new Error("active sheet passed completeness guard");
+    setXlsxTableExportBackend({
+      name: "sheet-scoped-completeness",
+      toXlsxTable: async () => {
+        throw reachedBackend;
+      },
+    });
+
+    try {
+      expect(store.queryCapability("s1").status).toBe("complete");
+      expect(store.queryCapability("inactive").status).toBe("incomplete");
+      await expect(grid.exportXlsx("active.xlsx")).rejects.toBe(reachedBackend);
+
+      grid.setActiveSheet("inactive");
+      await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(
+        "inactive has unloaded datasource cells",
+      );
+    } finally {
+      setXlsxTableExportBackend(null as never);
+      grid.destroy();
+      store.dispose();
     }
   });
 });

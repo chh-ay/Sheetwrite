@@ -248,6 +248,7 @@ export class GridImpl implements Grid {
     "renderer-fallback": new Set(),
     "datasource-error": new Set(),
     "mutation-rejected": new Set(),
+    "export-error": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -2108,7 +2109,11 @@ export class GridImpl implements Grid {
       pasteValues: () => this.clipboard.pasteValues(),
       clearContents: () => this.clearSelection(),
       exportCsv: (filename) => this.exportCsv(filename ?? "sheetwrite.csv"),
-      exportXlsx: (filename) => void this.exportXlsx(filename ?? "sheetwrite.xlsx"),
+      exportXlsx: (filename) => {
+        void this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
+          this.emitExportError(error);
+        });
+      },
       undo: () => this.undo(),
       redo: () => this.redo(),
     };
@@ -2316,6 +2321,13 @@ export class GridImpl implements Grid {
     if (!this.readOnly) this.document.redo();
   }
 
+  private emitExportError(error: unknown): void {
+    if (this.destroyed) return;
+    for (const listener of this.listeners["export-error"]) {
+      listener({ format: "xlsx", error });
+    }
+  }
+
   private requireCompleteExport(sheets: readonly Sheet[]): void {
     if (!this.loadable) return;
     for (const sheet of sheets) {
@@ -2332,8 +2344,16 @@ export class GridImpl implements Grid {
   }
 
   async exportXlsx(filename: string): Promise<void> {
-    this.requireCompleteExport(this.store.getWorkbook().sheets);
-    const bytes = await toXlsxTable(this.store.getWorkbook(), this.store);
+    const storedWorkbook = this.store.getWorkbook();
+    const workbook =
+      storedWorkbook.activeSheet === this.activeSheet
+        ? storedWorkbook
+        : { ...storedWorkbook, activeSheet: this.activeSheet };
+    const sheet =
+      workbook.sheets.find((candidate) => candidate.id === workbook.activeSheet) ??
+      workbook.sheets[0];
+    if (sheet) this.requireCompleteExport([sheet]);
+    const bytes = await toXlsxTable(workbook, this.store);
     downloadBytes(
       bytes,
       filename,

@@ -12,7 +12,7 @@ Simple framework component that owns initialization and Grid lifetime.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L242</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L250</code></dd></div>
 </dl>
 
 ## Signature

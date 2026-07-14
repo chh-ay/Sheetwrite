@@ -15,7 +15,7 @@ Payload map for events emitted by a Grid.
 <div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L327</code></dd></div>
 </dl>
 
-## Members <span class="api-count">10</span>
+## Members <span class="api-count">11</span>
 
 <div class="api-member-list">
 
@@ -68,6 +68,11 @@ Payload map for events emitted by a Grid.
 <summary><code>datasource-error</code></summary>
 <pre><code>&quot;datasource-error&quot;: { request: Omit&lt;DataSourceRequest, &quot;signal&quot;&gt;; error: unknown };</code></pre>
 </details>
+
+<details class="api-member" id="grid-events-export-error" data-pagefind-weight="1">
+<summary><code>export-error</code></summary>
+<pre><code>&quot;export-error&quot;: { format: &quot;xlsx&quot;; error: unknown };</code></pre>
+</details>
 </div>
 
 ## Declaration
@@ -106,6 +111,10 @@ export interface GridEvents {
     };
     "datasource-error": {
         request: Omit<DataSourceRequest, "signal">;
+        error: unknown;
+    };
+    "export-error": {
+        format: "xlsx";
         error: unknown;
     };
 }

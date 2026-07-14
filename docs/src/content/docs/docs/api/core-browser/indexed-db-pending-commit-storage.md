@@ -13,7 +13,7 @@ the package's root entrypoint never evaluates IndexedDB globals.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core/browser</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L50</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L58</code></dd></div>
 </dl>
 
 ## Signature

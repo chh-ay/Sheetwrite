@@ -12,7 +12,7 @@ Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L204</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L209</code></dd></div>
 </dl>
 
 ## Signature

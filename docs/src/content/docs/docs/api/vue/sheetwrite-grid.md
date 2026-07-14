@@ -12,7 +12,7 @@ Advanced framework component for workbook data or datasource input.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L237</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L245</code></dd></div>
 </dl>
 
 ## Signature
@@ -79,7 +79,8 @@ ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToRes
         default: undefined;
     };
     wasmSource: {
-        type: PropType<GridOptions extends never ? never : unknown>;
+        type: PropType<SheetwriteInitializationProps["wasmSource"]>;
+        default: undefined;
     };
     height: {
         type: (StringConstructor | NumberConstructor)[];
@@ -127,6 +128,7 @@ ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToRes
     overscan: number;
     minColumns: number;
     config: GridConfig | undefined;
+    wasmSource: string | BufferSource | Request | URL | WebAssembly.Module | undefined;
 }, true, {}, {}, GlobalComponents, GlobalDirectives, string, {}, any, ComponentProvideOptions, OptionTypesType<{}, {}, {}, {}, {}, {}>, Readonly<ExtractPropTypes<{
     workbook: {
         type: PropType<Workbook>;
@@ -185,7 +187,8 @@ ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToRes
         default: undefined;
     };
     wasmSource: {
-        type: PropType<GridOptions extends never ? never : unknown>;
+        type: PropType<SheetwriteInitializationProps["wasmSource"]>;
+        default: undefined;
     };
     height: {
         type: (StringConstructor | NumberConstructor)[];
@@ -234,6 +237,7 @@ ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToRes
     overscan: number;
     minColumns: number;
     config: GridConfig | undefined;
+    wasmSource: string | BufferSource | Request | URL | WebAssembly.Module | undefined;
 }>, any, any, any, ComputedOptions, MethodOptions> & ComponentOptionsBase<ToResolvedProps<ExtractPropTypes<{
     workbook: {
         type: PropType<Workbook>;
@@ -292,7 +296,8 @@ ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToRes
         default: undefined;
     };
     wasmSource: {
-        type: PropType<GridOptions extends never ? never : unknown>;
+        type: PropType<SheetwriteInitializationProps["wasmSource"]>;
+        default: undefined;
     };
     height: {
         type: (StringConstructor | NumberConstructor)[];
@@ -340,6 +345,7 @@ ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToRes
     overscan: number;
     minColumns: number;
     config: GridConfig | undefined;
+    wasmSource: string | BufferSource | Request | URL | WebAssembly.Module | undefined;
 }, {}, string, {}, GlobalComponents, GlobalDirectives, string, ComponentProvideOptions> & VNodeProps & AllowedComponentProps & ComponentCustomProps & (new ());
 ```
 

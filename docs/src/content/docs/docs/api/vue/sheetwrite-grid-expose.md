@@ -12,7 +12,7 @@ Imperative Grid handle exposed by the Vue advanced component.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L41</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L42</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">1</span>

@@ -12,7 +12,7 @@ Exhaustive stable target identity used by persistence/logging layers.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L1084</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L1273</code></dd></div>
 </dl>
 
 ## Signature

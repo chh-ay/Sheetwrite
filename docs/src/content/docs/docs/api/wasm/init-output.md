@@ -12,10 +12,10 @@ Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L278</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L283</code></dd></div>
 </dl>
 
-## Members <span class="api-count">93</span>
+## Members <span class="api-count">95</span>
 
 <div class="api-member-list">
 
@@ -214,6 +214,11 @@ Source summary unavailable; docs:check rejects this omission.
 <pre><code>readonly cellstore_poolStrings: (a: number, b: number, c: number) =&gt; [number, number];</code></pre>
 </details>
 
+<details class="api-member" id="init-output-cellstore-query-resource-stats" data-pagefind-weight="1">
+<summary><code>cellstore_queryResourceStats</code></summary>
+<pre><code>readonly cellstore_queryResourceStats: (a: number) =&gt; [number, number];</code></pre>
+</details>
+
 <details class="api-member" id="init-output-cellstore-range-fully-loaded" data-pagefind-weight="1">
 <summary><code>cellstore_rangeFullyLoaded</code></summary>
 <pre><code>readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) =&gt; number;</code></pre>
@@ -262,6 +267,11 @@ Source summary unavailable; docs:check rejects this omission.
 <details class="api-member" id="init-output-cellstore-rename-sheet" data-pagefind-weight="1">
 <summary><code>cellstore_renameSheet</code></summary>
 <pre><code>readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) =&gt; number;</code></pre>
+</details>
+
+<details class="api-member" id="init-output-cellstore-reset-query-resource-stats" data-pagefind-weight="1">
+<summary><code>cellstore_resetQueryResourceStats</code></summary>
+<pre><code>readonly cellstore_resetQueryResourceStats: (a: number) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="init-output-cellstore-restore-range" data-pagefind-weight="1">
@@ -549,6 +559,10 @@ export interface InitOutput {
         number,
         number
     ];
+    readonly cellstore_queryResourceStats: (a: number) => [
+        number,
+        number
+    ];
     readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
     readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [
         number,
@@ -562,6 +576,7 @@ export interface InitOutput {
     readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void;
     readonly cellstore_removeSheet: (a: number, b: number) => number;
     readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+    readonly cellstore_resetQueryResourceStats: (a: number) => void;
     readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly cellstore_rowCount: (a: number, b: number) => number;
     readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [

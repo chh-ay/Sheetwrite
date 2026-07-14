@@ -340,6 +340,8 @@ export interface GridEvents {
    */
   "renderer-fallback": { requested: "worker"; error: unknown };
   "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: unknown };
+  /** Built-in toolbar/context-menu export failed after its action was dispatched. */
+  "export-error": { format: "xlsx"; error: unknown };
 }
 
 /** Imperative grid handle for document commands, events, rendering, and teardown. */

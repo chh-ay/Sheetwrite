@@ -12,7 +12,7 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/clipboard-controller.ts#L41</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/clipboard-controller.ts#L51</code></dd></div>
 </dl>
 
 ## Signature

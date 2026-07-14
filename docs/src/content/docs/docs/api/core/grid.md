@@ -12,7 +12,7 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L346</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L348</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">81</span>

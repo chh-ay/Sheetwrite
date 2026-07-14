@@ -13,7 +13,7 @@ a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L384</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L391</code></dd></div>
 </dl>
 
 ## Signature
