@@ -266,6 +266,7 @@ class HandsontableAdapter implements RenderBenchAdapter {
       "getActiveEditor",
       "getDataAtCell",
       "getSelectedLast",
+      "render",
       "scrollViewportTo",
       "selectCell",
       "setDataAtCell",
@@ -315,6 +316,7 @@ class HandsontableAdapter implements RenderBenchAdapter {
     element.scrollTop = axis === "top" && startMiddle ? Math.floor(element.scrollHeight / 2) : 0;
     element.scrollLeft = axis === "left" && startMiddle ? Math.floor(element.scrollWidth / 2) : 0;
     element.dispatchEvent(new Event("scroll"));
+    this.hot.render();
   }
 
   scrollBy(axis: "top" | "left", pixels: number): void {
@@ -322,6 +324,7 @@ class HandsontableAdapter implements RenderBenchAdapter {
     if (axis === "top") element.scrollTop += pixels;
     else element.scrollLeft += pixels;
     element.dispatchEvent(new Event("scroll"));
+    this.hot.render();
   }
 
   scrollObservation(): ScrollObservation {

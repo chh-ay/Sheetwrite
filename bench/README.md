@@ -132,9 +132,11 @@ is retained, and median, linearly interpolated p95, and MAD use all valid sample
 Sheetwrite's viewport is driven via its `.sheetwrite-scroller` element and its
 keyboard path (`Enter` → editor, arrows → navigation, `applyTransaction` with
 `addRows`/`removeRows` → altering); Handsontable uses `.ht_master .wtHolder`,
-`getActiveEditor()`, `alter()`, and its selection API. Each engine runs in a
-separate fresh Chromium process with the same deterministic dataset, columns,
-640×480 stage, scenario actions, correctness checkpoints, and virtualization.
+`getActiveEditor()`, `alter()`, and its selection API. Scroll samples force each
+engine's paint inside the timed operation (`grid.refresh()` / `hot.render()`), so
+deferred work cannot make event dispatch look like a completed frame. Each engine
+runs in a separate fresh Chromium process with the same deterministic dataset,
+columns, 640×480 stage, scenario actions, correctness checkpoints, and virtualization.
 
 ### Current benchmark scope and missing coverage
 
