@@ -2,15 +2,9 @@ import type { AriaMirror } from "./aria-mirror.js";
 import type { DatasourceController } from "./datasource-controller.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
-import type {
-  PanePaint,
-  Renderer,
-  SheetId,
-  Store,
-  Theme,
-  Viewport,
-  VisibleWindowView,
-} from "./types.js";
+import type { SheetId } from "./types/coordinates.js";
+import type { PanePaint, Renderer, Theme, Viewport } from "./types/render.js";
+import type { Store, VisibleWindowView } from "./types/store.js";
 
 export interface RenderCoordinatorOptions {
   renderer: () => Renderer;

@@ -1,5 +1,5 @@
 import { cellScalarToText } from "./cell-input.js";
-import type { CellScalar, CellStyle, CellValue } from "./types.js";
+import type { CellScalar, CellStyle, CellValue } from "./types/cell.js";
 
 // Values beginning with any of these are neutralized on paste so a pasted
 // "=cmd|..." or "+...", "-...", "@..." can't become an executable formula.

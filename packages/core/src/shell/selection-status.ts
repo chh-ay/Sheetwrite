@@ -4,7 +4,8 @@
 // cells, never reads the store, and runs constant-time work per selection
 // event — safe next to any selection size.
 
-import type { Grid, Selection } from "../types.js";
+import type { Selection } from "../types/coordinates.js";
+import type { Grid } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
 
 /** Human phrase for a selection's geometry; blank for null/single-cell. */

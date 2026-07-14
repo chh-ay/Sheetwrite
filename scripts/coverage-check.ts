@@ -76,6 +76,7 @@ export const REQUIRED_RISK_PATHS = [
   "packages/core/src/rebase.ts",
   "packages/core/src/render-coordinator.ts",
   "packages/core/src/store.ts",
+  "packages/core/src/store/data-engine.ts",
   "packages/core/src/sync.ts",
   "packages/core/src/worker-renderer.ts",
   "packages/core/src/worker.ts",

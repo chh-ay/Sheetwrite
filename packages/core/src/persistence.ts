@@ -1,15 +1,14 @@
 import { SnapshotValidationError, validateWorkbookSnapshot } from "./document-protocol.js";
 import { GridImpl } from "./grid.js";
 import { SheetwriteStore } from "./store.js";
+import type { WorkbookSnapshot } from "./types/document.js";
+import type { Grid, GridOptions } from "./types/grid.js";
 import type {
-  Grid,
-  GridOptions,
   PersistenceAdapter,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
   VersionedOperation,
-  WorkbookSnapshot,
-} from "./types.js";
+} from "./types/transaction.js";
 
 export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data">;
 

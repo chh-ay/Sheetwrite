@@ -2,11 +2,17 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { analyzePublicApi, validateManifest } from "./public-api.js";
+import {
+  analyzePublicApi,
+  checkManifestBaseline,
+  publicApiDigest,
+  validateManifest,
+} from "./public-api.js";
 
 const roots: string[] = [];
 
 const canonicalDeclarations = `
+/** Canonical document operation. */
 export type DocumentOp = { op: "set" };
 export interface DataSource { getRows(request: unknown): Promise<unknown>; }
 export interface ChangeEvent { transaction: { patches: DocumentOp[] }; }
@@ -21,6 +27,7 @@ export declare function setXlsxTableImportBackend(backend: XlsxTableImportBacken
 export declare function toXlsxWorkbook(): Promise<Uint8Array>;
 export declare function fromXlsxWorkbook(): Promise<unknown>;
 export declare function setXlsxWorkbookBackend(backend: XlsxWorkbookBackend): void;
+export interface Box<T extends string = string> { value: T; }
 `;
 
 async function fixture(index = canonicalDeclarations): Promise<string> {
@@ -118,8 +125,38 @@ describe("public API policy", () => {
   });
 
   it("rejects malformed or partial reports", () => {
-    expect(validateManifest({ formatVersion: 1, packages: [{ name: "partial" }] })).toContainEqual(
+    expect(validateManifest({ formatVersion: 2, packages: [{ name: "partial" }] })).toContainEqual(
       expect.objectContaining({ code: "malformed-report" }),
     );
+  });
+
+  it("detects optionality, union, generic-constraint, export-name, and JSDoc drift", async () => {
+    const baselineRoot = await fixture();
+    const baseline = await analyzePublicApi(baselineRoot);
+    const expectedDigest = publicApiDigest(baseline.manifest);
+    const mutations = [
+      canonicalDeclarations.replace("getRows(request: unknown)", "getRows?(request: unknown)"),
+      canonicalDeclarations.replace(
+        'export type DocumentOp = { op: "set" };',
+        'export type DocumentOp = { op: "set" } | { op: "clear" };',
+      ),
+      canonicalDeclarations.replace(
+        "Box<T extends string = string>",
+        "Box<T extends string | number = string>",
+      ),
+      canonicalDeclarations.replace("interface DataSource", "interface DataProvider"),
+      canonicalDeclarations.replace(
+        "/** Canonical document operation. */",
+        "/** Changed document operation. */",
+      ),
+    ];
+
+    for (const mutation of mutations) {
+      const root = await fixture(mutation);
+      const result = await analyzePublicApi(root);
+      expect(checkManifestBaseline(result.manifest, expectedDigest)).toContainEqual(
+        expect.objectContaining({ code: "manifest-drift" }),
+      );
+    }
   });
 });

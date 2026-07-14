@@ -22,6 +22,7 @@ interface PackResult {
 interface PackageSpec {
   directory: string;
   requiredFiles: string[];
+  forbiddenFiles?: string[];
 }
 
 const repositoryRoot = resolve(import.meta.dir, "..");
@@ -55,12 +56,46 @@ const packageSpecs: PackageSpec[] = [
       "dist/adapter.js",
       "dist/index.d.ts",
       "dist/index.js",
+      "dist/types/cell.d.ts",
+      "dist/types/cell.d.ts.map",
+      "dist/types/coordinates.d.ts",
+      "dist/types/coordinates.d.ts.map",
+      "dist/types/data.d.ts",
+      "dist/types/data.d.ts.map",
+      "dist/types/document.d.ts",
+      "dist/types/document.d.ts.map",
+      "dist/types/grid.d.ts",
+      "dist/types/grid.d.ts.map",
+      "dist/types/render.d.ts",
+      "dist/types/render.d.ts.map",
+      "dist/types/store.d.ts",
+      "dist/types/store.d.ts.map",
+      "dist/types/transaction.d.ts",
+      "dist/types/transaction.d.ts.map",
       "dist/worker.d.ts",
       "dist/worker.js",
       "dist/shell.d.ts",
       "dist/shell.js",
       "shell.css",
       "styles.css",
+    ],
+    forbiddenFiles: [
+      "dist/types/cell.js",
+      "dist/types/cell.js.map",
+      "dist/types/coordinates.js",
+      "dist/types/coordinates.js.map",
+      "dist/types/data.js",
+      "dist/types/data.js.map",
+      "dist/types/document.js",
+      "dist/types/document.js.map",
+      "dist/types/grid.js",
+      "dist/types/grid.js.map",
+      "dist/types/render.js",
+      "dist/types/render.js.map",
+      "dist/types/store.js",
+      "dist/types/store.js.map",
+      "dist/types/transaction.js",
+      "dist/types/transaction.js.map",
     ],
   },
   {
@@ -225,6 +260,13 @@ async function assertTarball(
   for (const requiredFile of spec.requiredFiles) {
     if (!packedFiles.has(requiredFile)) {
       throw new Error(`${manifest.name} tarball is missing ${requiredFile}`);
+    }
+  }
+  for (const forbiddenFile of spec.forbiddenFiles ?? []) {
+    if (packedFiles.has(forbiddenFile)) {
+      throw new Error(
+        `${manifest.name} tarball contains unreachable runtime type module ${forbiddenFile}`,
+      );
     }
   }
 

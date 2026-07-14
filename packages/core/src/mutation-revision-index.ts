@@ -1,4 +1,5 @@
-import type { CellAddress, DocumentOp, Range } from "./types.js";
+import type { CellAddress, Range } from "./types/coordinates.js";
+import type { DocumentOp } from "./types/document.js";
 
 interface RevisionRectangle {
   readonly range: Range;

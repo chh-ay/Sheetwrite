@@ -1,4 +1,5 @@
-import type { CellAddress, CellScalar, SheetId } from "./types.js";
+import type { CellScalar } from "./types/cell.js";
+import type { CellAddress, SheetId } from "./types/coordinates.js";
 
 /** Sentinel shown for a reference that participates in a cycle. */
 export const REF_CYCLE = "#CYCLE!";

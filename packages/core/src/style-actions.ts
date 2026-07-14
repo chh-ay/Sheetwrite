@@ -1,6 +1,10 @@
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
-import type { CellStyle, CellValue, DocumentOp, Sheet, SheetId, Store, Theme } from "./types.js";
+import type { CellStyle, CellValue } from "./types/cell.js";
+import type { SheetId } from "./types/coordinates.js";
+import type { DocumentOp, Sheet } from "./types/document.js";
+import type { Theme } from "./types/render.js";
+import type { Store } from "./types/store.js";
 
 export interface StyleActionsDeps {
   store: Store;

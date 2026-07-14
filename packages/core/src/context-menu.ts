@@ -1,12 +1,12 @@
+import type { CellAddress } from "./types/coordinates.js";
 import type {
-  CellAddress,
   ContextMenuActionName,
   ContextMenuItem,
   Grid,
   GridActions,
   GridConfig,
-  Theme,
-} from "./types.js";
+} from "./types/grid.js";
+import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
 const DEFAULT_ITEMS: ContextMenuItem[] = [

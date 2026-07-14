@@ -6,7 +6,7 @@
 // the grid after Enter/Escape through the caller-provided callback.
 
 import { colToA1, labelToCol } from "../a1.js";
-import type { CellInputSnapshot, Grid } from "../types.js";
+import type { CellInputSnapshot, Grid } from "../types/grid.js";
 import { commitCellInput, selectionFocus } from "./grid-binding.js";
 
 /** A mounted shell piece: its root element plus an idempotent teardown. */

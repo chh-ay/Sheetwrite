@@ -1,5 +1,6 @@
 import { type AssistDeps, FormulaAssist } from "./formula-assist.js";
-import type { CellFormat, Theme } from "./types.js";
+import type { CellFormat } from "./types/cell.js";
+import type { Theme } from "./types/render.js";
 
 export type { AssistDeps };
 

@@ -1,17 +1,11 @@
 import { cellScalarToText } from "./cell-input.js";
 import { neutralizeInjection } from "./clipboard.js";
-import type {
-  CellFormat,
-  CellScalar,
-  Column,
-  ColumnarData,
-  Grid,
-  Range,
-  Sheet,
-  Store,
-  Workbook,
-  WorkbookSnapshot,
-} from "./types.js";
+import type { CellFormat, CellScalar, Column } from "./types/cell.js";
+import type { Range } from "./types/coordinates.js";
+import type { ColumnarData } from "./types/data.js";
+import type { Sheet, Workbook, WorkbookSnapshot } from "./types/document.js";
+import type { Grid } from "./types/grid.js";
+import type { Store } from "./types/store.js";
 
 function csvField(text: string): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;

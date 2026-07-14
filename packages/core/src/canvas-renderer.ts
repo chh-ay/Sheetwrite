@@ -6,8 +6,8 @@ import type {
   RenderLayout,
   Theme,
   Viewport,
-  VisibleWindowView,
-} from "./types.js";
+} from "./types/render.js";
+import type { VisibleWindowView } from "./types/store.js";
 
 /**
  * Canvas 2D backend (main thread). Owns Layer 1 (the cell canvas) and paints the

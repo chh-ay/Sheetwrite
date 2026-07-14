@@ -8,18 +8,11 @@ import {
   toTsv,
 } from "./clipboard.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
-import type {
-  CellScalar,
-  CellStyle,
-  CellValue,
-  ClipboardOutcome,
-  CommitReason,
-  DocumentOp,
-  PackedCellBlock,
-  Sheet,
-  SheetId,
-  Store,
-} from "./types.js";
+import type { CellScalar, CellStyle, CellValue } from "./types/cell.js";
+import type { SheetId } from "./types/coordinates.js";
+import type { CommitReason, DocumentOp, PackedCellBlock, Sheet } from "./types/document.js";
+import type { ClipboardOutcome } from "./types/grid.js";
+import type { Store } from "./types/store.js";
 
 export interface ClipboardControllerDeps {
   store: Store;

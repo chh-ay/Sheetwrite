@@ -1,5 +1,5 @@
 import type { PendingCommitStorage } from "./sync.js";
-import type { PendingCommit } from "./types.js";
+import type { PendingCommit } from "./types/transaction.js";
 
 const DATABASE_VERSION = 1;
 const RECORD_SCHEMA_VERSION = 1;

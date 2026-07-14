@@ -1,17 +1,11 @@
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { replaceInText } from "./search-replace.js";
 import type { SheetwriteStore } from "./store.js";
-import type {
-  CellAddress,
-  CellValue,
-  DocumentOp,
-  ReplaceResult,
-  SearchOptions,
-  SearchResult,
-  Sheet,
-  SheetId,
-  Store,
-} from "./types.js";
+import type { CellValue } from "./types/cell.js";
+import type { CellAddress, SheetId } from "./types/coordinates.js";
+import type { DocumentOp, Sheet } from "./types/document.js";
+import type { ReplaceResult, SearchOptions, SearchResult } from "./types/grid.js";
+import type { Store } from "./types/store.js";
 
 export interface SearchControllerDeps {
   store: Store;

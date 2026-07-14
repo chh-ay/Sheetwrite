@@ -1,14 +1,13 @@
+import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
+import type { Grid } from "./types/grid.js";
 import type {
-  DocumentOp,
-  Grid,
   PendingCommit,
   PersistenceAdapter,
   PersistenceCommitResponse,
   RemoteOperationSource,
   SyncMutationRecord,
   VersionedOperation,
-  WorkbookSnapshot,
-} from "./types.js";
+} from "./types/transaction.js";
 
 /** Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint. */
 export interface PendingCommitStorage {

@@ -1,5 +1,7 @@
 import { createGridFromSnapshot, type SnapshotGridOptions } from "./persistence.js";
-import type { Grid, PresenceOverlay, Range, Selection, Sheet, WorkbookSnapshot } from "./types.js";
+import type { PresenceOverlay, Range, Selection } from "./types/coordinates.js";
+import type { Sheet, WorkbookSnapshot } from "./types/document.js";
+import type { Grid } from "./types/grid.js";
 
 export interface PresenceActor {
   id: string;

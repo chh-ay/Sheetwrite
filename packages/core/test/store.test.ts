@@ -618,9 +618,25 @@ describe("SheetwriteStore", () => {
     expect(big.values[0]).toBe(0.5); // amount[0] = 0*10 + 0.5
     expect(big.values[rowCount - 1]).toBe((rowCount - 1) * 10 + 0.5);
 
-    // Private scratch handle: name the cast once, then read the retained length.
-    const internal = store as unknown as { windowValuesScratch: unknown[] };
-    expect(internal.windowValuesScratch.length).toBe(0); // big buffer released, not pinned
+    // Runtime-narrow the internal owner so the instrumentation follows the extracted boundary.
+    const retainedWindowScratchLength = (): number => {
+      const facade: unknown = store;
+      if (!facade || typeof facade !== "object" || !("engine" in facade)) {
+        throw new Error("missing StoreDataEngine owner");
+      }
+      const engine = facade.engine;
+      if (!engine || typeof engine !== "object" || !("windowReader" in engine)) {
+        throw new Error("missing StoreWindowReader owner");
+      }
+      const reader = engine.windowReader;
+      if (!reader || typeof reader !== "object" || !("valuesScratch" in reader)) {
+        throw new Error("missing StoreWindowReader scratch");
+      }
+      const scratch = reader.valuesScratch;
+      if (!Array.isArray(scratch)) throw new Error("invalid StoreWindowReader scratch");
+      return scratch.length;
+    };
+    expect(retainedWindowScratchLength()).toBe(0); // big buffer released, not pinned
 
     // A subsequent small window must still read correctly off a fresh scratch.
     const small = store.getVisibleWindow("s1", { start: 0, end: 3 }, [0, 1, 2]);
@@ -631,7 +647,7 @@ describe("SheetwriteStore", () => {
     expect(small.values[3]).toBe("Customer 1");
 
     // Retained scratch is now O(small window), never O(cells).
-    expect(internal.windowValuesScratch.length).toBe(9);
+    expect(retainedWindowScratchLength()).toBe(9);
     // The outsized view's buffer was handed off, so the small read did not clobber it.
     expect(big.values[rowCount - 1]).toBe((rowCount - 1) * 10 + 0.5);
 

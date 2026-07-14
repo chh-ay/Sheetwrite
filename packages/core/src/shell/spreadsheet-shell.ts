@@ -9,17 +9,10 @@
 import { DEFAULT_THEME } from "../grid.js";
 import { createGridController, type GridController } from "../grid-controller.js";
 import { SheetTabs } from "../sheet-tabs.js";
-import type {
-  ChangeEvent,
-  Grid,
-  GridConfig,
-  GridEvents,
-  GridOptions,
-  Selection,
-  SheetId,
-  Theme,
-  ToolbarItem,
-} from "../types.js";
+import type { Selection, SheetId } from "../types/coordinates.js";
+import type { Grid, GridConfig, GridEvents, GridOptions, ToolbarItem } from "../types/grid.js";
+import type { Theme } from "../types/render.js";
+import type { ChangeEvent } from "../types/transaction.js";
 import { seedWidgetTheme } from "../widget-theme.js";
 import { createFormulaBar, createNameBox, type ShellPiece } from "./formula-controls.js";
 import { createSelectionStatus } from "./selection-status.js";

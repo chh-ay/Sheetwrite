@@ -1,4 +1,5 @@
-import type { Grid, SearchResult, Theme } from "./types.js";
+import type { Grid, SearchResult } from "./types/grid.js";
+import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
 /** Counter label: empty when idle, "No results", or "<active+1> of <total>". */

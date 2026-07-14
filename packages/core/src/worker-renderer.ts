@@ -1,11 +1,5 @@
-import type {
-  PanePaint,
-  Renderer,
-  RenderLayout,
-  Theme,
-  Viewport,
-  VisibleWindowView,
-} from "./types.js";
+import type { PanePaint, Renderer, RenderLayout, Theme, Viewport } from "./types/render.js";
+import type { VisibleWindowView } from "./types/store.js";
 
 export interface WorkerRendererOptions {
   /**

@@ -23,49 +23,54 @@ import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import type {
-  AddSheetInput,
-  AggregateOp,
-  ApplyTransactionResult,
-  CellAddress,
-  CellInputSnapshot,
-  CellRenderer,
   CellScalar,
   CellStyle,
   CellValue,
   Column,
+  ConditionalFormatRule,
+} from "./types/cell.js";
+import type {
+  CellAddress,
+  HighlightRange,
+  PresenceOverlay,
+  Range,
+  Selection,
+  SheetId,
+} from "./types/coordinates.js";
+import type { AggregateOp } from "./types/data.js";
+import type {
+  AddSheetInput,
   ColumnFilter,
   CommitReason,
-  ConditionalFormatRule,
   DataValidationRule,
   DocumentOp,
+  MutationPolicyMode,
+  ProtectedRange,
+  ProtectionResolver,
+  RowGroup,
+  Sheet,
+  SheetSnapshot,
+  SortKey,
+  WorkbookSnapshot,
+} from "./types/document.js";
+import type {
+  CellInputSnapshot,
   Grid,
   GridActions,
   GridConfig,
   GridEvents,
   GridOptions,
-  GridTransaction,
-  HighlightRange,
-  MutationPolicyMode,
-  PresenceOverlay,
-  ProtectedRange,
-  ProtectionResolver,
-  Range,
-  RemoteOperationOptions,
-  Renderer,
   ReplaceResult,
-  RowGroup,
   SearchOptions,
   SearchResult,
-  Selection,
-  Sheet,
-  SheetId,
-  SheetSnapshot,
-  SortKey,
-  Store,
-  Theme,
-  VisibleWindowView,
-  WorkbookSnapshot,
-} from "./types.js";
+} from "./types/grid.js";
+import type { CellRenderer, Renderer, Theme } from "./types/render.js";
+import type { Store, VisibleWindowView } from "./types/store.js";
+import type {
+  ApplyTransactionResult,
+  GridTransaction,
+  RemoteOperationOptions,
+} from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 

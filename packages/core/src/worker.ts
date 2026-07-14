@@ -3,14 +3,9 @@
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.
 import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
-import type {
-  CellRenderer,
-  CellScalar,
-  RenderLayout,
-  Theme,
-  Viewport,
-  VisibleWindowView,
-} from "./types.js";
+import type { CellScalar } from "./types/cell.js";
+import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
+import type { VisibleWindowView } from "./types/store.js";
 
 /** Packed window payload (data fields shared by single-frame and pane paints). */
 interface PackedPaintData {

@@ -5,24 +5,22 @@ import {
   UndoManager,
 } from "./history.js";
 import type { SheetwriteStore } from "./store.js";
+import type { CellValue, Column } from "./types/cell.js";
+import type { CellAddress, MergeRange, Range, SheetId } from "./types/coordinates.js";
 import type {
-  ApplyTransactionResult,
-  CellAddress,
-  CellValue,
-  Column,
   CommitReason,
   DocumentOp,
-  GridTransaction,
-  MergeRange,
   MutationIssue,
-  Range,
-  RemoteOperationOptions,
   Sheet,
-  SheetId,
   SheetSnapshot,
   SnapshotCell,
-  Store,
-} from "./types.js";
+} from "./types/document.js";
+import type { Store } from "./types/store.js";
+import type {
+  ApplyTransactionResult,
+  GridTransaction,
+  RemoteOperationOptions,
+} from "./types/transaction.js";
 
 export interface DocumentControllerOptions {
   store: Store;

@@ -6,16 +6,11 @@ import { formatNumber } from "./number-format.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
-import type {
-  CellAddress,
-  CellValue,
-  CommitReason,
-  DocumentOp,
-  Sheet,
-  SheetId,
-  Store,
-  Theme,
-} from "./types.js";
+import type { CellValue } from "./types/cell.js";
+import type { CellAddress, SheetId } from "./types/coordinates.js";
+import type { CommitReason, DocumentOp, Sheet } from "./types/document.js";
+import type { Theme } from "./types/render.js";
+import type { Store } from "./types/store.js";
 
 const PRINTABLE = /^.$/u;
 

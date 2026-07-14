@@ -6,7 +6,8 @@
 // this file (and only this file) absorbs it.
 
 import { parseCellInput } from "../cell-input.js";
-import type { CellInputSnapshot, Grid, Selection } from "../types.js";
+import type { Selection } from "../types/coordinates.js";
+import type { CellInputSnapshot, Grid } from "../types/grid.js";
 
 /** The focused cell of a selection in view coordinates, or null. */
 export function selectionFocus(selection: Selection | null): { row: number; col: number } | null {

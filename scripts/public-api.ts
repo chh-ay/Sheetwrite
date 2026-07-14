@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { access, readdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
+import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 
 export interface ApiExport {
   name: string;
@@ -8,6 +10,7 @@ export interface ApiExport {
   signature: string;
   owners: string[];
   jsDocTags: string[];
+  documentation: string;
 }
 
 export interface ApiEntryPoint {
@@ -24,7 +27,7 @@ export interface ApiPackage {
 }
 
 export interface PublicApiManifest {
-  formatVersion: 1;
+  formatVersion: 2;
   packages: ApiPackage[];
 }
 
@@ -36,6 +39,8 @@ export interface ApiIssue {
     | "malformed-report"
     | "missing-export"
     | "parse-error"
+    | "manifest-drift"
+    | "wrong-owner"
     | "unresolved-entry";
   message: string;
   package?: string;
@@ -420,12 +425,16 @@ function analyzeEntry(
         ),
       );
       const tags = new Set([...collectTags(exported, checker), ...collectTags(target, checker)]);
+      const documentation = [exported, target]
+        .map((symbol) => ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim())
+        .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
       return {
         name: exported.getName(),
         kind: symbolKind(target),
         signature: declarationSignature(target, checker),
         owners: [...owners].sort(),
         jsDocTags: [...tags].sort(),
+        documentation: documentation.join("\n\n"),
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
@@ -469,7 +478,7 @@ export function validateManifest(value: unknown): ApiIssue[] {
   ];
   if (value === null || typeof value !== "object") return malformed("root is not an object");
   const report = value as Partial<PublicApiManifest>;
-  if (report.formatVersion !== 1) return malformed("formatVersion is not 1");
+  if (report.formatVersion !== 2) return malformed("formatVersion is not 2");
   if (!Array.isArray(report.packages) || report.packages.length === 0) {
     return malformed("packages is missing or empty");
   }
@@ -490,7 +499,8 @@ export function validateManifest(value: unknown): ApiIssue[] {
           typeof apiExport.kind !== "string" ||
           typeof apiExport.signature !== "string" ||
           !Array.isArray(apiExport.owners) ||
-          !Array.isArray(apiExport.jsDocTags)
+          !Array.isArray(apiExport.jsDocTags) ||
+          typeof apiExport.documentation !== "string"
         ) {
           return malformed(`${pkg.name} ${entry.subpath} contains a partial export`);
         }
@@ -501,6 +511,27 @@ export function validateManifest(value: unknown): ApiIssue[] {
     }
   }
   return [];
+}
+export const PUBLIC_API_BASELINE_SHA256 =
+  "3d74c6ae014fb74d2283d6543ed037cdf13065d1ddb91a6bf80284d07128ebb5";
+
+export function publicApiDigest(manifest: PublicApiManifest): string {
+  return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
+}
+
+export function checkManifestBaseline(
+  manifest: PublicApiManifest,
+  expected = PUBLIC_API_BASELINE_SHA256,
+): ApiIssue[] {
+  const actual = publicApiDigest(manifest);
+  return actual === expected
+    ? []
+    : [
+        {
+          code: "manifest-drift",
+          message: `Public API manifest digest changed: expected ${expected}, received ${actual}`,
+        },
+      ];
 }
 
 export async function analyzePublicApi(repositoryRoot: string): Promise<{
@@ -526,7 +557,7 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<{
     packages.push({ name: packageManifest.name, entryPoints });
   }
 
-  const manifest: PublicApiManifest = { formatVersion: 1, packages };
+  const manifest: PublicApiManifest = { formatVersion: 2, packages };
   issues.push(...validateManifest(manifest));
 
   const core = packages.find((pkg) => pkg.name === "@sheetwrite/core");
@@ -554,6 +585,29 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<{
       entryPoint: ".",
       symbol: name,
     });
+  }
+  if (
+    coreRoot !== undefined &&
+    (coreRoot.source === "dist/index.d.ts" || coreRoot.source === "src/index.ts")
+  ) {
+    const builtDeclarations = coreRoot.source.startsWith("dist/");
+    for (const [domainName, domain] of Object.entries(PUBLIC_TYPE_DOMAINS)) {
+      const expectedOwner = builtDeclarations
+        ? `dist/types/${domainName}.d.ts`
+        : `src/types/${domainName}.ts`;
+      for (const name of domain.exports) {
+        const apiExport = coreRoot.exports.find((item) => item.name === name);
+        if (apiExport === undefined) continue;
+        if (apiExport.owners.length === 1 && apiExport.owners[0] === expectedOwner) continue;
+        issues.push({
+          code: "wrong-owner",
+          message: `@sheetwrite/core ${name} must be owned by ${expectedOwner}; found ${apiExport.owners.join(", ") || "none"}`,
+          package: "@sheetwrite/core",
+          entryPoint: ".",
+          symbol: name,
+        });
+      }
+    }
   }
 
   issues.sort((left, right) =>
@@ -595,9 +649,9 @@ if (import.meta.main) {
       throw new Error(formatIssues(result.issues));
     }
     process.stdout.write(`${JSON.stringify(result.manifest, null, 2)}\n`);
-  } else if (result.issues.length > 0) {
-    throw new Error(formatIssues(result.issues));
   } else {
+    const issues = [...result.issues, ...checkManifestBaseline(result.manifest)];
+    if (issues.length > 0) throw new Error(formatIssues(issues));
     console.log("Public API policy check passed");
   }
 }

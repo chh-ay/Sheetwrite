@@ -1,4 +1,4 @@
-import type { CellStyle } from "./types.js";
+import type { CellStyle } from "./types/cell.js";
 
 const EMPTY: CellStyle = {};
 

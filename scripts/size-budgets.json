@@ -711,19 +711,19 @@
     },
     "package.@sheetwrite/core.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 179699,
-      "maximum": 188684,
+      "baseline": 195423,
+      "maximum": 205194,
       "category": "package-declarations",
       "owner": "@sheetwrite/core",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Approved post-store/type-domain baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/core.fileCount": {
       "unit": "count",
-      "baseline": 237,
-      "maximum": 239,
+      "baseline": 281,
+      "maximum": 283,
       "category": "package",
       "owner": "@sheetwrite/core",
-      "rationale": "Approved clean baseline with at most two additional files or packages."
+      "rationale": "Approved post-store/type-domain baseline with at most two additional files or packages."
     },
     "package.@sheetwrite/core.mapsBytes": {
       "unit": "bytes",

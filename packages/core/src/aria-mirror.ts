@@ -1,6 +1,7 @@
 import { colToA1 } from "./a1.js";
 import type { CellRef } from "./selection.js";
-import type { Selection, VisibleWindowView } from "./types.js";
+import type { Selection } from "./types/coordinates.js";
+import type { VisibleWindowView } from "./types/store.js";
 
 let ariaSeq = 0;
 

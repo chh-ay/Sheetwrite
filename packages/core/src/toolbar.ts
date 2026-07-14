@@ -2,11 +2,11 @@ import type {
   Grid,
   GridActions,
   GridConfig,
-  Theme,
   ToolbarActionName,
   ToolbarIcon,
   ToolbarItem,
-} from "./types.js";
+} from "./types/grid.js";
+import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
 /** Create a fresh, stroke-based SVG icon for each rendered toolbar button. */

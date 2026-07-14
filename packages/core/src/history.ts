@@ -1,4 +1,5 @@
-import type { CellAddress, DocumentOp, Range, SheetId } from "./types.js";
+import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
+import type { DocumentOp } from "./types/document.js";
 
 export type HistoryPart =
   | { kind: "patches"; patches: DocumentOp[] }

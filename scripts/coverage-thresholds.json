@@ -508,7 +508,16 @@
       "rationale": "Runtime helper or public integration surface"
     },
     {
-      "path": "packages/core/src/store.ts",
+      "path": "packages/core/src/store-runtime/**",
+      "members": [
+        "packages/core/src/store.ts",
+        "packages/core/src/store/data-engine.ts",
+        "packages/core/src/store/mutation-policy.ts",
+        "packages/core/src/store/ranges.ts",
+        "packages/core/src/store/snapshot-codec.ts",
+        "packages/core/src/store/view-state.ts",
+        "packages/core/src/store/window-reader.ts"
+      ],
       "language": "typescript",
       "tier": "B",
       "metrics": {
@@ -516,7 +525,19 @@
         "functions": 85
       },
       "owner": "core-runtime",
-      "rationale": "State orchestration, rendering, geometry, or input boundary"
+      "rationale": "Combined store coverage preserves the pre-decomposition state-runtime floor"
+    },
+    {
+      "path": "packages/core/src/store/wasm-contract.ts",
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "core-runtime",
+      "rationale": "Type-only internal WASM contracts have no emitted runtime statements",
+      "exclusion": {
+        "reason": "Type-only module is verified by package and consumer typechecks",
+        "command": "bun run typecheck"
+      }
     },
     {
       "path": "packages/core/src/style-actions.ts",
@@ -582,6 +603,28 @@
       "rationale": "Type-only public contracts have no emitted runtime statements",
       "exclusion": {
         "reason": "Type-only module is verified by package and consumer typechecks",
+        "command": "bun run typecheck"
+      }
+    },
+    {
+      "path": "packages/core/src/types/**",
+      "members": [
+        "packages/core/src/types/coordinates.ts",
+        "packages/core/src/types/cell.ts",
+        "packages/core/src/types/document.ts",
+        "packages/core/src/types/transaction.ts",
+        "packages/core/src/types/data.ts",
+        "packages/core/src/types/store.ts",
+        "packages/core/src/types/render.ts",
+        "packages/core/src/types/grid.ts"
+      ],
+      "language": "typescript",
+      "tier": "C",
+      "metrics": {},
+      "owner": "core-runtime",
+      "rationale": "Type-only domain contracts have no emitted runtime statements",
+      "exclusion": {
+        "reason": "Type-only modules are verified by package and consumer typechecks",
         "command": "bun run typecheck"
       }
     },

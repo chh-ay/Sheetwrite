@@ -1,7 +1,9 @@
 import { ColumnIndex } from "./column-index.js";
 import { OffsetIndex, ScaledScroll } from "./fenwick.js";
 import type { SheetwriteStore } from "./store.js";
-import type { Range, Sheet, SheetId, Theme } from "./types.js";
+import type { Range, SheetId } from "./types/coordinates.js";
+import type { Sheet } from "./types/document.js";
+import type { Theme } from "./types/render.js";
 import { computeColumnWindow, computeWindow } from "./virtualization.js";
 
 interface GeometryLayoutOptions {

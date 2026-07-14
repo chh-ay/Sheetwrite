@@ -1,15 +1,7 @@
 import { formatNumber } from "./number-format.js";
-import type {
-  CellAlign,
-  CellBorder,
-  CellRenderer,
-  CellScalar,
-  CellStyle,
-  RenderLayout,
-  Theme,
-  Viewport,
-  VisibleWindowView,
-} from "./types.js";
+import type { CellAlign, CellBorder, CellScalar, CellStyle } from "./types/cell.js";
+import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
+import type { VisibleWindowView } from "./types/store.js";
 
 const CELL_PAD = 6;
 

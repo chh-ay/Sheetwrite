@@ -1,5 +1,6 @@
 import { labelToCol } from "./a1.js";
-import type { HighlightRange, SheetId, Theme } from "./types.js";
+import type { HighlightRange, SheetId } from "./types/coordinates.js";
+import type { Theme } from "./types/render.js";
 
 // ── Function catalog ─────────────────────────────────────────────────────────
 

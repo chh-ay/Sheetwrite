@@ -4,7 +4,7 @@
 // resolved scalars plus per-cell formula flags and resolves tiled cells itself
 // (so formula reference-shifting stays in the grid layer).
 
-import type { CellScalar } from "./types.js";
+import type { CellScalar } from "./types/cell.js";
 
 // ── Inputs & outputs ─────────────────────────────────────────────────────────
 

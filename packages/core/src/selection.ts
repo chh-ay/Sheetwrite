@@ -1,4 +1,4 @@
-import type { Range, Selection, SheetId } from "./types.js";
+import type { Range, Selection, SheetId } from "./types/coordinates.js";
 
 export interface CellRef {
   row: number;

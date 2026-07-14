@@ -1,7 +1,9 @@
 import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
-import type { HighlightRange, PresenceOverlay, Sheet, SheetId, Theme } from "./types.js";
+import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinates.js";
+import type { Sheet } from "./types/document.js";
+import type { Theme } from "./types/render.js";
 
 export interface OverlayPainterDeps {
   theme: () => Theme;

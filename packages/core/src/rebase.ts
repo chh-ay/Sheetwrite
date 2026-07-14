@@ -1,12 +1,6 @@
-import type {
-  CellAddress,
-  CellValue,
-  DocumentOp,
-  PackedCellBlock,
-  Range,
-  SheetSnapshot,
-  SnapshotCell,
-} from "./types.js";
+import type { CellValue } from "./types/cell.js";
+import type { CellAddress, Range } from "./types/coordinates.js";
+import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
 
 export type RebaseConflictCode =
   | "overlapping-edit"

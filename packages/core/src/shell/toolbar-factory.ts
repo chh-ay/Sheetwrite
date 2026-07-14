@@ -5,7 +5,7 @@
 // (role, label, roving focus) without duplicating any action binding.
 
 import { defaultToolbarItems, renderToolbarItems } from "../toolbar.js";
-import type { Grid, ToolbarActionName, ToolbarIcon, ToolbarItem } from "../types.js";
+import type { Grid, ToolbarActionName, ToolbarIcon, ToolbarItem } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
 
 export interface ToolbarOptions {

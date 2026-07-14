@@ -1,5 +1,7 @@
 import type { EditNavigate, EditRect } from "./editor.js";
-import type { CellScalar, DataValidationRule, Theme } from "./types.js";
+import type { CellScalar } from "./types/cell.js";
+import type { DataValidationRule } from "./types/document.js";
+import type { Theme } from "./types/render.js";
 
 export interface BeginValidationEditOptions {
   row: number;

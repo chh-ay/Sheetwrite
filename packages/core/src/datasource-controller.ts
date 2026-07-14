@@ -1,5 +1,6 @@
 import type { SheetwriteStore } from "./store.js";
-import type { CellAddress, DataSourcePage, DataSourceRequest, SheetId } from "./types.js";
+import type { CellAddress, SheetId } from "./types/coordinates.js";
+import type { DataSourcePage, DataSourceRequest } from "./types/data.js";
 
 export interface DatasourceControllerOptions {
   datasource?: (request: DataSourceRequest) => Promise<DataSourcePage>;

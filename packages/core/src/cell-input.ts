@@ -1,5 +1,5 @@
 import { parseDateInput } from "./date-serial.js";
-import type { CellFormat, CellScalar, CellValue } from "./types.js";
+import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 
 /** Spreadsheet display text for a resolved scalar. */
 export function cellScalarToText(value: CellScalar): string {

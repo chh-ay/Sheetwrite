@@ -1,4 +1,5 @@
-import type { DocumentOp, MergeRange, Range, SheetSnapshot, WorkbookSnapshot } from "./types.js";
+import type { MergeRange, Range } from "./types/coordinates.js";
+import type { DocumentOp, SheetSnapshot, WorkbookSnapshot } from "./types/document.js";
 
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
 
