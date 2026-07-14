@@ -2,7 +2,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import {
   type CommentAdapter,
   CommentCoordinator,
+  type CommentListResult,
   type CommentMutationRequest,
+  type CommentMutationResponse,
   type CommentThread,
   createGridFromSnapshot,
   type Grid,
@@ -100,6 +102,19 @@ function serverThread(overrides: Partial<CommentThread> = {}): CommentThread {
     resolved: false,
     ...overrides,
   };
+}
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve;
+  });
+  return { promise, resolve };
 }
 
 describe("presence coordinator", () => {
@@ -373,5 +388,140 @@ describe("comment coordinator", () => {
       ),
     ).rejects.toThrow("server adapter");
     coordinator.destroy();
+  });
+
+  it("discards a stale list when a streamed event advances state", async () => {
+    const listing = deferred<CommentListResult>();
+    let remoteListener: ((event: VersionedCommentEvent) => void) | undefined;
+    const adapter: CommentAdapter = {
+      listComments: () => listing.promise,
+      async mutateComment() {
+        return { status: "conflict", currentVersion: 2 };
+      },
+      subscribeComments(_documentId, listener) {
+        remoteListener = listener;
+      },
+    };
+    const coordinator = new CommentCoordinator(adapter, {
+      documentId: "collab-doc",
+      serverVersion: 1,
+    });
+    const events: string[] = [];
+    coordinator.on((event) => events.push(event.type));
+
+    const pending = coordinator.load();
+    remoteListener?.({
+      version: 2,
+      thread: serverThread({ id: "thread-live", version: 2 }),
+    });
+    listing.resolve({
+      version: 1,
+      threads: [serverThread({ id: "thread-stale", version: 1 })],
+    });
+
+    expect(await pending).toEqual(coordinator.commentThreads());
+    expect(coordinator.serverVersion).toBe(2);
+    expect(coordinator.commentThreads().map((thread) => thread.id)).toEqual(["thread-live"]);
+    expect(events).toEqual(["changed"]);
+    coordinator.destroy();
+  });
+
+  it("does not rewind to a list older than the current version", async () => {
+    const adapter: CommentAdapter = {
+      async listComments() {
+        return { version: 3, threads: [serverThread({ version: 3 })] };
+      },
+      async mutateComment() {
+        return { status: "conflict", currentVersion: 4 };
+      },
+    };
+    const coordinator = new CommentCoordinator(adapter, {
+      documentId: "collab-doc",
+      serverVersion: 4,
+    });
+    expect(await coordinator.load()).toEqual([]);
+    expect(coordinator.serverVersion).toBe(4);
+    expect(coordinator.commentThreads()).toEqual([]);
+    coordinator.destroy();
+  });
+
+  it("accepts a same-version event after rejecting invalid mutation metadata", async () => {
+    let remoteListener: ((event: VersionedCommentEvent) => void) | undefined;
+    const mutation = deferred<CommentMutationResponse>();
+    const adapter: CommentAdapter = {
+      async listComments() {
+        return { version: 0, threads: [] };
+      },
+      mutateComment: () => mutation.promise,
+      subscribeComments(_documentId, listener) {
+        remoteListener = listener;
+      },
+    };
+    const coordinator = new CommentCoordinator(adapter, { documentId: "collab-doc" });
+    const pending = coordinator.create(
+      "thread-race",
+      "message-race",
+      { kind: "cell", address: { sheet: "s1", row: 0, col: 0 } },
+      "Race",
+      "comment-race",
+    );
+    mutation.resolve({
+      status: "applied",
+      version: 1,
+      clientMutationId: "comment-race",
+      thread: serverThread({
+        id: "thread-race",
+        version: 1,
+        messages: [
+          {
+            id: "message-race",
+            author: { id: "" },
+            body: "invalid",
+            createdAt: "",
+          },
+        ],
+      }),
+    });
+    await expect(pending).rejects.toThrow("server adapter");
+    expect(coordinator.serverVersion).toBe(0);
+
+    remoteListener?.({
+      version: 1,
+      thread: serverThread({ id: "thread-race", version: 1 }),
+    });
+    expect(coordinator.serverVersion).toBe(1);
+    expect(coordinator.commentThreads().map((thread) => thread.id)).toEqual(["thread-race"]);
+    coordinator.destroy();
+  });
+
+  it("does not commit pending list or mutation responses after destroy", async () => {
+    const listing = deferred<CommentListResult>();
+    const mutation = deferred<CommentMutationResponse>();
+    const adapter: CommentAdapter = {
+      listComments: () => listing.promise,
+      mutateComment: () => mutation.promise,
+    };
+    const coordinator = new CommentCoordinator(adapter, { documentId: "collab-doc" });
+    const pendingList = coordinator.load();
+    const pendingMutation = coordinator.create(
+      "thread-destroyed",
+      "message-destroyed",
+      { kind: "cell", address: { sheet: "s1", row: 0, col: 0 } },
+      "Destroyed",
+      "comment-destroyed",
+    );
+    coordinator.destroy();
+    listing.resolve({ version: 1, threads: [serverThread({ version: 1 })] });
+    mutation.resolve({
+      status: "applied",
+      version: 2,
+      clientMutationId: "comment-destroyed",
+      thread: serverThread({ id: "thread-destroyed", version: 2 }),
+    });
+
+    expect(await pendingList).toEqual([]);
+    expect(await pendingMutation).toMatchObject({ status: "applied", version: 2 });
+    expect(coordinator.serverVersion).toBe(0);
+    expect(coordinator.commentThreads()).toEqual([]);
   });
 });

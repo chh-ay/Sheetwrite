@@ -461,6 +461,7 @@ export class CommentCoordinator {
   private readonly threads = new Map<string, CommentThread>();
   private readonly disposeRemote?: () => void;
   private version: number;
+  private destroyed = false;
 
   constructor(
     private readonly adapter: CommentAdapter,
@@ -493,11 +494,15 @@ export class CommentCoordinator {
         this.options.documentId,
         this.abortController.signal,
       );
+      if (this.destroyed) return this.commentThreads();
+      validateCommentVersion(result.version);
       const next = new Map<string, CommentThread>();
       for (const input of result.threads) {
         const thread = validateCommentThread(input, this.options.documentId);
         next.set(thread.id, thread);
       }
+      if (this.destroyed || result.version < this.version) return this.commentThreads();
+
       this.threads.clear();
       for (const [id, thread] of next) this.threads.set(id, thread);
       this.version = result.version;
@@ -505,7 +510,7 @@ export class CommentCoordinator {
       this.emit({ type: "loaded", version: this.version, threads });
       return threads;
     } catch (error) {
-      this.emit({ type: "error", error });
+      if (!this.destroyed) this.emit({ type: "error", error });
       throw error;
     }
   }
@@ -549,32 +554,42 @@ export class CommentCoordinator {
         mutation: cloneJsonValue(mutation),
         signal: this.abortController.signal,
       });
+      if (this.destroyed) return response;
       if (response.status === "conflict") {
+        validateCommentVersion(response.currentVersion);
         this.version = Math.max(this.version, response.currentVersion);
-        this.emit({ type: "conflict", currentVersion: response.currentVersion });
+        this.emit({ type: "conflict", currentVersion: this.version });
         return response;
       }
-      this.version = Math.max(this.version, response.version);
+
+      validateCommentVersion(response.version);
       if (response.status === "applied") {
         const thread = validateCommentThread(response.thread, this.options.documentId);
         if (thread.id !== mutation.threadId) {
           throw new Error("Comment response changed the stable thread ID");
         }
-        this.threads.set(thread.id, thread);
-        this.emit({
-          type: "changed",
-          version: response.version,
-          thread: cloneCommentThread(thread),
-        });
+        if (response.version > this.version) {
+          this.threads.set(thread.id, thread);
+          this.version = response.version;
+          this.emit({
+            type: "changed",
+            version: response.version,
+            thread: cloneCommentThread(thread),
+          });
+        }
+      } else {
+        this.version = Math.max(this.version, response.version);
       }
       return response;
     } catch (error) {
-      this.emit({ type: "error", error });
+      if (!this.destroyed) this.emit({ type: "error", error });
       throw error;
     }
   }
 
   destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
     this.abortController.abort("Sheetwrite comment coordinator destroyed");
     this.disposeRemote?.();
     this.threads.clear();
@@ -582,6 +597,7 @@ export class CommentCoordinator {
   }
 
   private applyVersionedEvent(event: VersionedCommentEvent): void {
+    if (this.destroyed) return;
     if (event.version <= this.version) return;
     if (event.version !== this.version + 1) {
       this.emit({
@@ -683,6 +699,12 @@ function normalizePresenceMessage(
 
 function clonePresenceMessage(message: PresenceMessage): PresenceMessage {
   return cloneJsonValue(message);
+}
+
+function validateCommentVersion(version: number): void {
+  if (!Number.isSafeInteger(version) || version < 0) {
+    throw new Error("Comment adapter returned an invalid version");
+  }
 }
 
 function validateCommentThread(input: CommentThread, documentId: string): CommentThread {
