@@ -8,6 +8,7 @@
   "dependencies": {
     "@sheetwrite/core": "file:../.packed/sheetwrite-core.tgz",
     "@sheetwrite/react": "file:../.packed/sheetwrite-react.tgz",
+    "@sheetwrite/xlsx": "file:../.packed/sheetwrite-xlsx.tgz",
     "@sheetwrite/svelte": "file:../.packed/sheetwrite-svelte.tgz",
     "@sheetwrite/vue": "file:../.packed/sheetwrite-vue.tgz",
     "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm.tgz",

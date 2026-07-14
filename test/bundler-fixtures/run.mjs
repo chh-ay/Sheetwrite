@@ -10,6 +10,7 @@ const tarballRoot = join(fixturesRoot, ".packed");
 const packageDirectories = [
   "packages/wasm",
   "packages/core",
+  "packages/xlsx",
   "packages/react",
   "packages/vue",
   "packages/svelte",
@@ -71,9 +72,14 @@ async function stageAndPack(packageDirectory, filename) {
 
 await rm(stagingRoot, { recursive: true, force: true });
 await rm(tarballRoot, { recursive: true, force: true });
+await rm(join(repositoryRoot, "test-results/delivery-size/bundlers"), {
+  recursive: true,
+  force: true,
+});
 await mkdir(tarballRoot, { recursive: true });
 await stageAndPack("packages/wasm", "sheetwrite-wasm.tgz");
 await stageAndPack("packages/core", "sheetwrite-core.tgz");
+await stageAndPack("packages/xlsx", "sheetwrite-xlsx.tgz");
 await stageAndPack("packages/react", "sheetwrite-react.tgz");
 await stageAndPack("packages/vue", "sheetwrite-vue.tgz");
 await stageAndPack("packages/svelte", "sheetwrite-svelte.tgz");

@@ -4,7 +4,6 @@ export default {
   mode: "production",
   entry: "./src/main.js",
   devtool: false,
-  optimization: { minimize: false },
   output: {
     path: resolve("dist"),
     filename: "main.js",

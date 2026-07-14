@@ -183,6 +183,16 @@ bun test
 bun run build:examples
 bun run verify:packed
 bun run verify:bundlers
+bun run size:report
+bun run size:check
 ```
+
+Delivery-size budget increases require a standalone, reviewed
+`scripts/size-budgets.json` diff with the measured reason for every changed
+ceiling. Optional features belong in optional packages and lazy chunks; a
+stable optimization should lower its ceiling in the same change. Review
+packed declarations and source maps separately from browser raw, gzip, and
+Brotli transfer bytes. Never resolve a breach by removing required tests,
+types, licenses, provenance, or debugging artifacts.
 
 See `docs/` for configuration, framework integration, worker rendering, export, accessibility, and performance guidance.

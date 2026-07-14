@@ -101,6 +101,19 @@ describe("canonical workspace graph", () => {
     }
   });
 
+  it("checks delivery size after reusable package and bundler evidence", () => {
+    const benchmark = VERIFY_CI_NODES.findIndex((node) => node.id === "verify:benchmarks");
+    const size = VERIFY_CI_NODES.findIndex((node) => node.id === "verify:delivery-size");
+    expect(size).toBe(benchmark + 1);
+    expect(VERIFY_CI_NODES[size]?.command).toEqual([
+      "bun",
+      "scripts/size-report.ts",
+      "check",
+      "--reuse-bundlers",
+    ]);
+    expect(VERIFY_CI_NODES.slice(size).some((node) => node.id.startsWith("build:"))).toBe(false);
+  });
+
   it("rejects duplicate command starts", () => {
     expect(() =>
       assertUniqueOrderedNodes([...PACKAGE_BUILD_NODES, PACKAGE_BUILD_NODES[0]!]),

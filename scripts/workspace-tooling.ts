@@ -101,6 +101,7 @@ const TOOLING_TESTS: CommandNode = {
     "scripts/workspace-tooling.test.ts",
     "scripts/dependency-audit.test.ts",
     "scripts/verify-clean-build.test.ts",
+    "scripts/size-report.test.ts",
   ],
 };
 
@@ -161,6 +162,10 @@ export const VERIFY_CI_NODES: readonly CommandNode[] = [
   {
     id: "verify:benchmarks",
     command: ["bun", "run", "--filter", "@sheetwrite/bench", "bench:verify"],
+  },
+  {
+    id: "verify:delivery-size",
+    command: ["bun", "scripts/size-report.ts", "check", "--reuse-bundlers"],
   },
 ];
 

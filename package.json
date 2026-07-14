@@ -29,6 +29,9 @@
     "typecheck:verification": "tsc --noEmit -p tsconfig.verification.json",
     "typecheck:bench": "bun scripts/workspace-tooling.ts typecheck-bench",
     "typecheck": "bun scripts/workspace-tooling.ts typecheck",
+    "size:report": "bun scripts/size-report.ts report",
+    "size:check": "bun scripts/size-report.ts check",
+    "size:candidate": "bun scripts/size-report.ts candidate",
     "verify:packages": "bun run build:packages && bun run typecheck:packages && bun run verify:packed",
     "verify:examples": "bun run build:packages && bun run build:examples && bun run typecheck:examples",
     "verify:clean-build": "bun scripts/verify-clean-build.ts",
@@ -40,7 +43,7 @@
     "examples": "bun run build:packages && bun run --filter '@sheetwrite/example-site' dev",
     "toolchain:install-wasm-pack": "bun scripts/install-wasm-pack.ts",
     "test:browser": "playwright test --config test/browser/playwright.config.ts",
-    "test:tooling": "bun test scripts/toolchain-contract.test.ts scripts/workspace-tooling.test.ts scripts/dependency-audit.test.ts scripts/verify-clean-build.test.ts",
+    "test:tooling": "bun test scripts/toolchain-contract.test.ts scripts/workspace-tooling.test.ts scripts/dependency-audit.test.ts scripts/verify-clean-build.test.ts scripts/size-report.test.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test": "bun test"
