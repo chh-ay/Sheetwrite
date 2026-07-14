@@ -108,6 +108,7 @@ export class SyncCoordinator {
   private readonly activeSends = new Map<string, AbortController>();
   private readonly persistence = new Map<string, Promise<void>>();
   private readonly storageErrors = new Map<string, unknown>();
+  private readonly ambiguousRestores = new Set<string>();
   private readonly gapBuffer = new Map<number, VersionedOperation>();
   private readonly disposeGrid: () => void;
   private readonly readyPromise: Promise<void>;
@@ -142,6 +143,13 @@ export class SyncCoordinator {
             this.emit({ type: "storage-error", error });
           })
       : Promise.resolve();
+    if (this.hydrating) {
+      void this.readyPromise.then(() => {
+        if (!this.destroyed && this.connection === "online" && this.ambiguousRestores.size > 0) {
+          void this.flush().catch(() => {});
+        }
+      });
+    }
   }
 
   get serverVersion(): number {
@@ -318,7 +326,7 @@ export class SyncCoordinator {
         operations: record.operations,
         signal: controller.signal,
       });
-      if (!this.destroyed) this.handleResponse(response, clientMutationId);
+      await this.handleResponse(response, clientMutationId);
       return response;
     } catch (error) {
       const current = this.records.get(clientMutationId);
@@ -336,7 +344,10 @@ export class SyncCoordinator {
   }
 
   /** Public for transports that deliver responses independently of send promises. */
-  handleResponse(response: PersistenceCommitResponse, requestedMutationId?: string): void {
+  async handleResponse(
+    response: PersistenceCommitResponse,
+    requestedMutationId?: string,
+  ): Promise<void> {
     if (this.destroyed) return;
     if (response.status === "conflict") {
       const id = requestedMutationId;
@@ -369,17 +380,47 @@ export class SyncCoordinator {
       return;
     }
 
-    if (response.status === "applied" && response.canonicalOperations?.length) {
-      this.grid.applyRemoteOperations(response.canonicalOperations);
+    const canonical = response.status === "applied" ? response.canonicalOperations : undefined;
+    const operations =
+      canonical && canonical.length > 0
+        ? canonical
+        : response.status === "applied" && this.ambiguousRestores.has(id)
+          ? record.operations
+          : undefined;
+    if (operations && operations.length > 0) {
+      const outcome = this.grid.applyRemoteOperations(operations);
+      if (
+        outcome.status === "conflict" ||
+        outcome.status === "rejected" ||
+        outcome.status === "noop"
+      ) {
+        throw new Error(`Sheetwrite sync canonical operations for ${id} were not applied`);
+      }
     }
     this.grid.store.acknowledgeOperations?.(record.operations);
+
+    const storage = this.options.pendingStorage;
+    if (storage) {
+      try {
+        await storage.remove(record.documentId, id);
+      } catch (error) {
+        if (!this.destroyed) {
+          this.emitState();
+          this.emit({ type: "storage-error", error, clientMutationId: id });
+        }
+        throw error;
+      }
+    }
+
     this.version = Math.max(this.version, response.version);
     this.records.delete(id);
     const index = this.order.indexOf(id);
     if (index >= 0) this.order.splice(index, 1);
+    this.ambiguousRestores.delete(id);
     this.acknowledged.add(id);
     this.storageErrors.delete(id);
     this.persistence.delete(id);
+    if (this.destroyed) return;
     this.emitState();
     this.emit({
       type: "acknowledged",
@@ -387,25 +428,18 @@ export class SyncCoordinator {
       version: response.version,
       duplicate: response.status === "duplicate",
     });
-    const storage = this.options.pendingStorage;
-    if (storage) {
-      void storage
-        .remove(record.documentId, id, this.abortController.signal)
-        .catch((error: unknown) => {
-          if (this.destroyed) return;
-          this.emit({ type: "storage-error", error, clientMutationId: id });
-        });
-    }
   }
 
   applyVersionedOperation(operation: VersionedOperation): void {
     if (this.destroyed) return;
     const mutationId = operation.clientMutationId;
     if (mutationId && this.records.has(mutationId)) {
-      this.handleResponse({
+      void this.handleResponse({
         status: "applied",
         version: operation.version,
         clientMutationId: mutationId,
+      }).catch((error: unknown) => {
+        if (!this.destroyed) this.emit({ type: "error", error, clientMutationId: mutationId });
       });
       return;
     }
@@ -519,6 +553,8 @@ export class SyncCoordinator {
     const localOrder = this.order.slice();
     const restoredOrder: string[] = [];
     let nextBase = this.version;
+    let firstAmbiguousBase: number | undefined;
+    let ambiguousSequence = false;
 
     for (const pending of loaded) {
       assertPendingCommit(pending, this.options.documentId);
@@ -529,6 +565,16 @@ export class SyncCoordinator {
         ...clonePendingCommit(pending),
         status: "pending",
       };
+      this.records.set(record.clientMutationId, record);
+      restoredOrder.push(record.clientMutationId);
+      nextBase = Math.max(nextBase, record.baseVersion + 1);
+
+      if (ambiguousSequence || record.baseVersion < this.version) {
+        ambiguousSequence = true;
+        this.ambiguousRestores.add(record.clientMutationId);
+        firstAmbiguousBase ??= record.baseVersion;
+        continue;
+      }
       const outcome = this.grid.applyRemoteOperations(record.operations);
       if (
         outcome.status === "conflict" ||
@@ -537,9 +583,6 @@ export class SyncCoordinator {
       ) {
         throw new Error(`Durable mutation ${record.clientMutationId} could not be restored`);
       }
-      this.records.set(record.clientMutationId, record);
-      restoredOrder.push(record.clientMutationId);
-      nextBase = Math.max(nextBase, record.baseVersion + 1);
     }
 
     this.order.splice(0, this.order.length, ...restoredOrder, ...localOrder);
@@ -552,6 +595,13 @@ export class SyncCoordinator {
     this.hydrating = false;
     this.emitState();
     this.emit({ type: "restored", pending: this.pendingCommits() });
+    if (firstAmbiguousBase !== undefined && this.connection !== "online") {
+      this.emit({
+        type: "reload-required",
+        expectedVersion: firstAmbiguousBase + 1,
+        receivedVersion: this.version,
+      });
+    }
   }
 
   private async persistRecord(record: SyncMutationRecord): Promise<void> {

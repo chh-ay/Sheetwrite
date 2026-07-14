@@ -22,10 +22,25 @@ beforeEach(() => {
 });
 afterEach(() => restoreStubs());
 
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve;
+  });
+  return { promise, resolve };
+}
+
 class FakePendingStorage implements PendingCommitStorage {
   readonly records = new Map<string, PendingCommit>();
   readonly removals: string[] = [];
   failNextPut: unknown;
+  failNextRemove: unknown;
+  removeGate?: Deferred<void>;
 
   async load(documentId: string, signal?: AbortSignal): Promise<readonly PendingCommit[]> {
     if (signal?.aborted) throw signal.reason;
@@ -47,6 +62,12 @@ class FakePendingStorage implements PendingCommitStorage {
   async remove(_documentId: string, clientMutationId: string, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) throw signal.reason;
     this.removals.push(clientMutationId);
+    if (this.removeGate) await this.removeGate.promise;
+    if (this.failNextRemove !== undefined) {
+      const error = this.failNextRemove;
+      this.failNextRemove = undefined;
+      throw error;
+    }
     this.records.delete(clientMutationId);
   }
 }
@@ -69,7 +90,7 @@ class ControlledAdapter implements PersistenceAdapter {
   }
 }
 
-function snapshot(version = 4): WorkbookSnapshot {
+function snapshot(version = 4, rowCount = 2): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     documentId: "offline-doc",
@@ -80,7 +101,7 @@ function snapshot(version = 4): WorkbookSnapshot {
         id: "s1",
         name: "Sheet 1",
         order: 0,
-        rowCount: 2,
+        rowCount,
         columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
         cells: [],
       },
@@ -96,10 +117,10 @@ function setValue(value: number) {
   };
 }
 
-function mountGrid() {
+function mountGrid(version = 4, rowCount = 2) {
   const host = document.createElement("div");
   document.body.appendChild(host);
-  return createGridFromSnapshot(host, snapshot());
+  return createGridFromSnapshot(host, snapshot(version, rowCount));
 }
 
 describe("durable offline sync", () => {
@@ -253,6 +274,139 @@ describe("durable offline sync", () => {
     }));
     await coordinator.sendNext();
     expect(adapter.requests).toHaveLength(1);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("keeps acknowledgements pending until durable removal succeeds", async () => {
+    const storage = new FakePendingStorage();
+    const adapter = new ControlledAdapter(snapshot());
+    const grid = mountGrid();
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      createMutationId: () => "remove-m1",
+    });
+    const events: string[] = [];
+    coordinator.on((event) => events.push(event.type));
+    await coordinator.ready();
+    grid.applyTransaction({ patches: [setValue(8)] });
+    await coordinator.ready();
+    storage.failNextRemove = new Error("remove failed");
+    adapter.responders.push(async (request) => ({
+      status: "applied",
+      version: 5,
+      clientMutationId: request.clientMutationId,
+    }));
+
+    await expect(coordinator.sendNext()).rejects.toThrow("remove failed");
+    expect(coordinator.pendingCount).toBe(1);
+    expect(storage.records.has("remove-m1")).toBe(true);
+    expect(events).not.toContain("acknowledged");
+
+    adapter.responders.push(async (request) => ({
+      status: "duplicate",
+      version: 5,
+      clientMutationId: request.clientMutationId,
+    }));
+    await coordinator.retry("remove-m1");
+    expect(coordinator.pendingCount).toBe(0);
+    expect(storage.records.has("remove-m1")).toBe(false);
+    expect(events.filter((event) => event === "acknowledged")).toHaveLength(1);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("finishes an acknowledged durable removal after destroy without publishing", async () => {
+    const storage = new FakePendingStorage();
+    storage.removeGate = deferred<void>();
+    const adapter = new ControlledAdapter(snapshot());
+    const grid = mountGrid();
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      createMutationId: () => "destroy-remove-m1",
+    });
+    const events: string[] = [];
+    coordinator.on((event) => events.push(event.type));
+    await coordinator.ready();
+    grid.applyTransaction({ patches: [setValue(6)] });
+    await coordinator.ready();
+    adapter.responders.push(async (request) => ({
+      status: "applied",
+      version: 5,
+      clientMutationId: request.clientMutationId,
+    }));
+
+    const sending = coordinator.sendNext();
+    while (storage.removals.length === 0) await Promise.resolve();
+    coordinator.destroy();
+    storage.removeGate.resolve(undefined);
+    await sending;
+
+    expect(storage.records.has("destroy-remove-m1")).toBe(false);
+    expect(coordinator.pendingCount).toBe(0);
+    expect(events).not.toContain("acknowledged");
+    grid.destroy();
+  });
+
+  it("fails closed for an ambiguous durable mutation on a newer offline snapshot", async () => {
+    const storage = new FakePendingStorage();
+    storage.records.set("ambiguous-m1", {
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "ambiguous-m1",
+      operations: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }],
+    });
+    const adapter = new ControlledAdapter(snapshot(5, 3));
+    const grid = mountGrid(5, 3);
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 5,
+      pendingStorage: storage,
+      initialConnection: "offline",
+    });
+    const events: string[] = [];
+    coordinator.on((event) => events.push(event.type));
+    await coordinator.ready();
+
+    expect(grid.exportSnapshot().sheets[0]?.rowCount).toBe(3);
+    expect(coordinator.pendingCommits()[0]?.clientMutationId).toBe("ambiguous-m1");
+    expect(events).toContain("reload-required");
+    expect(storage.records.has("ambiguous-m1")).toBe(true);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("reconciles an ambiguous durable mutation before applying it locally", async () => {
+    const storage = new FakePendingStorage();
+    storage.records.set("ambiguous-online-m1", {
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "ambiguous-online-m1",
+      operations: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }],
+    });
+    const adapter = new ControlledAdapter(snapshot(5));
+    adapter.responders.push(async (request) => ({
+      status: "applied",
+      version: 6,
+      clientMutationId: request.clientMutationId,
+    }));
+    const grid = mountGrid(5);
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 5,
+      pendingStorage: storage,
+    });
+    await coordinator.ready();
+    await coordinator.flush();
+
+    expect(adapter.requests[0]?.clientMutationId).toBe("ambiguous-online-m1");
+    expect(grid.exportSnapshot().sheets[0]?.rowCount).toBe(3);
+    expect(coordinator.pendingCount).toBe(0);
+    expect(storage.records.has("ambiguous-online-m1")).toBe(false);
     coordinator.destroy();
     grid.destroy();
   });

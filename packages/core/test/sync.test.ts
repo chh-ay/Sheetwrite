@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import {
   type ChangeEvent,
   createGridFromSnapshot,
@@ -177,7 +177,11 @@ describe("sync coordinator", () => {
     expect(coordinator.pendingCommits().map((entry) => entry.clientMutationId)).toEqual(["m1"]);
     expect(coordinator.serverVersion).toBe(9);
 
-    coordinator.handleResponse({ status: "duplicate", version: 9, clientMutationId: "m2" });
+    await coordinator.handleResponse({
+      status: "duplicate",
+      version: 9,
+      clientMutationId: "m2",
+    });
     adapter.responses[0]!.resolve({
       status: "applied",
       version: 8,
@@ -245,7 +249,7 @@ describe("sync coordinator", () => {
     grid.destroy();
   });
 
-  it("applies host-rebased conflicted work without duplicating the outgoing mutation", () => {
+  it("applies host-rebased conflicted work without duplicating the outgoing mutation", async () => {
     const { grid, coordinator } = harness();
     const remoteEvents: ChangeEvent[] = [];
     grid.on("change", (event) => {
@@ -258,7 +262,7 @@ describe("sync coordinator", () => {
     };
     const remote = [{ op: "addRows" as const, sheet: "s1", at: 0, count: 1 }];
     grid.applyTransaction({ patches: [local] });
-    coordinator.handleResponse(
+    await coordinator.handleResponse(
       { status: "conflict", currentVersion: 8, snapshot: { ...snapshot(), version: 8 } },
       "m1",
     );
@@ -297,14 +301,14 @@ describe("sync coordinator", () => {
     grid.destroy();
   });
 
-  it("applies canonical and remote operations without outgoing echo", () => {
+  it("applies canonical and remote operations without outgoing echo", async () => {
     const { grid, coordinator, events } = harness();
     const remoteEvents: ChangeEvent[] = [];
     grid.on("change", (event) => {
       if (event.source === "remote") remoteEvents.push(event);
     });
     grid.applyTransaction({ patches: [localSet(2)] });
-    coordinator.handleResponse({
+    await coordinator.handleResponse({
       status: "applied",
       version: 8,
       clientMutationId: "m1",
@@ -330,6 +334,31 @@ describe("sync coordinator", () => {
     expect(remoteEvents.every((event) => event.transaction.patches.length === 1)).toBe(true);
     coordinator.destroy();
     grid.destroy();
+  });
+
+  it("retains mutations when nonempty canonical operations reject or noop", async () => {
+    for (const outcome of [
+      { status: "noop" as const, epoch: 0, reason: "out-of-bounds" as const },
+      { status: "rejected" as const, epoch: 0, issues: [] },
+    ]) {
+      const { grid, coordinator, events } = harness();
+      grid.applyTransaction({ patches: [localSet(2)] });
+      spyOn(grid, "applyRemoteOperations").mockReturnValue(outcome);
+
+      await expect(
+        coordinator.handleResponse({
+          status: "applied",
+          version: 8,
+          clientMutationId: "m1",
+          canonicalOperations: [localSet(10)],
+        }),
+      ).rejects.toThrow("canonical");
+      expect(coordinator.pendingCount).toBe(1);
+      expect(coordinator.serverVersion).toBe(7);
+      expect(events.some((event) => event.type === "acknowledged")).toBe(false);
+      coordinator.destroy();
+      grid.destroy();
+    }
   });
 
   it("deduplicates remote echoes by mutation ID", () => {
