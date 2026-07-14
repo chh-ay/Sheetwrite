@@ -109,7 +109,9 @@ export function entrySlug(packageName: string, subpath: string): string {
 }
 
 function packageSourcePath(packageName: string, source: string): string {
-  const [file, fragment] = source.split("#");
+  const separator = source.indexOf("#");
+  const file = separator === -1 ? source : source.slice(0, separator);
+  const fragment = separator === -1 ? undefined : source.slice(separator + 1);
   const packageDirectory = PACKAGE_DIRECTORIES[packageName];
   if (packageDirectory === undefined) return source;
   const normalized = posix(normalize(join(packageDirectory, file)));
@@ -258,7 +260,7 @@ function renderMembers(
   item: ApiExport,
   members: readonly DeclarationMember[],
 ): string {
-  const searchTargets = new Set(
+  const searchTargets = new Set<string>(
     REQUIRED_SEARCH_TARGETS.filter(
       (target) =>
         target.packageName === pkg.name &&
@@ -1019,7 +1021,7 @@ async function validateMarkdown(
       ) {
         continue;
       }
-      const [targetWithoutFragment, fragment] = rawTarget.split("#", 2);
+      const [targetWithoutFragment = "", fragment] = rawTarget.split("#", 2);
       let targetPath: string | undefined;
       if (targetWithoutFragment === "") targetPath = document.path;
       else if (targetWithoutFragment.startsWith("/docs/")) {

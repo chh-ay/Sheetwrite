@@ -137,6 +137,10 @@ describe("built-in widget styling", () => {
     expect(host.querySelectorAll(".sheetwrite-tb-button").length).toBeGreaterThan(0);
     expect(host.querySelectorAll(".sheetwrite-tb-color").length).toBeGreaterThan(0);
 
+    mustFind(host, ".sheetwrite-scroller").dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 0, clientY: 0 }),
+    );
+
     expect(host.querySelector(".sheetwrite-context-menu")).not.toBeNull();
     expect(host.querySelectorAll(".sheetwrite-context-menu-item").length).toBeGreaterThan(0);
 

@@ -303,15 +303,19 @@ describe("risk floors", () => {
 
 describe("aggregate risk floors", () => {
   it("classifies split modules once and enforces the prior combined floor", () => {
+    const members = [
+      "packages/core/src/store/facade.ts",
+      "packages/core/src/store/engine.ts",
+    ] as const;
     const group: CoverageThresholdEntry = {
       ...scored("packages/core/src/store/**", { lines: 90, functions: 85 }),
-      members: ["packages/core/src/store/facade.ts", "packages/core/src/store/engine.ts"],
+      members,
     };
     const manifest = manifestFor("typescript", [group]);
     const paths = runtimePaths(manifest.entries);
     const records = [
-      record(group.members[0]!, { covered: 98, total: 100 }),
-      record(group.members[1]!, { covered: 82, total: 100 }),
+      record(members[0], { covered: 98, total: 100 }),
+      record(members[1], { covered: 82, total: 100 }),
     ];
     expect(
       evaluateCoveragePolicy({
@@ -325,7 +329,7 @@ describe("aggregate risk floors", () => {
       evaluateCoveragePolicy({
         manifest,
         language: "typescript",
-        records: [records[0]!, record(group.members[1]!, { covered: 81, total: 100 })],
+        records: [records[0]!, record(members[1], { covered: 81, total: 100 })],
         runtimePaths: paths,
       }),
     ).toThrow("below 90%");

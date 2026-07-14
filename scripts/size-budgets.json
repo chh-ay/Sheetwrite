@@ -711,11 +711,11 @@
     },
     "package.@sheetwrite/core.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 195423,
-      "maximum": 205194,
+      "baseline": 206630,
+      "maximum": 216962,
       "category": "package-declarations",
       "owner": "@sheetwrite/core",
-      "rationale": "Approved post-store/type-domain baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Approved complete public JSDoc baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/core.fileCount": {
       "unit": "count",
