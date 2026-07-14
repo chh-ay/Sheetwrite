@@ -59,6 +59,7 @@ interface StructuralObservation {
   readonly maxTransferredArrayLength?: number;
   readonly documentOperationCount?: number;
   readonly jsPatchObjectCount?: number;
+  readonly outputSentinel?: string;
 }
 
 type InstrumentedGrid = Grid & {
@@ -131,6 +132,7 @@ async function profile(
     visibleWindowRequests: observation.visibleWindowRequests ?? 0,
     scheduledChunks: observation.scheduledChunks ?? 0,
     historyBytes: observation.historyBytes ?? 0,
+    outputSentinel: observation.outputSentinel ?? "",
   };
 }
 
@@ -233,6 +235,28 @@ async function storeWorkloads(
       return { store: store.getRangeMutationAllocationStats() };
     }),
   );
+
+  const selectedCells = Math.min(rows, 10_000);
+  results.push(
+    await profile(rows, "clipboard bulk read", selectedCells, wasmMemory, () => {
+      const packed = store.getClipboardWindow(SHEET, { start: 0, end: selectedCells }, [0]);
+      const materialized = new Array<{ resolved: unknown; style: unknown }>(selectedCells);
+      for (let index = 0; index < selectedCells; index++) {
+        materialized[index] = {
+          resolved: packed.values[index] ?? null,
+          style: packed.styles[packed.styleIds[index] ?? 0] ?? {},
+        };
+      }
+      return {
+        ffiCalls: packed.ffiCalls,
+        maxTransferredArrayLength: packed.transferredElements,
+        documentOperationCount: 0,
+        jsPatchObjectCount: materialized.length,
+        outputSentinel: JSON.stringify([materialized[0]?.resolved, materialized.at(-1)?.resolved]),
+      };
+    }),
+  );
+
   store.dispose();
   return results;
 }

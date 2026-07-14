@@ -35,8 +35,10 @@ export class StoreWindowReader {
   ): VisibleWindowView {
     const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
+    let ffiCalls = 1;
     if (this.wasm.isPaged(handle)) {
       this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
+      ffiCalls += 1;
     }
     const hasCondRules = applyConditionalRules && this.syncConditionalRules(sheet, handle);
 
@@ -47,6 +49,7 @@ export class StoreWindowReader {
     } else {
       view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32) as ConsumingWindowView;
     }
+    ffiCalls += 1;
 
     const kinds = view.takeKinds();
     const numbers = view.takeNumbers();
@@ -73,6 +76,7 @@ export class StoreWindowReader {
     if (missingIdSet) {
       stringPoolUpdateIds = Uint32Array.from(missingIdSet);
       stringPoolUpdateValues = this.wasm.poolStrings(stringPoolUpdateIds);
+      ffiCalls += 1;
       for (let i = 0; i < stringPoolUpdateValues.length; i++) {
         this.stringCache.set(stringPoolUpdateIds[i] ?? 0xffffffff, stringPoolUpdateValues[i] ?? "");
       }
@@ -116,6 +120,7 @@ export class StoreWindowReader {
       stringPoolUpdateIds,
       stringPoolUpdateValues,
       localStrings: strings,
+      ffiCalls,
     };
   }
 

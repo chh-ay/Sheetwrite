@@ -52,6 +52,33 @@ export interface VisibleWindowView {
   stringPoolUpdateValues?: readonly string[];
   /** Local non-pooled strings, currently formula error sentinels. */
   localStrings?: readonly string[];
+  /** Internal count of WASM boundary calls used to produce this window. */
+  ffiCalls?: number;
+}
+
+export interface ClipboardFormulaEntry {
+  readonly offset: number;
+  readonly source: string;
+}
+
+export interface ClipboardRefEntry {
+  readonly offset: number;
+  readonly target: CellAddress;
+}
+
+/** Packed base-state selection read used by clipboard serialization. */
+export interface ClipboardWindowView {
+  readonly sheet: SheetId;
+  readonly viewRows: { start: number; end: number };
+  readonly dataRows: Uint32Array;
+  readonly cols: readonly number[];
+  readonly values: ArrayLike<CellScalar>;
+  readonly styleIds: Uint32Array;
+  readonly styles: readonly CellStyle[];
+  readonly formulas: readonly ClipboardFormulaEntry[];
+  readonly refs: readonly ClipboardRefEntry[];
+  readonly ffiCalls: number;
+  readonly transferredElements: number;
 }
 
 /** Authoritative source value, evaluated value, style, and load state for a cell. */
@@ -100,6 +127,15 @@ export interface Store {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView;
+  /**
+   * Optional packed clipboard read. Custom stores may omit it; the controller
+   * preserves the per-cell Store fallback contract.
+   */
+  getClipboardWindow?(
+    sheet: SheetId,
+    viewRows: { start: number; end: number },
+    cols: readonly number[],
+  ): ClipboardWindowView;
   /**
    * Ensure a sheet can address at least `columns.length` columns without
    * producing user changes or dirty patches. Used for presentation padding.

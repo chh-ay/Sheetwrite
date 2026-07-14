@@ -31,6 +31,7 @@ function result(workload: RangeStructuralResult["workload"]): RangeStructuralRes
     visibleWindowRequests: 0,
     scheduledChunks: 0,
     historyBytes: 0,
+    outputSentinel: "",
   };
   if (workload === "style merge and clear") {
     return {
@@ -43,6 +44,15 @@ function result(workload: RangeStructuralResult["workload"]): RangeStructuralRes
   if (workload === "sparse setRange") return { ...base, addressedCells: 3, jsPatchObjectCount: 4 };
   if (workload === "dense setBlock") {
     return { ...base, addressedCells: 100, maxTransferredArrayLength: 100 };
+  }
+  if (workload === "clipboard bulk read") {
+    return {
+      ...base,
+      documentOperationCount: 0,
+      jsPatchObjectCount: 10_000,
+      maxTransferredArrayLength: 30_001,
+      outputSentinel: '["first",null]',
+    };
   }
   if (workload === "datasource revision retention") {
     return {

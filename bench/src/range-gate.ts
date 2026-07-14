@@ -15,6 +15,7 @@ export const RANGE_WORKLOADS = [
   "range clear",
   "sparse setRange",
   "dense setBlock",
+  "clipboard bulk read",
   "datasource revision retention",
   "large exact auto-fit",
 ] as const;
@@ -40,6 +41,7 @@ export interface RangeStructuralResult {
   readonly visibleWindowRequests: number;
   readonly scheduledChunks: number;
   readonly historyBytes: number;
+  readonly outputSentinel: string;
 }
 
 export interface RangeGateArtifact extends GateIdentity {
@@ -134,6 +136,30 @@ export function validateRangeArtifact(
           throw new Error(`${path} dense transfer length must equal its necessary block payload`);
         }
         break;
+      case "clipboard bulk read": {
+        const selectedCells = Math.min(result.rows, 10_000);
+        if (
+          result.addressedCells !== selectedCells ||
+          result.documentOperationCount !== 0 ||
+          result.jsPatchObjectCount !== selectedCells ||
+          result.ffiCalls > 4 ||
+          result.maxTransferredArrayLength < selectedCells * 2 ||
+          result.maxTransferredArrayLength > selectedCells * 3 + 32 ||
+          result.outputSentinel !== JSON.stringify(["first", null])
+        ) {
+          throw new Error(
+            `${path} did not preserve bounded bulk clipboard evidence: ${JSON.stringify({
+              addressedCells: result.addressedCells,
+              documentOperationCount: result.documentOperationCount,
+              jsPatchObjectCount: result.jsPatchObjectCount,
+              ffiCalls: result.ffiCalls,
+              transferredElements: result.maxTransferredArrayLength,
+              outputSentinel: result.outputSentinel,
+            })}`,
+          );
+        }
+        break;
+      }
       case "datasource revision retention":
         if (
           result.retainedRevisionPointsBefore !== 2 ||

@@ -23,6 +23,7 @@ import type {
   WorkbookSnapshot,
 } from "./types/document.js";
 import type {
+  ClipboardWindowView,
   CellLoadState,
   PagedStoreStats,
   QueryCapability,
@@ -163,6 +164,14 @@ export class SheetwriteStore implements Store {
     cols: readonly number[],
   ): VisibleWindowView {
     return this.engine.getVisibleWindow(sheet, rows, cols);
+  }
+
+  getClipboardWindow(
+    sheet: SheetId,
+    viewRows: { start: number; end: number },
+    cols: readonly number[],
+  ): ClipboardWindowView {
+    return this.engine.getClipboardWindow(sheet, viewRows, cols);
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {

@@ -27,6 +27,7 @@ import type {
   WorkbookSnapshot,
 } from "../types/document.js";
 import type {
+  ClipboardWindowView,
   CellLoadState,
   PagedStoreStats,
   QueryCapability,
@@ -541,6 +542,64 @@ export class StoreDataEngine {
     cols: readonly number[],
   ): VisibleWindowView {
     return this.windowReader.read(sheet, rows, cols, this.view.order(sheet), true);
+  }
+
+  getClipboardWindow(
+    sheet: SheetId,
+    viewRows: { start: number; end: number },
+    cols: readonly number[],
+  ): ClipboardWindowView {
+    const order = this.view.order(sheet);
+    const clippedEnd = order ? Math.min(viewRows.end, order.length) : viewRows.end;
+    const rowCount = Math.max(0, clippedEnd - viewRows.start);
+    const dataRows = new Uint32Array(rowCount);
+    if (order) {
+      dataRows.set(order.subarray(viewRows.start, clippedEnd));
+    } else {
+      for (let index = 0; index < rowCount; index++) dataRows[index] = viewRows.start + index;
+    }
+    const window = this.windowReader.read(
+      sheet,
+      { start: viewRows.start, end: clippedEnd },
+      cols,
+      order,
+      false,
+    );
+    const formulas: Array<{ offset: number; source: string }> = [];
+    const refs: Array<{ offset: number; target: CellAddress }> = [];
+    for (let rowIndex = 0; rowIndex < dataRows.length; rowIndex++) {
+      const row = dataRows[rowIndex]!;
+      for (let colIndex = 0; colIndex < cols.length; colIndex++) {
+        const offset = rowIndex * cols.length + colIndex;
+        const addr = { sheet, row, col: cols[colIndex]! };
+        const formula = this.getFormula(addr);
+        if (formula !== null) {
+          formulas.push({ offset, source: formula });
+          continue;
+        }
+        const target = this.getRefTarget(addr);
+        if (target !== null) refs.push({ offset, target });
+      }
+    }
+    return {
+      sheet,
+      viewRows: { start: viewRows.start, end: clippedEnd },
+      dataRows,
+      cols,
+      values: window.values,
+      styleIds: window.styleIds,
+      styles: window.styles,
+      formulas,
+      refs,
+      ffiCalls: window.ffiCalls ?? 0,
+      transferredElements:
+        window.values.length +
+        window.styleIds.length +
+        dataRows.length +
+        window.styles.length +
+        formulas.length * 2 +
+        refs.length * 4,
+    };
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {

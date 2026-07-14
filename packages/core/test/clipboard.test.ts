@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { neutralizeInjection, parseTsv, toTsv } from "../src/clipboard.js";
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
+import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
 import { SelectionModel } from "../src/selection.js";
 import type {
   CellAddress,
@@ -10,8 +12,11 @@ import type {
   DocumentOp,
   Store,
 } from "../src/types.js";
-import { makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
+beforeAll(async () => {
+  await initSheetwrite();
+});
 describe("clipboard TSV", () => {
   it("neutralizes formula-injection prefixes", () => {
     for (const p of ["=cmd", "+1", "-1", "@x", "\tx", "\rx"]) {
@@ -75,6 +80,11 @@ class FakeStore {
   getFormula(addr: CellAddress): string | null {
     const cell = this.cells.get(this.key(addr));
     return cell?.value.kind === "formula" ? cell.value.src : null;
+  }
+
+  getRefTarget(addr: CellAddress): CellAddress | null {
+    const cell = this.cells.get(this.key(addr));
+    return cell?.value.kind === "ref" ? cell.value.target : null;
   }
 
   viewRowCount(): number {
@@ -167,7 +177,20 @@ interface Harness {
   setReadOnly: (value: boolean) => void;
 }
 
-function makeHarness(): Harness {
+function makeHarness(
+  options: {
+    mergeAnchorAt?: (
+      row: number,
+      col: number,
+    ) => {
+      r0: number;
+      c0: number;
+      r1: number;
+      c1: number;
+    } | null;
+    toDataRow?: (viewRow: number) => number;
+  } = {},
+): Harness {
   const clip: { text: string; items: FakeClipboardItem[] } = { text: "", items: [] };
   Object.defineProperty(globalThis, "ClipboardItem", {
     configurable: true,
@@ -202,8 +225,8 @@ function makeHarness(): Harness {
     sheet: () => sheet,
     colIndices: () => [0, 1, 2],
     readOnly: () => readOnly,
-    mergeAnchorAt: () => null,
-    toDataRow: (viewRow) => viewRow,
+    mergeAnchorAt: options.mergeAnchorAt ?? (() => null),
+    toDataRow: options.toDataRow ?? ((viewRow) => viewRow),
     commit: (patches, reason) => {
       commitReasons.push(reason);
       store.apply(patches);
@@ -383,6 +406,38 @@ describe("ClipboardController", () => {
     // Both shift +2 rows uniformly: A3 <- =B3, A4 <- =B4.
     expect(h.store.getFormula({ sheet: "s1", row: 2, col: 0 })).toBe("=B3");
     expect(h.store.getFormula({ sheet: "s1", row: 3, col: 0 })).toBe("=B4");
+  });
+  it("preserves plain refs through the custom-store fallback", async () => {
+    h.store.seed(0, 0, { kind: "ref", target: { sheet: "s1", row: 1, col: 1 } }, 42, {
+      italic: true,
+    });
+    h.select(0, 0);
+    await h.controller.copy();
+    h.select(2, 0);
+    await h.controller.paste();
+
+    expect(h.store.getRefTarget({ sheet: "s1", row: 2, col: 0 })).toEqual({
+      sheet: "s1",
+      row: 1,
+      col: 1,
+    });
+    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toEqual({ italic: true });
+  });
+
+  it("serializes covered merge cells as blanks", async () => {
+    h = makeHarness({
+      mergeAnchorAt: (row, col) => (row === 0 && col <= 1 ? { r0: 0, c0: 0, r1: 0, c1: 1 } : null),
+    });
+    h.store.seed(0, 0, { kind: "literal", value: "anchor" }, "anchor");
+    h.store.seed(0, 1, { kind: "literal", value: "covered" }, "covered");
+    h.selection.selectCell(0, 0);
+    h.selection.extendTo(0, 1);
+    await h.controller.copy();
+    h.select(2, 0);
+    await h.controller.paste();
+
+    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("anchor");
+    expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBeNull();
   });
 
   it("resolves 'blocked' when writeText rejects, without an unhandled rejection", async () => {
@@ -661,5 +716,58 @@ describe("ClipboardController", () => {
     expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).resolved).toBe(7);
     expect(h.store.getFormula({ sheet: "s1", row: 5, col: 0 })).toBeNull();
     expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).style).toEqual({});
+  });
+});
+
+describe("SheetwriteStore clipboard bulk reads", () => {
+  it("keeps WASM calls bounded from one cell through 10K selected cells", () => {
+    const store = new SheetwriteStore(makeWorkbook(10_000), makeColumnarData(10_000));
+    try {
+      const single = store.getClipboardWindow("s1", { start: 0, end: 1 }, [1]);
+      const large = store.getClipboardWindow("s1", { start: 0, end: 10_000 }, [1]);
+
+      expect(single.values.length).toBe(1);
+      expect(large.values.length).toBe(10_000);
+      expect(single.ffiCalls).toBe(large.ffiCalls);
+      expect(large.ffiCalls).toBeLessThanOrEqual(3);
+      expect(large.transferredElements).toBeGreaterThanOrEqual(20_000);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("returns discontiguous sorted rows with formulas, refs, and base styles", () => {
+    const store = new SheetwriteStore(makeWorkbook(10), makeColumnarData(10));
+    try {
+      store.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 0, col: 1 },
+            value: { kind: "formula", src: "=1+1" },
+            style: { bold: true },
+          },
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 1, col: 1 },
+            value: { kind: "ref", target: { sheet: "s1", row: 0, col: 1 } },
+            style: { italic: true },
+          },
+        ],
+      });
+      const rich = store.getClipboardWindow("s1", { start: 0, end: 2 }, [1]);
+      expect(rich.formulas).toEqual([{ offset: 0, source: "=1+1" }]);
+      expect(rich.refs).toEqual([{ offset: 1, target: { sheet: "s1", row: 0, col: 1 } }]);
+      expect(rich.styles[rich.styleIds[0]!]).toMatchObject({ bold: true });
+      expect(rich.styles[rich.styleIds[1]!]).toMatchObject({ italic: true });
+
+      store.sortBy("s1", 1, false);
+      const sorted = store.getClipboardWindow("s1", { start: 0, end: 3 }, [1]);
+      expect(Array.from(sorted.dataRows)).not.toEqual([0, 1, 2]);
+      expect(sorted.values).toHaveLength(3);
+      expect(sorted.ffiCalls).toBeLessThanOrEqual(3);
+    } finally {
+      store.dispose();
+    }
   });
 });

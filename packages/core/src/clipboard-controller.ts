@@ -766,6 +766,21 @@ export class ClipboardController {
     if (!rect) return null;
 
     const activeSheet = this.deps.activeSheet();
+    const selectedColumns = Array.from(
+      { length: rect.c1 - rect.c0 + 1 },
+      (_, index) => rect.c0 + index,
+    );
+    const bulk = this.deps.store.getClipboardWindow?.(
+      activeSheet,
+      { start: rect.r0, end: rect.r1 + 1 },
+      selectedColumns,
+    );
+    const bulkFormulas = bulk
+      ? new Map(bulk.formulas.map((entry) => [entry.offset, entry.source] as const))
+      : null;
+    const bulkRefs = bulk
+      ? new Map(bulk.refs.map((entry) => [entry.offset, entry.target] as const))
+      : null;
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
     const clearPatches: DocumentOp[] = [];
@@ -804,13 +819,34 @@ export class ClipboardController {
           continue;
         }
 
-        const addr = { sheet: activeSheet, row: this.deps.toDataRow(r), col: c };
-        const cell = this.deps.store.getCell(addr);
-        const formula = this.deps.store.getFormula(addr);
-        const value: CellValue = formula
-          ? { kind: "formula", src: formula }
-          : { kind: "literal", value: cell.resolved };
-
+        const rowIndex = r - rect.r0;
+        const colIndex = c - rect.c0;
+        const offset = rowIndex * selectedColumns.length + colIndex;
+        const addr = {
+          sheet: activeSheet,
+          row: bulk?.dataRows[rowIndex] ?? this.deps.toDataRow(r),
+          col: c,
+        };
+        const bulkResolved = bulk?.values[offset];
+        const cell =
+          bulk === undefined
+            ? this.deps.store.getCell(addr)
+            : {
+                resolved: bulkResolved === undefined ? null : bulkResolved,
+                style: bulk.styles[bulk.styleIds[offset] ?? 0] ?? {},
+              };
+        const formula =
+          bulk === undefined
+            ? this.deps.store.getFormula(addr)
+            : (bulkFormulas?.get(offset) ?? null);
+        const ref =
+          bulk === undefined ? this.deps.store.getRefTarget(addr) : (bulkRefs?.get(offset) ?? null);
+        const value: CellValue =
+          formula !== null
+            ? { kind: "formula", src: formula }
+            : ref !== null
+              ? { kind: "ref", target: ref }
+              : { kind: "literal", value: cell.resolved };
         cellLine.push({ value, resolved: cell.resolved, style: cell.style });
         valueLine.push(cell.resolved);
         if (!rangeClear) {
@@ -825,7 +861,7 @@ export class ClipboardController {
       values.push(valueLine);
     }
 
-    const anchor = { row: this.deps.toDataRow(rect.r0), col: rect.c0 };
+    const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
     return { anchor, cells, tsv: toTsv(values), cut, clearPatches };
   }
 }
