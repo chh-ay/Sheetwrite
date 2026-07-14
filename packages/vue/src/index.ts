@@ -56,6 +56,14 @@ const gridProps = {
   },
   theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
   readOnly: { type: Boolean, default: undefined },
+  protectionResolver: {
+    type: Function as PropType<GridOptions["protectionResolver"]>,
+    default: undefined,
+  },
+  mutationPolicy: {
+    type: String as PropType<GridOptions["mutationPolicy"]>,
+    default: undefined,
+  },
   renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
   overscan: { type: Number, default: undefined },
   minColumns: { type: Number, default: undefined },
@@ -111,6 +119,8 @@ const SheetwriteGridComponent = defineComponent({
         workerUrl: props.workerUrl,
         theme: props.theme,
         readOnly: props.readOnly,
+        protectionResolver: props.protectionResolver,
+        mutationPolicy: props.mutationPolicy,
         renderers: props.renderers,
         overscan: props.overscan,
         minColumns: props.minColumns,
@@ -177,6 +187,8 @@ const SheetwriteGridComponent = defineComponent({
         props.datasourceStorage,
         props.renderer,
         props.workerUrl,
+        props.protectionResolver,
+        props.mutationPolicy,
         props.renderers,
       ],
       () => {

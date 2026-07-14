@@ -19,6 +19,8 @@ let {
   workerUrl,
   theme,
   readOnly,
+  protectionResolver,
+  mutationPolicy,
   renderers,
   overscan,
   minColumns,
@@ -58,7 +60,19 @@ const handlers = {
     onActiveSheetChange?.(event),
 };
 
+const UNSET_WASM_SOURCE = Symbol("unset-wasm-source");
 let previousOptions: GridOptions | null = null;
+let lastRequestedOptions: GridOptions | null = null;
+let previousWasmSource: Props["wasmSource"] | typeof UNSET_WASM_SOURCE = UNSET_WASM_SOURCE;
+let initializationToken = 0;
+let disposed = false;
+
+function teardownGrid(): void {
+  const active = untrack(() => controller);
+  grid = undefined;
+  controller = undefined;
+  active?.destroy();
+}
 
 $effect(() => {
   const resetInputs = {
@@ -68,56 +82,76 @@ $effect(() => {
     datasourceStorage,
     renderer,
     workerUrl,
+    protectionResolver,
+    mutationPolicy,
     renderers,
     wasmSource,
   };
-  let current = true;
-  let active: GridController | undefined;
+  const currentOptions = (): GridOptions =>
+    untrack(() => ({
+      workbook: resetInputs.workbook,
+      data: resetInputs.data,
+      datasource: resetInputs.datasource,
+      datasourceStorage: resetInputs.datasourceStorage,
+      renderer: resetInputs.renderer,
+      workerUrl: resetInputs.workerUrl,
+      protectionResolver: resetInputs.protectionResolver,
+      mutationPolicy: resetInputs.mutationPolicy,
+      renderers: resetInputs.renderers,
+      theme,
+      readOnly,
+      overscan,
+      minColumns,
+      config,
+    }));
+  const requestedOptions = currentOptions();
+  const wasmChanged =
+    previousWasmSource === UNSET_WASM_SOURCE || previousWasmSource !== resetInputs.wasmSource;
+  const resetReason =
+    lastRequestedOptions && getGridResetReason(lastRequestedOptions, requestedOptions);
+  const needsNewGeneration =
+    lastRequestedOptions === null ||
+    resetReason !== null ||
+    (wasmChanged && (!isSheetwriteReady() || untrack(() => controller) === undefined));
+
+  previousWasmSource = resetInputs.wasmSource;
+  lastRequestedOptions = requestedOptions;
+  if (!needsNewGeneration) return;
+
+  const token = ++initializationToken;
+  const reason: GridReadyReason =
+    generation === 0
+      ? "initial"
+      : (previousOptions && getGridResetReason(previousOptions, requestedOptions)) ?? "input-reset";
+  teardownGrid();
   loading = !isSheetwriteReady();
 
   void (async () => {
     try {
       if (!isSheetwriteReady()) await initSheetwrite(resetInputs.wasmSource);
-      if (!current) return;
-      const options: GridOptions = {
-        workbook: resetInputs.workbook,
-        data: resetInputs.data,
-        datasource: resetInputs.datasource,
-        datasourceStorage: resetInputs.datasourceStorage,
-        renderer: resetInputs.renderer,
-        workerUrl: resetInputs.workerUrl,
-        renderers: resetInputs.renderers,
-        theme,
-        readOnly,
-        overscan,
-        minColumns,
-        config,
-      };
-      active = untrack(() => createGridController(host, options, handlers));
-      const reason: GridReadyReason =
-        generation === 0
-          ? "initial"
-          : (previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset";
+      if (disposed || token !== initializationToken) return;
+      const options = currentOptions();
+      const active = untrack(() => createGridController(host, options, handlers));
+      controller = active;
+      grid = active.grid;
       previousOptions = options;
+      lastRequestedOptions = options;
       generation += 1;
-      untrack(() => {
-        controller = active;
-        grid = active?.grid;
-        loading = false;
-        if (active) onReady?.({ grid: active.grid, generation, reason });
-      });
+      loading = false;
+      untrack(() => onReady?.({ grid: active.grid, generation, reason }));
     } catch (error) {
-      if (!current) return;
+      if (disposed || token !== initializationToken) return;
       loading = true;
-      onInitializationError?.(error);
+      untrack(() => onInitializationError?.(error));
     }
   })();
+});
 
+$effect(() => {
   return () => {
-    current = false;
-    grid = undefined;
-    controller = undefined;
-    active?.destroy();
+    disposed = true;
+    initializationToken += 1;
+    teardownGrid();
   };
 });
 

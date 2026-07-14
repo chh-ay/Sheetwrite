@@ -1,8 +1,14 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
 import { DEFAULT_THEME, initSheetwrite } from "@sheetwrite/core";
+import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { act, createRef, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import {
+  type AdapterConformanceProps,
+  type MountedAdapter,
+  runSharedAdapterLifecycleContract,
+} from "../../../test/adapter-lifecycle-contract.js";
 import { Sheetwrite, SheetwriteGrid } from "../src/index.js";
 
 beforeAll(async () => {
@@ -11,52 +17,15 @@ beforeAll(async () => {
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-// happy-dom has no 2D canvas or layout; stub both like the core suites do.
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+let restoreStubs: () => void;
 
 beforeEach(() => {
   document.body.replaceChildren();
-  const noop = (): void => {};
-  const recording = new Proxy(
-    {
-      canvas: null,
-      fillStyle: "",
-      strokeStyle: "",
-      font: "",
-      lineWidth: 1,
-      measureText: () => ({ width: 8 }),
-    },
-    {
-      get(target, prop) {
-        if (prop in target) return Reflect.get(target, prop);
-        return noop;
-      },
-      set(target, prop, value) {
-        Reflect.set(target, prop, value);
-        return true;
-      },
-    },
-  );
-  const stub = (): CanvasRenderingContext2D => recording as unknown as CanvasRenderingContext2D;
-  HTMLCanvasElement.prototype.getContext =
-    stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
-  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-    configurable: true,
-    get: () => 800,
-  });
-  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-    configurable: true,
-    get: () => 400,
-  });
+  restoreStubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-  if (origClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth);
-  if (origClientHeight)
-    Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight);
+  restoreStubs();
 });
 
 function makeWorkbook(extraSheet = false): Workbook {
@@ -81,6 +50,44 @@ function makeWorkbook(extraSheet = false): Workbook {
   }
   return workbook;
 }
+
+async function mountConformanceGrid(props: AdapterConformanceProps): Promise<MountedAdapter> {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const gridRef = createRef<Grid>();
+  const publishedAtReady: Array<Grid | null | undefined> = [];
+
+  const render = async (nextProps: AdapterConformanceProps): Promise<void> => {
+    const { fallbackLabel, ...gridProps } = nextProps;
+    await act(async () => {
+      root.render(
+        <SheetwriteGrid
+          {...gridProps}
+          ref={gridRef}
+          fallback={<span data-lifecycle-fallback>{fallbackLabel}</span>}
+          onReady={(event) => {
+            publishedAtReady.push(gridRef.current);
+            gridProps.onReady?.(event);
+          }}
+        />,
+      );
+    });
+  };
+
+  await render(props);
+  return {
+    host,
+    publishedAtReady,
+    getPublishedGrid: () => gridRef.current,
+    render,
+    unmount: async () => {
+      await act(async () => root.unmount());
+    },
+  };
+}
+
+runSharedAdapterLifecycleContract("React", mountConformanceGrid);
 
 describe("SheetwriteGrid React lifecycle", () => {
   it("publishes, replaces, transfers, and clears the forwarded Grid ref", async () => {

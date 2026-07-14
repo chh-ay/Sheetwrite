@@ -20,6 +20,8 @@ export interface SheetwriteGridProps
   workerUrl?: GridOptions["workerUrl"];
   theme?: GridOptions["theme"];
   readOnly?: GridOptions["readOnly"];
+  protectionResolver?: GridOptions["protectionResolver"];
+  mutationPolicy?: GridOptions["mutationPolicy"];
   renderers?: GridOptions["renderers"];
   overscan?: GridOptions["overscan"];
   minColumns?: GridOptions["minColumns"];

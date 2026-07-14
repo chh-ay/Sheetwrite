@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  ADAPTER_LIFECYCLE_CONTRACT,
+  GRID_OPTION_CONFORMANCE,
+} from "../../../test/adapter-lifecycle-contract.js";
+import {
   applyChangedLiveGridOptions,
   createSimpleGridInput,
   GRID_OPTION_POLICY,
@@ -10,32 +14,51 @@ import type { GridOptions } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 describe("shared adapter option policy", () => {
-  it("classifies every GridOptions key and reports deterministic reset reasons", () => {
-    expect(Object.keys(GRID_OPTION_POLICY).sort()).toEqual([
-      "config",
-      "data",
-      "datasource",
-      "datasourceStorage",
-      "minColumns",
-      "mutationPolicy",
-      "overscan",
-      "protectionResolver",
-      "readOnly",
-      "renderer",
-      "renderers",
-      "theme",
-      "workbook",
-      "workerUrl",
+  it("defines all ten lifecycle observables without framework-specific copies", () => {
+    expect(ADAPTER_LIFECYCLE_CONTRACT.map(({ id }) => id)).toEqual([
+      "single-live-grid",
+      "loading-fallback",
+      "current-initialization-error",
+      "retry-after-corrected-input",
+      "stale-initialization-cancellation",
+      "current-callbacks",
+      "live-options",
+      "construction-reset",
+      "exact-cleanup",
+      "publication-agreement",
     ]);
+  });
+
+  it("classifies every GridOptions key and reports its deterministic reset reason", () => {
     const initial: GridOptions = { workbook: makeWorkbook(1) };
-    expect(getGridResetReason(initial, { ...initial, data: { rowCount: 0, columns: {} } })).toBe(
-      "input-reset",
-    );
-    expect(getGridResetReason(initial, { ...initial, renderer: "worker" })).toBe("renderer-reset");
-    expect(getGridResetReason(initial, { ...initial, datasourceStorage: { mode: "paged" } })).toBe(
-      "input-reset",
-    );
-    expect(getGridResetReason(initial, { ...initial, readOnly: true })).toBeNull();
+    const changedValues: { [Key in keyof GridOptions]-?: GridOptions[Key] } = {
+      workbook: makeWorkbook(2),
+      data: { rowCount: 0, columns: {} },
+      datasource: {
+        getRows: async ({ start }) => ({ start, rows: [] }),
+      },
+      datasourceStorage: { mode: "paged" },
+      renderer: "worker",
+      workerUrl: new URL("https://sheetwrite.invalid/worker.js"),
+      theme: { bg: "#fff" },
+      readOnly: true,
+      protectionResolver: () => "allow",
+      mutationPolicy: "partial",
+      renderers: {},
+      overscan: 2,
+      minColumns: 4,
+      config: { toolbar: false },
+    };
+
+    const keys = Object.keys(GRID_OPTION_CONFORMANCE) as Array<keyof GridOptions>;
+    expect(Object.keys(GRID_OPTION_POLICY).sort()).toEqual([...keys].sort());
+    for (const key of keys) {
+      const expected = GRID_OPTION_CONFORMANCE[key];
+      expect(GRID_OPTION_POLICY[key], key).toBe(expected.policy);
+      expect(getGridResetReason(initial, { ...initial, [key]: changedValues[key] }), key).toBe(
+        expected.reason,
+      );
+    }
   });
 
   it("applies each changed live option exactly once without recreating", () => {

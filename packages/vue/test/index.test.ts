@@ -1,58 +1,28 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import type { ColumnarData, Grid, GridEvents, Workbook } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
-import { createApp, defineComponent, h, nextTick, reactive, ref } from "vue";
+import { installCanvasTestStubs } from "@sheetwrite/core/testing";
+import { createApp, defineComponent, h, nextTick, reactive, ref, shallowRef } from "vue";
+import {
+  type AdapterConformanceProps,
+  type MountedAdapter,
+  runSharedAdapterLifecycleContract,
+} from "../../../test/adapter-lifecycle-contract.js";
 import { SheetwriteGrid, type SheetwriteGridExpose } from "../src/index.js";
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
-// happy-dom has no 2D canvas or layout; stub both like the core suites do.
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+let restoreStubs: () => void;
 
 beforeEach(() => {
-  const noop = (): void => {};
-  const recording = new Proxy(
-    {
-      canvas: null,
-      fillStyle: "",
-      strokeStyle: "",
-      font: "",
-      lineWidth: 1,
-      measureText: () => ({ width: 8 }),
-    },
-    {
-      get(target, prop) {
-        if (prop in target) return Reflect.get(target, prop);
-        return noop;
-      },
-      set(target, prop, value) {
-        Reflect.set(target, prop, value);
-        return true;
-      },
-    },
-  );
-  const stub = (): CanvasRenderingContext2D => recording as unknown as CanvasRenderingContext2D;
-  HTMLCanvasElement.prototype.getContext =
-    stub as unknown as typeof HTMLCanvasElement.prototype.getContext;
-  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-    configurable: true,
-    get: () => 800,
-  });
-  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-    configurable: true,
-    get: () => 400,
-  });
+  document.body.replaceChildren();
+  restoreStubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-  if (origClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth);
-  if (origClientHeight)
-    Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight);
+  restoreStubs();
 });
 
 function makeWorkbook(rowCount = 5, extraSheet = false): Workbook {
@@ -139,6 +109,56 @@ function mountGrid(
     unmount: () => app.unmount(),
   };
 }
+
+async function mountConformanceGrid(props: AdapterConformanceProps): Promise<MountedAdapter> {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const component = ref<SheetwriteGridExpose | null>(null);
+  const currentProps = shallowRef(props);
+  const publishedAtReady: Array<Grid | null | undefined> = [];
+  const Parent = defineComponent({
+    setup() {
+      return () => {
+        const { fallbackLabel, ...gridProps } = currentProps.value;
+        return h(
+          SheetwriteGrid,
+          {
+            ...gridProps,
+            ref: component,
+            onReady: (event) => {
+              publishedAtReady.push(component.value?.grid);
+              gridProps.onReady?.(event);
+            },
+          },
+          {
+            fallback: () => h("span", { "data-lifecycle-fallback": "" }, fallbackLabel),
+          },
+        );
+      };
+    },
+  });
+  const app = createApp(Parent);
+  app.mount(host);
+  await nextTick();
+  await nextTick();
+
+  return {
+    host,
+    publishedAtReady,
+    getPublishedGrid: () => component.value?.grid,
+    render: async (nextProps) => {
+      currentProps.value = nextProps;
+      await nextTick();
+      await nextTick();
+    },
+    unmount: async () => {
+      app.unmount();
+      await nextTick();
+    },
+  };
+}
+
+runSharedAdapterLifecycleContract("Vue", mountConformanceGrid);
 
 describe("SheetwriteGrid Vue lifecycle", () => {
   it("mounts a grid reachable through the exposed grid handle", () => {

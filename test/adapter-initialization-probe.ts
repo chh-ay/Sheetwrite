@@ -1,0 +1,284 @@
+import assert from "node:assert/strict";
+import { act, createElement, createRef } from "react";
+import { createRoot } from "react-dom/client";
+import { createApp, defineComponent, h, nextTick, ref, shallowRef } from "vue";
+// Bun resolves the public `svelte` entry to its server runtime outside a browser
+// bundle, so this lifecycle boundary intentionally selects Svelte's client entry.
+import { flushSync, mount, unmount } from "../node_modules/svelte/src/index-client.js";
+import type { GridReadyEvent } from "../packages/core/src/adapter.js";
+import type { Grid } from "../packages/core/src/index.js";
+import { isSheetwriteReady } from "../packages/core/src/index.js";
+import { installCanvasTestStubs } from "../packages/core/src/testing.js";
+import { SheetwriteGrid as ReactSheetwriteGrid } from "../packages/react/src/index.js";
+import SvelteLifecycleHarness from "../packages/svelte/test/LifecycleHarness.svelte";
+import {
+  type SheetwriteGridExpose,
+  SheetwriteGrid as VueSheetwriteGrid,
+} from "../packages/vue/src/index.js";
+import { makeConformanceWorkbook } from "./adapter-lifecycle-contract.js";
+
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+
+type InitializationSource = Uint8Array | Promise<ArrayBuffer> | undefined;
+type InitializationErrorHandler = (error: unknown) => void;
+
+interface InitializationDriver {
+  host: HTMLElement;
+  ready: GridReadyEvent[];
+  publishedAtReady: Array<Grid | null | undefined>;
+  getPublishedGrid(): Grid | null | undefined;
+  update(source: InitializationSource, handler: InitializationErrorHandler): Promise<void>;
+  unmount(): Promise<void>;
+}
+
+const workbook = makeConformanceWorkbook();
+
+async function mountReact(
+  source: InitializationSource,
+  handler: InitializationErrorHandler,
+): Promise<InitializationDriver> {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const grid = createRef<Grid>();
+  const ready: GridReadyEvent[] = [];
+  const publishedAtReady: Array<Grid | null | undefined> = [];
+
+  const render = async (
+    nextSource: InitializationSource,
+    nextHandler: InitializationErrorHandler,
+  ): Promise<void> => {
+    await act(async () => {
+      root.render(
+        createElement(ReactSheetwriteGrid, {
+          ref: grid,
+          workbook,
+          wasmSource: nextSource,
+          onInitializationError: nextHandler,
+          onReady: (event: GridReadyEvent) => {
+            publishedAtReady.push(grid.current);
+            ready.push(event);
+          },
+          fallback: createElement("span", { "data-lifecycle-fallback": "" }, "loading"),
+        }),
+      );
+    });
+  };
+
+  await render(source, handler);
+  return {
+    host,
+    ready,
+    publishedAtReady,
+    getPublishedGrid: () => grid.current,
+    render,
+    update: render,
+    unmount: async () => {
+      await act(async () => root.unmount());
+    },
+  };
+}
+
+async function mountVue(
+  source: InitializationSource,
+  handler: InitializationErrorHandler,
+): Promise<InitializationDriver> {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const grid = ref<SheetwriteGridExpose | null>(null);
+  const wasmSource = shallowRef<InitializationSource>(source);
+  const initializationError = shallowRef(handler);
+  const ready: GridReadyEvent[] = [];
+  const publishedAtReady: Array<Grid | null | undefined> = [];
+  const Parent = defineComponent({
+    setup() {
+      return () =>
+        h(
+          VueSheetwriteGrid,
+          {
+            ref: grid,
+            workbook,
+            wasmSource: wasmSource.value,
+            onInitializationError: initializationError.value,
+            onReady: (event: GridReadyEvent) => {
+              publishedAtReady.push(grid.value?.grid);
+              ready.push(event);
+            },
+          },
+          {
+            fallback: () => h("span", { "data-lifecycle-fallback": "" }, "loading"),
+          },
+        );
+    },
+  });
+  const app = createApp(Parent);
+  app.mount(host);
+  await nextTick();
+
+  return {
+    host,
+    ready,
+    publishedAtReady,
+    getPublishedGrid: () => grid.value?.grid,
+    update: async (nextSource, nextHandler) => {
+      wasmSource.value = nextSource;
+      initializationError.value = nextHandler;
+      await nextTick();
+    },
+    unmount: async () => {
+      app.unmount();
+      await nextTick();
+    },
+  };
+}
+
+interface SvelteLifecycleHarnessApi {
+  update(props: SvelteInitializationProps): void;
+  getGrid(): Grid | undefined;
+  getPublishedAtReady(): Array<Grid | null | undefined>;
+}
+
+interface SvelteInitializationProps {
+  workbook: typeof workbook;
+  wasmSource: InitializationSource;
+  fallbackLabel: string;
+  onInitializationError: InitializationErrorHandler;
+  onReady(event: GridReadyEvent): void;
+}
+
+async function mountSvelte(
+  source: InitializationSource,
+  handler: InitializationErrorHandler,
+): Promise<InitializationDriver> {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const ready: GridReadyEvent[] = [];
+  const initialProps: SvelteInitializationProps = {
+    workbook,
+    wasmSource: source,
+    fallbackLabel: "loading",
+    onInitializationError: handler,
+    onReady: (event) => {
+      ready.push(event);
+    },
+  };
+  const component = mount(SvelteLifecycleHarness, {
+    target: host,
+    props: { initialProps },
+  }) as SvelteLifecycleHarnessApi;
+  flushSync();
+  await Promise.resolve();
+  flushSync();
+
+  return {
+    host,
+    ready,
+    publishedAtReady: component.getPublishedAtReady(),
+    getPublishedGrid: () => component.getGrid(),
+    update: async (nextSource, nextHandler) => {
+      component.update({
+        ...initialProps,
+        wasmSource: nextSource,
+        onInitializationError: nextHandler,
+      });
+      flushSync();
+      await Promise.resolve();
+      flushSync();
+    },
+    unmount: async () => {
+      await unmount(component);
+      flushSync();
+    },
+  };
+}
+
+const adapter = process.argv.at(-1);
+assert.ok(adapter === "react" || adapter === "vue" || adapter === "svelte", "adapter required");
+const mountAdapter = adapter === "react" ? mountReact : adapter === "vue" ? mountVue : mountSvelte;
+
+async function waitFor(predicate: () => boolean, message: string): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (predicate()) return;
+    await Bun.sleep(5);
+  }
+  throw new Error(message);
+}
+
+const restoreCanvas = installCanvasTestStubs();
+// wasm-bindgen awaits module inputs before instantiation. A deferred buffer is
+// used only at this test seam to make stale asynchronous work deterministic.
+
+try {
+  const staleSource = Promise.withResolvers<ArrayBuffer>();
+  let staleErrors = 0;
+  const stale = await mountAdapter(staleSource.promise, () => {
+    staleErrors += 1;
+  });
+  assert.ok(stale.host.querySelector("[data-lifecycle-fallback]"));
+  await stale.unmount();
+  staleSource.resolve(new Uint8Array([0]).buffer);
+  await Bun.sleep(20);
+  assert.equal(stale.ready.length, 0);
+  assert.equal(staleErrors, 0);
+  assert.equal(stale.getPublishedGrid() ?? null, null);
+
+  const replacementSource = Promise.withResolvers<ArrayBuffer>();
+  let oldErrors = 0;
+  let currentErrors = 0;
+  const replacement = await mountAdapter(replacementSource.promise, () => {
+    oldErrors += 1;
+  });
+  assert.ok(replacement.host.querySelector("[data-lifecycle-fallback]"));
+  await replacement.update(new Uint8Array([0]), () => {
+    currentErrors += 1;
+  });
+  await waitFor(() => currentErrors === 1, "current initialization error was not reported once");
+
+  const wasm = await Bun.file(
+    new URL("../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url),
+  ).arrayBuffer();
+  replacementSource.resolve(wasm);
+  await waitFor(isSheetwriteReady, "replaced initialization did not settle");
+  await Bun.sleep(10);
+  assert.equal(replacement.ready.length, 0);
+  assert.equal(replacement.getPublishedGrid() ?? null, null);
+  assert.equal(oldErrors, 0);
+  assert.equal(currentErrors, 1);
+  assert.ok(replacement.host.querySelector("[data-lifecycle-fallback]"));
+
+  await replacement.update(undefined, () => {
+    currentErrors += 1;
+  });
+  await waitFor(
+    () => replacement.ready.length === 1,
+    "corrected initialization did not become ready",
+  );
+  assert.equal(currentErrors, 1);
+  assert.equal(replacement.publishedAtReady[0], replacement.ready[0]!.grid);
+  assert.equal(replacement.getPublishedGrid(), replacement.ready[0]!.grid);
+  assert.deepEqual(
+    {
+      generation: replacement.ready[0]!.generation,
+      reason: replacement.ready[0]!.reason,
+    },
+    { generation: 1, reason: "initial" },
+  );
+  assert.equal(replacement.host.querySelectorAll('[role="grid"]').length, 1);
+  assert.equal(replacement.host.querySelector("[data-lifecycle-fallback]"), null);
+  await replacement.unmount();
+  assert.equal(replacement.getPublishedGrid() ?? null, null);
+
+  console.log(
+    JSON.stringify({
+      adapter,
+      staleReady: stale.ready.length,
+      staleErrors,
+      currentErrors,
+      generation: replacement.ready[0]!.generation,
+      reason: replacement.ready[0]!.reason,
+      publishedBeforeReady: replacement.publishedAtReady[0] === replacement.ready[0]!.grid,
+    }),
+  );
+} finally {
+  restoreCanvas();
+}
