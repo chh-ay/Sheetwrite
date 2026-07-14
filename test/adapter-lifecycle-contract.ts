@@ -163,6 +163,10 @@ interface InitializationProbeResult {
   generation: number;
   reason: GridReadyReason;
   publishedBeforeReady: boolean;
+  readyCount: number;
+  sameGrid: boolean;
+  selectionPreserved: boolean;
+  editPreserved: boolean;
 }
 
 async function runInitializationProbe(adapter: string): Promise<InitializationProbeResult> {
@@ -194,10 +198,14 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         adapter: adapter.toLowerCase(),
         staleReady: 0,
         staleErrors: 0,
-        currentErrors: 1,
+        currentErrors: 2,
         generation: 1,
         reason: "initial",
+        readyCount: 1,
         publishedBeforeReady: true,
+        sameGrid: true,
+        selectionPreserved: true,
+        editPreserved: true,
       });
     });
 

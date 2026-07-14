@@ -7,7 +7,6 @@ import { createApp, defineComponent, h, nextTick, ref, shallowRef } from "vue";
 import { flushSync, mount, unmount } from "../node_modules/svelte/src/index-client.js";
 import type { GridReadyEvent } from "../packages/core/src/adapter.js";
 import type { Grid } from "../packages/core/src/index.js";
-import { isSheetwriteReady } from "../packages/core/src/index.js";
 import { installCanvasTestStubs } from "../packages/core/src/testing.js";
 import { SheetwriteGrid as ReactSheetwriteGrid } from "../packages/react/src/index.js";
 import SvelteLifecycleHarness from "../packages/svelte/test/LifecycleHarness.svelte";
@@ -71,7 +70,6 @@ async function mountReact(
     ready,
     publishedAtReady,
     getPublishedGrid: () => grid.current,
-    render,
     update: render,
     unmount: async () => {
       await act(async () => root.unmount());
@@ -192,7 +190,7 @@ async function mountSvelte(
   };
 }
 
-const adapter = process.argv.at(-1);
+const adapter = process.argv[process.argv.length - 1];
 assert.ok(adapter === "react" || adapter === "vue" || adapter === "svelte", "adapter required");
 const mountAdapter = adapter === "react" ? mountReact : adapter === "vue" ? mountVue : mountSvelte;
 
@@ -222,38 +220,41 @@ try {
   assert.equal(staleErrors, 0);
   assert.equal(stale.getPublishedGrid() ?? null, null);
 
-  const replacementSource = Promise.withResolvers<ArrayBuffer>();
-  let oldErrors = 0;
   let currentErrors = 0;
-  const replacement = await mountAdapter(replacementSource.promise, () => {
-    oldErrors += 1;
-  });
-  assert.ok(replacement.host.querySelector("[data-lifecycle-fallback]"));
-  await replacement.update(new Uint8Array([0]), () => {
+  const replacement = await mountAdapter(new Uint8Array([0]), () => {
     currentErrors += 1;
   });
-  await waitFor(() => currentErrors === 1, "current initialization error was not reported once");
+  assert.ok(replacement.host.querySelector("[data-lifecycle-fallback]"));
+  await waitFor(() => currentErrors === 1, "true initialization failure was not reported once");
+
+  const sourceA = Promise.withResolvers<ArrayBuffer>();
+  await replacement.update(sourceA.promise, () => {
+    currentErrors += 1;
+  });
+  await replacement.update(new Uint8Array([1]), () => {
+    currentErrors += 1;
+  });
+  await waitFor(() => currentErrors === 2, "conflicting source rejection was not reported once");
 
   const wasm = await Bun.file(
     new URL("../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url),
   ).arrayBuffer();
-  replacementSource.resolve(wasm);
-  await waitFor(isSheetwriteReady, "replaced initialization did not settle");
-  await Bun.sleep(10);
-  assert.equal(replacement.ready.length, 0);
-  assert.equal(replacement.getPublishedGrid() ?? null, null);
-  assert.equal(oldErrors, 0);
-  assert.equal(currentErrors, 1);
-  assert.ok(replacement.host.querySelector("[data-lifecycle-fallback]"));
-
-  await replacement.update(undefined, () => {
-    currentErrors += 1;
-  });
-  await waitFor(
-    () => replacement.ready.length === 1,
-    "corrected initialization did not become ready",
-  );
-  assert.equal(currentErrors, 1);
+  if (adapter === "react") {
+    await act(async () => {
+      sourceA.resolve(wasm);
+      await Promise.resolve();
+    });
+    await waitFor(
+      () => replacement.ready.length === 1,
+      "successful first source did not make the current component ready",
+    );
+  } else {
+    sourceA.resolve(wasm);
+    await waitFor(
+      () => replacement.ready.length === 1,
+      "successful first source did not make the current component ready",
+    );
+  }
   assert.equal(replacement.publishedAtReady[0], replacement.ready[0]!.grid);
   assert.equal(replacement.getPublishedGrid(), replacement.ready[0]!.grid);
   assert.deepEqual(
@@ -265,6 +266,32 @@ try {
   );
   assert.equal(replacement.host.querySelectorAll('[role="grid"]').length, 1);
   assert.equal(replacement.host.querySelector("[data-lifecycle-fallback]"), null);
+
+  const liveGrid = replacement.ready[0]!.grid;
+  const selectedAddress = { sheet: "lifecycle", row: 1, col: 0 };
+  const selection = { kind: "cell" as const, addr: selectedAddress };
+  liveGrid.setSelection(selection);
+  liveGrid.applyTransaction({
+    patches: [
+      {
+        op: "set",
+        addr: selectedAddress,
+        value: { kind: "literal", value: "preserved edit" },
+      },
+    ],
+  });
+  await replacement.update(new Uint8Array([2]), () => {
+    currentErrors += 1;
+  });
+  await Bun.sleep(10);
+  assert.equal(replacement.getPublishedGrid(), liveGrid);
+  assert.deepEqual(liveGrid.getSelection(), selection);
+  assert.equal(liveGrid.store.getCell(selectedAddress).resolved, "preserved edit");
+  assert.equal(replacement.ready.length, 1);
+  assert.equal(currentErrors, 2);
+  const sameGrid = replacement.getPublishedGrid() === liveGrid;
+  const selectionPreserved = JSON.stringify(liveGrid.getSelection()) === JSON.stringify(selection);
+  const editPreserved = liveGrid.store.getCell(selectedAddress).resolved === "preserved edit";
   await replacement.unmount();
   assert.equal(replacement.getPublishedGrid() ?? null, null);
 
@@ -276,7 +303,11 @@ try {
       currentErrors,
       generation: replacement.ready[0]!.generation,
       reason: replacement.ready[0]!.reason,
+      readyCount: replacement.ready.length,
       publishedBeforeReady: replacement.publishedAtReady[0] === replacement.ready[0]!.grid,
+      sameGrid,
+      selectionPreserved,
+      editPreserved,
     }),
   );
 } finally {

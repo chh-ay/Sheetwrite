@@ -23,6 +23,7 @@ import {
   type GridReadyReason,
   getGridResetReason,
   gridSizeStyle,
+  type SheetwriteInitializationProps,
   type SimpleGridInput,
 } from "@sheetwrite/core/adapter";
 import {
@@ -69,7 +70,10 @@ const gridProps = {
   overscan: { type: Number, default: undefined },
   minColumns: { type: Number, default: undefined },
   config: { type: Object as PropType<GridOptions["config"]>, default: undefined },
-  wasmSource: { type: [Object, String] as PropType<GridOptions extends never ? never : unknown> },
+  wasmSource: {
+    type: [Object, String] as PropType<SheetwriteInitializationProps["wasmSource"]>,
+    default: undefined,
+  },
   height: { type: [Number, String], default: undefined },
   fill: { type: Boolean, default: undefined },
 };
@@ -155,9 +159,14 @@ const SheetwriteGridComponent = defineComponent({
 
     async function initialize(): Promise<void> {
       const token = ++initializationToken;
+      const alreadyReady = isSheetwriteReady();
       try {
-        if (!isSheetwriteReady()) await initSheetwrite(props.wasmSource as never);
-        if (mounted && token === initializationToken) await createCurrentGrid();
+        const initialization = initSheetwrite(props.wasmSource);
+        if (alreadyReady && mounted && !controller) await createCurrentGrid();
+        await initialization;
+        if (!alreadyReady && mounted && isSheetwriteReady() && !controller) {
+          await createCurrentGrid();
+        }
       } catch (error) {
         if (mounted && token === initializationToken) emit("initialization-error", error);
       }
@@ -176,7 +185,6 @@ const SheetwriteGridComponent = defineComponent({
     watch(
       () => props.wasmSource,
       () => {
-        teardownGrid();
         void initialize();
       },
     );

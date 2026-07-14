@@ -74,6 +74,22 @@ function teardownGrid(): void {
   active?.destroy();
 }
 
+function publishReadyGrid(): void {
+  if (disposed || untrack(() => controller) || !lastRequestedOptions) return;
+  const options = lastRequestedOptions;
+  const reason: GridReadyReason =
+    generation === 0
+      ? "initial"
+      : (previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset";
+  const active = untrack(() => createGridController(host, options, handlers));
+  controller = active;
+  grid = active.grid;
+  previousOptions = options;
+  generation += 1;
+  loading = false;
+  untrack(() => onReady?.({ grid: active.grid, generation, reason }));
+}
+
 $effect(() => {
   const resetInputs = {
     workbook,
@@ -105,40 +121,40 @@ $effect(() => {
       config,
     }));
   const requestedOptions = currentOptions();
+  const activeController = untrack(() => controller);
   const wasmChanged =
     previousWasmSource === UNSET_WASM_SOURCE || previousWasmSource !== resetInputs.wasmSource;
   const resetReason =
     lastRequestedOptions && getGridResetReason(lastRequestedOptions, requestedOptions);
+  const sourceOnlyChange = wasmChanged && resetReason === null && activeController !== undefined;
   const needsNewGeneration =
     lastRequestedOptions === null ||
     resetReason !== null ||
-    (wasmChanged && (!isSheetwriteReady() || untrack(() => controller) === undefined));
+    (wasmChanged && (!isSheetwriteReady() || activeController === undefined));
 
   previousWasmSource = resetInputs.wasmSource;
   lastRequestedOptions = requestedOptions;
+  const token = ++initializationToken;
+  if (sourceOnlyChange) {
+    void initSheetwrite(resetInputs.wasmSource).catch((error: unknown) => {
+      if (!disposed && token === initializationToken) {
+        untrack(() => onInitializationError?.(error));
+      }
+    });
+    return;
+  }
   if (!needsNewGeneration) return;
 
-  const token = ++initializationToken;
-  const reason: GridReadyReason =
-    generation === 0
-      ? "initial"
-      : (previousOptions && getGridResetReason(previousOptions, requestedOptions)) ?? "input-reset";
   teardownGrid();
   loading = !isSheetwriteReady();
 
   void (async () => {
+    const alreadyReady = isSheetwriteReady();
     try {
-      if (!isSheetwriteReady()) await initSheetwrite(resetInputs.wasmSource);
-      if (disposed || token !== initializationToken) return;
-      const options = currentOptions();
-      const active = untrack(() => createGridController(host, options, handlers));
-      controller = active;
-      grid = active.grid;
-      previousOptions = options;
-      lastRequestedOptions = options;
-      generation += 1;
-      loading = false;
-      untrack(() => onReady?.({ grid: active.grid, generation, reason }));
+      const initialization = initSheetwrite(resetInputs.wasmSource);
+      if (alreadyReady) publishReadyGrid();
+      await initialization;
+      if (!alreadyReady && !disposed && isSheetwriteReady()) publishReadyGrid();
     } catch (error) {
       if (disposed || token !== initializationToken) return;
       loading = true;

@@ -90,6 +90,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
     const publishedRef = useRef<ForwardedRef<Grid> | null>(null);
     const generationRef = useRef(0);
     const initializedRef = useRef(isSheetwriteReady());
+    const mountedRef = useRef(false);
     const [initializationState, setInitializationState] = useState<"loading" | "ready" | "error">(
       initializedRef.current ? "ready" : "loading",
     );
@@ -129,6 +130,13 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
     }, [ref]);
 
     useEffect(() => {
+      mountedRef.current = true;
+      return () => {
+        mountedRef.current = false;
+      };
+    }, []);
+
+    useEffect(() => {
       let current = true;
       if (isSheetwriteReady()) {
         initializedRef.current = true;
@@ -138,12 +146,12 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       setInitializationState("loading");
       void initSheetwrite(wasmSource).then(
         () => {
-          if (!current) return;
+          if (!mountedRef.current || !isSheetwriteReady()) return;
           initializedRef.current = true;
           setInitializationState("ready");
         },
         (error: unknown) => {
-          if (!current) return;
+          if (!current || !mountedRef.current) return;
           initializedRef.current = false;
           setInitializationState("error");
           handlers.current.onInitializationError?.(error);

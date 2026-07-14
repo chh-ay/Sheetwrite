@@ -39,6 +39,15 @@ create a `renderer-reset`. `theme`, `readOnly`, `config`, `overscan`, and
 `minColumns` update the existing grid live. Readiness includes the resulting
 generation and reset reason.
 
+Framework adapters also accept `wasmSource`. Initialization is process-wide and
+first-source-wins: concurrent calls using the same source share one attempt, while
+a different source rejects until that attempt settles. If the winning attempt
+succeeds, every still-mounted adapter becomes ready even when its prop changed
+during the attempt. Changing `wasmSource` after readiness warns and keeps the live
+grid, selection, edits, generation, and ready-event count unchanged. A true
+initialization failure remains observable through `onInitializationError` and a
+later source can retry it.
+
 ### Datasource pages
 
 The cancellable request API owns one visible-window generation. Pages can carry
