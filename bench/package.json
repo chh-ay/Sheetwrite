@@ -8,6 +8,7 @@
     "bench:data": "bun run src/data-bench.ts",
     "bench:data:smoke": "bun run src/data-bench.ts --smoke",
     "bench:range": "bun run src/range-bench.ts",
+    "bench:range:smoke": "bun run src/range-bench.ts --smoke",
     "bench:paged": "bun run src/paged-bench.ts",
     "bench:paged:smoke": "bun run src/paged-bench.ts --smoke",
     "bench:formula": "bun run src/formula-bench.ts",

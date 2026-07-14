@@ -20,6 +20,10 @@ export const MATRIX_IDS = {
     full: "paged-full-v1",
     smoke: "paged-smoke-v1",
   },
+  range: {
+    full: "range-full-v1",
+    smoke: "range-smoke-v1",
+  },
   formula: {
     full: "formula-full-v1",
     smoke: "formula-smoke-v1",

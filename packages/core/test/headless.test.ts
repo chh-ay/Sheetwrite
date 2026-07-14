@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellAddress, Renderer, Viewport, Workbook } from "../src/types.js";
+import type { CellAddress, ChangeEvent, Renderer, Viewport, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
@@ -272,6 +272,104 @@ describe("grid.styleRange", () => {
     }
 
     grid.destroy();
+  });
+  it("commits a 10,000 x 4 style mutation as one compact distinct-style operation", () => {
+    const workbook = makeWorkbook(10_000);
+    workbook.sheets[0]!.columns.push({
+      key: "extra",
+      header: "Extra",
+      width: 100,
+      type: "text",
+    });
+    const store = new SheetwriteStore(workbook, makeColumnarData(10_000));
+    const literal = { op: "set", addr: A(0, 0), value: { kind: "literal", value: 7 } } as const;
+    store.applyTransaction({
+      patches: [
+        literal,
+        {
+          op: "set",
+          addr: A(1, 1),
+          value: { kind: "formula", src: "=A1*6" },
+          style: { color: "#123456" },
+        },
+        {
+          op: "set",
+          addr: A(9_999, 2),
+          value: { kind: "ref", target: A(0, 0) },
+          style: { italic: true },
+        },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
+    store.resetRangeMutationAllocationStats();
+
+    grid.styleRange(
+      { sheet: "s1", start: { row: 9_999, col: 3 }, end: { row: 0, col: 0 } },
+      { bold: true },
+    );
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]!.transaction.patches).toEqual([
+      {
+        op: "setRangeStyle",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 9_999, col: 3 } },
+        style: { bold: true },
+      },
+    ]);
+    expect(store.getCell(A(0, 0)).resolved).toBe(7);
+    expect(store.getFormula(A(1, 1))).toBe("=A1*6");
+    expect(store.getCell(A(1, 1))).toMatchObject({
+      resolved: 42,
+      style: { color: "#123456", bold: true },
+    });
+    expect(store.getRefTarget(A(9_999, 2))).toEqual(A(0, 0));
+    expect(store.getCell(A(9_999, 2))).toMatchObject({
+      resolved: 7,
+      style: { italic: true, bold: true },
+    });
+
+    const allocation = store.getRangeMutationAllocationStats();
+    expect(allocation).toMatchObject({
+      documentOperations: 1,
+      jsPatchObjects: 1,
+      historySnapshots: 1,
+      historyMaterializations: 0,
+    });
+    expect(allocation.distinctStyleIds).toBe(3);
+    expect(allocation.maxTransferredArrayLength).toBe(allocation.distinctStyleIds);
+    expect(allocation.maxTransferredArrayLength).toBeLessThan(40_000);
+
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: A(0, 0),
+          value: { kind: "literal", value: 8 },
+          style: store.getCell(A(0, 0)).style,
+        },
+      ],
+    });
+    expect(store.getCell(A(1, 1)).resolved).toBe(48);
+    expect(store.getCell(A(9_999, 2)).resolved).toBe(8);
+    grid.undo();
+    expect(store.getCell(A(1, 1)).resolved).toBe(42);
+    expect(store.getCell(A(9_999, 2)).resolved).toBe(7);
+
+    grid.undo();
+    expect(store.getCell(A(0, 0)).style.bold).toBeUndefined();
+    expect(store.getCell(A(1, 1)).style).toEqual({ color: "#123456" });
+    expect(store.getCell(A(5_000, 3)).style).toEqual({});
+    expect(store.getCell(A(9_999, 2)).style).toEqual({ italic: true });
+    expect(store.getFormula(A(1, 1))).toBe("=A1*6");
+    expect(store.getRefTarget(A(9_999, 2))).toEqual(A(0, 0));
+
+    grid.redo();
+    expect(store.getCell(A(1, 1)).style).toEqual({ color: "#123456", bold: true });
+    expect(store.getCell(A(9_999, 2)).style).toEqual({ italic: true, bold: true });
+    grid.destroy();
+    store.dispose();
   });
 });
 

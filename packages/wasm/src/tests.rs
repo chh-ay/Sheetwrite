@@ -1419,6 +1419,43 @@ fn range_native_block_clear_and_style_remap_preserve_column_major_semantics() {
 }
 
 #[test]
+fn range_style_remap_bounds_output_by_distinct_ids_and_rejects_invalid_tables() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 4);
+    for row in 0..4 {
+        store.set_number(sheet, row, 0, row as f64, 4);
+        store.set_number(sheet, row, 1, row as f64, if row % 2 == 0 { 7 } else { 4 });
+        store.set_number(sheet, row, 2, row as f64, 7);
+    }
+
+    assert_eq!(store.range_style_ids(sheet, 0, 0, 3, 2), vec![4, 7]);
+    assert!(store.remap_range_styles(sheet, 0, 0, 3, 2, &[4, 7], &[40, 70]));
+    assert_eq!(store.range_style_ids(sheet, 0, 0, 3, 2), vec![40, 70]);
+    assert!(store.remap_range_styles(sheet, 0, 0, 3, 2, &[40, 70], &[0, 0]));
+    assert_eq!(store.range_style_ids(sheet, 0, 0, 3, 2), vec![0]);
+
+    assert!(store.range_style_ids(sheet, 2, 0, 1, 2).is_empty());
+    assert!(store.range_style_ids(sheet + 1, 0, 0, 0, 0).is_empty());
+    assert!(!store.remap_range_styles(sheet, 2, 0, 1, 2, &[0], &[1]));
+    assert!(!store.remap_range_styles(sheet, 0, 0, 3, 2, &[0], &[]));
+    assert!(!store.remap_range_styles(sheet, 0, 0, 4, 2, &[0], &[1]));
+}
+
+#[test]
+fn range_style_remap_scans_only_loaded_paged_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 8, 4, 1_000_000);
+    store.begin_page_load();
+    store.set_number(sheet, 3, 1, 12.0, 9);
+    store.end_page_load();
+
+    assert_eq!(store.range_style_ids(sheet, 0, 0, 7, 1), vec![9]);
+    assert!(store.remap_range_styles(sheet, 0, 0, 7, 1, &[9], &[11]));
+    assert_eq!(store.style_id_at(sheet, 3, 1), 11);
+    assert_eq!(store.style_id_at(sheet, 0, 0), 0);
+}
+
+#[test]
 fn opaque_range_snapshot_restores_values_formulas_and_styles() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 3);

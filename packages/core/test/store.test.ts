@@ -1391,6 +1391,84 @@ describe("range-native mutations", () => {
     store.dispose();
   });
 
+  it("bounds style remapping arrays by distinct style IDs and deduplicates merged styles", () => {
+    const store = new SheetwriteStore(makeWorkbook(10_000));
+    const whole = {
+      sheet: "s1",
+      start: { row: 0, col: 0 },
+      end: { row: 9_999, col: 2 },
+    };
+    store.applyTransaction({
+      patches: [{ op: "setRangeStyle", range: whole, style: { bold: true } }],
+    });
+    store.applyTransaction({
+      patches: [
+        {
+          op: "setRangeStyle",
+          range: { ...whole, end: { row: 4_999, col: 2 } },
+          style: { italic: true },
+        },
+      ],
+    });
+    store.resetRangeMutationAllocationStats();
+
+    store.applyTransaction({
+      patches: [{ op: "setRangeStyle", range: whole, style: { color: "#abcdef" } }],
+    });
+    const first = store.getRangeMutationAllocationStats();
+    expect(first).toMatchObject({
+      documentOperations: 1,
+      jsPatchObjects: 1,
+      ffiCalls: 3,
+      distinctStyleIds: 2,
+      maxTransferredArrayLength: 2,
+    });
+    const dictionarySize = first.styleDictionaryEntries;
+    expect(store.getCell(addr(0, 0)).style).toEqual({
+      bold: true,
+      italic: true,
+      color: "#abcdef",
+    });
+    expect(store.getCell(addr(9_999, 2)).style).toEqual({
+      bold: true,
+      color: "#abcdef",
+    });
+
+    store.applyTransaction({
+      patches: [{ op: "setRangeStyle", range: whole, style: { color: "#abcdef" } }],
+    });
+    expect(store.getRangeMutationAllocationStats().styleDictionaryEntries).toBe(dictionarySize);
+
+    store.resetRangeMutationAllocationStats();
+    store.applyTransaction({ patches: [{ op: "setRangeStyle", range: whole, style: null }] });
+    expect(store.getRangeMutationAllocationStats()).toMatchObject({
+      documentOperations: 1,
+      jsPatchObjects: 1,
+      distinctStyleIds: 2,
+      maxTransferredArrayLength: 2,
+    });
+    expect(store.getCell(addr(0, 0)).style).toEqual({});
+    expect(store.getCell(addr(9_999, 2)).style).toEqual({});
+
+    store.resetRangeMutationAllocationStats();
+    const invalid = store.applyTransaction({
+      patches: [
+        {
+          op: "setRangeStyle",
+          range: { sheet: "s1", start: { row: -1, col: 0 }, end: { row: 0, col: 0 } },
+          style: { bold: true },
+        },
+      ],
+    });
+    expect(invalid).toMatchObject({ status: "noop", reason: "out-of-bounds" });
+    expect(store.getRangeMutationAllocationStats()).toMatchObject({
+      documentOperations: 0,
+      ffiCalls: 0,
+      maxTransferredArrayLength: 0,
+    });
+    store.dispose();
+  });
+
   it("materializes an opaque history snapshot only as a JSON-safe setBlock operation", () => {
     const store = new SheetwriteStore(makeWorkbook(3));
     store.applyTransaction({
@@ -1429,6 +1507,48 @@ describe("range-native mutations", () => {
 });
 
 describe("paged datasource storage", () => {
+  it("rejects style remapping across loading cells before crossing the WASM boundary", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 2,
+      cacheBytes: 1_000_000,
+    });
+    const range = {
+      sheet: "s1",
+      start: { row: 0, col: 0 },
+      end: { row: 3, col: 2 },
+    };
+    store.resetRangeMutationAllocationStats();
+    expect(
+      store.applyTransaction({
+        patches: [{ op: "setRangeStyle", range, style: { bold: true } }],
+      }),
+    ).toMatchObject({ status: "noop", reason: "incomplete-data" });
+    expect(store.getRangeMutationAllocationStats()).toMatchObject({
+      documentOperations: 0,
+      ffiCalls: 0,
+      maxTransferredArrayLength: 0,
+    });
+
+    store.loadRows("s1", 0, [
+      { name: "a", amount: 1, city: "A" },
+      { name: "b", amount: 2, city: "B" },
+      { name: "c", amount: 3, city: "C" },
+      { name: "d", amount: 4, city: "D" },
+    ]);
+    store.resetRangeMutationAllocationStats();
+    expect(
+      store.applyTransaction({
+        patches: [{ op: "setRangeStyle", range, style: { bold: true } }],
+      }).status,
+    ).toBe("applied");
+    expect(store.getRangeMutationAllocationStats()).toMatchObject({
+      distinctStyleIds: 1,
+      maxTransferredArrayLength: 1,
+    });
+    store.dispose();
+  });
+
   it("allocates no cell buffers up front and keeps dirty chunks resident", () => {
     const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
       storage: "paged",

@@ -66,6 +66,7 @@ describe("DatasourceController", () => {
         rowCount: () => 4,
         revision: () => 0,
         isCellNewerThan: () => false,
+        retainRevision: () => () => {},
         onRowsLoaded: () => {
           rowsLoaded += 1;
         },
@@ -158,6 +159,7 @@ describe("RenderCoordinator", () => {
         rowCount: () => sheet.rowCount,
         revision: () => 0,
         isCellNewerThan: () => false,
+        retainRevision: () => () => {},
         onRowsLoaded: () => {},
         onError: () => {},
       },

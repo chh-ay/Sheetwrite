@@ -8,15 +8,22 @@ export interface DatasourceControllerOptions {
   rowCount: (sheet: SheetId) => number;
   revision: () => number;
   isCellNewerThan: (address: CellAddress, revision: number) => boolean;
+  retainRevision: (revision: number) => () => void;
   onRowsLoaded: () => void;
   onError: (request: Omit<DataSourceRequest, "signal">, error: unknown) => void;
+}
+
+interface ActiveRequest {
+  readonly controller: AbortController;
+  readonly releaseRevision: () => void;
+  released: boolean;
 }
 
 /** Owns datasource request bands, cancellation, generations, and loaded-row state. */
 export class DatasourceController {
   private loaded: Uint8Array;
   private readonly inFlight = new Set<number>();
-  private readonly controllers = new Set<AbortController>();
+  private readonly requests = new Set<ActiveRequest>();
   private generation = 0;
   private destroyed = false;
 
@@ -49,7 +56,12 @@ export class DatasourceController {
     const generation = this.generation;
     const revision = this.options.revision();
     const controller = new AbortController();
-    this.controllers.add(controller);
+    const activeRequest: ActiveRequest = {
+      controller,
+      releaseRevision: this.options.retainRevision(revision),
+      released: false,
+    };
+    this.requests.add(activeRequest);
     const request: DataSourceRequest = {
       sheet,
       start: requestStart,
@@ -62,7 +74,7 @@ export class DatasourceController {
     try {
       pending = datasource(request);
     } catch (error) {
-      this.controllers.delete(controller);
+      this.finishRequest(activeRequest);
       this.clearInFlight(requestStart, requestEnd);
       this.options.onError({ sheet, start: requestStart, end: requestEnd, revision }, error);
       return;
@@ -70,7 +82,6 @@ export class DatasourceController {
 
     Promise.resolve(pending)
       .then((page) => {
-        this.controllers.delete(controller);
         if (this.destroyed || generation !== this.generation || controller.signal.aborted) return;
         const rows = page.rows;
         const valid =
@@ -95,11 +106,11 @@ export class DatasourceController {
         this.options.onRowsLoaded();
       })
       .catch((error: unknown) => {
-        this.controllers.delete(controller);
         if (this.destroyed || generation !== this.generation || controller.signal.aborted) return;
         this.clearInFlight(requestStart, requestEnd);
         this.options.onError({ sheet, start: requestStart, end: requestEnd, revision }, error);
-      });
+      })
+      .finally(() => this.finishRequest(activeRequest));
   }
 
   resize(rowCount: number): void {
@@ -108,8 +119,10 @@ export class DatasourceController {
 
   reset(rowCount: number): void {
     this.generation += 1;
-    for (const controller of this.controllers) controller.abort();
-    this.controllers.clear();
+    for (const request of this.requests) {
+      request.controller.abort();
+      this.finishRequest(request);
+    }
     this.inFlight.clear();
     this.loaded = new Uint8Array(rowCount);
   }
@@ -118,9 +131,18 @@ export class DatasourceController {
     if (this.destroyed) return;
     this.destroyed = true;
     this.generation += 1;
-    for (const controller of this.controllers) controller.abort();
-    this.controllers.clear();
+    for (const request of this.requests) {
+      request.controller.abort();
+      this.finishRequest(request);
+    }
     this.inFlight.clear();
+  }
+
+  private finishRequest(request: ActiveRequest): void {
+    if (request.released) return;
+    request.released = true;
+    this.requests.delete(request);
+    request.releaseRevision();
   }
 
   private clearInFlight(start: number, end: number): void {

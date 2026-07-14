@@ -13,6 +13,7 @@ import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
+import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { RenderCoordinator } from "./render-coordinator.js";
 import { SearchController } from "./search-controller.js";
@@ -62,6 +63,7 @@ import type {
   SortKey,
   Store,
   Theme,
+  VisibleWindowView,
   WorkbookSnapshot,
 } from "./types.js";
 import { ValidationEditor } from "./validation-editor.js";
@@ -71,6 +73,19 @@ import { WorkerRenderer } from "./worker-renderer.js";
 const MAX_ELEMENT_HEIGHT = 33_000_000;
 const DEFAULT_OVERSCAN = 6;
 const DEFAULT_COL_WIDTH = 100;
+
+/** Hard ceiling for one auto-fit bulk read. */
+export const AUTO_FIT_CHUNK_CELLS = 16_384;
+
+export interface AutoFitResourceStats {
+  readonly chunkCellLimit: number;
+  readonly windowRequests: number;
+  readonly maxWindowCells: number;
+  readonly scheduledChunks: number;
+  readonly completedJobs: number;
+  readonly cancelledJobs: number;
+  readonly committedPatches: number;
+}
 
 /** Scale every `<n>px` occurrence in a CSS font shorthand by `zoom`. */
 function scaleFontPx(font: string, zoom: number): string {
@@ -234,9 +249,20 @@ export class GridImpl implements Grid {
   private activeSheetCache: Sheet | null = null;
   private readonly virtualColumnTargets = new Map<SheetId, number>();
   private selection: SelectionModel;
-  private readonly cellRevisions = new Map<string, number>();
+  private readonly mutationRevisions = new MutationRevisionIndex();
   private destroyed = false;
   private storeEpoch = 0;
+  private autoFitGeneration = 0;
+  private autoFitFrame = 0;
+  private autoFitActive = false;
+  private readonly autoFitStats = {
+    windowRequests: 0,
+    maxWindowCells: 0,
+    scheduledChunks: 0,
+    completedJobs: 0,
+    cancelledJobs: 0,
+    committedPatches: 0,
+  };
   private resizeObserver: ResizeObserver | null = null;
   private readonly onScroll = () => this.scheduleRender();
   private readonly disposeStore: () => void;
@@ -319,8 +345,8 @@ export class GridImpl implements Grid {
         rowCount: (sheetId) => this.sheet(sheetId).rowCount,
         revision: () => this.storeEpoch,
         isCellNewerThan: (address, revision) =>
-          (this.cellRevisions.get(`${address.sheet}:${address.row}:${address.col}`) ?? -1) >
-          revision,
+          this.mutationRevisions.isNewerThan(address, revision),
+        retainRevision: (revision) => this.mutationRevisions.retainRevision(revision),
         onRowsLoaded: () => {
           this.storeEpoch += 1;
           this.scheduleRender();
@@ -549,32 +575,25 @@ export class GridImpl implements Grid {
 
     this.disposeStore = this.store.on("change", (event) => {
       this.storeEpoch += 1;
+      if (this.autoFitActive) this.cancelAutoFit();
+      this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
       this.activeSheetCache = null;
       let shouldRebuildRows = false;
       let shouldRebuildColumns = false;
       let shouldApplyLayout = false;
       let sheetsChanged = false;
+      let shouldResetDatasource = false;
       for (const patch of event.transaction.patches) {
-        if (patch.op === "set") {
-          this.cellRevisions.set(
-            `${patch.addr.sheet}:${patch.addr.row}:${patch.addr.col}`,
-            this.storeEpoch,
-          );
-        } else if (patch.op === "setRange" || patch.op === "clearRange") {
-          const range = patch.range;
-          for (
-            let row = Math.min(range.start.row, range.end.row);
-            row <= Math.max(range.start.row, range.end.row);
-            row++
-          ) {
-            for (
-              let col = Math.min(range.start.col, range.end.col);
-              col <= Math.max(range.start.col, range.end.col);
-              col++
-            ) {
-              this.cellRevisions.set(`${range.sheet}:${row}:${col}`, this.storeEpoch);
-            }
-          }
+        if (
+          (patch.op === "addRows" ||
+            patch.op === "removeRows" ||
+            patch.op === "moveRows" ||
+            patch.op === "addColumns" ||
+            patch.op === "removeColumns" ||
+            patch.op === "moveColumns") &&
+          patch.sheet === this.activeSheet
+        ) {
+          shouldResetDatasource = true;
         }
         if (
           patch.op === "addRows" ||
@@ -605,6 +624,10 @@ export class GridImpl implements Grid {
         ) {
           sheetsChanged = true;
         }
+      }
+      if (shouldResetDatasource) {
+        this.datasourceController.reset(this.sheet().rowCount);
+        this.mutationRevisions.clear();
       }
       if (!this.sheetById(this.activeSheet)) {
         this.setActiveSheet(this.store.getWorkbook().activeSheet);
@@ -1121,29 +1144,26 @@ export class GridImpl implements Grid {
   styleRange(range: Range, style: Partial<CellStyle> | null): void {
     if (this.readOnly) return;
 
-    const r0 = Math.min(range.start.row, range.end.row);
-    const r1 = Math.max(range.start.row, range.end.row);
-    const c0 = Math.min(range.start.col, range.end.col);
-    const c1 = Math.max(range.start.col, range.end.col);
-
-    const patches: DocumentOp[] = [];
-    for (let row = r0; row <= r1; row++) {
-      for (let col = c0; col <= c1; col++) {
-        const addr = { sheet: range.sheet, row, col };
-        const formula = this.loadable?.getFormula(addr) ?? null;
-        const cell = this.store.getCell(addr);
-        const value: CellValue = formula
-          ? { kind: "formula", src: formula }
-          : { kind: "literal", value: cell.resolved };
-        patches.push({
-          op: "set",
-          addr,
-          value,
-          style: style ? { ...cell.style, ...style } : undefined,
-        });
-      }
-    }
-    this.document.commit(patches, "style");
+    this.document.commit(
+      [
+        {
+          op: "setRangeStyle",
+          range: {
+            sheet: range.sheet,
+            start: {
+              row: Math.min(range.start.row, range.end.row),
+              col: Math.min(range.start.col, range.end.col),
+            },
+            end: {
+              row: Math.max(range.start.row, range.end.row),
+              col: Math.max(range.start.col, range.end.col),
+            },
+          },
+          style,
+        },
+      ],
+      "style",
+    );
   }
 
   dataEdge(row: number, col: number, dRow: number, dCol: number): number | null {
@@ -1157,8 +1177,111 @@ export class GridImpl implements Grid {
     return canvas.getContext("2d");
   }
 
+  private requireAutoFitRangeLoaded(range: Range): void {
+    if (!this.loadable || this.loadable.isRangeFullyLoaded(range)) return;
+    const capability = this.loadable.queryCapability(range.sheet);
+    if (capability.status === "incomplete") throw new IncompleteDataError(range.sheet, capability);
+  }
+
+  private noteAutoFitWindow(rows: number, columns: number): void {
+    const cells = rows * columns;
+    this.autoFitStats.windowRequests += 1;
+    this.autoFitStats.maxWindowCells = Math.max(this.autoFitStats.maxWindowCells, cells);
+  }
+
+  private scheduleAutoFitChunk(step: () => void): void {
+    this.autoFitStats.scheduledChunks += 1;
+    const requestFrame =
+      globalThis.requestAnimationFrame ??
+      ((callback: FrameRequestCallback): number =>
+        setTimeout(() => callback(performance.now()), 0) as unknown as number);
+    let invokedSynchronously = false;
+    const frame = requestFrame(() => {
+      invokedSynchronously = true;
+      this.autoFitFrame = 0;
+      step();
+    });
+    if (!invokedSynchronously) this.autoFitFrame = frame;
+  }
+
+  private cancelAutoFit(): void {
+    this.autoFitGeneration += 1;
+    if (this.autoFitActive) {
+      this.autoFitActive = false;
+      this.autoFitStats.cancelledJobs += 1;
+    }
+    if (this.autoFitFrame !== 0) {
+      (globalThis.cancelAnimationFrame ?? clearTimeout)(this.autoFitFrame);
+      this.autoFitFrame = 0;
+    }
+  }
+
+  private measureAutoFitRowWindow(
+    context: CanvasRenderingContext2D,
+    sheet: Sheet,
+    view: VisibleWindowView,
+    columns: readonly number[],
+    bandStart: number,
+    requiredHeights: Float64Array,
+    mergeWidths: ReadonlyMap<number, number>,
+  ): void {
+    const fallbackFontSize =
+      Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") || 12;
+    for (let row = view.rows.start; row < view.rows.end; row++) {
+      const requiredIndex = row - bandStart;
+      let required = requiredHeights[requiredIndex] ?? this.baseTheme.rowHeight;
+      for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+        const col = columns[columnIndex]!;
+        const valueIndex = (row - view.rows.start) * columns.length + columnIndex;
+        const value = view.values[valueIndex];
+        if (value === null || value === undefined || value === "") continue;
+        const column = sheet.columns[col]!;
+        const cellStyle = view.styles[view.styleIds[valueIndex]!] ?? {};
+        const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
+        const text = cellScalarToText(value);
+        if (!style.wrap && !text.includes("\n")) continue;
+        const width =
+          mergeWidths.get(row * sheet.columns.length + col) ?? sheet.columns[col]!.width;
+        const fontSize = style.fontSize ?? fallbackFontSize;
+        context.font = fontFor(this.baseTheme, style);
+        const lineCount = layoutTextLines(context, text, Math.max(0, width - 12)).length;
+        required = Math.max(required, Math.ceil(lineCount * fontSize * 1.2 + 8));
+      }
+      requiredHeights[requiredIndex] = required;
+    }
+  }
+
+  private measureAutoFitColumnWindow(
+    context: CanvasRenderingContext2D,
+    sheet: Sheet,
+    view: VisibleWindowView,
+    columns: readonly number[],
+    targetOffset: number,
+    widths: Float64Array,
+  ): void {
+    for (let row = view.rows.start; row < view.rows.end; row++) {
+      for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+        const col = columns[columnIndex]!;
+        const valueIndex = (row - view.rows.start) * columns.length + columnIndex;
+        const value = view.values[valueIndex];
+        if (value === null || value === undefined || value === "") continue;
+        const column = sheet.columns[col]!;
+        const cellStyle = view.styles[view.styleIds[valueIndex]!] ?? {};
+        const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
+        context.font = fontFor(this.baseTheme, style);
+        let width = widths[targetOffset + columnIndex]!;
+        for (const line of cellScalarToText(value).split("\n")) {
+          width = Math.max(width, context.measureText(line).width + 12);
+        }
+        widths[targetOffset + columnIndex] = width;
+      }
+    }
+  }
+
   autoFitRows(range?: Range): void {
     if (this.readOnly || (range && range.sheet !== this.activeSheet)) return;
+    this.cancelAutoFit();
+    const sheetId = this.activeSheet;
     const sheet = this.sheet();
     const r0 = Math.max(0, Math.min(range?.start.row ?? 0, range?.end.row ?? sheet.rowCount - 1));
     const r1 = Math.min(
@@ -1174,91 +1297,186 @@ export class GridImpl implements Grid {
       Math.max(range?.start.col ?? 0, range?.end.col ?? sheet.columns.length - 1),
     );
     if (r1 < r0 || c1 < c0) return;
-    const cols = Array.from({ length: c1 - c0 + 1 }, (_, index) => c0 + index);
-    const view = this.store.getVisibleWindow(this.activeSheet, { start: r0, end: r1 + 1 }, cols);
-    const ctx = this.measurementContext();
-    if (!ctx) return;
-    const merges = sheet.merges ?? [];
-    const patches: DocumentOp[] = [];
-    for (let row = r0; row <= r1; row++) {
-      let required = this.baseTheme.rowHeight;
-      for (let ci = 0; ci < cols.length; ci++) {
-        const col = cols[ci]!;
-        const value = view.values[(row - r0) * cols.length + ci];
-        if (value === null || value === undefined || value === "") continue;
-        const column = sheet.columns[col]!;
-        const cellStyle = view.styles[view.styleIds[(row - r0) * cols.length + ci]!] ?? {};
-        const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
-        if (!style.wrap && !cellScalarToText(value).includes("\n")) continue;
-        const merge = merges.find((candidate) => candidate.r0 === row && candidate.c0 === col);
-        const width = merge
-          ? sheet.columns
-              .slice(merge.c0, merge.c1 + 1)
-              .reduce((total, item) => total + item.width, 0)
-          : column.width;
-        const fontPx =
-          style.fontSize ??
-          (Number.parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.baseTheme.font)?.[1] ?? "") || 12);
-        ctx.font = fontFor(this.baseTheme, style);
-        const lineCount = layoutTextLines(
-          ctx,
-          cellScalarToText(value),
-          Math.max(0, width - 12),
-        ).length;
-        required = Math.max(required, Math.ceil(lineCount * fontPx * 1.2 + 8));
-      }
-      patches.push({
-        op: "setRowMeta",
-        sheet: this.activeSheet,
-        row: this.toDataRow(row),
-        meta: { height: required },
-      });
+    const measuredRange: Range = {
+      sheet: sheetId,
+      start: { row: r0, col: c0 },
+      end: { row: r1, col: c1 },
+    };
+    this.requireAutoFitRangeLoaded(measuredRange);
+    const context = this.measurementContext();
+    if (!context) return;
+
+    const mergeWidths = new Map<number, number>();
+    for (const merge of sheet.merges ?? []) {
+      let width = 0;
+      for (let col = merge.c0; col <= merge.c1; col++) width += sheet.columns[col]?.width ?? 0;
+      mergeWidths.set(merge.r0 * sheet.columns.length + merge.c0, width);
     }
-    this.document.commit(patches, "structure");
+    const rowCount = r1 - r0 + 1;
+    const columnCount = c1 - c0 + 1;
+    const patches: DocumentOp[] = [];
+    const appendRowPatches = (bandStart: number, required: Float64Array): void => {
+      for (let offset = 0; offset < required.length; offset++) {
+        const viewRow = bandStart + offset;
+        const dataRow = this.toDataRow(viewRow);
+        const height = required[offset]!;
+        if ((sheet.rowHeights?.get(dataRow) ?? this.baseTheme.rowHeight) === height) continue;
+        patches.push({
+          op: "setRowMeta",
+          sheet: sheetId,
+          row: dataRow,
+          meta: { height },
+        });
+      }
+    };
+
+    if (rowCount * columnCount <= AUTO_FIT_CHUNK_CELLS) {
+      const columns = Array.from({ length: columnCount }, (_, index) => c0 + index);
+      const view = this.store.getVisibleWindow(sheetId, { start: r0, end: r1 + 1 }, columns);
+      this.noteAutoFitWindow(rowCount, columnCount);
+      const required = new Float64Array(rowCount);
+      required.fill(this.baseTheme.rowHeight);
+      this.measureAutoFitRowWindow(context, sheet, view, columns, r0, required, mergeWidths);
+      appendRowPatches(r0, required);
+      this.autoFitStats.completedJobs += 1;
+      this.autoFitStats.committedPatches += patches.length;
+      this.document.commit(patches, "structure");
+      return;
+    }
+
+    const columnsPerWindow = Math.min(columnCount, AUTO_FIT_CHUNK_CELLS);
+    const rowsPerBand = Math.max(1, Math.floor(AUTO_FIT_CHUNK_CELLS / columnsPerWindow));
+    let bandStart = r0;
+    let bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
+    let columnStart = c0;
+    let required = new Float64Array(bandEnd - bandStart);
+    required.fill(this.baseTheme.rowHeight);
+    const generation = this.autoFitGeneration;
+    this.autoFitActive = true;
+
+    const step = (): void => {
+      if (
+        !this.autoFitActive ||
+        generation !== this.autoFitGeneration ||
+        this.destroyed ||
+        this.activeSheet !== sheetId
+      ) {
+        return;
+      }
+      const count = Math.min(columnsPerWindow, c1 - columnStart + 1);
+      const columns = Array.from({ length: count }, (_, index) => columnStart + index);
+      const view = this.store.getVisibleWindow(
+        sheetId,
+        { start: bandStart, end: bandEnd },
+        columns,
+      );
+      this.noteAutoFitWindow(bandEnd - bandStart, columns.length);
+      this.measureAutoFitRowWindow(context, sheet, view, columns, bandStart, required, mergeWidths);
+      columnStart += count;
+      if (columnStart > c1) {
+        appendRowPatches(bandStart, required);
+        bandStart = bandEnd;
+        if (bandStart > r1) {
+          this.autoFitActive = false;
+          this.autoFitStats.completedJobs += 1;
+          this.autoFitStats.committedPatches += patches.length;
+          this.document.commit(patches, "structure");
+          return;
+        }
+        bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
+        columnStart = c0;
+        required = new Float64Array(bandEnd - bandStart);
+        required.fill(this.baseTheme.rowHeight);
+      }
+      this.scheduleAutoFitChunk(step);
+    };
+    this.scheduleAutoFitChunk(step);
   }
 
   autoFitColumns(cols?: readonly number[]): void {
     if (this.readOnly) return;
+    this.cancelAutoFit();
+    const sheetId = this.activeSheet;
     const sheet = this.sheet();
     const targets = cols
       ? [...new Set(cols)].filter((col) => col >= 0 && col < sheet.columns.length)
       : sheet.columns.map((_, col) => col);
     if (targets.length === 0) return;
-    const view = this.store.getVisibleWindow(
-      this.activeSheet,
-      { start: 0, end: sheet.rowCount },
-      targets,
-    );
-    const ctx = this.measurementContext();
-    if (!ctx) return;
-    const patches: DocumentOp[] = [];
-    for (let ci = 0; ci < targets.length; ci++) {
-      const col = targets[ci]!;
-      const column = sheet.columns[col]!;
-      ctx.font = fontFor(this.baseTheme, {
+    for (const col of targets) {
+      this.requireAutoFitRangeLoaded({
+        sheet: sheetId,
+        start: { row: 0, col },
+        end: { row: Math.max(0, sheet.rowCount - 1), col },
+      });
+    }
+    const context = this.measurementContext();
+    if (!context) return;
+    const widths = new Float64Array(targets.length);
+    for (let index = 0; index < targets.length; index++) {
+      const column = sheet.columns[targets[index]!]!;
+      context.font = fontFor(this.baseTheme, {
         ...column.headerStyle,
         bold: column.headerStyle?.bold ?? true,
       });
-      let width = ctx.measureText(column.header).width + 12;
-      for (let row = 0; row < sheet.rowCount; row++) {
-        const index = row * targets.length + ci;
-        const value = view.values[index];
-        if (value === null || value === undefined || value === "") continue;
-        const cellStyle = view.styles[view.styleIds[index]!] ?? {};
-        const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
-        ctx.font = fontFor(this.baseTheme, style);
-        for (const line of cellScalarToText(value).split("\n")) {
-          width = Math.max(width, ctx.measureText(line).width + 12);
-        }
-      }
-      patches.push({
-        op: "setColumn",
-        sheet: this.activeSheet,
-        col,
-        patch: { width: Math.max(1, Math.ceil(width)) },
-      });
+      widths[index] = context.measureText(column.header).width + 12;
     }
-    this.document.commit(patches, "structure");
+    const patches: DocumentOp[] = [];
+    const commitWidths = (): void => {
+      for (let index = 0; index < targets.length; index++) {
+        const col = targets[index]!;
+        const width = Math.max(1, Math.ceil(widths[index]!));
+        if (sheet.columns[col]!.width === width) continue;
+        patches.push({ op: "setColumn", sheet: sheetId, col, patch: { width } });
+      }
+      this.autoFitStats.completedJobs += 1;
+      this.autoFitStats.committedPatches += patches.length;
+      this.document.commit(patches, "structure");
+    };
+
+    const totalCells = sheet.rowCount * targets.length;
+    if (totalCells <= AUTO_FIT_CHUNK_CELLS) {
+      const view = this.store.getVisibleWindow(sheetId, { start: 0, end: sheet.rowCount }, targets);
+      this.noteAutoFitWindow(sheet.rowCount, targets.length);
+      this.measureAutoFitColumnWindow(context, sheet, view, targets, 0, widths);
+      commitWidths();
+      return;
+    }
+
+    const columnsPerWindow = Math.min(targets.length, AUTO_FIT_CHUNK_CELLS);
+    const rowsPerWindow = Math.max(1, Math.floor(AUTO_FIT_CHUNK_CELLS / columnsPerWindow));
+    let targetOffset = 0;
+    let columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
+    let rowStart = 0;
+    const generation = this.autoFitGeneration;
+    this.autoFitActive = true;
+
+    const step = (): void => {
+      if (
+        !this.autoFitActive ||
+        generation !== this.autoFitGeneration ||
+        this.destroyed ||
+        this.activeSheet !== sheetId
+      ) {
+        return;
+      }
+      const rowEnd = Math.min(sheet.rowCount, rowStart + rowsPerWindow);
+      const view = this.store.getVisibleWindow(sheetId, { start: rowStart, end: rowEnd }, columns);
+      this.noteAutoFitWindow(rowEnd - rowStart, columns.length);
+      this.measureAutoFitColumnWindow(context, sheet, view, columns, targetOffset, widths);
+      rowStart = rowEnd;
+      if (rowStart >= sheet.rowCount) {
+        targetOffset += columns.length;
+        if (targetOffset >= targets.length) {
+          this.autoFitActive = false;
+          commitWidths();
+          return;
+        }
+        columns = targets.slice(targetOffset, targetOffset + columnsPerWindow);
+        rowStart = 0;
+      }
+      this.scheduleAutoFitChunk(step);
+    };
+    this.scheduleAutoFitChunk(step);
   }
 
   setRowHeight(row: number, height: number): void {
@@ -1304,12 +1522,31 @@ export class GridImpl implements Grid {
 
   // ── public API ─────────────────────────────────────────────────────────────
 
+  /** Internal structural counters used by allocation regression tests and range benchmarks. */
+  getMutationRevisionStats(): MutationRevisionStats {
+    return this.mutationRevisions.stats();
+  }
+  getAutoFitResourceStats(): AutoFitResourceStats {
+    return { ...this.autoFitStats, chunkCellLimit: AUTO_FIT_CHUNK_CELLS };
+  }
+
+  resetAutoFitResourceStats(): void {
+    this.autoFitStats.windowRequests = 0;
+    this.autoFitStats.maxWindowCells = 0;
+    this.autoFitStats.scheduledChunks = 0;
+    this.autoFitStats.completedJobs = 0;
+    this.autoFitStats.cancelledJobs = 0;
+    this.autoFitStats.committedPatches = 0;
+  }
+
   setActiveSheet(id: SheetId): void {
     if (id === this.activeSheet) return;
     if (!this.store.getWorkbook().sheets.some((sheet) => sheet.id === id)) return;
 
     this.editor.cancel();
     this.validationEditor.cancel();
+    this.cancelAutoFit();
+    this.mutationRevisions.clear();
     this.activeSheet = id;
     this.activeSheetCache = null;
     const sheet = this.sheet();
@@ -1429,6 +1666,7 @@ export class GridImpl implements Grid {
 
     this.readOnly = readOnly;
     if (readOnly) {
+      this.cancelAutoFit();
       this.editor.cancel();
       this.validationEditor.cancel();
     }
@@ -2112,7 +2350,9 @@ export class GridImpl implements Grid {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.cancelAutoFit();
     this.datasourceController.destroy();
+    this.mutationRevisions.clear();
     this.renderCoordinator.destroy();
     this.editor.destroy();
     this.validationEditor.destroy();

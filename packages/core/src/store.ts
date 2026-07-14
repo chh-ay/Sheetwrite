@@ -199,6 +199,19 @@ export interface CompactRangeHistory {
   dispose(): void;
 }
 
+export interface RangeMutationAllocationStats {
+  readonly documentOperations: number;
+  readonly jsPatchObjects: number;
+  readonly ffiCalls: number;
+  readonly maxTransferredArrayLength: number;
+  readonly distinctStyleIds: number;
+  readonly historySnapshots: number;
+  readonly historySnapshotBytes: number;
+  readonly historyMaterializations: number;
+  readonly historyDisposals: number;
+  readonly styleDictionaryEntries: number;
+}
+
 export interface SheetwriteStoreOptions {
   storage?: "dense" | "paged";
   chunkRows?: number;
@@ -286,6 +299,17 @@ export class SheetwriteStore implements Store {
   private readonly condRulesSynced = new Map<SheetId, string>();
   private protectionResolver: ProtectionResolver | undefined;
   private mutationPolicy: MutationPolicyMode;
+  private readonly rangeMutationStats = {
+    documentOperations: 0,
+    jsPatchObjects: 0,
+    ffiCalls: 0,
+    maxTransferredArrayLength: 0,
+    distinctStyleIds: 0,
+    historySnapshots: 0,
+    historySnapshotBytes: 0,
+    historyMaterializations: 0,
+    historyDisposals: 0,
+  };
 
   private documentId?: string;
   private documentVersion?: number;
@@ -321,6 +345,30 @@ export class SheetwriteStore implements Store {
   ): void {
     this.protectionResolver = resolver;
     this.mutationPolicy = mode;
+  }
+
+  /** Internal allocation counters for deterministic range-mutation gates. */
+  getRangeMutationAllocationStats(): RangeMutationAllocationStats {
+    return {
+      ...this.rangeMutationStats,
+      styleDictionaryEntries: this.styles.table.length,
+    };
+  }
+
+  resetRangeMutationAllocationStats(): void {
+    for (const key of Object.keys(this.rangeMutationStats) as Array<
+      keyof typeof this.rangeMutationStats
+    >) {
+      this.rangeMutationStats[key] = 0;
+    }
+  }
+
+  private noteRangeMutationFfi(transferredArrayLength = 0): void {
+    this.rangeMutationStats.ffiCalls += 1;
+    this.rangeMutationStats.maxTransferredArrayLength = Math.max(
+      this.rangeMutationStats.maxTransferredArrayLength,
+      transferredArrayLength,
+    );
   }
 
   private handleOf(sheet: SheetId): number {
@@ -550,6 +598,7 @@ export class SheetwriteStore implements Store {
     }
     const rows = range.end.row - range.start.row + 1;
     const cols = range.end.col - range.start.col + 1;
+    this.noteRangeMutationFfi();
     const resource = this.wasm.captureRange(
       this.handleOf(range.sheet),
       range.start.row,
@@ -558,6 +607,8 @@ export class SheetwriteStore implements Store {
       cols,
     );
     if (!resource) return null;
+    this.rangeMutationStats.historySnapshots += 1;
+    this.rangeMutationStats.historySnapshotBytes += resource.byteLength();
 
     const formulas: Array<[number, string]> = [];
     for (const [key, source] of this.formulaSrc) {
@@ -597,6 +648,7 @@ export class SheetwriteStore implements Store {
       refs,
       toDocumentOp: (target) => {
         if (disposed) throw new Error("history range snapshot already disposed");
+        this.rangeMutationStats.historyMaterializations += 1;
         const kindsColumnMajor = resource.kinds();
         const numbersColumnMajor = this.wasm.snapshotNumbers(resource);
         const textsColumnMajor = this.wasm.snapshotTexts(resource);
@@ -645,6 +697,7 @@ export class SheetwriteStore implements Store {
         if (disposed) return;
         disposed = true;
         resource.free();
+        this.rangeMutationStats.historyDisposals += 1;
       },
     };
   }
@@ -1841,14 +1894,18 @@ export class SheetwriteStore implements Store {
         reason: effectiveTx.patches.length === 0 ? "empty" : "out-of-bounds",
       };
     }
+    this.rangeMutationStats.documentOperations += appliedPatches.length;
+    this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
 
     if (hasStructuralPatch) {
       this.syncFormulaSources();
       for (const sheet of this.workbook.sheets) {
+        this.noteRangeMutationFfi();
         this.wasm.recompute(this.handleOf(sheet.id));
       }
     } else {
       for (const sheet of touchedSheets) {
+        this.noteRangeMutationFfi();
         this.wasm.recompute(this.handleOf(sheet));
       }
     }
@@ -1902,10 +1959,12 @@ export class SheetwriteStore implements Store {
           const key = cellKey(patch.addr);
           this.refs.removeRef(key);
           this.formulaSrc.set(key, patch.value.src);
+          this.noteRangeMutationFfi();
           this.wasm.setFormula(handle, row, col, patch.value.src, styleId);
         } else if (patch.value.kind === "ref") {
           const key = cellKey(patch.addr);
           const literalAt: LiteralLookup = (a) => this.rawCell(a).resolved;
+          this.noteRangeMutationFfi();
           this.wasm.clearCell(handle, row, col, styleId);
           this.formulaSrc.delete(key);
           this.refs.setRef(patch.addr, patch.value.target, literalAt);
@@ -1915,6 +1974,7 @@ export class SheetwriteStore implements Store {
           const key = hasRefs || hasFormulaSources ? cellKey(patch.addr) : undefined;
           if (key && hasRefs) this.refs.removeRef(key);
           const value = patch.value.value;
+          this.noteRangeMutationFfi();
           if (typeof value === "number") this.wasm.setNumber(handle, row, col, value, styleId);
           else if (typeof value === "boolean") this.wasm.setBool(handle, row, col, value, styleId);
           else if (typeof value === "string") this.wasm.setString(handle, row, col, value, styleId);
@@ -1958,6 +2018,7 @@ export class SheetwriteStore implements Store {
         ) {
           return false;
         }
+        this.rangeMutationStats.jsPatchObjects += patch.cells.length;
         for (const cell of patch.cells) {
           const addr = {
             sheet: bounds.sheet,
@@ -2027,6 +2088,8 @@ export class SheetwriteStore implements Store {
         }
 
         this.clearHostValuesInRange(bounds);
+        this.rangeMutationStats.jsPatchObjects += exceptions.length;
+        this.noteRangeMutationFfi(cellCount);
         if (
           !this.wasm.setBlock(
             this.handleOf(bounds.sheet),
@@ -2089,12 +2152,21 @@ export class SheetwriteStore implements Store {
         ) {
           return false;
         }
+        this.noteRangeMutationFfi();
         const oldIds = this.wasm.rangeStyleIds(
           this.handleOf(bounds.sheet),
           bounds.start.row,
           bounds.start.col,
           bounds.end.row,
           bounds.end.col,
+        );
+        this.rangeMutationStats.distinctStyleIds = Math.max(
+          this.rangeMutationStats.distinctStyleIds,
+          oldIds.length,
+        );
+        this.rangeMutationStats.maxTransferredArrayLength = Math.max(
+          this.rangeMutationStats.maxTransferredArrayLength,
+          oldIds.length,
         );
         const newIds = new Uint32Array(oldIds.length);
         for (let i = 0; i < oldIds.length; i++) {
@@ -2103,6 +2175,7 @@ export class SheetwriteStore implements Store {
               ? 0
               : this.styles.intern({ ...this.styles.get(oldIds[i]!), ...patch.style });
         }
+        this.noteRangeMutationFfi(Math.max(oldIds.length, newIds.length));
         return this.wasm.remapRangeStyles(
           this.handleOf(bounds.sheet),
           bounds.start.row,
@@ -2127,6 +2200,7 @@ export class SheetwriteStore implements Store {
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
         if (clearContents) this.clearHostValuesInRange(bounds);
+        this.noteRangeMutationFfi();
         return this.wasm.clearRange(
           this.handleOf(bounds.sheet),
           bounds.start.row,

@@ -1,7 +1,13 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { DEFAULT_THEME, GridImpl, initSheetwrite, resolveThemeFromCss } from "../src/grid.js";
+import {
+  AUTO_FIT_CHUNK_CELLS,
+  DEFAULT_THEME,
+  GridImpl,
+  initSheetwrite,
+  resolveThemeFromCss,
+} from "../src/grid.js";
 import { createGridController } from "../src/grid-controller.js";
-import { SheetwriteStore } from "../src/store.js";
+import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.js";
 import type {
   CellScalar,
@@ -1076,6 +1082,243 @@ describe("Grid auto-fit", () => {
 
     expect(workbook.sheets[0]!.rowHeights?.get(0)).toBeGreaterThan(28);
     expect(workbook.sheets[0]!.columns[0]!.width).toBeGreaterThan(originalWidth);
+    grid.destroy();
+    store.dispose();
+  });
+  it("matches exact small results while bounding and yielding large row and column reads", () => {
+    const text = `${"wide ".repeat(40)}\nsecond wrapped line`;
+    const smallWorkbook = makeWorkbook(1);
+    const smallStore = new SheetwriteStore(smallWorkbook);
+    smallStore.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: text },
+          style: { wrap: true, fontSize: 18 },
+        },
+      ],
+    });
+    const smallGrid = new GridImpl(mountHost(), { workbook: smallWorkbook }, smallStore);
+    smallGrid.autoFitRows({
+      sheet: "s1",
+      start: { row: 0, col: 0 },
+      end: { row: 0, col: 0 },
+    });
+    smallGrid.autoFitColumns([0]);
+    const expectedHeight = smallWorkbook.sheets[0]!.rowHeights!.get(0)!;
+    const expectedWidth = smallWorkbook.sheets[0]!.columns[0]!.width;
+
+    const rowCount = AUTO_FIT_CHUNK_CELLS + 1;
+    const workbook = makeWorkbook(rowCount);
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: rowCount - 1, col: 0 },
+          value: { kind: "literal", value: text },
+          style: { wrap: true, fontSize: 18 },
+        },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
+    const scheduled = new Map<number, FrameRequestCallback>();
+    let nextFrame = 1;
+    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      const frame = nextFrame++;
+      scheduled.set(frame, callback);
+      return frame;
+    }) as typeof requestAnimationFrame;
+    globalThis.cancelAnimationFrame = ((frame: number): void => {
+      scheduled.delete(frame);
+    }) as typeof cancelAnimationFrame;
+    const drain = (): void => {
+      let steps = 0;
+      while (scheduled.size > 0) {
+        if (++steps > 100) throw new Error("auto-fit scheduler did not quiesce");
+        const [frame, callback] = scheduled.entries().next().value!;
+        scheduled.delete(frame);
+        callback(steps);
+      }
+    };
+
+    try {
+      grid.resetAutoFitResourceStats();
+      grid.autoFitRows({
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: rowCount - 1, col: 0 },
+      });
+      expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
+      expect(scheduled.size).toBe(1);
+      drain();
+      expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBe(expectedHeight);
+      expect(changes.at(-1)!.transaction.patches).toEqual([
+        {
+          op: "setRowMeta",
+          sheet: "s1",
+          row: rowCount - 1,
+          meta: { height: expectedHeight },
+        },
+      ]);
+      expect(grid.getAutoFitResourceStats()).toMatchObject({
+        windowRequests: 2,
+        maxWindowCells: AUTO_FIT_CHUNK_CELLS,
+        scheduledChunks: 2,
+        completedJobs: 1,
+        committedPatches: 1,
+      });
+      grid.undo();
+      expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBeUndefined();
+      grid.redo();
+      expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBe(expectedHeight);
+
+      grid.resetAutoFitResourceStats();
+      grid.autoFitColumns([0]);
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
+      drain();
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
+      expect(grid.getAutoFitResourceStats()).toMatchObject({
+        windowRequests: 2,
+        maxWindowCells: AUTO_FIT_CHUNK_CELLS,
+        scheduledChunks: 2,
+        completedJobs: 1,
+        committedPatches: 1,
+      });
+      grid.undo();
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
+    } finally {
+      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+      grid.destroy();
+      store.dispose();
+      smallGrid.destroy();
+      smallStore.dispose();
+    }
+  });
+
+  it("cancels chunked work on destroy without a late commit", () => {
+    const rowCount = AUTO_FIT_CHUNK_CELLS * 2;
+    const workbook = makeWorkbook(rowCount);
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: rowCount - 1, col: 0 },
+          value: { kind: "literal", value: "never measured ".repeat(20) },
+        },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const scheduled = new Map<number, FrameRequestCallback>();
+    let nextFrame = 1;
+    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      const frame = nextFrame++;
+      scheduled.set(frame, callback);
+      return frame;
+    }) as typeof requestAnimationFrame;
+    globalThis.cancelAnimationFrame = ((frame: number): void => {
+      scheduled.delete(frame);
+    }) as typeof cancelAnimationFrame;
+
+    try {
+      grid.resetAutoFitResourceStats();
+      grid.autoFitColumns([0]);
+      const [firstFrame, first] = scheduled.entries().next().value!;
+      scheduled.delete(firstFrame);
+      first(0);
+      const late = scheduled.values().next().value!;
+      expect(grid.getAutoFitResourceStats().windowRequests).toBe(1);
+      grid.destroy();
+      late(1);
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
+      expect(grid.getAutoFitResourceStats()).toMatchObject({
+        completedJobs: 0,
+        cancelledJobs: 1,
+        committedPatches: 0,
+      });
+    } finally {
+      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+      grid.destroy();
+      store.dispose();
+    }
+  });
+
+  it("invalidates an older chunked job when a newer auto-fit request starts", () => {
+    const rowCount = AUTO_FIT_CHUNK_CELLS + 1;
+    const workbook = makeWorkbook(rowCount);
+    const store = new SheetwriteStore(workbook);
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const scheduled = new Map<number, FrameRequestCallback>();
+    let nextFrame = 1;
+    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      const frame = nextFrame++;
+      scheduled.set(frame, callback);
+      return frame;
+    }) as typeof requestAnimationFrame;
+    globalThis.cancelAnimationFrame = ((frame: number): void => {
+      scheduled.delete(frame);
+    }) as typeof cancelAnimationFrame;
+
+    try {
+      grid.resetAutoFitResourceStats();
+      grid.autoFitColumns([0]);
+      const stale = scheduled.values().next().value!;
+      grid.autoFitRows({
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 0, col: 0 },
+      });
+      stale(0);
+      expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
+      expect(grid.getAutoFitResourceStats()).toMatchObject({
+        completedJobs: 1,
+        cancelledJobs: 1,
+        committedPatches: 0,
+      });
+    } finally {
+      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+      grid.destroy();
+      store.dispose();
+    }
+  });
+
+  it("rejects incomplete paged ranges before measuring loading sentinels", () => {
+    const workbook = makeWorkbook(20);
+    const store = new SheetwriteStore(workbook, undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1_000_000,
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.resetAutoFitResourceStats();
+
+    expect(() =>
+      grid.autoFitRows({
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 19, col: 2 },
+      }),
+    ).toThrow(IncompleteDataError);
+    expect(() => grid.autoFitColumns([0])).toThrow(IncompleteDataError);
+    expect(grid.getAutoFitResourceStats()).toMatchObject({
+      windowRequests: 0,
+      scheduledChunks: 0,
+      committedPatches: 0,
+    });
+
     grid.destroy();
     store.dispose();
   });
