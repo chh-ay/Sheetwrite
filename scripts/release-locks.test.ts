@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const fixtureDirectories = [
@@ -98,5 +101,35 @@ describe("immutable release consumer locks", () => {
       expect(build).toStartWith("npm ci --ignore-scripts");
       expect(build).not.toContain("npm install");
     }
+  });
+
+  it("rebinds only copied canonical tarball integrities", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-lock-"));
+    const lockPath = join(root, "package-lock.json");
+    const tarballPath = join(root, "sheetwrite-core-0.1.0.tgz");
+    await writeFile(tarballPath, "canonical bytes");
+    await writeFile(
+      lockPath,
+      `${JSON.stringify({
+        lockfileVersion: 3,
+        packages: {
+          "": {},
+          "node_modules/@sheetwrite/core": {
+            resolved: "file:artifacts/sheetwrite-core-0.1.0.tgz",
+            integrity: "sha512-stale",
+          },
+          "node_modules/react": {
+            resolved: "https://registry.npmjs.org/react/-/react-19.1.0.tgz",
+            integrity: "sha512-registry",
+          },
+        },
+      })}\n`,
+    );
+
+    await bindCanonicalTarballIntegrities(lockPath, new Map([["@sheetwrite/core", tarballPath]]));
+    const rebound = JSON.parse(await readFile(lockPath, "utf8")) as FixtureLock;
+    expect(rebound.packages?.["node_modules/@sheetwrite/core"]?.integrity).toMatch(/^sha512-/);
+    expect(rebound.packages?.["node_modules/@sheetwrite/core"]?.integrity).not.toBe("sha512-stale");
+    expect(rebound.packages?.["node_modules/react"]?.integrity).toBe("sha512-registry");
   });
 });

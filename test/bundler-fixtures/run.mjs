@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bindCanonicalTarballIntegrities } from "../../scripts/release-lock-integrity.mjs";
 
 const fixturesRoot = fileURLToPath(new URL(".", import.meta.url));
 const repositoryRoot = resolve(fixturesRoot, "../..");
@@ -97,11 +98,16 @@ await rm(join(repositoryRoot, "test-results/delivery-size/bundlers"), {
   force: true,
 });
 await mkdir(tarballRoot, { recursive: true });
+const canonicalTarballs = new Map();
 if (artifactDirectory === undefined) {
   for (const directory of packageDirectories) {
     const manifest = sourceManifests[packageDirectories.indexOf(directory)];
     if (manifest === undefined) throw new Error(`Missing source manifest for ${directory}`);
     await stageAndPack(directory, `sheetwrite-${basename(directory)}-${manifest.version}.tgz`);
+    canonicalTarballs.set(
+      manifest.name,
+      join(tarballRoot, `sheetwrite-${basename(directory)}-${manifest.version}.tgz`),
+    );
   }
 } else {
   const artifactRoot = resolve(repositoryRoot, artifactDirectory);
@@ -117,15 +123,34 @@ if (artifactDirectory === undefined) {
       throw new Error(`Missing canonical artifact for ${sourceManifest.name}`);
     }
     await cp(join(artifactRoot, artifact.path), join(tarballRoot, artifact.path));
+    canonicalTarballs.set(sourceManifest.name, join(tarballRoot, artifact.path));
   }
 }
 await rm(stagingRoot, { recursive: true, force: true });
 
 for (const fixture of ["vite", "webpack", "next"]) {
   const cwd = join(fixturesRoot, fixture);
+  const lockPath = join(cwd, "package-lock.json");
+  const originalLock = await readFile(lockPath, "utf8");
+  const manifest = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"));
+  const fixtureTarballs = new Map();
+  for (const packageName of Object.keys({
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+  })) {
+    if (!packageName.startsWith("@sheetwrite/")) continue;
+    const tarball = canonicalTarballs.get(packageName);
+    if (tarball === undefined) throw new Error(`Missing canonical tarball for ${packageName}`);
+    fixtureTarballs.set(packageName, tarball);
+  }
   await rm(join(cwd, "node_modules"), { recursive: true, force: true });
   console.log(`\n=== ${fixture} bundler fixture ===`);
-  await run("npm", ["run", "build"], cwd);
+  try {
+    await bindCanonicalTarballIntegrities(lockPath, fixtureTarballs);
+    await run("npm", ["run", "build"], cwd);
+  } finally {
+    await writeFile(lockPath, originalLock);
+  }
 }
 
 console.log("\nAll bundler fixtures passed");

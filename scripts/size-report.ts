@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { verifyReleaseArtifacts } from "./release-artifacts.js";
+import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
 export const SIZE_PROTOCOL_VERSION = 1;
 export const SIZE_TOOL_NAME = "sheetwrite-delivery-size";
@@ -620,11 +621,14 @@ async function measureClosure(
   await cp(join(repositoryRoot, "test/release-locks", name), consumerRoot, { recursive: true });
   const artifactRoot = join(consumerRoot, "artifacts");
   await mkdir(artifactRoot, { recursive: true });
+  const closureTarballs = new Map<string, string>();
   for (const packageName of dependencyNames) {
     const tarball = packed.get(packageName);
     if (tarball === undefined) throw new Error(`No packed tarball for ${packageName}`);
+    closureTarballs.set(packageName, tarball);
     await cp(tarball, join(artifactRoot, basename(tarball)));
   }
+  await bindCanonicalTarballIntegrities(join(consumerRoot, "package-lock.json"), closureTarballs);
   await runCommand(
     ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"],
     consumerRoot,

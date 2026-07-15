@@ -2,6 +2,7 @@ import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "no
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { verifyReleaseArtifacts } from "./release-artifacts.js";
+import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
 interface PackageManifest {
   name: string;
@@ -329,11 +330,14 @@ async function verifyNoExcelClosure(
   await cp(join(repositoryRoot, "test/release-locks", name), root, { recursive: true });
   const artifactRoot = join(root, "artifacts");
   await mkdir(artifactRoot, { recursive: true });
+  const localTarballs = new Map<string, string>();
   for (const localPackage of new Set([packageName, "@sheetwrite/core", "@sheetwrite/wasm"])) {
     const tarball = tarballs.get(localPackage);
     if (tarball === undefined) throw new Error(`Missing tarball for ${localPackage}`);
+    localTarballs.set(localPackage, tarball);
     await cp(tarball, join(artifactRoot, basename(tarball)));
   }
+  await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), localTarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
@@ -523,6 +527,7 @@ try {
   for (const tarball of tarballs.values()) {
     await cp(tarball, join(consumerArtifacts, basename(tarball)));
   }
+  await bindCanonicalTarballIntegrities(join(consumerRoot, "package-lock.json"), tarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumerRoot);
   await run(
     ["npm", "ls", "@sheetwrite/core", "@sheetwrite/wasm", "react", "svelte", "vue"],
