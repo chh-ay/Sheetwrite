@@ -28,11 +28,9 @@ import "@sheetwrite/svelte/styles.css";
 
 `defaultRows` seeds an uncontrolled grid and is never mutated. Changing its identity intentionally creates a new generation. Use `height` or `fill`; `fill` requires an already-sized ancestor.
 
-`onGridChange` observes the complete transaction. Do not persist only
-`event.changes`; use `event.transaction.patches` or attach `SyncCoordinator` to
-the bound `Grid` for mutation IDs, acknowledgements, retry, and remote ordering.
+`onGridChange` carries the complete transaction. Persist `event.transaction.patches`, not only `event.changes`; use `SyncCoordinator` for acknowledgements, retry, and remote ordering.
 
-WASM initializes on client mount. A `fallback` snippet renders while loading, `onInitializationError` observes failure, and `wasmSource` is the explicit-source escape hatch.
+WASM initializes on client mount. Use `fallback` while loading, `onInitializationError` for failures, and `wasmSource` for an explicit source.
 
 ## Advanced component
 
@@ -40,9 +38,9 @@ WASM initializes on client mount. A `fallback` snippet renders while loading, `o
 <SheetwriteGrid bind:grid {workbook} {data} fill />
 ```
 
-The bindable `grid` is published before `onReady({ grid, generation, reason })` and clears during replacement/unmount. Reset-bound inputs are `workbook`, `data`, `datasource`, `datasourceStorage`, `renderer`, `workerUrl`, and `renderers`; `theme`, `readOnly`, `config`, `overscan`, and `minColumns` update live.
+The bindable `grid` is published before `onReady({ grid, generation, reason })` and clears during replacement or unmount. Reset-bound inputs replace the generation; presentation props update live.
 
-Grid events are `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, and `onActiveSheetChange`. Native host change/scroll handlers remain available.
+Grid events cover changes, viewport, selection, editing, search, and active-sheet changes.
 
 For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://chh-ay.github.io/Sheetwrite/docs/start/installation/), [Svelte integration](https://chh-ay.github.io/Sheetwrite/docs/frameworks/svelte/), and [collaboration](https://chh-ay.github.io/Sheetwrite/docs/guides/collaboration/).
 

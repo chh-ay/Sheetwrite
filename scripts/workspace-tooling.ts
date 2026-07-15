@@ -1,6 +1,14 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+export const BUN_VERSION = "1.3.14";
+export const RUST_VERSION = "1.96.0";
+export const NODE_VERSION = "24.3.0";
+export const NPM_VERSION = "11.18.0";
+export const WASM_TARGET = "wasm32-unknown-unknown";
+export const CARGO_AUDIT_VERSION = "0.22.2";
+export const CARGO_LLVM_COV_VERSION = "0.8.7";
+
 export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/wasm",
   "@sheetwrite/core",

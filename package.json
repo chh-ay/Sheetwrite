@@ -13,7 +13,8 @@
     "bench"
   ],
   "engines": {
-    "bun": ">=1.3.0"
+    "bun": ">=1.3.0",
+    "node": ">=24.3.0 <25"
   },
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",

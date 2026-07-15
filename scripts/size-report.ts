@@ -853,6 +853,8 @@ async function buildSizeReport(reuseBundlers: boolean): Promise<SizeReport> {
       }
     }
 
+    const npmVersion = (await runCommand(["npm", "--version"])).trim();
+
     return {
       schemaVersion: SIZE_PROTOCOL_VERSION,
       protocolVersion: SIZE_PROTOCOL_VERSION,
@@ -861,6 +863,7 @@ async function buildSizeReport(reuseBundlers: boolean): Promise<SizeReport> {
         bun: Bun.version,
         next: bundlers.find((entry) => entry.name === "next")?.version ?? "missing",
         node: process.versions.node,
+        npm: npmVersion,
         vite: bundlers.find((entry) => entry.name === "vite")?.version ?? "missing",
         webpack: bundlers.find((entry) => entry.name === "webpack")?.version ?? "missing",
       },
