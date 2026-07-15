@@ -1,6 +1,6 @@
 ---
 title: "Sheetwrite | @sheetwrite/svelte"
-description: "Simple framework component that owns initialization and Grid lifetime."
+description: "Convenience component for local object rows."
 tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/svelte|.|Sheetwrite -->
@@ -8,7 +8,7 @@ tableOfContents: false
 
 <span class="api-status">variable</span>
 
-Simple framework component that owns initialization and Grid lifetime.
+Convenience component for local object rows. Bind `grid` to access the live `Grid`.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>

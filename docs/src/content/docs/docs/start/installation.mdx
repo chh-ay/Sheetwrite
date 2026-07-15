@@ -1,0 +1,123 @@
+---
+title: Installation
+description: Install Sheetwrite for Vanilla, React, Vue, or Svelte and initialize its WebAssembly runtime.
+---
+
+import { TabItem, Tabs } from "@astrojs/starlight/components";
+
+Choose a framework in the header once. Every framework-aware example uses that preference, including the quick starts below and the lifecycle guide.
+
+<Tabs syncKey="sheetwrite-framework">
+  <TabItem label="Vanilla">
+
+```sh verify
+npm install @sheetwrite/core
+```
+
+```ts partial="requires workbook and data declarations" title="Vanilla"
+import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import "@sheetwrite/core/styles.css";
+
+await initSheetwrite();
+const grid = createGrid(document.querySelector("#grid")!, { workbook, data });
+```
+
+The host owns initialization and must destroy the returned `Grid` when its DOM lifetime ends.
+
+  </TabItem>
+  <TabItem label="React">
+
+```sh verify
+npm install @sheetwrite/react
+```
+
+```tsx partial="requires component-owned columns and rows" title="React"
+import { Sheetwrite } from "@sheetwrite/react";
+import "@sheetwrite/react/styles.css";
+
+export function Workbook() {
+  return <Sheetwrite columns={columns} defaultRows={rows} height={520} />;
+}
+```
+
+The adapter initializes WASM after client mount. Use a client component boundary in server-rendered React hosts.
+
+  </TabItem>
+  <TabItem label="Vue">
+
+```sh verify
+npm install @sheetwrite/vue
+```
+
+```vue partial="requires component-owned columns and rows" title="Vue"
+<script setup lang="ts">
+import { Sheetwrite } from "@sheetwrite/vue";
+import "@sheetwrite/vue/styles.css";
+</script>
+
+<template>
+  <Sheetwrite :columns="columns" :default-rows="rows" height="520px" />
+</template>
+```
+
+The adapter initializes WASM after client mount. Use a client-only boundary in Nuxt and other server-rendered Vue hosts.
+
+  </TabItem>
+  <TabItem label="Svelte">
+
+```sh verify
+npm install @sheetwrite/svelte
+```
+
+```svelte partial="requires component-owned columns and rows" title="Svelte"
+<script lang="ts">
+  import { Sheetwrite } from "@sheetwrite/svelte";
+  import "@sheetwrite/svelte/styles.css";
+</script>
+
+<Sheetwrite {columns} defaultRows={rows} height="520px" />
+```
+
+The adapter initializes WASM after client mount. Use a client-only boundary when a SvelteKit route renders on the server.
+
+  </TabItem>
+</Tabs>
+
+## Runtime initialization
+
+Zero-argument `initSheetwrite()` is canonical for the imperative package. It is re-entrant: concurrent calls share one initialization, retries work after failure, and repeats after success are no-ops. Framework adapters call the same initializer on mount.
+
+Pass a source only for unsupported bundlers, public-asset policies, or controlled delivery:
+
+```ts partial="requires an explicit asset source" title="Explicit WASM source"
+await initSheetwrite(source);
+```
+
+Accepted sources are `BufferSource | URL | string | Request | WebAssembly.Module`. The raw binary remains exported as `@sheetwrite/wasm/wasm`.
+
+```ts partial="requires surrounding host state" title="Explicit asset examples"
+// Vite-family URL
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
+await initSheetwrite(wasmUrl);
+
+// webpack asset URL
+await initSheetwrite(new URL("@sheetwrite/wasm/wasm", import.meta.url));
+
+// Public-copy fallback
+await initSheetwrite("/sheetwrite_wasm_bg.wasm");
+```
+
+webpack and Next.js need no `IgnorePlugin`; package export conditions keep Node filesystem code out of browser graphs.
+
+## Failure UI and retries
+
+React accepts `fallback`; Vue and Svelte use fallback content or slots. Initialization failures reach `onInitializationError` or Vue's `initialization-error`. A changed explicit source or remount can retry after failure.
+
+## Optional feature assets
+
+Worker rendering and XLSX stay explicit. Import the Worker entry from `@sheetwrite/core/worker`. XLSX requires `@sheetwrite/xlsx` plus `import "@sheetwrite/xlsx/register"` before toolbar or programmatic export.
+
+- [Build the first workbook](/docs/start/first-grid/)
+- [Choose lifecycle ownership](/docs/frameworks/lifecycle/)
+- [Configure Worker rendering](/docs/guides/worker-rendering/)
+- [Configure XLSX import and export](/docs/guides/xlsx-export/)

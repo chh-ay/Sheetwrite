@@ -3,10 +3,10 @@ import { hasOpaqueForeground } from "./canvas-assertions.js";
 import { siteUrl } from "./playwright.config.js";
 
 const REACT_URL = siteUrl("/react/");
-const GRID = ".example-grid .sheetwrite";
+const GRID = ".sw-demo-grid .sheetwrite";
 const CANVAS = `${GRID} .sheetwrite-canvas`;
-const INITIAL_CUSTOMER = "Customer 000001";
-const SCROLLED_CUSTOMER = "Customer 000101";
+const INITIAL_CUSTOMER = "Account 000001";
+const SCROLLED_CUSTOMER = "Account 000101";
 const WORKER_ASSET = /\/_astro\/worker-[A-Za-z0-9_-]+\.js$/;
 
 interface BrowserErrors {
@@ -88,7 +88,7 @@ test("production Worker renderer loads, paints, edits, and scrolls", async ({ pa
 
   await page.goto(REACT_URL);
   const renderer = page.getByTestId("renderer");
-  await expect(renderer).toContainText("Requested: canvas · Active: canvas");
+  await expect(renderer).toContainText("Requested: Main thread · Active: Main thread");
   await expect.poll(() => accessibilityValues(page)).toContain(INITIAL_CUSTOMER);
 
   const capabilities = await page.evaluate(() => ({
@@ -106,8 +106,8 @@ test("production Worker renderer loads, paints, edits, and scrolls", async ({ pa
     transferableCanvas: true,
   });
 
-  await page.getByRole("checkbox", { name: "Worker renderer" }).check();
-  await expect(renderer).toContainText("Requested: worker · Active: worker");
+  await page.getByRole("radio", { name: "Web Worker" }).click();
+  await expect(renderer).toContainText("Requested: Web Worker · Active: Web Worker");
   await expect(renderer).toHaveAttribute("data-fallback-count", "0");
   await expect
     .poll(() => frameGeneration(page), { message: "Worker never acknowledged a frame" })
@@ -146,13 +146,13 @@ test("production Worker renderer loads, paints, edits, and scrolls", async ({ pa
   expect(errors.worker).toEqual([]);
   expect(errors.console).toEqual([]);
 
-  await page.getByRole("checkbox", { name: "Worker renderer" }).uncheck();
-  await expect(renderer).toContainText("Requested: canvas · Active: canvas");
+  await page.getByRole("radio", { name: "Main thread" }).click();
+  await expect(renderer).toContainText("Requested: Main thread · Active: Main thread");
   await expect
     .poll(() => page.workers().length, { message: "Worker survived renderer teardown" })
     .toBe(0);
   await expect(page.locator(`${GRID} .sheetwrite-canvas`)).toHaveCount(1);
-  await expect(page.locator(".example-grid > .sheetwrite")).toHaveCount(1);
+  await expect(page.locator(".sw-demo-grid > .sheetwrite")).toHaveCount(1);
 });
 
 test("production Worker renderer falls back after a module-load failure", async ({ page }) => {
@@ -165,10 +165,10 @@ test("production Worker renderer falls back after a module-load failure", async 
 
   await page.goto(REACT_URL);
   const renderer = page.getByTestId("renderer");
-  await expect(renderer).toContainText("Requested: canvas · Active: canvas");
-  await page.getByRole("checkbox", { name: "Worker renderer" }).check();
+  await expect(renderer).toContainText("Requested: Main thread · Active: Main thread");
+  await page.getByRole("radio", { name: "Web Worker" }).click();
 
-  await expect(renderer).toContainText("Requested: worker · Active: canvas");
+  await expect(renderer).toContainText("Requested: Web Worker · Active: Main thread");
   await expect(renderer).toContainText(/Fallback: .+/);
   await expect(renderer).toHaveAttribute("data-fallback-count", "1");
   expect(failedWorkerUrls).toHaveLength(1);
@@ -185,13 +185,13 @@ test("production Worker renderer falls back after a module-load failure", async 
   await expect.poll(() => canvasBodyPainted(page)).toBe(true);
 
   await expect(page.locator(`${GRID} .sheetwrite-canvas`)).toHaveCount(1);
-  await expect(page.locator(".example-grid > .sheetwrite")).toHaveCount(1);
+  await expect(page.locator(".sw-demo-grid > .sheetwrite")).toHaveCount(1);
   expect(errors.page).toEqual([]);
   expect(errors.worker).toEqual([]);
 
-  await page.getByRole("checkbox", { name: "Worker renderer" }).uncheck();
-  await expect(renderer).toContainText("Requested: canvas · Active: canvas");
+  await page.getByRole("radio", { name: "Main thread" }).click();
+  await expect(renderer).toContainText("Requested: Main thread · Active: Main thread");
   await expect(renderer).toHaveAttribute("data-fallback-count", "0");
   await expect(page.locator(`${GRID} .sheetwrite-canvas`)).toHaveCount(1);
-  await expect(page.locator(".example-grid > .sheetwrite")).toHaveCount(1);
+  await expect(page.locator(".sw-demo-grid > .sheetwrite")).toHaveCount(1);
 });

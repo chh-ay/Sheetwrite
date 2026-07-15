@@ -7,20 +7,36 @@ description: Integrate Sheetwrite with Svelte bindings, callbacks, and reset own
 
 The binding is populated before `onReady` and cleared before reset or unmount. A reset publishes a new generation and reason; coordinators attached to the previous grid must be destroyed and recreated.
 
-```svelte partial="requires component-owned columns and rows" title="Svelte adapter"
+```svelte partial="requires application-owned rows" title="Svelte adapter"
 <script lang="ts">
-  import { Sheetwrite } from "@sheetwrite/svelte";
+  import {
+    Sheetwrite,
+    type Grid,
+    type GridReadyEvent,
+    type SimpleColumn,
+  } from "@sheetwrite/svelte";
+  import type { ChangeEvent, Transaction } from "@sheetwrite/core";
   import "@sheetwrite/svelte/styles.css";
 
-  let grid;
+  type Row = { name: string; amount: number };
+  interface Props {
+    columns: readonly SimpleColumn<Row>[];
+    rows: readonly Row[];
+    save: (transaction: Transaction) => void;
+    onReady: (event: GridReadyEvent) => void;
+  }
+
+  let { columns, rows, save, onReady }: Props = $props();
+  let grid: Grid | undefined;
+  const handleGridChange = (event: ChangeEvent) => save(event.transaction);
 </script>
 
 <Sheetwrite
   {columns}
   defaultRows={rows}
   bind:grid
-  onGridChange={(event) => save(event.transaction)}
-  onReady={({ generation, reason }) => console.log(generation, reason)}
+  onGridChange={handleGridChange}
+  {onReady}
 />
 ```
 

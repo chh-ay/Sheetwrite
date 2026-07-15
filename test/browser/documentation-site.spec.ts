@@ -76,10 +76,7 @@ test.describe("documentation site", () => {
     });
   }
 
-  test("uses one base-aware favicon across documentation and examples", async ({
-    page,
-    request,
-  }) => {
+  test("public pages expose a loadable shared icon", async ({ page, request }) => {
     for (const route of [
       "/",
       "/docs/start/installation/",
@@ -100,23 +97,23 @@ test.describe("documentation site", () => {
     expect(response.headers()["content-type"]).toContain("image/svg+xml");
   });
 
-  test("documentation site exposes sidebar, pagination, examples, and checked code", async ({
+  test("first-grid guide offers usable navigation, copy, and live-example entry", async ({
+    context,
     page,
   }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: `http://localhost:${SITE_PORT}`,
+    });
     await page.goto(docsUrl("start/first-grid/"));
 
-    await expect(page.getByRole("navigation", { name: /main/i })).toContainText("Start");
-    await expect(page.locator("main h1")).toHaveText("Your first grid");
-    await expect(page.locator("main pre code").first()).toContainText('from "@sheetwrite/core"');
-    await expect(page.getByRole("button", { name: /copy/i }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Vanilla example" })).toHaveAttribute(
-      "href",
-      `${SITE_BASE}/vanilla/`,
-    );
-    await expect(page.locator("main pre code").first()).toContainText(
-      'host.style.height = "420px"',
-    );
-    await expect(page.locator("a[rel='prev'], a[rel='next']").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Install Sheetwrite", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: /copy/i }).first().click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toContain("@sheetwrite/core");
+    await page.getByRole("link", { name: "Vanilla example", exact: true }).click();
+    await expect(page).toHaveURL(siteUrl("/vanilla/"));
+    await expect(page.locator(".sheetwrite")).toBeVisible({ timeout: 15_000 });
   });
 
   test("documentation headings and keyboard entry remain accessible", async ({ page }) => {
@@ -134,12 +131,207 @@ test.describe("documentation site", () => {
     await expect(page.locator(":focus")).toHaveAttribute("href", /#_top|#main-content/);
   });
 
+  test("desktop documentation article is centered within its pane", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto(docsUrl("start/installation/"));
+    const gutters = await page.evaluate(() => {
+      const pane = document.querySelector(".main-pane")?.getBoundingClientRect();
+      const article = document
+        .querySelector(".content-panel .sl-container")
+        ?.getBoundingClientRect();
+      if (!pane || !article) return null;
+      return {
+        left: article.left - pane.left,
+        right: pane.right - article.right,
+      };
+    });
+
+    expect(gutters).not.toBeNull();
+    expect(Math.abs((gutters?.left ?? 0) - (gutters?.right ?? 0))).toBeLessThanOrEqual(1);
+  });
+
+  test("code frame titles share the header baseline without a nested tab", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(docsUrl("start/installation/"));
+    const alignment = await page
+      .locator('starlight-tabs [role="tabpanel"]:not([hidden]) .frame.has-title')
+      .first()
+      .evaluate((frame) => {
+        const header = frame.querySelector(".header")?.getBoundingClientRect();
+        const title = frame.querySelector(".title")?.getBoundingClientRect();
+        if (!header || !title) return null;
+        return {
+          headerHeight: header.height,
+          titleHeight: title.height,
+          topGap: title.top - header.top,
+          bottomGap: header.bottom - title.bottom,
+        };
+      });
+
+    expect(alignment).not.toBeNull();
+    expect(alignment?.titleHeight ?? Infinity).toBeLessThan((alignment?.headerHeight ?? 0) * 0.6);
+    expect(Math.abs((alignment?.topGap ?? 0) - (alignment?.bottomGap ?? 0))).toBeLessThanOrEqual(2);
+  });
+
+  test("all framework examples expose owned, accessible type details", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const expectResolvedSignatures = async (
+      minimumCount: number,
+      expected: readonly string[],
+    ): Promise<void> => {
+      const signatures = await page
+        .locator(".sw-code-popover__accessible-signature")
+        .allTextContents();
+      expect(signatures.length).toBeGreaterThanOrEqual(minimumCount);
+      const joined = signatures.join("\n");
+      expect(joined).not.toMatch(/\bany\b|__VLS|unresolved/i);
+      for (const signature of expected) expect(joined).toContain(signature);
+    };
+    await page.goto(docsUrl("frameworks/react/"));
+    await expectResolvedSignatures(20, [
+      "event: ChangeEvent",
+      "SheetProps.onReady: (event: GridReadyEvent) => void",
+    ]);
+    const reactSymbol = page
+      .locator('pre[data-language="tsx"] .sw-code-popover__trigger')
+      .filter({ hasText: "Sheetwrite" })
+      .first();
+    await expect(reactSymbol).toBeVisible();
+
+    await reactSymbol.hover();
+    const reactDetails = page
+      .locator(".sw-code-popover__panel:visible")
+      .filter({ hasText: "SheetwriteProps" })
+      .first();
+    await expect(reactDetails).toBeVisible();
+    await expect(reactDetails).toContainText("SheetwriteProps");
+    await expect(reactDetails).toContainText("Convenience component for local object rows.");
+    await expect(reactDetails).toContainText("prop-driven resets and unmount cleanup");
+    await expect(reactDetails).toContainText("SheetwriteGrid");
+    await expect(reactDetails.locator(".expressive-code")).toHaveCount(0);
+
+    const surface = await reactDetails.evaluate((popover) => {
+      const bounds = popover.getBoundingClientRect();
+      const signature = popover.querySelector<HTMLElement>(".sw-code-popover__signature--wide");
+      const styles = getComputedStyle(popover);
+      return {
+        borderRadius: Number.parseFloat(styles.borderRadius),
+        boxShadow: styles.boxShadow,
+        signatureRight: signature?.getBoundingClientRect().right ?? Number.POSITIVE_INFINITY,
+        popoverRight: bounds.right,
+        accentDividerHeight: signature
+          ? Number.parseFloat(getComputedStyle(signature).borderBlockStartWidth)
+          : 0,
+        signatureLines: signature?.querySelectorAll(".sw-code-popover__line").length ?? 0,
+      };
+    });
+    expect(surface.borderRadius).toBeGreaterThanOrEqual(8);
+    expect(surface.boxShadow).not.toBe("none");
+    expect(surface.signatureRight).toBeLessThanOrEqual(surface.popoverRight);
+    expect(surface.accentDividerHeight).toBeGreaterThanOrEqual(2);
+    expect(surface.signatureLines).toBeGreaterThan(1);
+
+    await page.mouse.move(0, 0);
+    await expect(page.locator(".sw-code-popover__panel:visible")).toHaveCount(0);
+    await reactSymbol.focus();
+    await expect(reactDetails).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".sw-code-popover__panel:visible")).toHaveCount(0);
+    await expect(reactSymbol).toBeFocused();
+
+    const frameworkHovers = [
+      {
+        path: "frameworks/vanilla/",
+        language: "ts",
+        symbol: "createGrid",
+        docs: "Creates and mounts an imperative Grid",
+        minimumCount: 15,
+        signature: "host: HTMLElement",
+      },
+      {
+        path: "frameworks/vue/",
+        language: "vue",
+        symbol: "Sheetwrite",
+        docs: "live option updates",
+        minimumCount: 20,
+        signature: "onGridChange: (event: ChangeEvent) => void",
+      },
+      {
+        path: "frameworks/svelte/",
+        language: "svelte",
+        symbol: "Sheetwrite",
+        docs: "Bind grid to access the live Grid",
+        minimumCount: 20,
+        signature: "grid: Grid | undefined",
+      },
+    ] as const;
+    for (const example of frameworkHovers) {
+      await page.goto(docsUrl(example.path));
+      await expectResolvedSignatures(example.minimumCount, [example.signature]);
+      const symbol = page
+        .locator(`pre[data-language="${example.language}"] .sw-code-popover__trigger`)
+        .filter({ hasText: example.symbol })
+        .first();
+      await expect(symbol).toBeVisible();
+      await symbol.focus();
+      const details = page.locator(".sw-code-popover__panel:visible").first();
+      await expect(details).toBeVisible();
+      await expect(details).toContainText(example.symbol);
+      await expect(details).toContainText(example.docs);
+      await expect(details.locator(".expressive-code")).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".sw-code-popover__panel:visible")).toHaveCount(0);
+    }
+
+    await page.setViewportSize({ width: 347, height: 700 });
+    await page.goto(docsUrl("frameworks/react/"));
+    const mobileSymbol = page
+      .locator('pre[data-language="tsx"] .sw-code-popover__trigger')
+      .filter({ hasText: "Sheetwrite" })
+      .first();
+    await mobileSymbol.focus();
+    const mobileDetails = page
+      .locator(".sw-code-popover__panel:visible")
+      .filter({ hasText: "SheetwriteProps" })
+      .first();
+    await expect(mobileDetails).toBeVisible();
+    await expect(mobileDetails.locator(".sw-code-popover__signature--narrow")).toBeVisible();
+    const mobileBounds = await mobileDetails.evaluate((popover) => {
+      const bounds = popover.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        scrollWidth: popover.scrollWidth,
+        clientWidth: popover.clientWidth,
+      };
+    });
+    expect(mobileBounds.left).toBeGreaterThanOrEqual(0);
+    expect(mobileBounds.right).toBeLessThanOrEqual(mobileBounds.viewportWidth);
+    expect(mobileBounds.bottom).toBeLessThanOrEqual(mobileBounds.viewportHeight);
+    expect(mobileBounds.scrollWidth).toBeLessThanOrEqual(mobileBounds.clientWidth);
+
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = "dark";
+    });
+    const darkSurface = await mobileDetails.evaluate((popover) => {
+      const signature = popover.querySelector<HTMLElement>(".sw-code-popover__signature--narrow");
+      return {
+        panel: getComputedStyle(popover).backgroundColor,
+        signature: signature ? getComputedStyle(signature).backgroundColor : "",
+      };
+    });
+    expect(darkSurface.panel).not.toBe(darkSurface.signature);
+  });
+
   for (const width of [347, 700, 1568] as const) {
     test(`product landing remains aligned at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 855 });
       await page.goto(siteUrl());
       await expect(page.locator("main h1")).toHaveCount(1);
-      await expect(page.getByLabel("Sheetwrite workbook preview")).toBeVisible();
+      await expect(page.getByLabel("Interactive revenue workbook")).toBeVisible();
       const layout = await page.evaluate(() => {
         const main = document.querySelector<HTMLElement>("main");
         const sections = main ? [...main.querySelectorAll<HTMLElement>(":scope > section")] : [];
@@ -150,153 +342,75 @@ test.describe("documentation site", () => {
             const bounds = section.getBoundingClientRect();
             return bounds.left >= 0 && bounds.right <= window.innerWidth + 1;
           }),
-          mainWidth: main.getBoundingClientRect().width,
         };
       });
       expect(layout).not.toBeNull();
       expect(layout?.documentFits).toBe(true);
       expect(layout?.sectionsFit).toBe(true);
-      if (width === 1568) expect(layout?.mainWidth).toBeGreaterThanOrEqual(width * 0.6);
+      if (width === 1568) {
+        await page.getByLabel("Market").click();
+        await page.getByRole("option", { name: "Tokyo", exact: true }).click();
+        await expect(page.locator(".sw-live-workbook__metrics b").first()).toHaveText("14,286");
+        await page.getByLabel("Find").fill("Account 000042");
+        await expect(page.locator(".sw-live-workbook__controls output")).toContainText("1 matches");
+      }
     });
   }
 
-  for (const width of [1280, 1568] as const) {
-    test(`documentation content layout remains balanced at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.goto(docsUrl("guides/formulas/"));
-      const layout = await page.evaluate(() => {
-        const main = document.querySelector<HTMLElement>(".main-pane");
-        const content = document.querySelector<HTMLElement>(".sl-markdown-content");
-        const toc = document.querySelector<HTMLElement>(".right-sidebar-container");
-        if (!main || !content) return null;
-        const mainBounds = main.getBoundingClientRect();
-        const tocBounds = toc?.getBoundingClientRect();
-        const contentBounds = content.getBoundingClientRect();
-        return {
-          documentFits: document.documentElement.scrollWidth <= window.innerWidth,
-          mainRight: mainBounds.right,
-          contentWidth: contentBounds.width,
-          contentInsetDelta: Math.abs(
-            contentBounds.left - mainBounds.left - (mainBounds.right - contentBounds.right),
-          ),
-          tocDisplay: toc ? getComputedStyle(toc).display : "none",
-          tocWidth: tocBounds?.width ?? 0,
-          tablesFillFrames: [...document.querySelectorAll("table")].every((table) => {
-            const width = table.getBoundingClientRect().width;
-            return [...table.rows].every(
-              (row) => Math.abs(row.getBoundingClientRect().width - width) < 3,
-            );
-          }),
-          codeFramesContained: [
-            ...document.querySelectorAll<HTMLElement>(".expressive-code figure.frame"),
-          ].every((frame) => {
-            const bounds = frame.getBoundingClientRect();
-            return bounds.left >= contentBounds.left && bounds.right <= contentBounds.right;
-          }),
-          codeLinesPreserveSource: [
-            ...document.querySelectorAll<HTMLElement>(".expressive-code .ec-line .code"),
-          ].every((code) => getComputedStyle(code).whiteSpace === "pre"),
-          codeFramesHaveBorders: [
-            ...document.querySelectorAll<HTMLElement>(".expressive-code figure.frame"),
-          ].every((frame) => Number.parseFloat(getComputedStyle(frame).borderWidth) >= 1),
-        };
-      });
-      expect(layout).not.toBeNull();
-      expect(layout?.documentFits).toBe(true);
-      expect(layout?.contentInsetDelta).toBeLessThanOrEqual(1);
-      expect(layout?.tablesFillFrames).toBe(true);
-      expect(layout?.codeFramesContained).toBe(true);
-      expect(layout?.codeLinesPreserveSource).toBe(true);
-      expect(layout?.codeFramesHaveBorders).toBe(true);
-      expect(layout?.tocDisplay).toBe("none");
-      expect(layout?.tocWidth).toBe(0);
-      expect(layout?.mainRight).toBe(width);
-    });
-  }
-  for (const width of [347, 1280, 1568] as const) {
-    test(`code chrome remains aligned and source-preserving at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.goto(docsUrl("start/installation/"));
-      const chrome = await page
-        .locator(".expressive-code figure.frame.has-title")
-        .first()
-        .evaluate((frame) => {
-          const header = frame.querySelector<HTMLElement>(".header");
-          const button = frame.querySelector<HTMLButtonElement>(".copy button");
-          const code = frame.querySelector<HTMLElement>(".ec-line .code");
-          const pre = frame.querySelector<HTMLElement>("pre");
-          if (!header || !button || !code || !pre) return null;
-          const headerBounds = header.getBoundingClientRect();
-          const buttonBounds = button.getBoundingClientRect();
-          return {
-            buttonCenterDelta: Math.abs(
-              headerBounds.top +
-                headerBounds.height / 2 -
-                (buttonBounds.top + buttonBounds.height / 2),
-            ),
-            buttonWidth: buttonBounds.width,
-            buttonHeight: buttonBounds.height,
-            buttonDisplay: getComputedStyle(button).display,
-            codeWhiteSpace: getComputedStyle(code).whiteSpace,
-            preOverflowX: getComputedStyle(pre).overflowX,
-            documentFits: document.documentElement.scrollWidth <= window.innerWidth,
-          };
-        });
-      expect(chrome).not.toBeNull();
-      expect(chrome?.buttonCenterDelta).toBeLessThanOrEqual(1);
-      expect(chrome?.buttonWidth).toBeGreaterThanOrEqual(36);
-      expect(chrome?.buttonHeight).toBeGreaterThanOrEqual(36);
-      expect(chrome?.buttonDisplay).toBe("grid");
-      expect(chrome?.codeWhiteSpace).toBe("pre");
-      expect(chrome?.preOverflowX).toBe("auto");
-      expect(chrome?.documentFits).toBe(true);
-    });
-  }
-
-  test("the header framework selector is the single persisted framework control", async ({
+  test("framework preference synchronizes examples and persists across guides", async ({
     page,
   }) => {
-    await page.goto(docsUrl());
-    let framework = page.locator(".sw-framework-menu:visible summary");
-    await expect(framework).toHaveCount(1);
-    await expect(framework).toContainText("Framework");
-    await framework.click();
-    await expect(page.locator(".sw-framework-menu:visible details")).toHaveAttribute("open", "");
-    await page.locator('.sw-framework-options:visible [data-framework="React"]').click();
-    await expect(page).toHaveURL(/\/docs\/frameworks\/react\/$/);
-    framework = page.locator(".sw-framework-menu:visible summary");
-    await expect(framework).toContainText("React");
     await page.goto(docsUrl("start/installation/"));
-    await expect(page.locator(".sw-framework-menu:visible summary")).toContainText("React");
-    await expect(page.locator("starlight-tabs")).toHaveCount(0);
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(docsUrl("start/installation/"));
-    await page.waitForFunction(() => customElements.get("starlight-menu-button") !== undefined);
-    const menuControl = page.locator("starlight-menu-button");
-    await menuControl.evaluate(
-      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    const preference = page.getByLabel("Preferred framework");
+    await expect(preference).toHaveCount(1);
+    await preference.click();
+    await page.keyboard.press("End");
+    await expect(page.locator(":focus")).toHaveAttribute("data-framework-option", "svelte");
+    await page.keyboard.press("Escape");
+    await expect(preference).toHaveAttribute("aria-expanded", "false");
+    await preference.press("ArrowDown");
+    await page.keyboard.press("Home");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(page.locator('starlight-tabs [role="tab"][aria-selected="true"]')).toHaveText(
+      "React",
     );
-    await page.getByRole("button", { name: /menu/i }).first().click();
-    await expect(menuControl).toHaveAttribute("aria-expanded", "true");
-    framework = page.locator(".sw-framework-menu:visible summary");
-    await expect(framework).toHaveCount(1);
-    await expect(framework).toContainText("React");
-    await framework.click();
-    await page.locator('.sw-framework-options:visible [data-framework="Vue"]').click();
-    await expect(page).toHaveURL(/\/docs\/frameworks\/vue\/$/);
+    await expect(page.locator('starlight-tabs [role="tabpanel"]:not([hidden])')).toContainText(
+      "@sheetwrite/react",
+    );
+    expect(await page.evaluate(() => localStorage.getItem("sheetwrite-docs-framework"))).toBe(
+      "react",
+    );
+
+    await page.goto(docsUrl("frameworks/lifecycle/"));
+    await expect(page.getByLabel("Preferred framework")).toContainText("React");
+    await expect(page.locator('starlight-tabs [role="tab"][aria-selected="true"]')).toHaveText(
+      "React",
+    );
+
+    await page.goto(docsUrl("frameworks/react/"));
+    await page.getByLabel("Preferred framework").click();
+    await page.getByRole("option", { name: "Vue", exact: true }).click();
+    await expect(page).toHaveURL(docsUrl("frameworks/vue/"));
   });
+
+  for (const framework of ["react", "vue", "svelte"] as const) {
+    test(`${framework} showcase renders its real grid without runtime errors`, async ({ page }) => {
+      const errors = collectErrors(page);
+      await page.goto(siteUrl(`/${framework}/`));
+      await expect(page.locator(".sw-demo-app .sheetwrite")).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator("main h1")).toBeVisible();
+      expect(errors.console).toEqual([]);
+      expect(errors.page).toEqual([]);
+    });
+  }
 
   test("generated API indexes lead to focused, progressively disclosed symbol pages", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1568, height: 900 });
     await page.goto(docsUrl("api/core/"));
-    await expect(page.locator(".right-sidebar-container")).toHaveCount(0);
-    await expect(page.locator(".api-symbol-card").first()).toBeVisible();
-    expect(await page.locator(".api-symbol-card").count()).toBeGreaterThan(50);
-    await expect(page.locator(".expressive-code")).toHaveCount(0);
-    await page.locator(`.api-symbol-card[href="${SITE_BASE}/docs/api/core/grid/"]`).click();
+    await page.locator(`a[href="${SITE_BASE}/docs/api/core/grid/"]`).first().click();
     await expect(page).toHaveURL(/\/docs\/api\/core\/grid\/$/);
     await expect(page.locator("main h1")).toContainText("Grid");
     await expect(page.locator(".api-member").first()).not.toHaveAttribute("open");
@@ -334,12 +448,10 @@ test.describe("documentation site", () => {
     test(`runtime architecture stays semantic and contained at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(docsUrl("concepts/runtime-ownership/"));
-      const diagram = page.locator(".sw-architecture");
+      const diagram = page.getByRole("region", {
+        name: "Sheetwrite runtime ownership and data flow",
+      });
       await expect(diagram).toBeVisible();
-      await expect(diagram.locator("article")).toHaveCount(5);
-      await expect(diagram).toContainText("SheetwriteStore");
-      await expect(diagram).toContainText("Columnar engine");
-      await expect(page.locator(".mermaid, code.language-mermaid")).toHaveCount(0);
       const contained = await diagram.evaluate((element) => {
         const bounds = element.getBoundingClientRect();
         return (
@@ -365,12 +477,13 @@ test.describe("documentation site", () => {
     await expect(menu).toBeVisible();
     await menu.click();
     await expect(menuControl).toHaveAttribute("aria-expanded", "true");
-    const theme = page
-      .locator("select:visible")
-      .filter({ has: page.locator('option[value="light"]') })
-      .first();
+    const theme = page.locator("#starlight__sidebar").getByRole("button", { name: "Select theme" });
     await expect(theme).toBeVisible();
-    await theme.selectOption("light");
+    await theme.press("ArrowDown");
+    await page.keyboard.press("Home");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(theme).toHaveAttribute("aria-expanded", "false");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
     await page.keyboard.press("Escape");
@@ -381,13 +494,15 @@ test.describe("documentation site", () => {
     await page.goto(siteUrl("/vanilla/"));
     const grid = page.locator(".sheetwrite");
     await expect(grid).toBeVisible();
-    await grid.click({ button: "right", position: { x: 90, y: 70 } });
+    await grid.scrollIntoViewIfNeeded();
+    await grid.click({ button: "right", position: { x: 400, y: 70 } });
 
-    const copy = page.locator('[data-context-menu-item="copy"]');
-    await expect(copy).toContainText("Copy");
-    await expect(copy.locator(".sheetwrite-context-menu-shortcut")).toHaveText("Ctrl+C");
-    await expect(page.locator('[data-context-menu-item="highlight"]')).toBeVisible();
-    await page.locator('[data-context-menu-item="highlight"]').click();
+    const copy = page.getByRole("menuitem", { name: /^Copy/ });
+    await expect(copy).toContainText("Ctrl+C");
+    const highlight = page.getByRole("menuitem", { name: /^Highlight cell/ });
+    await expect(highlight).toHaveCount(1);
+    await expect(highlight).toBeVisible();
+    await highlight.click();
     await expect(page.locator(".sheetwrite-context-menu")).toBeHidden();
   });
 

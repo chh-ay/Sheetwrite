@@ -1,0 +1,130 @@
+<script>
+  import {
+    autoUpdate,
+    computePosition,
+    flip,
+    offset,
+    shift,
+    size,
+  } from "@floating-ui/dom";
+
+  interface OpenPopover {
+    trigger: HTMLElement;
+    panel: HTMLElement;
+    stopPositioning: () => void;
+  }
+
+  const initializedTriggers = new WeakSet<HTMLElement>();
+  let activePopover: OpenPopover | null = null;
+  let closeTimer: number | undefined;
+
+  function cancelScheduledClose(): void {
+    if (closeTimer === undefined) return;
+    window.clearTimeout(closeTimer);
+    closeTimer = undefined;
+  }
+
+  function closePopover(): void {
+    cancelScheduledClose();
+    if (!activePopover) return;
+    activePopover.stopPositioning();
+    activePopover.panel.hidden = true;
+    activePopover.panel.setAttribute("aria-hidden", "true");
+    activePopover.trigger.removeAttribute("data-popover-open");
+    activePopover = null;
+  }
+
+  function scheduleClose(trigger: HTMLElement, panel: HTMLElement): void {
+    cancelScheduledClose();
+    closeTimer = window.setTimeout(() => {
+      if (trigger.matches(":hover, :focus") || panel.matches(":hover")) return;
+      closePopover();
+    }, 90);
+  }
+
+  async function positionPopover(trigger: HTMLElement, panel: HTMLElement): Promise<void> {
+    const { x, y, placement } = await computePosition(trigger, panel, {
+      strategy: "fixed",
+      placement: "bottom-start",
+      middleware: [
+        offset(8),
+        flip({
+          padding: 12,
+          fallbackPlacements: ["top-start", "bottom-end", "top-end"],
+        }),
+        shift({ padding: 12 }),
+        size({
+          padding: 12,
+          apply({ availableHeight, availableWidth, elements }) {
+            Object.assign(elements.floating.style, {
+              maxWidth: `${Math.min(620, availableWidth)}px`,
+              maxHeight: `${Math.min(480, availableHeight)}px`,
+            });
+          },
+        }),
+      ],
+    });
+    panel.dataset.placement = placement;
+    Object.assign(panel.style, {
+      position: "fixed",
+      left: `${x}px`,
+      top: `${y}px`,
+    });
+  }
+
+  function openPopover(trigger: HTMLElement, panel: HTMLElement): void {
+    cancelScheduledClose();
+    if (activePopover?.trigger === trigger) return;
+    closePopover();
+
+    document.body.append(panel);
+    panel.hidden = false;
+    panel.setAttribute("aria-hidden", "false");
+    trigger.setAttribute("data-popover-open", "true");
+    const stopPositioning = autoUpdate(trigger, panel, () => {
+      void positionPopover(trigger, panel);
+    });
+    activePopover = { trigger, panel, stopPositioning };
+  }
+
+  function initializeCodePopovers(root: ParentNode = document): void {
+    const triggers = root.querySelectorAll<HTMLElement>("[data-sw-code-popover-trigger]");
+    for (const trigger of triggers) {
+      if (initializedTriggers.has(trigger)) continue;
+      const panelId = trigger.dataset.swCodePopoverTrigger;
+      const panel = panelId ? document.getElementById(panelId) : null;
+      if (!(panel instanceof HTMLElement)) continue;
+      initializedTriggers.add(trigger);
+
+      trigger.addEventListener("pointerenter", () => openPopover(trigger, panel));
+      trigger.addEventListener("pointerleave", () => scheduleClose(trigger, panel));
+      trigger.addEventListener("focus", () => openPopover(trigger, panel));
+      trigger.addEventListener("blur", () => scheduleClose(trigger, panel));
+      trigger.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || activePopover?.trigger !== trigger) return;
+        event.preventDefault();
+        closePopover();
+      });
+      trigger.addEventListener("click", () => {
+        if (!window.matchMedia("(hover: none)").matches) return;
+        if (activePopover?.trigger !== trigger) openPopover(trigger, panel);
+      });
+      panel.addEventListener("pointerenter", cancelScheduledClose);
+      panel.addEventListener("pointerleave", () => scheduleClose(trigger, panel));
+    }
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!activePopover || !(event.target instanceof Node)) return;
+    if (
+      activePopover.trigger.contains(event.target) ||
+      activePopover.panel.contains(event.target)
+    ) {
+      return;
+    }
+    closePopover();
+  });
+  document.addEventListener("astro:before-swap", closePopover);
+  document.addEventListener("astro:page-load", () => initializeCodePopovers());
+  initializeCodePopovers();
+</script>

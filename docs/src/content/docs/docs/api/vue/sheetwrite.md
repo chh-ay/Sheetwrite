@@ -1,6 +1,6 @@
 ---
 title: "Sheetwrite | @sheetwrite/vue"
-description: "Simple framework component that owns initialization and Grid lifetime."
+description: "Convenience component for local object rows with live option updates."
 tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/vue|.|Sheetwrite -->
@@ -8,7 +8,7 @@ tableOfContents: false
 
 <span class="api-status">variable</span>
 
-Simple framework component that owns initialization and Grid lifetime.
+Convenience component for local object rows with live option updates.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>

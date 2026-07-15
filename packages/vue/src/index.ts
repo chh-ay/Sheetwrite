@@ -246,7 +246,7 @@ export const SheetwriteGrid = SheetwriteGridComponent as typeof SheetwriteGridCo
   new (): InstanceType<typeof SheetwriteGridComponent> & SheetwriteGridExpose;
 };
 
-/** Simple framework component that owns initialization and Grid lifetime. */
+/** Convenience component for local object rows with live option updates. */
 export const Sheetwrite = defineComponent({
   name: "SheetwriteComponent",
   inheritAttrs: false,

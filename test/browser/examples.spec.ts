@@ -12,7 +12,7 @@ import { examplePages, SITE_BASE, siteUrl } from "./playwright.config.js";
 
 const EXPECTED_CELL_VALUE = {
   vanilla: "Customer 000001",
-  react: "Customer 000001",
+  react: "Account 000001",
   vue: "Customer 0000001",
   svelte: "Product line 001",
   theming: "Account 001",
@@ -81,8 +81,8 @@ for (const name of examplePages) {
       // The paged fixture resolves after the mirror's initial loading snapshot.
       // Wait on its visible request counter, then focus a body cell so the live
       // accessibility window is refreshed through normal grid interaction.
-      await expect(page.locator(".stream-strip output")).toContainText(/[1-9][0-9]* requests/);
-      await page.locator(".example-grid .sheetwrite").click({ position: { x: 80, y: 50 } });
+      await expect(page.locator(".sw-demo-kpis article:nth-child(2) strong")).not.toHaveText("0");
+      await page.locator(".sw-demo-grid .sheetwrite").click({ position: { x: 80, y: 50 } });
     }
     await expect
       .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
@@ -153,10 +153,10 @@ test("offline queue, two-grid sync, and presence converge in a browser", async (
 
 test("example pages cross-link through the shared nav", async ({ page }) => {
   await page.goto(urlOf("vanilla"));
-  await page.waitForSelector(".sw-nav");
-  await page.click(`.sw-nav a[href="${SITE_BASE}/react/"]`);
+  await page.waitForSelector(".sw-product-nav");
+  await page.click(`.sw-product-nav a[href="${SITE_BASE}/react/"]`);
   await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
-  await expect(page.locator('.sw-nav a[aria-current="page"]')).toHaveText("React");
+  await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("React");
 });
 
 test("vanilla example commits an edit through the formula bar and undoes it", async ({ page }) => {
@@ -333,9 +333,9 @@ test("vue sync demo queues, retries, and acknowledges a stable mutation", async 
   await page.getByRole("button", { name: /Edit visible row/i }).click();
   await expect(sync).toContainText("1 pending mutation");
 
-  const acknowledge = page.getByRole("button", { name: /Acknowledge changes/i });
+  const acknowledge = page.getByRole("button", { name: "Acknowledge", exact: true });
   await acknowledge.click();
-  await expect(page.locator(".example-log")).toContainText("retry ready");
+  await expect(page.locator(".sw-vue-activity")).toContainText("retry ready");
   await expect(sync).toContainText("1 pending mutation");
 
   await acknowledge.click();

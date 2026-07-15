@@ -258,7 +258,12 @@ const SheetwriteComponent = forwardRef<Grid, SheetwriteProps<Record<string, Cell
   },
 );
 
-/** Simple framework component that owns initialization and Grid lifetime. */
+/**
+ * Convenience component for local object rows. It derives a single-sheet workbook from
+ * `columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`
+ * through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
+ * use `SheetwriteGrid` when the host already owns a workbook or datasource.
+ */
 export const Sheetwrite = SheetwriteComponent as <Row extends Record<string, CellScalar>>(
   props: SheetwriteProps<Row> & { ref?: ForwardedRef<Grid> },
 ) => ReactElement;

@@ -2501,9 +2501,9 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L262",
+              "source": "src/index.tsx#L267",
               "jsDocTags": [],
-              "documentation": "Simple framework component that owns initialization and Grid lifetime."
+              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`\nthrough prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;\nuse `SheetwriteGrid` when the host already owns a workbook or datasource."
             },
             {
               "name": "SheetwriteGrid",
@@ -2612,7 +2612,7 @@
               ],
               "source": "src/Sheetwrite.svelte.d.ts#L7",
               "jsDocTags": [],
-              "documentation": "Simple framework component that owns initialization and Grid lifetime."
+              "documentation": "Convenience component for local object rows. Bind `grid` to access the live `Grid`."
             },
             {
               "name": "SheetwriteGrid",
@@ -2721,7 +2721,7 @@
               ],
               "source": "src/index.ts#L250",
               "jsDocTags": [],
-              "documentation": "Simple framework component that owns initialization and Grid lifetime."
+              "documentation": "Convenience component for local object rows with live option updates."
             },
             {
               "name": "SheetwriteGrid",
