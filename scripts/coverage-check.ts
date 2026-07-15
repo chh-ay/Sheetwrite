@@ -345,6 +345,15 @@ export function normalizeRustCoverage(
     throw new Error("LLVM JSON is missing files/functions arrays");
   }
 
+  const reportedFilenames = new Set<string>();
+  for (const [fileIndex, value] of data.files.entries()) {
+    assertRecord(value, `LLVM file ${fileIndex}`);
+    if (typeof value.filename !== "string") {
+      throw new Error(`LLVM file ${fileIndex} filename is invalid`);
+    }
+    reportedFilenames.add(value.filename);
+  }
+
   const lcovByPath = new Map(lcovRecords.map((record) => [record.path, record]));
   const functions = data.functions.map((value, index) => {
     assertRecord(value, `LLVM function ${index}`);
@@ -356,11 +365,14 @@ export function normalizeRustCoverage(
       throw new Error(`LLVM function ${index} has an invalid schema`);
     }
     const count = finiteNonNegativeInteger(value.count, `LLVM function ${index} count`);
-    const filenames = value.filenames.map((filename, filenameIndex) => {
-      if (typeof filename !== "string")
-        throw new Error(`LLVM function ${index} filename ${filenameIndex} is invalid`);
-      return normalizeSourcePath(filename, root);
-    });
+    const filenames = value.filenames
+      .filter((filename, filenameIndex) => {
+        if (typeof filename !== "string") {
+          throw new Error(`LLVM function ${index} filename ${filenameIndex} is invalid`);
+        }
+        return reportedFilenames.has(filename);
+      })
+      .map((filename) => normalizeSourcePath(filename as string, root));
     return {
       name: value.name,
       count,

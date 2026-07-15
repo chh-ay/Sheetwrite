@@ -22,6 +22,12 @@ describe("formatNumber", () => {
     expect(formatNumber(1234.5, "$#,##0.00")).toBe("$1,234.50");
   });
 
+  it("resolves the locale currency placeholder", () => {
+    resetNumberFormatResourcesForTest();
+    expect(formatNumber(1234.5, "¤#,##0.00")).toBe("$1,234.50");
+    expect(formatNumber(1, "¤0.00")).toBe("$1.00");
+  });
+
   it("matches Intl rounding for grouped formats without using toFixed semantics", () => {
     const cases: Array<{ value: number; code: string }> = [
       { value: 1.005, code: "#,##0.00" },

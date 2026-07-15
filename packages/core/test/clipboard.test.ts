@@ -424,6 +424,39 @@ describe("ClipboardController", () => {
     expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toEqual({ italic: true });
   });
 
+  it("preserves formulas and refs from the packed clipboard read", async () => {
+    Object.assign(h.store, {
+      getClipboardWindow: () => ({
+        sheet: "s1",
+        viewRows: { start: 0, end: 1 },
+        dataRows: new Uint32Array([0]),
+        cols: [0, 1],
+        values: [7, 42],
+        styleIds: new Uint32Array([0, 1]),
+        styles: [{ bold: true }, { italic: true }],
+        formulas: [{ offset: 0, source: "=B1" }],
+        refs: [{ offset: 1, target: { sheet: "s1", row: 1, col: 1 } }],
+        ffiCalls: 1,
+        transferredElements: 2,
+      }),
+    });
+    h.selection.selectCell(0, 0);
+    h.selection.extendTo(0, 1);
+    await h.controller.copy();
+
+    h.select(2, 0);
+    await h.controller.paste();
+
+    expect(h.store.getFormula({ sheet: "s1", row: 2, col: 0 })).toBe("=B3");
+    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toEqual({ bold: true });
+    expect(h.store.getRefTarget({ sheet: "s1", row: 2, col: 1 })).toEqual({
+      sheet: "s1",
+      row: 1,
+      col: 1,
+    });
+    expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).style).toEqual({ italic: true });
+  });
+
   it("serializes covered merge cells as blanks", async () => {
     h = makeHarness({
       mergeAnchorAt: (row, col) => (row === 0 && col <= 1 ? { r0: 0, c0: 0, r1: 0, c1: 1 } : null),

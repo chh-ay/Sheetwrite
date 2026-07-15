@@ -10,6 +10,7 @@ import {
   rebaseDocumentOperations,
   SyncCoordinator,
   type SyncCoordinatorEvent,
+  type SyncCoordinatorOptions,
   type VersionedOperation,
   type WorkbookSnapshot,
 } from "../src/index.js";
@@ -100,7 +101,7 @@ function localSet(value: number) {
   };
 }
 
-function harness(ids = ["m1", "m2", "m3"]) {
+function harness(ids = ["m1", "m2", "m3"], options: Partial<SyncCoordinatorOptions> = {}) {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGridFromSnapshot(host, snapshot());
@@ -110,6 +111,7 @@ function harness(ids = ["m1", "m2", "m3"]) {
     documentId: "sync-doc",
     serverVersion: 7,
     createMutationId: () => ids[index++]!,
+    ...options,
   });
   const events: SyncCoordinatorEvent[] = [];
   coordinator.on((event) => events.push(event));
@@ -332,6 +334,39 @@ describe("sync coordinator", () => {
     });
     expect(remoteEvents).toHaveLength(2);
     expect(remoteEvents.every((event) => event.transaction.patches.length === 1)).toBe(true);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("recovers missing versions in order and drains the buffered operation", async () => {
+    const recovery = deferred<readonly VersionedOperation[]>();
+    const requests: Array<{ expectedVersion: number; receivedVersion: number }> = [];
+    const { grid, coordinator, events } = harness(["m1"], {
+      recoverVersionGap: (request) => {
+        requests.push({
+          expectedVersion: request.expectedVersion,
+          receivedVersion: request.receivedVersion,
+        });
+        return recovery.promise;
+      },
+    });
+
+    coordinator.applyVersionedOperation({ version: 10, operations: [localSet(10)] });
+    recovery.resolve([
+      { version: 9, operations: [localSet(9)] },
+      { version: 8, operations: [localSet(8)] },
+    ]);
+    await recovery.promise;
+    await Promise.resolve();
+
+    expect(requests).toEqual([{ expectedVersion: 8, receivedVersion: 10 }]);
+    expect(coordinator.serverVersion).toBe(10);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(10);
+    expect(
+      events
+        .filter((event) => event.type === "remote-applied")
+        .map((event) => event.operation.version),
+    ).toEqual([8, 9, 10]);
     coordinator.destroy();
     grid.destroy();
   });

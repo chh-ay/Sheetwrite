@@ -358,7 +358,7 @@ describe("manifest schema", () => {
 });
 
 describe("Rust LLVM normalization", () => {
-  it("removes inline #[cfg(test)] function regions from line/function/region metrics", () => {
+  it("removes inline tests and ignores function sources excluded from the file report", () => {
     const lcov = parseLcov(
       [
         "SF:/repo/packages/wasm/src/calc.rs",
@@ -383,7 +383,10 @@ describe("Rust LLVM normalization", () => {
             {
               name: "_RNv_prod",
               count: 3,
-              filenames: ["/repo/packages/wasm/src/calc.rs"],
+              filenames: [
+                "/repo/packages/wasm/src/calc.rs",
+                "/toolchain/rustlib/src/thread_local.rs",
+              ],
               regions: [
                 [1, 1, 1, 8, 3, 0, 0, 0],
                 [2, 1, 3, 8, 0, 0, 0, 0],
