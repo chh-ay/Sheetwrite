@@ -127,11 +127,11 @@
     },
     "bundler.vite.coreInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 267642,
-      "maximum": 281025,
+      "baseline": 281390,
+      "maximum": 295460,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Audited Plan 063 correctness baseline plus five percent."
     },
     "bundler.vite.coreInitial.wasm.brotliBytes": {
       "unit": "bytes",
@@ -535,11 +535,11 @@
     },
     "bundler.webpack.workerAsync.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 15910,
-      "maximum": 16934,
+      "baseline": 17058,
+      "maximum": 18082,
       "category": "browser-javascript",
       "owner": "webpack:worker-async",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Audited Plan 063 correctness baseline plus 1 KiB."
     },
     "closure.core-xlsx.logicalBytes": {
       "unit": "bytes",
@@ -727,11 +727,11 @@
     },
     "package.@sheetwrite/core.mapsBytes": {
       "unit": "bytes",
-      "baseline": 812239,
-      "maximum": 852851,
+      "baseline": 870048,
+      "maximum": 913551,
       "category": "package-maps",
       "owner": "@sheetwrite/core",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Audited Plan 063 source-map baseline plus five percent."
     },
     "package.@sheetwrite/core.metadataBytes": {
       "unit": "bytes",
@@ -847,11 +847,11 @@
     },
     "package.@sheetwrite/react.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 19734,
-      "maximum": 20758,
+      "baseline": 20816,
+      "maximum": 21857,
       "category": "package",
       "owner": "@sheetwrite/react",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Audited Plan 063 adapter declarations baseline plus five percent."
     },
     "package.@sheetwrite/react.wasmBytes": {
       "unit": "bytes",

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { paintFrame } from "../src/canvas-paint.js";
-import { dateToSerial } from "../src/date-serial.js";
 import {
   getMergeIndexResourceStatsForTest,
+  paintFrame,
   resetMergeIndexResourceStatsForTest,
-} from "../src/merge-index.js";
+} from "../src/canvas-paint.js";
+import { dateToSerial } from "../src/date-serial.js";
 import {
   getNumberFormatResourceStatsForTest,
   resetNumberFormatResourcesForTest,

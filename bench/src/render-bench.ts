@@ -9,9 +9,10 @@ import "@sheetwrite/core/styles.css";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 import {
   getMergeIndexResourceStatsForTest,
+  intersectingMerges,
   prepareMergeIndex,
   resetMergeIndexResourceStatsForTest,
-} from "../../packages/core/src/merge-index.js";
+} from "../../packages/core/src/canvas-paint.js";
 import {
   formatNumber,
   getNumberFormatResourceStatsForTest,
@@ -286,7 +287,7 @@ class SheetwriteAdapter implements RenderBenchAdapter {
   mergeResources() {
     const merges = this.grid.store.getWorkbook().sheets.find((sheet) => sheet.id === SHEET)?.merges;
     if (merges && merges.length > 0) {
-      prepareMergeIndex(merges).intersectingWindow(0, 20, [0, 1, 2, 3, 4]);
+      intersectingMerges(prepareMergeIndex(merges), 0, 20, [0, 1, 2, 3, 4]);
     }
     return getMergeIndexResourceStatsForTest();
   }

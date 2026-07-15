@@ -1,4 +1,3 @@
-import { type MergeRect, prepareMergeIndex } from "./merge-index.js";
 import { formatNumber } from "./number-format.js";
 import type { CellAlign, CellBorder, CellScalar, CellStyle } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
@@ -350,7 +349,10 @@ export function paintFrame(
   const styleStride = view.styles.length || 1;
   const merges = layout.merges;
   const mergeIndex = merges === undefined ? undefined : prepareMergeIndex(merges);
-  const visibleMerges = mergeIndex?.intersectingWindow(view.rows.start, view.rows.end, view.cols);
+  const visibleMerges =
+    mergeIndex === undefined
+      ? undefined
+      : intersectingMerges(mergeIndex, view.rows.start, view.rows.end, view.cols);
   let minimumVisibleColumn = view.cols[0] ?? 0;
   let maximumVisibleColumn = view.cols[0] ?? -1;
   for (let index = 1; index < view.cols.length; index++) {
@@ -475,11 +477,10 @@ export function paintFrame(
     const lineY = Math.round(headerHeight + rowBottom - scrollTop) - 0.5;
     if (lineY < paintTop || lineY > paintBottom) continue;
     let cursorX = g;
-    const mergesByColumn = mergeIndex?.horizontalGaps(
-      row,
-      minimumVisibleColumn,
-      maximumVisibleColumn,
-    );
+    const mergesByColumn =
+      mergeIndex === undefined
+        ? undefined
+        : horizontalMergeGaps(mergeIndex, row, minimumVisibleColumn, maximumVisibleColumn);
     if (mergesByColumn) {
       for (const merge of mergesByColumn) {
         if (merge.r0 > row || row >= merge.r1) continue;
@@ -508,7 +509,10 @@ export function paintFrame(
   ctx.beginPath();
   const appendVerticalGridline = (c: number, lineX: number): void => {
     if (lineX < g || lineX > width) return;
-    const mergesByRow = mergeIndex?.verticalGaps(c, view.rows.start, view.rows.end - 1);
+    const mergesByRow =
+      mergeIndex === undefined
+        ? undefined
+        : verticalMergeGaps(mergeIndex, c, view.rows.start, view.rows.end - 1);
     let cursorY = 0;
     if (mergesByRow) {
       for (const merge of mergesByRow) {
@@ -818,4 +822,161 @@ function paintHeader(
   ctx.moveTo(0, h - 0.5);
   ctx.lineTo(width, h - 0.5);
   ctx.stroke();
+}
+
+export interface MergeRect {
+  readonly r0: number;
+  readonly c0: number;
+  readonly r1: number;
+  readonly c1: number;
+}
+
+type MergeAxisIndex = readonly [
+  entries: readonly MergeRect[],
+  prefixMaxEnd: readonly number[],
+  rows: boolean,
+];
+
+export interface MergeIndexResourceStats {
+  readonly indexConstructions: number;
+  readonly candidatesExamined: number;
+}
+
+let mergeResourceStats: [indexConstructions: number, candidatesExamined: number] | undefined;
+const mergeIndexCache = new WeakMap<ReadonlyArray<MergeRect>, PreparedMergeIndex>();
+const axisStart = (merge: MergeRect, rows: boolean): number => (rows ? merge.r0 : merge.c0);
+const axisEnd = (merge: MergeRect, rows: boolean): number => (rows ? merge.r1 : merge.c1);
+
+function buildMergeAxis(merges: ReadonlyArray<MergeRect>, rows: boolean): MergeAxisIndex {
+  const entries = [...merges].sort(
+    (a, b) => axisStart(a, rows) - axisStart(b, rows) || axisEnd(a, rows) - axisEnd(b, rows),
+  );
+  const prefixMaxEnd = new Array<number>(entries.length);
+  let maximum = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < entries.length; index++) {
+    maximum = Math.max(maximum, axisEnd(entries[index]!, rows));
+    prefixMaxEnd[index] = maximum;
+  }
+  return [entries, prefixMaxEnd, rows];
+}
+
+function mergeCandidateRange(
+  index: MergeAxisIndex,
+  minimum: number,
+  maximum: number,
+): readonly [number, number] {
+  let first = 0;
+  let last = index[0].length;
+  while (first < last) {
+    const middle = (first + last) >>> 1;
+    if (index[1][middle]! < minimum) first = middle + 1;
+    else last = middle;
+  }
+  let end = first;
+  last = index[0].length;
+  while (end < last) {
+    const middle = (end + last) >>> 1;
+    if (axisStart(index[0][middle]!, index[2]) <= maximum) end = middle + 1;
+    else last = middle;
+  }
+  return [first, end];
+}
+
+/** Prepared interval projections shared by interaction, clipboard, and paint paths. */
+export type PreparedMergeIndex = readonly [rows: MergeAxisIndex, columns: MergeAxisIndex];
+
+function queryMerges(
+  prepared: PreparedMergeIndex,
+  rowMinimum: number,
+  rowMaximum: number,
+  columnMinimum: number,
+  columnMaximum: number,
+): MergeRect[] {
+  const rowRange = mergeCandidateRange(prepared[0], rowMinimum, rowMaximum);
+  const columnRange = mergeCandidateRange(prepared[1], columnMinimum, columnMaximum);
+  const rows = rowRange[1] - rowRange[0] <= columnRange[1] - columnRange[0];
+  const index = prepared[rows ? 0 : 1];
+  const range = rows ? rowRange : columnRange;
+  const minimum = rows ? rowMinimum : columnMinimum;
+  const matches: MergeRect[] = [];
+  for (let position = range[0]; position < range[1]; position++) {
+    const merge = index[0][position]!;
+    if (mergeResourceStats) mergeResourceStats[1] += 1;
+    if (
+      axisEnd(merge, index[2]) >= minimum &&
+      (rows
+        ? merge.c1 >= columnMinimum && merge.c0 <= columnMaximum
+        : merge.r1 >= rowMinimum && merge.r0 <= rowMaximum)
+    ) {
+      matches.push(merge);
+    }
+  }
+  return matches;
+}
+
+export function mergeAnchorAt(
+  prepared: PreparedMergeIndex,
+  row: number,
+  column: number,
+): MergeRect | null {
+  return queryMerges(prepared, row, row, column, column)[0] ?? null;
+}
+
+export function intersectingMerges(
+  prepared: PreparedMergeIndex,
+  rowStart: number,
+  rowEnd: number,
+  columns: readonly number[],
+): readonly MergeRect[] {
+  if (rowStart >= rowEnd || columns.length === 0) return [];
+  let minimumColumn = columns[0]!;
+  let maximumColumn = minimumColumn;
+  for (let index = 1; index < columns.length; index++) {
+    minimumColumn = Math.min(minimumColumn, columns[index]!);
+    maximumColumn = Math.max(maximumColumn, columns[index]!);
+  }
+  return queryMerges(prepared, rowStart, rowEnd - 1, minimumColumn, maximumColumn);
+}
+
+export function horizontalMergeGaps(
+  prepared: PreparedMergeIndex,
+  row: number,
+  columnMinimum = Number.NEGATIVE_INFINITY,
+  columnMaximum = Number.POSITIVE_INFINITY,
+): readonly MergeRect[] {
+  return queryMerges(prepared, row, row, columnMinimum, columnMaximum)
+    .filter((merge) => row < merge.r1)
+    .sort((a, b) => a.c0 - b.c0 || a.c1 - b.c1);
+}
+
+export function verticalMergeGaps(
+  prepared: PreparedMergeIndex,
+  column: number,
+  rowMinimum = Number.NEGATIVE_INFINITY,
+  rowMaximum = Number.POSITIVE_INFINITY,
+): readonly MergeRect[] {
+  return queryMerges(prepared, rowMinimum, rowMaximum, column, column)
+    .filter((merge) => merge.c0 < column)
+    .sort((a, b) => a.r0 - b.r0 || a.r1 - b.r1);
+}
+
+export function prepareMergeIndex(merges: ReadonlyArray<MergeRect>): PreparedMergeIndex {
+  let prepared = mergeIndexCache.get(merges);
+  if (!prepared) {
+    prepared = [buildMergeAxis(merges, true), buildMergeAxis(merges, false)];
+    mergeIndexCache.set(merges, prepared);
+    if (mergeResourceStats) mergeResourceStats[0] += 1;
+  }
+  return prepared;
+}
+
+export function getMergeIndexResourceStatsForTest(): MergeIndexResourceStats {
+  return {
+    indexConstructions: mergeResourceStats?.[0] ?? 0,
+    candidatesExamined: mergeResourceStats?.[1] ?? 0,
+  };
+}
+
+export function resetMergeIndexResourceStatsForTest(): void {
+  mergeResourceStats = [0, 0];
 }
