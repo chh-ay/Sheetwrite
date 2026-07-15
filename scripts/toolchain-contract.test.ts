@@ -137,6 +137,17 @@ describe("contributor and CI toolchain contract", () => {
       "browser-smoke",
     ]);
     expect(jobs.required?.name).toBe("Required CI");
+    for (const jobName of [
+      "preflight",
+      "artifact-build",
+      "packed-consumers",
+      "bundler-consumers",
+      "delivery-size",
+    ]) {
+      expect(
+        jobs[jobName]?.steps?.some((step) => step.run === "npm install --global npm@11.18.0"),
+      ).toBe(true);
+    }
     for (const job of Object.values(jobs)) {
       expect(job["timeout-minutes"]).toBeGreaterThan(0);
     }
