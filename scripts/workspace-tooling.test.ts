@@ -80,6 +80,31 @@ describe("canonical workspace graph", () => {
     expect(() => validateWorkspaceGraph(resolve(import.meta.dir, ".."))).not.toThrow();
   });
 
+  it("publishes canonical repository metadata for every package", async () => {
+    const root = resolve(import.meta.dir, "..");
+    for (const name of PUBLISHABLE_PACKAGE_ORDER) {
+      const directory = name.slice("@sheetwrite/".length);
+      const manifest = JSON.parse(
+        await readFile(join(root, "packages", directory, "package.json"), "utf8"),
+      ) as {
+        readonly repository?: {
+          readonly type?: string;
+          readonly url?: string;
+          readonly directory?: string;
+        };
+        readonly homepage?: string;
+        readonly bugs?: { readonly url?: string };
+      };
+      expect(manifest.repository).toEqual({
+        type: "git",
+        url: "git+https://github.com/chh-ay/Sheetwrite.git",
+        directory: `packages/${directory}`,
+      });
+      expect(manifest.homepage).toBe("https://chh-ay.github.io/Sheetwrite/");
+      expect(manifest.bugs?.url).toBe("https://github.com/chh-ay/Sheetwrite/issues");
+    }
+  });
+
   it("rejects an unlisted publishable workspace package", async () => {
     const root = await graphFixture({ name: "@sheetwrite/new-package" });
     expect(() => validateWorkspaceGraph(root)).toThrow("missing: @sheetwrite/new-package");

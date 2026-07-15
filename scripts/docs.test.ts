@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
   entrySlug,
   expectedGeneratedFiles,
@@ -8,6 +10,7 @@ import {
   renderSymbolPage,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
+import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const coreEntry: ApiEntryPoint = {
   subpath: ".",
@@ -95,5 +98,19 @@ describe("documentation generation", () => {
         line: 5,
       },
     ]);
+  });
+
+  it("keeps published package README links valid outside the monorepo", async () => {
+    const root = resolve(import.meta.dir, "..");
+    for (const name of PUBLISHABLE_PACKAGE_ORDER) {
+      const directory = name.slice("@sheetwrite/".length);
+      const readme = await readFile(resolve(root, "packages", directory, "README.md"), "utf8");
+      const links = [...readme.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]!);
+      for (const link of links) {
+        expect(link).toMatch(
+          /^https:\/\/(?:chh-ay\.github\.io\/Sheetwrite\/|github\.com\/chh-ay\/Sheetwrite\/)/,
+        );
+      }
+    }
   });
 });

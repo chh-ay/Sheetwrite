@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible Sheetwrite defect
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Security vulnerabilities must use private vulnerability reporting, not this form.
+  - type: input
+    id: version
+    attributes:
+      label: Sheetwrite version
+      placeholder: "@sheetwrite/core 0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Link a repository or provide the smallest code sample that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Actual and expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, operating system, framework and version, Node version, and bundler.
+    validations:
+      required: true

@@ -4,6 +4,15 @@
   "type": "module",
   "description": "Sheetwrite columnar store and data engine (Rust/WASM).",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chh-ay/Sheetwrite.git",
+    "directory": "packages/wasm"
+  },
+  "homepage": "https://chh-ay.github.io/Sheetwrite/",
+  "bugs": {
+    "url": "https://github.com/chh-ay/Sheetwrite/issues"
+  },
   "keywords": [
     "spreadsheet",
     "wasm",

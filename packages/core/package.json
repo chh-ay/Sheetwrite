@@ -4,6 +4,15 @@
   "type": "module",
   "description": "Framework-agnostic, canvas-rendered spreadsheet grid core.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chh-ay/Sheetwrite.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://chh-ay.github.io/Sheetwrite/",
+  "bugs": {
+    "url": "https://github.com/chh-ay/Sheetwrite/issues"
+  },
   "keywords": [
     "spreadsheet",
     "data-grid",

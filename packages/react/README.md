@@ -52,7 +52,7 @@ Reset-bound inputs are `workbook`, `data`, `datasource`, `datasourceStorage`, `r
 
 Grid events use collision-free names: `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, and `onActiveSheetChange`. Native host `onChange` and `onScroll` remain ordinary DOM handlers.
 
-For vanilla/preload control, import `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](../../docs/src/content/docs/docs/start/installation.md), [React integration](../../docs/src/content/docs/docs/frameworks/react.md), and [collaboration](../../docs/src/content/docs/docs/guides/collaboration.md).
+For vanilla/preload control, import `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://chh-ay.github.io/Sheetwrite/docs/start/installation/), [React integration](https://chh-ay.github.io/Sheetwrite/docs/frameworks/react/), and [collaboration](https://chh-ay.github.io/Sheetwrite/docs/guides/collaboration/).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
 XLSX export, install `@sheetwrite/xlsx` and import

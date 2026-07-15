@@ -4,6 +4,15 @@
   "type": "module",
   "description": "Svelte adapter for Sheetwrite.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chh-ay/Sheetwrite.git",
+    "directory": "packages/svelte"
+  },
+  "homepage": "https://chh-ay.github.io/Sheetwrite/",
+  "bugs": {
+    "url": "https://github.com/chh-ay/Sheetwrite/issues"
+  },
   "keywords": [
     "spreadsheet",
     "data-grid",
