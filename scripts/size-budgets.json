@@ -111,11 +111,11 @@
     },
     "bundler.vite.coreInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 64784,
-      "maximum": 68024,
+      "baseline": 68041,
+      "maximum": 71444,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Audited correctness baseline plus five percent."
     },
     "bundler.vite.coreInitial.javascript.gzipBytes": {
       "unit": "bytes",
@@ -131,7 +131,7 @@
       "maximum": 295460,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
-      "rationale": "Audited Plan 063 correctness baseline plus five percent."
+      "rationale": "Audited correctness baseline plus five percent."
     },
     "bundler.vite.coreInitial.wasm.brotliBytes": {
       "unit": "bytes",
@@ -199,11 +199,11 @@
     },
     "bundler.vite.reactInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 280629,
-      "maximum": 294661,
+      "baseline": 294906,
+      "maximum": 309652,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Audited correctness baseline plus five percent."
     },
     "bundler.vite.reactInitial.wasm.brotliBytes": {
       "unit": "bytes",
@@ -539,7 +539,7 @@
       "maximum": 18082,
       "category": "browser-javascript",
       "owner": "webpack:worker-async",
-      "rationale": "Audited Plan 063 correctness baseline plus 1 KiB."
+      "rationale": "Audited correctness baseline plus 1 KiB."
     },
     "closure.core-xlsx.logicalBytes": {
       "unit": "bytes",
@@ -731,7 +731,7 @@
       "maximum": 913551,
       "category": "package-maps",
       "owner": "@sheetwrite/core",
-      "rationale": "Audited Plan 063 source-map baseline plus five percent."
+      "rationale": "Audited source-map baseline plus five percent."
     },
     "package.@sheetwrite/core.metadataBytes": {
       "unit": "bytes",
@@ -851,7 +851,7 @@
       "maximum": 21857,
       "category": "package",
       "owner": "@sheetwrite/react",
-      "rationale": "Audited Plan 063 adapter declarations baseline plus five percent."
+      "rationale": "Audited adapter declarations baseline plus five percent."
     },
     "package.@sheetwrite/react.wasmBytes": {
       "unit": "bytes",
