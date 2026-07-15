@@ -139,7 +139,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L64",
+              "source": "src/types/store.ts#L91",
               "jsDocTags": [],
               "documentation": "Datasource loading state for a resolved cell."
             },
@@ -480,7 +480,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L174",
+              "source": "src/grid.ts#L175",
               "jsDocTags": [],
               "documentation": "Creates and mounts an imperative Grid in the supplied host element."
             },
@@ -590,7 +590,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L104",
+              "source": "src/grid.ts#L105",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides."
             },
@@ -667,7 +667,7 @@
               "owners": [
                 "src/number-format.ts"
               ],
-              "source": "src/number-format.ts#L346",
+              "source": "src/number-format.ts#L455",
               "jsDocTags": [],
               "documentation": "Deterministic Excel-style number/date formatter. Supports explicit locale\nseparators, percent/scientific notation, UTC date/time tokens, four-section\npositive/negative/zero/text codes, quoted literals, and backslash escapes."
             },
@@ -788,7 +788,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L105",
+              "source": "src/store/data-engine.ts#L106",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded."
             },
@@ -799,7 +799,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L122",
+              "source": "src/grid.ts#L123",
               "jsDocTags": [],
               "documentation": "Load the WASM data engine once. Must be awaited before `createGrid`."
             },
@@ -810,7 +810,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L129",
+              "source": "src/grid.ts#L130",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source."
             },
@@ -909,7 +909,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L67",
+              "source": "src/types/store.ts#L94",
               "jsDocTags": [],
               "documentation": "Allocation and load statistics for one paged datasource sheet."
             },
@@ -1162,7 +1162,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L76",
+              "source": "src/types/store.ts#L103",
               "jsDocTags": [],
               "documentation": "Whether a query is complete for the currently loaded datasource pages."
             },
@@ -1272,7 +1272,7 @@
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L58",
+              "source": "src/types/store.ts#L85",
               "jsDocTags": [],
               "documentation": "Authoritative source value, evaluated value, style, and load state for a cell."
             },
@@ -1283,7 +1283,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L134",
+              "source": "src/grid.ts#L135",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme."
             },
@@ -1521,11 +1521,11 @@
             {
               "name": "SheetwriteStore",
               "kind": "class",
-              "signature": "class SheetwriteStore { (workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions): SheetwriteStore; acknowledgeOperations: (operations: readonly DocumentOp[]) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => void; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => void; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getFormula: (addr: CellAddress) => string | null; getPagedStats: (sheet: SheetId) => PagedStoreStats; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => void; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => void; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadRows: (sheet: SheetId, start: number, rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; resetRangeMutationAllocationStats: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => void; sortBy: (sheet: SheetId, col: number, ascending: boolean) => void; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void; static fromSnapshot: (input: unknown) => SheetwriteStore; ungroupRows: (sheet: SheetId, start: number, end: number) => void; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null }",
+              "signature": "class SheetwriteStore { (workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions): SheetwriteStore; acknowledgeOperations: (operations: readonly DocumentOp[]) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => void; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => void; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getFormula: (addr: CellAddress) => string | null; getPagedStats: (sheet: SheetId) => PagedStoreStats; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => void; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => void; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadRows: (sheet: SheetId, start: number, rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; resetRangeMutationAllocationStats: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => void; sortBy: (sheet: SheetId, col: number, ascending: boolean) => void; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void; static fromSnapshot: (input: unknown) => SheetwriteStore; ungroupRows: (sheet: SheetId, start: number, end: number) => void; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null }",
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L46",
+              "source": "src/store.ts#L47",
               "jsDocTags": [],
               "documentation": "Stable public facade and the sole transaction, epoch, policy, and event barrier."
             },
@@ -1587,11 +1587,11 @@
             {
               "name": "Store",
               "kind": "interface",
-              "signature": "export interface Store { getWorkbook(): Workbook; getCell(addr: CellAddress): ResolvedCell; getFormula(addr: CellAddress): string | null; getRefTarget(addr: CellAddress): CellAddress | null; recalculateVolatile(now?: Date): void; getVisibleWindow( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView; ensureColumns(sheet: SheetId, columns: readonly Column[]): void; applyTransaction( tx: Transaction, options?: TransactionApplicationOptions, ): ApplyTransactionResult; setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; on(evt: \"change\", fn: (event: ChangeEvent) => void): () => void; queryCapability?(sheet: SheetId): QueryCapability; getCellLoadState?(addr: CellAddress): CellLoadState; acknowledgeOperations?(operations: readonly DocumentOp[]): void; exportSnapshot?(): WorkbookSnapshot; viewRowCount(sheet: SheetId): number; }",
+              "signature": "export interface Store { getWorkbook(): Workbook; getCell(addr: CellAddress): ResolvedCell; getFormula(addr: CellAddress): string | null; getRefTarget(addr: CellAddress): CellAddress | null; recalculateVolatile(now?: Date): void; getVisibleWindow( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView; getClipboardWindow?( sheet: SheetId, viewRows: { start: number; end: number }, cols: readonly number[], ): ClipboardWindowView; ensureColumns(sheet: SheetId, columns: readonly Column[]): void; applyTransaction( tx: Transaction, options?: TransactionApplicationOptions, ): ApplyTransactionResult; setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; on(evt: \"change\", fn: (event: ChangeEvent) => void): () => void; queryCapability?(sheet: SheetId): QueryCapability; getCellLoadState?(addr: CellAddress): CellLoadState; acknowledgeOperations?(operations: readonly DocumentOp[]): void; exportSnapshot?(): WorkbookSnapshot; viewRowCount(sheet: SheetId): number; }",
               "owners": [
                 "src/types/store.ts"
               ],
-              "source": "src/types/store.ts#L81",
+              "source": "src/types/store.ts#L108",
               "jsDocTags": [],
               "documentation": "Columnar workbook storage, query, transaction, and subscription contract."
             },
@@ -1851,7 +1851,7 @@
             {
               "name": "VisibleWindowView",
               "kind": "interface",
-              "signature": "export interface VisibleWindowView { sheet: SheetId; rows: { start: number; end: number }; cols: readonly number[]; values: ArrayLike<CellScalar>; styleIds: Uint32Array; styles: readonly CellStyle[]; valueKinds?: Uint8Array; numberValues?: Float64Array; stringPoolIds?: Uint32Array; stringLocalIds?: Int32Array; stringPoolUpdateIds?: Uint32Array; stringPoolUpdateValues?: readonly string[]; localStrings?: readonly string[]; }",
+              "signature": "export interface VisibleWindowView { sheet: SheetId; rows: { start: number; end: number }; cols: readonly number[]; values: ArrayLike<CellScalar>; styleIds: Uint32Array; styles: readonly CellStyle[]; valueKinds?: Uint8Array; numberValues?: Float64Array; stringPoolIds?: Uint32Array; stringLocalIds?: Int32Array; stringPoolUpdateIds?: Uint32Array; stringPoolUpdateValues?: readonly string[]; localStrings?: readonly string[]; ffiCalls?: number; }",
               "owners": [
                 "src/types/store.ts"
               ],
@@ -2479,7 +2479,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L265",
+              "source": "../core/dist/types/grid.d.ts#L270",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown."
             },
@@ -2588,7 +2588,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L265",
+              "source": "../core/dist/types/grid.d.ts#L270",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown."
             },
@@ -2697,7 +2697,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L265",
+              "source": "../core/dist/types/grid.d.ts#L270",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown."
             },

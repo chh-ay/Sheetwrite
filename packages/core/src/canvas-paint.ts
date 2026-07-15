@@ -1,5 +1,5 @@
+import { type MergeRect, prepareMergeIndex } from "./merge-index.js";
 import { formatNumber } from "./number-format.js";
-import { prepareMergeIndex, type MergeRect } from "./merge-index.js";
 import type { CellAlign, CellBorder, CellScalar, CellStyle } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";

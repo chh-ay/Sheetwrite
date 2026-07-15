@@ -12,7 +12,7 @@ Creates and mounts an imperative Grid in the supplied host element.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L174</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L175</code></dd></div>
 </dl>
 
 ## Signature

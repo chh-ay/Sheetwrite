@@ -6,17 +6,17 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
-import {
-  formatNumber,
-  getNumberFormatResourceStatsForTest,
-  resetNumberFormatResourcesForTest,
-} from "../../packages/core/src/number-format.js";
+import type { CellValue, GridSettings, HotInstance } from "handsontable";
 import {
   getMergeIndexResourceStatsForTest,
   prepareMergeIndex,
   resetMergeIndexResourceStatsForTest,
 } from "../../packages/core/src/merge-index.js";
-import type { CellValue, GridSettings, HotInstance } from "handsontable";
+import {
+  formatNumber,
+  getNumberFormatResourceStatsForTest,
+  resetNumberFormatResourcesForTest,
+} from "../../packages/core/src/number-format.js";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
 import { COLUMNS, type ColumnarDataset, datasetChecksum, makeColumnar, toAoA } from "./dataset.js";
@@ -26,11 +26,11 @@ import {
   type EngineId,
   type FailedScenario,
   type FailureStage,
-  type RenderResourceMetrics,
   RENDER_MINIMUM_SAMPLE_MS,
   RENDER_PROTOCOL_VERSION,
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
+  type RenderResourceMetrics,
   type ScenarioResult,
 } from "./render-protocol.js";
 import {

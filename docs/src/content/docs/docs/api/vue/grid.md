@@ -12,7 +12,7 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L265</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L270</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">81</span>

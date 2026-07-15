@@ -23,8 +23,8 @@ import type {
   WorkbookSnapshot,
 } from "./types/document.js";
 import type {
-  ClipboardWindowView,
   CellLoadState,
+  ClipboardWindowView,
   PagedStoreStats,
   QueryCapability,
   ResolvedCell,

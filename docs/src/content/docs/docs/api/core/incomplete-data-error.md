@@ -12,7 +12,7 @@ Error thrown when an operation requires datasource cells that are not loaded.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store/data-engine.ts#L105</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store/data-engine.ts#L106</code></dd></div>
 </dl>
 
 ## Signature

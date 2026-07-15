@@ -12,7 +12,7 @@ Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L46</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L47</code></dd></div>
 </dl>
 
 ## Signature

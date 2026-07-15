@@ -12,7 +12,7 @@ Allocation and load statistics for one paged datasource sheet.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L67</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L94</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">5</span>

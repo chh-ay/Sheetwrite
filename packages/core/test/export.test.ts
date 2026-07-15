@@ -344,8 +344,8 @@ describe("export", () => {
     expect(Object.getPrototypeOf(data.columns)).toBeNull();
     expect(Object.keys(data.columns)).toEqual(["__proto__", "constructor", "ordinary"]);
     expect(Object.hasOwn(data.columns, "__proto__")).toBe(true);
-    expect(data.columns.__proto__).toEqual(["alpha"]);
-    expect(data.columns.constructor).toEqual(["beta"]);
+    expect(Reflect.get(data.columns, "__proto__")).toEqual(["alpha"]);
+    expect(Reflect.get(data.columns, "constructor")).toEqual(["beta"]);
     expect(JSON.stringify(data.columns)).toBe(
       '{"__proto__":["alpha"],"constructor":["beta"],"ordinary":["gamma"]}',
     );

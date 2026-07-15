@@ -1,5 +1,5 @@
-import { prepareMergeIndex } from "./merge-index.js";
 import type { EditRect } from "./editor.js";
+import { prepareMergeIndex } from "./merge-index.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinates.js";

@@ -545,9 +545,7 @@ impl CellStore {
                 ""
             };
             let key = match kind {
-                1 => DistinctKey::Number(
-                    numeric_cell_value(data, index).unwrap_or(0.0).to_bits(),
-                ),
+                1 => DistinctKey::Number(numeric_cell_value(data, index).unwrap_or(0.0).to_bits()),
                 2 => DistinctKey::Text(text),
                 3 => DistinctKey::Bool(boolean_cell_value(data, index).unwrap_or(false)),
                 _ => DistinctKey::Blank,
