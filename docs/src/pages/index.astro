@@ -1,5 +1,8 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { withBasePath } from "../base-path.js";
+
+const route = (path: string) => withBasePath(path, import.meta.env.BASE_URL);
 
 const cards = [
   {
@@ -81,8 +84,8 @@ const stats = [
             </p>
           </div>
           <div class="hero-actions">
-            <a href="/vanilla/" class="hero-primary">Launch workbook</a>
-            <a href="/react/" class="hero-secondary">Stress-test 100k rows</a>
+            <a href={route("/vanilla/")} class="hero-primary">Launch workbook</a>
+            <a href={route("/react/")} class="hero-secondary">Stress-test 100k rows</a>
           </div>
         </div>
 
@@ -138,7 +141,7 @@ const stats = [
       <div class="demo-grid">
         {
           cards.map((card) => (
-            <a href={`/${card.slug}/`} class="demo-card" style={`--accent: ${card.accent}`}>
+            <a href={route(`/${card.slug}/`)} class="demo-card" style={`--accent: ${card.accent}`}>
               <div class="flex items-center justify-between gap-3">
                 <p class="m-0 font-mono text-[12px] tracking-wide uppercase" style="color: var(--accent)">
                   {card.kicker}
@@ -167,8 +170,8 @@ const stats = [
         <p>Browser-runnable fixtures exercise workbook round-trip and reconnect/reload collaboration paths.</p>
       </div>
       <div class="mt-6 flex flex-wrap gap-3">
-        <a href="/test/xlsx/" class="hero-secondary">XLSX round-trip fixture</a>
-        <a href="/test/collaboration/" class="hero-secondary">Offline collaboration fixture</a>
+        <a href={route("/test/xlsx/")} class="hero-secondary">XLSX round-trip fixture</a>
+        <a href={route("/test/collaboration/")} class="hero-secondary">Offline collaboration fixture</a>
       </div>
     </section>
 

@@ -16,6 +16,7 @@ import "@sheetwrite/core/styles.css";
 
 const host = document.querySelector<HTMLElement>("#grid");
 if (host === null) throw new Error("Missing #grid host");
+host.style.height = "420px";
 
 const workbook: Workbook = {
   activeSheet: "sales",

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { SITE_PORT } from "./playwright.config.js";
+import { SITE_BASE, SITE_PORT, siteUrl } from "./playwright.config.js";
 
 interface PageErrors {
   console: string[];
@@ -16,17 +16,20 @@ function collectErrors(page: Page): PageErrors {
 }
 
 function docsUrl(path = ""): string {
-  return `http://localhost:${SITE_PORT}/docs/${path}`;
+  return siteUrl(`/docs/${path}`);
 }
 
 const representativeRoutes = [
   "",
+  "start/installation/",
   "start/first-grid/",
+  "frameworks/lifecycle/",
   "frameworks/vanilla/",
   "frameworks/react/",
   "frameworks/vue/",
   "frameworks/svelte/",
   "guides/xlsx-export/",
+  "guides/configuration/",
   "reference/compatibility-limits/",
   "api/core/",
   "api/core/grid/",
@@ -37,12 +40,34 @@ test.describe("documentation site", () => {
   for (const route of representativeRoutes) {
     test(`documentation site renders /docs/${route} without browser errors`, async ({ page }) => {
       const errors = collectErrors(page);
+      const escapedRequests: string[] = [];
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (
+          url.origin === `http://localhost:${SITE_PORT}` &&
+          url.pathname !== SITE_BASE &&
+          !url.pathname.startsWith(`${SITE_BASE}/`)
+        ) {
+          escapedRequests.push(url.pathname);
+        }
+      });
       const response = await page.goto(docsUrl(route));
       expect(response?.ok()).toBe(true);
       await expect(page.locator("main h1")).toHaveCount(1);
       await expect(page.locator("main")).toBeVisible();
       expect(errors.page).toEqual([]);
       expect(errors.console).toEqual([]);
+      const rootRelativeUrls = await page
+        .locator('a[href^="/"], link[href^="/"], script[src^="/"]')
+        .evaluateAll((elements) =>
+          elements.map((element) => element.getAttribute("href") ?? element.getAttribute("src")),
+        );
+      expect(rootRelativeUrls.every((url) => url?.startsWith(`${SITE_BASE}/`))).toBe(true);
+      expect(escapedRequests).toEqual([]);
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+        "href",
+        `https://chh-ay.github.io${SITE_BASE}/docs/${route}`,
+      );
     });
   }
 
@@ -57,7 +82,10 @@ test.describe("documentation site", () => {
     await expect(page.getByRole("button", { name: /copy/i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Vanilla example" })).toHaveAttribute(
       "href",
-      "/vanilla/",
+      `${SITE_BASE}/vanilla/`,
+    );
+    await expect(page.locator("main pre code").first()).toContainText(
+      'host.style.height = "420px"',
     );
     await expect(page.locator("a[rel='prev'], a[rel='next']").first()).toBeVisible();
   });
@@ -248,7 +276,7 @@ test.describe("documentation site", () => {
     await expect(page.locator(".api-symbol-card").first()).toBeVisible();
     expect(await page.locator(".api-symbol-card").count()).toBeGreaterThan(50);
     await expect(page.locator(".expressive-code")).toHaveCount(0);
-    await page.locator('.api-symbol-card[href="/docs/api/core/grid/"]').click();
+    await page.locator(`.api-symbol-card[href="${SITE_BASE}/docs/api/core/grid/"]`).click();
     await expect(page).toHaveURL(/\/docs\/api\/core\/grid\/$/);
     await expect(page.locator("main h1")).toContainText("Grid");
     await expect(page.locator(".api-member").first()).not.toHaveAttribute("open");
@@ -330,7 +358,7 @@ test.describe("documentation site", () => {
   });
 
   test("documentation live example renders request-aware context-menu items", async ({ page }) => {
-    await page.goto(`http://localhost:${SITE_PORT}/vanilla/`);
+    await page.goto(siteUrl("/vanilla/"));
     const grid = page.locator(".sheetwrite");
     await expect(grid).toBeVisible();
     await grid.click({ button: "right", position: { x: 90, y: 70 } });
@@ -344,11 +372,11 @@ test.describe("documentation site", () => {
   });
 
   const searchTargets = {
-    rendererKind: "/docs/api/core/grid/#rendererkind",
-    onGridChange: "/docs/api/core-adapter/grid-adapter-event-handlers/#ongridchange",
-    applyTransaction: "/docs/api/core/grid/#applytransaction",
-    SnapshotValidationError: "/docs/api/core/snapshot-validation-error/",
-    toXlsxWorkbook: "/docs/api/core/to-xlsx-workbook/",
+    rendererKind: `${SITE_BASE}/docs/api/core/grid/#rendererkind`,
+    onGridChange: `${SITE_BASE}/docs/api/core-adapter/grid-adapter-event-handlers/#ongridchange`,
+    applyTransaction: `${SITE_BASE}/docs/api/core/grid/#applytransaction`,
+    SnapshotValidationError: `${SITE_BASE}/docs/api/core/snapshot-validation-error/`,
+    toXlsxWorkbook: `${SITE_BASE}/docs/api/core/to-xlsx-workbook/`,
   } as const;
 
   for (const [term, expectedHref] of Object.entries(searchTargets)) {
@@ -372,6 +400,6 @@ test.describe("documentation site", () => {
       .first()
       .click();
     await page.locator('input[placeholder="Search"]').fill("XLSX browser verification");
-    await expect(page.locator("a[href^='/test/']")).toHaveCount(0);
+    await expect(page.locator(`a[href^='${SITE_BASE}/test/']`)).toHaveCount(0);
   });
 });

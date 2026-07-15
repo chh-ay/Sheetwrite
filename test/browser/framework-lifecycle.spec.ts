@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { LIFECYCLE_CELL } from "../../docs/src/components/framework-lifecycle/fixture.js";
 import { hasOpaqueForeground } from "./canvas-assertions.js";
-import { SITE_PORT } from "./playwright.config.js";
+import { siteUrl } from "./playwright.config.js";
 
 interface BrowserErrors {
   console: string[];
@@ -47,7 +47,7 @@ for (const framework of ["react", "vue", "svelte"] as const) {
     page,
   }) => {
     const errors = collectErrors(page);
-    await page.goto(`http://localhost:${SITE_PORT}/test/framework-lifecycle/${framework}/`);
+    await page.goto(siteUrl(`/test/framework-lifecycle/${framework}/`));
 
     const fallback = page.locator("[data-lifecycle-fallback]");
     const status = page.locator("[data-lifecycle-status]");

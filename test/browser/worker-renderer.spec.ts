@@ -1,8 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 import { hasOpaqueForeground } from "./canvas-assertions.js";
-import { SITE_PORT } from "./playwright.config.js";
+import { siteUrl } from "./playwright.config.js";
 
-const REACT_URL = `http://localhost:${SITE_PORT}/react/`;
+const REACT_URL = siteUrl("/react/");
 const GRID = ".example-grid .sheetwrite";
 const CANVAS = `${GRID} .sheetwrite-canvas`;
 const INITIAL_CUSTOMER = "Customer 000001";

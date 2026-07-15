@@ -1,5 +1,5 @@
 // @ts-check
-import { readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import react from "@astrojs/react";
 import sitemap from "@astrojs/sitemap";
 import starlight from "@astrojs/starlight";
@@ -7,9 +7,13 @@ import svelte from "@astrojs/svelte";
 import vue from "@astrojs/vue";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
+import { withBasePath } from "./src/base-path.ts";
 
-/** @returns {import("astro").AstroIntegration} */
-function pagefindWorkerUrls() {
+const PRODUCTION_SITE = "https://chh-ay.github.io";
+const PRODUCTION_BASE = "/Sheetwrite";
+
+/** @param {string} base @returns {import("astro").AstroIntegration} */
+function pagefindWorkerUrls(base) {
   return {
     name: "sheetwrite-pagefind-worker-urls",
     hooks: {
@@ -17,8 +21,8 @@ function pagefindWorkerUrls() {
         const workerUrl = new URL("pagefind/pagefind-worker.js", dir);
         const generated = await readFile(workerUrl, "utf8");
         const original = 'let basePath=opts.basePath||"/pagefind/";';
-        const replacement =
-          'let basePath=opts.basePath||"/pagefind/";if(basePath.startsWith("/"))basePath=new URL(basePath,self.location.origin).href;';
+        const fallback = JSON.stringify(withBasePath("/pagefind/", base));
+        const replacement = `let basePath=opts.basePath||${fallback};if(basePath.startsWith("/"))basePath=new URL(basePath,self.location.origin).href;`;
         if (!generated.includes(original)) {
           throw new Error("Pagefind worker base-path initialization changed");
         }
@@ -28,14 +32,62 @@ function pagefindWorkerUrls() {
   };
 }
 
+/** @param {URL} directory @param {string} base */
+async function prefixBuiltHtmlLinks(directory, base) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  await Promise.all(
+    entries.map(async (entry) => {
+      const target = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
+      if (entry.isDirectory()) {
+        await prefixBuiltHtmlLinks(target, base);
+        return;
+      }
+      if (!entry.name.endsWith(".html")) return;
+      const html = await readFile(target, "utf8");
+      const rewritten = html.replace(
+        /\b(href|src)=(["'])(\/[^"']*)/g,
+        (match, attribute, quote, path) => {
+          if (path.startsWith("//") || path === base || path.startsWith(`${base}/`)) return match;
+          return `${attribute}=${quote}${withBasePath(path, base)}`;
+        },
+      );
+      if (rewritten !== html) await writeFile(target, rewritten);
+    }),
+  );
+}
+
+/** @param {string} base @returns {import("astro").AstroIntegration} */
+function basePathOutput(base) {
+  return {
+    name: "sheetwrite-base-path-output",
+    hooks: {
+      "astro:build:done": async ({ dir }) => prefixBuiltHtmlLinks(dir, base),
+    },
+  };
+}
+
+// One product site: routed documentation plus every runnable Sheetwrite example.
+const production = process.argv.includes("build");
+const site =
+  process.env.SHEETWRITE_SITE_URL ?? (production ? PRODUCTION_SITE : "http://localhost:4321");
+const base = process.env.SHEETWRITE_BASE_PATH ?? (production ? PRODUCTION_BASE : "/");
+if (production && (site !== PRODUCTION_SITE || base !== PRODUCTION_BASE)) {
+  throw new Error(
+    `Production docs require site=${PRODUCTION_SITE} and base=${PRODUCTION_BASE}; received site=${site} base=${base}`,
+  );
+}
+/** @param {string} path */
+const route = (path) => withBasePath(path, base);
+
 // One product site: routed documentation plus every runnable Sheetwrite example.
 export default defineConfig({
-  site: process.env.SHEETWRITE_SITE_URL ?? "http://localhost:4321",
+  site,
+  base,
   integrations: [
     sitemap({
       filter: (page) => {
         const pathname = new URL(page).pathname;
-        return !pathname.startsWith("/test/") && !pathname.startsWith("/__test__/");
+        return !pathname.startsWith(route("/test/")) && !pathname.startsWith(route("/__test__/"));
       },
     }),
     starlight({
@@ -173,7 +225,8 @@ export default defineConfig({
         },
       ],
     }),
-    pagefindWorkerUrls(),
+    basePathOutput(base),
+    pagefindWorkerUrls(base),
     react(),
     vue(),
     svelte(),

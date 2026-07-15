@@ -1178,7 +1178,10 @@ async function checkDocs(
   const sidebarConfig = await readFile(join(repositoryRoot, "docs/astro.config.mjs"), "utf8");
   for (const apiPagePath of entryPageKeys) {
     const route = `/docs/${posix(relative(contentRoot, apiPagePath)).replace(/\.md$/, "/")}`;
-    if (!sidebarConfig.includes(`link: "${route}"`)) {
+    if (
+      !sidebarConfig.includes(`link: "${route}"`) &&
+      !sidebarConfig.includes(`link: route("${route}")`)
+    ) {
       failures.push(`generated API entry page is missing from the sidebar: ${route}`);
     }
   }

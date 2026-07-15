@@ -8,7 +8,7 @@ declare global {
   }
 }
 
-import { examplePages, SITE_PORT } from "./playwright.config.js";
+import { examplePages, SITE_BASE, siteUrl } from "./playwright.config.js";
 
 const EXPECTED_CELL_VALUE = {
   vanilla: "Customer 000001",
@@ -25,7 +25,7 @@ const EXPECTED_CELL_VALUE = {
  */
 
 function urlOf(page: (typeof examplePages)[number]): string {
-  return `http://localhost:${SITE_PORT}/${page}/`;
+  return siteUrl(`/${page}/`);
 }
 
 interface BootErrors {
@@ -104,7 +104,7 @@ for (const name of examplePages) {
 
 test("workbook XLSX backend preserves formulas in a browser build", async ({ page }) => {
   const errors = collectErrors(page);
-  await page.goto(`http://localhost:${SITE_PORT}/test/xlsx/`);
+  await page.goto(siteUrl("/test/xlsx/"));
   const result = page.locator("#result");
   await expect
     .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
@@ -121,7 +121,7 @@ test("workbook XLSX backend preserves formulas in a browser build", async ({ pag
 
 test("offline queue, two-grid sync, and presence converge in a browser", async ({ page }) => {
   const errors = collectErrors(page);
-  await page.goto(`http://localhost:${SITE_PORT}/test/collaboration/`);
+  await page.goto(siteUrl("/test/collaboration/"));
   const result = page.locator("#result");
   await expect
     .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
@@ -154,7 +154,7 @@ test("offline queue, two-grid sync, and presence converge in a browser", async (
 test("example pages cross-link through the shared nav", async ({ page }) => {
   await page.goto(urlOf("vanilla"));
   await page.waitForSelector(".sw-nav");
-  await page.click('.sw-nav a[href="/react/"]');
+  await page.click(`.sw-nav a[href="${SITE_BASE}/react/"]`);
   await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
   await expect(page.locator('.sw-nav a[aria-current="page"]')).toHaveText("React");
 });

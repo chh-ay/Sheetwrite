@@ -2,6 +2,7 @@
 // Shared shell for every example page: fonts, tokens, favicon, nav.
 import Nav from "@/components/Nav.astro";
 import "@/styles/global.css";
+import { withBasePath } from "../base-path.js";
 
 interface Props {
   title: string;
@@ -10,7 +11,7 @@ interface Props {
 }
 
 const { title, description, active = "" } = Astro.props;
-const isTestPage = Astro.url.pathname.startsWith("/test/");
+const isTestPage = Astro.url.pathname.startsWith(withBasePath("/test/", import.meta.env.BASE_URL));
 
 // The logo mark, inlined as the favicon so the tab matches the nav.
 const faviconSvg =

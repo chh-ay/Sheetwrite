@@ -2,6 +2,11 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "@playwright/test";
 
 export const SITE_PORT = 4173;
+export const SITE_BASE = "/Sheetwrite";
+export function siteUrl(path = "/"): string {
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `http://localhost:${SITE_PORT}${SITE_BASE}${suffix}`;
+}
 export const examplePages = ["vanilla", "react", "vue", "svelte", "theming"] as const;
 
 export default defineConfig({
@@ -11,13 +16,13 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    baseURL: `http://localhost:${SITE_PORT}`,
+    baseURL: siteUrl(),
     headless: true,
   },
   webServer: {
-    command: `bun run --filter '@sheetwrite/docs-site' preview --host 127.0.0.1 --port ${SITE_PORT}`,
-    url: `http://localhost:${SITE_PORT}`,
-    reuseExistingServer: false,
+    command: `PORT=${SITE_PORT} bun scripts/serve-docs.ts`,
+    cwd: fileURLToPath(new URL("../../", import.meta.url)),
+    url: siteUrl(),
     timeout: 120_000,
   },
 });
