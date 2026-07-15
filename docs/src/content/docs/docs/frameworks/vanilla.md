@@ -5,7 +5,7 @@ description: Own Sheetwrite initialization and Grid lifetime without a framework
 
 Use `@sheetwrite/core` when the host owns DOM lifetime directly. Call `initSheetwrite()` on the client, pass an existing element to `createGrid`, and retain the returned `Grid` for events and commands.
 
-```ts title="Vanilla lifecycle"
+```ts partial="requires host-owned workbook data" title="Vanilla lifecycle"
 import {
   createGrid,
   initSheetwrite,

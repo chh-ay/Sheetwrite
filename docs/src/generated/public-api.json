@@ -2610,9 +2610,9 @@
               "owners": [
                 "src/Sheetwrite.svelte.d.ts"
               ],
-              "source": "src/Sheetwrite.svelte.d.ts#L12",
+              "source": "src/Sheetwrite.svelte.d.ts#L7",
               "jsDocTags": [],
-              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns reset and\nteardown through the component lifecycle. Bind `grid` to access the live `Grid`; use\n`SheetwriteGrid` when the host already owns a workbook or datasource."
+              "documentation": "Convenience component for local object rows. Bind `grid` to access the live `Grid`."
             },
             {
               "name": "SheetwriteGrid",
@@ -2719,9 +2719,9 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L255",
+              "source": "src/index.ts#L250",
               "jsDocTags": [],
-              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, then delegates initialization, live option\nupdates, reset-sensitive replacements, and teardown to `SheetwriteGrid`. Use\n`SheetwriteGrid` directly when the host already owns a workbook or datasource."
+              "documentation": "Convenience component for local object rows with live option updates."
             },
             {
               "name": "SheetwriteGrid",

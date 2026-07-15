@@ -34,6 +34,6 @@ Source entry: `packages/vue/src/index.ts`
 ### Variables <span class="api-count">2</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/vue/sheetwrite/"><code>Sheetwrite</code><span>Convenience component for local object rows.</span></a>
+<a class="api-symbol-card" href="/docs/api/vue/sheetwrite/"><code>Sheetwrite</code><span>Convenience component for local object rows with live option updates.</span></a>
 <a class="api-symbol-card" href="/docs/api/vue/sheetwrite-grid/"><code>SheetwriteGrid</code><span>Advanced framework component for workbook data or datasource input.</span></a>
 </div>

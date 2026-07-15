@@ -246,12 +246,7 @@ export const SheetwriteGrid = SheetwriteGridComponent as typeof SheetwriteGridCo
   new (): InstanceType<typeof SheetwriteGridComponent> & SheetwriteGridExpose;
 };
 
-/**
- * Convenience component for local object rows. It derives a single-sheet workbook from
- * `columns`, `defaultRows`, and `sheetName`, then delegates initialization, live option
- * updates, reset-sensitive replacements, and teardown to `SheetwriteGrid`. Use
- * `SheetwriteGrid` directly when the host already owns a workbook or datasource.
- */
+/** Convenience component for local object rows with live option updates. */
 export const Sheetwrite = defineComponent({
   name: "SheetwriteComponent",
   inheritAttrs: false,

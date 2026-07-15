@@ -184,7 +184,7 @@ function mapSvelteHovers(source: string, analyzer: SheetwriteTypeEngine): Sheetw
 }
 
 class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
-  readonly name = "sheetwrite-code-hover";
+  override readonly name = "sheetwrite-code-hover";
 
   constructor(
     hover: SheetwriteTypeHover,

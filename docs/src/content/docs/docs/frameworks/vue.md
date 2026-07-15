@@ -7,7 +7,7 @@ description: Integrate Sheetwrite with Vue events, exposed Grid state, and reset
 
 The component exposes `grid` before emitting `ready`. A reset clears the old exposed handle, creates a new generation, and then publishes the replacement. Reattach any coordinator that subscribed to the old grid.
 
-```vue title="Vue adapter"
+```vue partial="requires application-owned rows" title="Vue adapter"
 <script setup lang="ts">
 import { Sheetwrite, type GridReadyEvent, type SimpleColumn } from "@sheetwrite/vue";
 import type { ChangeEvent } from "@sheetwrite/core";
