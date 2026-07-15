@@ -102,7 +102,9 @@ describe("contributor and CI toolchain contract", () => {
       "bun run changeset:status -- --since=origin/develop",
       "bun scripts/install-wasm-pack.ts",
       "bun run browser:install",
-      "bun run verify:ci",
+      "bun run release:artifacts",
+      "bun run verify:release-quality",
+      "bun scripts/release-verify.ts --artifacts test-results/release-artifacts",
       "bun run test:coverage",
       "bun run test:browser",
     ];
@@ -111,6 +113,12 @@ describe("contributor and CI toolchain contract", () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(workflow).not.toContain("bun run build:wasm");
     expect(workflow).not.toContain("bunx @changesets/cli");
+    expect(workflow.match(/bun run release:artifacts/g)).toHaveLength(1);
+    expect(workflow).not.toContain("npm pack");
+    expect(workflow).toContain("if: always()");
+    expect(workflow).toContain("test-results/");
+    expect(workflow).toContain("coverage/");
+    expect(workflow).toContain("playwright-report/");
   });
 
   it("matches the active pinned tools", () => {

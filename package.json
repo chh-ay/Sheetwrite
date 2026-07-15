@@ -45,6 +45,7 @@
     "verify:examples": "bun run build:packages && bun run build:examples && bun run typecheck:examples",
     "verify:clean-build": "bun scripts/verify-clean-build.ts",
     "verify:ci": "bun scripts/workspace-tooling.ts verify-ci",
+    "verify:release-quality": "bun scripts/workspace-tooling.ts verify-release-quality",
     "verify:packed": "bun scripts/verify-packed-consumer.ts",
     "verify:bundlers": "node test/bundler-fixtures/run.mjs",
     "verify:node-esm": "node scripts/verify-node-esm.mjs",

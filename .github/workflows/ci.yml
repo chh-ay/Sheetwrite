@@ -107,8 +107,14 @@ jobs:
       - name: Install Playwright Chromium
         run: bun run browser:install
 
-      - name: Run canonical non-browser verification graph
-        run: bun run verify:ci
+      - name: Build one canonical release artifact set
+        run: bun run release:artifacts
+
+      - name: Run quality gates against the canonical build
+        run: bun run verify:release-quality
+
+      - name: Verify every canonical artifact consumer
+        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
 
       - name: Enforce source coverage
         run: bun run test:coverage
@@ -116,15 +122,16 @@ jobs:
       - name: Browser smoke tests
         run: bun run test:browser
 
+      - name: Assert verification did not mutate source
+        run: test -z "$(git status --porcelain --untracked-files=all)"
 
-      - name: Upload verification evidence on failure
-        if: failure()
+      - name: Upload canonical artifacts and verification evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: verification-failure-evidence
+          name: canonical-release-and-verification-evidence
           path: |
-            test-results/dependency-audit/
-            test-results/performance-gates/
             test-results/
+            coverage/
             playwright-report/
-          if-no-files-found: ignore
+          if-no-files-found: warn

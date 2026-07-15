@@ -7,6 +7,7 @@ import {
   PACKAGE_BUILD_NODES,
   PACKAGE_TYPECHECK_NODES,
   PUBLISHABLE_PACKAGE_ORDER,
+  RELEASE_QUALITY_NODES,
   TYPECHECK_NODES,
   VERIFY_CI_NODES,
   validateWorkspaceGraph,
@@ -123,6 +124,33 @@ describe("canonical workspace graph", () => {
     expect(() => assertUniqueOrderedNodes(VERIFY_CI_NODES)).not.toThrow();
     for (const buildNode of PACKAGE_BUILD_NODES) {
       expect(VERIFY_CI_NODES.filter((node) => node.id === buildNode.id)).toHaveLength(1);
+    }
+  });
+
+  it("runs release quality against the single prebuilt package set", () => {
+    expect(() => assertUniqueOrderedNodes(RELEASE_QUALITY_NODES)).not.toThrow();
+    expect(
+      PACKAGE_BUILD_NODES.some((build) =>
+        RELEASE_QUALITY_NODES.some((node) => node.id === build.id),
+      ),
+    ).toBeFalse();
+    expect(
+      RELEASE_QUALITY_NODES.some((node) =>
+        ["verify:packed", "verify:bundlers", "verify:delivery-size"].includes(node.id),
+      ),
+    ).toBeFalse();
+    for (const id of [
+      "test:tooling-contracts",
+      "audit:javascript",
+      "test:rust",
+      "audit:rust",
+      "verify:exports",
+      "lint",
+      "test:unit",
+      "verify:public-api",
+      "verify:benchmarks",
+    ]) {
+      expect(RELEASE_QUALITY_NODES.some((node) => node.id === id)).toBeTrue();
     }
   });
 

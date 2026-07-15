@@ -118,10 +118,13 @@ const TOOLING_TESTS: CommandNode = {
     "scripts/dependency-audit.test.ts",
     "scripts/verify-clean-build.test.ts",
     "scripts/size-report.test.ts",
+    "scripts/release-artifacts.test.ts",
+    "scripts/release-locks.test.ts",
+    "scripts/release-verify.test.ts",
   ],
 };
 
-export const VERIFY_CI_NODES: readonly CommandNode[] = [
+const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
   TOOLING_TESTS,
   {
     id: "audit:javascript",
@@ -137,7 +140,9 @@ export const VERIFY_CI_NODES: readonly CommandNode[] = [
     command: ["cargo", "audit"],
     cwd: "packages/wasm",
   },
-  ...PACKAGE_BUILD_NODES,
+];
+
+const POST_BUILD_QUALITY_NODES: readonly CommandNode[] = [
   {
     id: "verify:exports",
     command: ["bun", "scripts/verify-clean-build.ts", "--validate-current"],
@@ -163,14 +168,9 @@ export const VERIFY_CI_NODES: readonly CommandNode[] = [
     id: "verify:node-esm",
     command: ["bun", "run", "verify:node-esm"],
   },
-  {
-    id: "verify:packed",
-    command: ["bun", "run", "verify:packed"],
-  },
-  {
-    id: "verify:bundlers",
-    command: ["bun", "run", "verify:bundlers"],
-  },
+];
+
+const PUBLIC_API_AND_BENCHMARK_NODES: readonly CommandNode[] = [
   {
     id: "verify:public-api",
     command: ["bun", "run", "api:check"],
@@ -179,6 +179,27 @@ export const VERIFY_CI_NODES: readonly CommandNode[] = [
     id: "verify:benchmarks",
     command: ["bun", "run", "--filter", "@sheetwrite/bench", "bench:verify"],
   },
+];
+
+export const RELEASE_QUALITY_NODES: readonly CommandNode[] = [
+  ...PRE_BUILD_VERIFICATION_NODES,
+  ...POST_BUILD_QUALITY_NODES,
+  ...PUBLIC_API_AND_BENCHMARK_NODES,
+];
+
+export const VERIFY_CI_NODES: readonly CommandNode[] = [
+  ...PRE_BUILD_VERIFICATION_NODES,
+  ...PACKAGE_BUILD_NODES,
+  ...POST_BUILD_QUALITY_NODES,
+  {
+    id: "verify:packed",
+    command: ["bun", "run", "verify:packed"],
+  },
+  {
+    id: "verify:bundlers",
+    command: ["bun", "run", "verify:bundlers"],
+  },
+  ...PUBLIC_API_AND_BENCHMARK_NODES,
   {
     id: "verify:delivery-size",
     command: ["bun", "scripts/size-report.ts", "check", "--reuse-bundlers"],
@@ -329,6 +350,8 @@ function nodesForMode(mode: string): readonly CommandNode[] {
       return TYPECHECK_NODES;
     case "verify-ci":
       return VERIFY_CI_NODES;
+    case "verify-release-quality":
+      return RELEASE_QUALITY_NODES;
     default:
       throw new Error(`Unknown workspace tooling mode: ${mode}`);
   }
