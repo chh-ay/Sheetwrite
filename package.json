@@ -39,6 +39,8 @@
     "size:candidate": "bun scripts/size-report.ts candidate",
     "release:artifacts": "bun scripts/release-artifacts.ts build --output test-results/release-artifacts",
     "release:artifacts:verify": "bun scripts/release-artifacts.ts verify --artifacts test-results/release-artifacts",
+    "release:prepare": "bun scripts/release-artifacts.ts prepare",
+    "release:verify-artifacts": "bun scripts/release-artifacts.ts verify-input",
     "release:audit": "bun scripts/release-audit.ts --artifacts test-results/release-artifacts",
     "release:verify": "bun scripts/release-verify.ts",
     "verify:packages": "bun run build:packages && bun run typecheck:packages && bun run verify:packed",

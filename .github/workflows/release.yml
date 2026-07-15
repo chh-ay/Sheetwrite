@@ -1,0 +1,189 @@
+name: Stage npm release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Full commit SHA reachable from origin/develop
+        required: true
+        type: string
+      version:
+        description: Exact version shared by all six packages
+        required: true
+        type: string
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.3.14"
+  NODE_VERSION: "24.3.0"
+  NPM_VERSION: "11.18.0"
+  RUST_VERSION: "1.96.0"
+  WASM_TARGET: "wasm32-unknown-unknown"
+  WASM_PACK_VERSION: "0.15.0"
+  CARGO_AUDIT_VERSION: "0.22.2"
+  CARGO_LLVM_COV_VERSION: "0.8.7"
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout requested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Validate release identity and registry state
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/release-preflight.ts
+      - name: Changeset status
+        run: bun run changeset:status -- --since=origin/develop
+      - name: Install verification toolchain
+        run: |
+          bun scripts/install-wasm-pack.ts
+          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+          cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
+          bun run browser:install
+      - name: Print exact toolchain
+        run: |
+          test "$(bun --version)" = "$BUN_VERSION"
+          test "$(node --version)" = "v$NODE_VERSION"
+          test "$(npm --version)" = "$NPM_VERSION"
+          test "$(rustc --version | cut -d' ' -f2)" = "$RUST_VERSION"
+          test "$(wasm-pack --version | cut -d' ' -f2)" = "$WASM_PACK_VERSION"
+          cargo audit --version
+          cargo llvm-cov --version
+      - name: Run canonical source verification
+        run: bun run verify:ci
+      - name: Assert source remains clean
+        run: test -z "$(git status --porcelain --untracked-files=all)"
+
+  prepare:
+    needs: preflight
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - name: Checkout requested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install checksum-pinned wasm-pack
+        run: bun scripts/install-wasm-pack.ts
+      - name: Build and pack one canonical artifact set
+        run: bun run release:prepare -- --mode release --output test-results/release-artifacts
+      - name: Verify canonical artifact manifest
+        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Upload immutable canonical artifact bundle
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+
+  package-gates:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout requested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download immutable canonical artifact bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Assert workflow artifact digest exists
+        env:
+          ARTIFACT_DIGEST: ${{ needs.prepare.outputs.artifact_digest }}
+        run: test -n "$ARTIFACT_DIGEST"
+      - name: Rehash and verify exact tarballs
+        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Run every package consumer against downloaded bytes
+        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
+
+  stage:
+    needs: [prepare, package-gates]
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout requested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Download immutable canonical artifact bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Rehash exact tarballs before staging
+        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Stage exact tarballs sequentially
+        run: bun scripts/release-stage.ts test-results/release-artifacts test-results/release-stage
+      - name: Upload maintainer review summary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-stage-review-summary
+          path: test-results/release-stage/staging-summary.json
+          if-no-files-found: error

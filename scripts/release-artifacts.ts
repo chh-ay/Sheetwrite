@@ -505,6 +505,18 @@ async function cli(): Promise<void> {
     );
     return;
   }
+  if (command === "prepare") {
+    const mode = requiredOption(args, "--mode");
+    if (mode !== "verification" && mode !== "release") {
+      throw new Error("--mode must be verification or release");
+    }
+    const output = requiredOption(args, "--output");
+    const manifest = await buildReleaseArtifacts(output);
+    console.log(
+      `Prepared ${manifest.packages.length} canonical release tarballs in ${resolve(output)} (${mode})`,
+    );
+    return;
+  }
   if (command === "verify") {
     const artifacts = requiredOption(args, "--artifacts");
     const manifest = await verifyReleaseArtifacts(artifacts);
@@ -513,8 +525,16 @@ async function cli(): Promise<void> {
     );
     return;
   }
+  if (command === "verify-input") {
+    const artifacts = requiredOption(args, "--input");
+    const manifest = await verifyReleaseArtifacts(artifacts);
+    console.log(
+      `Verified ${manifest.packages.length} canonical release tarballs from ${manifest.sourceCommit}`,
+    );
+    return;
+  }
   throw new Error(
-    "Usage: bun scripts/release-artifacts.ts build --output <directory> | verify --artifacts <directory>",
+    "Usage: bun scripts/release-artifacts.ts build --output <directory> | prepare --mode <verification|release> --output <directory> | verify --artifacts <directory> | verify-input --input <directory>",
   );
 }
 
