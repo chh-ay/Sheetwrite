@@ -24,6 +24,26 @@ const workspaceVersions = new Map(
   sourceManifests.map((manifest) => [manifest.name, manifest.version]),
 );
 
+function optionValue(name) {
+  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
+  if (inline !== undefined) return inline.slice(name.length + 1);
+  const index = process.argv.indexOf(name);
+  return index < 0 ? undefined : process.argv[index + 1];
+}
+
+const artifactDirectory = optionValue("--artifacts");
+const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
+if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
+  throw new Error("Artifact-only bundler verification requires --artifacts");
+}
+if (
+  requiredArtifacts !== undefined &&
+  (artifactDirectory === undefined ||
+    resolve(repositoryRoot, artifactDirectory) !== resolve(requiredArtifacts))
+) {
+  throw new Error("Bundler artifact input differs from the canonical artifact set");
+}
+
 function run(command, args, cwd) {
   return new Promise((resolveRun, reject) => {
     const child = spawn(command, args, {
@@ -77,12 +97,29 @@ await rm(join(repositoryRoot, "test-results/delivery-size/bundlers"), {
   force: true,
 });
 await mkdir(tarballRoot, { recursive: true });
-await stageAndPack("packages/wasm", "sheetwrite-wasm.tgz");
-await stageAndPack("packages/core", "sheetwrite-core.tgz");
-await stageAndPack("packages/xlsx", "sheetwrite-xlsx.tgz");
-await stageAndPack("packages/react", "sheetwrite-react.tgz");
-await stageAndPack("packages/vue", "sheetwrite-vue.tgz");
-await stageAndPack("packages/svelte", "sheetwrite-svelte.tgz");
+if (artifactDirectory === undefined) {
+  for (const directory of packageDirectories) {
+    await stageAndPack(directory, `sheetwrite-${basename(directory)}.tgz`);
+  }
+} else {
+  const artifactRoot = resolve(repositoryRoot, artifactDirectory);
+  const releaseManifest = JSON.parse(
+    await readFile(join(artifactRoot, "release-manifest.json"), "utf8"),
+  );
+  if (!Array.isArray(releaseManifest.packages) || releaseManifest.packages.length !== 6) {
+    throw new Error("Canonical release manifest must contain exactly six packages");
+  }
+  for (const [index, sourceManifest] of sourceManifests.entries()) {
+    const artifact = releaseManifest.packages.find((entry) => entry.name === sourceManifest.name);
+    if (artifact === undefined || artifact.version !== sourceManifest.version) {
+      throw new Error(`Missing canonical artifact for ${sourceManifest.name}`);
+    }
+    await cp(
+      join(artifactRoot, artifact.path),
+      join(tarballRoot, `sheetwrite-${basename(packageDirectories[index])}.tgz`),
+    );
+  }
+}
 await rm(stagingRoot, { recursive: true, force: true });
 
 for (const fixture of ["vite", "webpack", "next"]) {

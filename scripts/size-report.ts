@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
+import { verifyReleaseArtifacts } from "./release-artifacts.js";
 
 export const SIZE_PROTOCOL_VERSION = 1;
 export const SIZE_TOOL_NAME = "sheetwrite-delivery-size";
@@ -563,6 +564,40 @@ async function packPackages(temporaryRoot: string): Promise<PackedPackage[]> {
   return packed;
 }
 
+async function loadPackedArtifacts(
+  artifactDirectory: string,
+  temporaryRoot: string,
+): Promise<PackedPackage[]> {
+  const artifactRoot = resolve(artifactDirectory);
+  const release = await verifyReleaseArtifacts(artifactRoot);
+  const extractRoot = join(temporaryRoot, "artifact-packages");
+  await mkdir(extractRoot, { recursive: true });
+  const packed: PackedPackage[] = [];
+  for (const artifact of release.packages) {
+    const packageRoot = join(extractRoot, artifact.name.replaceAll("/", "-"));
+    await mkdir(packageRoot, { recursive: true });
+    const tarballPath = join(artifactRoot, artifact.path);
+    await runCommand(["tar", "-xzf", tarballPath, "-C", packageRoot]);
+    const files = await Promise.all(
+      artifact.files.map(async (path) => ({
+        path,
+        size: (await stat(join(packageRoot, "package", path))).size,
+      })),
+    );
+    packed.push({
+      name: artifact.name,
+      tarballPath,
+      report: summarizePack(artifact.name, {
+        filename: artifact.path,
+        size: artifact.bytes,
+        unpackedSize: artifact.unpackedBytes,
+        files,
+      }),
+    });
+  }
+  return packed;
+}
+
 async function sumPackageFiles(packageRoot: string): Promise<number> {
   let bytes = 0;
   async function visit(directory: string): Promise<void> {
@@ -656,8 +691,15 @@ function addMetric(
   metrics[key] = { actual, unit, category, owner };
 }
 
-async function loadBundlerEvidence(reuseBundlers: boolean): Promise<BundlerEvidence[]> {
-  if (!reuseBundlers) await runCommand(["node", "test/bundler-fixtures/run.mjs"]);
+async function loadBundlerEvidence(
+  reuseBundlers: boolean,
+  artifactDirectory?: string,
+): Promise<BundlerEvidence[]> {
+  if (!reuseBundlers) {
+    const command = ["node", "test/bundler-fixtures/run.mjs"];
+    if (artifactDirectory !== undefined) command.push("--artifacts", resolve(artifactDirectory));
+    await runCommand(command);
+  }
   const evidence: BundlerEvidence[] = [];
   for (const bundler of ["vite", "webpack", "next"] as const) {
     const path = join(evidenceRoot, "bundlers", `${bundler}.json`);
@@ -684,10 +726,16 @@ function metricSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9]+(.)/g, (_, next: string) => next.toUpperCase());
 }
 
-async function buildSizeReport(reuseBundlers: boolean): Promise<SizeReport> {
+async function buildSizeReport(
+  reuseBundlers: boolean,
+  artifactDirectory?: string,
+): Promise<SizeReport> {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-size-report-"));
   try {
-    const packedPackages = await packPackages(temporaryRoot);
+    const packedPackages =
+      artifactDirectory === undefined
+        ? await packPackages(temporaryRoot)
+        : await loadPackedArtifacts(artifactDirectory, temporaryRoot);
     const tarballs = new Map(packedPackages.map((entry) => [entry.name, entry.tarballPath]));
     const closureSpecs: Array<[string, string[]]> = [
       ["core", ["@sheetwrite/wasm", "@sheetwrite/core"]],
@@ -718,7 +766,7 @@ async function buildSizeReport(reuseBundlers: boolean): Promise<SizeReport> {
       throw new Error("Repeated core clean-install closure measurement was not deterministic");
     }
 
-    const bundlerEvidence = await loadBundlerEvidence(reuseBundlers);
+    const bundlerEvidence = await loadBundlerEvidence(reuseBundlers, artifactDirectory);
     const bundlers: SizeReport["bundlers"] = [];
     for (const evidence of bundlerEvidence) {
       const assets = await Promise.all(evidence.assets.map(reportAsset));
@@ -946,11 +994,32 @@ async function writeFailure(error: unknown): Promise<void> {
   );
 }
 
+function optionValue(name: string): string | undefined {
+  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
+  if (inline !== undefined) return inline.slice(name.length + 1);
+  const index = process.argv.indexOf(name);
+  return index < 0 ? undefined : process.argv[index + 1];
+}
+
 async function cli(): Promise<void> {
   const mode = process.argv[2] ?? "report";
   const reuseBundlers = process.argv.includes("--reuse-bundlers");
+  const artifactDirectory = optionValue("--artifacts");
   try {
-    const report = await buildSizeReport(reuseBundlers);
+    if (artifactDirectory?.startsWith("--")) {
+      throw new Error("--artifacts requires a directory");
+    }
+    const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
+    if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
+      throw new Error("Artifact-only size verification requires --artifacts");
+    }
+    if (
+      requiredArtifacts !== undefined &&
+      (artifactDirectory === undefined || resolve(artifactDirectory) !== resolve(requiredArtifacts))
+    ) {
+      throw new Error("Size verification artifact input differs from the canonical artifact set");
+    }
+    const report = await buildSizeReport(reuseBundlers, artifactDirectory);
     await writeReport(report);
     console.log(formatTable(report));
     console.log(`JSON report: ${relative(repositoryRoot, reportPath)}`);

@@ -1,6 +1,7 @@
 import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { verifyReleaseArtifacts } from "./release-artifacts.js";
 
 interface PackageManifest {
   name: string;
@@ -416,6 +417,25 @@ async function auditRuntimeLicenses(consumerRoot: string): Promise<number> {
   return visited.size;
 }
 
+function optionValue(name: string): string | undefined {
+  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
+  if (inline !== undefined) return inline.slice(name.length + 1);
+  const index = process.argv.indexOf(name);
+  return index < 0 ? undefined : process.argv[index + 1];
+}
+
+const artifactDirectory = optionValue("--artifacts");
+const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
+if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
+  throw new Error("Artifact-only packed verification requires --artifacts");
+}
+if (
+  requiredArtifacts !== undefined &&
+  (artifactDirectory === undefined || resolve(artifactDirectory) !== resolve(requiredArtifacts))
+) {
+  throw new Error("Packed verification artifact input differs from the canonical artifact set");
+}
+
 const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-packed-consumer-"));
 try {
   const stageRoot = join(temporaryRoot, "stage");
@@ -439,27 +459,58 @@ try {
   const tarballs = new Map<string, string>();
   const packageSizes = new Map<string, { packed: number; unpacked: number }>();
 
-  for (const spec of packageSpecs) {
-    const manifest = await stagePackage(spec, stageRoot, versions);
-    const packageRoot = join(stageRoot, basename(spec.directory));
-    const output = await run(
-      ["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", tarballRoot],
-      packageRoot,
-    );
-    const results = JSON.parse(output) as PackResult[];
-    const result = results[0];
-    if (result === undefined) throw new Error(`npm pack returned no result for ${manifest.name}`);
+  if (artifactDirectory === undefined) {
+    for (const spec of packageSpecs) {
+      const manifest = await stagePackage(spec, stageRoot, versions);
+      const packageRoot = join(stageRoot, basename(spec.directory));
+      const output = await run(
+        ["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", tarballRoot],
+        packageRoot,
+      );
+      const results = JSON.parse(output) as PackResult[];
+      const result = results[0];
+      if (result === undefined) throw new Error(`npm pack returned no result for ${manifest.name}`);
 
-    const tarballPath = join(tarballRoot, result.filename);
-    await assertTarball(
-      spec,
-      manifest,
-      result,
-      tarballPath,
-      join(extractRoot, basename(spec.directory)),
-    );
-    tarballs.set(manifest.name, tarballPath);
-    packageSizes.set(manifest.name, { packed: result.size, unpacked: result.unpackedSize });
+      const tarballPath = join(tarballRoot, result.filename);
+      await assertTarball(
+        spec,
+        manifest,
+        result,
+        tarballPath,
+        join(extractRoot, basename(spec.directory)),
+      );
+      tarballs.set(manifest.name, tarballPath);
+      packageSizes.set(manifest.name, { packed: result.size, unpacked: result.unpackedSize });
+    }
+  } else {
+    const release = await verifyReleaseArtifacts(resolve(artifactDirectory));
+    const artifacts = new Map(release.packages.map((artifact) => [artifact.name, artifact]));
+    for (const [index, spec] of packageSpecs.entries()) {
+      const manifest = sourceManifests[index];
+      if (manifest === undefined) throw new Error(`Missing source manifest for ${spec.directory}`);
+      const artifact = artifacts.get(manifest.name);
+      if (artifact === undefined)
+        throw new Error(`Missing canonical artifact for ${manifest.name}`);
+      const tarballPath = join(resolve(artifactDirectory), artifact.path);
+      const result: PackResult = {
+        filename: artifact.path,
+        size: artifact.bytes,
+        unpackedSize: artifact.unpackedBytes,
+        files: artifact.files.map((path) => ({ path })),
+      };
+      await assertTarball(
+        spec,
+        manifest,
+        result,
+        tarballPath,
+        join(extractRoot, basename(spec.directory)),
+      );
+      tarballs.set(manifest.name, tarballPath);
+      packageSizes.set(manifest.name, {
+        packed: artifact.bytes,
+        unpacked: artifact.unpackedBytes,
+      });
+    }
   }
 
   await Promise.all([
