@@ -189,9 +189,10 @@ describe("public API policy", () => {
       ),
     ];
 
-    for (const mutation of mutations) {
-      const root = await fixture(mutation);
-      const result = await analyzePublicApi(root);
+    const results = await Promise.all(
+      mutations.map(async (mutation) => analyzePublicApi(await fixture(mutation))),
+    );
+    for (const result of results) {
       expect(checkManifestBaseline(result.manifest, expectedDigest)).toContainEqual(
         expect.objectContaining({ code: "manifest-drift" }),
       );
