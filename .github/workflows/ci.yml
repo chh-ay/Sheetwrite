@@ -72,7 +72,7 @@ jobs:
             ~/.cargo/git
           key: cargo-audit-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}
       - name: Install cargo-audit
-        run: cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+        run: command -v cargo-audit >/dev/null || cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
       - name: Rust dependency audit
         working-directory: packages/wasm
         run: cargo audit
@@ -163,8 +163,8 @@ jobs:
           key: release-tools-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}
       - name: Install release verification tools
         run: |
-          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
-          cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
+          command -v cargo-audit >/dev/null || cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+          command -v cargo-llvm-cov >/dev/null || cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
       - name: Install dependencies and wasm-pack
         run: |
           bun install --frozen-lockfile
