@@ -1,0 +1,12 @@
+:root {
+  /* 12 / 14 / 16 / 18 / 20 / 24 / 32 / 48 / 64 px at the browser default. */
+  --sw-type-xs: 0.75rem;
+  --sw-type-sm: 0.875rem;
+  --sw-type-base: 1rem;
+  --sw-type-lg: 1.125rem;
+  --sw-type-xl: 1.25rem;
+  --sw-type-2xl: 1.5rem;
+  --sw-type-3xl: 2rem;
+  --sw-type-4xl: 3rem;
+  --sw-type-5xl: 4rem;
+}

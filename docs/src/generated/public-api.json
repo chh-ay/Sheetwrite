@@ -2501,9 +2501,9 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L262",
+              "source": "src/index.tsx#L267",
               "jsDocTags": [],
-              "documentation": "Simple framework component that owns initialization and Grid lifetime."
+              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`\nthrough prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;\nuse `SheetwriteGrid` when the host already owns a workbook or datasource."
             },
             {
               "name": "SheetwriteGrid",
@@ -2610,9 +2610,9 @@
               "owners": [
                 "src/Sheetwrite.svelte.d.ts"
               ],
-              "source": "src/Sheetwrite.svelte.d.ts#L7",
+              "source": "src/Sheetwrite.svelte.d.ts#L12",
               "jsDocTags": [],
-              "documentation": "Simple framework component that owns initialization and Grid lifetime."
+              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns reset and\nteardown through the component lifecycle. Bind `grid` to access the live `Grid`; use\n`SheetwriteGrid` when the host already owns a workbook or datasource."
             },
             {
               "name": "SheetwriteGrid",
@@ -2719,9 +2719,9 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L250",
+              "source": "src/index.ts#L255",
               "jsDocTags": [],
-              "documentation": "Simple framework component that owns initialization and Grid lifetime."
+              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, then delegates initialization, live option\nupdates, reset-sensitive replacements, and teardown to `SheetwriteGrid`. Use\n`SheetwriteGrid` directly when the host already owns a workbook or datasource."
             },
             {
               "name": "SheetwriteGrid",

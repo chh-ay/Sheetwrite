@@ -48,7 +48,7 @@
     "@sheetwrite/core": "workspace:*"
   },
   "devDependencies": {
-    "svelte-check": "^4.7.2",
+    "svelte-check": "4.7.3",
     "typescript": "^6"
   }
 }

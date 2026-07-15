@@ -1,488 +1,281 @@
-import type {
-  ColumnarData,
-  Grid,
-  SearchResult,
-  Selection,
-  Theme,
-  Workbook,
-} from "@sheetwrite/core";
+import type { Grid, SearchResult, Selection } from "@sheetwrite/core";
 import workerUrl from "@sheetwrite/core/worker?worker&url";
-import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/react";
+import { SheetwriteGrid } from "@sheetwrite/react";
+import { FileSpreadsheet, Monitor } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createRevenueWorkbook,
+  REVENUE_AMOUNT_COLUMN,
+  REVENUE_CITIES,
+  REVENUE_CITY_COLUMN,
+  REVENUE_DATA,
+  REVENUE_ROWS,
+  SHOWCASE_THEME,
+} from "../showcase/revenue.js";
+import { DemoButton } from "./ui/DemoButton.js";
+import { DemoRenderingMode } from "./ui/DemoRenderingMode.js";
+import { DemoSelect } from "./ui/DemoSelect.js";
 import "@sheetwrite/react/styles.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "../styles/showcase.css";
 
-// ── 100,000 rows of eager columnar data ──────────────────────────────────────
-// Loaded into the Rust/WASM store in one bulk pass; every sort, filter,
-// distinct scan, and aggregate below runs over the full 100k in Rust.
-
-const ROWS = 100_000;
-const CITIES = ["Phnom Penh", "Tokyo", "Berlin", "Lisbon", "Nairobi", "Lima", "Oslo"];
-const REPS = ["Ana", "Bram", "Chen", "Dara", "Eve"];
-
-function buildData(): ColumnarData {
-  const id = new Float64Array(ROWS);
-  const date: string[] = new Array(ROWS);
-  const customer: string[] = new Array(ROWS);
-  const city: string[] = new Array(ROWS);
-  const rep: string[] = new Array(ROWS);
-  const amount = new Float64Array(ROWS);
-  for (let r = 0; r < ROWS; r++) {
-    const day = new Date(Date.UTC(2020, 0, 1 + (r % 1000)));
-    id[r] = r + 1;
-    date[r] = day.toISOString().slice(0, 10);
-    customer[r] = `Customer ${String(r + 1).padStart(6, "0")}`;
-    city[r] = CITIES[r % CITIES.length] ?? "";
-    rep[r] = REPS[(r * 7) % REPS.length] ?? "";
-    amount[r] = Math.round((Math.sin(r) * 0.5 + 0.5) * 1_000_000) / 100;
-  }
-  return { rowCount: ROWS, columns: { id, date, customer, city, rep, amount } };
-}
-
-const AMOUNT_COL = 5;
-const CITY_COL = 3;
-
-/** Conditional formats are plain data on the workbook — the Highlight control
- *  builds a new workbook and lets the documented reset re-ingest all 100k rows. */
-function buildWorkbook(highlightAbove: number): Workbook {
-  const amountRange = {
-    sheet: "sales",
-    start: { row: 0, col: AMOUNT_COL },
-    end: { row: ROWS - 1, col: AMOUNT_COL },
-  };
-  return {
-    activeSheet: "sales",
-    sheets: [
-      {
-        id: "sales",
-        name: "Sales",
-        rowCount: ROWS,
-        columns: [
-          { key: "id", header: "ID", width: 70, type: "number" },
-          { key: "date", header: "Date", width: 110, type: "text" },
-          { key: "customer", header: "Customer", width: 200, type: "text" },
-          { key: "city", header: "City", width: 130, type: "text" },
-          { key: "rep", header: "Rep", width: 90, type: "text" },
-          // Excel-style number format painted by the canvas renderer.
-          {
-            key: "amount",
-            header: "Amount",
-            width: 130,
-            type: "currency",
-            numberFormat: "$#,##0.00",
-          },
-        ],
-        // Conditional formats fold into the bulk render window in Rust.
-        conditionalFormats: [
-          ...(highlightAbove > 0
-            ? [
-                {
-                  range: amountRange,
-                  when: { kind: "greaterThan", value: highlightAbove } as const,
-                  // Translucent emerald reads on both the light and dark canvas.
-                  style: { backgroundColor: "#10b98130", bold: true },
-                },
-              ]
-            : []),
-          {
-            range: amountRange,
-            when: { kind: "lessThan", value: 500 },
-            style: { color: "#ef4444" },
-          },
-        ],
-      },
-    ],
-  };
-}
-
-const data = buildData();
-
-const LIGHT_THEME: Partial<Theme> = {
-  bg: "#ffffff",
-  fg: "#1c2333",
-  gridLine: "#e3e8f0",
-  headerBg: "#f4f6fa",
-  headerFg: "#5c6b8a",
-  selection: "#10b9811f",
-  selectionBorder: "#059669",
-};
-// Sits on the site's ink scale so the grid blends into the page chrome.
-const DARK_THEME: Partial<Theme> = {
-  bg: "#0e1526",
-  fg: "#e4e9f2",
-  gridLine: "#1d2740",
-  headerBg: "#0a101e",
-  headerFg: "#8b99b5",
-  selection: "#34d39922",
-  selectionBorder: "#34d399",
-};
-
-/** Hoisted: a stable identity means the adapter never reconfigures chrome per render. */
-const GRID_CONFIG = { toolbar: true, export: true } as const;
-
-const SORTS: Record<string, { label: string; keys: { col: number; ascending: boolean }[] }> = {
-  none: { label: "Original order", keys: [] },
-  cityAmount: {
-    label: "City ↑ then Amount ↓",
-    keys: [
-      { col: CITY_COL, ascending: true },
-      { col: AMOUNT_COL, ascending: false },
-    ],
-  },
-  amountDesc: { label: "Amount ↓", keys: [{ col: AMOUNT_COL, ascending: false }] },
-};
-
-const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const integer = new Intl.NumberFormat("en-US");
+const workbook = createRevenueWorkbook();
+const GRID_CONFIG = { toolbar: true } as const;
+const MARKET_OPTIONS = [
+  { label: "All markets", value: "all" },
+  ...REVENUE_CITIES.map((city) => ({ label: city, value: city })),
+];
+const money = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 function describeSelection(selection: Selection | null): string {
-  if (!selection) return "none";
-  if (selection.kind === "cell") {
-    return `R${selection.addr.row + 1} C${selection.addr.col + 1}`;
-  }
+  if (!selection) return "No selection";
+  if (selection.kind === "cell") return `R${selection.addr.row + 1} C${selection.addr.col + 1}`;
   if (selection.kind === "range") {
-    const rows = Math.abs(selection.range.end.row - selection.range.start.row) + 1;
-    const cols = Math.abs(selection.range.end.col - selection.range.start.col) + 1;
-    return `${rows} × ${cols} cells`;
+    return `R${selection.range.start.row + 1}:R${selection.range.end.row + 1}`;
   }
   return selection.kind;
 }
 
-function rendererFailureReason(error: unknown): string {
-  if (error instanceof Error && error.message.length > 0) return error.message;
-  return typeof error === "string" && error.length > 0 ? error : "Worker failed to load";
-}
-
-const SIMPLE_ROWS = [
-  { name: "Notebook", price: 12.5 },
-  { name: "Pen", price: 2.25 },
-] as const;
-const SIMPLE_COLUMNS = [
-  { key: "name", title: "Product" },
-  { key: "price", title: "Price", type: "currency" as const },
-] as const;
-
-function App() {
+export default function ReactWorkbook() {
   const gridRef = useRef<Grid>(null);
-  const [dark, setDark] = useState(true);
-  const [readOnly, setReadOnly] = useState(false);
-  const [selection, setSelection] = useState("none");
-  const [visibleRows, setVisibleRows] = useState(ROWS);
-  const [stats, setStats] = useState({ sum: 0, avg: 0 });
+  const activityId = useRef(0);
+  const rendererCleanup = useRef<() => void>(() => {});
+  const [market, setMarket] = useState("all");
+  const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<SearchResult | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [city, setCity] = useState("all");
-  const [minAmount, setMinAmount] = useState(0);
-  const [sortKey, setSortKey] = useState("none");
-  const [useWorker, setUseWorker] = useState(false);
-  const [activeRenderer, setActiveRenderer] = useState<"canvas" | "worker" | null>(null);
+  const [visibleRows, setVisibleRows] = useState(REVENUE_ROWS);
+  const [pipeline, setPipeline] = useState(0);
+  const [selection, setSelection] = useState("No selection");
+  const [renderer, setRenderer] = useState<"canvas" | "worker">("canvas");
+  const [activeRenderer, setActiveRenderer] = useState<"canvas" | "worker">("canvas");
   const [rendererFallback, setRendererFallback] = useState<{
     count: number;
     reason: string;
   } | null>(null);
-  const [overscan, setOverscan] = useState(2);
-  const [highlight, setHighlight] = useState(9_500);
-  // Conditional-format rules ride on the workbook, a documented reset boundary:
-  // a new rule set recreates the grid and bulk re-ingests all 100k rows.
-  const workbook = useMemo(() => buildWorkbook(highlight), [highlight]);
-  const rendererFallbackCleanup = useRef<(() => void) | null>(null);
-  // Current view settings, readable from onReady without stale closures so a
-  // workbook reset (Highlight control) can re-apply filters, sort, and search.
-  const searchQuery = useRef("");
-  const viewRef = useRef({ city, minAmount, sortKey });
-  viewRef.current = { city, minAmount, sortKey };
+  const [activity, setActivity] = useState([{ id: 0, message: "Workbook initialized" }]);
 
-  /** Refresh the Rust-scanned footer numbers after any view/data change. */
-  const refreshStats = useCallback((ready?: Grid) => {
+  const refresh = useCallback((ready?: Grid) => {
     const grid = ready ?? gridRef.current;
     if (!grid) return;
-    setVisibleRows(grid.store.viewRowCount("sales"));
-    setStats({ sum: grid.aggregate(AMOUNT_COL, "sum"), avg: grid.aggregate(AMOUNT_COL, "avg") });
+    setVisibleRows(grid.store.viewRowCount("pipeline"));
+    setPipeline(grid.aggregate(REVENUE_AMOUNT_COLUMN, "sum"));
   }, []);
 
-  useEffect(
-    () => () => {
-      rendererFallbackCleanup.current?.();
-    },
-    [],
-  );
+  useEffect(() => () => rendererCleanup.current(), []);
 
-  const onReady = useCallback(
-    ({ grid }: { grid: Grid }) => {
-      // The published ref and readiness event reference the same generation.
-      grid.setFrozen(0, 1);
-      // A fresh generation starts with a clean view; restore the active one.
-      const view = viewRef.current;
-      const keys = SORTS[view.sortKey]?.keys ?? [];
-      if (keys.length > 0) grid.sortByMulti(keys);
-      if (view.city !== "all") {
-        grid.setColumnFilter(CITY_COL, { kind: "values", values: [view.city] });
-      }
-      if (view.minAmount > 0) {
-        grid.setColumnFilter(AMOUNT_COL, { kind: "compare", op: "gte", value: view.minAmount });
-      }
-      if (searchQuery.current.length > 0) setMatches(grid.search(searchQuery.current));
-      refreshStats(grid);
-      setActiveRenderer(grid.rendererKind());
-      rendererFallbackCleanup.current?.();
-      rendererFallbackCleanup.current = grid.on("renderer-fallback", (event) => {
-        setActiveRenderer(grid.rendererKind());
-        setRendererFallback((current) => ({
-          count: (current?.count ?? 0) + 1,
-          reason: rendererFailureReason(event.error),
-        }));
-      });
-    },
-    [refreshStats],
-  );
+  function record(message: string): void {
+    const id = ++activityId.current;
+    setActivity((items) => [{ id, message }, ...items].slice(0, 3));
+  }
 
-  function applyCityFilter(next: string): void {
-    setCity(next);
-    gridRef.current?.setColumnFilter(
-      CITY_COL,
+  function chooseMarket(next: string): void {
+    setMarket(next);
+    const grid = gridRef.current;
+    if (!grid) return;
+    grid.setColumnFilter(
+      REVENUE_CITY_COLUMN,
       next === "all" ? null : { kind: "values", values: [next] },
     );
-    refreshStats();
+    refresh(grid);
+    record(next === "all" ? "Showing all markets" : `Filtered to ${next}`);
   }
 
-  function applyMinAmount(next: number): void {
-    setMinAmount(next);
-    gridRef.current?.setColumnFilter(
-      AMOUNT_COL,
-      next <= 0 ? null : { kind: "compare", op: "gte", value: next },
-    );
-    refreshStats();
-  }
-
-  function applySort(next: string): void {
-    setSortKey(next);
+  function searchFor(nextQuery: string): void {
     const grid = gridRef.current;
     if (!grid) return;
-    const keys = SORTS[next]?.keys ?? [];
-    if (keys.length === 0) grid.clearView();
-    else grid.sortByMulti(keys);
-    // clearView also drops filters; re-apply the active ones.
-    if (keys.length === 0) {
-      if (city !== "all") grid.setColumnFilter(CITY_COL, { kind: "values", values: [city] });
-      if (minAmount > 0) {
-        grid.setColumnFilter(AMOUNT_COL, { kind: "compare", op: "gte", value: minAmount });
-      }
-    }
-    refreshStats();
-  }
-
-  function runSearch(query: string): void {
-    searchQuery.current = query;
-    const grid = gridRef.current;
-    if (!grid) return;
-    if (query.length === 0) {
+    setQuery(nextQuery);
+    if (nextQuery.trim().length === 0) {
       grid.clearSearch();
       setMatches(null);
+      record("Search cleared");
       return;
     }
-    setMatches(grid.search(query));
+    const result = grid.search(nextQuery.trim());
+    setMatches(result);
+    if (result.matches.length > 0) grid.findNext();
+    record(`${result.matches.length.toLocaleString()} search matches`);
+  }
+
+  function search(): void {
+    searchFor(query);
+  }
+
+  function resetWorkbook(): void {
+    const grid = gridRef.current;
+    if (!grid) return;
+    setMarket("all");
+    setQuery("");
+    setMatches(null);
+    grid.setColumnFilter(REVENUE_CITY_COLUMN, null);
+    grid.clearSearch();
+    refresh(grid);
+    record("Workbook view reset");
   }
 
   return (
-    <main className="example-shell" data-theme={dark ? "dark" : undefined}>
-      <div className="example-controls" role="toolbar" aria-label="Data operations">
-        <label>
-          Search{" "}
-          <input
-            type="search"
-            placeholder="tokyo, 000042, …"
-            onChange={(event) => runSearch(event.target.value)}
-          />
-        </label>
-        <button type="button" disabled={!matches} onClick={() => gridRef.current?.findPrev()}>
-          ↑
-        </button>
-        <button type="button" disabled={!matches} onClick={() => gridRef.current?.findNext()}>
-          ↓
-        </button>
-        <output data-testid="matches">
-          {matches ? `${matches.matches.length.toLocaleString()} matches` : ""}
-        </output>
-        <span className="example-divider" />
-        <label>
-          City{" "}
-          <select value={city} onChange={(event) => applyCityFilter(event.target.value)}>
-            <option value="all">All cities</option>
-            {CITIES.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Min amount{" "}
-          <select
-            value={minAmount}
-            onChange={(event) => applyMinAmount(Number(event.target.value))}
-          >
-            <option value={0}>Any</option>
-            <option value={2_500}>≥ $2,500</option>
-            <option value={7_500}>≥ $7,500</option>
-          </select>
-        </label>
-        <label>
-          Sort{" "}
-          <select value={sortKey} onChange={(event) => applySort(event.target.value)}>
-            {Object.entries(SORTS).map(([key, sort]) => (
-              <option key={key} value={key}>
-                {sort.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Highlight{" "}
-          <select
-            value={highlight}
-            onChange={(event) => setHighlight(Number(event.target.value))}
-            title="Conditional-format rule on the Amount column; changing it swaps the workbook and re-ingests all 100k rows"
-          >
-            <option value={0}>Off</option>
-            <option value={7_500}>Amount &gt; $7,500</option>
-            <option value={9_500}>Amount &gt; $9,500</option>
-          </select>
-        </label>
-        <output data-testid="visible">
-          Showing {integer.format(visibleRows)} of {integer.format(ROWS)} rows
-        </output>
-        <span className="example-divider" />
-        <label>
-          <input
-            type="checkbox"
-            checked={useWorker}
-            onChange={(event) => {
-              // Renderer changes recreate the grid: this is a documented reset boundary.
-              setActiveRenderer(null);
-              setRendererFallback(null);
-              setUseWorker(event.target.checked);
-            }}
-          />{" "}
-          Worker renderer
-        </label>
-        <label>
-          Overscan{" "}
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={overscan}
-            onChange={(event) => setOverscan(Math.max(0, Number(event.target.value)))}
-          />
-        </label>
-        <output data-testid="renderer" data-fallback-count={rendererFallback?.count ?? 0}>
-          Requested: {useWorker ? "worker" : "canvas"} · Active: {activeRenderer ?? "starting…"}
-          {rendererFallback ? ` · Fallback: ${rendererFallback.reason}` : ""}
-        </output>
-      </div>
-      <div className="example-grid">
-        {/* Overscan is a live option: changing it does not recreate the grid. */}
-        <SheetwriteGrid
-          ref={gridRef}
-          workbook={workbook}
-          data={data}
-          theme={dark ? DARK_THEME : LIGHT_THEME}
-          readOnly={readOnly}
-          config={GRID_CONFIG}
-          renderer={useWorker ? "worker" : "canvas"}
-          workerUrl={useWorker ? workerUrl : undefined}
-          overscan={overscan}
-          style={{ height: "100%" }}
-          onReady={onReady}
-          onSelectionChange={(value) => setSelection(describeSelection(value))}
-          onGridChange={() => refreshStats()}
-          onViewportChange={(event) => console.log("viewport", event)}
-          onEditBegin={(event) => console.log("edit-begin", event)}
-          onEditCommit={(event) => console.log("edit-commit", event)}
-        />
-      </div>
-      <div className="example-controls example-footer" role="toolbar" aria-label="Workbook status">
-        <output data-testid="stats">
-          Amount, all rows — Sum {money.format(stats.sum)} · Avg {money.format(stats.avg)}
-        </output>
-        <output data-testid="selection">Selection: {selection}</output>
-        <span className="example-divider" />
-        <label>
-          Zoom{" "}
-          <input
-            type="range"
-            min={0.5}
-            max={2}
-            step={0.25}
-            value={zoom}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              setZoom(next);
-              gridRef.current?.setZoom(next);
-            }}
-          />
-        </label>
-        <button type="button" aria-pressed={dark} onClick={() => setDark((value) => !value)}>
-          Dark theme
-        </button>
-        <button
-          type="button"
-          aria-pressed={readOnly}
-          onClick={() => setReadOnly((value) => !value)}
-        >
-          Read only
-        </button>
-        <button type="button" onClick={() => gridRef.current?.undo()}>
-          Undo
-        </button>
-        <button type="button" onClick={() => gridRef.current?.redo()}>
-          Redo
-        </button>
-        <button type="button" onClick={() => gridRef.current?.exportCsv("sales.csv")}>
-          CSV
-        </button>
-        <button
-          type="button"
-          onClick={async () => {
-            // Dynamic import keeps the optional XLSX backend out of the default page chunk.
-            await import("@sheetwrite/xlsx/register");
-            await gridRef.current?.exportXlsx("sales.xlsx");
-          }}
-        >
-          XLSX
-        </button>
-      </div>
-      <details className="example-simple" aria-label="Quick-start Sheetwrite example">
-        <summary>
-          Quick start: everything above is the advanced grid — a basic one is 6 lines
-        </summary>
-        <div className="example-simple-body">
-          <pre className="example-simple-code">{`import { Sheetwrite } from "@sheetwrite/react";
-import "@sheetwrite/react/styles.css";
-
-<Sheetwrite
-  columns={[
-    { key: "name", title: "Product" },
-    { key: "price", title: "Price", type: "currency" },
-  ]}
-  defaultRows={[
-    { name: "Notebook", price: 12.5 },
-    { name: "Pen", price: 2.25 },
-  ]}
-  height={180}
-/>`}</pre>
-          <Sheetwrite
-            columns={SIMPLE_COLUMNS}
-            defaultRows={SIMPLE_ROWS}
-            height={180}
-            theme={dark ? DARK_THEME : LIGHT_THEME}
-          />
+    <section className="sw-demo-app" data-framework="react">
+      <header className="sw-demo-topbar">
+        <div className="sw-demo-product">
+          <span className="sw-demo-product__mark">
+            <FileSpreadsheet aria-hidden="true" size={16} strokeWidth={1.8} />
+          </span>
+          <div>
+            <strong>Revenue desk</strong>
+            <span>FY26 operating workbook</span>
+          </div>
         </div>
-      </details>
-    </main>
-  );
-}
+        <div className="sw-demo-presence" role="status" data-state="ready">
+          <Monitor aria-hidden="true" size={16} />
+          {activeRenderer === "worker" ? "Worker canvas" : "Main-thread canvas"}
+        </div>
+      </header>
 
-/** Client-only island; the adapter initializes WASM on mount. */
-export default function ReactWorkbook() {
-  return <App />;
+      <div className="sw-demo-layout sw-demo-layout--single">
+        <main className="sw-demo-main" id="workbook">
+          <div className="sw-demo-heading">
+            <div>
+              <p>OPERATING MODEL / Q3</p>
+              <h2>Revenue pipeline</h2>
+            </div>
+            <div className="sw-demo-heading__actions">
+              <DemoButton type="button" onClick={() => gridRef.current?.exportCsv("revenue.csv")}>
+                Export CSV
+              </DemoButton>
+              <DemoButton
+                type="button"
+                data-primary="true"
+                onClick={() => {
+                  gridRef.current?.sortBy(REVENUE_AMOUNT_COLUMN, false);
+                  record("Sorted amount high to low");
+                }}
+              >
+                Rank pipeline
+              </DemoButton>
+            </div>
+          </div>
+
+          <section className="sw-demo-kpis" aria-label="Workbook metrics">
+            <article>
+              <span>VISIBLE ROWS</span>
+              <strong>{visibleRows.toLocaleString()}</strong>
+              <small>Current filtered view</small>
+            </article>
+            <article>
+              <span>PIPELINE</span>
+              <strong>{money.format(pipeline)}</strong>
+              <small>WASM aggregate</small>
+            </article>
+            <article>
+              <span>SEARCH</span>
+              <strong>{matches ? matches.matches.length.toLocaleString() : "—"}</strong>
+              <small>{query || "No active query"}</small>
+            </article>
+            <article>
+              <span>RENDERING THREAD</span>
+              <strong>{activeRenderer === "worker" ? "Web Worker" : "Main thread"}</strong>
+              <output data-testid="renderer" data-fallback-count={rendererFallback?.count ?? 0}>
+                Requested: {renderer === "worker" ? "Web Worker" : "Main thread"} · Active:{" "}
+                {activeRenderer === "worker" ? "Web Worker" : "Main thread"}
+                {rendererFallback ? ` · Fallback: ${rendererFallback.reason}` : ""}
+              </output>
+            </article>
+          </section>
+
+          <div className="sw-demo-commandbar" role="toolbar" aria-label="Workbook controls">
+            <DemoSelect
+              label="Market"
+              value={market}
+              options={MARKET_OPTIONS}
+              onValueChange={chooseMarket}
+            />
+            <label className="sw-demo-commandbar__search">
+              <span>Search customers</span>
+              <input
+                type="search"
+                value={query}
+                placeholder="Account 004812"
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") search();
+                }}
+              />
+            </label>
+            <DemoButton type="button" onClick={search}>
+              Find
+            </DemoButton>
+            <DemoButton
+              type="button"
+              onClick={() => gridRef.current?.findPrev()}
+              disabled={!matches?.matches.length}
+            >
+              Previous
+            </DemoButton>
+            <DemoButton
+              type="button"
+              onClick={() => gridRef.current?.findNext()}
+              disabled={!matches?.matches.length}
+            >
+              Next
+            </DemoButton>
+            <DemoButton type="button" onClick={resetWorkbook}>
+              Reset
+            </DemoButton>
+            <DemoRenderingMode
+              label="Rendering thread"
+              mode={renderer}
+              onModeChange={(mode) => {
+                setRenderer(mode);
+                setRendererFallback(null);
+              }}
+            />
+          </div>
+
+          <div className="sw-demo-grid">
+            <SheetwriteGrid
+              ref={gridRef}
+              workbook={workbook}
+              data={REVENUE_DATA}
+              theme={SHOWCASE_THEME}
+              renderer={renderer}
+              workerUrl={renderer === "worker" ? workerUrl : undefined}
+              config={GRID_CONFIG}
+              style={{ height: "100%" }}
+              onReady={({ grid }) => {
+                grid.setFrozen(0, 1);
+                rendererCleanup.current();
+                setActiveRenderer(grid.rendererKind());
+                rendererCleanup.current = grid.on("renderer-fallback", ({ error }) => {
+                  setActiveRenderer("canvas");
+                  setRendererFallback((current) => ({
+                    count: (current?.count ?? 0) + 1,
+                    reason: error instanceof Error ? error.message : String(error),
+                  }));
+                });
+                refresh(grid);
+                record("Grid ready · 100,000 rows");
+              }}
+              onGridChange={({ transaction }) => {
+                record(`${transaction.patches.length} operation committed`);
+                refresh();
+              }}
+              onSelectionChange={(value) => setSelection(describeSelection(value))}
+            />
+          </div>
+
+          <footer className="sw-demo-status" data-react-activity tabIndex={-1}>
+            <span>{selection}</span>
+            <ol>
+              {activity.map((item) => (
+                <li key={item.id}>{item.message}</li>
+              ))}
+            </ol>
+          </footer>
+        </main>
+      </div>
+    </section>
+  );
 }

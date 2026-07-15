@@ -35,6 +35,6 @@ Source entry: `packages/svelte/src/index.ts`
 ### Variables <span class="api-count">2</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/svelte/sheetwrite/"><code>Sheetwrite</code><span>Simple framework component that owns initialization and Grid lifetime.</span></a>
+<a class="api-symbol-card" href="/docs/api/svelte/sheetwrite/"><code>Sheetwrite</code><span>Convenience component for local object rows.</span></a>
 <a class="api-symbol-card" href="/docs/api/svelte/sheetwrite-grid/"><code>SheetwriteGrid</code><span>Advanced framework component for workbook data or datasource input.</span></a>
 </div>

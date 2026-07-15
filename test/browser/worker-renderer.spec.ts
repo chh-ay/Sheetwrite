@@ -3,10 +3,10 @@ import { hasOpaqueForeground } from "./canvas-assertions.js";
 import { siteUrl } from "./playwright.config.js";
 
 const REACT_URL = siteUrl("/react/");
-const GRID = ".example-grid .sheetwrite";
+const GRID = ".sw-demo-grid .sheetwrite";
 const CANVAS = `${GRID} .sheetwrite-canvas`;
-const INITIAL_CUSTOMER = "Customer 000001";
-const SCROLLED_CUSTOMER = "Customer 000101";
+const INITIAL_CUSTOMER = "Account 000001";
+const SCROLLED_CUSTOMER = "Account 000101";
 const WORKER_ASSET = /\/_astro\/worker-[A-Za-z0-9_-]+\.js$/;
 
 interface BrowserErrors {
@@ -152,7 +152,7 @@ test("production Worker renderer loads, paints, edits, and scrolls", async ({ pa
     .poll(() => page.workers().length, { message: "Worker survived renderer teardown" })
     .toBe(0);
   await expect(page.locator(`${GRID} .sheetwrite-canvas`)).toHaveCount(1);
-  await expect(page.locator(".example-grid > .sheetwrite")).toHaveCount(1);
+  await expect(page.locator(".sw-demo-grid > .sheetwrite")).toHaveCount(1);
 });
 
 test("production Worker renderer falls back after a module-load failure", async ({ page }) => {
@@ -185,7 +185,7 @@ test("production Worker renderer falls back after a module-load failure", async 
   await expect.poll(() => canvasBodyPainted(page)).toBe(true);
 
   await expect(page.locator(`${GRID} .sheetwrite-canvas`)).toHaveCount(1);
-  await expect(page.locator(".example-grid > .sheetwrite")).toHaveCount(1);
+  await expect(page.locator(".sw-demo-grid > .sheetwrite")).toHaveCount(1);
   expect(errors.page).toEqual([]);
   expect(errors.worker).toEqual([]);
 
@@ -193,5 +193,5 @@ test("production Worker renderer falls back after a module-load failure", async 
   await expect(renderer).toContainText("Requested: canvas · Active: canvas");
   await expect(renderer).toHaveAttribute("data-fallback-count", "0");
   await expect(page.locator(`${GRID} .sheetwrite-canvas`)).toHaveCount(1);
-  await expect(page.locator(".example-grid > .sheetwrite")).toHaveCount(1);
+  await expect(page.locator(".sw-demo-grid > .sheetwrite")).toHaveCount(1);
 });

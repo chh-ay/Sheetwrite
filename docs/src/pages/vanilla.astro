@@ -1,26 +1,47 @@
 ---
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowDownAZ,
+  Bold,
+  Download,
+  Grid2X2,
+  Italic,
+  Merge,
+  PaintBucket,
+  Redo2,
+  Table2,
+  Type,
+  Undo2,
+  Upload,
+} from "lucide-astro";
 // Complete workbook shell over the headless imperative API.
 // Wiring contract with src/lib/vanilla.ts: every #t-* button id, #namebox,
 // #formula, #status, #csvfile, #app, and the .gs-zoom class must survive.
-import Layout from "@/layouts/Layout.astro";
+import ShowcasePage from "@/components/ShowcasePage.astro";
 ---
 
-<Layout
-  title="Sheetwrite — spreadsheet workbook (100k rows)"
-  description="An application spreadsheet shell built on Sheetwrite's headless imperative API: toolbar, formula bar, cross-sheet formulas, frozen panes, CSV import/export."
+<ShowcasePage
   active="vanilla"
+  eyebrow="VANILLA / IMPERATIVE WORKBOOK"
+  title="Own every piece of workbook chrome."
+  description="A production-shaped spreadsheet shell built directly on Sheetwrite's headless API: toolbar actions, formula editing, workbook tabs, cross-sheet formulas, and CSV exchange."
+  packageName="@sheetwrite/core"
+  guide="/docs/frameworks/vanilla/"
+  sourcePath="docs/src/lib/vanilla.ts"
+  proof={[
+    { icon: "braces", title: "Imperative chrome", detail: "Toolbar, formula bar, and status share one Grid instance." },
+    { icon: "database", title: "Columnar store", detail: "100,000 eager rows stay in the WASM-backed engine." },
+    { icon: "table", title: "Workbook model", detail: "Tabs and cross-sheet formulas remain live together." },
+    { icon: "download", title: "CSV exchange", detail: "Import and export run through the public Grid API." },
+  ]}
 >
+  <div class="sw-vanilla-demo">
   <!-- Title + menu -->
   <div class="gs-title">
     <div class="gs-logo" aria-hidden="true">
-      <svg viewBox="0 0 32 32" width="20" height="20">
-        <path
-          d="M7 12h18M7 20h18M12 7v18M20 7v18"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          fill="none"></path>
-      </svg>
+      <Table2 size={20} strokeWidth={1.8} />
     </div>
     <div class="gs-titlewrap">
       <div class="gs-overline">Vanilla API</div>
@@ -36,84 +57,52 @@ import Layout from "@/layouts/Layout.astro";
   <!-- Toolbar -->
   <div class="gs-toolbar">
     <button id="t-undo" type="button" title="Undo (Ctrl+Z)">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path
-          d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
-        ></path></svg
-      >
+      <Undo2 aria-hidden="true" size={17} />
     </button>
     <button id="t-redo" type="button" title="Redo (Ctrl+Shift+Z)">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path
-          d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"
-        ></path></svg
-      >
+      <Redo2 aria-hidden="true" size={17} />
     </button>
     <span class="gs-div"></span>
     <button class="gs-zoom" type="button" title="Zoom">100%</button>
     <span class="gs-div"></span>
-    <button id="t-bold" class="b" type="button" title="Bold (Ctrl+B)">B</button>
-    <button id="t-italic" class="i" type="button" title="Italic (Ctrl+I)">I</button>
+    <button id="t-bold" class="b" type="button" title="Bold (Ctrl+B)"><Bold aria-hidden="true" size={16} /></button>
+    <button id="t-italic" class="i" type="button" title="Italic (Ctrl+I)"><Italic aria-hidden="true" size={16} /></button>
     <span class="gs-color" title="Text color">
-      <span class="glyph">A</span>
+      <span class="glyph"><Type aria-hidden="true" size={16} /></span>
       <span class="bar" id="t-textcolor-bar" style="background:#34d399"></span>
       <input id="t-textcolor" type="color" value="#34d399" aria-label="Text color" />
     </span>
     <span class="gs-color" title="Fill color">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path
-          d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21z"
-        ></path></svg
-      >
+      <PaintBucket aria-hidden="true" size={16} />
       <span class="bar" id="t-fillcolor-bar" style="background:#fff7e0"></span>
       <input id="t-fillcolor" type="color" value="#fff7e0" aria-label="Fill color" />
     </span>
     <span class="gs-div"></span>
     <button id="t-border" type="button" title="Borders">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path
-          d="M3 3v18h18V3H3zm8 16H5v-6h6v6zm0-8H5V5h6v6zm8 8h-6v-6h6v6zm0-8h-6V5h6v6z"
-        ></path></svg
-      >
+      <Grid2X2 aria-hidden="true" size={16} />
     </button>
     <button id="t-merge" type="button" title="Merge cells">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path
-          d="M3 3v18h18V3H3zm16 16H5V5h14v14zM7.5 12l2.5-2.5v1.8h4V9.5L16.5 12 14 14.5v-1.8h-4v1.8z"
-        ></path></svg
-      >
+      <Merge aria-hidden="true" size={16} />
     </button>
     <span class="gs-div"></span>
     <button id="t-alignl" type="button" title="Align left">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path d="M3 5h18v2H3V5zm0 4h12v2H3V9zm0 4h18v2H3v-2zm0 4h12v2H3v-2z"></path></svg
-      >
+      <AlignLeft aria-hidden="true" size={16} />
     </button>
     <button id="t-alignc" type="button" title="Align center">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path d="M3 5h18v2H3V5zm3 4h12v2H6V9zm-3 4h18v2H3v-2zm3 4h12v2H6v-2z"></path></svg
-      >
+      <AlignCenter aria-hidden="true" size={16} />
     </button>
     <button id="t-alignr" type="button" title="Align right">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path d="M3 5h18v2H3V5zm6 4h12v2H9V9zm-6 4h18v2H3v-2zm6 4h12v2H9v-2z"></path></svg
-      >
+      <AlignRight aria-hidden="true" size={16} />
     </button>
     <span class="gs-div"></span>
     <button id="t-sort" type="button" title="Sort sheet by column (A→Z)">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"></path></svg
-      >
+      <ArrowDownAZ aria-hidden="true" size={16} />
     </button>
     <button id="t-export" type="button" title="Download as CSV">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg
-      >
+      <Download aria-hidden="true" size={16} />
     </button>
     <button id="t-import" type="button" title="Import CSV">
-      <svg aria-hidden="true" viewBox="0 0 24 24"
-        ><path d="M5 15h4v6h6v-6h4l-7-7-7 7zM5 6V4h14v2H5z"></path></svg
-      >
+      <Upload aria-hidden="true" size={16} />
     </button>
     <input id="csvfile" type="file" accept=".csv" hidden />
   </div>
@@ -139,14 +128,20 @@ import Layout from "@/layouts/Layout.astro";
     <span class="gs-hint">Try the Summary tab — it holds live cross-sheet formulas into Sales</span>
     <div class="gs-status" id="status"></div>
   </div>
+  </div>
 
   <script>
     import "../lib/vanilla";
   </script>
 
   <style is:global>
-    body {
-      overflow: hidden;
+    .sw-vanilla-demo {
+      display: flex;
+      height: 46rem;
+      min-height: 38rem;
+      flex-direction: column;
+      background: #080b12;
+      color: #d8deea;
     }
 
     /* ── Workbook masthead ─────────────────────────────────────── */
@@ -455,4 +450,4 @@ import Layout from "@/layouts/Layout.astro";
       }
     }
   </style>
-</Layout>
+</ShowcasePage>

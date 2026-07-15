@@ -16,18 +16,11 @@ import type {
   WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { SheetwriteStore, SyncCoordinator } from "@sheetwrite/core";
-import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/vue";
+import { SheetwriteGrid } from "@sheetwrite/vue";
+import { FileSpreadsheet, Server } from "lucide-vue-next";
 import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef } from "vue";
 import "@sheetwrite/vue/styles.css";
-
-const SIMPLE_ROWS = [
-  { name: "Notebook", price: 12.5 },
-  { name: "Pen", price: 2.25 },
-];
-const SIMPLE_COLUMNS = [
-  { key: "name", title: "Product" },
-  { key: "price", title: "Price", type: "currency" as const },
-];
+import "../styles/showcase.css";
 
 // ── Showcase: streaming datasource + versioned sync pipeline ─────────────────
 // One million rows are NEVER materialized up front: the grid asks a paged
@@ -196,11 +189,31 @@ const App = defineComponent({
     const selection = ref("none");
     const log = ref<string[]>([]);
     const searchQuery = ref("");
+    const activeSheet = ref<"orders" | "review">("orders");
 
     const gridOf = () => gridComponent.value?.grid ?? null;
     const syncAdapter = new DemoVersionedAdapter();
     let sync: SyncCoordinator | null = null;
     let mutationSequence = 0;
+    let pendingReveal: { addr: { sheet: "orders"; row: number; col: number } } | null = null;
+
+    function revealCommittedPage(start: number, end: number): void {
+      const reveal = pendingReveal;
+      if (!reveal || reveal.addr.row < start || reveal.addr.row >= end) return;
+      const grid = gridOf();
+      if (!grid) {
+        pendingReveal = null;
+        return;
+      }
+      if (grid.store.getCellLoadState?.(reveal.addr) === "unloaded") {
+        requestAnimationFrame(() => revealCommittedPage(start, end));
+        return;
+      }
+      grid.setSelection(null);
+      grid.setSelection({ kind: "cell", addr: reveal.addr });
+      grid.scrollToCell(reveal.addr);
+      pendingReveal = null;
+    }
 
     // Paint the first page immediately so navigation never lands on an empty
     // canvas. Later page requests retain visible latency for the streaming demo.
@@ -225,11 +238,15 @@ const App = defineComponent({
           }
           pagesLoaded.value += 1;
           resolve({ start, rows, revision });
+          requestAnimationFrame(() => revealCommittedPage(start, end));
         }, latency);
         signal.addEventListener(
           "abort",
           () => {
             clearTimeout(timer);
+            if (pendingReveal && pendingReveal.addr.row >= start && pendingReveal.addr.row < end) {
+              pendingReveal = null;
+            }
             reject(new DOMException("Datasource request aborted", "AbortError"));
           },
           { once: true },
@@ -290,25 +307,49 @@ const App = defineComponent({
       refreshSync();
     }
 
-    function simulateSearch(): void {
-      searchQuery.value = "Tokyo";
-      gridOf()?.search("Tokyo");
+    function datasourceMatch(query: string): { row: number; col: number } | null {
+      const normalized = query.trim().toLocaleLowerCase();
+      const cityIndex = CITIES.findIndex((city) => city.toLocaleLowerCase() === normalized);
+      if (cityIndex >= 0) {
+        const start = Math.min(ROWS - 1, Math.max(0, viewWindow.value.last) + 100_000);
+        const row = start + ((cityIndex - (start % CITIES.length) + CITIES.length) % CITIES.length);
+        return { row: row < ROWS ? row : cityIndex, col: 3 };
+      }
+      const customer = /^customer\s+0*(\d+)$/i.exec(query.trim());
+      if (customer?.[1]) {
+        const row = Number(customer[1]) - 1;
+        if (Number.isInteger(row) && row >= 0 && row < ROWS) return { row, col: 2 };
+      }
+      return null;
     }
 
-    const actionIcon = (path: string) =>
-      h(
-        "svg",
-        {
-          viewBox: "0 0 24 24",
-          "aria-hidden": "true",
-          fill: "none",
-          stroke: "currentColor",
-          "stroke-width": "1.8",
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-        },
-        [h("path", { d: path })],
-      );
+    function searchOrders(query: string): void {
+      const grid = gridOf();
+      if (!grid) return;
+      pendingReveal = null;
+      const datasourceAddress = datasourceMatch(query);
+      if (datasourceAddress) {
+        const normalizedQuery = query.trim();
+        const addr = { sheet: "orders" as const, ...datasourceAddress };
+        pendingReveal = { addr };
+        grid.setActiveSheet("orders");
+        grid.setSelection({ kind: "cell", addr });
+        grid.scrollToCell(addr);
+        pushLog(`datasource lookup "${normalizedQuery}" · row ${integer.format(addr.row + 1)}`);
+        return;
+      }
+      const result = grid.search(query.trim());
+      if (result.matches.length > 0) {
+        grid.findNext();
+      } else {
+        pushLog(`search "${query}" · no matches in the loaded window`);
+      }
+    }
+
+    function simulateSearch(): void {
+      searchQuery.value = "Tokyo";
+      searchOrders("Tokyo");
+    }
 
     const syncLabel = computed(() =>
       syncBusy.value
@@ -320,7 +361,10 @@ const App = defineComponent({
 
     // The adapter owns client-side WASM initialization.
     const ready = ref(true);
-    onBeforeUnmount(() => sync?.destroy());
+    onBeforeUnmount(() => {
+      pendingReveal = null;
+      sync?.destroy();
+    });
     onBeforeUnmount(() => {
       delete window.__sheetwriteVueGrid;
     });
@@ -328,255 +372,241 @@ const App = defineComponent({
     return () =>
       !ready.value
         ? h("p", { role: "status" }, "Loading the WASM engine…")
-        : h("main", { class: "example-shell", "data-theme": dark.value ? "dark" : undefined }, [
-            h("div", { class: "example-body" }, [
-              h("div", { class: "example-grid" }, [
-                h("div", { class: "stream-strip" }, [
-                  h("span", "Visible-window rendering"),
-                  h(
-                    "output",
-                    `cache rows ${integer.format(viewWindow.value.first)}–${integer.format(viewWindow.value.last)} (includes overscan) · ${pagesLoaded.value} requests`,
-                  ),
-                ]),
-                h(SheetwriteGrid, {
-                  ref: gridComponent,
-                  workbook,
-                  datasource,
-                  datasourceStorage: PAGED_STORAGE,
-                  theme: dark.value ? DARK_THEME : LIGHT_THEME,
-                  readOnly: readOnly.value,
-                  config: GRID_CONFIG,
-                  style: "flex: 1; min-height: 0",
-                  onReady: ({ grid }: { grid: Grid }) => {
-                    window.__sheetwriteVueGrid = grid;
-                    if (!(grid.store instanceof SheetwriteStore)) {
-                      throw new Error("Vue streaming demo requires SheetwriteStore");
-                    }
-                    grid.setFrozen(0, 1);
-                    sync?.destroy();
-                    sync = new SyncCoordinator(grid, syncAdapter, {
-                      documentId: "vue-stream",
-                      serverVersion: 0,
-                      createMutationId: () => `vue-${++mutationSequence}`,
-                    });
-                    sync.on((event) => {
-                      refreshSync();
-                      if (event.type === "pending") {
-                        pushLog(
-                          `queued      ${event.mutation.clientMutationId} at v${event.mutation.baseVersion}`,
-                        );
-                      } else if (event.type === "conflict") {
-                        pushLog(
-                          `conflict    local work retained at server v${event.response.currentVersion}`,
-                        );
-                      }
-                    });
-                    refreshSync();
-                    pushLog(`grid ready — ${integer.format(ROWS)} virtual rows`);
-                  },
-                  onSelectionChange: (value: Selection | null) => {
-                    selection.value =
-                      value?.kind === "cell"
-                        ? `R${value.addr.row + 1} C${value.addr.col + 1}`
-                        : (value?.kind ?? "none");
-                  },
-                  onViewportChange: (event: GridEvents["scroll"]) => {
-                    viewWindow.value = { first: event.firstRow + 1, last: event.lastRow + 1 };
-                  },
-                  "onEdit-begin": (event: GridEvents["edit-begin"]) => {
-                    pushLog(`edit-begin  R${event.addr.row + 1} C${event.addr.col + 1}`);
-                  },
-                  "onEdit-commit": (event: GridEvents["edit-commit"]) => {
-                    pushLog(`edit-commit R${event.addr.row + 1} C${event.addr.col + 1}`);
-                  },
-                  onGridChange: (event: ChangeEvent) => {
-                    pushLog(
-                      `${event.source.padEnd(11)} ${event.transaction.patches.length} operation(s), epoch ${event.epoch ?? "-"}`,
-                    );
-                    refreshSync();
-                  },
-                  onSearch: (result: GridEvents["search"]) => {
-                    pushLog(
-                      `search      "${result.query}" ${result.matches.length} match(es), active ${result.active < 0 ? "none" : result.active + 1}`,
-                    );
-                  },
-                  onActiveSheetChange: (event: GridEvents["active-sheet"]) => {
-                    pushLog(`active-sheet ${String(event.sheet)}`);
-                  },
-                }),
-              ]),
-              h("aside", { class: "example-log", "aria-label": "Event pipeline" }, [
-                h("h2", "Event pipeline"),
-                h(
-                  "p",
-                  { class: "example-hint" },
-                  "Run the sequence below. Each action hits the real grid API and appears in the log.",
-                ),
-                h("div", { class: "event-actions" }, [
-                  h("button", { type: "button", onClick: simulateEdit }, [
-                    actionIcon("M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"),
-                    h("span", [h("b", "1"), " Edit visible row"]),
+        : h(
+            "section",
+            {
+              class: "sw-demo-app sw-vue-demo",
+              "data-framework": "vue",
+              "data-theme": dark.value ? "dark" : undefined,
+            },
+            [
+              h("header", { class: "sw-demo-topbar" }, [
+                h("div", { class: "sw-demo-product" }, [
+                  h("span", { class: "sw-demo-product__mark" }, [
+                    h(FileSpreadsheet, { size: 16, "aria-hidden": "true" }),
                   ]),
-                  h("button", { type: "button", onClick: simulateSearch }, [
-                    actionIcon("m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0"),
-                    h("span", [h("b", "2"), " Search Tokyo"]),
+                  h("div", [h("strong", "Order control"), h("span", "Streaming operations")]),
+                ]),
+                h("div", { class: "sw-demo-presence", role: "status", "data-state": "ready" }, [
+                  h(Server, { size: 16, "aria-hidden": "true" }),
+                  " Paged datasource",
+                ]),
+              ]),
+              h("div", { class: "sw-demo-layout sw-demo-layout--single" }, [
+                h("main", { class: "sw-demo-main", id: "orders" }, [
+                  h("div", { class: "sw-demo-heading" }, [
+                    h("div", [h("p", "STREAMING WORKBOOK / LIVE"), h("h2", "Order operations")]),
+                    h("div", { class: "sw-demo-heading__actions" }, [
+                      h("button", { type: "button", onClick: simulateEdit }, "Edit visible row"),
+                      h(
+                        "button",
+                        {
+                          type: "button",
+                          "data-primary": "true",
+                          disabled: pendingCount.value === 0 || syncBusy.value,
+                          onClick: () => void acknowledge(),
+                        },
+                        syncBusy.value ? "Sending…" : "Acknowledge",
+                      ),
+                    ]),
+                  ]),
+                  h("div", { class: "sw-demo-kpis", "aria-label": "Streaming workbook metrics" }, [
+                    h("article", [
+                      h("span", "CACHE WINDOW"),
+                      h(
+                        "strong",
+                        `${integer.format(viewWindow.value.first)}–${integer.format(viewWindow.value.last)}`,
+                      ),
+                      h("small", "Visible rows plus overscan"),
+                    ]),
+                    h("article", [
+                      h("span", "PAGE REQUESTS"),
+                      h("strong", integer.format(pagesLoaded.value)),
+                      h("small", `${integer.format(ROWS)} virtual rows`),
+                    ]),
+                    h("article", [
+                      h("span", "PENDING"),
+                      h("strong", integer.format(pendingCount.value)),
+                      h("small", "Durable mutations"),
+                    ]),
+                    h("article", [
+                      h("span", "SERVER VERSION"),
+                      h("strong", `v${serverVersion.value}`),
+                      h("small", syncBusy.value ? "Sending mutation" : "Monotonic state"),
+                    ]),
+                  ]),
+                  h(
+                    "div",
+                    {
+                      class: "sw-demo-commandbar",
+                      role: "toolbar",
+                      "aria-label": "Order controls",
+                    },
+                    [
+                      h("label", { class: "sw-demo-commandbar__search" }, [
+                        h("span", "Search orders"),
+                        h("input", {
+                          type: "search",
+                          value: searchQuery.value,
+                          placeholder: "City or customer ID",
+                          "aria-label": "Search grid",
+                          onInput: (event: Event) => {
+                            searchQuery.value = (event.target as HTMLInputElement).value;
+                          },
+                          onKeydown: (event: KeyboardEvent) => {
+                            if (event.key === "Enter") searchOrders(searchQuery.value);
+                          },
+                        }),
+                      ]),
+                      h(
+                        "button",
+                        { type: "button", onClick: () => searchOrders(searchQuery.value) },
+                        "Locate",
+                      ),
+                      h(
+                        "button",
+                        { type: "button", onClick: () => gridOf()?.setActiveSheet("orders") },
+                        "Orders",
+                      ),
+                      h(
+                        "button",
+                        { type: "button", onClick: () => gridOf()?.setActiveSheet("review") },
+                        "Review",
+                      ),
+                      h(
+                        "button",
+                        {
+                          type: "button",
+                          "aria-pressed": frozen.value,
+                          onClick: () => {
+                            frozen.value = !frozen.value;
+                            gridOf()?.setFrozen(0, frozen.value ? 1 : 0);
+                          },
+                        },
+                        "Freeze first column",
+                      ),
+                      h(
+                        "button",
+                        {
+                          type: "button",
+                          "aria-pressed": readOnly.value,
+                          onClick: () => {
+                            readOnly.value = !readOnly.value;
+                          },
+                        },
+                        "Read only",
+                      ),
+                    ],
+                  ),
+                  h("div", { class: "sw-vue-workspace" }, [
+                    h("div", { class: "sw-demo-grid" }, [
+                      h(SheetwriteGrid, {
+                        ref: gridComponent,
+                        workbook,
+                        datasource,
+                        datasourceStorage: PAGED_STORAGE,
+                        theme: dark.value ? DARK_THEME : LIGHT_THEME,
+                        readOnly: readOnly.value,
+                        config: GRID_CONFIG,
+                        style: "height: 100%",
+                        onReady: ({ grid }: { grid: Grid }) => {
+                          window.__sheetwriteVueGrid = grid;
+                          if (!(grid.store instanceof SheetwriteStore)) {
+                            throw new Error("Vue streaming demo requires SheetwriteStore");
+                          }
+                          grid.setFrozen(0, 1);
+                          sync?.destroy();
+                          sync = new SyncCoordinator(grid, syncAdapter, {
+                            documentId: "vue-stream",
+                            serverVersion: 0,
+                            createMutationId: () => `vue-${++mutationSequence}`,
+                          });
+                          sync.on((event) => {
+                            refreshSync();
+                            if (event.type === "pending") {
+                              pushLog(
+                                `queued ${event.mutation.clientMutationId} at v${event.mutation.baseVersion}`,
+                              );
+                            } else if (event.type === "conflict") {
+                              pushLog(`conflict · server v${event.response.currentVersion}`);
+                            }
+                          });
+                          refreshSync();
+                          pushLog(`grid ready · ${integer.format(ROWS)} virtual rows`);
+                        },
+                        onSelectionChange: (value: Selection | null) => {
+                          selection.value =
+                            value?.kind === "cell"
+                              ? `R${value.addr.row + 1} C${value.addr.col + 1}`
+                              : (value?.kind ?? "none");
+                        },
+                        onViewportChange: (event: GridEvents["scroll"]) => {
+                          viewWindow.value = { first: event.firstRow + 1, last: event.lastRow + 1 };
+                        },
+                        "onEdit-begin": (event: GridEvents["edit-begin"]) => {
+                          pushLog(`edit-begin · R${event.addr.row + 1} C${event.addr.col + 1}`);
+                        },
+                        "onEdit-commit": (event: GridEvents["edit-commit"]) => {
+                          pushLog(`edit-commit · R${event.addr.row + 1} C${event.addr.col + 1}`);
+                        },
+                        onGridChange: (event: ChangeEvent) => {
+                          pushLog(
+                            `${event.source} · ${event.transaction.patches.length} operation(s) · epoch ${event.epoch ?? "-"}`,
+                          );
+                          refreshSync();
+                        },
+                        onSearch: (result: GridEvents["search"]) => {
+                          pushLog(`search "${result.query}" · ${result.matches.length} matches`);
+                        },
+                        onActiveSheetChange: (event: GridEvents["active-sheet"]) => {
+                          activeSheet.value = event.sheet === "review" ? "review" : "orders";
+                          pushLog(`active sheet · ${String(event.sheet)}`);
+                        },
+                      }),
+                    ]),
+                    h(
+                      "aside",
+                      { class: "sw-vue-activity", id: "activity", "aria-label": "Event pipeline" },
+                      [
+                        h("div", [
+                          h("p", "EVENT PIPELINE"),
+                          h("strong", "Host-visible operations"),
+                        ]),
+                        h("output", { "data-testid": "sync", id: "sync" }, syncLabel.value),
+                        h(
+                          "ol",
+                          log.value.length > 0
+                            ? log.value.map((line, index) =>
+                                h("li", { key: `${index}-${line}` }, line),
+                              )
+                            : [h("li", "Interact with the grid to populate this log.")],
+                        ),
+                        h("button", { type: "button", onClick: simulateSearch }, "Locate Tokyo"),
+                        h(
+                          "button",
+                          {
+                            type: "button",
+                            "aria-pressed": dark.value,
+                            onClick: () => {
+                              dark.value = !dark.value;
+                            },
+                          },
+                          dark.value ? "Use light grid" : "Use dark grid",
+                        ),
+                      ],
+                    ),
+                  ]),
+                  h("footer", { class: "sw-demo-status" }, [
+                    h("span", `Selection · ${selection.value}`),
+                    h(
+                      "span",
+                      `Cached ${integer.format(viewWindow.value.first)}–${integer.format(viewWindow.value.last)} of ${integer.format(ROWS)}`,
+                    ),
                   ]),
                 ]),
-                h("output", { "data-testid": "sync", class: "example-sync" }, syncLabel.value),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    class: "acknowledge",
-                    disabled: pendingCount.value === 0 || syncBusy.value,
-                    onClick: () => void acknowledge(),
-                  },
-                  [actionIcon("m5 12 4 4L19 6"), h("span", [h("b", "3"), " Acknowledge changes"])],
-                ),
-                h(
-                  "ul",
-                  log.value.map((line, index) => h("li", { key: `${index}-${line}` }, line)),
-                ),
               ]),
-            ]),
-            h(
-              "details",
-              { class: "example-simple", "aria-label": "Quick-start Sheetwrite example" },
-              [
-                h(
-                  "summary",
-                  "Quick start: everything above is the advanced grid — a basic one is 6 lines",
-                ),
-                h("div", { class: "example-simple-body" }, [
-                  h(
-                    "pre",
-                    { class: "example-simple-code" },
-                    `<script setup>
-import { Sheetwrite } from "@sheetwrite/vue";
-import "@sheetwrite/vue/styles.css";
-</script>
-
-<Sheetwrite
-  :columns="[
-    { key: 'name', title: 'Product' },
-    { key: 'price', title: 'Price', type: 'currency' },
-  ]"
-  :default-rows="[
-    { name: 'Notebook', price: 12.5 },
-    { name: 'Pen', price: 2.25 },
-  ]"
-  :height="180"
-/>`,
-                  ),
-                  h(Sheetwrite, {
-                    columns: SIMPLE_COLUMNS,
-                    defaultRows: SIMPLE_ROWS,
-                    height: 180,
-                    theme: dark.value ? DARK_THEME : LIGHT_THEME,
-                  }),
-                ]),
-              ],
-            ),
-            h(
-              "div",
-              { class: "example-controls example-footer", role: "toolbar", "aria-label": "Status" },
-              [
-                h("output", { "data-testid": "window" }, [
-                  `Cached rows ${integer.format(viewWindow.value.first)}–${integer.format(viewWindow.value.last)} `,
-                  `of ${integer.format(ROWS)} (including overscan) · ${pagesLoaded.value} pages fetched`,
-                ]),
-                h("output", {}, `Selection: ${selection.value}`),
-                h("label", [
-                  "Search ",
-                  h("input", {
-                    type: "search",
-                    value: searchQuery.value,
-                    placeholder: "e.g. Tokyo",
-                    "aria-label": "Search grid",
-                    onInput: (event: Event) => {
-                      searchQuery.value = (event.target as HTMLInputElement).value;
-                      gridOf()?.search(searchQuery.value);
-                    },
-                  }),
-                ]),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => {
-                      gridOf()?.findPrev();
-                    },
-                  },
-                  "◀ Prev",
-                ),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => {
-                      gridOf()?.findNext();
-                    },
-                  },
-                  "Next ▶",
-                ),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => {
-                      gridOf()?.setActiveSheet("orders");
-                    },
-                  },
-                  "Orders sheet",
-                ),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => {
-                      gridOf()?.setActiveSheet("review");
-                    },
-                  },
-                  "Review sheet",
-                ),
-                h("span", { class: "example-divider" }),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    "aria-pressed": frozen.value,
-                    onClick: () => {
-                      frozen.value = !frozen.value;
-                      gridOf()?.setFrozen(0, frozen.value ? 1 : 0);
-                    },
-                  },
-                  "Freeze Order col",
-                ),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    "aria-pressed": dark.value,
-                    onClick: () => {
-                      dark.value = !dark.value;
-                    },
-                  },
-                  "Dark theme",
-                ),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    "aria-pressed": readOnly.value,
-                    onClick: () => {
-                      readOnly.value = !readOnly.value;
-                    },
-                  },
-                  "Read only",
-                ),
-              ],
-            ),
-          ]);
+            ],
+          );
   },
 });
 

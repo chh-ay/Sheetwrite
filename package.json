@@ -64,8 +64,8 @@
     "test": "bun test"
   },
   "devDependencies": {
-    "@astrojs/svelte": "^8.1.2",
-    "@biomejs/biome": "^2.5.3",
+    "@astrojs/svelte": "9.0.1",
+    "@biomejs/biome": "2.5.4",
     "@changesets/cli": "2.31.0",
     "@happy-dom/global-registrator": "^20.10.6",
     "@playwright/test": "^1.61.1",
@@ -76,7 +76,7 @@
     "fake-indexeddb": "6.2.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "svelte": "^5.56.4",
+    "svelte": "5.56.5",
     "typescript": "^7.0.2",
     "typescript-compiler": "npm:typescript@^6.0.3",
     "vue": "^3.5.39"

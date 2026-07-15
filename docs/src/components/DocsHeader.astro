@@ -1,0 +1,90 @@
+---
+import Search from "@astrojs/starlight/components/Search.astro";
+import { withBasePath } from "../base-path.js";
+import Brand from "./Brand.astro";
+import DocsThemeSelect from "./DocsThemeSelect.astro";
+import FrameworkPreference from "./FrameworkPreference.astro";
+
+const route = (path: string) => withBasePath(path, import.meta.env.BASE_URL);
+---
+
+<header class="sw-docs-header">
+  <Brand />
+  <nav aria-label="Documentation shortcuts">
+    <a href={route("/docs/start/installation/")}>Guides</a>
+    <a href={route("/docs/api/")}>API</a>
+    <a data-framework-example href={route("/vanilla/")}>Open the Vanilla example</a>
+  </nav>
+  <div class="sw-docs-header__tools">
+    <FrameworkPreference />
+    <Search />
+    <DocsThemeSelect />
+  </div>
+</header>
+
+<style>
+  .sw-docs-header {
+    display: grid;
+    min-height: 4.25rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(1rem, 2vw, 2rem);
+    padding-inline: clamp(1rem, 2.5vw, 2rem);
+    border-bottom: 1px solid var(--sw-border, #d8dee9);
+    background: color-mix(in srgb, var(--sw-surface-0, #ffffff) 94%, transparent);
+    backdrop-filter: blur(18px);
+  }
+
+  .sw-docs-header nav {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .sw-docs-header nav a {
+    color: var(--sw-fg-muted, #64748b);
+    font-size: var(--sw-type-sm);
+    font-weight: 650;
+    text-decoration: none;
+  }
+
+  .sw-docs-header nav a:hover {
+    color: var(--sw-fg-strong, #0f172a);
+  }
+
+  .sw-docs-header__tools {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+  }
+
+  .sw-docs-header__tools :global(site-search) {
+    min-width: 2.4rem;
+  }
+
+  @media (max-width: 66rem) {
+    .sw-docs-header nav a:last-child {
+      display: none;
+    }
+  }
+
+  @media (max-width: 48rem) {
+    .sw-docs-header {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.75rem;
+      padding-inline-end: 4.5rem;
+    }
+
+    .sw-docs-header :global(.sw-brand span),
+    .sw-docs-header nav {
+      display: none;
+    }
+
+    .sw-docs-header__tools :global(sheetwrite-theme-select) {
+      display: none;
+    }
+  }
+</style>

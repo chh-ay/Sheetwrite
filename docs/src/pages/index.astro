@@ -1,236 +1,403 @@
 ---
+import HeroWorkbook from "@/components/HeroWorkbook";
 import Layout from "@/layouts/Layout.astro";
 import { withBasePath } from "../base-path.js";
 
 const route = (path: string) => withBasePath(path, import.meta.env.BASE_URL);
-
 const integrations = [
   {
-    slug: "vanilla",
-    label: "Core",
-    title: "Imperative workbook",
-    description: "Own the DOM lifecycle directly and compose the built-in spreadsheet shell.",
-    accent: "var(--color-fw-vanilla)",
+    name: "Core",
+    accent: "#f0b429",
+    description: "Own the DOM lifecycle directly and compose the full imperative Grid API.",
+    href: "/vanilla/",
   },
   {
-    slug: "react",
-    label: "React",
-    title: "100k-row analytics",
-    description: "Render, search, filter, aggregate, and export through the React adapter.",
-    accent: "var(--color-fw-react)",
+    name: "React",
+    accent: "#61dafb",
+    description: "Forwarded refs, explicit readiness generations, and production-safe resets.",
+    href: "/react/",
   },
   {
-    slug: "vue",
-    label: "Vue",
-    title: "Streaming datasource",
-    description: "Page through one million virtual rows with delayed mutation acknowledgements.",
-    accent: "var(--color-fw-vue)",
+    name: "Vue",
+    accent: "#42b883",
+    description: "Exposed Grid state, kebab-case events, and paged datasource workflows.",
+    href: "/vue/",
   },
   {
-    slug: "svelte",
-    label: "Svelte",
-    title: "Formula workbook",
-    description: "Compose the shared shell around live formulas and cross-sheet aggregates.",
-    accent: "var(--color-fw-svelte)",
+    name: "Svelte",
+    accent: "#ff3e00",
+    description: "Bindable Grid ownership, callbacks, formulas, and custom renderer composition.",
+    href: "/svelte/",
   },
 ] as const;
 ---
 
 <Layout
   title="Sheetwrite — spreadsheet infrastructure for the web"
-  description="A canvas spreadsheet backed by a Rust and WebAssembly columnar engine, with an imperative core and React, Vue, and Svelte adapters."
+  description="A production spreadsheet engine with a Rust/WASM columnar core, canvas rendering, and first-class React, Vue, and Svelte adapters."
 >
-  <main class="min-h-0 flex-1 overflow-y-auto bg-ink-950">
-    <section class="border-b border-ink-800">
-      <div class="mx-auto grid max-w-7xl gap-16 px-6 py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(25rem,.95fr)] lg:items-center lg:py-28">
-        <div class="max-w-3xl">
-          <p class="mb-6 font-mono text-[11px] font-semibold tracking-[0.16em] text-brand-300 uppercase">
-            Open source · Rust + WebAssembly · Canvas
-          </p>
-          <h1 class="m-0 max-w-3xl font-display text-5xl leading-[1.02] font-semibold tracking-[-0.055em] text-ink-50 sm:text-6xl lg:text-7xl">
-            Spreadsheet infrastructure for the web.
-          </h1>
-          <p class="mt-7 max-w-2xl text-lg leading-8 text-ink-300">
-            Sheetwrite provides the engine, rendering, formulas, and framework adapters for products that need a real spreadsheet—not another table component.
-          </p>
-          <div class="mt-9 flex flex-wrap gap-3">
-            <a
-              href={route("/docs/start/installation/")}
-              class="inline-flex min-h-11 items-center rounded-md bg-brand-500 px-5 text-sm font-semibold text-ink-950 no-underline transition hover:bg-brand-300"
-            >
-              Read the documentation
-            </a>
-            <a
-              href={route("/vanilla/")}
-              class="inline-flex min-h-11 items-center rounded-md border border-ink-600 px-5 text-sm font-semibold text-ink-100 no-underline transition hover:border-ink-400 hover:bg-ink-900"
-            >
-              Open the workbook demo
-            </a>
-          </div>
-          <div class="mt-5 inline-flex items-center gap-3 rounded-md border border-ink-800 bg-ink-900/70 px-4 py-2 font-mono text-xs text-ink-400">
-            <span class="text-ink-600">$</span>
-            <code>bun add <span class="text-brand-300">@sheetwrite/react</span></code>
-          </div>
+  <main class="sw-home">
+    <section class="sw-home-hero">
+      <div class="sw-home-hero__copy">
+        <span class="sw-kicker">RUST / WASM / CANVAS</span>
+        <h1>A spreadsheet engine for products that outgrow tables.</h1>
+        <p>
+          Ship editing, formulas, search, sort, filters, collaboration primitives, and XLSX without
+          turning every cell into a DOM component.
+        </p>
+        <div class="sw-home-actions">
+          <a class="is-primary" href={route("/docs/start/installation/")}>Build your first grid</a>
+          <a href="https://github.com/chh-ay/Sheetwrite">View source</a>
         </div>
-
-        <div class="overflow-hidden rounded-xl border border-ink-700 bg-ink-900 shadow-2xl shadow-black/25" aria-label="Sheetwrite workbook preview">
-          <div class="flex items-center gap-3 border-b border-ink-700 px-4 py-3">
-            <span class="grid h-7 w-7 place-items-center rounded bg-brand-500 font-mono text-xs font-semibold text-ink-950">S</span>
-            <div>
-              <p class="m-0 text-xs font-semibold text-ink-100">Revenue plan</p>
-              <p class="m-0 mt-0.5 font-mono text-[9px] text-ink-500">Autosaved · Sheet 1</p>
-            </div>
-            <span class="ml-auto rounded-full border border-ink-700 px-2.5 py-1 font-mono text-[9px] text-ink-400">100k rows</span>
-          </div>
-          <div class="grid grid-cols-[3.25rem_2rem_minmax(0,1fr)] border-b border-ink-700 bg-ink-950/70 font-mono text-[10px]">
-            <span class="border-r border-ink-700 px-3 py-2 text-brand-300">D6</span>
-            <span class="border-r border-ink-700 px-2 py-2 text-ink-500">fx</span>
-            <span class="truncate px-3 py-2 text-ink-300">=SUM(D2:D5)</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[32rem] table-fixed border-collapse text-left text-[11px] text-ink-300">
-              <thead class="bg-ink-950/80 font-mono text-[9px] text-ink-500">
-                <tr>
-                  <th class="w-8 border-r border-b border-ink-800 px-2 py-2"></th>
-                  <th class="border-r border-b border-ink-800 px-3 py-2 font-medium">A</th>
-                  <th class="border-r border-b border-ink-800 px-3 py-2 font-medium">B</th>
-                  <th class="border-r border-b border-ink-800 px-3 py-2 font-medium">C</th>
-                  <th class="border-b border-ink-800 px-3 py-2 font-medium">D</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr class="font-semibold text-ink-100">
-                  <th class="border-r border-b border-ink-800 px-2 py-2 text-center font-mono text-[9px] font-normal text-ink-600">1</th>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Quarter</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Region</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Owner</td>
-                  <td class="border-b border-ink-800 px-3 py-2">Revenue</td>
-                </tr>
-                <tr>
-                  <th class="border-r border-b border-ink-800 px-2 py-2 text-center font-mono text-[9px] font-normal text-ink-600">2</th>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Q1</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">North</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Mira</td>
-                  <td class="border-b border-ink-800 px-3 py-2 text-right font-mono">$84,320</td>
-                </tr>
-                <tr>
-                  <th class="border-r border-b border-ink-800 px-2 py-2 text-center font-mono text-[9px] font-normal text-ink-600">3</th>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Q2</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">West</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Jon</td>
-                  <td class="border-b border-ink-800 px-3 py-2 text-right font-mono">$97,680</td>
-                </tr>
-                <tr>
-                  <th class="border-r border-b border-ink-800 px-2 py-2 text-center font-mono text-[9px] font-normal text-ink-600">4</th>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Q3</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">East</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Ari</td>
-                  <td class="border-b border-ink-800 px-3 py-2 text-right font-mono">$112,940</td>
-                </tr>
-                <tr>
-                  <th class="border-r border-b border-ink-800 px-2 py-2 text-center font-mono text-[9px] font-normal text-ink-600">5</th>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Q4</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">South</td>
-                  <td class="border-r border-b border-ink-800 px-3 py-2">Noa</td>
-                  <td class="border-b border-ink-800 px-3 py-2 text-right font-mono">$126,500</td>
-                </tr>
-                <tr class="bg-brand-500/5">
-                  <th class="border-r border-ink-800 px-2 py-2 text-center font-mono text-[9px] font-normal text-ink-600">6</th>
-                  <td class="border-r border-ink-800 px-3 py-2 font-semibold text-ink-100" colspan="3">Annual total</td>
-                  <td class="relative border-2 border-brand-500 px-3 py-2 text-right font-mono font-semibold text-brand-300">$421,440</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="flex items-center border-t border-ink-700 bg-ink-950/70 px-4">
-            <span class="border-b-2 border-brand-500 px-3 py-2.5 text-[10px] font-semibold text-ink-100">Forecast</span>
-            <span class="px-3 py-2.5 text-[10px] text-ink-500">Assumptions</span>
-            <span class="ml-auto font-mono text-[9px] text-ink-600">Ready</span>
-          </div>
-        </div>
+        <dl class="sw-home-proof">
+          <div><dt>100k</dt><dd>live rows below</dd></div>
+          <div><dt>6</dt><dd>public packages</dd></div>
+          <div><dt>4</dt><dd>integration paths</dd></div>
+        </dl>
+      </div>
+      <div class="sw-home-hero__demo">
+        <HeroWorkbook client:only="react" />
       </div>
     </section>
 
-    <section class="border-b border-ink-800 bg-ink-900/35">
-      <div class="mx-auto grid max-w-7xl divide-y divide-ink-800 px-6 md:grid-cols-3 md:divide-x md:divide-y-0">
-        <article class="py-10 md:pr-10">
-          <p class="m-0 font-mono text-xs text-brand-300">01</p>
-          <h2 class="mt-4 mb-0 font-display text-xl font-semibold text-ink-50">One canvas, stable DOM size</h2>
-          <p class="mt-3 mb-0 leading-7 text-ink-300">Only the visible window is painted. A million rows do not become a million elements.</p>
+    <section class="sw-home-principles" aria-labelledby="principles-title">
+      <header>
+        <span class="sw-kicker">ONE ENGINE, CLEAR OWNERSHIP</span>
+        <h2 id="principles-title">Built as infrastructure, not a widget pile.</h2>
+      </header>
+      <div class="sw-home-principles__grid">
+        <article>
+          <span>01</span>
+          <h3>Columnar state</h3>
+          <p>Typed columns, packed windows, Rust scans, and explicit query capabilities keep scale honest.</p>
         </article>
-        <article class="py-10 md:px-10">
-          <p class="m-0 font-mono text-xs text-brand-300">02</p>
-          <h2 class="mt-4 mb-0 font-display text-xl font-semibold text-ink-50">Columnar work stays in Rust</h2>
-          <p class="mt-3 mb-0 leading-7 text-ink-300">Sort, filter, search, formulas, and aggregates cross the WASM boundary as bulk operations.</p>
+        <article>
+          <span>02</span>
+          <h3>Canvas presentation</h3>
+          <p>One renderer contract serves the main thread and Worker path without per-cell DOM churn.</p>
         </article>
-        <article class="py-10 md:pl-10">
-          <p class="m-0 font-mono text-xs text-brand-300">03</p>
-          <h2 class="mt-4 mb-0 font-display text-xl font-semibold text-ink-50">One API across frameworks</h2>
-          <p class="mt-3 mb-0 leading-7 text-ink-300">Use the imperative engine directly or mount thin React, Vue, and Svelte adapters.</p>
+        <article>
+          <span>03</span>
+          <h3>Host-owned lifecycle</h3>
+          <p>Core and adapters expose readiness, resets, events, persistence, and sync as explicit contracts.</p>
         </article>
       </div>
     </section>
 
-    <section class="mx-auto max-w-7xl px-6 py-20">
-      <div class="grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-16">
-        <div>
-          <p class="m-0 font-mono text-[11px] font-semibold tracking-[0.14em] text-brand-300 uppercase">Working examples</p>
-          <h2 class="mt-4 mb-0 font-display text-3xl font-semibold tracking-[-0.035em] text-ink-50">See each integration under load.</h2>
-          <p class="mt-4 mb-0 leading-7 text-ink-300">Every example is a complete product surface with real editing, data, and lifecycle behavior.</p>
-        </div>
-
-        <div class="border-t border-ink-700">
-          {
-            integrations.map((integration) => (
-              <a
-                href={route(`/${integration.slug}/`)}
-                class="group grid gap-3 border-b border-ink-800 py-6 text-inherit no-underline transition hover:border-ink-600 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center"
-              >
-                <span class="font-mono text-xs font-semibold" style={`color: ${integration.accent}`}>
-                  {integration.label}
-                </span>
-                <span>
-                  <strong class="block font-display text-lg font-semibold text-ink-50">{integration.title}</strong>
-                  <span class="mt-1 block text-sm leading-6 text-ink-400">{integration.description}</span>
-                </span>
-                <span class="text-ink-500 transition group-hover:translate-x-1 group-hover:text-brand-300" aria-hidden="true">→</span>
-              </a>
-            ))
-          }
-          <a
-            href={route("/theming/")}
-            class="group grid gap-3 border-b border-ink-800 py-6 text-inherit no-underline transition hover:border-ink-600 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center"
-          >
-            <span class="font-mono text-xs font-semibold text-violet-300">Theming</span>
-            <span>
-              <strong class="block font-display text-lg font-semibold text-ink-50">Renderer laboratory</strong>
-              <span class="mt-1 block text-sm leading-6 text-ink-400">Switch palettes, paint custom cells, and apply store-backed formatting.</span>
-            </span>
-            <span class="text-ink-500 transition group-hover:translate-x-1 group-hover:text-brand-300" aria-hidden="true">→</span>
+    <section class="sw-home-integrations" aria-labelledby="integrations-title">
+      <header>
+        <span class="sw-kicker">RUN THE REAL PRODUCT</span>
+        <h2 id="integrations-title">Same engine. Four ownership models.</h2>
+        <p>Each showcase is a production build with real editing and data—not a screenshot or DOM mock.</p>
+      </header>
+      <div class="sw-home-integrations__grid">
+        {integrations.map((integration) => (
+          <a href={route(integration.href)} style={`--integration-accent:${integration.accent}`}>
+            <span>{integration.name}</span>
+            <p>{integration.description}</p>
+            <strong>Open showcase →</strong>
           </a>
-        </div>
+        ))}
       </div>
     </section>
 
-    <section class="border-t border-ink-800 bg-ink-900/35">
-      <div class="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-14 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 class="m-0 font-display text-2xl font-semibold text-ink-50">Ready to build?</h2>
-          <p class="mt-2 mb-0 text-ink-400">Install the core, choose an adapter, and render your first grid.</p>
-        </div>
-        <a href={route("/docs/start/installation/")} class="text-sm font-semibold text-brand-300 no-underline hover:text-brand-200">Start with installation →</a>
+    <section class="sw-home-cta">
+      <div>
+        <span class="sw-kicker">START WITH THE CONTRACT</span>
+        <h2>Install the engine. Choose ownership later.</h2>
       </div>
+      <a href={route("/docs/start/installation/")}>Read installation</a>
     </section>
 
-    <footer class="border-t border-ink-800">
-      <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-7 text-xs text-ink-500">
-        <p class="m-0">Sheetwrite · MIT licensed</p>
-        <div class="flex gap-5">
-          <a class="text-ink-400 no-underline hover:text-ink-100" href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
-          <a class="text-ink-400 no-underline hover:text-ink-100" href={route("/docs/reference/package-entry-points/")}>Packages</a>
-          <a class="text-ink-400 no-underline hover:text-ink-100" href={route("/docs/api/")}>API</a>
-        </div>
-      </div>
+    <footer class="sw-home-footer">
+      <span>Sheetwrite</span>
+      <span>MIT licensed</span>
+      <nav aria-label="Footer links">
+        <a href={route("/docs/reference/compatibility-limits/")}>Compatibility</a>
+        <a href={route("/docs/api/")}>API</a>
+        <a href="https://github.com/chh-ay/Sheetwrite/blob/develop/SECURITY.md">Security</a>
+      </nav>
     </footer>
   </main>
 </Layout>
+
+<style>
+  .sw-home {
+    flex: 1;
+    overflow-y: auto;
+    background:
+      radial-gradient(circle at 12% 8%, rgb(52 211 153 / 10%), transparent 30rem),
+      var(--sw-surface-0, #070a12);
+  }
+
+  .sw-home-hero {
+    display: grid;
+    min-height: calc(100svh - 4rem);
+    grid-template-columns: minmax(18rem, 0.75fr) minmax(36rem, 1.25fr);
+    align-items: center;
+    gap: clamp(2rem, 4vw, 4rem);
+    padding: clamp(2.5rem, 5vh, 4rem) clamp(1.25rem, 5vw, 5rem);
+    border-bottom: 1px solid var(--sw-border, #202b40);
+  }
+
+  .sw-home-hero__copy {
+    max-width: 43rem;
+  }
+
+  .sw-kicker {
+    color: var(--sw-accent, #34d399);
+    font: 650 var(--sw-type-xs) var(--sw-font-mono, monospace);
+    letter-spacing: 0.16em;
+  }
+
+  .sw-home h1,
+  .sw-home h2,
+  .sw-home h3,
+  .sw-home p {
+    margin-block-start: 0;
+  }
+
+  .sw-home h1 {
+    margin-block: 0.9rem 1.25rem;
+    color: var(--sw-fg-strong, #f8fafc);
+    font: 650 clamp(2.75rem, 4.5vw, 4.75rem) / 0.98 var(--sw-font-display, system-ui);
+    letter-spacing: -0.055em;
+    text-wrap: balance;
+  }
+
+  .sw-home-hero__copy > p {
+    max-width: 35rem;
+    color: var(--sw-fg-muted, #91a4c1);
+    font-size: clamp(1rem, 1.4vw, 1.15rem);
+    line-height: 1.7;
+  }
+
+  .sw-home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-block: 2rem;
+  }
+
+  .sw-home-actions a,
+  .sw-home-cta > a {
+    display: inline-flex;
+    min-height: 2.8rem;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 1.1rem;
+    border: 1px solid var(--sw-border-strong, #33445f);
+    border-radius: 0.65rem;
+    color: var(--sw-fg-strong, #f8fafc);
+    font-size: var(--sw-type-sm);
+    font-weight: 650;
+    text-decoration: none;
+  }
+
+  .sw-home-actions a.is-primary,
+  .sw-home-cta > a {
+    border-color: var(--sw-accent, #34d399);
+    background: var(--sw-accent, #34d399);
+    color: #052016;
+  }
+
+  .sw-home-proof {
+    display: flex;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin: 0;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--sw-border, #202b40);
+  }
+
+  .sw-home-proof div {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .sw-home-proof dt {
+    color: var(--sw-fg-strong, #f8fafc);
+    font: 650 1.2rem var(--sw-font-display, system-ui);
+  }
+
+  .sw-home-proof dd {
+    margin: 0;
+    color: var(--sw-fg-dim, #64748b);
+    font: 500 var(--sw-type-xs) var(--sw-font-mono, monospace);
+    text-transform: uppercase;
+  }
+
+  .sw-home-hero__demo {
+    min-width: 0;
+  }
+
+  .sw-home-principles,
+  .sw-home-integrations {
+    padding: clamp(4rem, 8vw, 8rem) clamp(1.25rem, 6vw, 6rem);
+    border-bottom: 1px solid var(--sw-border, #202b40);
+  }
+
+  .sw-home-principles > header,
+  .sw-home-integrations > header {
+    max-width: 58rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .sw-home h2 {
+    margin-block: 0.6rem 0;
+    color: var(--sw-fg-strong, #f8fafc);
+    font: 650 clamp(1.8rem, 3vw, 3.25rem) / 1.05 var(--sw-font-display, system-ui);
+    letter-spacing: -0.04em;
+  }
+
+  .sw-home-principles__grid,
+  .sw-home-integrations__grid {
+    display: grid;
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid var(--sw-border, #202b40);
+    border-radius: 1rem;
+    background: var(--sw-border, #202b40);
+  }
+
+  .sw-home-principles__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .sw-home-principles article,
+  .sw-home-integrations__grid a {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    background: var(--sw-surface-1, #0b1120);
+  }
+
+  .sw-home-principles article > span,
+  .sw-home-integrations__grid a > span {
+    color: var(--sw-accent, #34d399);
+    font: 600 var(--sw-type-xs) var(--sw-font-mono, monospace);
+    letter-spacing: 0.12em;
+  }
+
+  .sw-home h3 {
+    margin-block: 2rem 0.65rem;
+    color: var(--sw-fg-strong, #f8fafc);
+    font: 620 1.25rem var(--sw-font-display, system-ui);
+  }
+
+  .sw-home-principles p,
+  .sw-home-integrations p {
+    color: var(--sw-fg-muted, #91a4c1);
+    line-height: 1.65;
+  }
+
+  .sw-home-integrations > header > p {
+    margin-top: 1rem;
+  }
+
+  .sw-home-integrations__grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .sw-home-integrations__grid a {
+    display: grid;
+    min-height: 15rem;
+    grid-template-rows: auto 1fr auto;
+    color: inherit;
+    text-decoration: none;
+    transition: background 150ms ease;
+  }
+
+  .sw-home-integrations__grid a:hover {
+    background: color-mix(in srgb, var(--integration-accent) 8%, var(--sw-surface-1, #0b1120));
+  }
+
+  .sw-home-integrations__grid a > span,
+  .sw-home-integrations__grid a > strong {
+    color: var(--integration-accent);
+  }
+
+  .sw-home-integrations__grid a > strong {
+    font-size: var(--sw-type-xs);
+  }
+
+  .sw-home-cta {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: clamp(4rem, 8vw, 8rem) clamp(1.25rem, 6vw, 6rem);
+  }
+
+  .sw-home-footer {
+    display: flex;
+    min-height: 5rem;
+    align-items: center;
+    gap: 1.5rem;
+    padding-inline: clamp(1.25rem, 5vw, 5rem);
+    border-top: 1px solid var(--sw-border, #202b40);
+    color: var(--sw-fg-dim, #64748b);
+    font-size: var(--sw-type-xs);
+  }
+
+  .sw-home-footer > span:first-child {
+    color: var(--sw-fg-strong, #f8fafc);
+    font-weight: 650;
+  }
+
+  .sw-home-footer nav {
+    display: flex;
+    gap: 1rem;
+    margin-inline-start: auto;
+  }
+
+  .sw-home-footer a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (max-width: 70rem) {
+    .sw-home-hero {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sw-home-hero__copy {
+      max-width: 54rem;
+    }
+
+    .sw-home h1 {
+      max-width: 48rem;
+    }
+
+    .sw-home-principles__grid,
+    .sw-home-integrations__grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 42rem) {
+    .sw-home-hero {
+      padding-block: 3.5rem 1rem;
+    }
+
+    .sw-home h1 {
+      font-size: clamp(2.5rem, 10vw, 3.4rem);
+    }
+
+    .sw-home-principles__grid,
+    .sw-home-integrations__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sw-home-cta,
+    .sw-home-footer {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .sw-home-footer {
+      padding-block: 1.25rem;
+    }
+
+    .sw-home-footer nav {
+      margin-inline-start: 0;
+    }
+  }
+</style>

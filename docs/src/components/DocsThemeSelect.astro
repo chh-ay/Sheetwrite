@@ -1,0 +1,291 @@
+---
+import { Check, ChevronDown, Laptop, Moon, Sun } from "lucide-astro";
+
+const themes = [
+  { id: "dark", label: "Dark", Icon: Moon },
+  { id: "light", label: "Light", Icon: Sun },
+  { id: "auto", label: "Auto", Icon: Laptop },
+] as const;
+---
+
+<sheetwrite-theme-select class="sw-theme-select">
+  <button
+    type="button"
+    class="sw-theme-select__trigger"
+    aria-label="Select theme"
+    aria-haspopup="listbox"
+    aria-expanded="false"
+    aria-controls="sw-theme-options"
+  >
+    <Laptop class="sw-theme-select__mode" size={14} aria-hidden="true" />
+    <span data-theme-value>Auto</span>
+    <ChevronDown class="sw-theme-select__chevron" size={13} aria-hidden="true" />
+  </button>
+  <div class="sw-theme-select__popup" id="sw-theme-options" role="listbox" hidden>
+    {themes.map(({ id, label, Icon }) => (
+      <button type="button" role="option" aria-selected="false" tabindex="-1" data-theme-option={id}>
+        <Check class="sw-theme-select__check" size={14} aria-hidden="true" />
+        <Icon size={14} aria-hidden="true" />
+        <span>{label}</span>
+      </button>
+    ))}
+  </div>
+</sheetwrite-theme-select>
+
+<script>
+  type Theme = "auto" | "dark" | "light";
+  const storageKey = "starlight-theme";
+
+  function parseTheme(value: unknown): Theme {
+    return value === "dark" || value === "light" || value === "auto" ? value : "auto";
+  }
+
+  function systemTheme(): Exclude<Theme, "auto"> {
+    return matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+
+  class SheetwriteThemeSelect extends HTMLElement {
+    private readonly media = matchMedia("(prefers-color-scheme: light)");
+    private theme: Theme = "auto";
+
+    connectedCallback(): void {
+      this.theme = parseTheme(localStorage.getItem(storageKey));
+      this.apply(this.theme, false);
+      this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger")?.addEventListener(
+        "click",
+        this.onTrigger,
+      );
+      this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger")?.addEventListener(
+        "keydown",
+        this.onTriggerKeydown,
+      );
+      this.querySelector<HTMLElement>(".sw-theme-select__popup")?.addEventListener(
+        "click",
+        this.onOption,
+      );
+      this.querySelector<HTMLElement>(".sw-theme-select__popup")?.addEventListener(
+        "keydown",
+        this.onKeydown,
+      );
+      this.addEventListener("focusout", this.onFocusOut);
+      document.addEventListener("pointerdown", this.onOutside);
+      this.media.addEventListener("change", this.onSystemChange);
+    }
+
+    disconnectedCallback(): void {
+      this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger")?.removeEventListener(
+        "click",
+        this.onTrigger,
+      );
+      this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger")?.removeEventListener(
+        "keydown",
+        this.onTriggerKeydown,
+      );
+      this.querySelector<HTMLElement>(".sw-theme-select__popup")?.removeEventListener(
+        "click",
+        this.onOption,
+      );
+      this.querySelector<HTMLElement>(".sw-theme-select__popup")?.removeEventListener(
+        "keydown",
+        this.onKeydown,
+      );
+      document.removeEventListener("pointerdown", this.onOutside);
+      this.media.removeEventListener("change", this.onSystemChange);
+      this.removeEventListener("focusout", this.onFocusOut);
+    }
+
+    private readonly onTrigger = (): void => {
+      const trigger = this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger");
+      const open = trigger?.getAttribute("aria-expanded") !== "true";
+      this.setOpen(open);
+      if (open) {
+        this.querySelector<HTMLButtonElement>(`[data-theme-option="${this.theme}"]`)?.focus();
+      }
+    };
+
+    private readonly onTriggerKeydown = (event: KeyboardEvent): void => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      this.setOpen(true);
+      this.querySelector<HTMLButtonElement>(`[data-theme-option="${this.theme}"]`)?.focus();
+    };
+
+    private readonly onOption = (event: Event): void => {
+      const option =
+        event.target instanceof Element
+          ? event.target.closest<HTMLButtonElement>("[data-theme-option]")
+          : null;
+      if (!option) return;
+      this.apply(parseTheme(option.dataset.themeOption), true);
+      this.setOpen(false);
+      this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger")?.focus();
+    };
+
+    private readonly onFocusOut = (event: FocusEvent): void => {
+      if (!(event.relatedTarget instanceof Node) || !this.contains(event.relatedTarget)) {
+        this.setOpen(false);
+      }
+    };
+
+    private readonly onKeydown = (event: KeyboardEvent): void => {
+      const options = [...this.querySelectorAll<HTMLButtonElement>("[data-theme-option]")];
+      const index = options.findIndex((option) => option === document.activeElement);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.setOpen(false);
+        this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger")?.focus();
+        return;
+      }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next =
+        event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? options.length - 1
+            : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+      for (const [optionIndex, option] of options.entries()) {
+        option.tabIndex = optionIndex === next ? 0 : -1;
+      }
+      options[next]?.focus();
+    };
+
+    private readonly onOutside = (event: PointerEvent): void => {
+      if (event.target instanceof Node && !this.contains(event.target)) this.setOpen(false);
+    };
+
+    private readonly onSystemChange = (): void => {
+      if (this.theme === "auto") document.documentElement.dataset.theme = systemTheme();
+    };
+
+    private setOpen(open: boolean): void {
+      const trigger = this.querySelector<HTMLButtonElement>(".sw-theme-select__trigger");
+      const popup = this.querySelector<HTMLElement>(".sw-theme-select__popup");
+      trigger?.setAttribute("aria-expanded", String(open));
+      if (popup) popup.hidden = !open;
+    }
+
+    private apply(theme: Theme, persist: boolean): void {
+      this.theme = theme;
+      document.documentElement.dataset.theme = theme === "auto" ? systemTheme() : theme;
+      if (persist) localStorage.setItem(storageKey, theme === "auto" ? "" : theme);
+      const label = theme === "auto" ? "Auto" : theme === "dark" ? "Dark" : "Light";
+      const value = this.querySelector<HTMLElement>("[data-theme-value]");
+      if (value) value.textContent = label;
+      for (const option of this.querySelectorAll<HTMLElement>("[data-theme-option]")) {
+        const selected = option.dataset.themeOption === theme;
+        option.setAttribute("aria-selected", String(selected));
+        option.tabIndex = selected ? 0 : -1;
+      }
+    }
+  }
+
+  if (!customElements.get("sheetwrite-theme-select")) {
+    customElements.define("sheetwrite-theme-select", SheetwriteThemeSelect);
+  }
+</script>
+
+<style>
+  .sw-theme-select {
+    position: relative;
+    display: inline-block;
+  }
+
+  .sw-theme-select__trigger {
+    display: flex;
+    min-width: 5.6rem;
+    min-height: 2.25rem;
+    gap: 0.45rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.55rem;
+    border: 1px solid var(--sw-border);
+    border-radius: 0.5rem;
+    outline: 0;
+    background: var(--sw-surface-2);
+    color: var(--sw-fg-strong);
+    font: 600 var(--sw-type-sm) var(--sw-font-body);
+    cursor: pointer;
+  }
+
+  .sw-theme-select__mode,
+  .sw-theme-select__chevron {
+    color: var(--sw-fg-muted);
+  }
+
+  .sw-theme-select__chevron {
+    transition: transform 120ms ease;
+  }
+
+  .sw-theme-select__trigger[aria-expanded="true"] .sw-theme-select__chevron {
+    transform: rotate(180deg);
+  }
+
+  .sw-theme-select__trigger:is(:hover, :focus-visible),
+  .sw-theme-select__trigger[aria-expanded="true"] {
+    border-color: var(--sw-accent);
+  }
+
+  .sw-theme-select__trigger:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 25%, transparent);
+  }
+
+  .sw-theme-select__popup {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    min-width: 9rem;
+    padding: 0.3rem;
+    border: 1px solid var(--sw-border);
+    border-radius: 0.6rem;
+    background: var(--sw-surface-2);
+    box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
+  }
+
+  .sw-theme-select__popup button {
+    display: grid;
+    width: 100%;
+    min-height: 2.25rem;
+    grid-template-columns: 1rem 1rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: center;
+    padding: 0.4rem 0.55rem;
+    border: 0;
+    border-radius: 0.4rem;
+    outline: 0;
+    background: transparent;
+    color: var(--sw-fg-muted);
+    font: 550 var(--sw-type-sm) var(--sw-font-body);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .sw-theme-select__check {
+    visibility: hidden;
+    color: var(--sw-accent);
+  }
+
+  .sw-theme-select__popup button[aria-selected="true"] .sw-theme-select__check {
+    visibility: visible;
+  }
+
+  .sw-theme-select__popup button:is(:hover, :focus-visible) {
+    background: color-mix(in srgb, var(--sw-accent) 11%, transparent);
+    color: var(--sw-fg-strong);
+  }
+
+  @media (max-width: 46rem) {
+    .sw-theme-select__trigger {
+      min-width: 2.25rem;
+    }
+
+    .sw-theme-select__trigger span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+  }
+</style>

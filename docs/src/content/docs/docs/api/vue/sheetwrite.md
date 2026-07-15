@@ -1,6 +1,6 @@
 ---
 title: "Sheetwrite | @sheetwrite/vue"
-description: "Simple framework component that owns initialization and Grid lifetime."
+description: "Convenience component for local object rows."
 tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/vue|.|Sheetwrite -->
@@ -8,11 +8,14 @@ tableOfContents: false
 
 <span class="api-status">variable</span>
 
-Simple framework component that owns initialization and Grid lifetime.
+Convenience component for local object rows. It derives a single-sheet workbook from
+`columns`, `defaultRows`, and `sheetName`, then delegates initialization, live option
+updates, reset-sensitive replacements, and teardown to `SheetwriteGrid`. Use
+`SheetwriteGrid` directly when the host already owns a workbook or datasource.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L250</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L255</code></dd></div>
 </dl>
 
 ## Signature

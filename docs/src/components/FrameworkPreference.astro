@@ -1,0 +1,306 @@
+---
+import { Check, ChevronDown } from "lucide-astro";
+import { withBasePath } from "../base-path.js";
+import { FRAMEWORKS, frameworkByPath } from "../framework-preference.js";
+
+const current = frameworkByPath(Astro.url.pathname)?.id ?? "";
+const options = FRAMEWORKS.map((framework) => ({
+  ...framework,
+  guide: withBasePath(framework.guide, import.meta.env.BASE_URL),
+  example: withBasePath(framework.example, import.meta.env.BASE_URL),
+}));
+---
+
+<div class="sw-framework" data-framework-preference data-current={current}>
+  <span id="sw-framework-label">Framework</span>
+  <div class="sw-framework__control">
+    <button
+      type="button"
+      class="sw-framework__trigger"
+      aria-label="Preferred framework"
+      aria-haspopup="listbox"
+      aria-expanded="false"
+      aria-controls="sw-framework-options"
+    >
+      <span data-framework-value>{options[0]?.label}</span>
+      <ChevronDown size={14} aria-hidden="true" />
+    </button>
+    <div class="sw-framework__popup" id="sw-framework-options" role="listbox" hidden>
+      {options.map((framework) => (
+        <button
+          type="button"
+          role="option"
+          aria-selected="false"
+          tabindex="-1"
+          data-framework-option={framework.id}
+          data-guide={framework.guide}
+          data-example={framework.example}
+        >
+          <Check size={14} aria-hidden="true" />
+          <span>{framework.label}</span>
+        </button>
+      ))}
+    </div>
+  </div>
+</div>
+
+<script>
+  import {
+    FRAMEWORK_STORAGE_KEY,
+    FRAMEWORK_TAB_STORAGE_KEY,
+    FRAMEWORKS,
+    frameworkById,
+  } from "../framework-preference.js";
+
+  const controls = [...document.querySelectorAll<HTMLElement>("[data-framework-preference]")];
+
+  function optionFor(control: HTMLElement, value: string): HTMLButtonElement | null {
+    return control.querySelector<HTMLButtonElement>(`[data-framework-option="${value}"]`);
+  }
+
+  function setOpen(control: HTMLElement, open: boolean): void {
+    const trigger = control.querySelector<HTMLButtonElement>(".sw-framework__trigger");
+    const popup = control.querySelector<HTMLElement>(".sw-framework__popup");
+    if (!trigger || !popup) return;
+    trigger.setAttribute("aria-expanded", String(open));
+    popup.hidden = !open;
+  }
+
+  function publish(value: string, navigate: boolean): void {
+    const framework = frameworkById(value);
+    if (!framework) return;
+
+    localStorage.setItem(FRAMEWORK_STORAGE_KEY, framework.id);
+    localStorage.setItem(FRAMEWORK_TAB_STORAGE_KEY, framework.label);
+
+    for (const control of controls) {
+      const valueNode = control.querySelector<HTMLElement>("[data-framework-value]");
+      if (valueNode) valueNode.textContent = framework.label;
+      for (const option of control.querySelectorAll<HTMLElement>("[data-framework-option]")) {
+        const selected = option.dataset.frameworkOption === framework.id;
+        option.setAttribute("aria-selected", String(selected));
+        option.tabIndex = selected ? 0 : -1;
+      }
+    }
+
+    for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-framework-example]")) {
+      const option = controls[0] ? optionFor(controls[0], framework.id) : null;
+      if (option?.dataset.example) link.href = option.dataset.example;
+      link.textContent = `Open the ${framework.label} example`;
+    }
+
+    for (const tabsElement of document.querySelectorAll<HTMLElement>(
+      'starlight-tabs[data-sync-key="sheetwrite-framework"]',
+    )) {
+      const tab = [...tabsElement.querySelectorAll<HTMLAnchorElement>('[role="tab"]')].find(
+        (candidate) => candidate.textContent?.trim() === framework.label,
+      );
+      if (tab?.getAttribute("aria-selected") !== "true") tab?.click();
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("sheetwrite:framework-change", { detail: { framework: framework.id } }),
+    );
+
+    if (!navigate) return;
+    const activeGuide = controls[0]?.dataset.current;
+    const option = controls[0] ? optionFor(controls[0], framework.id) : null;
+    if (activeGuide && option?.dataset.guide) window.location.assign(option.dataset.guide);
+  }
+
+  const current = controls.find((control) => control.dataset.current)?.dataset.current;
+  const stored = localStorage.getItem(FRAMEWORK_STORAGE_KEY);
+  const initial = frameworkById(current)?.id ?? frameworkById(stored)?.id ?? FRAMEWORKS[0].id;
+  publish(initial, false);
+
+  for (const control of controls) {
+    const trigger = control.querySelector<HTMLButtonElement>(".sw-framework__trigger");
+    const popup = control.querySelector<HTMLElement>(".sw-framework__popup");
+    const options = [...control.querySelectorAll<HTMLButtonElement>("[data-framework-option]")];
+    if (!trigger || !popup) continue;
+
+    const focusOption = (index: number): void => {
+      for (const [optionIndex, option] of options.entries()) {
+        option.tabIndex = optionIndex === index ? 0 : -1;
+      }
+      options[index]?.focus();
+    };
+
+    trigger.addEventListener("click", () => {
+      const open = trigger.getAttribute("aria-expanded") !== "true";
+      setOpen(control, open);
+      if (open) {
+        const selected = options.findIndex(
+          (option) => option.getAttribute("aria-selected") === "true",
+        );
+        focusOption(Math.max(0, selected));
+      }
+    });
+    trigger.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      setOpen(control, true);
+      const selected = options.findIndex(
+        (option) => option.getAttribute("aria-selected") === "true",
+      );
+      focusOption(Math.max(0, selected));
+    });
+    control.addEventListener("focusout", (event) => {
+      if (!(event.relatedTarget instanceof Node) || !control.contains(event.relatedTarget)) {
+        setOpen(control, false);
+      }
+    });
+    popup.addEventListener("click", (event) => {
+      const option =
+        event.target instanceof Element
+          ? event.target.closest<HTMLButtonElement>("[data-framework-option]")
+          : null;
+      if (!option?.dataset.frameworkOption) return;
+      publish(option.dataset.frameworkOption, true);
+      setOpen(control, false);
+    });
+    popup.addEventListener("keydown", (event) => {
+      const focused = document.activeElement;
+      const index = options.findIndex((option) => option === focused);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(control, false);
+        trigger.focus();
+        return;
+      }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next =
+        event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? options.length - 1
+            : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+      focusOption(next);
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    for (const control of controls) {
+      if (!(event.target instanceof Node) || !control.contains(event.target)) setOpen(control, false);
+    }
+
+    const tab =
+      event.target instanceof Element
+        ? event.target.closest<HTMLAnchorElement>(
+            'starlight-tabs[data-sync-key="sheetwrite-framework"] [role="tab"]',
+          )
+        : null;
+    const framework = FRAMEWORKS.find((candidate) => candidate.label === tab?.textContent?.trim());
+    if (framework) publish(framework.id, false);
+  });
+</script>
+
+<style>
+  .sw-framework {
+    display: inline-flex;
+    min-width: max-content;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--sw-fg-muted, #94a3b8);
+    font-size: var(--sw-type-xs);
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .sw-framework__control {
+    position: relative;
+  }
+
+  .sw-framework__trigger {
+    display: flex;
+    min-width: 5.75rem;
+    min-height: 2.25rem;
+    gap: 0.65rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.6rem 0 0.7rem;
+    border: 1px solid var(--sw-border, #273246);
+    border-radius: 0.55rem;
+    outline: 0;
+    background: var(--sw-surface-2, #0f172a);
+    color: var(--sw-fg-strong, #f8fafc);
+    font: 600 var(--sw-type-sm) var(--sw-font-body, system-ui), sans-serif;
+    cursor: pointer;
+  }
+
+  .sw-framework__trigger svg {
+    color: var(--sw-fg-muted, #94a3b8);
+    transition: transform 120ms ease;
+  }
+
+  .sw-framework__trigger[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+
+  .sw-framework__trigger:hover,
+  .sw-framework__trigger:focus-visible,
+  .sw-framework__trigger[aria-expanded="true"] {
+    border-color: var(--sw-accent, #34d399);
+  }
+
+  .sw-framework__trigger:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent, #34d399) 25%, transparent);
+  }
+
+  .sw-framework__popup {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    min-width: 10rem;
+    padding: 0.3rem;
+    border: 1px solid var(--sw-border, #273246);
+    border-radius: 0.6rem;
+    background: var(--sw-surface-2, #0f172a);
+    box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
+  }
+
+  .sw-framework__popup button {
+    display: grid;
+    width: 100%;
+    min-height: 2.25rem;
+    grid-template-columns: 1rem minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.4rem 0.55rem;
+    border: 0;
+    border-radius: 0.4rem;
+    outline: 0;
+    background: transparent;
+    color: var(--sw-fg-muted, #94a3b8);
+    font: 550 var(--sw-type-sm) var(--sw-font-body, system-ui), sans-serif;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .sw-framework__popup button svg {
+    visibility: hidden;
+    color: var(--sw-accent, #34d399);
+  }
+
+  .sw-framework__popup button[aria-selected="true"] svg {
+    visibility: visible;
+  }
+
+  .sw-framework__popup button:is(:hover, :focus-visible) {
+    background: color-mix(in srgb, var(--sw-accent, #34d399) 11%, transparent);
+    color: var(--sw-fg-strong, #f8fafc);
+  }
+
+  @media (max-width: 42rem) {
+    .sw-framework > span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+  }
+</style>

@@ -8,6 +8,7 @@ import vue from "@astrojs/vue";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 import { withBasePath } from "./src/base-path.ts";
+import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
 
 const PRODUCTION_SITE = "https://chh-ay.github.io";
 const PRODUCTION_BASE = "/Sheetwrite";
@@ -96,11 +97,18 @@ export default defineConfig({
       favicon: "/favicon.svg",
       customCss: ["/src/styles/docs.css", "/src/styles/api-reference.css"],
       components: {
-        PageSidebar: "./src/components/PageSidebar.astro",
-        SocialIcons: "./src/components/FrameworkSelect.astro",
+        Header: "./src/components/DocsHeader.astro",
+        Footer: "./src/components/DocsFooter.astro",
+        ThemeSelect: "./src/components/DocsThemeSelect.astro",
       },
       expressiveCode: {
         defaultProps: { wrap: false },
+        plugins: [
+          sheetwriteCodeHovers({
+            cwd: new URL(".", import.meta.url).pathname,
+            shouldTransform: (codeBlock) => !/\bgenerated\b/.test(codeBlock.meta),
+          }),
+        ],
       },
       pagefind: true,
       sidebar: [

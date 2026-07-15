@@ -1,6 +1,6 @@
 ---
 title: "Sheetwrite | @sheetwrite/react"
-description: "Simple framework component that owns initialization and Grid lifetime."
+description: "Convenience component for local object rows."
 tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/react|.|Sheetwrite -->
@@ -8,11 +8,14 @@ tableOfContents: false
 
 <span class="api-status">variable</span>
 
-Simple framework component that owns initialization and Grid lifetime.
+Convenience component for local object rows. It derives a single-sheet workbook from
+`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`
+through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
+use `SheetwriteGrid` when the host already owns a workbook or datasource.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L262</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L267</code></dd></div>
 </dl>
 
 ## Signature
