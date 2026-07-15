@@ -3,7 +3,7 @@ title: Interaction and editing
 description: Configure selection, editing, clipboard, validation, protection, search, merge, and fill behavior.
 ---
 
-[Docs index](/docs/)
+[Installation](/docs/start/installation/)
 
 Sheetwrite handles selection, keyboard navigation, inline editing, the clipboard,
 the toolbar, merges, and drag-to-fill out of the box. The host element is made

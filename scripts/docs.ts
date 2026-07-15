@@ -17,7 +17,7 @@ const generatedManifestPath = join(generatedDataRoot, "public-api.json");
 const docsContractPath = join(generatedDataRoot, "docs-contract.json");
 
 export const MIGRATION_MATRIX = {
-  "docs/README.md": "/docs/",
+  "docs/README.md": "/docs/start/installation/",
   "docs/getting-started.md": "/docs/start/installation/",
   "docs/concepts.md": "/docs/concepts/runtime-ownership/",
   "docs/configuration.md": "/docs/guides/configuration/",

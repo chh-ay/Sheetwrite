@@ -71,9 +71,11 @@ describe("documentation generation", () => {
     expect(inventory?.content).toContain("supported");
   });
 
-  it("keeps the old-guide migration matrix exhaustive and route-unique", () => {
+  it("keeps the old-guide migration matrix exhaustive with one intentional landing consolidation", () => {
     expect(Object.keys(MIGRATION_MATRIX)).toHaveLength(12);
-    expect(new Set(Object.values(MIGRATION_MATRIX)).size).toBe(12);
+    const routes = Object.values(MIGRATION_MATRIX);
+    expect(new Set(routes).size).toBe(11);
+    expect(routes.filter((route) => route === "/docs/start/installation/")).toHaveLength(2);
     for (const [source, route] of Object.entries(MIGRATION_MATRIX)) {
       expect(source).toMatch(/^docs\/.+\.md$/);
       expect(route).toMatch(/^\/docs\/.+\/$|^\/docs\/$/);

@@ -99,25 +99,25 @@
   }
 
   .example-shell[data-theme="dark"] {
-    --chrome-bg: var(--color-ink-900);
-    --chrome-raised: var(--color-ink-850);
+    --chrome-bg: #080d17;
+    --chrome-raised: #0d1422;
     --chrome-fg: var(--color-ink-100);
-    --chrome-muted: var(--color-ink-300);
-    --chrome-border: var(--color-ink-700);
+    --chrome-muted: #93a1ba;
+    --chrome-border: #202b40;
     --chrome-accent: var(--color-brand-400);
-    --chrome-accent-soft: color-mix(in srgb, var(--color-brand-400) 16%, transparent);
+    --chrome-accent-soft: color-mix(in srgb, var(--color-brand-400) 12%, transparent);
   }
 
   .example-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem 0.75rem;
-    padding: 0.5rem 0.85rem;
+    gap: 0.5rem 0.9rem;
+    padding: 0.625rem 1rem;
     border-bottom: 1px solid var(--chrome-border);
     background: var(--chrome-raised);
     color: var(--chrome-fg);
-    font-size: 12.5px;
+    font-size: 13px;
   }
 
   .example-footer {
@@ -128,21 +128,22 @@
   .example-controls label {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
     color: var(--chrome-muted);
-    font-weight: 500;
+    font-weight: 550;
     white-space: nowrap;
   }
 
   .example-controls button,
   .example-log button {
-    padding: 0.28rem 0.65rem;
+    min-height: 2rem;
+    padding: 0.4rem 0.7rem;
     border: 1px solid var(--chrome-border);
-    border-radius: 3px;
+    border-radius: 5px;
     background: var(--chrome-bg);
     color: var(--chrome-fg);
     font: inherit;
-    font-weight: 500;
+    font-weight: 550;
     cursor: pointer;
     transition:
       border-color 120ms,
@@ -152,6 +153,7 @@
   .example-controls button:hover:not(:disabled),
   .example-log button:hover:not(:disabled) {
     border-color: var(--chrome-accent);
+    background: var(--chrome-accent-soft);
   }
 
   .example-controls button:disabled,
@@ -171,9 +173,10 @@
   .example-controls input[type="search"],
   .example-controls input[type="number"],
   .example-controls input[type="text"] {
-    padding: 0.28rem 0.5rem;
+    min-height: 2rem;
+    padding: 0.4rem 0.6rem;
     border: 1px solid var(--chrome-border);
-    border-radius: 3px;
+    border-radius: 5px;
     background: var(--chrome-bg);
     color: var(--chrome-fg);
     font: inherit;
@@ -184,7 +187,12 @@
   }
 
   .example-controls input[type="search"] {
-    width: 11rem;
+    width: 13rem;
+  }
+
+  .example-controls input[type="checkbox"],
+  .example-controls input[type="range"] {
+    accent-color: var(--chrome-accent);
   }
 
   .example-controls select:focus-visible,
@@ -225,14 +233,14 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 0.85rem;
+    padding: 0.625rem 1rem;
     cursor: pointer;
     user-select: none;
     list-style: none;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--chrome-muted);
   }
 
@@ -288,16 +296,18 @@
      restyled onto the shared chrome tokens; host rules win over styles.css
      without !important by design, and follow the island's dark toggle. */
   .example-shell .sheetwrite-toolbar {
-    gap: 3px;
-    padding: 4px 8px;
+    gap: 4px;
+    padding: 5px 10px;
     background: var(--chrome-raised);
     color: var(--chrome-fg);
     border-bottom: 1px solid var(--chrome-border);
-    font: 12.5px var(--font-sans);
+    font: 13px var(--font-sans);
   }
 
   .example-shell .sheetwrite-tb-button {
-    border-radius: 2px;
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 4px;
   }
 
   .example-shell .sheetwrite-tb-button:hover {
@@ -319,9 +329,10 @@
   }
 
   .example-shell .sheetwrite-tabbar {
+    min-height: 34px;
     background: var(--chrome-raised);
     border-top: 1px solid var(--chrome-border);
-    font: 12.5px var(--font-sans);
+    font: 13px var(--font-sans);
   }
 
   .example-shell .sheetwrite-tab {

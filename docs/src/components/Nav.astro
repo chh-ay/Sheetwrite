@@ -1,7 +1,4 @@
 ---
-// Shared example switcher. Deliberately restrained: one rail, no status pills,
-// fake formula controls, or dashboard decoration competing with the demos.
-// Test contract: `.sw-nav`, stable demo hrefs, and bare framework names in links.
 import { withBasePath } from "../base-path.js";
 
 interface Props {
@@ -12,33 +9,31 @@ const { active } = Astro.props;
 const route = (path: string) => withBasePath(path, import.meta.env.BASE_URL);
 
 const links = [
-  { slug: "docs", name: "Docs", accent: "var(--color-brand-500)" },
-  { slug: "vanilla", name: "Vanilla", accent: "var(--color-fw-vanilla)" },
-  { slug: "theming", name: "Theming", accent: "var(--color-fw-lab)" },
-  { slug: "react", name: "React", accent: "var(--color-fw-react)" },
-  { slug: "vue", name: "Vue", accent: "var(--color-fw-vue)" },
-  { slug: "svelte", name: "Svelte", accent: "var(--color-fw-svelte)" },
-];
+  { slug: "docs", name: "Docs", href: "/docs/start/installation/" },
+  { slug: "vanilla", name: "Core demo", href: "/vanilla/" },
+  { slug: "react", name: "React", href: "/react/" },
+  { slug: "vue", name: "Vue", href: "/vue/" },
+  { slug: "svelte", name: "Svelte", href: "/svelte/" },
+] as const;
 ---
 
-<nav class="sw-nav" aria-label="Sheetwrite examples">
-  <a class="sw-brand" href={route("/")} aria-label="Sheetwrite home">
-    <svg class="sw-mark" viewBox="0 0 28 28" aria-hidden="true">
+<nav class="sw-nav flex h-16 flex-none items-stretch border-b border-ink-800 bg-ink-950 px-5 sm:px-7" aria-label="Sheetwrite examples">
+  <a class="sw-brand inline-flex items-center gap-3 font-display text-sm font-semibold text-ink-50 no-underline" href={route("/")} aria-label="Sheetwrite home">
+    <svg class="h-6 w-6 fill-ink-900 stroke-ink-500" viewBox="0 0 28 28" aria-hidden="true">
       <rect x="1" y="1" width="26" height="26"></rect>
       <path d="M1 10h26M1 18h26M10 1v26M18 1v26"></path>
-      <rect class="sw-active-cell" x="10" y="10" width="8" height="8"></rect>
+      <rect class="fill-brand-500 stroke-brand-300" x="10" y="10" width="8" height="8"></rect>
     </svg>
     <span>Sheetwrite</span>
   </a>
-  <span class="sw-rule" aria-hidden="true"></span>
-  <div class="sw-links">
+
+  <div class="sw-links ml-auto flex min-w-0 items-stretch overflow-x-auto">
     {
       links.map((link) => (
         <a
-          class="sw-tab"
-          href={route(`/${link.slug}/`)}
+          class="sw-tab relative inline-flex min-w-max items-center px-3 text-xs font-medium text-ink-400 no-underline transition hover:text-ink-100 sm:px-4"
+          href={route(link.href)}
           aria-current={link.slug === active ? "page" : "false"}
-          style={`--accent: ${link.accent}`}
         >
           {link.name}
         </a>
@@ -48,116 +43,21 @@ const links = [
 </nav>
 
 <style>
-  .sw-nav {
-    position: relative;
-    z-index: 20;
-    display: flex;
-    flex: none;
-    align-items: stretch;
-    height: 54px;
-    padding: 0 18px;
-    border-bottom: 1px solid #20283a;
-    background: #080b12;
-    color: var(--color-ink-200);
-  }
-
-  .sw-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    color: #f4f6fa;
-    font: 650 14px var(--font-display);
-    letter-spacing: -0.01em;
-    text-decoration: none;
-  }
-
-  .sw-mark {
-    width: 25px;
-    height: 25px;
-    fill: #0f1520;
-    stroke: #526078;
-    stroke-width: 1;
-  }
-
-  .sw-mark .sw-active-cell {
-    fill: var(--color-brand-500);
-    stroke: var(--color-brand-300);
-  }
-
-  .sw-rule {
-    width: 1px;
-    margin: 15px 17px;
-    background: #293247;
-  }
-
-  .sw-links {
-    display: flex;
-    align-items: stretch;
-  }
-
-  .sw-tab {
-    position: relative;
-    display: grid;
-    min-width: 82px;
-    place-items: center;
-    padding: 0 14px;
-    color: #758198;
-    font: 520 12.5px var(--font-sans);
-    text-decoration: none;
-    transition:
-      color 120ms,
-      background 120ms;
-  }
-
-  .sw-tab::after {
-    position: absolute;
-    right: 14px;
-    bottom: -1px;
-    left: 14px;
-    height: 2px;
-    background: var(--accent);
-    content: "";
-    opacity: 0;
-  }
-
-  .sw-tab:hover {
-    background: #0d131e;
-    color: #dce2ec;
-  }
-
   .sw-tab[aria-current="page"] {
-    background: #101722;
-    color: #f4f6fa;
+    color: var(--color-ink-50);
   }
 
   .sw-tab[aria-current="page"]::after {
-    opacity: 1;
+    position: absolute;
+    right: 0.75rem;
+    bottom: -1px;
+    left: 0.75rem;
+    height: 2px;
+    background: var(--color-brand-500);
+    content: "";
   }
 
-
-  @media (max-width: 780px) {
-    .sw-nav {
-      height: auto;
-      min-height: 52px;
-      padding-right: 0;
-    }
-    .sw-rule {
-      display: none;
-    }
-    .sw-brand {
-      padding-right: 14px;
-    }
-    .sw-links {
-      flex: 1;
-      overflow-x: auto;
-    }
-    .sw-tab {
-      min-width: 70px;
-      padding: 0 10px;
-    }
-  }
-
-  @media (max-width: 510px) {
+  @media (max-width: 34rem) {
     .sw-brand span {
       display: none;
     }

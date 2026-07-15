@@ -3,7 +3,7 @@ title: Styling and theming
 description: Customize Sheetwrite with package CSS, theme tokens, cell styles, borders, and number formats.
 ---
 
-[Docs index](/docs/)
+[Installation](/docs/start/installation/)
 
 Sheetwrite paints cells on a canvas, so styling has two layers: the **`Theme`**
 (colors, fonts, and geometry the renderer uses) and **`CellStyle`** (per-cell and

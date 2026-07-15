@@ -1,0 +1,5 @@
+---
+import { withBasePath } from "../../base-path.js";
+
+return Astro.redirect(withBasePath("/docs/start/installation/", import.meta.env.BASE_URL));
+---

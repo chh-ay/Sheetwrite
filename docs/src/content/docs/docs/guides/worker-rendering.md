@@ -3,7 +3,7 @@ title: Worker rendering
 description: Configure OffscreenCanvas worker painting and understand capability-based main-thread fallback.
 ---
 
-[Docs index](/docs/)
+[Installation](/docs/start/installation/)
 
 By default Sheetwrite paints on the main thread (`renderer: "canvas"`). For sheets
 where a busy main thread could stall scrolling, you can move painting onto a Web
