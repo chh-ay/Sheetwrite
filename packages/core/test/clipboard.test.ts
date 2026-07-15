@@ -2,8 +2,8 @@ import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { neutralizeInjection, parseTsv, toTsv } from "../src/clipboard.js";
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
 import { initSheetwrite } from "../src/grid.js";
-import { SheetwriteStore } from "../src/store.js";
 import { SelectionModel } from "../src/selection.js";
+import { SheetwriteStore } from "../src/store.js";
 import type {
   CellAddress,
   CellScalar,

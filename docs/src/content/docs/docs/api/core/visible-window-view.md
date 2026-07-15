@@ -21,7 +21,7 @@ Lifetime: valid until the next store mutation or window refresh.
 <div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L29</code></dd></div>
 </dl>
 
-## Members <span class="api-count">13</span>
+## Members <span class="api-count">14</span>
 
 <div class="api-member-list">
 
@@ -89,6 +89,11 @@ Lifetime: valid until the next store mutation or window refresh.
 <summary><code>localStrings</code></summary>
 <pre><code>localStrings?: readonly string[];</code></pre>
 </details>
+
+<details class="api-member" id="visible-window-view-ffi-calls" data-pagefind-weight="1">
+<summary><code>ffiCalls</code></summary>
+<pre><code>ffiCalls?: number;</code></pre>
+</details>
 </div>
 
 ## Declaration
@@ -114,6 +119,7 @@ export interface VisibleWindowView {
     stringPoolUpdateIds?: Uint32Array;
     stringPoolUpdateValues?: readonly string[];
     localStrings?: readonly string[];
+    ffiCalls?: number;
 }
 ```
 

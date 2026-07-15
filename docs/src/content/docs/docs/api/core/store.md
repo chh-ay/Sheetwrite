@@ -12,10 +12,10 @@ Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L81</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L108</code></dd></div>
 </dl>
 
-## Members <span class="api-count">15</span>
+## Members <span class="api-count">16</span>
 
 <div class="api-member-list">
 
@@ -47,6 +47,11 @@ Columnar workbook storage, query, transaction, and subscription contract.
 <details class="api-member" id="store-get-visible-window" data-pagefind-weight="1">
 <summary><code>getVisibleWindow</code></summary>
 <pre><code>getVisibleWindow( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView;</code></pre>
+</details>
+
+<details class="api-member" id="store-get-clipboard-window" data-pagefind-weight="1">
+<summary><code>getClipboardWindow</code></summary>
+<pre><code>getClipboardWindow?( sheet: SheetId, viewRows: { start: number; end: number }, cols: readonly number[], ): ClipboardWindowView;</code></pre>
 </details>
 
 <details class="api-member" id="store-ensure-columns" data-pagefind-weight="1">
@@ -111,6 +116,10 @@ export interface Store {
         start: number;
         end: number;
     }, cols: readonly number[]): VisibleWindowView;
+    getClipboardWindow?(sheet: SheetId, viewRows: {
+        start: number;
+        end: number;
+    }, cols: readonly number[]): ClipboardWindowView;
     ensureColumns(sheet: SheetId, columns: readonly Column[]): void;
     applyTransaction(tx: Transaction, options?: TransactionApplicationOptions): ApplyTransactionResult;
     setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;

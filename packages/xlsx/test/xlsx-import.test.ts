@@ -122,9 +122,9 @@ describe("table XLSX interchange", () => {
       "ordinary",
     ]);
     expect(Object.hasOwn(data.columns, "__proto__")).toBe(true);
-    expect(data.columns.__proto__).toEqual(["first"]);
+    expect(Reflect.get(data.columns, "__proto__")).toEqual(["first"]);
     expect(data.columns.__proto___2).toEqual(["second"]);
-    expect(data.columns.constructor).toEqual(["third"]);
+    expect(Reflect.get(data.columns, "constructor")).toEqual(["third"]);
     expect(JSON.stringify(data.columns)).toBe(
       '{"__proto__":["first"],"__proto___2":["second"],"constructor":["third"],"ordinary":["fourth"]}',
     );

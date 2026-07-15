@@ -12,7 +12,7 @@ Load the WASM data engine once. Must be awaited before `createGrid`.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L122</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L123</code></dd></div>
 </dl>
 
 ## Signature

@@ -12,7 +12,7 @@ Authoritative source value, evaluated value, style, and load state for a cell.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L58</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L85</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>

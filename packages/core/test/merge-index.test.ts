@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
   getMergeIndexResourceStatsForTest,
+  type MergeRect,
   prepareMergeIndex,
   resetMergeIndexResourceStatsForTest,
-  type MergeRect,
 } from "../src/merge-index.js";
 
 describe("PreparedMergeIndex", () => {
@@ -12,14 +12,14 @@ describe("PreparedMergeIndex", () => {
     const initial: readonly MergeRect[] = [{ r0: 2, c0: 3, r1: 4, c1: 5 }];
     const first = prepareMergeIndex(initial);
     expect(prepareMergeIndex(initial)).toBe(first);
-    expect(first.anchorAt(3, 4)).toEqual(initial[0]);
+    expect(first.anchorAt(3, 4)).toEqual(initial[0]!);
     expect(first.anchorAt(0, 0)).toBeNull();
     expect(getMergeIndexResourceStatsForTest().indexConstructions).toBe(1);
 
     const replaced: readonly MergeRect[] = [{ r0: 7, c0: 8, r1: 9, c1: 10 }];
     const second = prepareMergeIndex(replaced);
     expect(second).not.toBe(first);
-    expect(second.anchorAt(8, 9)).toEqual(replaced[0]);
+    expect(second.anchorAt(8, 9)).toEqual(replaced[0]!);
     expect(second.anchorAt(3, 4)).toBeNull();
     expect(getMergeIndexResourceStatsForTest().indexConstructions).toBe(2);
 
@@ -34,9 +34,9 @@ describe("PreparedMergeIndex", () => {
       { r0: 20, c0: 20, r1: 21, c1: 21 },
     ];
     const index = prepareMergeIndex(merges);
-    expect(index.intersectingWindow(2, 6, [0, 1, 2, 3, 7, 8, 9])).toEqual([merges[1], merges[0]]);
-    expect(index.horizontalGaps(3, 0, 10)).toEqual([merges[1], merges[0]]);
-    expect(index.verticalGaps(8, 0, 10)).toEqual([merges[0]]);
+    expect(index.intersectingWindow(2, 6, [0, 1, 2, 3, 7, 8, 9])).toEqual([merges[1]!, merges[0]!]);
+    expect(index.horizontalGaps(3, 0, 10)).toEqual([merges[1]!, merges[0]!]);
+    expect(index.verticalGaps(8, 0, 10)).toEqual([merges[0]!]);
   });
 
   it("examines nearby candidates instead of thousands of offscreen merges", () => {
@@ -50,10 +50,10 @@ describe("PreparedMergeIndex", () => {
     resetMergeIndexResourceStatsForTest();
     const index = prepareMergeIndex(merges);
 
-    expect(index.anchorAt(5, 3)).toEqual(merges.at(-1));
-    expect(index.intersectingWindow(0, 10, [0, 1, 2, 3, 4, 5])).toEqual([merges.at(-1)]);
-    expect(index.horizontalGaps(4, 0, 5)).toEqual([merges.at(-1)]);
-    expect(index.verticalGaps(3, 0, 10)).toEqual([merges.at(-1)]);
+    expect(index.anchorAt(5, 3)).toEqual(merges.at(-1)!);
+    expect(index.intersectingWindow(0, 10, [0, 1, 2, 3, 4, 5])).toEqual([merges.at(-1)!]);
+    expect(index.horizontalGaps(4, 0, 5)).toEqual([merges.at(-1)!]);
+    expect(index.verticalGaps(3, 0, 10)).toEqual([merges.at(-1)!]);
 
     const stats = getMergeIndexResourceStatsForTest();
     expect(stats.indexConstructions).toBe(1);

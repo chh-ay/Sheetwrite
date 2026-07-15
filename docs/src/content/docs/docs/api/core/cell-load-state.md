@@ -12,7 +12,7 @@ Datasource loading state for a resolved cell.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L64</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L91</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">4</span>

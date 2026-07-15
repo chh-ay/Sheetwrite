@@ -118,6 +118,17 @@ grid.exportCsv("sales.csv");
 await grid.exportXlsx("sales.xlsx");
 ```
 
+`grid.exportXlsx(...)` rejects when registration or encoding fails, preserving
+the backend error. Built-in toolbar and context-menu actions cannot return that
+promise, so the grid emits one `export-error` event with
+`{ format: "xlsx", error }` instead:
+
+```ts partial="requires an initialized Grid host" title="Observe built-in XLSX failures"
+grid.on("export-error", ({ format, error }) => {
+  console.error(`${format} export failed`, error);
+});
+```
+
 CSV is written UTF-8 with a BOM and CRLF line endings, and string values are
 **injection-hardened** — a value starting with `=`, `+`, `-`, `@`, tab, or CR is
 prefixed with a single quote so it cannot become an executable formula when
