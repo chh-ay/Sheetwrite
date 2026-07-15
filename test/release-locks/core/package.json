@@ -1,0 +1,9 @@
+{
+  "name": "sheetwrite-release-core",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.1.0.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.1.0.tgz"
+  }
+}

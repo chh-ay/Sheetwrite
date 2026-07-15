@@ -99,7 +99,9 @@ await rm(join(repositoryRoot, "test-results/delivery-size/bundlers"), {
 await mkdir(tarballRoot, { recursive: true });
 if (artifactDirectory === undefined) {
   for (const directory of packageDirectories) {
-    await stageAndPack(directory, `sheetwrite-${basename(directory)}.tgz`);
+    const manifest = sourceManifests[packageDirectories.indexOf(directory)];
+    if (manifest === undefined) throw new Error(`Missing source manifest for ${directory}`);
+    await stageAndPack(directory, `sheetwrite-${basename(directory)}-${manifest.version}.tgz`);
   }
 } else {
   const artifactRoot = resolve(repositoryRoot, artifactDirectory);
@@ -109,15 +111,12 @@ if (artifactDirectory === undefined) {
   if (!Array.isArray(releaseManifest.packages) || releaseManifest.packages.length !== 6) {
     throw new Error("Canonical release manifest must contain exactly six packages");
   }
-  for (const [index, sourceManifest] of sourceManifests.entries()) {
+  for (const sourceManifest of sourceManifests) {
     const artifact = releaseManifest.packages.find((entry) => entry.name === sourceManifest.name);
     if (artifact === undefined || artifact.version !== sourceManifest.version) {
       throw new Error(`Missing canonical artifact for ${sourceManifest.name}`);
     }
-    await cp(
-      join(artifactRoot, artifact.path),
-      join(tarballRoot, `sheetwrite-${basename(packageDirectories[index])}.tgz`),
-    );
+    await cp(join(artifactRoot, artifact.path), join(tarballRoot, artifact.path));
   }
 }
 await rm(stagingRoot, { recursive: true, force: true });

@@ -2,11 +2,11 @@
   "private": true,
   "scripts": {
     "bundle": "next build",
-    "build": "npm install --ignore-scripts --no-audit --no-fund --package-lock=false && npm run bundle && node check.mjs"
+    "build": "npm ci --ignore-scripts --no-audit --no-fund && npm run bundle && node check.mjs"
   },
   "dependencies": {
-    "@sheetwrite/core": "file:../.packed/sheetwrite-core.tgz",
-    "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm.tgz",
+    "@sheetwrite/core": "file:../.packed/sheetwrite-core-0.1.0.tgz",
+    "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm-0.1.0.tgz",
     "next": "15.5.9",
     "react": "19.1.0",
     "react-dom": "19.1.0",

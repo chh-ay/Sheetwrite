@@ -3,15 +3,15 @@
   "type": "module",
   "scripts": {
     "bundle": "vite build",
-    "build": "npm install --ignore-scripts --no-audit --no-fund --package-lock=false && npm run bundle && node check.mjs"
+    "build": "npm ci --ignore-scripts --no-audit --no-fund && npm run bundle && node check.mjs"
   },
   "dependencies": {
-    "@sheetwrite/core": "file:../.packed/sheetwrite-core.tgz",
-    "@sheetwrite/react": "file:../.packed/sheetwrite-react.tgz",
-    "@sheetwrite/xlsx": "file:../.packed/sheetwrite-xlsx.tgz",
-    "@sheetwrite/svelte": "file:../.packed/sheetwrite-svelte.tgz",
-    "@sheetwrite/vue": "file:../.packed/sheetwrite-vue.tgz",
-    "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm.tgz",
+    "@sheetwrite/core": "file:../.packed/sheetwrite-core-0.1.0.tgz",
+    "@sheetwrite/react": "file:../.packed/sheetwrite-react-0.1.0.tgz",
+    "@sheetwrite/xlsx": "file:../.packed/sheetwrite-xlsx-0.1.0.tgz",
+    "@sheetwrite/svelte": "file:../.packed/sheetwrite-svelte-0.1.0.tgz",
+    "@sheetwrite/vue": "file:../.packed/sheetwrite-vue-0.1.0.tgz",
+    "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm-0.1.0.tgz",
     "@sveltejs/vite-plugin-svelte": "6.2.4",
     "react": "19.1.0",
     "svelte": "5.56.4",

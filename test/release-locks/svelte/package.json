@@ -1,0 +1,11 @@
+{
+  "name": "sheetwrite-release-svelte",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.1.0.tgz",
+    "@sheetwrite/svelte": "file:artifacts/sheetwrite-svelte-0.1.0.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.1.0.tgz",
+    "svelte": "5.56.4"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "sheetwrite-release-react",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.1.0.tgz",
+    "@sheetwrite/react": "file:artifacts/sheetwrite-react-0.1.0.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.1.0.tgz",
+    "react": "19.2.7"
+  }
+}

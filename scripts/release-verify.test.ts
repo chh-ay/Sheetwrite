@@ -25,6 +25,7 @@ describe("canonical artifact consumer graph", () => {
     const artifactRoot = resolve(repositoryRoot, "test-results/release-artifact-fixture");
     const commands = releaseConsumerCommands(artifactRoot);
     expect(commands).toEqual([
+      ["bun", "scripts/release-audit.ts", "--artifacts", artifactRoot],
       ["bun", "scripts/verify-packed-consumer.ts", "--artifacts", artifactRoot],
       ["node", "test/bundler-fixtures/run.mjs", "--artifacts", artifactRoot],
       ["bun", "scripts/size-report.ts", "check", "--artifacts", artifactRoot, "--reuse-bundlers"],

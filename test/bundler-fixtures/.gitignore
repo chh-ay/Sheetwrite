@@ -4,4 +4,3 @@ dist/
 out/
 .packed/
 .staging/
-package-lock.json

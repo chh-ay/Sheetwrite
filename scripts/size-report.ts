@@ -158,11 +158,6 @@ const packageDirectories = [
   "packages/vue",
   "packages/svelte",
 ] as const;
-const frameworkPeerVersions: Record<string, Record<string, string>> = {
-  react: { react: "19.2.7" },
-  svelte: { svelte: "5.56.4" },
-  vue: { vue: "3.5.39" },
-};
 const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]> = {
   vite: [
     "core-initial",
@@ -622,21 +617,14 @@ async function measureClosure(
   sequence: number,
 ): Promise<ClosureReport> {
   const consumerRoot = join(temporaryRoot, `closure-${name}-${sequence}`);
-  await mkdir(consumerRoot, { recursive: true });
-  const dependencies: Record<string, string> = { ...(frameworkPeerVersions[name] ?? {}) };
+  await cp(join(repositoryRoot, "test/release-locks", name), consumerRoot, { recursive: true });
+  const artifactRoot = join(consumerRoot, "artifacts");
+  await mkdir(artifactRoot, { recursive: true });
   for (const packageName of dependencyNames) {
     const tarball = packed.get(packageName);
     if (tarball === undefined) throw new Error(`No packed tarball for ${packageName}`);
-    dependencies[packageName] = `file:${tarball}`;
+    await cp(tarball, join(artifactRoot, basename(tarball)));
   }
-  await writeFile(
-    join(consumerRoot, "package.json"),
-    `${JSON.stringify({ name: `size-${name}`, private: true, version: "0.0.0", dependencies }, null, 2)}\n`,
-  );
-  await runCommand(
-    ["npm", "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund"],
-    consumerRoot,
-  );
   await runCommand(
     ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"],
     consumerRoot,
@@ -645,7 +633,7 @@ async function measureClosure(
     join(consumerRoot, "package-lock.json"),
   );
   if (lock.packages === undefined)
-    throw new Error(`${name} generated lockfile has no package graph`);
+    throw new Error(`${name} committed lockfile has no package graph`);
   const packagePaths = Object.keys(lock.packages)
     .filter((path) => /(?:^|\/)node_modules\//.test(path))
     .sort();

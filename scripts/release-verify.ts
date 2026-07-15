@@ -9,6 +9,7 @@ export function releaseConsumerCommands(
 ): ReadonlyArray<readonly [string, ...string[]]> {
   const root = resolve(artifactRoot);
   return [
+    ["bun", "scripts/release-audit.ts", "--artifacts", root],
     ["bun", "scripts/verify-packed-consumer.ts", "--artifacts", root],
     ["node", "test/bundler-fixtures/run.mjs", "--artifacts", root],
     ["bun", "scripts/size-report.ts", "check", "--artifacts", root, "--reuse-bundlers"],

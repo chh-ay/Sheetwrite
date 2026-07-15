@@ -326,18 +326,15 @@ async function verifyNoExcelClosure(
   temporaryRoot: string,
 ): Promise<void> {
   const root = join(temporaryRoot, `without-xlsx-${name}`);
-  await mkdir(root, { recursive: true });
-  const dependencies: Record<string, string> = {};
+  await cp(join(repositoryRoot, "test/release-locks", name), root, { recursive: true });
+  const artifactRoot = join(root, "artifacts");
+  await mkdir(artifactRoot, { recursive: true });
   for (const localPackage of new Set([packageName, "@sheetwrite/core", "@sheetwrite/wasm"])) {
     const tarball = tarballs.get(localPackage);
     if (tarball === undefined) throw new Error(`Missing tarball for ${localPackage}`);
-    dependencies[localPackage] = `file:${tarball}`;
+    await cp(tarball, join(artifactRoot, basename(tarball)));
   }
-  await writeFile(
-    join(root, "package.json"),
-    `${JSON.stringify({ name: `sheetwrite-${name}-without-xlsx`, private: true, type: "module", dependencies }, null, 2)}\n`,
-  );
-  await run(["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund"], root);
+  await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
   for (const dependency of excelPackages) {
@@ -521,20 +518,12 @@ try {
   ]);
 
   await cp(fixtureRoot, consumerRoot, { recursive: true });
-  const consumerManifest = await readJson<PackageManifest>(join(consumerRoot, "package.json"));
-  consumerManifest.dependencies = {
-    ...consumerManifest.dependencies,
-    ...Object.fromEntries([...tarballs].map(([name, path]) => [name, `file:${path}`])),
-  };
-  await writeFile(
-    join(consumerRoot, "package.json"),
-    `${JSON.stringify(consumerManifest, null, 2)}\n`,
-  );
-
-  await run(
-    ["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund", "--package-lock=false"],
-    consumerRoot,
-  );
+  const consumerArtifacts = join(consumerRoot, "artifacts");
+  await mkdir(consumerArtifacts, { recursive: true });
+  for (const tarball of tarballs.values()) {
+    await cp(tarball, join(consumerArtifacts, basename(tarball)));
+  }
+  await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumerRoot);
   await run(
     ["npm", "ls", "@sheetwrite/core", "@sheetwrite/wasm", "react", "svelte", "vue"],
     consumerRoot,
