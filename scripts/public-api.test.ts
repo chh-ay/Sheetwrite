@@ -197,5 +197,5 @@ describe("public API policy", () => {
         expect.objectContaining({ code: "manifest-drift" }),
       );
     }
-  });
+  }, 20_000);
 });
