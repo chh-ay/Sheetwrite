@@ -75,6 +75,16 @@ jobs:
           cargo llvm-cov --version
       - name: Run canonical source verification
         run: bun run verify:ci
+      - name: Build verification-mode canonical artifacts
+        run: bun run release:artifacts
+      - name: Run Plan 063 release quality gates
+        run: bun run verify:release-quality
+      - name: Verify every canonical artifact consumer
+        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
+      - name: Enforce source coverage
+        run: bun run test:coverage
+      - name: Browser smoke tests
+        run: bun run test:browser
       - name: Assert source remains clean
         run: test -z "$(git status --porcelain --untracked-files=all)"
 
