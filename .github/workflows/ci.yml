@@ -25,7 +25,7 @@ env:
 
 jobs:
   preflight:
-    name: preflight
+    name: Preflight
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -55,6 +55,8 @@ jobs:
           test "$(rustc --version | cut -d' ' -f2)" = "$RUST_VERSION"
       - name: Changeset status
         run: bun run changeset:status -- --since=origin/develop
+      - name: Install checksum-pinned wasm-pack
+        run: bun scripts/install-wasm-pack.ts
       - name: Tooling contracts
         run: bun run test:tooling
       - name: Import cycles
@@ -69,7 +71,7 @@ jobs:
         run: bun run lint
 
   unit-coverage:
-    name: unit, Rust & coverage
+    name: Unit Tests & Coverage
     needs: artifact-build
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -122,7 +124,7 @@ jobs:
           if-no-files-found: warn
 
   artifact-build:
-    name: canonical artifact build
+    name: Canonical Artifacts
     needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -159,7 +161,7 @@ jobs:
           retention-days: 7
 
   packed-consumers:
-    name: packed consumers
+    name: Packed Consumers
     needs: artifact-build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -193,7 +195,7 @@ jobs:
         run: bun run verify:packed -- --artifacts test-results/release-artifacts --locked
 
   bundler-consumers:
-    name: bundler consumers
+    name: Bundler Consumers
     needs: artifact-build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -227,7 +229,7 @@ jobs:
         run: bun run verify:bundlers -- --artifacts test-results/release-artifacts --locked
 
   delivery-size:
-    name: delivery size
+    name: Delivery Size
     needs: artifact-build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -259,7 +261,7 @@ jobs:
         run: bun scripts/size-report.ts check --artifacts test-results/release-artifacts
 
   docs-build:
-    name: production docs
+    name: Production Docs
     needs: artifact-build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -302,7 +304,7 @@ jobs:
           retention-days: 1
 
   browser-smoke:
-    name: browser smoke
+    name: Browser Smoke
     needs: docs-build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -335,7 +337,7 @@ jobs:
           if-no-files-found: warn
 
   required:
-    name: required
+    name: Required CI
     if: always()
     needs:
       - preflight

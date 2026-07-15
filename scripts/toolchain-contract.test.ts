@@ -135,7 +135,7 @@ describe("contributor and CI toolchain contract", () => {
       "docs-build",
       "browser-smoke",
     ]);
-    expect(jobs.required?.name).toBe("required");
+    expect(jobs.required?.name).toBe("Required CI");
     for (const job of Object.values(jobs)) {
       expect(job["timeout-minutes"]).toBeGreaterThan(0);
     }
