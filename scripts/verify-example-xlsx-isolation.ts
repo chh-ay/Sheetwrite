@@ -60,13 +60,17 @@ for (const [path, content] of defaultGraph) {
   }
 }
 
-const reactWorkbook = [...defaultGraph].find(([path]) =>
-  basename(path).startsWith("ReactWorkbook."),
-);
-if (reactWorkbook === undefined || !/import\(["']\.\/register\./.test(reactWorkbook[1])) {
-  throw new Error(
-    "React workbook XLSX action is not isolated behind a dynamic registration import",
-  );
+const reactGraph = await collectStaticGraph(await entrypointsFromHtml("react/index.html"));
+const lazyEntrypoints: string[] = [];
+for (const [path, content] of reactGraph) {
+  for (const match of content.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g)) {
+    const specifier = match[1];
+    if (specifier?.startsWith(".")) lazyEntrypoints.push(resolve(dirname(path), specifier));
+  }
+}
+const lazyGraph = await collectStaticGraph(lazyEntrypoints);
+if (![...lazyGraph.values()].some((content) => content.includes(xlsxMarker))) {
+  throw new Error("React workbook XLSX action cannot reach the backend through a lazy import");
 }
 
 const xlsxEntrypoints = await entrypointsFromHtml("test/xlsx/index.html");

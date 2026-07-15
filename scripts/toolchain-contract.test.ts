@@ -19,6 +19,17 @@ const packageManifest = JSON.parse(readFileSync(resolve(root, "package.json"), "
 };
 const rustToolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+const parsedWorkflow = Bun.YAML.parse(workflow) as {
+  jobs?: Record<
+    string,
+    {
+      name?: string;
+      needs?: string | string[];
+      "timeout-minutes"?: number;
+      steps?: Array<{ run?: string; uses?: string }>;
+    }
+  >;
+};
 const nodeVersion = readFileSync(resolve(root, ".node-version"), "utf8").trim();
 const sizeBudget = JSON.parse(readFileSync(resolve(root, "scripts/size-budgets.json"), "utf8")) as {
   readonly toolchain?: Readonly<Record<string, string>>;
@@ -28,8 +39,8 @@ const EXPECTED_ACTION_PINS: Readonly<Record<string, string>> = {
   "actions/checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
   "actions/setup-node": "249970729cb0ef3589644e2896645e5dc5ba9c38",
   "oven-sh/setup-bun": "735343b667d3e6f658f44d0eca948eb6282f2b76",
-  "actions/cache": "5a3ec84eff668545956fd18022155c47e93e2684",
   "actions/upload-artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+  "actions/download-artifact": "634f93cb2916e3fdff6788551b99b062d0335ce0",
 };
 
 function commandOutput(command: readonly [string, ...string[]]): string {
@@ -55,8 +66,8 @@ describe("contributor and CI toolchain contract", () => {
     expect(workflow).toContain(`NPM_VERSION: "${NPM_VERSION}"`);
     expect(workflow).toContain(`node-version: ${NODE_VERSION}`);
     expect(workflow).toContain(`npm install --global npm@${NPM_VERSION}`);
-    expect(workflow).toContain(`test "$(node --version)" = "v${NODE_VERSION}"`);
-    expect(workflow).toContain(`test "$(npm --version)" = "${NPM_VERSION}"`);
+    expect(workflow).toContain('test "$(node --version)" = "v$NODE_VERSION"');
+    expect(workflow).toContain('test "$(npm --version)" = "$NPM_VERSION"');
     expect(sizeBudget.toolchain?.node).toBe(NODE_VERSION);
     expect(sizeBudget.toolchain?.npm).toBe(NPM_VERSION);
   });
@@ -94,31 +105,52 @@ describe("contributor and CI toolchain contract", () => {
     );
   });
 
-  it("uses the same canonical local commands in CI", () => {
-    const orderedCommands = [
-      `npm install --global npm@${NPM_VERSION}`,
-      "bun scripts/verify-clean-build.ts --assert-absent",
-      "bun install --frozen-lockfile",
-      "bun run changeset:status -- --since=origin/develop",
-      "bun scripts/install-wasm-pack.ts",
-      "bun run browser:install",
-      "bun run release:artifacts",
-      "bun run verify:release-quality",
-      "bun scripts/release-verify.ts --artifacts test-results/release-artifacts",
-      "bun run test:coverage",
-      "bun run test:browser",
-    ];
-    const positions = orderedCommands.map((command) => workflow.indexOf(command));
-    expect(positions.every((position) => position >= 0)).toBeTrue();
-    expect(positions).toEqual([...positions].sort((left, right) => left - right));
-    expect(workflow).not.toContain("bun run build:wasm");
-    expect(workflow).not.toContain("bunx @changesets/cli");
-    expect(workflow.match(/bun run release:artifacts/g)).toHaveLength(1);
+  it("fans independent gates out from one canonical artifact build", () => {
+    const jobs = parsedWorkflow.jobs ?? {};
+    expect(Object.keys(jobs)).toEqual([
+      "preflight",
+      "unit-coverage",
+      "artifact-build",
+      "packed-consumers",
+      "bundler-consumers",
+      "delivery-size",
+      "docs-build",
+      "browser-smoke",
+      "required",
+    ]);
+    expect(jobs["unit-coverage"]?.needs).toBe("artifact-build");
+    expect(jobs["artifact-build"]?.needs).toBe("preflight");
+    expect(jobs["packed-consumers"]?.needs).toBe("artifact-build");
+    expect(jobs["bundler-consumers"]?.needs).toBe("artifact-build");
+    expect(jobs["delivery-size"]?.needs).toBe("artifact-build");
+    expect(jobs["docs-build"]?.needs).toBe("artifact-build");
+    expect(jobs["browser-smoke"]?.needs).toBe("docs-build");
+    expect(jobs.required?.needs).toEqual([
+      "preflight",
+      "unit-coverage",
+      "artifact-build",
+      "packed-consumers",
+      "bundler-consumers",
+      "delivery-size",
+      "docs-build",
+      "browser-smoke",
+    ]);
+    expect(jobs.required?.name).toBe("required");
+    for (const job of Object.values(jobs)) {
+      expect(job["timeout-minutes"]).toBeGreaterThan(0);
+    }
+
+    const commands = Object.values(jobs)
+      .flatMap((job) => job.steps ?? [])
+      .flatMap((step) => (step.run ? [step.run] : []))
+      .join("\n");
+    expect(commands.match(/release:prepare/g)).toHaveLength(1);
+    expect(commands).toContain("verify:packed -- --artifacts");
+    expect(commands).toContain("verify:bundlers -- --artifacts");
+    expect(commands).toContain("size-report.ts check --artifacts");
+    expect(commands).toContain("test:coverage");
+    expect(commands).toContain("test:browser");
     expect(workflow).not.toContain("npm pack");
-    expect(workflow).toContain("if: always()");
-    expect(workflow).toContain("test-results/");
-    expect(workflow).toContain("coverage/");
-    expect(workflow).toContain("playwright-report/");
   });
 
   it("matches the active pinned tools", () => {

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [develop]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -20,118 +24,347 @@ env:
   CARGO_LLVM_COV_VERSION: "0.8.7"
 
 jobs:
-  build-and-test:
-    name: build & test
+  preflight:
+    name: preflight
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.3.0
-
       - name: Install pinned npm
-        run: |
-          npm install --global npm@11.18.0
-          test "$(node --version)" = "v24.3.0"
-          test "$(npm --version)" = "11.18.0"
-
+        run: npm install --global npm@11.18.0
       - name: Setup Bun
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: 1.3.14
-
-      - name: Assert clean source checkout
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Assert clean checkout and exact toolchain
         run: |
           test -z "$(git status --porcelain --untracked-files=all)"
           bun scripts/verify-clean-build.ts --assert-absent
-
-      - name: Setup pinned Rust toolchain
-        run: |
-          rustup show active-toolchain
-          rustc --version
-          rustup target list --installed
-
-      - name: Cache Cargo inputs and intermediates
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.cargo/bin/cargo-audit
-            ~/.cargo/bin/cargo-llvm-cov
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
-            packages/wasm/target
-          key: ${{ runner.os }}-cargo-rust-${{ env.RUST_VERSION }}-${{ env.WASM_TARGET }}-wasm-pack-${{ env.WASM_PACK_VERSION }}-audit-${{ env.CARGO_AUDIT_VERSION }}-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-rust-${{ env.RUST_VERSION }}-${{ env.WASM_TARGET }}-wasm-pack-${{ env.WASM_PACK_VERSION }}-audit-${{ env.CARGO_AUDIT_VERSION }}-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}-
-
-      - name: Cache Bun downloads
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-${{ env.BUN_VERSION }}-
-
-      - name: Install dependencies from frozen lockfile
-        run: bun install --frozen-lockfile
-
+          test "$(bun --version)" = "$BUN_VERSION"
+          test "$(node --version)" = "v$NODE_VERSION"
+          test "$(npm --version)" = "$NPM_VERSION"
+          test "$(rustc --version | cut -d' ' -f2)" = "$RUST_VERSION"
       - name: Changeset status
         run: bun run changeset:status -- --since=origin/develop
-
-      - name: Install checksum-pinned wasm-pack
-        run: bun scripts/install-wasm-pack.ts
-
-      - name: Install pinned cargo-audit
-        run: cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
-
-      - name: Install pinned cargo-llvm-cov
-        run: cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
-
-      - name: Print toolchain contract
+      - name: Tooling contracts
+        run: bun run test:tooling
+      - name: Import cycles
+        run: bun run check:cycles
+      - name: JavaScript dependency audit
+        run: bun run audit:js
+      - name: Install and run Rust dependency audit
         run: |
-          bun --version
-          node --version
-          npm --version
-          rustc --version
-          wasm-pack --version
-          cargo audit --version
-          cargo llvm-cov --version
+          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+          cargo audit --manifest-path packages/wasm/Cargo.toml
+      - name: Lint
+        run: bun run lint
 
-      - name: Install Playwright Chromium
-        run: bun run browser:install
-
-      - name: Build one canonical release artifact set
-        run: bun run release:artifacts
-
-      - name: Run quality gates against the canonical build
-        run: bun run verify:release-quality
-
-      - name: Verify every canonical artifact consumer
-        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
-
-      - name: Enforce source coverage
+  unit-coverage:
+    name: unit, Rust & coverage
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install coverage toolchain
+        run: cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify and hydrate canonical package outputs
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      - name: Unit and Rust tests
+        run: |
+          bun test packages test/browser/canvas-assertions.test.ts scripts/public-api.test.ts bench/test
+          cargo test --manifest-path packages/wasm/Cargo.toml
+      - name: Type checks and public API
+        run: |
+          bun run typecheck
+          bun run api:check
+      - name: Deterministic performance gates
+        run: bun run --filter '@sheetwrite/bench' bench:verify
+      - name: Source coverage
         run: bun run test:coverage
-
-      - name: Browser smoke tests
-        run: bun run test:browser
-
-      - name: Assert verification did not mutate source
-        run: test -z "$(git status --porcelain --untracked-files=all)"
-
-      - name: Upload canonical artifacts and verification evidence
-        if: always()
+      - name: Upload coverage evidence on failure
+        if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: canonical-release-and-verification-evidence
+          name: unit-coverage-failure-evidence
           path: |
             test-results/
             coverage/
+          if-no-files-found: warn
+
+  artifact-build:
+    name: canonical artifact build
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies and wasm-pack
+        run: |
+          bun install --frozen-lockfile
+          bun scripts/install-wasm-pack.ts
+      - name: Build and pack once
+        run: bun run release:prepare -- --mode release --output test-results/release-artifacts
+      - name: Verify manifest before upload
+        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Upload canonical tarballs
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+
+  packed-consumers:
+    name: packed consumers
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify downloaded bytes and digest contract
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Test locked packed consumers
+        run: bun run verify:packed -- --artifacts test-results/release-artifacts --locked
+
+  bundler-consumers:
+    name: bundler consumers
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify downloaded bytes and digest contract
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Test locked bundler consumers
+        run: bun run verify:bundlers -- --artifacts test-results/release-artifacts --locked
+
+  delivery-size:
+    name: delivery size
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify downloaded bytes and digest contract
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Enforce delivery budgets
+        run: bun scripts/size-report.ts check --artifacts test-results/release-artifacts
+
+  docs-build:
+    name: production docs
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download canonical tarballs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: canonical-release-artifacts
+          path: test-results/release-artifacts
+      - name: Verify and hydrate canonical package outputs
+        env:
+          ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
+        run: |
+          test -n "$ARTIFACT_DIGEST"
+          bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      - name: Generate, check, and build production docs
+        run: |
+          bun run docs:generate
+          bun run docs:check
+          bun run --filter '@sheetwrite/docs-site' typecheck
+          bun run --filter '@sheetwrite/docs-site' build
+      - name: Upload production docs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-docs
+          path: docs/dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  browser-smoke:
+    name: browser smoke
+    needs: docs-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies and Chromium
+        run: |
+          bun install --frozen-lockfile
+          bun run browser:install
+      - name: Download production docs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: production-docs
+          path: docs/dist
+      - name: Exercise production site
+        run: bun run test:browser
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: browser-failure-evidence
+          path: |
+            test-results/playwright/
             playwright-report/
           if-no-files-found: warn
+
+  required:
+    name: required
+    if: always()
+    needs:
+      - preflight
+      - unit-coverage
+      - artifact-build
+      - packed-consumers
+      - bundler-consumers
+      - delivery-size
+      - docs-build
+      - browser-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI branch
+        env:
+          PREFLIGHT: ${{ needs.preflight.result }}
+          UNIT_COVERAGE: ${{ needs.unit-coverage.result }}
+          ARTIFACT_BUILD: ${{ needs.artifact-build.result }}
+          PACKED: ${{ needs.packed-consumers.result }}
+          BUNDLERS: ${{ needs.bundler-consumers.result }}
+          SIZE: ${{ needs.delivery-size.result }}
+          DOCS: ${{ needs.docs-build.result }}
+          BROWSER: ${{ needs.browser-smoke.result }}
+        run: |
+          test "$PREFLIGHT" = success
+          test "$UNIT_COVERAGE" = success
+          test "$ARTIFACT_BUILD" = success
+          test "$PACKED" = success
+          test "$BUNDLERS" = success
+          test "$SIZE" = success
+          test "$DOCS" = success
+          test "$BROWSER" = success
