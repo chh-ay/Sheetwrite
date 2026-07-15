@@ -16,8 +16,8 @@ Pick the affected packages, choose `major` / `minor` / `patch`, and write a
 short summary. This creates a Markdown file under `.changeset/` — commit it
 alongside your change.
 
-The example apps (`@sheetwrite/example-*`) are ignored and never released, so
-you only select the published packages: `@sheetwrite/core`, `@sheetwrite/wasm`,
+Private workspaces are excluded by Changesets policy, so you only select the
+published packages: `@sheetwrite/core`, `@sheetwrite/wasm`, `@sheetwrite/xlsx`,
 `@sheetwrite/react`, `@sheetwrite/vue`, `@sheetwrite/svelte`.
 
 ## How releases consume them

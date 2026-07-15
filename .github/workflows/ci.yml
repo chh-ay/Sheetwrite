@@ -69,6 +69,9 @@ jobs:
       - name: Install dependencies from frozen lockfile
         run: bun install --frozen-lockfile
 
+      - name: Changeset status
+        run: bun run changeset:status -- --since=origin/develop
+
       - name: Install checksum-pinned wasm-pack
         run: bun scripts/install-wasm-pack.ts
 
@@ -98,8 +101,6 @@ jobs:
       - name: Browser smoke tests
         run: bun run test:browser
 
-      - name: Changeset status
-        run: bun run changeset:status -- --since=origin/develop
 
       - name: Upload verification evidence on failure
         if: failure()

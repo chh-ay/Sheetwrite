@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -131,5 +131,48 @@ describe("canonical workspace graph", () => {
       "typecheck:verification",
       "typecheck:consumer-nodenext",
     ]);
+  });
+});
+
+describe("changeset workspace contract", () => {
+  it("resolves every configured ignore to an existing workspace", async () => {
+    const root = resolve(import.meta.dir, "..");
+    const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
+      readonly workspaces: readonly string[];
+    };
+    const changesetConfig = JSON.parse(
+      await readFile(join(root, ".changeset/config.json"), "utf8"),
+    ) as {
+      readonly ignore: readonly string[];
+    };
+    const workspaceNames = new Set<string>();
+    for (const workspace of rootManifest.workspaces) {
+      const glob = new Bun.Glob(`${workspace}/package.json`);
+      for await (const path of glob.scan({ cwd: root, onlyFiles: true })) {
+        const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
+          readonly name?: string;
+        };
+        if (manifest.name) workspaceNames.add(manifest.name);
+      }
+    }
+
+    for (const ignore of changesetConfig.ignore) {
+      const escaped = ignore.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(`^${escaped.replaceAll("*", ".*").replaceAll("?", ".")}$`);
+      expect([...workspaceNames].some((name) => pattern.test(name))).toBeTrue();
+    }
+  });
+
+  it("runs the canonical Changesets status command", () => {
+    const root = resolve(import.meta.dir, "..");
+    const result = Bun.spawnSync(
+      ["bun", "run", "changeset:status", "--", "--since=origin/develop"],
+      {
+        cwd: root,
+        stderr: "pipe",
+        stdout: "pipe",
+      },
+    );
+    expect(result.exitCode, result.stderr.toString()).toBe(0);
   });
 });

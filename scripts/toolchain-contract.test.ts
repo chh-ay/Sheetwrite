@@ -71,12 +71,12 @@ describe("contributor and CI toolchain contract", () => {
     const orderedCommands = [
       "bun scripts/verify-clean-build.ts --assert-absent",
       "bun install --frozen-lockfile",
+      "bun run changeset:status -- --since=origin/develop",
       "bun scripts/install-wasm-pack.ts",
       "bun run browser:install",
       "bun run verify:ci",
       "bun run test:coverage",
       "bun run test:browser",
-      "bun run changeset:status -- --since=origin/develop",
     ];
     const positions = orderedCommands.map((command) => workflow.indexOf(command));
     expect(positions.every((position) => position >= 0)).toBeTrue();
