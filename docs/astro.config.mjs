@@ -93,6 +93,7 @@ export default defineConfig({
     starlight({
       title: "Sheetwrite",
       description: "Guides, examples, and generated API reference for Sheetwrite.",
+      favicon: "/favicon.svg",
       customCss: ["/src/styles/docs.css", "/src/styles/api-reference.css"],
       components: {
         PageSidebar: "./src/components/PageSidebar.astro",
@@ -106,7 +107,6 @@ export default defineConfig({
         {
           label: "Start",
           items: [
-            { label: "Documentation home", link: "/docs/" },
             { label: "Install Sheetwrite", link: "/docs/start/installation/" },
             { label: "Build your first grid", link: "/docs/start/first-grid/" },
           ],

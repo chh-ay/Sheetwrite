@@ -1,5 +1,4 @@
 ---
-// Shared compact masthead for the framework demos.
 interface Props {
   accent: string;
   kicker: string;
@@ -10,50 +9,58 @@ const { accent, kicker, title } = Astro.props;
 ---
 
 <header class="demo-header" style={`--accent: ${accent}`}>
-  <div class="demo-header-lead">
+  <div class="demo-identity">
     <p class="demo-kicker">{kicker}</p>
     <h1 class="demo-title">{title}</h1>
-    <p class="demo-copy"><slot /></p>
   </div>
+  <p class="demo-copy"><slot /></p>
 </header>
 
 <style>
   .demo-header {
+    display: grid;
     flex: none;
-    padding: 14px 20px 13px;
+    grid-template-columns: minmax(18rem, 0.7fr) minmax(26rem, 1.3fr);
+    align-items: end;
+    gap: clamp(2rem, 5vw, 5rem);
     border-bottom: 1px solid var(--color-ink-800);
-    border-left: 3px solid var(--accent);
-    background: #080b12;
-  }
-
-  .demo-header-lead {
-    max-width: 960px;
+    padding: 18px 24px;
+    background: #070a11;
   }
 
   .demo-kicker {
-    margin: 0 0 3px;
+    margin: 0 0 5px;
     color: var(--accent);
-    font: 600 11px var(--font-mono);
-    letter-spacing: 0.1em;
+    font: 600 10px var(--font-mono);
+    letter-spacing: 0.11em;
     text-transform: uppercase;
   }
 
   .demo-title {
     margin: 0;
     color: var(--color-ink-50);
-    font: 610 22px var(--font-display);
+    font: 610 24px/1.2 var(--font-display);
     letter-spacing: -0.025em;
   }
 
   .demo-copy {
-    margin: 5px 0 0;
+    max-width: 72ch;
+    margin: 0;
     color: var(--color-ink-300);
-    font-size: 13.5px;
-    line-height: 1.5;
+    font-size: 14px;
+    line-height: 1.55;
   }
 
   .demo-copy :global(code) {
     color: var(--color-brand-300);
     font: 12px var(--font-mono);
+  }
+
+  @media (max-width: 60rem) {
+    .demo-header {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      padding: 16px 18px;
+    }
   }
 </style>

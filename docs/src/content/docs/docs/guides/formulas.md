@@ -3,7 +3,7 @@ title: Formulas
 description: Use Sheetwrite formula syntax, references, functions, errors, and compatibility limits.
 ---
 
-[Docs index](/docs/)
+[Installation](/docs/start/installation/)
 
 Sheetwrite evaluates formulas in the Rust/WASM calculation engine. Formula sources are persisted exactly as document values; evaluated results are cached for rendering, queries, export, and dependent formulas.
 

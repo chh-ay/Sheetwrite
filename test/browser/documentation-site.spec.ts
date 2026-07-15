@@ -20,7 +20,6 @@ function docsUrl(path = ""): string {
 }
 
 const representativeRoutes = [
-  "",
   "start/installation/",
   "start/first-grid/",
   "frameworks/lifecycle/",
@@ -35,6 +34,12 @@ const representativeRoutes = [
   "api/core/grid/",
   "api/xlsx/",
 ] as const;
+
+test("documentation root redirects to installation", async ({ page }) => {
+  await page.goto(docsUrl());
+  await expect(page).toHaveURL(docsUrl("start/installation/"));
+  await expect(page.locator("main h1")).toHaveText("Installation");
+});
 
 test.describe("documentation site", () => {
   for (const route of representativeRoutes) {
@@ -71,6 +76,30 @@ test.describe("documentation site", () => {
     });
   }
 
+  test("uses one base-aware favicon across documentation and examples", async ({
+    page,
+    request,
+  }) => {
+    for (const route of [
+      "/",
+      "/docs/start/installation/",
+      "/vanilla/",
+      "/react/",
+      "/vue/",
+      "/svelte/",
+    ]) {
+      await page.goto(siteUrl(route));
+      await expect(page.locator('link[rel~="icon"]')).toHaveAttribute(
+        "href",
+        `${SITE_BASE}/favicon.svg`,
+      );
+    }
+
+    const response = await request.get(siteUrl("/favicon.svg"));
+    expect(response.ok()).toBe(true);
+    expect(response.headers()["content-type"]).toContain("image/svg+xml");
+  });
+
   test("documentation site exposes sidebar, pagination, examples, and checked code", async ({
     page,
   }) => {
@@ -106,36 +135,27 @@ test.describe("documentation site", () => {
   });
 
   for (const width of [347, 700, 1568] as const) {
-    test(`documentation landing remains aligned at ${width}px`, async ({ page }) => {
+    test(`product landing remains aligned at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 855 });
-      await page.goto(docsUrl());
+      await page.goto(siteUrl());
+      await expect(page.locator("main h1")).toHaveCount(1);
+      await expect(page.getByLabel("Sheetwrite workbook preview")).toBeVisible();
       const layout = await page.evaluate(() => {
-        const hero = document.querySelector<HTMLElement>(".sw-docs-hero");
-        const sections = [
-          document.querySelector<HTMLElement>(".sw-docs-hero-copy"),
-          document.querySelector<HTMLElement>(".sw-docs-code"),
-          document.querySelector<HTMLElement>(".sw-docs-facts"),
-        ];
-        const code = document.querySelector<HTMLElement>(".sw-docs-code pre");
-        const main = document.querySelector<HTMLElement>(".main-pane");
-        if (!hero || !code || !main || sections.some((section) => !section)) return null;
-        const heroBounds = hero.getBoundingClientRect();
+        const main = document.querySelector<HTMLElement>("main");
+        const sections = main ? [...main.querySelectorAll<HTMLElement>(":scope > section")] : [];
+        if (!main || sections.length === 0) return null;
         return {
           documentFits: document.documentElement.scrollWidth <= window.innerWidth,
           sectionsFit: sections.every((section) => {
-            const bounds = section!.getBoundingClientRect();
-            return bounds.left >= heroBounds.left && bounds.right <= heroBounds.right;
+            const bounds = section.getBoundingClientRect();
+            return bounds.left >= 0 && bounds.right <= window.innerWidth + 1;
           }),
-          codeFits: code.scrollWidth <= code.clientWidth,
           mainWidth: main.getBoundingClientRect().width,
-          tocAbsent: document.querySelector(".right-sidebar-container") === null,
         };
       });
       expect(layout).not.toBeNull();
       expect(layout?.documentFits).toBe(true);
       expect(layout?.sectionsFit).toBe(true);
-      expect(layout?.codeFits).toBe(true);
-      expect(layout?.tocAbsent).toBe(true);
       if (width === 1568) expect(layout?.mainWidth).toBeGreaterThanOrEqual(width * 0.6);
     });
   }

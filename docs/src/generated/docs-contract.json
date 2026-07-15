@@ -2,7 +2,7 @@
   "formatVersion": 2,
   "generatedBy": "scripts/docs.ts",
   "migrationMatrix": {
-    "docs/README.md": "/docs/",
+    "docs/README.md": "/docs/start/installation/",
     "docs/getting-started.md": "/docs/start/installation/",
     "docs/concepts.md": "/docs/concepts/runtime-ownership/",
     "docs/configuration.md": "/docs/guides/configuration/",

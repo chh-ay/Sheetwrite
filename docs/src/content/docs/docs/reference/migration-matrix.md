@@ -6,7 +6,7 @@ The old loose Markdown files were removed only after every source guide had a ca
 
 | Former repository guide | Canonical route |
 | --- | --- |
-| `docs/README.md` | [`/docs/`](/docs/) |
+| `docs/README.md` | [`/docs/start/installation/`](/docs/start/installation/) |
 | `docs/getting-started.md` | [`/docs/start/installation/`](/docs/start/installation/) |
 | `docs/concepts.md` | [`/docs/concepts/runtime-ownership/`](/docs/concepts/runtime-ownership/) |
 | `docs/configuration.md` | [`/docs/guides/configuration/`](/docs/guides/configuration/) |
