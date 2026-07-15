@@ -1,0 +1,209 @@
+name: Bootstrap npm 0.1.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact canonical v0.1.0 source commit
+        required: true
+        type: string
+
+concurrency:
+  group: npm-bootstrap-0.1.0
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_SHA: e2b14bc8fc0d1bd2e2f32493f50988684b0438da
+  RELEASE_VERSION: "0.1.0"
+  BUN_VERSION: "1.3.14"
+  NODE_VERSION: "24.3.0"
+  NPM_VERSION: "11.18.0"
+  RUST_VERSION: "1.96.0"
+  WASM_TARGET: "wasm32-unknown-unknown"
+  WASM_PACK_VERSION: "0.15.0"
+  CARGO_AUDIT_VERSION: "0.22.2"
+  CARGO_LLVM_COV_VERSION: "0.8.7"
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject any noncanonical source commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: test "$EXPECTED_SHA" = "$RELEASE_SHA"
+      - name: Checkout exact canonical source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Validate release identity and registry state
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/release-preflight.ts
+      - name: Install verification toolchain
+        run: |
+          bun scripts/install-wasm-pack.ts
+          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+          cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
+          bun run browser:install
+      - name: Assert exact toolchain
+        run: |
+          test "$(bun --version)" = "$BUN_VERSION"
+          test "$(node --version)" = "v$NODE_VERSION"
+          test "$(npm --version)" = "$NPM_VERSION"
+          test "$(rustc --version | cut -d' ' -f2)" = "$RUST_VERSION"
+          test "$(wasm-pack --version | cut -d' ' -f2)" = "$WASM_PACK_VERSION"
+          cargo audit --version
+          cargo llvm-cov --version
+      - name: Run canonical source verification
+        run: bun run verify:ci
+      - name: Build verification-mode artifacts
+        run: bun run release:artifacts
+      - name: Run Plan 063 release quality gates
+        run: bun run verify:release-quality
+      - name: Verify every canonical artifact consumer
+        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
+      - name: Enforce source coverage
+        run: bun run test:coverage
+      - name: Browser smoke tests
+        run: bun run test:browser
+      - name: Assert source remains clean
+        run: test -z "$(git status --porcelain --untracked-files=all)"
+
+  prepare:
+    needs: preflight
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - name: Checkout exact canonical source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies and wasm-pack
+        run: |
+          bun install --frozen-lockfile
+          bun scripts/install-wasm-pack.ts
+      - name: Build and pack one release artifact set
+        run: bun run release:prepare -- --mode release --output test-results/release-artifacts
+      - name: Verify canonical artifact manifest
+        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Upload immutable canonical artifact bundle
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bootstrap-release-artifacts
+          path: test-results/release-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+
+  package-gates:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact canonical source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download immutable canonical artifact bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bootstrap-release-artifacts
+          path: test-results/release-artifacts
+      - name: Assert workflow artifact digest exists
+        env:
+          ARTIFACT_DIGEST: ${{ needs.prepare.outputs.artifact_digest }}
+        run: test -n "$ARTIFACT_DIGEST"
+      - name: Rehash exact tarballs
+        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Run all package, bundler, and size gates
+        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
+
+  publish:
+    needs: [prepare, package-gates]
+    runs-on: ubuntu-latest
+    environment: npm-bootstrap
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout exact canonical source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - name: Setup Node and npm registry
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.3.0
+          registry-url: https://registry.npmjs.org
+          scope: "@sheetwrite"
+      - name: Install pinned npm
+        run: npm install --global npm@11.18.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Download immutable canonical artifact bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bootstrap-release-artifacts
+          path: test-results/release-artifacts
+      - name: Rehash exact tarballs immediately before publication
+        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
+      - name: Publish exact tarballs sequentially
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        run: |
+          npm publish test-results/release-artifacts/sheetwrite-wasm-0.1.0.tgz --access public --tag latest --provenance --ignore-scripts
+          npm publish test-results/release-artifacts/sheetwrite-core-0.1.0.tgz --access public --tag latest --provenance --ignore-scripts
+          npm publish test-results/release-artifacts/sheetwrite-xlsx-0.1.0.tgz --access public --tag latest --provenance --ignore-scripts
+          npm publish test-results/release-artifacts/sheetwrite-react-0.1.0.tgz --access public --tag latest --provenance --ignore-scripts
+          npm publish test-results/release-artifacts/sheetwrite-vue-0.1.0.tgz --access public --tag latest --provenance --ignore-scripts
+          npm publish test-results/release-artifacts/sheetwrite-svelte-0.1.0.tgz --access public --tag latest --provenance --ignore-scripts
+      - name: Upload publication evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bootstrap-publication-artifacts
+          path: test-results/release-artifacts/
+          if-no-files-found: error
+          retention-days: 7
