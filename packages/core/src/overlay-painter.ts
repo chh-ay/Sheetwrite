@@ -1,5 +1,5 @@
+import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
 import type { EditRect } from "./editor.js";
-import { prepareMergeIndex } from "./merge-index.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinates.js";
@@ -469,7 +469,7 @@ export class OverlayPainter {
       let expanded: boolean;
       do {
         expanded = false;
-        for (const merge of mergeIndex.intersectingWindow(r0, r1 + 1, [c0, c1])) {
+        for (const merge of intersectingMerges(mergeIndex, r0, r1 + 1, [c0, c1])) {
           if (merge.r1 < r0 || merge.r0 > r1 || merge.c1 < c0 || merge.c0 > c1) continue;
           const nextR0 = Math.min(r0, merge.r0);
           const nextC0 = Math.min(c0, merge.c0);

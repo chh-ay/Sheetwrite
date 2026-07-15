@@ -480,7 +480,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L175",
+              "source": "src/grid.ts#L180",
               "jsDocTags": [],
               "documentation": "Creates and mounts an imperative Grid in the supplied host element."
             },
@@ -590,7 +590,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L105",
+              "source": "src/grid.ts#L110",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides."
             },
@@ -799,7 +799,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L123",
+              "source": "src/grid.ts#L128",
               "jsDocTags": [],
               "documentation": "Load the WASM data engine once. Must be awaited before `createGrid`."
             },
@@ -810,7 +810,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L130",
+              "source": "src/grid.ts#L135",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source."
             },
@@ -1283,7 +1283,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L135",
+              "source": "src/grid.ts#L140",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme."
             },

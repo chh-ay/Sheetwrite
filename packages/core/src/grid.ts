@@ -1,7 +1,13 @@
 import { isLoaded, load } from "@sheetwrite/wasm";
 import { colToA1 } from "./a1.js";
 import { AriaMirror } from "./aria-mirror.js";
-import { fontFor, layoutTextLines } from "./canvas-paint.js";
+import {
+  fontFor,
+  intersectingMerges,
+  layoutTextLines,
+  mergeAnchorAt,
+  prepareMergeIndex,
+} from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
@@ -13,7 +19,6 @@ import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
-import { prepareMergeIndex } from "./merge-index.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { RenderCoordinator } from "./render-coordinator.js";
@@ -910,7 +915,7 @@ export class GridImpl implements Grid {
     const merges = this.sheet().merges;
     if (!merges) return null;
 
-    return prepareMergeIndex(merges).anchorAt(row, col);
+    return mergeAnchorAt(prepareMergeIndex(merges), row, col);
   }
 
   private anchorCell(row: number, col: number): CellRef {
@@ -1064,7 +1069,7 @@ export class GridImpl implements Grid {
       mergeIndex !== null &&
       rects.some(
         (rect) =>
-          mergeIndex.intersectingWindow(rect.r0, rect.r1 + 1, [rect.c0, rect.c1]).length > 0,
+          intersectingMerges(mergeIndex, rect.r0, rect.r1 + 1, [rect.c0, rect.c1]).length > 0,
       );
     if (!intersectsMerge) {
       for (const rect of rects) {
