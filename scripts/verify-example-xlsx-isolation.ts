@@ -43,7 +43,7 @@ async function entrypointsFromHtml(relativePath: string): Promise<string[]> {
   const html = await readFile(join(distRoot, relativePath), "utf8");
   const entrypoints: string[] = [];
   for (const match of html.matchAll(
-    /(?:src|component-url|renderer-url|href)=["']\/?(_astro\/[^"']+\.js)["']/g,
+    /(?:src|component-url|renderer-url|href)=["'][^"']*?(_astro\/[^"']+\.js)["']/g,
   )) {
     if (match[1] !== undefined) entrypoints.push(join(distRoot, match[1]));
   }
