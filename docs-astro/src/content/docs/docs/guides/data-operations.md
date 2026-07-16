@@ -13,7 +13,7 @@ the store keeps a row-order permutation/subset and the renderer reads through it
 
 The simple shorthands are still available:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.sortBy(4);            // sort by column 4, ascending
 grid.sortBy(4, false);     // descending
 grid.filterBy(3, "Tokyo"); // keep rows whose column-3 text contains "Tokyo"
@@ -24,7 +24,7 @@ For custom UI, use the composable primitives. All active column filters are ANDe
 together, hidden rows and collapsed groups are subtracted, and the remaining rows
 are sorted by the active multi-key sort.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.sortByMulti([
   { col: 4, ascending: false }, // primary key
   { col: 0, ascending: true },  // tie-breaker
@@ -75,11 +75,11 @@ row groups if you need the full natural data order.
 `aggregate` computes a column reduction over the active sheet's data and returns a
 number:
 
-```ts partial="requires surrounding host state" title="Partial example"
-grid.aggregate(col: number, op: "sum" | "avg" | "min" | "max" | "count"): number
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
+type Aggregate = Grid["aggregate"];
 ```
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 const total = grid.aggregate(4, "sum");
 const rows = grid.aggregate(0, "count");
 ```
@@ -88,7 +88,7 @@ const rows = grid.aggregate(0, "count");
 
 Frozen panes and zoom are view geometry, not data mutations:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.setFrozen(1, 1); // pin first view row and first column
 grid.setFrozen(0, 0); // unfreeze
 
@@ -111,7 +111,7 @@ or calling `grid.exportXlsx`:
 npm install @sheetwrite/xlsx
 ```
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 import "@sheetwrite/xlsx/register";
 
 grid.exportCsv("sales.csv");
@@ -123,7 +123,7 @@ the backend error. Built-in toolbar and context-menu actions cannot return that
 promise, so the grid emits one `export-error` event with
 `{ format: "xlsx", error }` instead:
 
-```ts partial="requires an initialized Grid host" title="Observe built-in XLSX failures"
+```ts prelude="core" partial="requires an initialized Grid host" title="Observe built-in XLSX failures"
 grid.on("export-error", ({ format, error }) => {
   console.error(`${format} export failed`, error);
 });
@@ -150,7 +150,7 @@ Sheetwrite exposes two intentionally different XLSX contracts:
   a header row.
 
 Register the optional XLSX package once before using either contract:
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="xlsx" partial="requires surrounding host state" title="Partial example"
 import {
   downloadBytes,
   fromCsv,
@@ -242,7 +242,7 @@ is side-effect free and exports `registerXlsxBackends()` plus the three named
 backend instances for explicit registration or wrapping. The `./register`
 entry performs idempotent registration:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 import {
   excelJsWorkbookBackend,
   readExcelFileTableImportBackend,

@@ -11,8 +11,8 @@ and the `Grid` instance API.
 
 ## GridOptions
 
-```ts partial="requires surrounding host state" title="Partial example"
-createGrid(host: HTMLElement, opts: GridOptions): Grid
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
+type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 ```
 
 | Field | Type | Default | Notes |
@@ -53,7 +53,7 @@ later source can retry it.
 The cancellable request API owns one visible-window generation. Pages can carry
 authoritative formula source and style rather than only resolved scalars:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 import type { DataSource } from "@sheetwrite/core";
 
 interface ApiRow {
@@ -131,7 +131,7 @@ conflicts are typed commit responses that retain local work.
 
 A `CellRenderer` paints (or returns a DOM node for) a single cell:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 interface CellRenderer {
   canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
   dom?(c: CellPaintContext): HTMLElement;
@@ -147,7 +147,7 @@ Set `config` to show the built-in toolbar. Each flag toggles one control; all
 flags **default to `true`** when `config` is present. The one special case is
 `toolbar: false`, which suppresses the toolbar entirely.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 createGrid(host, { workbook, config: {} });               // toolbar with every control
 createGrid(host, { workbook, config: { sort: false } });  // toolbar, no sort control
 createGrid(host, { workbook, config: { toolbar: false } }); // no toolbar
@@ -205,7 +205,7 @@ context-aware `visible`/`disabled` policy. The lean context carries only
 `cell`, `clientX`, and `clientY`. `onClick(grid, cell)` overrides `action`;
 hidden separators are normalized.
 
-```ts partial="requires an initialized Grid host" title="Context-aware bundled menu"
+```ts prelude="core" partial="requires an initialized Grid host" title="Context-aware bundled menu"
 const config = {
   contextMenu: (context) => [
     { id: "copy", action: "copy", label: "Copy value", shortcut: "Ctrl+C" },
@@ -230,12 +230,16 @@ For fully host-owned UI, set `contextMenu: false`, listen for the DOM
 invoke `grid.actions` from the host menu. Sheetwrite does not prescribe the
 host's event lifecycle:
 
-```ts partial="requires host menu state" title="Host-owned context menu"
+```ts prelude="core" partial="requires host menu state" title="Host-owned context menu"
 host.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   const cell = grid.getCellAtPoint(event.clientX, event.clientY);
   if (cell !== null) grid.setSelection({ kind: "cell", addr: cell });
-  openHostMenu({ cell, x: event.clientX, y: event.clientY, actions: grid.actions });
+  host.dispatchEvent(
+    new CustomEvent("sheetwrite:context-menu", {
+      detail: { cell, x: event.clientX, y: event.clientY, actions: grid.actions },
+    }),
+  );
 });
 ```
 
@@ -254,7 +258,7 @@ widget (unless `find: false`).
 
 `createGrid` returns an imperative handle:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 interface Grid {
   readonly store: Store;
   readonly actions: GridActions;
@@ -366,7 +370,7 @@ match into view, and emits a [`search`](#events) event. `findNext()` / `findPrev
 move the active match; `clearSearch()` clears the highlights. The built-in **Ctrl+F**
 find widget (gated by `config.find`, on by default) drives this same API.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 interface SearchOptions {
   matchCase?: boolean; // case-sensitive match (default false)
   wholeCell?: boolean; // match the whole cell, not a substring (default false)
@@ -381,7 +385,7 @@ interface SearchResult {
 }
 ```
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 const result = grid.search("error");
 console.log(`${result.matches.length} match(es)`);
 grid.findNext();    // advance the active match and scroll to it
@@ -404,7 +408,7 @@ search (pass `null` to clear); `color` overrides the theme highlight color.
 | `edit-commit` | `{ addr: CellAddress; value: CellValue }` |
 | `search` | `SearchResult` — `{ query: string; matches: CellAddress[]; active: number }` |
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 const sync = new SyncCoordinator(grid, adapter, {
   documentId: "products",
   serverVersion: loadedSnapshot.version ?? 0,

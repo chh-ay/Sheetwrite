@@ -29,7 +29,7 @@ HTTP):
 cp -r node_modules/@sheetwrite/core/dist public/sheetwrite
 ```
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
 
 await initSheetwrite();
@@ -47,7 +47,7 @@ worker graph into one chunk and returns its URL via the `?worker&url` query —
 verified by the fixture build in `test/bundler-fixtures/vite`
 (`bun run verify:bundlers`):
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 ```
 
@@ -65,7 +65,7 @@ bundler preserves module URLs (it usually does not after bundling to one file).
 A worker that fails to construct falls back to the main-thread canvas renderer
 (see below) — verify instead of assuming:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
 grid.on("renderer-fallback", ({ error }) => {
   console.warn("Sheetwrite worker renderer unavailable, using canvas:", error);
 });

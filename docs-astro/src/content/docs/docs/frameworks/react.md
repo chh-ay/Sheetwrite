@@ -7,7 +7,7 @@ description: Integrate Sheetwrite with React ownership, readiness, and controlle
 
 `onGridChange` reports committed grid changes. `onReady` receives `{ grid, generation, reason }` after the forwarded ref is assigned. Replacing reset-sensitive inputs creates a new generation; destroy persistence/sync coordinators attached to the previous grid.
 
-```tsx partial="requires application-owned save state" title="React adapter"
+```tsx prelude="react" partial="requires application-owned save state" title="React adapter"
 import { Sheetwrite, type GridReadyEvent, type SimpleColumn } from "@sheetwrite/react";
 import type { Transaction } from "@sheetwrite/core";
 import "@sheetwrite/react/styles.css";

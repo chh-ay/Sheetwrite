@@ -16,7 +16,7 @@ The `Theme` controls the canvas paint. Pass a `Partial<Theme>` as the `theme`
 option, or call `grid.setTheme(partial)` at runtime; either is merged over the
 defaults.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 interface Theme {
   font: string;
   bg: string;
@@ -61,7 +61,7 @@ below.
 
 Override the search-match colors at runtime via `setTheme`:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 grid.setTheme({ searchMatch: "#fff47580", searchActiveMatch: "#fbbc04" });
 ```
 
@@ -95,7 +95,7 @@ the host with arbitrary-property utilities (e.g.
 rule; construction and `replaceTheme(undefined)` both pick them up from the
 computed style.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 const DARK: Partial<Theme> = {
   bg: "#0b0b0c",
   fg: "#e7e7e7",
@@ -116,7 +116,7 @@ Import the stylesheet once. It styles the host container (the grid adds the
 and ships a dark variant under `[data-theme="dark"]` or a `.dark` ancestor class
 (the Tailwind convention):
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 import "@sheetwrite/core/styles.css";
 ```
 
@@ -175,7 +175,7 @@ The recommended runtime-theming pattern (from the theming example page) drives b
 layers together: toggle `data-theme` on a wrapper so the surrounding
 CSS-variable chrome flips, and call `setTheme` so the canvas repaints.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 darkBtn.addEventListener("click", () => {
   grid.setTheme(DARK);
   stage.setAttribute("data-theme", "dark");
@@ -195,7 +195,7 @@ darkBtn.addEventListener("click", () => {
 column default for that cell, so a cell paints with its column's `cellStyle` until
 its own patch supplies styling.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 interface CellStyle {
   bold?: boolean;
   italic?: boolean;
@@ -213,7 +213,7 @@ interface CellStyle {
 Apply a style to a cell via a transaction (a `set` replaces value + style, so pass
 the current value back when only restyling):
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 grid.store.applyTransaction({
   patches: [
     {
@@ -231,7 +231,7 @@ grid.store.applyTransaction({
 Borders are per side. `CellBorders.all` applies to any side not given its own
 border:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 interface CellBorders {
   all?: CellBorder;
   top?: CellBorder;
@@ -247,7 +247,7 @@ interface CellBorder {
 }
 ```
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 const style: CellStyle = {
   border: {
     all: { color: "#cccccc", width: 1, style: "solid" },
@@ -262,16 +262,18 @@ A numeric/date column can carry an Excel-style `numberFormat` code and an explic
 BCP 47 `numberLocale`. The same UTC serial value and locale are used by the
 canvas renderer, auto-fit measurement, and exported formatter:
 
-```ts partial="requires surrounding host state" title="Partial example"
-{
-  key: "amount",
-  header: "Amount",
-  width: 140,
-  type: "number",
-  numberFormat: "#,##0.00",
-  numberLocale: "de-DE",
-}
-{ key: "day", header: "Day", width: 120, type: "date", numberFormat: "yyyy-mm-dd" }
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
+const columns: Column[] = [
+  {
+    key: "amount",
+    header: "Amount",
+    width: 140,
+    type: "number",
+    numberFormat: "#,##0.00",
+    numberLocale: "de-DE",
+  },
+  { key: "day", header: "Day", width: 120, type: "date", numberFormat: "yyyy-mm-dd" },
+];
 ```
 
 `formatNumber(value, code?, locale?)` is exported from `@sheetwrite/core`. It is

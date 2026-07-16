@@ -3,8 +3,12 @@ import { injectHoverPrelude } from "../docs/src/lib/hover-preludes.js";
 import {
   collectFenceHovers,
   formatHoverSignature,
+  isHighQualityHover,
 } from "../docs/src/lib/sheetwrite-code-hovers.js";
-import { SheetwriteTypeEngine } from "../docs/src/lib/sheetwrite-type-engine.js";
+import {
+  SheetwriteTypeEngine,
+  type SheetwriteTypeHover,
+} from "../docs/src/lib/sheetwrite-type-engine.js";
 
 describe("Sheetwrite code hover signatures", () => {
   it("formats generic function parameters at semantic boundaries", async () => {
@@ -198,7 +202,7 @@ describe("Sheetwrite hover preludes", () => {
     expect(workbook?.line).toBe(1);
     expect(workbook?.text).toContain("Workbook");
     for (const hover of hovers) {
-      expect(hover.text).not.toContain("/*unresolved*/");
+      expect(isHighQualityHover(hover, "ts")).toBe(true);
     }
   });
 
@@ -209,6 +213,34 @@ describe("Sheetwrite hover preludes", () => {
     expect(grid?.line).toBe(0);
     expect(grid?.character).toBe(18);
     expect(grid?.text).toContain("Grid");
+  });
+});
+
+describe("Sheetwrite hover quality", () => {
+  const hover = (text: string, origin: SheetwriteTypeHover["origin"]): SheetwriteTypeHover => ({
+    type: "hover",
+    text,
+    start: 0,
+    length: 5,
+    target: "value",
+    line: 0,
+    character: 0,
+    origin,
+  });
+
+  it("rejects unresolved application hovers but keeps lib signatures", () => {
+    expect(isHighQualityHover(hover("const value: any", "snippet"))).toBe(false);
+    expect(isHighQualityHover(hover("type Value = /*unresolved*/ any", "workspace"))).toBe(false);
+    expect(isHighQualityHover(hover("Console.log(...data: any[]): void", "lib"))).toBe(true);
+    expect(isHighQualityHover(hover("const grid: Grid", "workspace"))).toBe(true);
+  });
+
+  it("evaluates framework hovers after language-specific normalization", () => {
+    const component = hover("const Sheetwrite: DefineComponent<any, any, any>", "workspace");
+    component.target = "Sheetwrite";
+
+    expect(isHighQualityHover(component, "vue")).toBe(true);
+    expect(isHighQualityHover(component, "ts")).toBe(false);
   });
 });
 

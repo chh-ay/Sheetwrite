@@ -10,17 +10,105 @@
  */
 
 const CORE_TYPES =
-  'import type { CellAddress, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, DataSource, Grid, GridOptions, Selection, SheetId, Theme, Transaction, Workbook } from "@sheetwrite/core";';
+  'import type { AggregateOp, ApplyTransactionResult, CellAddress, CellBorders, CellPaintContext, CellRenderer, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, ColumnFilter, DataSource, DataValidationRule, DocumentOp, Grid, GridActions, GridConfig, GridEvents, GridOptions, HighlightRange, MutationPolicyMode, PersistenceAdapter, ProtectedRange, ProtectionResolver, ReplaceResult, ResolvedCell, RowGroup, SearchOptions, SearchResult, Selection, SheetId, SortKey, Store, SyncCoordinator, Theme, Transaction, VisibleWindowView, Workbook, WorkbookSnapshot } from "@sheetwrite/core";';
+const CORE_VALUES =
+  'import { createGrid, createGridFromSnapshot, initSheetwrite, validateWorkbookSnapshot } from "@sheetwrite/core";';
+const CORE_PRELUDE = [
+  CORE_TYPES,
+  CORE_VALUES,
+  "declare const host: HTMLElement;",
+  "declare const grid: Grid;",
+  "declare const workbook: Workbook;",
+  "declare const data: ColumnarData;",
+  "declare const store: Store;",
+].join("\n");
+const FRAMEWORK_PRELUDE = [
+  CORE_PRELUDE,
+  'import type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";',
+  "declare const columns: readonly SimpleColumn<Record<string, CellScalar>>[];",
+  "declare const rows: readonly Record<string, CellScalar>[];",
+  "declare const dataSource: DataSource;",
+  "declare const gridRef: Grid | null;",
+  "declare const persist: (transaction: Transaction) => void;",
+  "declare const observe: (grid: Grid, generation: number, reason: string) => void;",
+  "declare const connect: (grid: Grid) => void;",
+  'declare const operationQueue: { push(...patches: Transaction["patches"]): void };',
+].join("\n");
 
 export const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([
+  ["core", CORE_PRELUDE],
+  ["framework", FRAMEWORK_PRELUDE],
   [
-    "core",
+    "react",
+    [FRAMEWORK_PRELUDE, 'import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/react";'].join(
+      "\n",
+    ),
+  ],
+  [
+    "vue",
+    [FRAMEWORK_PRELUDE, 'import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/vue";'].join("\n"),
+  ],
+  [
+    "svelte",
+    [FRAMEWORK_PRELUDE, 'import { Sheetwrite, SheetwriteGrid } from "@sheetwrite/svelte";'].join(
+      "\n",
+    ),
+  ],
+  [
+    "collaboration",
     [
-      CORE_TYPES,
-      "declare const host: HTMLElement;",
-      "declare const grid: Grid;",
-      "declare const workbook: Workbook;",
-      "declare const data: ColumnarData;",
+      CORE_PRELUDE,
+      "declare const adapter: PersistenceAdapter;",
+      "declare const persistenceAdapter: PersistenceAdapter;",
+      "declare const sync: SyncCoordinator;",
+      "declare const snapshot: WorkbookSnapshot;",
+      "declare const loadedSnapshot: WorkbookSnapshot;",
+      "declare const documentId: string;",
+      "declare const signal: AbortSignal;",
+      "declare const saveButton: HTMLButtonElement;",
+      "declare const remoteOperationSource: AsyncIterable<DocumentOp>;",
+      "declare const showConflict: (conflict: unknown) => void;",
+      "declare const requestFreshSnapshot: () => Promise<void>;",
+      "declare const pendingStorage: { remove(documentId: string): Promise<void> };",
+    ].join("\n"),
+  ],
+  [
+    "theming",
+    [
+      CORE_PRELUDE,
+      "declare const darkBtn: HTMLButtonElement;",
+      "declare const stage: HTMLElement;",
+      "declare const DARK: Partial<Theme>;",
+    ].join("\n"),
+  ],
+  [
+    "architecture",
+    [
+      CORE_PRELUDE,
+      "declare const payload: string;",
+      "declare function computeWindow(index: unknown, contentTop: number, viewportHeight: number, overscan: number): { start: number; end: number };",
+      "declare function toContent(scrollTop: number): number;",
+      "declare function toScroll(contentOffset: number): number;",
+    ].join("\n"),
+  ],
+  [
+    "xlsx",
+    [
+      CORE_PRELUDE,
+      'import type { SimpleColumn } from "@sheetwrite/core/adapter";',
+      "declare const csvText: string;",
+      "declare const columns: readonly SimpleColumn<Record<string, CellScalar>>[];",
+      "declare const abortController: AbortController;",
+      "declare const signal: AbortSignal;",
+      "declare const sheet: SheetId;",
+      "declare const range: { start: CellAddress; end: CellAddress };",
+    ].join("\n"),
+  ],
+  [
+    "wasm",
+    [
+      CORE_PRELUDE,
+      "declare const source: BufferSource | URL | string | Request | WebAssembly.Module;",
     ].join("\n"),
   ],
 ]);
