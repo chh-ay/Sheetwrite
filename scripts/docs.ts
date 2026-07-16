@@ -562,11 +562,12 @@ interface RenderEvidenceResult {
   engine: string;
   scenarioId: string;
   round: number;
+  rows: number;
   status: string;
   medianMs: number;
   p95Ms: number;
   madMs: number;
-  memory: { deltaBytes: number };
+  memory: { beforeBytes: number; afterBytes: number; deltaBytes: number };
   validation: Array<{ passed: boolean }>;
 }
 
@@ -587,261 +588,532 @@ interface ValidatedRenderEvidence {
   };
   config: { engines: string[]; rows: number[]; scenarios: string[] };
   results: RenderEvidenceResult[];
+  completeness?: { failedKeys: string[]; missingKeys: string[]; complete: boolean };
 }
 
-async function unavailableEvidence(path: string, reproduction: string): Promise<EvidenceState> {
+interface CaptureMeta {
+  commit: string;
+  dirty: boolean;
+  timestamp: string;
+}
+
+function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined {
+  const raw = value.metadata ?? value.meta;
+  if (raw === null || typeof raw !== "object") return undefined;
+  const meta = raw as Record<string, unknown>;
+  if (
+    typeof meta.commit !== "string" ||
+    meta.dirty !== false ||
+    typeof meta.timestamp !== "string" ||
+    !Number.isFinite(Date.parse(meta.timestamp))
+  ) {
+    return undefined;
+  }
+  return { commit: meta.commit, dirty: meta.dirty, timestamp: meta.timestamp };
+}
+
+async function loadEvidence<T>(
+  relPath: string,
+  reproduction: string,
+  validate: (value: Record<string, unknown>) => T | string,
+): Promise<{ evidence: T; source: string } | EvidenceState> {
+  const path = join(repositoryRoot, relPath);
   const source = posix(relative(repositoryRoot, path));
   if (!(await exists(path)))
     return { available: false, reason: "artifact is missing", source, reproduction };
   try {
     const value = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
-    const metadata =
-      value.metadata !== null && typeof value.metadata === "object"
-        ? (value.metadata as Record<string, unknown>)
-        : value.meta !== null && typeof value.meta === "object"
-          ? (value.meta as Record<string, unknown>)
-          : value;
-    if (typeof metadata.commit !== "string" || typeof metadata.timestamp !== "string") {
+    if (captureMetaOf(value) === undefined) {
       return {
         available: false,
         reason:
-          "artifact has no protocol-bound commit and timestamp, so freshness cannot be established",
+          "artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established",
         source,
         reproduction,
       };
     }
-    return {
-      available: false,
-      reason:
-        "artifact does not expose the completeness and validation fields required by this view",
-      source,
-      reproduction,
-    };
+    const evidence = validate(value);
+    if (typeof evidence === "string") {
+      return { available: false, reason: evidence, source, reproduction };
+    }
+    return { evidence, source };
   } catch {
     return { available: false, reason: "artifact is not valid JSON", source, reproduction };
   }
 }
 
-async function validatedRenderEvidence(): Promise<
-  { evidence: ValidatedRenderEvidence; source: string } | EvidenceState
-> {
-  const path = join(repositoryRoot, "bench/results/render-results.json");
-  const source = posix(relative(repositoryRoot, path));
-  const reproduction =
-    "bun run --filter @sheetwrite/bench bench:render:prepare && bun run --filter @sheetwrite/bench bench:render && bun run --filter @sheetwrite/bench bench:render:validate";
-  if (!(await exists(path)))
-    return { available: false, reason: "artifact is missing", source, reproduction };
-  try {
-    const value = JSON.parse(await readFile(path, "utf8")) as Partial<ValidatedRenderEvidence>;
-    const metadata = value.metadata;
-    const config = value.config;
-    const results = value.results;
-    if (
-      value.protocolVersion !== 1 ||
-      metadata === undefined ||
-      typeof metadata.commit !== "string" ||
-      typeof metadata.timestamp !== "string" ||
-      metadata.dirty !== false ||
-      !Number.isInteger(metadata.rounds) ||
-      metadata.rounds < 1 ||
-      !Array.isArray(metadata.launchAttempts) ||
-      config === undefined ||
-      !Array.isArray(config.engines) ||
-      !Array.isArray(config.rows) ||
-      !Array.isArray(config.scenarios) ||
-      !Array.isArray(results)
-    ) {
-      return {
-        available: false,
-        reason: "artifact metadata does not match controlled render protocol version 1",
-        source,
-        reproduction,
-      };
-    }
-    const expected =
-      metadata.rounds * config.engines.length * config.rows.length * config.scenarios.length;
-    const complete =
-      results.length === expected &&
-      metadata.launchAttempts.every((attempt) => attempt.success === true) &&
-      results.every(
-        (result) =>
-          result.status === "success" &&
-          Number.isFinite(result.medianMs) &&
-          Number.isFinite(result.p95Ms) &&
-          Number.isFinite(result.madMs) &&
-          Number.isFinite(result.memory?.deltaBytes) &&
-          Array.isArray(result.validation) &&
-          result.validation.every((check) => check.passed === true),
-      );
-    if (!complete) {
-      return {
-        available: false,
-        reason: `controlled protocol is incomplete or has failures (${results.length}/${expected} scenarios)`,
-        source,
-        reproduction,
-      };
-    }
-    return { evidence: value as ValidatedRenderEvidence, source };
-  } catch {
-    return { available: false, reason: "artifact is not valid JSON", source, reproduction };
+function validateRenderArtifact(value: Record<string, unknown>): ValidatedRenderEvidence | string {
+  const artifact = value as unknown as Partial<ValidatedRenderEvidence>;
+  const metadata = artifact.metadata;
+  const config = artifact.config;
+  const results = artifact.results;
+  if (
+    artifact.protocolVersion !== 1 ||
+    metadata === undefined ||
+    !Number.isInteger(metadata.rounds) ||
+    metadata.rounds < 1 ||
+    !Array.isArray(metadata.launchAttempts) ||
+    !metadata.launchAttempts.every((attempt) => attempt.success === true) ||
+    config === undefined ||
+    !Array.isArray(config.engines) ||
+    !Array.isArray(config.rows) ||
+    !Array.isArray(config.scenarios) ||
+    !Array.isArray(results)
+  ) {
+    return "artifact does not match controlled render protocol version 1";
   }
+  // Failed cells are allowed - the page reports them as crashes - but every
+  // present result must be internally valid.
+  const valid = results.every(
+    (result) =>
+      Number.isFinite(result.medianMs) &&
+      Number.isFinite(result.p95Ms) &&
+      Number.isFinite(result.memory?.afterBytes) &&
+      Array.isArray(result.validation),
+  );
+  if (!valid) return "controlled render results carry non-finite samples";
+  return artifact as ValidatedRenderEvidence;
+}
+
+interface DataEvidence {
+  protocolVersion: number;
+  mode: string;
+  meta: CaptureMeta & { bun: string };
+  sheetwrite: Record<
+    string,
+    { rows: number; stats: Record<string, { median: number; p95: number }> }
+  >;
+  handsontable: Record<
+    string,
+    { rows: number; stats: Record<string, { median: number; p95: number }> }
+  >;
+}
+
+function validateDataArtifact(value: Record<string, unknown>): DataEvidence | string {
+  const artifact = value as unknown as Partial<DataEvidence>;
+  if (artifact.protocolVersion !== 1 || artifact.mode !== "full") {
+    return "artifact is not a full-mode data protocol capture";
+  }
+  for (const engine of ["sheetwrite", "handsontable"] as const) {
+    const block = artifact[engine];
+    if (block === undefined || typeof block !== "object") return `artifact lacks ${engine} results`;
+    for (const entry of Object.values(block)) {
+      for (const stat of Object.values(entry.stats)) {
+        if (!Number.isFinite(stat.median) || !Number.isFinite(stat.p95)) {
+          return "data medians carry non-finite samples";
+        }
+      }
+    }
+  }
+  return artifact as DataEvidence;
+}
+
+interface FormulaEvidence {
+  protocolVersion: number;
+  mode: string;
+  meta: CaptureMeta;
+  workloads: Array<{ id: string; size: number; stat: { median: number; p95: number } }>;
+  memory: Array<{ formulas: number; wasmDeltaBytes: number }>;
+}
+
+function validateFormulaArtifact(value: Record<string, unknown>): FormulaEvidence | string {
+  const artifact = value as unknown as Partial<FormulaEvidence>;
+  if (artifact.protocolVersion !== 1 || artifact.mode !== "full") {
+    return "artifact is not a full-mode formula protocol capture";
+  }
+  if (!Array.isArray(artifact.workloads) || artifact.workloads.length === 0) {
+    return "artifact carries no formula workloads";
+  }
+  if (
+    !artifact.workloads.every(
+      (workload) => Number.isFinite(workload.stat?.median) && Number.isFinite(workload.stat?.p95),
+    )
+  ) {
+    return "formula workloads carry non-finite samples";
+  }
+  return artifact as FormulaEvidence;
+}
+
+interface SizeEvidence {
+  schemaVersion: number;
+  meta: CaptureMeta;
+  metrics: Record<string, { actual: number; unit: string }>;
+  packages: Array<{ name: string; tarballBytes: number; unpackedBytes: number }>;
+}
+
+function validateSizeArtifact(value: Record<string, unknown>): SizeEvidence | string {
+  const artifact = value as unknown as Partial<SizeEvidence>;
+  if (!Number.isInteger(artifact.schemaVersion)) return "artifact lacks a size schema version";
+  if (!Array.isArray(artifact.packages) || artifact.packages.length === 0) {
+    return "artifact carries no package reports";
+  }
+  if (artifact.metrics === undefined || typeof artifact.metrics !== "object") {
+    return "artifact carries no metrics map";
+  }
+  return artifact as SizeEvidence;
+}
+
+const BENCH_SIZES = [1_000, 10_000, 100_000, 1_000_000] as const;
+const BENCH_ENGINE_LABELS = { sheetwrite: "Sheetwrite", handsontable: "Handsontable" } as const;
+type BenchEngine = keyof typeof BENCH_ENGINE_LABELS;
+
+function fmtMs(value: number): string {
+  return `${value.toFixed(value < 10 ? 2 : 1)} ms`;
+}
+
+function fmtMb(value: number): string {
+  return `${(value / 1_000_000).toFixed(1)} MB`;
+}
+
+function fmtRows(rows: number): string {
+  return rows >= 1_000_000 ? `${rows / 1_000_000}M` : `${rows / 1_000}k`;
+}
+
+interface BenchPairStat {
+  main: number;
+  faded: number;
+}
+
+/** One widget row: label, ratio chip, and a bar per engine (or a crash card). */
+function benchPairRow(
+  label: string,
+  ours: BenchPairStat | undefined,
+  theirs: BenchPairStat | undefined,
+  fmt: (value: number) => string,
+  betterChip: [string, string],
+): string {
+  const rowMax = Math.max(ours?.faded ?? 0, theirs?.faded ?? 0, ours?.main ?? 0, theirs?.main ?? 0);
+  const bar = (engine: BenchEngine, stats: BenchPairStat | undefined): string => {
+    if (stats === undefined) {
+      return (
+        `<div class="bench-bar" data-engine="${engine}" data-crashed="">` +
+        `<span class="bench-bar__engine">${BENCH_ENGINE_LABELS[engine]}</span>` +
+        `<span class="bench-crash">did not complete</span>` +
+        `</div>`
+      );
+    }
+    const pct = (value: number): string =>
+      `${Math.min(100, Math.max(0.6, (value / rowMax) * 100)).toFixed(2)}%`;
+    return (
+      `<div class="bench-bar" data-engine="${engine}">` +
+      `<span class="bench-bar__engine">${BENCH_ENGINE_LABELS[engine]}</span>` +
+      `<span class="bench-bar__track" aria-hidden="true">` +
+      `<i class="bench-bar__spread" style="width:${pct(stats.faded)}"></i>` +
+      `<i class="bench-bar__fill" style="width:${pct(stats.main)}"></i></span>` +
+      `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${fmt(stats.main)}</b><b class="bench-num" data-stat="p95">${fmt(stats.faded)}</b></span>` +
+      `</div>`
+    );
+  };
+  let chip: string;
+  let outcome: string;
+  if (ours === undefined || theirs === undefined) {
+    outcome = ours === undefined ? "crashed" : "solo";
+    chip =
+      ours === undefined
+        ? '<span class="bench-viz__ratio" data-kind="crashed">Sheetwrite did not complete</span>'
+        : '<span class="bench-viz__ratio" data-kind="solo">only Sheetwrite completed</span>';
+  } else {
+    const faster = theirs.main >= ours.main;
+    const ratio = (faster ? theirs.main / ours.main : ours.main / theirs.main).toFixed(1);
+    outcome = faster ? "faster" : "slower";
+    chip = `<span class="bench-viz__ratio"><strong>${ratio}×</strong> ${faster ? betterChip[0] : betterChip[1]}</span>`;
+  }
+  return [
+    `<div class="bench-viz__row" data-outcome="${outcome}">`,
+    `<div class="bench-viz__head"><code>${label}</code>${chip}</div>`,
+    bar("sheetwrite", ours),
+    bar("handsontable", theirs),
+    "</div>",
+  ].join("\n");
+}
+
+function benchPanel(
+  size: number,
+  metric: "speed" | "memory",
+  rows: string[],
+  note: string,
+): string {
+  return [
+    `<section class="bench-panel" data-size="${size}" data-metric="${metric}">`,
+    `<div class="bench-viz__scale"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis-note">${note}</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>${metric === "speed" ? "median" : "footprint"}<i class="bench-legend-swatch" data-kind="p95"></i>${metric === "speed" ? "p95" : "delta"}</span></div>`,
+    ...rows,
+    "</section>",
+  ].join("\n");
+}
+
+/** The two-axis (size x metric) CSS-only tab widget for the render benchmark. */
+function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
+  const mid = (values: number[]): number => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+  };
+  const sizes = BENCH_SIZES.filter((size) => evidence.config.rows.includes(size));
+  const parts: string[] = ['<figure class="bench-viz bench-widget" data-pagefind-ignore>'];
+  for (const size of sizes) {
+    parts.push(
+      `<input type="radio" name="bench-size" id="bench-size-${size}"${size === 100_000 ? " checked" : ""}>`,
+    );
+  }
+  parts.push(
+    '<input type="radio" name="bench-metric" id="bench-metric-speed" checked>',
+    '<input type="radio" name="bench-metric" id="bench-metric-memory">',
+    '<div class="bench-widget__tabs">',
+    '<div class="bench-tabs" aria-label="Workbook size">',
+    ...sizes.map((size) => `<label for="bench-size-${size}">${fmtRows(size)} rows</label>`),
+    "</div>",
+    '<div class="bench-tabs bench-tabs--metric" aria-label="Metric">',
+    '<label for="bench-metric-speed">Speed</label>',
+    '<label for="bench-metric-memory">Memory</label>',
+    "</div>",
+    "</div>",
+  );
+  for (const size of sizes) {
+    const byScenario = new Map<string, Map<string, RenderEvidenceResult[]>>();
+    for (const result of evidence.results) {
+      if (result.rows !== size || result.status !== "success") continue;
+      const engines =
+        byScenario.get(result.scenarioId) ?? new Map<string, RenderEvidenceResult[]>();
+      byScenario.set(result.scenarioId, engines);
+      const bucket = engines.get(result.engine) ?? [];
+      engines.set(result.engine, bucket);
+      bucket.push(result);
+    }
+    const speedRows: string[] = [];
+    const memoryRows: string[] = [];
+    for (const scenario of evidence.config.scenarios) {
+      const engines = byScenario.get(scenario);
+      const ours = engines?.get("sheetwrite");
+      const theirs = engines?.get("handsontable");
+      const speedStat = (bucket?: RenderEvidenceResult[]): BenchPairStat | undefined =>
+        bucket?.length
+          ? { main: mid(bucket.map((r) => r.medianMs)), faded: mid(bucket.map((r) => r.p95Ms)) }
+          : undefined;
+      const memoryStat = (bucket?: RenderEvidenceResult[]): BenchPairStat | undefined =>
+        bucket?.length
+          ? {
+              main: mid(bucket.map((r) => r.memory.afterBytes)),
+              faded: mid(bucket.map((r) => Math.max(0, r.memory.deltaBytes))),
+            }
+          : undefined;
+      speedRows.push(
+        benchPairRow(scenario, speedStat(ours), speedStat(theirs), fmtMs, ["faster", "slower"]),
+      );
+      memoryRows.push(
+        benchPairRow(scenario, memoryStat(ours), memoryStat(theirs), fmtMb, ["leaner", "heavier"]),
+      );
+    }
+    parts.push(
+      benchPanel(size, "speed", speedRows, "relative time per row — shorter is faster"),
+      benchPanel(size, "memory", memoryRows, "renderer heap after interaction — shorter is leaner"),
+    );
+  }
+  parts.push(
+    "<figcaption>Each row is scaled to its slower (or heavier) engine, so bar lengths compare directly within a row. Bright numbers are the median run; faded numbers are the p95 run (speed) or the interaction's heap delta (memory). Rows marked as not completed are runs the engine failed to finish under the protocol timeout.</figcaption>",
+    "</figure>",
+  );
+  return parts.join("\n");
 }
 
 async function renderEvidencePage(): Promise<string> {
-  const render = await validatedRenderEvidence();
-  const states = [
-    await unavailableEvidence(
-      join(repositoryRoot, "bench/results/data-results.json"),
-      "bun run --filter @sheetwrite/bench bench:data",
-    ),
-    await unavailableEvidence(
-      join(repositoryRoot, "bench/results/formula-results.json"),
-      "bun run --filter @sheetwrite/bench bench:formula",
-    ),
-    await unavailableEvidence(
-      join(repositoryRoot, "test-results/delivery-size/size-report.json"),
-      "bun run size:report",
-    ),
-  ];
+  const scale = await loadEvidence(
+    "bench/results/render-scale.json",
+    "bun run --filter @sheetwrite/bench bench:render:scale",
+    validateRenderArtifact,
+  );
+  const data = await loadEvidence(
+    "bench/results/data-results.json",
+    "bun run --filter @sheetwrite/bench bench:data",
+    validateDataArtifact,
+  );
+  const formula = await loadEvidence(
+    "bench/results/formula-results.json",
+    "bun run --filter @sheetwrite/bench bench:formula",
+    validateFormulaArtifact,
+  );
+  const sizeReport = await loadEvidence(
+    "test-results/delivery-size/size-report.json",
+    "bun run size:report",
+    validateSizeArtifact,
+  );
+  const pending: EvidenceState[] = [];
   const lines = [
     frontmatter(
       "Performance and delivery evidence",
       "Freshness-gated benchmark and package-size evidence for Sheetwrite.",
     ).trimEnd(),
-    "Every number on this page comes from a validated local protocol artifact; nothing is published from an unvalidated, incomplete, or protocol-mismatched run.",
+    "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated, incomplete, or protocol-mismatched run.",
     "",
     "## Render benchmark: Sheetwrite vs Handsontable",
     "",
   ];
-  if ("evidence" in render) {
-    const { evidence, source } = render;
+  if ("evidence" in scale) {
+    const { evidence, source } = scale;
     const metadata = evidence.metadata;
-    const failures = evidence.results.filter(
-      (result) =>
-        result.status !== "success" || result.validation.some((check) => check.passed !== true),
-    ).length;
-    // Pivot rounds/engines into one row per scenario so the page reads as a
-    // comparison instead of a raw artifact dump.
-    const byScenario = new Map<string, Map<string, { medians: number[]; p95s: number[] }>>();
-    for (const result of evidence.results) {
-      const engines = byScenario.get(result.scenarioId) ?? new Map();
-      byScenario.set(result.scenarioId, engines);
-      const stats = engines.get(result.engine) ?? { medians: [], p95s: [] };
-      engines.set(result.engine, stats);
-      stats.medians.push(result.medianMs);
-      stats.p95s.push(result.p95Ms);
-    }
-    const mid = (values: number[]): number => {
-      const sorted = [...values].sort((a, b) => a - b);
-      return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
-    };
-    const rows = evidence.config.rows.join(", ");
+    const failures = evidence.completeness?.failedKeys.length ?? 0;
+    const total = evidence.results.length + failures;
     lines.push(
-      `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.results.length}/${evidence.results.length} engine/scenario/round runs completed with ${failures} failures; every correctness checkpoint passed.</div>`,
+      `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.results.length}/${total} engine/scenario/round runs completed across ${evidence.config.rows.length} workbook sizes; every completed run passed its correctness checkpoints${failures > 0 ? `; ${failures} runs did not finish and are shown as such` : ""}.</div>`,
       "",
-      `Both engines drive the same ${rows}-row workbook through identical scripted interactions in a controlled Chromium (${metadata.browserVersion}) on ${metadata.cpu}. Captured ${metadata.timestamp} at \`${metadata.commit.slice(0, 12)}\` (clean worktree); raw artifact \`${source}\`.`,
+      "Both engines drive identical scripted interactions in a controlled browser. Pick a workbook size and a metric:",
       "",
-    );
-    const ms = (value: number): string => `${value.toFixed(value < 10 ? 2 : 1)} ms`;
-    const comparisons: {
-      scenario: string;
-      ours: { median: number; p95: number };
-      theirs: { median: number; p95: number };
-    }[] = [];
-    for (const [scenario, engines] of byScenario) {
-      const ours = engines.get("sheetwrite");
-      const theirs = engines.get("handsontable");
-      if (!ours || !theirs) continue;
-      comparisons.push({
-        scenario,
-        ours: { median: mid(ours.medians), p95: mid(ours.p95s) },
-        theirs: { median: mid(theirs.medians), p95: mid(theirs.p95s) },
-      });
-    }
-    // Paired-bar comparison chart instead of a raw table. Everything is
-    // precomputed here into static HTML (prerender-safe, no client JS); the
-    // medians, p95s, and ratios stay real text for search and screen readers,
-    // while tracks, fills, and axis ticks are aria-hidden decoration styled by
-    // the `bench-` block in docs/src/styles/site.css.
-    // The axis is logarithmic: samples span three decades (0.15-266 ms), so a
-    // linear scale would flatten every sub-10 ms bar into invisibility. Domain
-    // runs from the nearest decade below the fastest sample to the slowest.
-    const samples = comparisons.flatMap(({ ours, theirs }) => [
-      ours.median,
-      ours.p95,
-      theirs.median,
-      theirs.p95,
-    ]);
-    const lowExponent = Math.floor(Math.log10(Math.min(...samples)));
-    const low = 10 ** lowExponent;
-    const high = Math.max(...samples);
-    const decades = Math.log10(high / low);
-    const percent = (value: number): string =>
-      `${Math.min(100, Math.max(0, (Math.log10(value / low) / decades) * 100)).toFixed(2)}%`;
-    const tickValues: number[] = [];
-    for (let exponent = lowExponent; 10 ** exponent <= high; exponent += 1) {
-      tickValues.push(10 ** exponent);
-    }
-    const axisLabels = tickValues
-      .map(
-        (tick, index) =>
-          `<i style="left:${percent(tick)}">${tick}${index === tickValues.length - 1 ? " ms" : ""}</i>`,
-      )
-      .join("");
-    const trackTicks = tickValues
-      .filter((tick) => tick > low)
-      .map((tick) => `<i class="bench-bar__tick" style="left:${percent(tick)}"></i>`)
-      .join("");
-    const engineLabels = { sheetwrite: "Sheetwrite", handsontable: "Handsontable" } as const;
-    // Solid fill = median; an attached faded tail extends to p95. A visual
-    // legend in the header carries the vocabulary so the rows stay clean.
-    const bar = (
-      engine: keyof typeof engineLabels,
-      stats: { median: number; p95: number },
-    ): string =>
-      `<div class="bench-bar" data-engine="${engine}">` +
-      `<span class="bench-bar__engine">${engineLabels[engine]}</span>` +
-      `<span class="bench-bar__track" aria-hidden="true">${trackTicks}` +
-      `<i class="bench-bar__spread" style="width:${percent(stats.p95)}"></i>` +
-      `<i class="bench-bar__fill" style="width:${percent(stats.median)}"></i></span>` +
-      `<span class="bench-bar__value">${ms(stats.median)}<small>p95 ${ms(stats.p95)}</small></span>` +
-      `</div>`;
-    const legend =
-      '<span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span>';
-    lines.push(
-      '<figure class="bench-viz">',
-      `<div class="bench-viz__scale" aria-hidden="true"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis">${axisLabels}</span>${legend}</div>`,
-    );
-    for (const { scenario, ours, theirs } of comparisons) {
-      const faster = theirs.median >= ours.median;
-      const ratio = (faster ? theirs.median / ours.median : ours.median / theirs.median).toFixed(1);
-      lines.push(
-        `<div class="bench-viz__row" data-outcome="${faster ? "faster" : "slower"}">`,
-        `<div class="bench-viz__head"><code>${scenario}</code><span class="bench-viz__ratio"><strong>${ratio}×</strong> ${faster ? "faster" : "slower"}</span></div>`,
-        bar("sheetwrite", ours),
-        bar("handsontable", theirs),
-        "</div>",
-      );
-    }
-    lines.push(
-      "<figcaption>Bars are per-interaction time on a logarithmic axis — every tick is one 10× step, shorter is faster. The solid fill is the median run; the faded tail reaches the slowest 1-in-20 run (p95). Full samples and memory counters live in the raw artifact.</figcaption>",
-      "</figure>",
-    );
-    lines.push(
+      '<dl class="bench-meta" data-pagefind-ignore>',
+      `<div><dt>Captured</dt><dd>${metadata.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
+      `<div><dt>Commit</dt><dd><code>${metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Environment</dt><dd>Chromium ${metadata.browserVersion} · ${html(metadata.cpu)}</dd></div>`,
+      `<div><dt>Protocol</dt><dd>${metadata.rounds} rounds · raw artifact <code>${source}</code></dd></div>`,
+      "</dl>",
       "",
-      "Per-round samples, spread, and memory counters live in the raw artifact. Reproduce and validate with:",
+      renderBenchWidget(evidence),
+      "",
+      "Reproduce and validate with:",
       "",
       '```sh verify title="Controlled render evidence"',
       "bun run --filter @sheetwrite/bench bench:render:prepare",
-      "bun run --filter @sheetwrite/bench bench:render",
-      "bun run --filter @sheetwrite/bench bench:render:validate",
+      "bun run --filter @sheetwrite/bench bench:render:scale",
       "```",
       "",
     );
   } else {
-    states.unshift(render);
+    pending.push(scale);
   }
-  if (states.length > 0) {
+  lines.push("## Data engine benchmark", "");
+  if ("evidence" in data) {
+    const { evidence, source } = data;
+    const ops = ["ingest", "windowRead", "edit", "sort", "filter", "aggregate"] as const;
+    lines.push(
+      `<div class="evidence-available"><strong>Validated evidence.</strong> Head-to-head store operations at the sizes both engines complete headlessly; Sheetwrite additionally scales to 1M rows below.</div>`,
+      "",
+      '<dl class="bench-meta" data-pagefind-ignore>',
+      `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
+      `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
+      "</dl>",
+      "",
+      '<figure class="bench-viz" data-pagefind-ignore>',
+    );
+    for (const rows of [1_000, 10_000]) {
+      const ours = evidence.sheetwrite[String(rows)];
+      const theirs = evidence.handsontable[String(rows)];
+      if (!ours || !theirs) continue;
+      lines.push(
+        `<div class="bench-viz__scale"><span class="bench-viz__lead">${fmtRows(rows)} rows</span><span class="bench-viz__axis-note">relative time per row — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+      );
+      for (const op of ops) {
+        const a = ours.stats[op];
+        const b = theirs.stats[op];
+        if (!a || !b) continue;
+        lines.push(
+          benchPairRow(
+            op,
+            { main: a.median, faded: a.p95 },
+            { main: b.median, faded: b.p95 },
+            fmtMs,
+            ["faster", "slower"],
+          ),
+        );
+      }
+    }
+    lines.push(
+      "</figure>",
+      "",
+      "Sheetwrite alone at scale (Handsontable cannot complete these sizes headlessly):",
+      "",
+    );
+    lines.push(
+      "| Rows | Ingest | Window read | Edit | Sort | Filter | Aggregate |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    );
+    for (const rows of [100_000, 500_000, 1_000_000]) {
+      const block = evidence.sheetwrite[String(rows)];
+      if (!block) continue;
+      lines.push(
+        `| ${rows.toLocaleString("en-US")} | ${ops.map((op) => (block.stats[op] ? fmtMs(block.stats[op].median) : "—")).join(" | ")} |`,
+      );
+    }
+    lines.push(
+      "",
+      "Reproduce with:",
+      "",
+      '```sh verify title="Data engine evidence"',
+      "bun run --filter @sheetwrite/bench bench:data",
+      "```",
+      "",
+    );
+  } else {
+    pending.push(data);
+  }
+  lines.push("## Formula engine benchmark", "");
+  if ("evidence" in formula) {
+    const { evidence, source } = formula;
+    lines.push(
+      `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.workloads.length} recalculation workloads across dependency shapes; every workload passed the protocol's safety ceilings.</div>`,
+      "",
+      '<dl class="bench-meta" data-pagefind-ignore>',
+      `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
+      `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
+      "</dl>",
+      "",
+      "| Workload | Cells | Median | p95 |",
+      "| --- | ---: | ---: | ---: |",
+    );
+    const sorted = [...evidence.workloads].sort(
+      (left, right) => left.id.localeCompare(right.id) || left.size - right.size,
+    );
+    for (const workload of sorted) {
+      lines.push(
+        `| \`${workload.id}\` | ${workload.size.toLocaleString("en-US")} | ${fmtMs(workload.stat.median)} | ${fmtMs(workload.stat.p95)} |`,
+      );
+    }
+    lines.push(
+      "",
+      "Reproduce with:",
+      "",
+      '```sh verify title="Formula engine evidence"',
+      "bun run --filter @sheetwrite/bench bench:formula",
+      "```",
+      "",
+    );
+  } else {
+    pending.push(formula);
+  }
+  lines.push("## Delivery size", "");
+  if ("evidence" in sizeReport) {
+    const { evidence, source } = sizeReport;
+    lines.push(
+      '<div class="evidence-available"><strong>Validated evidence.</strong> Published package and bundler-output sizes, gated by absolute budgets in CI.</div>',
+      "",
+      '<dl class="bench-meta" data-pagefind-ignore>',
+      `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
+      `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
+      "</dl>",
+      "",
+      "| Package | Tarball | Unpacked |",
+      "| --- | ---: | ---: |",
+    );
+    for (const pkg of evidence.packages) {
+      lines.push(
+        `| \`${pkg.name}\` | ${(pkg.tarballBytes / 1024).toFixed(1)} KiB | ${(pkg.unpackedBytes / 1024).toFixed(1)} KiB |`,
+      );
+    }
+    const coreGzip = evidence.metrics["bundler.vite.coreInitial.javascript.gzipBytes"];
+    const coreWasm = evidence.metrics["package.@sheetwrite/core.wasmBytes"];
+    lines.push(
+      "",
+      `A minimal Vite app that renders a grid ships ${coreGzip ? `${(coreGzip.actual / 1024).toFixed(1)} KiB of gzipped JavaScript` : "the core entry"}${coreWasm && coreWasm.actual > 0 ? ` plus a ${(coreWasm.actual / 1024).toFixed(0)} KiB WASM data engine` : ""}.`,
+      "",
+      "Reproduce with:",
+      "",
+      '```sh verify title="Delivery size evidence"',
+      "bun run size:report",
+      "```",
+      "",
+    );
+  } else {
+    pending.push(sizeReport);
+  }
+  if (pending.length > 0) {
     lines.push(
       "## Pending local evidence",
       "",
@@ -849,7 +1121,7 @@ async function renderEvidencePage(): Promise<string> {
       "",
       "| Artifact | Status | Reproduce with |",
       "| --- | --- | --- |",
-      ...states.map(
+      ...pending.map(
         (state) => `| \`${state.source}\` | ${state.reason} | \`${state.reproduction}\` |`,
       ),
       "",

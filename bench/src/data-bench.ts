@@ -33,6 +33,7 @@
 
 // Side-effecting DOM bootstrap MUST be first so Handsontable boots headlessly.
 import "./dom-setup.js";
+import { protocolCaptureMeta } from "./protocol-meta.js";
 
 import { readFileSync } from "node:fs";
 import type { Column, Workbook } from "@sheetwrite/core";
@@ -189,6 +190,9 @@ export interface DataBenchmarkResult extends GateIdentity {
     readonly bun: string;
     readonly platform: string;
     readonly arch: string;
+    readonly commit: string;
+    readonly dirty: boolean;
+    readonly timestamp: string;
     readonly sheetwriteRows: readonly number[];
     readonly handsontableRows: readonly number[];
   };
@@ -883,6 +887,7 @@ function dataResult(
       bun: Bun.version,
       platform: process.platform,
       arch: process.arch,
+      ...protocolCaptureMeta(),
       sheetwriteRows: [...sheetwrite.keys()],
       handsontableRows: [...handsontable.keys()],
     },

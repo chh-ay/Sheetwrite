@@ -1888,30 +1888,38 @@ body .sw-code-popover__accessible-signature {
   text-align: right;
 }
 
-/* Decade labels sit at generator-computed offsets over the track column. */
-.bench-viz__axis {
-  position: relative;
+.bench-viz__axis-note {
   grid-area: axis;
-  height: 0.9rem;
-  letter-spacing: 0;
-  text-transform: none;
+  color: var(--sw-fg-dim);
+  letter-spacing: 0.05em;
+  text-align: center;
 }
 
-.bench-viz__axis i {
-  position: absolute;
-  bottom: 0;
-  transform: translateX(-50%);
-  font-style: normal;
-  white-space: nowrap;
+/* Capture provenance: labeled grid instead of a run-on sentence. */
+.bench-meta {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 1.6rem;
 }
 
-/* Edge ticks hang inward so the axis never overflows the track column. */
-.bench-viz__axis i:first-child {
-  transform: none;
+.bench-meta div {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: baseline;
 }
 
-.bench-viz__axis i:last-child {
-  transform: translateX(-100%);
+.bench-meta dt {
+  color: var(--sw-fg-dim);
+  font: 650 0.62rem / 1.8 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bench-meta dd {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.85rem;
 }
 
 .bench-viz__row {
@@ -1999,10 +2007,6 @@ body .sw-code-popover__accessible-signature {
   bottom: 0;
 }
 
-.bench-bar__tick {
-  width: 1px;
-  background: color-mix(in srgb, var(--sw-fg-dim) 22%, transparent);
-}
 
 .bench-bar__fill {
   left: 0;
@@ -2026,17 +2030,28 @@ body .sw-code-popover__accessible-signature {
 }
 
 .bench-bar__value {
+  display: flex;
+  gap: 0.7rem;
+  justify-content: flex-end;
   grid-area: value;
-  color: var(--sw-fg-strong);
   font: 500 0.76rem / 1.4 var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
-.bench-bar__value small {
-  margin-left: 0.45rem;
-  color: var(--sw-fg-dim);
-  font-size: 0.66rem;
+/* Stat colors mirror the legend swatches: bright = median, faded = p95. */
+.bench-num {
+  font-weight: 600;
+  font-style: normal;
+}
+
+.bench-num[data-stat="median"] {
+  color: var(--sw-fg-strong);
+}
+
+.bench-num[data-stat="p95"] {
+  color: color-mix(in srgb, var(--sw-fg-dim) 80%, transparent);
+  font-weight: 500;
 }
 
 /* Header legend: real swatches teach the fill/tail encoding at a glance. */
@@ -2088,4 +2103,105 @@ body .sw-code-popover__accessible-signature {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0.3rem;
   }
+}
+
+/* ---- Benchmark widget: size x metric CSS-only tabs (no client JS) ---- */
+
+/* Radios stay focusable (arrow keys switch tabs); labels are the visual UI. */
+.bench-widget > input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bench-widget__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.bench-tabs {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.55rem;
+  background: var(--sw-surface-1);
+}
+
+.bench-tabs label {
+  padding: 0.42rem 0.85rem;
+  color: var(--sw-fg-muted);
+  font: 600 0.72rem / 1.4 var(--sw-font-mono);
+  cursor: pointer;
+  user-select: none;
+}
+
+.bench-tabs label + label {
+  border-left: 1px solid var(--sw-border);
+}
+
+.bench-tabs label:hover {
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-2);
+}
+
+.bench-panel {
+  display: none;
+}
+
+/* Active tab + visible panel wiring; inputs precede everything they select. */
+#bench-size-1000:checked ~ .bench-widget__tabs label[for="bench-size-1000"],
+#bench-size-10000:checked ~ .bench-widget__tabs label[for="bench-size-10000"],
+#bench-size-100000:checked ~ .bench-widget__tabs label[for="bench-size-100000"],
+#bench-size-1000000:checked ~ .bench-widget__tabs label[for="bench-size-1000000"],
+#bench-metric-speed:checked ~ .bench-widget__tabs label[for="bench-metric-speed"],
+#bench-metric-memory:checked ~ .bench-widget__tabs label[for="bench-metric-memory"] {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
+}
+
+#bench-size-1000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="1000"][data-metric="speed"],
+#bench-size-1000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="1000"][data-metric="memory"],
+#bench-size-10000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="10000"][data-metric="speed"],
+#bench-size-10000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="10000"][data-metric="memory"],
+#bench-size-100000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="100000"][data-metric="speed"],
+#bench-size-100000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="100000"][data-metric="memory"],
+#bench-size-1000000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="1000000"][data-metric="speed"],
+#bench-size-1000000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="1000000"][data-metric="memory"] {
+  display: block;
+}
+
+/* Keyboard focus on the hidden radios surfaces on the active label. */
+#bench-size-1000:focus-visible ~ .bench-widget__tabs label[for="bench-size-1000"],
+#bench-size-10000:focus-visible ~ .bench-widget__tabs label[for="bench-size-10000"],
+#bench-size-100000:focus-visible ~ .bench-widget__tabs label[for="bench-size-100000"],
+#bench-size-1000000:focus-visible ~ .bench-widget__tabs label[for="bench-size-1000000"],
+#bench-metric-speed:focus-visible ~ .bench-widget__tabs label[for="bench-metric-speed"],
+#bench-metric-memory:focus-visible ~ .bench-widget__tabs label[for="bench-metric-memory"] {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+}
+
+/* An engine that never finished lays it down honestly. */
+.bench-bar[data-crashed] {
+  grid-template-columns: var(--bench-label) minmax(0, 1fr);
+}
+
+.bench-crash {
+  padding: 0.1rem 0.6rem;
+  border: 1px dashed color-mix(in srgb, var(--sw-type-number) 55%, var(--sw-border));
+  border-radius: 0.35rem;
+  color: var(--sw-type-number);
+  font: 600 0.68rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  justify-self: start;
+}
+
+.bench-viz__ratio[data-kind="crashed"],
+.bench-viz__ratio[data-kind="solo"] {
+  color: var(--sw-type-number);
 }

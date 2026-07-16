@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { protocolCaptureMeta } from "./protocol-meta.js";
 import { CellStore, initSync } from "@sheetwrite/wasm";
 import {
   diamondFormulas,
@@ -42,6 +43,8 @@ export interface FormulaBenchmarkResult extends GateIdentity {
     bun: string;
     platform: string;
     arch: string;
+    commit: string;
+    dirty: boolean;
     timestamp: string;
   };
   workloads: FormulaWorkloadResult[];
@@ -684,7 +687,7 @@ async function runBenchmark(smoke: boolean): Promise<void> {
       bun: Bun.version,
       platform: process.platform,
       arch: process.arch,
-      timestamp: new Date().toISOString(),
+      ...protocolCaptureMeta(),
     },
     workloads,
     memory,

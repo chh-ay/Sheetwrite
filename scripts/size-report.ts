@@ -108,6 +108,8 @@ export interface SizeReport {
   schemaVersion: number;
   protocolVersion: number;
   tool: { name: string; version: string };
+  /** Protocol-binding capture stamp; the docs evidence page requires it. */
+  meta: { commit: string; dirty: boolean; timestamp: string };
   toolchain: Record<string, string>;
   metrics: Record<string, Metric>;
   packages: PackageReport[];
@@ -899,6 +901,13 @@ async function buildSizeReport(
       schemaVersion: SIZE_PROTOCOL_VERSION,
       protocolVersion: SIZE_PROTOCOL_VERSION,
       tool: { name: SIZE_TOOL_NAME, version: SIZE_TOOL_VERSION },
+      meta: {
+        commit: (await runCommand(["git", "rev-parse", "HEAD"])).trim(),
+        dirty:
+          (await runCommand(["git", "status", "--porcelain", "--untracked-files=no"])).trim()
+            .length > 0,
+        timestamp: new Date().toISOString(),
+      },
       toolchain: {
         bun: Bun.version,
         next: bundlers.find((entry) => entry.name === "next")?.version ?? "missing",
