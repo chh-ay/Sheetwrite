@@ -13,7 +13,7 @@ Sheetwrite intentionally implements a coherent spreadsheet subset. It does **not
 
 A formula is a `CellValue` with `kind: "formula"`. The leading `=` is optional at the storage API, although UI input conventionally includes it.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 grid.store.applyTransaction({
   patches: [
     {
@@ -77,7 +77,7 @@ A1 cells (`A1`, `$B12`, `AA$3`), normalized rectangles (`A1:B3`), and cross-shee
 
 Named ranges are document operations and snapshot metadata:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 store.applyTransaction({
   patches: [
     {
@@ -134,7 +134,7 @@ Dates are numbers: whole days since the spreadsheet epoch, with a fractional day
 
 `TODAY` and `NOW` are volatile, but never consult the clock during paint or ordinary dependency reads. The host captures one absolute instant and triggers a barrier:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 store.recalculateVolatile(new Date("2026-07-13T18:00:00.000Z"));
 ```
 
@@ -179,7 +179,7 @@ While editing a formula, clicking a cell inserts its A1 reference and dragging i
 
 The same `$`-aware utility is public:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 import { shiftA1Refs } from "@sheetwrite/core";
 
 shiftA1Refs("A1 + $B$1", 0, 1); // "B1 + $B$1"

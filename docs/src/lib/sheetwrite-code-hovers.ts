@@ -18,6 +18,7 @@ import {
 import { SheetwriteTypeEngine, type SheetwriteTypeHover } from "./sheetwrite-type-engine.js";
 
 const SUPPORTED_LANGUAGES = new Set(["ts", "tsx", "vue", "svelte"]);
+const LOW_QUALITY_HOVER = /\bany\b|\/\*unresolved\*\//;
 const LEADING_KIND = /^\(([\w-]+)\)\s+/gm;
 const IMPORT_SUFFIX = /\nimport .*$/s;
 const TYPE_MEMBER = /^[A-Z]\w*(<[^>]*>)?:/;
@@ -125,6 +126,9 @@ function resolvedQuickInfo(hover: SheetwriteTypeHover, language: string): string
     return "const Sheetwrite: DefineComponent";
   }
   return signature;
+}
+export function isHighQualityHover(hover: SheetwriteTypeHover, language = "ts"): boolean {
+  return hover.origin === "lib" || !LOW_QUALITY_HOVER.test(resolvedQuickInfo(hover, language));
 }
 
 function svelteScriptDocumentation(
@@ -334,7 +338,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           codeBlock.language as "ts" | "tsx" | "vue" | "svelte",
           analyzer,
           codeBlock.metaOptions.getString("prelude"),
-        );
+        ).filter((hover) => isHighQualityHover(hover, codeBlock.language));
 
         for (const hover of hovers) {
           const line = codeBlock.getLine(hover.line);

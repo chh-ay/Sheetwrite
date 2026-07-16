@@ -27,7 +27,7 @@ Use **`SheetwriteGrid`** for an advanced `Workbook` plus eager data or a `DataSo
 
 The imperative core has one ownership mode: the host supplies the workbook and data, awaits runtime initialization, and destroys the returned grid.
 
-```ts partial="requires workbook and data declarations" title="Vanilla lifecycle"
+```ts prelude="framework" partial="requires workbook and data declarations" title="Vanilla lifecycle"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
 
 await initSheetwrite();
@@ -40,7 +40,7 @@ grid.destroy();
   </TabItem>
   <TabItem label="React">
 
-```tsx partial="requires component-owned columns and rows" title="React ownership"
+```tsx prelude="react" partial="requires component-owned columns and rows" title="React ownership"
 <Sheetwrite
   columns={columns}
   defaultRows={rows}
@@ -49,7 +49,7 @@ grid.destroy();
 />
 ```
 
-```tsx partial="requires workbook and datasource declarations" title="React advanced grid"
+```tsx prelude="react" partial="requires workbook and datasource declarations" title="React advanced grid"
 <SheetwriteGrid
   ref={gridRef}
   workbook={workbook}
@@ -63,7 +63,7 @@ grid.destroy();
   </TabItem>
   <TabItem label="Vue">
 
-```vue partial="requires component-owned columns and rows" title="Vue ownership"
+```vue prelude="vue" partial="requires component-owned columns and rows" title="Vue ownership"
 <Sheetwrite
   :columns="columns"
   :default-rows="rows"
@@ -72,7 +72,7 @@ grid.destroy();
 />
 ```
 
-```vue partial="requires workbook and datasource declarations" title="Vue advanced grid"
+```vue prelude="vue" partial="requires workbook and datasource declarations" title="Vue advanced grid"
 <SheetwriteGrid
   ref="gridRef"
   :workbook="workbook"
@@ -86,22 +86,25 @@ grid.destroy();
   </TabItem>
   <TabItem label="Svelte">
 
-```svelte partial="requires component-owned columns and rows" title="Svelte ownership"
-<Sheetwrite
-  {columns}
-  defaultRows={rows}
-  onGridChange={persist}
-  onReady={({ grid, generation, reason }) => observe(grid, generation, reason)}
-/>
+```svelte prelude="svelte" partial="requires component-owned columns and rows" title="Svelte ownership"
+<script lang="ts">
+  import type { GridReadyEvent } from "@sheetwrite/core/adapter";
+  const handleReady = ({ grid, generation, reason }: GridReadyEvent) =>
+    observe(grid, generation, reason);
+</script>
+
+<Sheetwrite {columns} defaultRows={rows} onGridChange={persist} onReady={handleReady} />
 ```
 
-```svelte partial="requires workbook and datasource declarations" title="Svelte advanced grid"
-<SheetwriteGrid
-  bind:this={gridRef}
-  {workbook}
-  {dataSource}
-  onReady={({ grid }) => connect(grid)}
-/>
+```svelte prelude="svelte" partial="requires workbook and datasource declarations" title="Svelte advanced grid"
+<script lang="ts">
+  import type { Grid } from "@sheetwrite/core";
+  import type { GridReadyEvent } from "@sheetwrite/core/adapter";
+  let gridRef: Grid | undefined;
+  const handleReady = ({ grid }: GridReadyEvent) => connect(grid);
+</script>
+
+<SheetwriteGrid bind:this={gridRef} {workbook} {dataSource} onReady={handleReady} />
 ```
 
 `defaultRows` seeds the document once. A new `resetKey`, source, workbook, or structural column schema creates a new generation.
@@ -133,7 +136,7 @@ Structural changes are different:
 
 `onGridChange` receives committed transactions. `transaction.patches` is the exhaustive document operation list; `changes` is the cell-level compatibility view.
 
-```ts partial="requires an operation queue" title="Persist committed transactions"
+```ts prelude="framework" partial="requires an operation queue" title="Persist committed transactions"
 function persist(event: ChangeEvent): void {
   if (event.source === "local") operationQueue.push(...event.transaction.patches);
 }

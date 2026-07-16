@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
+import { collectFenceHovers, isHighQualityHover } from "../docs/src/lib/sheetwrite-code-hovers.js";
+import { SheetwriteTypeEngine } from "../docs/src/lib/sheetwrite-type-engine.js";
 import {
   type ApiEntryPoint,
   type ApiExport,
@@ -837,6 +839,10 @@ export function parseFences(content: string): Fence[] {
   }
   return fences;
 }
+function fenceMetaValue(meta: string, name: string): string | undefined {
+  const match = new RegExp(`(?:^|\\s)${name}=(?:"([^"]+)"|'([^']+)')`).exec(meta);
+  return match?.[1] ?? match?.[2];
+}
 
 function maskCode(content: string): string {
   return content
@@ -1008,6 +1014,7 @@ async function validateMarkdown(
   manifest: PublicApiManifest,
 ): Promise<string[]> {
   const failures: string[] = [];
+  const hoverAnalyzer = new SheetwriteTypeEngine({ cwd: join(repositoryRoot, "docs") });
   const compiled: Array<{ document: MarkdownDocument; fence: Fence }> = [];
   for (const document of documents) {
     let fences: Fence[];
@@ -1027,6 +1034,34 @@ async function validateMarkdown(
         failures.push(
           `${posix(relative(repositoryRoot, document.path))}:${fence.line} code fence is not compile-checked or explicitly classified`,
         );
+      }
+      const typedLanguage =
+        fence.language === "ts" ||
+        fence.language === "tsx" ||
+        fence.language === "vue" ||
+        fence.language === "svelte";
+      const generated = /(?:^|\s)generated(?:\s|$)/.test(fence.meta);
+      const partial = /(?:^|\s)partial=(?:"[^"]+"|'[^']+')/.test(fence.meta);
+      const prelude = fenceMetaValue(fence.meta, "prelude");
+      if (typedLanguage && !generated) {
+        if (partial && prelude === undefined) {
+          failures.push(
+            `${posix(relative(repositoryRoot, document.path))}:${fence.line} typed partial fence requires a named hover prelude`,
+          );
+        }
+        try {
+          const hovers = collectFenceHovers(fence.code, fence.language, hoverAnalyzer, prelude);
+          for (const hover of hovers) {
+            if (isHighQualityHover(hover, fence.language)) continue;
+            failures.push(
+              `${posix(relative(repositoryRoot, document.path))}:${fence.line + hover.line} low-quality hover for ${hover.target}: ${hover.text}`,
+            );
+          }
+        } catch (error) {
+          failures.push(
+            `${posix(relative(repositoryRoot, document.path))}:${fence.line} hover analysis failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       }
       if (/(?:^|\s)compile(?:\s|$)/.test(fence.meta)) {
         if (fence.language !== "ts" && fence.language !== "tsx") {

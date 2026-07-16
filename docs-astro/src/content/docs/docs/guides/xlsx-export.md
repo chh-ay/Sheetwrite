@@ -11,7 +11,7 @@ bun add @sheetwrite/xlsx
 
 Register it once before invoking grid XLSX actions or the core workbook/table functions:
 
-```ts partial="requires an initialized grid" title="Register and export"
+```ts prelude="core" partial="requires an initialized grid" title="Register and export"
 import "@sheetwrite/xlsx/register";
 
 await grid.exportXlsx("sales.xlsx");

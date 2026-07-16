@@ -48,8 +48,8 @@ current scroll offset and viewport height into a half-open row range
 `[start, end)`, padded by `overscan` rows on each side so a fast scroll reveals
 already-painted rows:
 
-```ts partial="requires surrounding host state" title="Partial example"
-computeWindow(index, contentTop, viewportHeight, overscan): { start: number; end: number }
+```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
+declare function computeWindow(index: unknown, contentTop: number, viewportHeight: number, overscan: number): { start: number; end: number };
 ```
 
 Row positions come from an `OffsetIndex` — a Fenwick (binary-indexed) tree over
@@ -62,11 +62,11 @@ size the scroll sizer to the true content height. `ScaledScroll` pins the DOM
 sizer to the cap (`MAX_ELEMENT_HEIGHT = 33_000_000`) and maps the capped scrollbar
 position linearly onto the real virtual range:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
 // DOM scrollTop -> content-space offset (identity below the cap)
-toContent(scrollTop): number
+declare function toContent(scrollTop: number): number;
 // content-space offset -> DOM scrollTop
-toScroll(contentOffset): number
+declare function toScroll(contentOffset: number): number;
 ```
 
 Below the cap the mapping is the identity; above it, scrolling stays smooth while
@@ -88,14 +88,18 @@ until the next store mutation or window refresh.
 
 The full interface:
 
-```ts partial="requires surrounding host state" title="Partial example"
-interface Store {
+```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
+interface StoreContract {
   getWorkbook(): Workbook;
   getCell(addr: CellAddress): ResolvedCell;
-  getVisibleWindow(sheet, rows: { start; end }, cols: readonly number[]): VisibleWindowView;
-  applyTransaction(tx, { source?, commitReason? }): ApplyTransactionResult;
-  on("change", fn): () => void;                              // returns an unsubscribe
-  acknowledgeOperations?(operations: readonly DocumentOp[]): void;             // release paged dirty-cell pins after acknowledgement
+  getVisibleWindow(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+  ): VisibleWindowView;
+  applyTransaction: Store["applyTransaction"];
+  on: Store["on"];
+  acknowledgeOperations?(operations: readonly DocumentOp[]): void;
 }
 ```
 
@@ -119,7 +123,7 @@ mutation-ID record. Direct `Store.applyTransaction` calls deliberately bypass
 grid read-only/history policy. Remote operations remain observable with
 `source: "remote"` but enter neither local history nor outgoing synchronization.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
 const checked = validateWorkbookSnapshot(JSON.parse(payload));
 if (!checked.ok) throw new Error(checked.errors[0]?.message);
 
@@ -142,7 +146,7 @@ or undo entry. Export uses one bulk data-order read per sheet, ignores local
 sort/filter views and conditional render styles, and emits deterministic sparse
 blocks.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 const saved = await adapter.load(documentId, signal);
 const grid = createGridFromSnapshot(host, saved);
 const sync = new SyncCoordinator(grid, adapter, {
@@ -201,7 +205,7 @@ no-ops when the grid is read-only.
 
 A cell value is one of three shapes:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
 type CellValue =
   | { kind: "literal"; value: string | number | boolean | null }
   | { kind: "ref"; target: CellAddress } // a plain cross-reference
@@ -221,7 +225,7 @@ real sheet, is to put them in **row 0** (the first data row) and style them
 yourself. The live [Vanilla example](/vanilla/) reserves row 0 and writes a
 styled header band over it once the initial page loads:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
 const FIELD_HEADERS = ["ID", "Date", "Customer", "City", "Amount"];
 
 function applyFieldHeader(): void {

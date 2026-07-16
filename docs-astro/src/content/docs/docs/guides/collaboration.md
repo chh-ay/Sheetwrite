@@ -11,7 +11,7 @@ Load a validated snapshot before mounting, then let one `SyncCoordinator`
 observe local grid transactions. Do not also save `event.changes`: that list is
 cell-oriented rollback detail and omits document metadata operations.
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import {
   createGridFromSnapshot,
   SyncCoordinator,
@@ -55,7 +55,7 @@ remove that mutation. A transport error leaves the immutable record pending.
 
 An HTTP adapter can stay transport-neutral at the core boundary:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import type {
   PersistenceAdapter,
   PersistenceCommitRequest,
@@ -149,7 +149,7 @@ Await `coordinator.ready()` before declaring startup synchronized. Use `initialC
 
 The browser IndexedDB implementation is intentionally isolated from Node and SSR entrypoints:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import { SyncCoordinator } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 
@@ -189,7 +189,7 @@ returns both `operationsSinceBase` and a current snapshot, the host can gate
 every pending transaction through the conservative rebaser, clear the old
 durable IDs, remount, and submit the safe results as new mutations:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import {
   createGridFromSnapshot,
   rebaseDocumentOperations,

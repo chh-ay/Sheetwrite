@@ -15,7 +15,7 @@ fill, paste, and restyling) while leaving navigation and selection intact.
 
 A `Selection` is one of five shapes:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 type Selection =
   | { kind: "cell"; addr: CellAddress }
   | { kind: "range"; range: Range }
@@ -26,7 +26,7 @@ type Selection =
 
 Read or set it imperatively, and subscribe to changes:
 
-```ts partial="requires surrounding host state" title="Partial example"
+```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 const sel = grid.getSelection();
 grid.setSelection({ kind: "cell", addr: { sheet: "sheet1", row: 0, col: 0 } });
 grid.setSelection(null); // clear
