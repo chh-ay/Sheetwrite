@@ -8,6 +8,7 @@ import viteReact from "@vitejs/plugin-react";
 import vue from "@vitejs/plugin-vue";
 import rehypeExpressiveCode from "rehype-expressive-code";
 import rehypeRaw from "rehype-raw";
+import rehypeSlug from "rehype-slug";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
@@ -75,6 +76,8 @@ export default defineConfig({
           ],
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          // Prerendered heading ids: fragment links must resolve before hydration.
+          rehypeSlug,
           markResponsiveCodeBlocks,
         ],
       }),
