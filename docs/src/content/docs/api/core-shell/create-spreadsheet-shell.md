@@ -11,12 +11,14 @@ sheet workbooks only) and a selection status. The host must have a real
 size; the shell fills it. Returns the shell handle; `destroy` tears down
 every piece, the grid, and the shell DOM, and is safe to call twice.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/shell/spreadsheet-shell.ts#L59</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function createSpreadsheetShell(
@@ -24,3 +26,5 @@ function createSpreadsheetShell(
   options: SpreadsheetShellOptions,
 ): SpreadsheetShell
 ```
+
+</div>

@@ -9,13 +9,17 @@ CSV (UTF-8 BOM, CRLF). String values are injection-hardened (a leading
 `= + - @ \t \r` is prefixed with `'`). Reads the whole sheet as one bulk
 window, not cell-by-cell.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L46</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function toCsv(sheet: Sheet, store: Store): string
 ```
+
+</div>

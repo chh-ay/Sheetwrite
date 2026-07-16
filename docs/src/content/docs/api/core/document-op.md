@@ -7,14 +7,14 @@ description: "Exhaustive serializable operation union for workbook mutations."
 
 Exhaustive serializable operation union for workbook mutations.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L262</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">27</span>
+## Variants <span class="api-count" data-pagefind-ignore>27</span>
 
-<div class="api-variant-list">
+<div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
 ```ts generated
@@ -278,7 +278,7 @@ Exhaustive serializable operation union for workbook mutations.
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

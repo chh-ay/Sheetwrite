@@ -6,7 +6,7 @@ description: "API reference for @sheetwrite/core/shell."
 
 **Supported public entry point.** Import this entry point as `@sheetwrite/core/shell`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/shell.d.ts</code></dd></div>
 <div><dt>Exports</dt><dd>13</dd></div>
 </dl>
@@ -15,7 +15,7 @@ Source entry: `packages/core/src/shell.ts`
 
 ## Exported symbols
 
-### Functions <span class="api-count">6</span>
+### Functions <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-shell/create-formula-bar/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createFormulaBar</code></span><span class="api-symbol-card__desc">Detached formula bar: mirrors the focused cell's editable text (exact formula source, else literal text) and commits on Enter through the grid's undoable transaction path, targeting the data address captured with the…</span></a>
@@ -26,7 +26,7 @@ Source entry: `packages/core/src/shell.ts`
 <a class="api-symbol-card" href="/docs/api/core-shell/describe-selection/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>describeSelection</code></span><span class="api-symbol-card__desc">Human phrase for a selection's geometry; blank for null/single-cell.</span></a>
 </div>
 
-### Interfaces <span class="api-count">7</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-shell/formula-bar-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>FormulaBarOptions</code></span><span class="api-symbol-card__desc">Host elements and callbacks used to bind a formula bar to a Grid.</span></a>

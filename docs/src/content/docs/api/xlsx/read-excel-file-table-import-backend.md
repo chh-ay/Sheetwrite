@@ -7,13 +7,17 @@ description: "Default first-sheet table import backend."
 
 Default first-sheet table import backend.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-import.ts#L58</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 const readExcelFileTableImportBackend: XlsxTableImportBackend
 ```
+
+</div>

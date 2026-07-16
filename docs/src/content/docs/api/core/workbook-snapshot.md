@@ -7,12 +7,12 @@ description: "Schema-versioned serializable workbook document."
 
 Schema-versioned serializable workbook document.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L250</code></dd></div>
 </dl>
 
-## Members <span class="api-count">5</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -64,7 +64,7 @@ sheets: SheetSnapshot[];
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

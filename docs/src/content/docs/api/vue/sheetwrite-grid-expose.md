@@ -7,12 +7,12 @@ description: "Imperative Grid handle exposed by the Vue advanced component."
 
 Imperative Grid handle exposed by the Vue advanced component.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L42</code></dd></div>
 </dl>
 
-## Members <span class="api-count">1</span>
+## Members <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-member-list">
 
@@ -28,7 +28,7 @@ grid: Grid | null;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

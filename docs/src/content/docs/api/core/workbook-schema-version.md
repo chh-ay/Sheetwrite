@@ -7,13 +7,17 @@ description: "Current workbook snapshot schema version accepted by Sheetwrite."
 
 Current workbook snapshot schema version accepted by Sheetwrite.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L5</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 const WORKBOOK_SCHEMA_VERSION: 1
 ```
+
+</div>

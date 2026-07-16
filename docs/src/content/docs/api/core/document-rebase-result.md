@@ -7,14 +7,14 @@ description: "Successful rebased operations or a conservative rebase conflict."
 
 Successful rebased operations or a conservative rebase conflict.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L23</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">2</span>
+## Variants <span class="api-count" data-pagefind-ignore>2</span>
 
-<div class="api-variant-list">
+<div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
 ```ts generated
@@ -33,7 +33,7 @@ Successful rebased operations or a conservative rebase conflict.
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

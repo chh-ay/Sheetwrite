@@ -7,14 +7,14 @@ description: "Serializable condition enforced by a data-validation rule."
 
 Serializable condition enforced by a data-validation rule.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L97</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">5</span>
+## Variants <span class="api-count" data-pagefind-ignore>5</span>
 
-<div class="api-variant-list">
+<div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
 ```ts generated
@@ -62,7 +62,7 @@ Serializable condition enforced by a data-validation rule.
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

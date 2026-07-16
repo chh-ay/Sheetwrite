@@ -7,12 +7,12 @@ description: "Tabular workbook model exchanged with the optional XLSX table back
 
 Tabular workbook model exchanged with the optional XLSX table backend.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L74</code></dd></div>
 </dl>
 
-## Members <span class="api-count">2</span>
+## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
@@ -37,7 +37,7 @@ options: SheetOptions<Blob>;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

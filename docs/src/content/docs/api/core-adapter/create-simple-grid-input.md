@@ -7,15 +7,19 @@ description: "Converts simple columns and row objects into canonical workbook an
 
 Converts simple columns and row objects into canonical workbook and columnar input.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L193</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function createSimpleGridInput<
   Row extends Record<string, CellScalar>,
 >(options: SimpleSheetwriteOptions<Row>): SimpleGridInput
 ```
+
+</div>

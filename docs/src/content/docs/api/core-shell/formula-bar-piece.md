@@ -7,12 +7,12 @@ description: "A formula bar piece; setReadOnly blocks commits without unmounting
 
 A formula bar piece; `setReadOnly` blocks commits without unmounting.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L124</code></dd></div>
 </dl>
 
-## Members <span class="api-count">1</span>
+## Members <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-member-list">
 
@@ -28,7 +28,7 @@ setReadOnly(readOnly: boolean): void;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

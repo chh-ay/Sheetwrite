@@ -669,4 +669,15 @@ test.describe("documentation site", () => {
       .fill("XLSX browser verification");
     await expect(page.locator(`a[href^='${SITE_BASE}/test/']`)).toHaveCount(0);
   });
+
+  test("member deep links open and emphasize the target row", async ({ page }) => {
+    // The search-anchor form: the fragment targets a hidden h3, and the
+    // following collapsed details row must open and carry the emphasis flag.
+    await page.goto(docsUrl("api/core/grid/#applytransaction"));
+    await waitForHydration(page);
+    const member = page.locator("#grid-apply-transaction");
+    await expect(member).toHaveAttribute("open", "");
+    await expect(member).toHaveAttribute("data-revealed", "");
+    await expect(member.locator(".expressive-code").first()).toBeVisible();
+  });
 });

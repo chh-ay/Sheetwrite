@@ -11,13 +11,17 @@ grouping (`,`), and whitespace, and reads accounting-style parentheses
 (`(1,234.50)`) as a negative amount. Grouping/decimals follow the US locale the
 renderer uses.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/cell-input.ts#L74</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function parseCurrencyInput(raw: string): number | null
 ```
+
+</div>

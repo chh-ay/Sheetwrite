@@ -7,12 +7,14 @@ description: "Convenience component for local object rows with live option updat
 
 Convenience component for local object rows with live option updates.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L268</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 const Sheetwrite: DefineComponent<
@@ -103,3 +105,5 @@ const Sheetwrite: DefineComponent<
   any
 >
 ```
+
+</div>

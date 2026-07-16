@@ -13,12 +13,12 @@ transferred during paint, so main-thread code must not read it after `paint`.
 
 Lifetime: valid until the next store mutation or window refresh.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L29</code></dd></div>
 </dl>
 
-## Members <span class="api-count">14</span>
+## Members <span class="api-count" data-pagefind-ignore>14</span>
 
 <div class="api-member-list">
 
@@ -152,7 +152,7 @@ ffiCalls?: number;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

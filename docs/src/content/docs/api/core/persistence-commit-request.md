@@ -7,12 +7,12 @@ description: "Cancellable pending commit submitted to a persistence adapter."
 
 Cancellable pending commit submitted to a persistence adapter.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L88</code></dd></div>
 </dl>
 
-## Members <span class="api-count">1</span>
+## Members <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-member-list">
 
@@ -28,7 +28,7 @@ signal?: AbortSignal;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

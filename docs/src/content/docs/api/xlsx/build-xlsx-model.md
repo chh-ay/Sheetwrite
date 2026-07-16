@@ -7,12 +7,14 @@ description: "Build the default writer's complete active-sheet model without ser
 
 Build the default writer's complete active-sheet model without serializing it.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L80</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function buildXlsxModel(
@@ -20,3 +22,5 @@ function buildXlsxModel(
   store: Store,
 ): XlsxModel | null
 ```
+
+</div>

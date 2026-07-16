@@ -7,12 +7,12 @@ description: "A highlight target: a range plus an optional per-range color overr
 
 A highlight target: a range plus an optional per-range color override.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/coordinates.ts#L30</code></dd></div>
 </dl>
 
-## Members <span class="api-count">1</span>
+## Members <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-member-list">
 
@@ -28,7 +28,7 @@ color?: string;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

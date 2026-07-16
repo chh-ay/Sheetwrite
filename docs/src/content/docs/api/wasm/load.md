@@ -11,15 +11,19 @@ call rejects; a different-source call after success warns and no-ops; a
 rejected init is retryable. When `source` is omitted the loader picks the
 right strategy for the runtime.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/wasm/loader.d.ts#L19</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function load(
   source?: BufferSource | URL | string | Request | WebAssembly.Module,
 ): Promise<void>
 ```
+
+</div>

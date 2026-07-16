@@ -10,13 +10,17 @@ of [`serialToDate`](/docs/api/core/serial-to-date/) except for synthetic serial 
 cannot represent as a Date. Construct calendar dates with `Date.UTC(...)`
 (or via [`parseDateInput`](/docs/api/core/parse-date-input/)) to avoid host-timezone shifts.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/date-serial.ts#L29</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function dateToSerial(date: Date): number
 ```
+
+</div>

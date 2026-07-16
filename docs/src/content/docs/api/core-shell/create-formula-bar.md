@@ -12,12 +12,14 @@ draft — correct even under an active sort/filter view. A focused, dirty
 draft is never overwritten by selection/change events; Escape restores the
 last stable text.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L136</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function createFormulaBar(
@@ -26,3 +28,5 @@ function createFormulaBar(
   options?: FormulaBarOptions,
 ): FormulaBarPiece
 ```
+
+</div>

@@ -7,12 +7,12 @@ description: "Payload map for events emitted by a Grid."
 
 Payload map for events emitted by a Grid.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L344</code></dd></div>
 </dl>
 
-## Members <span class="api-count">11</span>
+## Members <span class="api-count" data-pagefind-ignore>11</span>
 
 <div class="api-member-list">
 
@@ -118,7 +118,7 @@ search: SearchResult;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

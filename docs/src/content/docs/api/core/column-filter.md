@@ -8,14 +8,14 @@ description: "One column's filter predicate."
 One column's filter predicate. All active column filters AND together;
 matching is against the cell's resolved value (text or number).
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L55</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">5</span>
+## Variants <span class="api-count" data-pagefind-ignore>5</span>
 
-<div class="api-variant-list">
+<div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
 ```ts generated
@@ -59,7 +59,7 @@ matching is against the cell's resolved value (text or number).
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

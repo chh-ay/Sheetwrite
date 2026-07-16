@@ -7,12 +7,14 @@ description: "Returns the first reset-sensitive adapter input that changed, if a
 
 Returns the first reset-sensitive adapter input that changed, if any.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L130</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function getGridResetReason(
@@ -20,3 +22,5 @@ function getGridResetReason(
   next: GridOptions,
 ): GridResetReason | null
 ```
+
+</div>

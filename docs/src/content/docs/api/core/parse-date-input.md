@@ -19,13 +19,17 @@ Accepted forms:
 Anything else (bare numbers, free text) returns `null` so callers can fall back
 to a text literal.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/date-serial.ts#L95</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function parseDateInput(raw: string): number | null
 ```
+
+</div>

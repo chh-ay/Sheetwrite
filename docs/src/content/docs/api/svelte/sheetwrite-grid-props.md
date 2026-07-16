@@ -7,12 +7,12 @@ description: "Advanced framework adapter props for workbook data or datasource o
 
 Advanced framework adapter props for workbook data or datasource ownership.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L12</code></dd></div>
 </dl>
 
-## Members <span class="api-count">18</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -181,7 +181,7 @@ grid?: Grid;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

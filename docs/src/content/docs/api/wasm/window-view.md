@@ -7,12 +7,12 @@ description: "A bulk window of resolved cells, row-major over nrows x ncols."
 
 A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L253</code></dd></div>
 </dl>
 
-## Members <span class="api-count">11</span>
+## Members <span class="api-count" data-pagefind-ignore>11</span>
 
 <div class="api-member-list">
 
@@ -118,7 +118,7 @@ takeStyleIndex: () => Uint32Array
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

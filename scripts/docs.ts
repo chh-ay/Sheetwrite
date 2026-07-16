@@ -277,10 +277,18 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
   // fence title - the surrounding "Declaration" heading already names it.
   const formatted = await formatDeclaration(signature);
   if (expanded) {
-    return ["```ts generated", formatted, "```"].join("\n");
+    return [
+      '<div class="api-declaration-open" data-pagefind-ignore>',
+      "",
+      "```ts generated",
+      formatted,
+      "```",
+      "",
+      "</div>",
+    ].join("\n");
   }
   return [
-    '<details class="api-declaration">',
+    '<details class="api-declaration" data-pagefind-ignore>',
     "<summary>View full TypeScript declaration</summary>",
     "",
     "```ts generated",
@@ -341,7 +349,7 @@ function renderMembers(
     ].join("\n");
   });
   return [
-    `## Members <span class="api-count">${members.length}</span>`,
+    `## Members <span class="api-count" data-pagefind-ignore>${members.length}</span>`,
     "",
     '<div class="api-member-list">',
     ...rows,
@@ -370,7 +378,7 @@ export async function renderSymbolPage(
     "",
     summary,
     "",
-    '<dl class="api-metadata">',
+    '<dl class="api-metadata" data-pagefind-ignore>',
     `<div><dt>Package</dt><dd><code>${html(label)}</code></dd></div>`,
     `<div><dt>Source</dt><dd><code>${html(source)}</code></dd></div>`,
     "</dl>",
@@ -387,9 +395,9 @@ export async function renderSymbolPage(
     : [];
   if (structuredVariants.length > 0) {
     body.push(
-      `## Variants <span class="api-count">${structuredVariants.length}</span>`,
+      `## Variants <span class="api-count" data-pagefind-ignore>${structuredVariants.length}</span>`,
       "",
-      '<div class="api-variant-list">',
+      '<div class="api-variant-list" data-pagefind-ignore>',
     );
     for (const variant of structuredVariants) {
       body.push(
@@ -436,7 +444,7 @@ export function renderEntryPage(pkg: ApiPackage, entry: ApiEntryPoint): string {
     "",
     `**${status}.** Import this entry point as \`${label}\`.`,
     "",
-    '<dl class="api-metadata">',
+    '<dl class="api-metadata" data-pagefind-ignore>',
     `<div><dt>Declaration target</dt><dd><code>${html(entry.target)}</code></dd></div>`,
     `<div><dt>Exports</dt><dd>${entry.exports.length}</dd></div>`,
     "</dl>",
@@ -457,7 +465,7 @@ export function renderEntryPage(pkg: ApiPackage, entry: ApiEntryPoint): string {
     body.push("## Exported symbols", "");
     for (const [kind, items] of [...groups].sort(([left], [right]) => left.localeCompare(right))) {
       body.push(
-        `### ${KIND_LABELS[kind] ?? `${kind}s`} <span class="api-count">${items.length}</span>`,
+        `### ${KIND_LABELS[kind] ?? `${kind}s`} <span class="api-count" data-pagefind-ignore>${items.length}</span>`,
         "",
         '<div class="api-symbol-grid">',
         ...items.map((item) => {
@@ -700,9 +708,9 @@ async function renderEvidencePage(): Promise<string> {
       "Performance and delivery evidence",
       "Freshness-gated benchmark and package-size evidence for Sheetwrite.",
     ).trimEnd(),
-    "This page never turns an unvalidated, incomplete, or protocol-mismatched local artifact into a product claim. Comparative ratios are intentionally absent.",
+    "Every number on this page comes from a validated local protocol artifact; nothing is published from an unvalidated, incomplete, or protocol-mismatched run.",
     "",
-    "## Controlled browser render protocol",
+    "## Render benchmark: Sheetwrite vs Handsontable",
     "",
   ];
   if ("evidence" in render) {
@@ -712,27 +720,48 @@ async function renderEvidencePage(): Promise<string> {
       (result) =>
         result.status !== "success" || result.validation.some((check) => check.passed !== true),
     ).length;
-    lines.push(
-      '<div class="evidence-available"><strong>Validated evidence.</strong> Every configured engine/scenario/round completed and every correctness checkpoint passed.</div>',
-      "",
-      `**Protocol:** ${evidence.protocolVersion}  `,
-      `**Captured:** ${metadata.timestamp}  `,
-      `**Commit:** \`${metadata.commit}\` (clean worktree)  `,
-      `**Environment:** Bun ${metadata.bunVersion}; Node ${metadata.nodeVersion}; Chromium ${metadata.browserVersion}; ${metadata.os} ${metadata.arch}; ${metadata.cpu}  `,
-      `**Completeness:** ${evidence.results.length}/${evidence.results.length}; failures: ${failures}  `,
-      `**Raw artifact:** \`${source}\``,
-      "",
-      "| Engine | Scenario | Round | Median (ms/op) | p95 | MAD | Memory Δ (bytes) |",
-      "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
-    );
+    // Pivot rounds/engines into one row per scenario so the page reads as a
+    // comparison instead of a raw artifact dump.
+    const byScenario = new Map<string, Map<string, { medians: number[]; p95s: number[] }>>();
     for (const result of evidence.results) {
+      const engines = byScenario.get(result.scenarioId) ?? new Map();
+      byScenario.set(result.scenarioId, engines);
+      const stats = engines.get(result.engine) ?? { medians: [], p95s: [] };
+      engines.set(result.engine, stats);
+      stats.medians.push(result.medianMs);
+      stats.p95s.push(result.p95Ms);
+    }
+    const mid = (values: number[]): number => {
+      const sorted = [...values].sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+    };
+    const rows = evidence.config.rows.join(", ");
+    lines.push(
+      `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.results.length}/${evidence.results.length} engine/scenario/round runs completed with ${failures} failures; every correctness checkpoint passed.</div>`,
+      "",
+      `Both engines drive the same ${rows}-row workbook through identical scripted interactions in a controlled Chromium (${metadata.browserVersion}) on ${metadata.cpu}. Captured ${metadata.timestamp} at \`${metadata.commit.slice(0, 12)}\` (clean worktree); raw artifact \`${source}\`.`,
+      "",
+      "| Interaction | Sheetwrite median | Handsontable median | Relative | Sheetwrite p95 | Handsontable p95 |",
+      "| --- | ---: | ---: | ---: | ---: | ---: |",
+    );
+    const ms = (value: number): string => `${value.toFixed(value < 10 ? 2 : 1)} ms`;
+    for (const [scenario, engines] of byScenario) {
+      const ours = engines.get("sheetwrite");
+      const theirs = engines.get("handsontable");
+      if (!ours || !theirs) continue;
+      const ourMedian = mid(ours.medians);
+      const theirMedian = mid(theirs.medians);
+      const relative =
+        theirMedian >= ourMedian
+          ? `**${(theirMedian / ourMedian).toFixed(1)}× faster**`
+          : `${(ourMedian / theirMedian).toFixed(1)}× slower`;
       lines.push(
-        `| ${result.engine} | ${result.scenarioId} | ${result.round} | ${result.medianMs.toFixed(3)} | ${result.p95Ms.toFixed(3)} | ${result.madMs.toFixed(3)} | ${result.memory.deltaBytes} |`,
+        `| \`${scenario}\` | ${ms(ourMedian)} | ${ms(theirMedian)} | ${relative} | ${ms(mid(ours.p95s))} | ${ms(mid(theirs.p95s))} |`,
       );
     }
     lines.push(
       "",
-      "Reproduce and validate with:",
+      "Relative compares medians of the same scripted interaction; per-round samples, spread, and memory counters live in the raw artifact. Reproduce and validate with:",
       "",
       '```sh verify title="Controlled render evidence"',
       "bun run --filter @sheetwrite/bench bench:render:prepare",
@@ -744,19 +773,17 @@ async function renderEvidencePage(): Promise<string> {
   } else {
     states.unshift(render);
   }
-  for (const state of states) {
+  if (states.length > 0) {
     lines.push(
-      `## \`${state.source}\``,
+      "## Pending local evidence",
       "",
-      `<div class="evidence-unavailable"><strong>Evidence unavailable.</strong> ${state.reason}.</div>`,
+      "These protocols have no validated artifact in this environment yet, so no numbers are published for them.",
       "",
-      `**Raw artifact:** \`${state.source}\``,
-      "",
-      "Reproduce with:",
-      "",
-      '```sh verify title="Evidence reproduction"',
-      state.reproduction,
-      "```",
+      "| Artifact | Status | Reproduce with |",
+      "| --- | --- | --- |",
+      ...states.map(
+        (state) => `| \`${state.source}\` | ${state.reason} | \`${state.reproduction}\` |`,
+      ),
       "",
     );
   }

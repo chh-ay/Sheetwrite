@@ -7,13 +7,17 @@ description: "Two cell corners → A1 range (\"A1:B3\"), collapsing to a single 
 
 Two cell corners → A1 range ("A1:B3"), collapsing to a single ref when equal.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/a1.ts#L30</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function rangeA1(a: CellRef, b: CellRef): string
 ```
+
+</div>

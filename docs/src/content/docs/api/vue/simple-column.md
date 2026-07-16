@@ -7,12 +7,12 @@ description: "Column definition accepted by the adapters’ simple row-object AP
 
 Column definition accepted by the adapters’ simple row-object API.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L90</code></dd></div>
 </dl>
 
-## Members <span class="api-count">8</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -91,7 +91,7 @@ visible?: boolean;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

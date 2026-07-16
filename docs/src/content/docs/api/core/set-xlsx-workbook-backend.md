@@ -7,13 +7,17 @@ description: "Registers the optional workbook XLSX implementation used by core."
 
 Registers the optional workbook XLSX implementation used by core.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L327</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void
 ```
+
+</div>

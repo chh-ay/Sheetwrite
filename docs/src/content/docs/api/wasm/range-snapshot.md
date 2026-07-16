@@ -11,12 +11,12 @@ The host may retain this object in undo history, but it is deliberately not
 part of the serialized document protocol. String payloads remain interned in
 the owning `CellStore`, so snapshots must only be restored into that store.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L239</code></dd></div>
 </dl>
 
-## Members <span class="api-count">6</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -77,7 +77,7 @@ styleIds: () => Uint32Array
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

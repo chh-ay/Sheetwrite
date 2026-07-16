@@ -7,15 +7,19 @@ description: "Advanced framework component for workbook data or datasource input
 
 Advanced framework component for workbook data or datasource input.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L58</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function SheetwriteGrid(
   props: SheetwriteGridProps & React.RefAttributes<Grid>,
 ): ReactNode
 ```
+
+</div>

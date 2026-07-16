@@ -7,12 +7,14 @@ description: "Applies live-updatable adapter option changes to an existing Grid.
 
 Applies live-updatable adapter option changes to an existing Grid.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L144</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function applyChangedLiveGridOptions(
@@ -21,3 +23,5 @@ function applyChangedLiveGridOptions(
   next: GridOptions,
 ): void
 ```
+
+</div>

@@ -1,5 +1,5 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { createFileRoute, notFound, useLocation } from "@tanstack/react-router";
+import { Suspense, useEffect } from "react";
 import { DocsShell } from "../components/DocsShell.js";
 import {
   documentComponentForSplat,
@@ -7,6 +7,7 @@ import {
   normalizeDocumentHref,
 } from "../lib/content.js";
 import { pageMeta } from "../lib/seo.js";
+import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
@@ -26,6 +27,9 @@ export const Route = createFileRoute("/docs/$")({
 
 function DocumentRoute() {
   const params = Route.useParams();
+  // SPA navigations (pushState) never fire hashchange; reveal per location.
+  const href = useLocation({ select: (location) => location.href });
+  useEffect(() => revealAnchoredMember(), [href]);
   const metadata = Route.useLoaderData();
   const Content = documentComponentForSplat(params._splat);
   if (Content === undefined) return <DocumentNotFound />;

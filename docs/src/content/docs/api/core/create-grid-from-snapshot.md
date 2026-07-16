@@ -8,12 +8,14 @@ description: "Mount a grid over a validated, non-dirty snapshot."
 Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes
 the hydrated store just like one created through `createGrid`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L35</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function createGridFromSnapshot(
@@ -22,3 +24,5 @@ function createGridFromSnapshot(
   options?: SnapshotGridOptions,
 ): Grid
 ```
+
+</div>

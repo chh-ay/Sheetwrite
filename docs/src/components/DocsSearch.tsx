@@ -8,7 +8,7 @@ interface PagefindSubResult {
 
 interface PagefindResultData {
   url: string;
-  meta: { title?: string };
+  meta: { title?: string; package?: string };
   excerpt: string;
   sub_results?: PagefindSubResult[];
 }
@@ -25,17 +25,23 @@ interface PagefindResponse {
 interface SearchEntry {
   url: string;
   title: string;
+  package?: string;
   excerpt: string;
 }
+
+// Structural section headings; a sub-result named "Declaration" tells the
+// reader nothing about WHICH declaration matched.
+const GENERIC_SECTIONS = new Set(["Members", "Declaration", "Variants", "Exported symbols"]);
 
 function entriesFor(data: PagefindResultData): SearchEntry[] {
   const page: SearchEntry = {
     url: data.url,
     title: data.meta.title ?? data.url,
+    package: data.meta.package,
     excerpt: data.excerpt,
   };
   const anchored = (data.sub_results ?? [])
-    .filter((sub) => sub.url.includes("#"))
+    .filter((sub) => sub.url.includes("#") && !GENERIC_SECTIONS.has(sub.title.trim()))
     .slice(0, 3)
     .map((sub) => ({ url: sub.url, title: sub.title, excerpt: sub.excerpt }));
   return [page, ...anchored];
@@ -94,10 +100,7 @@ export function DocsSearch() {
           for (const entry of entriesFor(page)) {
             if (seen.has(entry.url)) continue;
             seen.add(entry.url);
-            data.push({
-              ...entry,
-              excerpt: entry.excerpt.replaceAll("<mark>", "").replaceAll("</mark>", ""),
-            });
+            data.push(entry);
           }
         }
         if (controller.signal.aborted) return;
@@ -164,8 +167,13 @@ export function DocsSearch() {
           {status.length > 0 ? <p>{status}</p> : null}
           {results.map((result) => (
             <a href={result.url} key={result.url}>
-              <strong>{result.title}</strong>
-              <span>{result.excerpt}</span>
+              <strong>
+                {result.title}
+                {result.package ? <code>{result.package}</code> : null}
+              </strong>
+              {/* Pagefind excerpts are our own indexed text with <mark> highlights. */}
+              {/* biome-ignore lint/security/noDangerouslySetInnerHtml: self-generated index content */}
+              <span dangerouslySetInnerHTML={{ __html: result.excerpt }} />
             </a>
           ))}
         </div>

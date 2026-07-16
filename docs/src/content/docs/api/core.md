@@ -6,7 +6,7 @@ description: "API reference for @sheetwrite/core."
 
 **Supported public entry point.** Import this entry point as `@sheetwrite/core`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
 <div><dt>Exports</dt><dd>176</dd></div>
 </dl>
@@ -15,7 +15,7 @@ Source entry: `packages/core/src/index.ts`
 
 ## Exported symbols
 
-### Classes <span class="api-count">9</span>
+### Classes <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/comment-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CommentCoordinator</code></span><span class="api-symbol-card__desc">Transport/auth-neutral comment state with server-owned author and timestamp fields.</span></a>
@@ -29,7 +29,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/sync-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SyncCoordinator</code></span><span class="api-symbol-card__desc">Deterministic, transport-neutral optimistic sync.</span></a>
 </div>
 
-### Functions <span class="api-count">32</span>
+### Functions <span class="api-count" data-pagefind-ignore>32</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/cell-a1/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>cellA1</code></span><span class="api-symbol-card__desc">0-based (row, col) → A1 cell reference (0, 0 → &quot;A1&quot;).</span></a>
@@ -66,7 +66,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/validate-workbook-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>validateWorkbookSnapshot</code></span><span class="api-symbol-card__desc">Validate and canonically order a schema-1 snapshot without hydrating runtime state.</span></a>
 </div>
 
-### Interfaces <span class="api-count">89</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>89</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/cell-address/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CellAddress</code></span><span class="api-symbol-card__desc">Zero-based address of one cell on a stable sheet ID.</span></a>
@@ -160,7 +160,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during workbook XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count">42</span>
+### Types <span class="api-count" data-pagefind-ignore>42</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -207,7 +207,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/validation-policy/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ValidationPolicy</code></span><span class="api-symbol-card__desc">Reject-or-warn policy attached to a data-validation rule.</span></a>
 </div>
 
-### Variables <span class="api-count">4</span>
+### Variables <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/default-theme/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_THEME</code></span><span class="api-symbol-card__desc">Default canvas theme used before CSS and explicit theme overrides.</span></a>

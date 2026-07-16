@@ -7,14 +7,18 @@ description: "Datasource loading state for a resolved cell."
 
 Datasource loading state for a resolved cell.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L91</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type CellLoadState =
   "unloaded" | "loaded-empty" | "loaded-value" | "local-edit";
 ```
+
+</div>

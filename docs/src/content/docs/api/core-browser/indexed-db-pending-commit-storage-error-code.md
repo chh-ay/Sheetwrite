@@ -7,12 +7,14 @@ description: "Stable category for an IndexedDB pending-storage failure."
 
 Stable category for an IndexedDB pending-storage failure.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/browser</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L10</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 export type IndexedDbPendingCommitStorageErrorCode =
@@ -23,3 +25,5 @@ export type IndexedDbPendingCommitStorageErrorCode =
   | "unsupported-schema"
   | "transaction";
 ```
+
+</div>

@@ -7,12 +7,12 @@ description: "Document, version, durability, and online options for synchronizat
 
 Document, version, durability, and online options for synchronization.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L49</code></dd></div>
 </dl>
 
-## Members <span class="api-count">6</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -75,7 +75,7 @@ snapshot for the host to remount before calling `resumeAfterReload`.</p>
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

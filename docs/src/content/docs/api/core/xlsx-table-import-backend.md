@@ -9,12 +9,12 @@ Pluggable table import backend. Parses raw `.xlsx` bytes into the same
 `ColumnarData` shape `fromCsv` returns, so host ingestion code can stay
 format-agnostic.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L263</code></dd></div>
 </dl>
 
-## Members <span class="api-count">2</span>
+## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
@@ -39,7 +39,7 @@ fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

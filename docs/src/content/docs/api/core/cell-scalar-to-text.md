@@ -7,13 +7,17 @@ description: "Spreadsheet display text for a resolved scalar."
 
 Spreadsheet display text for a resolved scalar.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/cell-input.ts#L5</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function cellScalarToText(value: CellScalar): string
 ```
+
+</div>

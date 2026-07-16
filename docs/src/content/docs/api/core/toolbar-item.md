@@ -7,12 +7,12 @@ description: "Built-in, separator, or custom callback item in the grid toolbar."
 
 Built-in, separator, or custom callback item in the grid toolbar.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L132</code></dd></div>
 </dl>
 
-## Members <span class="api-count">4</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -57,7 +57,7 @@ title?: string;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

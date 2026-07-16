@@ -7,12 +7,12 @@ description: "Versioned discussion anchored to a document location."
 
 Versioned discussion anchored to a document location.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L374</code></dd></div>
 </dl>
 
-## Members <span class="api-count">8</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -91,7 +91,7 @@ resolvedAt?: string;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

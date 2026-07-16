@@ -76,18 +76,29 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
         </div>
         <Sidebar activeHref={activeHref} />
       </aside>
-      <main className="sw-document" data-pagefind-body id="main-content">
+      <main
+        className="sw-document"
+        data-pagefind-body
+        // Attribute-value meta works regardless of element nesting; the h1
+        // span below captures the clean symbol title.
+        data-pagefind-meta={titlePackage ? `package:${titlePackage}` : undefined}
+        id="main-content"
+      >
         <header className="sw-document__header">
-          <p>Sheetwrite / Documentation</p>
+          <p data-pagefind-ignore>Sheetwrite / Documentation</p>
           <h1>
-            {titleMain}
-            {titlePackage ? <code className="sw-title-package">{titlePackage}</code> : null}
+            <span data-pagefind-meta="title">{titleMain}</span>
+            {titlePackage ? (
+              <code className="sw-title-package" data-pagefind-ignore>
+                {titlePackage}
+              </code>
+            ) : null}
           </h1>
           <span>{description}</span>
         </header>
         <article className="sw-prose">{children}</article>
         <TableOfContents />
-        <footer className="sw-document__footer">
+        <footer className="sw-document__footer" data-pagefind-ignore>
           <span>Sheetwrite is MIT licensed.</span>
           <a href="https://github.com/chh-ay/Sheetwrite/issues">Report a documentation issue</a>
         </footer>

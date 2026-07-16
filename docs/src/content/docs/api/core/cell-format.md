@@ -10,13 +10,17 @@ via its `numberFormat`, `date` as an Excel-style serial (see `date-serial.ts`)
 rendered by a date `numberFormat`, and `currency` as a plain number rendered by
 a currency `numberFormat` (e.g. `$#,##0.00`).
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L70</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type CellFormat = "text" | "number" | "date" | "currency";
 ```
+
+</div>

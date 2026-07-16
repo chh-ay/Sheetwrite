@@ -7,14 +7,14 @@ description: "Applied, duplicate, or conflict acknowledgement from persistence."
 
 Applied, duplicate, or conflict acknowledgement from persistence.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L93</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">3</span>
+## Variants <span class="api-count" data-pagefind-ignore>3</span>
 
-<div class="api-variant-list">
+<div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
 ```ts generated
@@ -54,7 +54,7 @@ Applied, duplicate, or conflict acknowledgement from persistence.
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

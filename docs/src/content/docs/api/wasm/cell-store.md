@@ -7,12 +7,12 @@ description: "The workbook-wide store: every sheet, one string pool."
 
 The workbook-wide store: every sheet, one string pool.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></dd></div>
 </dl>
 
-## Members <span class="api-count">60</span>
+## Members <span class="api-count" data-pagefind-ignore>60</span>
 
 <div class="api-member-list">
 
@@ -611,7 +611,7 @@ the cell's style.</p>
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

@@ -10,12 +10,14 @@ Mouse clicks never steal grid focus; keyboard users get local
 Left/Right/Home/End movement across the controls while the toolbar has
 focus. Returns the mounted piece with an idempotent `destroy`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/shell/toolbar-factory.ts#L27</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function createToolbar(
@@ -24,3 +26,5 @@ function createToolbar(
   options?: ToolbarOptions,
 ): ShellPiece
 ```
+
+</div>

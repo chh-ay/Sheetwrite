@@ -7,13 +7,17 @@ description: "Human phrase for a selection's geometry; blank for null/single-cel
 
 Human phrase for a selection's geometry; blank for null/single-cell.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/shell/selection-status.ts#L12</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function describeSelection(selection: Selection | null): string
 ```
+
+</div>

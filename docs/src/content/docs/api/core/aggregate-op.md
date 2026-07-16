@@ -7,13 +7,17 @@ description: "Column aggregate operation for Grid.aggregate / Store data ops."
 
 Column aggregate operation for `Grid.aggregate` / `Store` data ops.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L8</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type AggregateOp = "sum" | "avg" | "min" | "max" | "count";
 ```
+
+</div>

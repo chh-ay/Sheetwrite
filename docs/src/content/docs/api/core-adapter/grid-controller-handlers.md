@@ -13,12 +13,12 @@ The controller reads these fields **live** on every event — see
 mutating the fields of the object it passed in, without recreating the grid.
 Every field is optional; a missing callback simply drops that event.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L16</code></dd></div>
 </dl>
 
-## Members <span class="api-count">7</span>
+## Members <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-member-list">
 
@@ -88,7 +88,7 @@ onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

@@ -7,12 +7,12 @@ description: "Acknowledgement posted back to the sender after a frame actually p
 
 Acknowledgement posted back to the sender after a frame actually painted.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/worker</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/worker.ts#L246</code></dd></div>
 </dl>
 
-## Members <span class="api-count">1</span>
+## Members <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-member-list">
 
@@ -28,7 +28,7 @@ type: "painted"
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
