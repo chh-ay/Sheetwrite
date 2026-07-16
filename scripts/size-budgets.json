@@ -120,8 +120,8 @@
     },
     "bundler.vite.coreInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 76580,
-      "maximum": 80409,
+      "baseline": 80814,
+      "maximum": 84855,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -184,16 +184,16 @@
     },
     "bundler.vite.reactInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 69203,
-      "maximum": 72664,
+      "baseline": 72933,
+      "maximum": 76580,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.reactInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 81529,
-      "maximum": 85606,
+      "baseline": 85797,
+      "maximum": 90087,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -272,8 +272,8 @@
     },
     "bundler.vite.svelteInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 306397,
-      "maximum": 321717,
+      "baseline": 322575,
+      "maximum": 338704,
       "category": "browser-javascript",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -344,8 +344,8 @@
     },
     "bundler.vite.vueInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 294523,
-      "maximum": 309250,
+      "baseline": 310582,
+      "maximum": 326111,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -392,8 +392,8 @@
     },
     "bundler.vite.workerAsync.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 23049,
-      "maximum": 24202,
+      "baseline": 25764,
+      "maximum": 27052,
       "category": "browser-javascript",
       "owner": "vite:worker-async",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -536,8 +536,8 @@
     },
     "bundler.webpack.workerAsync.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 17058,
-      "maximum": 18082,
+      "baseline": 18385,
+      "maximum": 19409,
       "category": "browser-javascript",
       "owner": "webpack:worker-async",
       "rationale": "Audited correctness baseline plus 1 KiB."

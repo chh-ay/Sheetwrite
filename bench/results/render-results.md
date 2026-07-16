@@ -1,15 +1,15 @@
 # Auditable render benchmark
 
 Protocol version: **1**  
-Run ID: `814245c3-f51a-4e1c-aecb-e36b49e153f7`  
+Run ID: `e315eb00-dc4d-432c-97ee-a6d4e44c1e93`  
 Matrix: **complete and successful**
 
 ## Environment
 
 | Field | Value |
 |:--|:--|
-| Commit | `cacbb406bc64f0afa6a342aa1f071b668f40ff0e` (clean) |
-| Timestamp | 2026-07-13T20:03:25.716Z |
+| Commit | `35c87b994b60da334202f6fbd1f550426f1b8681` (clean) |
+| Timestamp | 2026-07-16T17:13:27.610Z |
 | Runtime | Bun 1.3.14; Node 24.3.0 |
 | Browser | 149.0.7827.55 |
 | OS / arch | linux 7.1.3-2-cachyos / x64 |
@@ -27,28 +27,34 @@ Every cell below is linked to the raw JSON. Timings are per logical operation an
 
 | round | rows | scenario / raw identity | Sheetwrite | Handsontable |
 |---:|---:|:--|:--|:--|
-| 1 | 100,000 | [`r1-100000-scroll-down.top-left`](./render-results.json) | median 2.405 ms; p95 2.497; MAD 0.10274; 3 samples / 132 ops | median 53.367 ms; p95 54.477; MAD 0.96667; 3 samples / 7 ops |
-| 1 | 100,000 | [`r1-100000-scroll-down.middle`](./render-results.json) | median 2.059 ms; p95 2.286; MAD 0.03118; 3 samples / 143 ops | median 0.15267 ms; p95 0.16019; MAD 0.00836; 3 samples / 2033 ops |
-| 1 | 100,000 | [`r1-100000-scroll-right.top-left`](./render-results.json) | median 0.74296 ms; p95 0.79031; MAD 0.05261; 3 samples / 563 ops | median 117.3 ms; p95 118.2; MAD 1.000; 3 samples / 4 ops |
-| 1 | 100,000 | [`r1-100000-edit-open.top-left`](./render-results.json) | median 0.94717 ms; p95 0.97025; MAD 0.02565; 3 samples / 323 ops | median 2.262 ms; p95 2.606; MAD 0.24822; 3 samples / 133 ops |
-| 1 | 100,000 | [`r1-100000-edit-open.middle`](./render-results.json) | median 1.314 ms; p95 1.675; MAD 0.26949; 3 samples / 232 ops | median 2.595 ms; p95 2.774; MAD 0.19957; 3 samples / 119 ops |
-| 1 | 100,000 | [`r1-100000-edit-open.bottom-right`](./render-results.json) | median 0.78438 ms; p95 0.86231; MAD 0.02956; 3 samples / 387 ops | median 3.689 ms; p95 3.865; MAD 0.09618; 3 samples / 83 ops |
-| 1 | 100,000 | [`r1-100000-edit-commit.middle`](./render-results.json) | median 1.425 ms; p95 1.668; MAD 0.16160; 3 samples / 210 ops | median 60.500 ms; p95 75.845; MAD 6.100; 3 samples / 6 ops |
-| 1 | 100,000 | [`r1-100000-altering.insert-5-rows-top`](./render-results.json) | median 5.368 ms; p95 7.152; MAD 0.52080; 3 samples / 54 ops | median 178.0 ms; p95 187.5; MAD 0.40000; 3 samples / 3 ops |
-| 1 | 100,000 | [`r1-100000-altering.remove-5-rows-top`](./render-results.json) | median 4.354 ms; p95 4.760; MAD 0.05000; 3 samples / 69 ops | median 237.8 ms; p95 266.1; MAD 31.400; 3 samples / 3 ops |
-| 1 | 100,000 | [`r1-100000-arrow-down.top-left`](./render-results.json) | median 0.90180 ms; p95 1.093; MAD 0.19900; 3 samples / 348 ops | median 2.909 ms; p95 2.991; MAD 0.08635; 3 samples / 105 ops |
-| 1 | 100,000 | [`r1-100000-arrow-right.middle`](./render-results.json) | median 1.303 ms; p95 1.372; MAD 0.07685; 3 samples / 236 ops | median 3.337 ms; p95 3.349; MAD 0.01333; 3 samples / 94 ops |
-| 2 | 100,000 | [`r2-100000-scroll-down.top-left`](./render-results.json) | median 3.134 ms; p95 3.576; MAD 0.20866; 3 samples / 95 ops | median 74.450 ms; p95 80.660; MAD 6.900; 3 samples / 6 ops |
-| 2 | 100,000 | [`r2-100000-scroll-down.middle`](./render-results.json) | median 2.909 ms; p95 3.194; MAD 0.31724; 3 samples / 106 ops | median 0.12072 ms; p95 0.12318; MAD 0.00273; 3 samples / 2520 ops |
-| 2 | 100,000 | [`r2-100000-scroll-right.top-left`](./render-results.json) | median 0.52513 ms; p95 0.87903; MAD 0.01077; 3 samples / 495 ops | median 125.5 ms; p95 130.1; MAD 5.100; 3 samples / 4 ops |
-| 2 | 100,000 | [`r2-100000-edit-open.top-left`](./render-results.json) | median 0.98350 ms; p95 1.185; MAD 0.13812; 3 samples / 305 ops | median 2.631 ms; p95 3.216; MAD 0.28891; 3 samples / 113 ops |
-| 2 | 100,000 | [`r2-100000-edit-open.middle`](./render-results.json) | median 0.86610 ms; p95 0.99201; MAD 0.05147; 3 samples / 341 ops | median 2.530 ms; p95 2.791; MAD 0.15791; 3 samples / 119 ops |
-| 2 | 100,000 | [`r2-100000-edit-open.bottom-right`](./render-results.json) | median 0.63291 ms; p95 0.76585; MAD 0.00993; 3 samples / 448 ops | median 4.056 ms; p95 4.212; MAD 0.17317; 3 samples / 76 ops |
-| 2 | 100,000 | [`r2-100000-edit-commit.middle`](./render-results.json) | median 1.169 ms; p95 1.318; MAD 0.01113; 3 samples / 249 ops | median 63.050 ms; p95 71.150; MAD 9.000; 3 samples / 7 ops |
-| 2 | 100,000 | [`r2-100000-altering.insert-5-rows-top`](./render-results.json) | median 4.044 ms; p95 5.597; MAD 0.28104; 3 samples / 75 ops | median 170.2 ms; p95 170.6; MAD 0.50000; 3 samples / 3 ops |
-| 2 | 100,000 | [`r2-100000-altering.remove-5-rows-top`](./render-results.json) | median 4.714 ms; p95 4.971; MAD 0.28636; 3 samples / 67 ops | median 190.5 ms; p95 208.2; MAD 17.100; 3 samples / 3 ops |
-| 2 | 100,000 | [`r2-100000-arrow-down.top-left`](./render-results.json) | median 1.050 ms; p95 1.112; MAD 0.06868; 3 samples / 294 ops | median 3.510 ms; p95 3.548; MAD 0.04138; 3 samples / 88 ops |
-| 2 | 100,000 | [`r2-100000-arrow-right.middle`](./render-results.json) | median 1.164 ms; p95 1.215; MAD 0.05653; 3 samples / 274 ops | median 3.693 ms; p95 3.910; MAD 0.24176; 3 samples / 92 ops |
+| 1 | 100,000 | [`r1-100000-scroll-down.top-left`](./render-results.json) | median 1.692 ms; p95 1.722; MAD 0.03376; 3 samples / 189 ops | median 103.6 ms; p95 109.7; MAD 2.100; 3 samples / 4 ops |
+| 1 | 100,000 | [`r1-100000-scroll-down.middle`](./render-results.json) | median 1.397 ms; p95 1.444; MAD 0.05202; 3 samples / 223 ops | median 38.233 ms; p95 41.503; MAD 1.733; 3 samples / 9 ops |
+| 1 | 100,000 | [`r1-100000-scroll-smooth.same-window`](./render-results.json) | median 0.52356 ms; p95 0.54198; MAD 0.01544; 3 samples / 572 ops | median 104.1 ms; p95 122.3; MAD 16.700; 3 samples / 4 ops |
+| 1 | 100,000 | [`r1-100000-scroll-right.top-left`](./render-results.json) | median 0.30120 ms; p95 0.31693; MAD 0.00622; 3 samples / 1003 ops | median 68.100 ms; p95 74.625; MAD 2.500; 3 samples / 6 ops |
+| 1 | 100,000 | [`r1-100000-edit-open.top-left`](./render-results.json) | median 0.62422 ms; p95 0.68311; MAD 0.03767; 3 samples / 477 ops | median 1.437 ms; p95 1.603; MAD 0.07768; 3 samples / 206 ops |
+| 1 | 100,000 | [`r1-100000-edit-open.middle`](./render-results.json) | median 0.96346 ms; p95 1.364; MAD 0.14883; 3 samples / 300 ops | median 2.034 ms; p95 2.044; MAD 0.01090; 3 samples / 152 ops |
+| 1 | 100,000 | [`r1-100000-edit-open.bottom-right`](./render-results.json) | median 0.56610 ms; p95 0.73398; MAD 0.00387; 3 samples / 498 ops | median 2.592 ms; p95 3.091; MAD 0.11182; 3 samples / 112 ops |
+| 1 | 100,000 | [`r1-100000-edit-commit.middle`](./render-results.json) | median 0.98235 ms; p95 1.001; MAD 0.02065; 3 samples / 315 ops | median 39.700 ms; p95 41.890; MAD 2.433; 3 samples / 9 ops |
+| 1 | 100,000 | [`r1-100000-altering.insert-5-rows-top`](./render-results.json) | median 3.176 ms; p95 3.654; MAD 0.25576; 3 samples / 95 ops | median 125.6 ms; p95 127.6; MAD 2.200; 3 samples / 3 ops |
+| 1 | 100,000 | [`r1-100000-altering.remove-5-rows-top`](./render-results.json) | median 2.839 ms; p95 3.341; MAD 0.15205; 3 samples / 104 ops | median 139.1 ms; p95 163.0; MAD 21.000; 3 samples / 3 ops |
+| 1 | 100,000 | [`r1-100000-arrow-down.top-left`](./render-results.json) | median 0.65260 ms; p95 0.69906; MAD 0.02304; 3 samples / 455 ops | median 2.253 ms; p95 2.341; MAD 0.09783; 3 samples / 136 ops |
+| 1 | 100,000 | [`r1-100000-arrow-right.middle`](./render-results.json) | median 0.64487 ms; p95 0.66197; MAD 0.01900; 3 samples / 479 ops | median 2.574 ms; p95 2.673; MAD 0.02186; 3 samples / 117 ops |
+| 1 | 100,000 | [`r1-100000-formatted-paint.top-left`](./render-results.json) | median 0.99109 ms; p95 1.047; MAD 0.06260; 3 samples / 309 ops | median 4.032 ms; p95 4.183; MAD 0.11662; 3 samples / 75 ops |
+| 1 | 100,000 | [`r1-100000-merge-heavy.paint`](./render-results.json) | median 0.28934 ms; p95 0.34366; MAD 0.00596; 3 samples / 1084 ops | median 8.377 ms; p95 11.918; MAD 0.64615; 3 samples / 35 ops |
+| 2 | 100,000 | [`r2-100000-scroll-down.top-left`](./render-results.json) | median 1.464 ms; p95 1.612; MAD 0.11640; 3 samples / 208 ops | median 93.800 ms; p95 103.3; MAD 0.40000; 3 samples / 5 ops |
+| 2 | 100,000 | [`r2-100000-scroll-down.middle`](./render-results.json) | median 1.347 ms; p95 1.440; MAD 0.01904; 3 samples / 220 ops | median 41.400 ms; p95 45.120; MAD 4.133; 3 samples / 9 ops |
+| 2 | 100,000 | [`r2-100000-scroll-smooth.same-window`](./render-results.json) | median 0.57644 ms; p95 0.65605; MAD 0.00769; 3 samples / 501 ops | median 94.500 ms; p95 102.5; MAD 1.900; 3 samples / 6 ops |
+| 2 | 100,000 | [`r2-100000-scroll-right.top-left`](./render-results.json) | median 0.31509 ms; p95 0.32737; MAD 0.01364; 3 samples / 1036 ops | median 56.250 ms; p95 60.885; MAD 1.450; 3 samples / 6 ops |
+| 2 | 100,000 | [`r2-100000-edit-open.top-left`](./render-results.json) | median 0.66447 ms; p95 0.69645; MAD 0.00275; 3 samples / 457 ops | median 1.212 ms; p95 1.289; MAD 0.00000; 3 samples / 244 ops |
+| 2 | 100,000 | [`r2-100000-edit-open.middle`](./render-results.json) | median 0.75070 ms; p95 0.85924; MAD 0.07043; 3 samples / 404 ops | median 1.732 ms; p95 1.790; MAD 0.06423; 3 samples / 180 ops |
+| 2 | 100,000 | [`r2-100000-edit-open.bottom-right`](./render-results.json) | median 0.56369 ms; p95 0.68637; MAD 0.04771; 3 samples / 516 ops | median 2.488 ms; p95 2.510; MAD 0.02470; 3 samples / 122 ops |
+| 2 | 100,000 | [`r2-100000-edit-commit.middle`](./render-results.json) | median 0.99703 ms; p95 1.073; MAD 0.08416; 3 samples / 325 ops | median 38.633 ms; p95 40.343; MAD 1.900; 3 samples / 10 ops |
+| 2 | 100,000 | [`r2-100000-altering.insert-5-rows-top`](./render-results.json) | median 2.869 ms; p95 3.821; MAD 0.11992; 3 samples / 98 ops | median 112.3 ms; p95 120.8; MAD 5.200; 3 samples / 3 ops |
+| 2 | 100,000 | [`r2-100000-altering.remove-5-rows-top`](./render-results.json) | median 2.853 ms; p95 3.148; MAD 0.12305; 3 samples / 105 ops | median 126.9 ms; p95 153.6; MAD 8.600; 3 samples / 3 ops |
+| 2 | 100,000 | [`r2-100000-arrow-down.top-left`](./render-results.json) | median 0.74296 ms; p95 0.76671; MAD 0.02638; 3 samples / 421 ops | median 2.047 ms; p95 2.136; MAD 0.08027; 3 samples / 148 ops |
+| 2 | 100,000 | [`r2-100000-arrow-right.middle`](./render-results.json) | median 0.67315 ms; p95 0.85995; MAD 0.03581; 3 samples / 421 ops | median 2.251 ms; p95 2.433; MAD 0.06850; 3 samples / 132 ops |
+| 2 | 100,000 | [`r2-100000-formatted-paint.top-left`](./render-results.json) | median 0.97670 ms; p95 1.065; MAD 0.05778; 3 samples / 307 ops | median 4.076 ms; p95 4.260; MAD 0.18341; 3 samples / 77 ops |
+| 2 | 100,000 | [`r2-100000-merge-heavy.paint`](./render-results.json) | median 0.30030 ms; p95 0.35929; MAD 0.00356; 3 samples / 954 ops | median 8.315 ms; p95 8.932; MAD 0.11538; 3 samples / 38 ops |
 
 ## Reproduce
 
