@@ -10,15 +10,15 @@ import {
   REVENUE_CITY_COLUMN,
   REVENUE_DATA,
   REVENUE_ROWS,
-  SHOWCASE_THEME,
-} from "../showcase/revenue.js";
+  REACT_SHOWCASE_THEME,
+} from "./revenue.js";
 import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRenderingMode } from "./ui/DemoRenderingMode.js";
 import { DemoSelect } from "./ui/DemoSelect.js";
 import "@sheetwrite/react/styles.css";
 import "../styles/showcase.css";
 
-const workbook = createRevenueWorkbook();
+const workbook = createRevenueWorkbook("#58c4dc24");
 const GRID_CONFIG = { toolbar: true } as const;
 const MARKET_OPTIONS = [
   { label: "All markets", value: "all" },
@@ -118,83 +118,32 @@ export default function ReactWorkbook() {
 
   return (
     <section className="sw-demo-app" data-framework="react">
-      <header className="sw-demo-topbar">
-        <div className="sw-demo-product">
-          <span className="sw-demo-product__mark">
-            <FileSpreadsheet aria-hidden="true" size={16} strokeWidth={1.8} />
-          </span>
-          <div>
-            <strong>Revenue desk</strong>
-            <span>FY26 operating workbook</span>
-          </div>
-        </div>
-        <div className="sw-demo-presence" role="status" data-state="ready">
-          <Monitor aria-hidden="true" size={16} />
-          {activeRenderer === "worker" ? "Worker canvas" : "Main-thread canvas"}
-        </div>
-      </header>
-
-      <div className="sw-demo-layout sw-demo-layout--single">
-        <main className="sw-demo-main" id="workbook">
-          <div className="sw-demo-heading">
+      <main className="sw-demo-main" id="workbook">
+        <header className="sw-demo-controlbar">
+          <div className="sw-demo-controlbar__identity">
+            <span className="sw-demo-product__mark" aria-hidden="true">
+              <FileSpreadsheet size={16} strokeWidth={1.8} />
+            </span>
             <div>
-              <p>OPERATING MODEL / Q3</p>
               <h2>Revenue pipeline</h2>
-            </div>
-            <div className="sw-demo-heading__actions">
-              <DemoButton type="button" onClick={() => gridRef.current?.exportCsv("revenue.csv")}>
-                Export CSV
-              </DemoButton>
-              <DemoButton
-                type="button"
-                data-primary="true"
-                onClick={() => {
-                  gridRef.current?.sortBy(REVENUE_AMOUNT_COLUMN, false);
-                  record("Sorted amount high to low");
-                }}
-              >
-                Rank pipeline
-              </DemoButton>
+              <span>{visibleRows.toLocaleString()} visible rows</span>
             </div>
           </div>
-
-          <section className="sw-demo-kpis" aria-label="Workbook metrics">
-            <article>
-              <span>VISIBLE ROWS</span>
-              <strong>{visibleRows.toLocaleString()}</strong>
-              <small>Current filtered view</small>
-            </article>
-            <article>
-              <span>PIPELINE</span>
-              <strong>{money.format(pipeline)}</strong>
-              <small>WASM aggregate</small>
-            </article>
-            <article>
-              <span>SEARCH</span>
-              <strong>{matches ? matches.matches.length.toLocaleString() : "—"}</strong>
-              <small>{query || "No active query"}</small>
-            </article>
-            <article>
-              <span>RENDERING THREAD</span>
-              <strong>{activeRenderer === "worker" ? "Web Worker" : "Main thread"}</strong>
-              <output data-testid="renderer" data-fallback-count={rendererFallback?.count ?? 0}>
-                Requested: {renderer === "worker" ? "Web Worker" : "Main thread"} · Active:{" "}
-                {activeRenderer === "worker" ? "Web Worker" : "Main thread"}
-                {rendererFallback ? ` · Fallback: ${rendererFallback.reason}` : ""}
-              </output>
-            </article>
-          </section>
-
-          <div className="sw-demo-commandbar" role="toolbar" aria-label="Workbook controls">
+          <div
+            className="sw-demo-controlbar__controls"
+            role="toolbar"
+            aria-label="Workbook controls"
+          >
             <DemoSelect
               label="Market"
               value={market}
               options={MARKET_OPTIONS}
               onValueChange={chooseMarket}
             />
-            <label className="sw-demo-commandbar__search">
-              <span>Search customers</span>
+            <label className="sw-demo-controlbar__search">
+              <span className="sw-visually-hidden">Search customers</span>
               <input
+                aria-label="Search customers"
                 type="search"
                 value={query}
                 placeholder="Account 004812"
@@ -221,6 +170,15 @@ export default function ReactWorkbook() {
             >
               Next
             </DemoButton>
+            <DemoButton
+              type="button"
+              onClick={() => {
+                gridRef.current?.sortBy(REVENUE_AMOUNT_COLUMN, false);
+                record("Sorted amount high to low");
+              }}
+            >
+              Rank
+            </DemoButton>
             <DemoButton type="button" onClick={resetWorkbook}>
               Reset
             </DemoButton>
@@ -233,49 +191,59 @@ export default function ReactWorkbook() {
               }}
             />
           </div>
+          <span className="sw-demo-controlbar__state" role="status">
+            <Monitor aria-hidden="true" size={14} />
+            {activeRenderer === "worker" ? "Worker" : "Canvas"}
+          </span>
+        </header>
 
-          <div className="sw-demo-grid">
-            <SheetwriteGrid
-              ref={gridRef}
-              workbook={workbook}
-              data={REVENUE_DATA}
-              theme={SHOWCASE_THEME}
-              renderer={renderer}
-              workerUrl={renderer === "worker" ? workerUrl : undefined}
-              config={GRID_CONFIG}
-              style={{ height: "100%" }}
-              onReady={({ grid }) => {
-                grid.setFrozen(0, 1);
-                rendererCleanup.current();
-                setActiveRenderer(grid.rendererKind());
-                rendererCleanup.current = grid.on("renderer-fallback", ({ error }) => {
-                  setActiveRenderer("canvas");
-                  setRendererFallback((current) => ({
-                    count: (current?.count ?? 0) + 1,
-                    reason: error instanceof Error ? error.message : String(error),
-                  }));
-                });
-                refresh(grid);
-                record("Grid ready · 100,000 rows");
-              }}
-              onGridChange={({ transaction }) => {
-                record(`${transaction.patches.length} operation committed`);
-                refresh();
-              }}
-              onSelectionChange={(value) => setSelection(describeSelection(value))}
-            />
-          </div>
+        <div className="sw-demo-grid">
+          <SheetwriteGrid
+            ref={gridRef}
+            workbook={workbook}
+            data={REVENUE_DATA}
+            theme={REACT_SHOWCASE_THEME}
+            renderer={renderer}
+            workerUrl={renderer === "worker" ? workerUrl : undefined}
+            config={GRID_CONFIG}
+            style={{ height: "100%" }}
+            onReady={({ grid }) => {
+              grid.setFrozen(0, 1);
+              rendererCleanup.current();
+              setActiveRenderer(grid.rendererKind());
+              rendererCleanup.current = grid.on("renderer-fallback", ({ error }) => {
+                setActiveRenderer("canvas");
+                setRendererFallback((current) => ({
+                  count: (current?.count ?? 0) + 1,
+                  reason: error instanceof Error ? error.message : String(error),
+                }));
+              });
+              refresh(grid);
+              record("Grid ready · 100,000 rows");
+            }}
+            onGridChange={({ transaction }) => {
+              record(`${transaction.patches.length} operation committed`);
+              refresh();
+            }}
+            onSelectionChange={(value) => setSelection(describeSelection(value))}
+          />
+        </div>
 
-          <footer className="sw-demo-status" data-react-activity tabIndex={-1}>
-            <span>{selection}</span>
-            <ol>
-              {activity.map((item) => (
-                <li key={item.id}>{item.message}</li>
-              ))}
-            </ol>
-          </footer>
-        </main>
-      </div>
+        <footer className="sw-demo-status sw-demo-status--metrics">
+          <span>Rows · {visibleRows.toLocaleString()}</span>
+          <span>Pipeline · {money.format(pipeline)}</span>
+          <span>Search · {matches ? matches.matches.length.toLocaleString() : "—"}</span>
+          <output data-testid="renderer" data-fallback-count={rendererFallback?.count ?? 0}>
+            Requested: {renderer === "worker" ? "Web Worker" : "Main thread"} · Active:{" "}
+            {activeRenderer === "worker" ? "Web Worker" : "Main thread"}
+            {rendererFallback ? ` · Fallback: ${rendererFallback.reason}` : ""}
+          </output>
+          <span>{selection}</span>
+          <span aria-live="polite" data-react-activity>
+            {activity[0]?.message}
+          </span>
+        </footer>
+      </main>
     </section>
   );
 }

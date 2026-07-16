@@ -10,7 +10,6 @@ import type {
   ColumnarData,
   Grid,
   GridEvents,
-  Theme,
   Workbook,
 } from "@sheetwrite/core";
 import {
@@ -20,31 +19,14 @@ import {
   createToolbar,
 } from "@sheetwrite/core/shell";
 import { SheetwriteGrid } from "@sheetwrite/svelte";
-import { Calculator, FileSpreadsheet, ListChecks, Moon, Sun } from "lucide-svelte";
+import { Calculator, FileSpreadsheet, ListChecks } from "lucide-svelte";
+import { SVELTE_SHOWCASE_THEME } from "./revenue.js";
 import "@sheetwrite/svelte/styles.css";
 import "@sheetwrite/core/shell.css";
 import "../styles/showcase.css";
 
 const ROWS = 500;
 
-const LIGHT_THEME: Partial<Theme> = {
-  bg: "#fffdf7",
-  fg: "#292524",
-  gridLine: "#e7e5e4",
-  headerBg: "#1c1917",
-  headerFg: "#fbbf24",
-  selection: "#f59e0b22",
-  selectionBorder: "#f59e0b",
-};
-const DARK_THEME: Partial<Theme> = {
-  bg: "#1c1917",
-  fg: "#e7e5e4",
-  gridLine: "#44403c",
-  headerBg: "#0c0a09",
-  headerFg: "#fbbf24",
-  selection: "#f59e0b33",
-  selectionBorder: "#fbbf24",
-};
 
 function strokeIcon(paths: readonly string[]): () => SVGSVGElement {
   return () => {
@@ -174,7 +156,6 @@ const renderers: Record<string, CellRenderer> = {
 const data = buildModelData();
 
 let grid = $state<Grid>();
-let dark = $state(true);
 let activeSheet = $state<"model" | "summary">("model");
 let changeLog = $state<ChangeEvent[]>([]);
 let chromeHost = $state<HTMLDivElement>();
@@ -184,7 +165,7 @@ const GRID_CONFIG = { toolbar: false } as const;
 let toolbarHost = $state<HTMLDivElement>();
 let gridWrap = $state<HTMLDivElement>();
 
-const theme = $derived(dark ? DARK_THEME : LIGHT_THEME);
+const theme = SVELTE_SHOWCASE_THEME;
 
 function openSheet(sheet: "model" | "summary"): void {
   grid?.setActiveSheet(sheet);
@@ -250,104 +231,81 @@ $effect(() => {
 });
 </script>
 
-<section class="sw-demo-app sw-svelte-demo" data-framework="svelte" data-theme={dark ? "dark" : undefined}>
-  <header class="sw-demo-topbar">
-    <div class="sw-demo-product">
-      <span class="sw-demo-product__mark">
-        <FileSpreadsheet size={16} strokeWidth={1.8} aria-hidden="true" />
-      </span>
-      <div>
-        <strong>Planning model</strong>
-        <span>Formula operations</span>
-      </div>
-    </div>
-    <nav aria-label="Workbook quick actions">
-      <button type="button" data-active={activeSheet === "model"} onclick={() => openSheet("model")}>
-        <FileSpreadsheet size={15} aria-hidden="true" /> Model
-      </button>
-      <button type="button" data-active={activeSheet === "summary"} onclick={() => openSheet("summary")}>
-        <ListChecks size={15} aria-hidden="true" /> Summary
-      </button>
-      <button type="button" onclick={() => (dark = !dark)}>
-        {#if dark}<Sun size={15} aria-hidden="true" /> Light{:else}<Moon size={15} aria-hidden="true" /> Dark{/if}
-      </button>
-    </nav>
-    <div class="sw-demo-presence" role="status" data-state="ready">
-      <Calculator size={16} aria-hidden="true" /> 500 formulas ready
-    </div>
-  </header>
-
-  <div class="sw-demo-layout sw-demo-layout--single">
-
-    <main class="sw-demo-main" id="model">
-      <div class="sw-demo-heading">
+<section class="sw-demo-app sw-svelte-demo" data-framework="svelte">
+  <main class="sw-demo-main" id="model">
+    <header class="sw-svelte-chrome sw-demo-controlbar" id="formulas">
+      <div class="sw-demo-controlbar__identity">
+        <span class="sw-demo-product__mark" aria-hidden="true">
+          <FileSpreadsheet size={16} strokeWidth={1.8} />
+        </span>
         <div>
-          <p>PLANNING MODEL / FY26</p>
           <h2>Annual revenue plan</h2>
+          <span>{ROWS.toLocaleString()} live formulas</span>
         </div>
       </div>
-
-      <div class="sw-demo-kpis" aria-label="Formula workbook metrics">
-        <article><span>MODEL ROWS</span><strong>{ROWS.toLocaleString()}</strong><small>Bulk columnar ingest</small></article>
-        <article><span>LIVE FORMULAS</span><strong>{ROWS.toLocaleString()}</strong><small>=SUM(B:E) per line</small></article>
-        <article><span>COMMITTED</span><strong>{changeLog.length}</strong><small>Recent transactions</small></article>
-        <article><span>SHEETS</span><strong>2</strong><small>Cross-sheet references</small></article>
+      <nav class="sw-demo-controlbar__sheet-actions" aria-label="Workbook quick actions">
+        <button type="button" data-active={activeSheet === "model"} onclick={() => openSheet("model")}>
+          <FileSpreadsheet size={15} aria-hidden="true" /> Model
+        </button>
+        <button type="button" data-active={activeSheet === "summary"} onclick={() => openSheet("summary")}>
+          <ListChecks size={15} aria-hidden="true" /> Summary
+        </button>
+      </nav>
+      <div class="sw-svelte-toolbar" bind:this={toolbarHost}>
+        <span>EDIT</span>
       </div>
+      <div class="sw-svelte-formula" bind:this={chromeHost}></div>
+    </header>
 
-      <div class="sw-svelte-chrome" id="formulas">
-        <div class="sw-svelte-toolbar" bind:this={toolbarHost}>
-          <span>EDIT</span>
+    <div class="sw-demo-workspace">
+      <div class="sw-demo-grid" bind:this={gridWrap}>
+        <SheetwriteGrid
+          bind:grid
+          {workbook}
+          {data}
+          {theme}
+          {renderers}
+          onGridChange={logChange}
+          onActiveSheetChange={(event: GridEvents["active-sheet"]) => {
+            activeSheet = event.sheet === "summary" ? "summary" : "model";
+          }}
+          config={GRID_CONFIG}
+          onReady={seedSummary}
+          fill
+        />
+      </div>
+      <aside class="sw-demo-activity" id="activity" aria-label="Recent transactions" aria-live="polite">
+        <div>
+          <p>TRANSACTION LOG</p>
+          <strong>Committed operations</strong>
         </div>
-        <div class="sw-svelte-formula" bind:this={chromeHost}></div>
-      </div>
-
-      <div class="sw-demo-workspace">
-        <div class="sw-demo-grid" bind:this={gridWrap}>
-          <SheetwriteGrid
-            bind:grid
-            {workbook}
-            {data}
-            {theme}
-            {renderers}
-            onGridChange={logChange}
-            onActiveSheetChange={(event: GridEvents["active-sheet"]) => {
-              activeSheet = event.sheet === "summary" ? "summary" : "model";
-            }}
-            config={GRID_CONFIG}
-            onReady={seedSummary}
-            fill
-          />
+        {#if changeLog.length === 0}
+          <p class="sw-demo-activity__empty">Edit a value or formula to inspect its commit reason.</p>
+        {:else}
+          <ol>
+            {#each [...changeLog].reverse() as event}
+              <li>
+                <code>{event.commitReason}</code>
+                <span>{event.changes.length} changed cell(s)</span>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+        <div class="sw-demo-activity__help">
+          <span>TRY THIS</span>
+          <p>Edit a quarter value, then open Summary. The cross-sheet total recalculates immediately.</p>
         </div>
-        <aside class="sw-demo-activity" id="activity" aria-label="Recent transactions" aria-live="polite">
-          <div>
-            <p>TRANSACTION LOG</p>
-            <strong>Committed operations</strong>
-          </div>
-          {#if changeLog.length === 0}
-            <p class="sw-demo-activity__empty">Edit a value or formula to inspect its commit reason.</p>
-          {:else}
-            <ol>
-              {#each [...changeLog].reverse() as event}
-                <li>
-                  <code>{event.commitReason}</code>
-                  <span>{event.changes.length} changed cell(s)</span>
-                </li>
-              {/each}
-            </ol>
-          {/if}
-          <div class="sw-demo-activity__help">
-            <span>TRY THIS</span>
-            <p>Edit a quarter value, then open Summary. The cross-sheet total recalculates immediately.</p>
-          </div>
-        </aside>
-      </div>
+      </aside>
+    </div>
 
-      <footer class="sw-demo-status">
-        <span>Svelte 5 runes · bound Grid handle</span>
-        <span>Custom Canvas renderer · composed shell controls</span>
-      </footer>
-    </main>
-  </div>
+    <footer class="sw-demo-status sw-demo-status--metrics">
+      <span>{ROWS.toLocaleString()} model rows</span>
+      <span>{ROWS.toLocaleString()} formulas</span>
+      <span>{changeLog.length} recent commits</span>
+      <span>2 linked sheets</span>
+      <span><Calculator size={13} aria-hidden="true" /> Svelte 5 bound Grid</span>
+    </footer>
+  </main>
 </section>
 
 <style>
@@ -356,57 +314,63 @@ $effect(() => {
     --sheetwrite-widget-fg: var(--demo-fg);
     --sheetwrite-widget-border: var(--demo-border);
     --sheetwrite-widget-selection: color-mix(in srgb, var(--demo-accent) 14%, transparent);
-    --sheetwrite-widget-accent: var(--demo-accent);
-    --sheetwrite-toolbar-bg: var(--demo-raised);
+    --sheetwrite-widget-accent: var(--sw-demo-accent-strong);
+    --sheetwrite-toolbar-bg: transparent;
     --sheetwrite-toolbar-fg: var(--demo-fg);
-    display: grid;
-    overflow: hidden;
-    border: 1px solid var(--demo-border);
-    border-radius: 0.5rem;
+    display: flex;
+    min-width: 0;
+    min-height: 3.25rem;
+    gap: var(--sw-demo-space-2);
+    align-items: center;
+    padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
+    overflow-x: auto;
+    border-bottom: 1px solid var(--demo-border);
     background: var(--demo-raised);
+    scrollbar-width: thin;
   }
 
   .sw-svelte-toolbar {
     display: flex;
-    min-height: 2.4rem;
-    gap: 0.55rem;
+    flex: none;
+    min-width: max-content;
+    gap: var(--sw-demo-space-1);
     align-items: center;
-    padding-inline: 0.55rem;
-    border-bottom: 1px solid var(--demo-border);
   }
 
-  .sw-svelte-toolbar > span {
-    color: #60708b;
+  .sw-svelte-toolbar > span,
+  .sw-svelte-formula::before {
+    color: var(--sw-demo-dim);
     font: 600 var(--sw-type-xs) var(--font-mono);
     letter-spacing: 0.1em;
   }
 
-  .sw-svelte-toolbar > button {
-    min-height: 1.75rem;
-    margin-left: auto;
-    border: 1px solid var(--demo-border);
-    border-radius: 0.3rem;
-    background: var(--demo-surface);
-    color: var(--demo-muted);
-    font: 500 var(--sw-type-xs) var(--font-mono);
-  }
-
   .sw-svelte-toolbar :global(.sheetwrite-shell-toolbar) {
-    flex: 1;
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
 
   .sw-svelte-formula {
     display: flex;
-    min-height: 2.4rem;
-    gap: 0.4rem;
+    flex: 1 0 22rem;
+    min-width: 18rem;
+    gap: var(--sw-demo-space-1);
     align-items: center;
-    padding: 0.35rem 0.55rem;
   }
 
   .sw-svelte-formula::before {
-    color: #60708b;
-    font: 600 var(--sw-type-xs) var(--font-mono);
-    letter-spacing: 0.1em;
     content: "CELL";
+  }
+
+  .sw-svelte-formula :global(.sheetwrite-shell-formula) {
+    min-width: 12rem;
+  }
+
+  .sw-svelte-chrome :global(.sheetwrite-shell-status) {
+    flex: none;
+    padding-inline: var(--sw-demo-space-1);
+    color: var(--demo-muted);
+    font: 500 var(--sw-type-xs) var(--font-mono);
   }
 </style>
