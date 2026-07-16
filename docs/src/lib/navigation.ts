@@ -14,6 +14,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
     label: "Start",
     items: [
+      { label: "Overview", href: "/docs/" },
       { label: "Installation", href: "/docs/start/installation/" },
       { label: "First grid", href: "/docs/start/first-grid/" },
     ],
