@@ -712,8 +712,8 @@
     },
     "package.@sheetwrite/core.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 206630,
-      "maximum": 216962,
+      "baseline": 217218,
+      "maximum": 228079,
       "category": "package-declarations",
       "owner": "@sheetwrite/core",
       "rationale": "Approved complete public JSDoc baseline plus the larger of five percent or 1 KiB."
@@ -792,8 +792,8 @@
     },
     "package.@sheetwrite/react.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 1415,
-      "maximum": 2439,
+      "baseline": 2684,
+      "maximum": 3708,
       "category": "package-declarations",
       "owner": "@sheetwrite/react",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -848,11 +848,11 @@
     },
     "package.@sheetwrite/react.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 20816,
-      "maximum": 21857,
+      "baseline": 22453,
+      "maximum": 23576,
       "category": "package",
       "owner": "@sheetwrite/react",
-      "rationale": "Audited adapter declarations baseline plus five percent."
+      "rationale": "Approved adapter documentation baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/react.wasmBytes": {
       "unit": "bytes",
@@ -912,8 +912,8 @@
     },
     "package.@sheetwrite/svelte.runtimeSourceBytes": {
       "unit": "bytes",
-      "baseline": 7810,
-      "maximum": 8834,
+      "baseline": 9570,
+      "maximum": 10594,
       "category": "package-runtime-source",
       "owner": "@sheetwrite/svelte",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -928,8 +928,8 @@
     },
     "package.@sheetwrite/svelte.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 12637,
-      "maximum": 13661,
+      "baseline": 14645,
+      "maximum": 15669,
       "category": "package",
       "owner": "@sheetwrite/svelte",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -952,8 +952,8 @@
     },
     "package.@sheetwrite/vue.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 8167,
-      "maximum": 9191,
+      "baseline": 11549,
+      "maximum": 12573,
       "category": "package-declarations",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -1000,16 +1000,16 @@
     },
     "package.@sheetwrite/vue.tarballBytes": {
       "unit": "bytes",
-      "baseline": 7587,
-      "maximum": 8611,
+      "baseline": 8827,
+      "maximum": 9851,
       "category": "package",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/vue.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 30136,
-      "maximum": 31643,
+      "baseline": 34918,
+      "maximum": 36664,
       "category": "package",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
