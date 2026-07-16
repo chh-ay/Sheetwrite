@@ -641,7 +641,10 @@ async function renderLandingBench(): Promise<string> {
         result.scenarioId === scenario &&
         result.status === "success",
     );
-  const sizes = evidence.config.rows.map((size) => {
+  // Sizes with zero full-round pairs are omitted rather than emitted as NaN
+  // (JSON.stringify silently turns NaN into null and the landing would render
+  // it as a number).
+  const sizes = evidence.config.rows.flatMap((size) => {
     const ratios: Array<{ scenario: string; ratio: number }> = [];
     let handsontableIncomplete = 0;
     for (const scenario of evidence.config.scenarios) {
@@ -657,26 +660,47 @@ async function renderLandingBench(): Promise<string> {
         ratio: mid(theirs.map((r) => r.medianMs)) / mid(ours.map((r) => r.medianMs)),
       });
     }
-    const best = ratios.reduce(
-      (a, b) => (b.ratio > a.ratio ? b : a),
-      ratios[0] ?? { scenario: "", ratio: Number.NaN },
-    );
-    return {
-      size,
-      comparedScenarios: ratios.length,
-      medianRatio: round1(mid(ratios.map((r) => r.ratio))),
-      bestRatio: round1(best.ratio),
-      bestScenario: best.scenario,
-      handsontableIncomplete,
-    };
+    if (ratios.length === 0) return [];
+    const best = ratios.reduce((a, b) => (b.ratio > a.ratio ? b : a));
+    return [
+      {
+        size,
+        comparedScenarios: ratios.length,
+        medianRatio: round1(mid(ratios.map((r) => r.ratio))),
+        bestRatio: round1(best.ratio),
+        bestScenario: best.scenario,
+        handsontableIncomplete,
+      },
+    ];
   });
   const scenarioMedians: number[] = [];
   const scenarioHeaps: number[] = [];
   for (const scenario of evidence.config.scenarios) {
     const bucket = successes(1_000_000, "sheetwrite", scenario);
-    if (bucket.length === 0) continue;
+    // Hero stats hold the same full-round bar as the ratio pairs.
+    if (bucket.length < evidence.metadata.rounds) continue;
     scenarioMedians.push(mid(bucket.map((r) => r.medianMs)));
     scenarioHeaps.push(mid(bucket.map((r) => r.memory.afterBytes)));
+  }
+  const heroStats = {
+    millionRowScenarios: scenarioMedians.length,
+    millionRowMedianMs: round1(mid(scenarioMedians)),
+    millionRowHeapMb: Math.round(mid(scenarioHeaps) / 1_000_000),
+  };
+  const displayed = [
+    ...sizes.flatMap((entry) => [entry.medianRatio, entry.bestRatio]),
+    heroStats.millionRowMedianMs,
+    heroStats.millionRowHeapMb,
+  ];
+  // Never publish a payload whose displayed values are not all finite: a
+  // structurally valid artifact with no comparable pairs must fall back to
+  // the "run the protocol" placeholder, not render null.
+  if (sizes.length === 0 || displayed.some((value) => !Number.isFinite(value))) {
+    return `${JSON.stringify(
+      { available: false, reason: "artifact has no full-round engine pairs to compare" },
+      null,
+      2,
+    )}\n`;
   }
   const payload = {
     available: true,
@@ -686,11 +710,7 @@ async function renderLandingBench(): Promise<string> {
       browser: `Chromium ${evidence.metadata.browserVersion}`,
       rounds: evidence.metadata.rounds,
     },
-    heroStats: {
-      millionRowScenarios: scenarioMedians.length,
-      millionRowMedianMs: round1(mid(scenarioMedians)),
-      millionRowHeapMb: Math.round(mid(scenarioHeaps) / 1_000_000),
-    },
+    heroStats,
     sizes,
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
