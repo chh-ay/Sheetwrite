@@ -1175,6 +1175,20 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   return parts.join("\n");
 }
 
+/**
+ * Run-completion arithmetic for the evidence headline. `results` already
+ * contains failed entries - failedKeys must never be added on top (that
+ * double-count published 1120/1140 for a 1120-cell matrix).
+ */
+export function runCompletionSummary(results: ReadonlyArray<{ status: string }>): {
+  successes: number;
+  total: number;
+  failures: number;
+} {
+  const successes = results.filter((result) => result.status === "success").length;
+  return { successes, total: results.length, failures: results.length - successes };
+}
+
 async function renderEvidencePage(): Promise<string> {
   const scale = await loadEvidence(
     "bench/results/render-scale.json",
@@ -1210,10 +1224,9 @@ async function renderEvidencePage(): Promise<string> {
   if ("evidence" in scale) {
     const { evidence, source } = scale;
     const metadata = evidence.metadata;
-    const failures = evidence.completeness?.failedKeys.length ?? 0;
-    const total = evidence.results.length + failures;
+    const { successes, total, failures } = runCompletionSummary(evidence.results);
     lines.push(
-      `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.results.length}/${total} engine/scenario/round runs completed across ${evidence.config.rows.length} workbook sizes; every completed run passed its correctness checkpoints${failures > 0 ? `; ${failures} runs did not finish and are shown as such` : ""}.</div>`,
+      `<div class="evidence-available"><strong>Validated evidence.</strong> ${successes}/${total} engine/scenario/round runs completed across ${evidence.config.rows.length} workbook sizes; every completed run passed its correctness checkpoints${failures > 0 ? `; ${failures} runs did not finish and are shown as such` : ""}.</div>`,
       "",
       "Both engines drive identical scripted interactions in a controlled browser. Pick a workbook size and a metric:",
       "",
