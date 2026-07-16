@@ -6,6 +6,7 @@ import {
   documentForSplat,
   normalizeDocumentHref,
 } from "../lib/content.js";
+import { pageMeta } from "../lib/seo.js";
 
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
@@ -14,10 +15,10 @@ export const Route = createFileRoute("/docs/$")({
     return { title: document.title, description: document.description };
   },
   head: ({ loaderData }) => ({
-    meta: [
-      { title: `${loaderData?.title ?? "Documentation"} — Sheetwrite` },
-      { name: "description", content: loaderData?.description ?? "Sheetwrite documentation." },
-    ],
+    meta: pageMeta(
+      `${loaderData?.title ?? "Documentation"} — Sheetwrite`,
+      loaderData?.description ?? "Sheetwrite documentation.",
+    ),
   }),
   component: DocumentRoute,
   notFoundComponent: DocumentNotFound,

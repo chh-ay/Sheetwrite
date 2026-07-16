@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun vite dev",
-    "build": "bun ../scripts/docs.ts check && bun --bun vite build && bunx pagefind --site dist/client",
+    "build": "bun ../scripts/docs.ts check && bun --bun vite build && bun ../scripts/normalize-sitemap.ts && bunx pagefind --site dist/client",
     "preview": "bun --bun vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

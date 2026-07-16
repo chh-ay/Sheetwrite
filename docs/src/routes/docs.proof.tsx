@@ -2,7 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import Proof from "../content/proof.mdx";
 
 export const Route = createFileRoute("/docs/proof")({
-  head: () => ({ meta: [{ title: "MDX and hover proof · Sheetwrite" }] }),
+  // Internal MDX/hover pipeline proof; not a reader-facing document.
+  head: () => ({
+    meta: [
+      { title: "MDX and hover proof · Sheetwrite" },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
   component: ProofPage,
 });
 

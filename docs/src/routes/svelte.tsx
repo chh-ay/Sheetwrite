@@ -1,16 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SvelteShowcaseIsland } from "../showcases/AdapterIslands.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
+import { pageMeta } from "../lib/seo.js";
 
 const description =
   "Edit 500 live formulas, move between model and summary sheets, and inspect committed transactions through a bound Grid handle.";
 
 export const Route = createFileRoute("/svelte")({
   head: () => ({
-    meta: [
-      { title: "Svelte formula workbook — Sheetwrite" },
-      { name: "description", content: description },
-    ],
+    meta: pageMeta("Svelte formula workbook — Sheetwrite", description),
   }),
   component: SvelteShowcaseRoute,
 });

@@ -1,16 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DocsShell } from "../components/DocsShell.js";
+import { pageMeta } from "../lib/seo.js";
 
 export const Route = createFileRoute("/")({
   head: () => ({
-    meta: [
-      { title: "Sheetwrite documentation" },
-      {
-        name: "description",
-        content:
-          "Install Sheetwrite, choose a framework adapter, and build against its runtime, data, interaction, and API contracts.",
-      },
-    ],
+    meta: pageMeta(
+      "Sheetwrite documentation",
+      "Install Sheetwrite, choose a framework adapter, and build against its runtime, data, interaction, and API contracts.",
+    ),
   }),
   component: Home,
 });

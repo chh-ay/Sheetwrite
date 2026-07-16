@@ -85,11 +85,13 @@ export default defineConfig({
       pages: [
         { path: "/" },
         { path: "/docs/" },
-        { path: "/test/xlsx/" },
-        { path: "/test/collaboration/" },
-        { path: "/test/framework-lifecycle/react/" },
-        { path: "/test/framework-lifecycle/vue/" },
-        { path: "/test/framework-lifecycle/svelte/" },
+        { path: "/docs/proof/", sitemap: { exclude: true } },
+        // Test fixtures stay reachable for Playwright but out of search surfaces.
+        { path: "/test/xlsx/", sitemap: { exclude: true } },
+        { path: "/test/collaboration/", sitemap: { exclude: true } },
+        { path: "/test/framework-lifecycle/react/", sitemap: { exclude: true } },
+        { path: "/test/framework-lifecycle/vue/", sitemap: { exclude: true } },
+        { path: "/test/framework-lifecycle/svelte/", sitemap: { exclude: true } },
       ],
       prerender: {
         enabled: true,
