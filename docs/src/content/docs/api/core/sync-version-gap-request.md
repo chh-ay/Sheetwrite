@@ -60,10 +60,10 @@ signal: AbortSignal;
 
 ```ts generated
 export interface SyncVersionGapRequest {
-    documentId: string;
-    expectedVersion: number;
-    receivedVersion: number;
-    signal: AbortSignal;
+  documentId: string;
+  expectedVersion: number;
+  receivedVersion: number;
+  signal: AbortSignal;
 }
 ```
 

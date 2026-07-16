@@ -114,16 +114,16 @@ border?: CellBorders;
 
 ```ts generated
 export interface CellStyle {
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean;
-    strikethrough?: boolean;
-    fontSize?: number;
-    color?: string;
-    backgroundColor?: string;
-    align?: CellAlign;
-    wrap?: boolean;
-    border?: CellBorders;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  fontSize?: number;
+  color?: string;
+  backgroundColor?: string;
+  align?: CellAlign;
+  wrap?: boolean;
+  border?: CellBorders;
 }
 ```
 

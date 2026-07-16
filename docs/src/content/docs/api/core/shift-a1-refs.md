@@ -14,8 +14,8 @@ tokens preceded by an alphanumeric (function names, identifiers) are skipped.
 <div><dt>Source</dt><dd><code>packages/core/src/a1.ts#L46</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function shiftA1Refs(src: string, dRow: number, dCol: number): string;
+function shiftA1Refs(src: string, dRow: number, dCol: number): string
 ```

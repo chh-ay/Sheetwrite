@@ -12,11 +12,15 @@ Advanced framework component for workbook data or datasource input.
 <div><dt>Source</dt><dd><code>packages/svelte/src/Grid.svelte.d.ts#L7</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function SheetwriteGrid(this: void, internals: ComponentInternals, props: SheetwriteGridProps): {
-    $on?(type: string, callback: (e: any) => void): () => void;
-    $set?(props: Partial<SheetwriteGridProps>): void;
-};
+function SheetwriteGrid(
+  this: void,
+  internals: ComponentInternals,
+  props: SheetwriteGridProps,
+): {
+  $on?(type: string, callback: (e: any) => void): () => void;
+  $set?(props: Partial<SheetwriteGridProps>): void;
+}
 ```

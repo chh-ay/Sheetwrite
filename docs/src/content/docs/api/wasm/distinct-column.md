@@ -61,10 +61,10 @@ takeTexts: () => string[]
 
 ```ts generated
 class DistinctColumn {
-    free: () => void;
-    takeKinds: () => Uint8Array;
-    takeNumbers: () => Float64Array;
-    takeTexts: () => string[];
+  free: () => void;
+  takeKinds: () => Uint8Array;
+  takeNumbers: () => Float64Array;
+  takeTexts: () => string[];
 }
 ```
 

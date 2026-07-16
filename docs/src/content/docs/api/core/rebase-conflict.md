@@ -60,10 +60,10 @@ message: string;
 
 ```ts generated
 export interface RebaseConflict {
-    code: RebaseConflictCode;
-    localOperationIndex: number;
-    remoteOperationIndex: number;
-    message: string;
+  code: RebaseConflictCode;
+  localOperationIndex: number;
+  remoteOperationIndex: number;
+  message: string;
 }
 ```
 

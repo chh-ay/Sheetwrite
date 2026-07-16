@@ -12,8 +12,8 @@ Whether the WASM module has finished initializing.
 <div><dt>Source</dt><dd><code>packages/wasm/loader.d.ts#L24</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function isLoaded(): boolean;
+function isLoaded(): boolean
 ```

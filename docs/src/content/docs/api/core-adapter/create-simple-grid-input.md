@@ -12,8 +12,10 @@ Converts simple columns and row objects into canonical workbook and columnar inp
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L193</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createSimpleGridInput<Row extends Record<string, CellScalar>>(options: SimpleSheetwriteOptions<Row>): SimpleGridInput;
+function createSimpleGridInput<
+  Row extends Record<string, CellScalar>,
+>(options: SimpleSheetwriteOptions<Row>): SimpleGridInput
 ```

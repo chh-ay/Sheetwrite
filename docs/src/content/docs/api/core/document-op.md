@@ -15,33 +15,265 @@ Exhaustive serializable operation union for workbook mutations.
 ## Variants <span class="api-count">27</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ op: &quot;set&quot;; addr: CellAddress; value: CellValue; style?: CellStyle }</code></div>
-<div class="api-variant"><code>{ op: &quot;setRange&quot;; range: Range; cells: SnapshotCell[] }</code></div>
-<div class="api-variant"><code>{ op: &quot;setBlock&quot;; range: Range; block: PackedCellBlock }</code></div>
-<div class="api-variant"><code>{ op: &quot;setRangeStyle&quot;; range: Range; style: Partial&lt;CellStyle&gt; | null }</code></div>
-<div class="api-variant"><code>{ op: &quot;clearRange&quot;; range: Range; contents?: boolean; style?: boolean }</code></div>
-<div class="api-variant"><code>{ op: &quot;addRows&quot;; sheet: SheetId; at: number; count: number }</code></div>
-<div class="api-variant"><code>{ op: &quot;removeRows&quot;; sheet: SheetId; at: number; count: number }</code></div>
-<div class="api-variant"><code>{ op: &quot;moveRows&quot;; sheet: SheetId; from: number; count: number; to: number }</code></div>
-<div class="api-variant"><code>{ op: &quot;addColumns&quot;; sheet: SheetId; at: number; columns: Column[] }</code></div>
-<div class="api-variant"><code>{ op: &quot;removeColumns&quot;; sheet: SheetId; at: number; count: number }</code></div>
-<div class="api-variant"><code>{ op: &quot;moveColumns&quot;; sheet: SheetId; from: number; count: number; to: number }</code></div>
-<div class="api-variant"><code>{ op: &quot;setColumn&quot;; sheet: SheetId; col: number; patch: Partial&lt;Column&gt; }</code></div>
-<div class="api-variant"><code>{ op: &quot;setRowMeta&quot;; sheet: SheetId; row: number; meta: RowMetadata | null }</code></div>
-<div class="api-variant"><code>{ op: &quot;addMerge&quot;; sheet: SheetId; merge: MergeRange }</code></div>
-<div class="api-variant"><code>{ op: &quot;removeMerge&quot;; sheet: SheetId; merge: MergeRange }</code></div>
-<div class="api-variant"><code>{ op: &quot;addSheet&quot;; sheet: SheetSnapshot }</code></div>
-<div class="api-variant"><code>{ op: &quot;removeSheet&quot;; sheet: SheetId }</code></div>
-<div class="api-variant"><code>{ op: &quot;renameSheet&quot;; sheet: SheetId; name: string }</code></div>
-<div class="api-variant"><code>{ op: &quot;moveSheet&quot;; sheet: SheetId; to: number }</code></div>
-<div class="api-variant"><code>{ op: &quot;setSheetMeta&quot;; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array&lt;[col: number, filter: ColumnFilter]&gt;; }; }</code></div>
-<div class="api-variant"><code>{ op: &quot;setValidationRule&quot;; sheet: SheetId; rule: DataValidationRule }</code></div>
-<div class="api-variant"><code>{ op: &quot;removeValidationRule&quot;; sheet: SheetId; id: string }</code></div>
-<div class="api-variant"><code>{ op: &quot;setProtectedRange&quot;; sheet: SheetId; protectedRange: ProtectedRange }</code></div>
-<div class="api-variant"><code>{ op: &quot;removeProtectedRange&quot;; sheet: SheetId; id: string }</code></div>
-<div class="api-variant"><code>{ op: &quot;setNote&quot;; addr: CellAddress; text: string | null }</code></div>
-<div class="api-variant"><code>{ op: &quot;setNamedRange&quot;; namedRange: NamedRangeSnapshot }</code></div>
-<div class="api-variant"><code>{ op: &quot;removeNamedRange&quot;; name: string; scope?: SheetId }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "set";
+  addr: CellAddress;
+  value: CellValue;
+  style?: CellStyle;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "setRange"; range: Range; cells: SnapshotCell[] }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "setBlock"; range: Range; block: PackedCellBlock }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setRangeStyle";
+  range: Range;
+  style: Partial<CellStyle> | null;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "clearRange";
+  range: Range;
+  contents?: boolean;
+  style?: boolean;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "addRows"; sheet: SheetId; at: number; count: number }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "removeRows";
+  sheet: SheetId;
+  at: number;
+  count: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "moveRows";
+  sheet: SheetId;
+  from: number;
+  count: number;
+  to: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "addColumns";
+  sheet: SheetId;
+  at: number;
+  columns: Column[];
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "removeColumns";
+  sheet: SheetId;
+  at: number;
+  count: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "moveColumns";
+  sheet: SheetId;
+  from: number;
+  count: number;
+  to: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setColumn";
+  sheet: SheetId;
+  col: number;
+  patch: Partial<Column>;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setRowMeta";
+  sheet: SheetId;
+  row: number;
+  meta: RowMetadata | null;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "addMerge"; sheet: SheetId; merge: MergeRange }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeMerge"; sheet: SheetId; merge: MergeRange }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "addSheet"; sheet: SheetSnapshot }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeSheet"; sheet: SheetId }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "renameSheet"; sheet: SheetId; name: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "moveSheet"; sheet: SheetId; to: number }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setSheetMeta";
+  sheet: SheetId;
+  patch: {
+    frozenRows?: number;
+    frozenCols?: number;
+    conditionalFormats?: ConditionalFormatRule[];
+    rowGroups?: RowGroup[];
+    sortKeys?: SortKey[];
+    filters?: Array<[col: number, filter: ColumnFilter]>;
+  };
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setValidationRule";
+  sheet: SheetId;
+  rule: DataValidationRule;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeValidationRule"; sheet: SheetId; id: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setProtectedRange";
+  sheet: SheetId;
+  protectedRange: ProtectedRange;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeProtectedRange"; sheet: SheetId; id: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "setNote"; addr: CellAddress; text: string | null }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "setNamedRange"; namedRange: NamedRangeSnapshot }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeNamedRange"; name: string; scope?: SheetId }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -50,134 +282,158 @@ Exhaustive serializable operation union for workbook mutations.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type DocumentOp = {
-    op: "set";
-    addr: CellAddress;
-    value: CellValue;
-    style?: CellStyle;
-} | {
-    op: "setRange";
-    range: Range;
-    cells: SnapshotCell[];
-} | {
-    op: "setBlock";
-    range: Range;
-    block: PackedCellBlock;
-} | {
-    op: "setRangeStyle";
-    range: Range;
-    style: Partial<CellStyle> | null;
-} | {
-    op: "clearRange";
-    range: Range;
-    contents?: boolean;
-    style?: boolean;
-} | {
-    op: "addRows";
-    sheet: SheetId;
-    at: number;
-    count: number;
-} | {
-    op: "removeRows";
-    sheet: SheetId;
-    at: number;
-    count: number;
-} | {
-    op: "moveRows";
-    sheet: SheetId;
-    from: number;
-    count: number;
-    to: number;
-} | {
-    op: "addColumns";
-    sheet: SheetId;
-    at: number;
-    columns: Column[];
-} | {
-    op: "removeColumns";
-    sheet: SheetId;
-    at: number;
-    count: number;
-} | {
-    op: "moveColumns";
-    sheet: SheetId;
-    from: number;
-    count: number;
-    to: number;
-} | {
-    op: "setColumn";
-    sheet: SheetId;
-    col: number;
-    patch: Partial<Column>;
-} | {
-    op: "setRowMeta";
-    sheet: SheetId;
-    row: number;
-    meta: RowMetadata | null;
-} | {
-    op: "addMerge";
-    sheet: SheetId;
-    merge: MergeRange;
-} | {
-    op: "removeMerge";
-    sheet: SheetId;
-    merge: MergeRange;
-} | {
-    op: "addSheet";
-    sheet: SheetSnapshot;
-} | {
-    op: "removeSheet";
-    sheet: SheetId;
-} | {
-    op: "renameSheet";
-    sheet: SheetId;
-    name: string;
-} | {
-    op: "moveSheet";
-    sheet: SheetId;
-    to: number;
-} | {
-    op: "setSheetMeta";
-    sheet: SheetId;
-    patch: {
+export type DocumentOp =
+  | {
+      op: "set";
+      addr: CellAddress;
+      value: CellValue;
+      style?: CellStyle;
+    }
+  | {
+      op: "setRange";
+      range: Range;
+      cells: SnapshotCell[];
+    }
+  | {
+      op: "setBlock";
+      range: Range;
+      block: PackedCellBlock;
+    }
+  | {
+      op: "setRangeStyle";
+      range: Range;
+      style: Partial<CellStyle> | null;
+    }
+  | {
+      op: "clearRange";
+      range: Range;
+      contents?: boolean;
+      style?: boolean;
+    }
+  | {
+      op: "addRows";
+      sheet: SheetId;
+      at: number;
+      count: number;
+    }
+  | {
+      op: "removeRows";
+      sheet: SheetId;
+      at: number;
+      count: number;
+    }
+  | {
+      op: "moveRows";
+      sheet: SheetId;
+      from: number;
+      count: number;
+      to: number;
+    }
+  | {
+      op: "addColumns";
+      sheet: SheetId;
+      at: number;
+      columns: Column[];
+    }
+  | {
+      op: "removeColumns";
+      sheet: SheetId;
+      at: number;
+      count: number;
+    }
+  | {
+      op: "moveColumns";
+      sheet: SheetId;
+      from: number;
+      count: number;
+      to: number;
+    }
+  | {
+      op: "setColumn";
+      sheet: SheetId;
+      col: number;
+      patch: Partial<Column>;
+    }
+  | {
+      op: "setRowMeta";
+      sheet: SheetId;
+      row: number;
+      meta: RowMetadata | null;
+    }
+  | {
+      op: "addMerge";
+      sheet: SheetId;
+      merge: MergeRange;
+    }
+  | {
+      op: "removeMerge";
+      sheet: SheetId;
+      merge: MergeRange;
+    }
+  | {
+      op: "addSheet";
+      sheet: SheetSnapshot;
+    }
+  | {
+      op: "removeSheet";
+      sheet: SheetId;
+    }
+  | {
+      op: "renameSheet";
+      sheet: SheetId;
+      name: string;
+    }
+  | {
+      op: "moveSheet";
+      sheet: SheetId;
+      to: number;
+    }
+  | {
+      op: "setSheetMeta";
+      sheet: SheetId;
+      patch: {
         frozenRows?: number;
         frozenCols?: number;
         conditionalFormats?: ConditionalFormatRule[];
         rowGroups?: RowGroup[];
         sortKeys?: SortKey[];
-        filters?: Array<[
-            col: number,
-            filter: ColumnFilter
-        ]>;
+        filters?: Array<[col: number, filter: ColumnFilter]>;
+      };
+    }
+  | {
+      op: "setValidationRule";
+      sheet: SheetId;
+      rule: DataValidationRule;
+    }
+  | {
+      op: "removeValidationRule";
+      sheet: SheetId;
+      id: string;
+    }
+  | {
+      op: "setProtectedRange";
+      sheet: SheetId;
+      protectedRange: ProtectedRange;
+    }
+  | {
+      op: "removeProtectedRange";
+      sheet: SheetId;
+      id: string;
+    }
+  | {
+      op: "setNote";
+      addr: CellAddress;
+      text: string | null;
+    }
+  | {
+      op: "setNamedRange";
+      namedRange: NamedRangeSnapshot;
+    }
+  | {
+      op: "removeNamedRange";
+      name: string;
+      scope?: SheetId;
     };
-} | {
-    op: "setValidationRule";
-    sheet: SheetId;
-    rule: DataValidationRule;
-} | {
-    op: "removeValidationRule";
-    sheet: SheetId;
-    id: string;
-} | {
-    op: "setProtectedRange";
-    sheet: SheetId;
-    protectedRange: ProtectedRange;
-} | {
-    op: "removeProtectedRange";
-    sheet: SheetId;
-    id: string;
-} | {
-    op: "setNote";
-    addr: CellAddress;
-    text: string | null;
-} | {
-    op: "setNamedRange";
-    namedRange: NamedRangeSnapshot;
-} | {
-    op: "removeNamedRange";
-    name: string;
-    scope?: SheetId;
-};
 ```
 
 </details>

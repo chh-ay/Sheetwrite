@@ -33,7 +33,7 @@ type: "painted"
 
 ```ts generated
 export type WorkerAcknowledgement = {
-    type: "painted";
+  type: "painted";
 };
 ```
 

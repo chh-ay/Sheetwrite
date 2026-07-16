@@ -12,8 +12,8 @@ Sentinel shown for a reference that participates in a cycle.
 <div><dt>Source</dt><dd><code>packages/core/src/reference.ts#L5</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const REF_CYCLE: "#CYCLE!";
+const REF_CYCLE: "#CYCLE!"
 ```

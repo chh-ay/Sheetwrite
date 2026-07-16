@@ -51,9 +51,9 @@ style?: "solid" | "dashed" | "dotted";
 
 ```ts generated
 export interface CellBorder {
-    color?: string;
-    width?: number;
-    style?: "solid" | "dashed" | "dotted";
+  color?: string;
+  width?: number;
+  style?: "solid" | "dashed" | "dotted";
 }
 ```
 

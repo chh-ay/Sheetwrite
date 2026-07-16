@@ -13,10 +13,14 @@ a precompiled `WebAssembly.Module`.
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L405</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function initSync(module: {
-    module: SyncInitInput;
-} | SyncInitInput): InitOutput;
+function initSync(
+  module:
+    | {
+        module: SyncInitInput;
+      }
+    | SyncInitInput,
+): InitOutput
 ```

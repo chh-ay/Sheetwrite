@@ -269,9 +269,10 @@ test.describe("documentation site", () => {
       .poll(() => markedLine.evaluate((line) => getComputedStyle(line).backgroundColor))
       .not.toBe("rgba(0, 0, 0, 0)");
 
-    // A deterministically overflowing block: the full Grid declaration at a
-    // narrow viewport, revealed from its collapsed disclosure first.
-    await page.setViewportSize({ width: 700, height: 900 });
+    // A deterministically overflowing block: declarations pretty-print at 78
+    // columns, so a 520px viewport guarantees horizontal overflow in the
+    // revealed Grid declaration.
+    await page.setViewportSize({ width: 520, height: 900 });
     await page.goto(docsUrl("api/core/grid/"));
     await waitForHydration(page);
     await page.locator(".api-declaration summary").click();

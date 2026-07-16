@@ -20,8 +20,10 @@ Test-only: never import from production code.
 <div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L72</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function installCanvasTestStubs(options?: CanvasTestStubOptions): () => void;
+function installCanvasTestStubs(
+  options?: CanvasTestStubOptions,
+): () => void
 ```

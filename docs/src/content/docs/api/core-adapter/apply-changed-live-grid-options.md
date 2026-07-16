@@ -12,8 +12,12 @@ Applies live-updatable adapter option changes to an existing Grid.
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L144</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function applyChangedLiveGridOptions(controller: GridController, previous: GridOptions, next: GridOptions): void;
+function applyChangedLiveGridOptions(
+  controller: GridController,
+  previous: GridOptions,
+  next: GridOptions,
+): void
 ```

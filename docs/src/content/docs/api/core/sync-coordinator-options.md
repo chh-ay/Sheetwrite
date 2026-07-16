@@ -80,12 +80,14 @@ snapshot for the host to remount before calling `resumeAfterReload`.</p>
 
 ```ts generated
 export interface SyncCoordinatorOptions {
-    documentId: string;
-    serverVersion: number;
-    createMutationId?: () => string;
-    pendingStorage?: PendingCommitStorage;
-    initialConnection?: "offline" | "online";
-    recoverVersionGap?: (request: SyncVersionGapRequest) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>;
+  documentId: string;
+  serverVersion: number;
+  createMutationId?: () => string;
+  pendingStorage?: PendingCommitStorage;
+  initialConnection?: "offline" | "online";
+  recoverVersionGap?: (
+    request: SyncVersionGapRequest,
+  ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>;
 }
 ```
 

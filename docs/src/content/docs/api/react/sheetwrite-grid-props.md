@@ -68,12 +68,20 @@ fill?: true;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SheetwriteGridProps extends GridOptions, GridAdapterEventHandlers, SheetwriteInitializationProps, Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | "children"> {
-    className?: string;
-    style?: CSSProperties;
-    fallback?: ReactNode;
-    height?: number | string;
-    fill?: true;
+export interface SheetwriteGridProps
+  extends
+    GridOptions,
+    GridAdapterEventHandlers,
+    SheetwriteInitializationProps,
+    Omit<
+      HTMLAttributes<HTMLDivElement>,
+      keyof GridAdapterEventHandlers | "children"
+    > {
+  className?: string;
+  style?: CSSProperties;
+  fallback?: ReactNode;
+  height?: number | string;
+  fill?: true;
 }
 ```
 

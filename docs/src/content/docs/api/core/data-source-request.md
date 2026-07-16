@@ -69,11 +69,11 @@ revision: number;
 
 ```ts generated
 export interface DataSourceRequest {
-    sheet: SheetId;
-    start: number;
-    end: number;
-    signal: AbortSignal;
-    revision: number;
+  sheet: SheetId;
+  start: number;
+  end: number;
+  signal: AbortSignal;
+  revision: number;
 }
 ```
 

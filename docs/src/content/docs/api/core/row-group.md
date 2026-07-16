@@ -51,9 +51,9 @@ collapsed: boolean;
 
 ```ts generated
 export interface RowGroup {
-    start: number;
-    end: number;
-    collapsed: boolean;
+  start: number;
+  end: number;
+  collapsed: boolean;
 }
 ```
 

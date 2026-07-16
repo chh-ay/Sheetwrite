@@ -42,8 +42,8 @@ toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
 
 ```ts generated
 export interface XlsxTableExportBackend {
-    name: string;
-    toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
+  name: string;
+  toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
 }
 ```
 

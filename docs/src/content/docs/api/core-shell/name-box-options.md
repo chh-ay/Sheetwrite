@@ -42,8 +42,8 @@ label?: string;
 
 ```ts generated
 export interface NameBoxOptions {
-    focusGrid?: () => void;
-    label?: string;
+  focusGrid?: () => void;
+  label?: string;
 }
 ```
 

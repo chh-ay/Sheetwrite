@@ -42,8 +42,8 @@ storeName?: string;
 
 ```ts generated
 export interface IndexedDbPendingCommitStorageOptions {
-    databaseName?: string;
-    storeName?: string;
+  databaseName?: string;
+  storeName?: string;
 }
 ```
 

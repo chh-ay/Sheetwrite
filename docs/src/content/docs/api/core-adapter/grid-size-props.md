@@ -15,8 +15,20 @@ Explicit width and height accepted by framework adapters.
 ## Variants <span class="api-count">2</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ height: number | string; fill?: never; }</code></div>
-<div class="api-variant"><code>{ fill: true; height?: never; }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ height: number | string; fill?: never }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ fill: true; height?: never }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -25,13 +37,15 @@ Explicit width and height accepted by framework adapters.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type GridSizeProps = {
-    height: number | string;
-    fill?: never;
-} | {
-    fill: true;
-    height?: never;
-};
+export type GridSizeProps =
+  | {
+      height: number | string;
+      fill?: never;
+    }
+  | {
+      fill: true;
+      height?: never;
+    };
 ```
 
 </details>

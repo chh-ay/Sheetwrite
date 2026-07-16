@@ -60,10 +60,10 @@ columns?: number[];
 
 ```ts generated
 export interface SearchOptions {
-    matchCase?: boolean;
-    wholeCell?: boolean;
-    sheet?: SheetId;
-    columns?: number[];
+  matchCase?: boolean;
+  wholeCell?: boolean;
+  sheet?: SheetId;
+  columns?: number[];
 }
 ```
 

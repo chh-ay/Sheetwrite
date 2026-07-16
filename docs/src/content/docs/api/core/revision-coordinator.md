@@ -87,13 +87,20 @@ serverVersion: number
 
 ```ts generated
 class RevisionCoordinator {
-    constructor(adapter: RevisionAdapter, options: RevisionCoordinatorOptions);
-    destroy: () => void;
-    list: () => Promise<readonly RevisionSummary[]>;
-    on: (listener: RevisionListener) => () => void;
-    preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions) => Promise<Grid>;
-    restore: (targetVersion: number, clientMutationId: string) => Promise<RevisionRestoreResponse>;
-    serverVersion: number;
+  constructor(adapter: RevisionAdapter, options: RevisionCoordinatorOptions);
+  destroy: () => void;
+  list: () => Promise<readonly RevisionSummary[]>;
+  on: (listener: RevisionListener) => () => void;
+  preview: (
+    host: HTMLElement,
+    version: number,
+    options?: SnapshotGridOptions,
+  ) => Promise<Grid>;
+  restore: (
+    targetVersion: number,
+    clientMutationId: string,
+  ) => Promise<RevisionRestoreResponse>;
+  serverVersion: number;
 }
 ```
 

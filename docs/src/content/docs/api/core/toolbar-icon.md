@@ -12,21 +12,8 @@ Text, DOM node, or node factory used as toolbar icon content.
 <div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L129</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">3</span>
-
-<div class="api-variant-list">
-<div class="api-variant"><code>string</code></div>
-<div class="api-variant"><code>Node</code></div>
-<div class="api-variant"><code>(() =&gt; Node)</code></div>
-</div>
-
 ## Declaration
-
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
 
 ```ts generated
 export type ToolbarIcon = string | Node | (() => Node);
 ```
-
-</details>

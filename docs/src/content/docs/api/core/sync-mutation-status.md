@@ -12,23 +12,9 @@ Lifecycle state of one local mutation in the synchronization queue.
 <div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L68</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">5</span>
-
-<div class="api-variant-list">
-<div class="api-variant"><code>&quot;persisting&quot;</code></div>
-<div class="api-variant"><code>&quot;pending&quot;</code></div>
-<div class="api-variant"><code>&quot;sending&quot;</code></div>
-<div class="api-variant"><code>&quot;conflicted&quot;</code></div>
-<div class="api-variant"><code>&quot;storage-error&quot;</code></div>
-</div>
-
 ## Declaration
 
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
-
 ```ts generated
-export type SyncMutationStatus = "persisting" | "pending" | "sending" | "conflicted" | "storage-error";
+export type SyncMutationStatus =
+  "persisting" | "pending" | "sending" | "conflicted" | "storage-error";
 ```
-
-</details>

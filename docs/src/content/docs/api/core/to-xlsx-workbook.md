@@ -12,8 +12,11 @@ Formula-preserving, multi-sheet workbook export through the optional XLSX backen
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L338</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function toXlsxWorkbook(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
+function toXlsxWorkbook(
+  input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
+  options?: XlsxWorkbookOptions,
+): Promise<Uint8Array>
 ```

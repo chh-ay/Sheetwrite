@@ -616,66 +616,240 @@ the cell's style.</p>
 
 ```ts generated
 class CellStore {
-    addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number) => number;
-    addRows: (sheet: number, at: number, count: number) => void;
-    addSheet: (n_cols: number, row_count: number) => number;
-    aggregate: (sheet: number, col: number, op: number) => number;
-    beginPageLoad: () => void;
-    captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined;
-    cellState: (sheet: number, row: number, col: number) => number;
-    clearCell: (sheet: number, row: number, col: number, style: number) => void;
-    clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean;
-    colCount: (sheet: number) => number;
-    dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number;
-    dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number;
-    distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn;
-    endPageLoad: () => void;
-    filterRows: (sheet: number, col: number, needle: string) => Uint32Array;
-    filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array;
-    formulaSource: (sheet: number, row: number, col: number) => string | undefined;
-    free: () => void;
-    getCell: (sheet: number, row: number, col: number) => CellOut;
-    getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView;
-    getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView;
-    insertCols: (sheet: number, at: number, count: number) => void;
-    isFullyLoaded: (sheet: number) => boolean;
-    isPaged: (sheet: number) => boolean;
-    isSheetAlive: (sheet: number) => boolean;
-    markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void;
-    pagedStats: (sheet: number) => Float64Array;
-    pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void;
-    poolStrings: (ids: Uint32Array) => string[];
-    queryResourceStats: () => Float64Array;
-    rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean;
-    rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array;
-    recompute: (sheet: number) => void;
-    recomputeVolatile: (serial: number) => boolean;
-    remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean;
-    removeCols: (sheet: number, at: number, count: number) => void;
-    removeNamedRange: (name: string, scope: number) => boolean;
-    removeRows: (sheet: number, at: number, count: number) => void;
-    removeSheet: (sheet: number) => boolean;
-    renameSheet: (sheet: number, id: string, name: string) => boolean;
-    resetQueryResourceStats: () => void;
-    restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean;
-    rowCount: (sheet: number) => number;
-    search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array;
-    setBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array) => boolean;
-    setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void;
-    setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void;
-    setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void;
-    setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void;
-    setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void;
-    setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number;
-    setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean;
-    setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void;
-    setSheetName: (sheet: number, id: string, name: string) => void;
-    setString: (sheet: number, row: number, col: number, value: string, style: number) => void;
-    snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array;
-    snapshotTexts: (snapshot: RangeSnapshot) => string[];
-    sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array;
-    sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array;
-    styleIdAt: (sheet: number, row: number, col: number) => number;
+  addPagedSheet: (
+    n_cols: number,
+    row_count: number,
+    chunk_rows: number,
+    byte_budget: number,
+  ) => number;
+  addRows: (sheet: number, at: number, count: number) => void;
+  addSheet: (n_cols: number, row_count: number) => number;
+  aggregate: (sheet: number, col: number, op: number) => number;
+  beginPageLoad: () => void;
+  captureRange: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    rows: number,
+    cols: number,
+  ) => RangeSnapshot | undefined;
+  cellState: (sheet: number, row: number, col: number) => number;
+  clearCell: (sheet: number, row: number, col: number, style: number) => void;
+  clearRange: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+    contents: boolean,
+    style: boolean,
+  ) => boolean;
+  colCount: (sheet: number) => number;
+  dataEdge: (
+    sheet: number,
+    row: number,
+    col: number,
+    d_row: number,
+    d_col: number,
+  ) => number;
+  dataEdgeOrdered: (
+    sheet: number,
+    order: Uint32Array,
+    row: number,
+    col: number,
+    d_row: number,
+    d_col: number,
+  ) => number;
+  distinctValues: (
+    sheet: number,
+    col: number,
+    limit: number,
+  ) => DistinctColumn;
+  endPageLoad: () => void;
+  filterRows: (sheet: number, col: number, needle: string) => Uint32Array;
+  filterRowsMulti: (
+    sheet: number,
+    cols: Uint32Array,
+    kinds: Uint8Array,
+    flags: Uint8Array,
+    nums: Float64Array,
+    num_counts: Uint32Array,
+    text_counts: Uint32Array,
+    value_nums: Float64Array,
+    value_texts: string[],
+  ) => Uint32Array;
+  formulaSource: (
+    sheet: number,
+    row: number,
+    col: number,
+  ) => string | undefined;
+  free: () => void;
+  getCell: (sheet: number, row: number, col: number) => CellOut;
+  getWindow: (
+    sheet: number,
+    row_start: number,
+    row_end: number,
+    cols: Uint32Array,
+  ) => WindowView;
+  getWindowRows: (
+    sheet: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ) => WindowView;
+  insertCols: (sheet: number, at: number, count: number) => void;
+  isFullyLoaded: (sheet: number) => boolean;
+  isPaged: (sheet: number) => boolean;
+  isSheetAlive: (sheet: number) => boolean;
+  markRangeClean: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    start_col: number,
+    end_col: number,
+  ) => void;
+  pagedStats: (sheet: number) => Float64Array;
+  pinRange: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    cols: Uint32Array,
+  ) => void;
+  poolStrings: (ids: Uint32Array) => string[];
+  queryResourceStats: () => Float64Array;
+  rangeFullyLoaded: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+  ) => boolean;
+  rangeStyleIds: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+  ) => Uint32Array;
+  recompute: (sheet: number) => void;
+  recomputeVolatile: (serial: number) => boolean;
+  remapRangeStyles: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+    old_ids: Uint32Array,
+    new_ids: Uint32Array,
+  ) => boolean;
+  removeCols: (sheet: number, at: number, count: number) => void;
+  removeNamedRange: (name: string, scope: number) => boolean;
+  removeRows: (sheet: number, at: number, count: number) => void;
+  removeSheet: (sheet: number) => boolean;
+  renameSheet: (sheet: number, id: string, name: string) => boolean;
+  resetQueryResourceStats: () => void;
+  restoreRange: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    snapshot: RangeSnapshot,
+  ) => boolean;
+  rowCount: (sheet: number) => number;
+  search: (
+    sheet: number,
+    cols: Uint32Array,
+    query: string,
+    case_insensitive: boolean,
+    whole_cell: boolean,
+  ) => Uint32Array;
+  setBlock: (
+    sheet: number,
+    start_row: number,
+    start_col: number,
+    rows: number,
+    cols: number,
+    kinds: Uint8Array,
+    numbers: Float64Array,
+    texts: string[],
+    styles: Uint32Array,
+  ) => boolean;
+  setBool: (
+    sheet: number,
+    row: number,
+    col: number,
+    value: boolean,
+    style: number,
+  ) => void;
+  setColumnNumbers: (
+    sheet: number,
+    col: number,
+    start_row: number,
+    values: Float64Array,
+    style: number,
+  ) => void;
+  setColumnStrings: (
+    sheet: number,
+    col: number,
+    start_row: number,
+    values: string[],
+    style: number,
+  ) => void;
+  setColumnStringsPacked: (
+    sheet: number,
+    col: number,
+    start_row: number,
+    buf: string,
+    utf16_lens: Uint32Array,
+    style: number,
+  ) => void;
+  setConditionalRules: (
+    sheet: number,
+    kinds: Uint8Array,
+    bounds: Uint32Array,
+    nums: Float64Array,
+    strs: string[],
+    flags: Uint8Array,
+  ) => void;
+  setFormula: (
+    sheet: number,
+    row: number,
+    col: number,
+    src: string,
+    style: number,
+  ) => number;
+  setNamedRange: (
+    name: string,
+    scope: number,
+    sheet: number,
+    row_start: number,
+    col_start: number,
+    row_end: number,
+    col_end: number,
+  ) => boolean;
+  setNumber: (
+    sheet: number,
+    row: number,
+    col: number,
+    value: number,
+    style: number,
+  ) => void;
+  setSheetName: (sheet: number, id: string, name: string) => void;
+  setString: (
+    sheet: number,
+    row: number,
+    col: number,
+    value: string,
+    style: number,
+  ) => void;
+  snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array;
+  snapshotTexts: (snapshot: RangeSnapshot) => string[];
+  sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array;
+  sortRowsMulti: (
+    sheet: number,
+    cols: Uint32Array,
+    ascending: Uint8Array,
+    candidates: Uint32Array,
+  ) => Uint32Array;
+  styleIdAt: (sheet: number, row: number, col: number) => number;
 }
 ```
 

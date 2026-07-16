@@ -70,11 +70,11 @@ onReady?: (grid: Grid) => void;
 
 ```ts generated
 export interface SpreadsheetShellOptions {
-    grid: GridOptions;
-    toolbar?: readonly ToolbarItem[];
-    onChange?: (event: ChangeEvent) => void;
-    onSelectionChange?: (selection: Selection | null) => void;
-    onReady?: (grid: Grid) => void;
+  grid: GridOptions;
+  toolbar?: readonly ToolbarItem[];
+  onChange?: (event: ChangeEvent) => void;
+  onSelectionChange?: (selection: Selection | null) => void;
+  onReady?: (grid: Grid) => void;
 }
 ```
 

@@ -96,14 +96,14 @@ resolvedAt?: string;
 
 ```ts generated
 export interface CommentThread {
-    id: string;
-    documentId: string;
-    anchor: CommentAnchor;
-    version: number;
-    messages: readonly CommentMessage[];
-    resolved: boolean;
-    resolvedBy?: CommentAuthorRef;
-    resolvedAt?: string;
+  id: string;
+  documentId: string;
+  anchor: CommentAnchor;
+  version: number;
+  messages: readonly CommentMessage[];
+  resolved: boolean;
+  resolvedBy?: CommentAuthorRef;
+  resolvedAt?: string;
 }
 ```
 

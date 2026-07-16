@@ -12,20 +12,8 @@ Reason an adapter published a ready Grid generation.
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L43</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">2</span>
-
-<div class="api-variant-list">
-<div class="api-variant"><code>&quot;initial&quot;</code></div>
-<div class="api-variant"><code>GridResetReason</code></div>
-</div>
-
 ## Declaration
-
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
 
 ```ts generated
 export type GridReadyReason = "initial" | GridResetReason;
 ```
-
-</details>

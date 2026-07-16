@@ -794,87 +794,109 @@ destroy(): void;
 
 ```ts generated
 export interface Grid {
-    readonly store: Store;
-    readonly actions: GridActions;
-    setActiveSheet(id: SheetId): void;
-    scrollToCell(addr: CellAddress): void;
-    getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
-    getActiveSheet(): SheetId;
-    getCellInput(row: number, col: number): CellInputSnapshot | null;
-    getSelection(): Selection | null;
-    setSelection(sel: Selection | null): void;
-    setTheme(theme: Partial<Theme>): void;
-    replaceTheme(theme: Partial<Theme> | undefined): void;
-    getEffectiveTheme(): Theme;
-    setReadOnly(readOnly: boolean): void;
-    setConfig(config: GridConfig | undefined): void;
-    applyTransaction(transaction: GridTransaction): ApplyTransactionResult;
-    exportSnapshot(): WorkbookSnapshot;
-    applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult;
-    defineCellRenderer(name: string, renderer: CellRenderer): void;
-    aggregate(col: number, op: AggregateOp): number;
-    sortBy(col: number, ascending?: boolean): void;
-    sortByMulti(keys: readonly SortKey[]): void;
-    filterBy(col: number, needle: string): void;
-    setColumnFilter(col: number, filter: ColumnFilter | null): void;
-    setSort(keys: readonly SortKey[]): ApplyTransactionResult;
-    getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
-    distinctValues(col: number, limit?: number): CellScalar[];
-    hideRows(rows: readonly number[]): void;
-    showRows(rows?: readonly number[]): void;
-    hiddenRows(): readonly number[];
-    hideColumns(cols?: readonly number[]): void;
-    showColumns(cols?: readonly number[]): void;
-    hiddenColumns(): readonly number[];
-    groupRows(start: number, end: number): void;
-    ungroupRows(start: number, end: number): void;
-    setGroupCollapsed(start: number, collapsed: boolean): void;
-    rowGroups(): readonly RowGroup[];
-    clearView(): void;
-    undo(): void;
-    redo(): void;
-    exportCsv(filename: string): void;
-    exportXlsx(filename: string): Promise<void>;
-    search(query: string, opts?: SearchOptions): SearchResult;
-    findNext(): SearchResult;
-    findPrev(): SearchResult;
-    clearSearch(): void;
-    replaceCurrent(replacement: string): SearchResult;
-    replaceAll(replacement: string): ReplaceResult;
-    insertRows(at: number, count?: number): void;
-    removeRows(at: number, count?: number): void;
-    insertColumns(at: number, count?: number): void;
-    removeColumns(at: number, count?: number): void;
-    addSheet(input: AddSheetInput): SheetId;
-    removeSheet(id: SheetId): void;
-    renameSheet(id: SheetId, name: string): void;
-    moveSheet(id: SheetId, toIndex: number): void;
-    setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
-    setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
-    removeValidationRule(id: string): ApplyTransactionResult;
-    setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
-    removeProtectedRange(id: string): ApplyTransactionResult;
-    setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
-    setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
-    getNote(addr: CellAddress): string | null;
-    setOverscan(overscan?: number): void;
-    setMinColumns(minColumns?: number): void;
-    highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
-    setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;
-    styleRange(range: Range, style: Partial<CellStyle> | null): void;
-    beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void;
-    dataEdge(row: number, col: number, dRow: number, dCol: number): number | null;
-    setRowHeight(row: number, height: number): void;
-    setColumnWidth(col: number, width: number): void;
-    autoFitRows(range?: Range): void;
-    autoFitColumns(cols?: readonly number[]): void;
-    setFrozen(rows: number, cols?: number): void;
-    setZoom(zoom: number): void;
-    getZoom(): number;
-    rendererKind(): "canvas" | "worker";
-    on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
-    refresh(): void;
-    destroy(): void;
+  readonly store: Store;
+  readonly actions: GridActions;
+  setActiveSheet(id: SheetId): void;
+  scrollToCell(addr: CellAddress): void;
+  getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
+  getActiveSheet(): SheetId;
+  getCellInput(row: number, col: number): CellInputSnapshot | null;
+  getSelection(): Selection | null;
+  setSelection(sel: Selection | null): void;
+  setTheme(theme: Partial<Theme>): void;
+  replaceTheme(theme: Partial<Theme> | undefined): void;
+  getEffectiveTheme(): Theme;
+  setReadOnly(readOnly: boolean): void;
+  setConfig(config: GridConfig | undefined): void;
+  applyTransaction(transaction: GridTransaction): ApplyTransactionResult;
+  exportSnapshot(): WorkbookSnapshot;
+  applyRemoteOperations(
+    operations: readonly DocumentOp[],
+    options?: RemoteOperationOptions,
+  ): ApplyTransactionResult;
+  defineCellRenderer(name: string, renderer: CellRenderer): void;
+  aggregate(col: number, op: AggregateOp): number;
+  sortBy(col: number, ascending?: boolean): void;
+  sortByMulti(keys: readonly SortKey[]): void;
+  filterBy(col: number, needle: string): void;
+  setColumnFilter(col: number, filter: ColumnFilter | null): void;
+  setSort(keys: readonly SortKey[]): ApplyTransactionResult;
+  getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
+  distinctValues(col: number, limit?: number): CellScalar[];
+  hideRows(rows: readonly number[]): void;
+  showRows(rows?: readonly number[]): void;
+  hiddenRows(): readonly number[];
+  hideColumns(cols?: readonly number[]): void;
+  showColumns(cols?: readonly number[]): void;
+  hiddenColumns(): readonly number[];
+  groupRows(start: number, end: number): void;
+  ungroupRows(start: number, end: number): void;
+  setGroupCollapsed(start: number, collapsed: boolean): void;
+  rowGroups(): readonly RowGroup[];
+  clearView(): void;
+  undo(): void;
+  redo(): void;
+  exportCsv(filename: string): void;
+  exportXlsx(filename: string): Promise<void>;
+  search(query: string, opts?: SearchOptions): SearchResult;
+  findNext(): SearchResult;
+  findPrev(): SearchResult;
+  clearSearch(): void;
+  replaceCurrent(replacement: string): SearchResult;
+  replaceAll(replacement: string): ReplaceResult;
+  insertRows(at: number, count?: number): void;
+  removeRows(at: number, count?: number): void;
+  insertColumns(at: number, count?: number): void;
+  removeColumns(at: number, count?: number): void;
+  addSheet(input: AddSheetInput): SheetId;
+  removeSheet(id: SheetId): void;
+  renameSheet(id: SheetId, name: string): void;
+  moveSheet(id: SheetId, toIndex: number): void;
+  setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+  setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
+  removeValidationRule(id: string): ApplyTransactionResult;
+  setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
+  removeProtectedRange(id: string): ApplyTransactionResult;
+  setProtectionResolver(
+    resolver: ProtectionResolver | undefined,
+    mode?: MutationPolicyMode,
+  ): void;
+  setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
+  getNote(addr: CellAddress): string | null;
+  setOverscan(overscan?: number): void;
+  setMinColumns(minColumns?: number): void;
+  highlightCells(
+    ranges: readonly HighlightRange[] | null,
+    color?: string,
+  ): void;
+  setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;
+  styleRange(range: Range, style: Partial<CellStyle> | null): void;
+  beginEdit(
+    row: number,
+    col: number,
+    initial?: string,
+    selectAll?: boolean,
+  ): void;
+  dataEdge(
+    row: number,
+    col: number,
+    dRow: number,
+    dCol: number,
+  ): number | null;
+  setRowHeight(row: number, height: number): void;
+  setColumnWidth(col: number, width: number): void;
+  autoFitRows(range?: Range): void;
+  autoFitColumns(cols?: readonly number[]): void;
+  setFrozen(rows: number, cols?: number): void;
+  setZoom(zoom: number): void;
+  getZoom(): number;
+  rendererKind(): "canvas" | "worker";
+  on<E extends keyof GridEvents>(
+    evt: E,
+    fn: (e: GridEvents[E]) => void,
+  ): () => void;
+  refresh(): void;
+  destroy(): void;
 }
 ```
 

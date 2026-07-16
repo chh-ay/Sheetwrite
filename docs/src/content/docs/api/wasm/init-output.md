@@ -879,185 +879,430 @@ readonly __wbindgen_start: () => void;
 
 ```ts generated
 export interface InitOutput {
-    readonly memory: WebAssembly.Memory;
-    readonly __wbg_cellout_free: (a: number, b: number) => void;
-    readonly __wbg_cellstore_free: (a: number, b: number) => void;
-    readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
-    readonly __wbg_rangesnapshot_free: (a: number, b: number) => void;
-    readonly __wbg_windowview_free: (a: number, b: number) => void;
-    readonly cellout_kind: (a: number) => number;
-    readonly cellout_num: (a: number) => number;
-    readonly cellout_string: (a: number) => [
-        number,
-        number
-    ];
-    readonly cellout_style: (a: number) => number;
-    readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number) => number;
-    readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void;
-    readonly cellstore_addSheet: (a: number, b: number, c: number) => number;
-    readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number;
-    readonly cellstore_beginPageLoad: (a: number) => void;
-    readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
-    readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number;
-    readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void;
-    readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
-    readonly cellstore_colCount: (a: number, b: number) => number;
-    readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
-    readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
-    readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number;
-    readonly cellstore_endPageLoad: (a: number) => void;
-    readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number;
-    readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
-    readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
-    readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void;
-    readonly cellstore_isFullyLoaded: (a: number, b: number) => number;
-    readonly cellstore_isPaged: (a: number, b: number) => number;
-    readonly cellstore_isSheetAlive: (a: number, b: number) => number;
-    readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly cellstore_new: () => number;
-    readonly cellstore_pagedStats: (a: number, b: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly cellstore_poolStrings: (a: number, b: number, c: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_queryResourceStats: (a: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
-    readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_recompute: (a: number, b: number) => void;
-    readonly cellstore_recomputeVolatile: (a: number, b: number) => number;
-    readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number;
-    readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void;
-    readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number;
-    readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void;
-    readonly cellstore_removeSheet: (a: number, b: number) => number;
-    readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
-    readonly cellstore_resetQueryResourceStats: (a: number) => void;
-    readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number;
-    readonly cellstore_rowCount: (a: number, b: number) => number;
-    readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_setBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number) => number;
-    readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
-    readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
-    readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
-    readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void;
-    readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
-    readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number;
-    readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
-    readonly cellstore_snapshotNumbers: (a: number, b: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_snapshotTexts: (a: number, b: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_sortRows: (a: number, b: number, c: number, d: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [
-        number,
-        number
-    ];
-    readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number;
-    readonly distinctcolumn_takeKinds: (a: number) => [
-        number,
-        number
-    ];
-    readonly distinctcolumn_takeNumbers: (a: number) => [
-        number,
-        number
-    ];
-    readonly distinctcolumn_takeTexts: (a: number) => [
-        number,
-        number
-    ];
-    readonly rangesnapshot_byteLength: (a: number) => number;
-    readonly rangesnapshot_formulaOffsets: (a: number) => [
-        number,
-        number
-    ];
-    readonly rangesnapshot_formulaSources: (a: number) => [
-        number,
-        number
-    ];
-    readonly rangesnapshot_kinds: (a: number) => [
-        number,
-        number
-    ];
-    readonly rangesnapshot_styleIds: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_nCols: (a: number) => number;
-    readonly windowview_nRows: (a: number) => number;
-    readonly windowview_takeCondMatches: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_takeStringIds: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_takeStringIndex: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_takeStrings: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_takeStyleDict: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_takeStyleIndex: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_takeKinds: (a: number) => [
-        number,
-        number
-    ];
-    readonly windowview_takeNumbers: (a: number) => [
-        number,
-        number
-    ];
-    readonly __wbindgen_malloc: (a: number, b: number) => number;
-    readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-    readonly __wbindgen_externrefs: WebAssembly.Table;
-    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
-    readonly __externref_table_alloc: () => number;
-    readonly __externref_drop_slice: (a: number, b: number) => void;
-    readonly __wbindgen_start: () => void;
+  readonly memory: WebAssembly.Memory;
+  readonly __wbg_cellout_free: (a: number, b: number) => void;
+  readonly __wbg_cellstore_free: (a: number, b: number) => void;
+  readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
+  readonly __wbg_rangesnapshot_free: (a: number, b: number) => void;
+  readonly __wbg_windowview_free: (a: number, b: number) => void;
+  readonly cellout_kind: (a: number) => number;
+  readonly cellout_num: (a: number) => number;
+  readonly cellout_string: (a: number) => [number, number];
+  readonly cellout_style: (a: number) => number;
+  readonly cellstore_addPagedSheet: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+  ) => number;
+  readonly cellstore_addRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => void;
+  readonly cellstore_addSheet: (a: number, b: number, c: number) => number;
+  readonly cellstore_aggregate: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly cellstore_beginPageLoad: (a: number) => void;
+  readonly cellstore_captureRange: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
+  readonly cellstore_cellState: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly cellstore_clearCell: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+  ) => void;
+  readonly cellstore_clearRange: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+  ) => number;
+  readonly cellstore_colCount: (a: number, b: number) => number;
+  readonly cellstore_dataEdge: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
+  readonly cellstore_dataEdgeOrdered: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+  ) => number;
+  readonly cellstore_distinctValues: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly cellstore_endPageLoad: (a: number) => void;
+  readonly cellstore_filterRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+  ) => [number, number];
+  readonly cellstore_filterRowsMulti: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
+    l: number,
+    m: number,
+    n: number,
+    o: number,
+    p: number,
+    q: number,
+    r: number,
+  ) => [number, number];
+  readonly cellstore_formulaSource: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
+  readonly cellstore_getCell: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly cellstore_getWindow: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
+  readonly cellstore_getWindowRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
+  readonly cellstore_insertCols: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => void;
+  readonly cellstore_isFullyLoaded: (a: number, b: number) => number;
+  readonly cellstore_isPaged: (a: number, b: number) => number;
+  readonly cellstore_isSheetAlive: (a: number, b: number) => number;
+  readonly cellstore_markRangeClean: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => void;
+  readonly cellstore_new: () => number;
+  readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
+  readonly cellstore_pinRange: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => void;
+  readonly cellstore_poolStrings: (
+    a: number,
+    b: number,
+    c: number,
+  ) => [number, number];
+  readonly cellstore_queryResourceStats: (a: number) => [number, number];
+  readonly cellstore_rangeFullyLoaded: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
+  readonly cellstore_rangeStyleIds: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => [number, number];
+  readonly cellstore_recompute: (a: number, b: number) => void;
+  readonly cellstore_recomputeVolatile: (a: number, b: number) => number;
+  readonly cellstore_remapRangeStyles: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+  ) => number;
+  readonly cellstore_removeCols: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => void;
+  readonly cellstore_removeNamedRange: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly cellstore_removeRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => void;
+  readonly cellstore_removeSheet: (a: number, b: number) => number;
+  readonly cellstore_renameSheet: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
+  readonly cellstore_resetQueryResourceStats: (a: number) => void;
+  readonly cellstore_restoreRange: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+  ) => number;
+  readonly cellstore_rowCount: (a: number, b: number) => number;
+  readonly cellstore_search: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+  ) => [number, number];
+  readonly cellstore_setBlock: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
+    l: number,
+    m: number,
+    n: number,
+  ) => number;
+  readonly cellstore_setBool: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => void;
+  readonly cellstore_setColumnNumbers: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => void;
+  readonly cellstore_setColumnStrings: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => void;
+  readonly cellstore_setColumnStringsPacked: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+  ) => void;
+  readonly cellstore_setConditionalRules: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
+    l: number,
+  ) => void;
+  readonly cellstore_setFormula: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => number;
+  readonly cellstore_setNamedRange: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+  ) => number;
+  readonly cellstore_setNumber: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => void;
+  readonly cellstore_setSheetName: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => void;
+  readonly cellstore_setString: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+  ) => void;
+  readonly cellstore_snapshotNumbers: (
+    a: number,
+    b: number,
+  ) => [number, number];
+  readonly cellstore_snapshotTexts: (
+    a: number,
+    b: number,
+  ) => [number, number];
+  readonly cellstore_sortRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
+  readonly cellstore_sortRowsMulti: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+  ) => [number, number];
+  readonly cellstore_styleIdAt: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly distinctcolumn_takeKinds: (a: number) => [number, number];
+  readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
+  readonly distinctcolumn_takeTexts: (a: number) => [number, number];
+  readonly rangesnapshot_byteLength: (a: number) => number;
+  readonly rangesnapshot_formulaOffsets: (a: number) => [number, number];
+  readonly rangesnapshot_formulaSources: (a: number) => [number, number];
+  readonly rangesnapshot_kinds: (a: number) => [number, number];
+  readonly rangesnapshot_styleIds: (a: number) => [number, number];
+  readonly windowview_nCols: (a: number) => number;
+  readonly windowview_nRows: (a: number) => number;
+  readonly windowview_takeCondMatches: (a: number) => [number, number];
+  readonly windowview_takeStringIds: (a: number) => [number, number];
+  readonly windowview_takeStringIndex: (a: number) => [number, number];
+  readonly windowview_takeStrings: (a: number) => [number, number];
+  readonly windowview_takeStyleDict: (a: number) => [number, number];
+  readonly windowview_takeStyleIndex: (a: number) => [number, number];
+  readonly windowview_takeKinds: (a: number) => [number, number];
+  readonly windowview_takeNumbers: (a: number) => [number, number];
+  readonly __wbindgen_malloc: (a: number, b: number) => number;
+  readonly __wbindgen_realloc: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly __wbindgen_externrefs: WebAssembly.Table;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+  readonly __externref_table_alloc: () => number;
+  readonly __externref_drop_slice: (a: number, b: number) => void;
+  readonly __wbindgen_start: () => void;
 }
 ```
 

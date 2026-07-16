@@ -12,8 +12,8 @@ Register all concrete XLSX backends with the backend-neutral core contracts.
 <div><dt>Source</dt><dd><code>packages/xlsx/src/registration.ts#L11</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function registerXlsxBackends(): void;
+function registerXlsxBackends(): void
 ```

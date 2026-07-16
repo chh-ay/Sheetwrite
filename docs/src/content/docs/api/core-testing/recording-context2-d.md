@@ -98,14 +98,14 @@ lineWidth: number;
 
 ```ts generated
 export interface RecordingContext2D {
-    readonly calls: Record<string, number>;
-    fillStyle: string;
-    strokeStyle: string;
-    font: string;
-    textAlign: string;
-    textBaseline: string;
-    lineWidth: number;
-    [method: string]: unknown;
+  readonly calls: Record<string, number>;
+  fillStyle: string;
+  strokeStyle: string;
+  font: string;
+  textAlign: string;
+  textBaseline: string;
+  lineWidth: number;
+  [method: string]: unknown;
 }
 ```
 

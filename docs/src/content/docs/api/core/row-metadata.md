@@ -42,8 +42,8 @@ hidden?: boolean;
 
 ```ts generated
 export interface RowMetadata {
-    height?: number;
-    hidden?: boolean;
+  height?: number;
+  hidden?: boolean;
 }
 ```
 

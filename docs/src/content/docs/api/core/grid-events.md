@@ -123,41 +123,41 @@ search: SearchResult;
 
 ```ts generated
 export interface GridEvents {
-    change: ChangeEvent;
-    selection: {
-        selection: Selection | null;
-    };
-    scroll: {
-        scrollTop: number;
-        firstRow: number;
-        lastRow: number;
-    };
-    "edit-begin": {
-        addr: CellAddress;
-    };
-    "edit-commit": {
-        addr: CellAddress;
-        value: CellValue;
-    };
-    search: SearchResult;
-    "mutation-rejected": {
-        issues: MutationIssue[];
-    };
-    "active-sheet": {
-        sheet: SheetId;
-    };
-    "renderer-fallback": {
-        requested: "worker";
-        error: unknown;
-    };
-    "datasource-error": {
-        request: Omit<DataSourceRequest, "signal">;
-        error: unknown;
-    };
-    "export-error": {
-        format: "xlsx";
-        error: unknown;
-    };
+  change: ChangeEvent;
+  selection: {
+    selection: Selection | null;
+  };
+  scroll: {
+    scrollTop: number;
+    firstRow: number;
+    lastRow: number;
+  };
+  "edit-begin": {
+    addr: CellAddress;
+  };
+  "edit-commit": {
+    addr: CellAddress;
+    value: CellValue;
+  };
+  search: SearchResult;
+  "mutation-rejected": {
+    issues: MutationIssue[];
+  };
+  "active-sheet": {
+    sheet: SheetId;
+  };
+  "renderer-fallback": {
+    requested: "worker";
+    error: unknown;
+  };
+  "datasource-error": {
+    request: Omit<DataSourceRequest, "signal">;
+    error: unknown;
+  };
+  "export-error": {
+    format: "xlsx";
+    error: unknown;
+  };
 }
 ```
 

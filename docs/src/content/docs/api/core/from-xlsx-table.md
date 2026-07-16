@@ -15,8 +15,10 @@ verbatim, and empty cells become `null`.
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L281</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
+function fromXlsxTable(
+  data: ArrayBuffer | Uint8Array,
+): Promise<ColumnarData>
 ```

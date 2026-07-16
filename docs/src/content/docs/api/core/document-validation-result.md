@@ -15,8 +15,20 @@ Success or structured errors returned by document validation.
 ## Variants <span class="api-count">2</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ ok: true; value: WorkbookSnapshot }</code></div>
-<div class="api-variant"><code>{ ok: false; errors: DocumentValidationError[] }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ ok: true; value: WorkbookSnapshot }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ ok: false; errors: DocumentValidationError[] }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -25,13 +37,15 @@ Success or structured errors returned by document validation.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type DocumentValidationResult = {
-    ok: true;
-    value: WorkbookSnapshot;
-} | {
-    ok: false;
-    errors: DocumentValidationError[];
-};
+export type DocumentValidationResult =
+  | {
+      ok: true;
+      value: WorkbookSnapshot;
+    }
+  | {
+      ok: false;
+      errors: DocumentValidationError[];
+    };
 ```
 
 </details>

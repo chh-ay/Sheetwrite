@@ -53,9 +53,9 @@ cacheBytes?: number;
 
 ```ts generated
 export interface DataSourceStorageOptions {
-    mode?: "dense" | "paged";
-    chunkRows?: number;
-    cacheBytes?: number;
+  mode?: "dense" | "paged";
+  chunkRows?: number;
+  cacheBytes?: number;
 }
 ```
 

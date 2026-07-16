@@ -42,8 +42,8 @@ result: SearchResult;
 
 ```ts generated
 export interface ReplaceResult {
-    replaced: number;
-    result: SearchResult;
+  replaced: number;
+  result: SearchResult;
 }
 ```
 

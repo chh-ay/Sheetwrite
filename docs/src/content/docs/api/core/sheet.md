@@ -168,25 +168,22 @@ frozenCols?: number;
 
 ```ts generated
 export interface Sheet {
-    id: SheetId;
-    name: string;
-    columns: Column[];
-    rowCount: number;
-    rowHeights?: Map<number, number>;
-    hiddenRows?: Set<number>;
-    rowGroups?: RowGroup[];
-    conditionalFormats?: ConditionalFormatRule[];
-    validationRules?: DataValidationRule[];
-    protectedRanges?: ProtectedRange[];
-    notes?: CellNote[];
-    sortKeys?: SortKey[];
-    filters?: Array<[
-        col: number,
-        filter: ColumnFilter
-    ]>;
-    merges?: MergeRange[];
-    frozenRows?: number;
-    frozenCols?: number;
+  id: SheetId;
+  name: string;
+  columns: Column[];
+  rowCount: number;
+  rowHeights?: Map<number, number>;
+  hiddenRows?: Set<number>;
+  rowGroups?: RowGroup[];
+  conditionalFormats?: ConditionalFormatRule[];
+  validationRules?: DataValidationRule[];
+  protectedRanges?: ProtectedRange[];
+  notes?: CellNote[];
+  sortKeys?: SortKey[];
+  filters?: Array<[col: number, filter: ColumnFilter]>;
+  merges?: MergeRange[];
+  frozenRows?: number;
+  frozenCols?: number;
 }
 ```
 

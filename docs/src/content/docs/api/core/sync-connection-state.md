@@ -12,23 +12,9 @@ Host-controlled online state reported by synchronization.
 <div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L20</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">5</span>
-
-<div class="api-variant-list">
-<div class="api-variant"><code>&quot;offline&quot;</code></div>
-<div class="api-variant"><code>&quot;connecting&quot;</code></div>
-<div class="api-variant"><code>&quot;online&quot;</code></div>
-<div class="api-variant"><code>&quot;error&quot;</code></div>
-<div class="api-variant"><code>&quot;destroyed&quot;</code></div>
-</div>
-
 ## Declaration
 
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
-
 ```ts generated
-export type SyncConnectionState = "offline" | "connecting" | "online" | "error" | "destroyed";
+export type SyncConnectionState =
+  "offline" | "connecting" | "online" | "error" | "destroyed";
 ```
-
-</details>

@@ -55,9 +55,9 @@ readonly format: CellFormat;
 
 ```ts generated
 export interface CellInputSnapshot {
-    readonly address: CellAddress;
-    readonly text: string;
-    readonly format: CellFormat;
+  readonly address: CellAddress;
+  readonly text: string;
+  readonly format: CellFormat;
 }
 ```
 

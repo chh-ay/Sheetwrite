@@ -15,8 +15,24 @@ Whether a query is complete for the currently loaded datasource pages.
 ## Variants <span class="api-count">2</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ status: &quot;complete&quot; }</code></div>
-<div class="api-variant"><code>{ status: &quot;incomplete&quot;; loadedCells: number; totalCells: number }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ status: "complete" }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "incomplete";
+  loadedCells: number;
+  totalCells: number;
+}
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -25,13 +41,15 @@ Whether a query is complete for the currently loaded datasource pages.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type QueryCapability = {
-    status: "complete";
-} | {
-    status: "incomplete";
-    loadedCells: number;
-    totalCells: number;
-};
+export type QueryCapability =
+  | {
+      status: "complete";
+    }
+  | {
+      status: "incomplete";
+      loadedCells: number;
+      totalCells: number;
+    };
 ```
 
 </details>

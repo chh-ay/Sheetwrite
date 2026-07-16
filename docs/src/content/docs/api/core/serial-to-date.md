@@ -14,8 +14,8 @@ calendar fields are stable regardless of the host time zone.
 <div><dt>Source</dt><dd><code>packages/core/src/date-serial.ts#L40</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function serialToDate(serial: number): Date;
+function serialToDate(serial: number): Date
 ```

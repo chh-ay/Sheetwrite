@@ -60,10 +60,10 @@ readonly operations: readonly DocumentOp[];
 
 ```ts generated
 export interface PendingCommit {
-    documentId: string;
-    baseVersion: number;
-    clientMutationId: string;
-    readonly operations: readonly DocumentOp[];
+  documentId: string;
+  baseVersion: number;
+  clientMutationId: string;
+  readonly operations: readonly DocumentOp[];
 }
 ```
 

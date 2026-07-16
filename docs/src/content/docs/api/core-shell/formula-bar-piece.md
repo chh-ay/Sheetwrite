@@ -33,7 +33,7 @@ setReadOnly(readOnly: boolean): void;
 
 ```ts generated
 export interface FormulaBarPiece extends ShellPiece {
-    setReadOnly(readOnly: boolean): void;
+  setReadOnly(readOnly: boolean): void;
 }
 ```
 

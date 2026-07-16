@@ -12,22 +12,9 @@ Stable category for a persistence failure.
 <div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L17</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">4</span>
-
-<div class="api-variant-list">
-<div class="api-variant"><code>&quot;aborted&quot;</code></div>
-<div class="api-variant"><code>&quot;invalid-snapshot&quot;</code></div>
-<div class="api-variant"><code>&quot;not-found&quot;</code></div>
-<div class="api-variant"><code>&quot;commit-rejected&quot;</code></div>
-</div>
-
 ## Declaration
 
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
-
 ```ts generated
-export type PersistenceErrorCode = "aborted" | "invalid-snapshot" | "not-found" | "commit-rejected";
+export type PersistenceErrorCode =
+  "aborted" | "invalid-snapshot" | "not-found" | "commit-rejected";
 ```
-
-</details>

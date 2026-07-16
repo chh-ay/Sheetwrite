@@ -12,8 +12,10 @@ Load the WASM data engine once. Must be awaited before `createGrid`.
 <div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L174</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function initSheetwrite(source?: BufferSource | URL | string | Request | WebAssembly.Module): Promise<void>;
+function initSheetwrite(
+  source?: BufferSource | URL | string | Request | WebAssembly.Module,
+): Promise<void>
 ```

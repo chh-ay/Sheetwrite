@@ -33,7 +33,7 @@ grid: Grid | null;
 
 ```ts generated
 export interface SheetwriteGridExpose {
-    grid: Grid | null;
+  grid: Grid | null;
 }
 ```
 

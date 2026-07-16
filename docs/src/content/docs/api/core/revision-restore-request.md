@@ -69,11 +69,11 @@ signal?: AbortSignal;
 
 ```ts generated
 export interface RevisionRestoreRequest {
-    documentId: string;
-    targetVersion: number;
-    baseVersion: number;
-    clientMutationId: string;
-    signal?: AbortSignal;
+  documentId: string;
+  targetVersion: number;
+  baseVersion: number;
+  clientMutationId: string;
+  signal?: AbortSignal;
 }
 ```
 

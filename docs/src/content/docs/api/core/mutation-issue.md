@@ -15,8 +15,35 @@ Structured warning or rejection produced while applying an operation.
 ## Variants <span class="api-count">2</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ kind: &quot;validation&quot;; severity: &quot;error&quot; | &quot;warning&quot;; ruleId: string; addr: CellAddress; value: CellValue; message: string; operationIndex: number; }</code></div>
-<div class="api-variant"><code>{ kind: &quot;protection&quot;; severity: &quot;error&quot;; protectedRangeId: string; range: Range; operationIndex: number; message: string; }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  kind: "validation";
+  severity: "error" | "warning";
+  ruleId: string;
+  addr: CellAddress;
+  value: CellValue;
+  message: string;
+  operationIndex: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  kind: "protection";
+  severity: "error";
+  protectedRangeId: string;
+  range: Range;
+  operationIndex: number;
+  message: string;
+}
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -25,22 +52,24 @@ Structured warning or rejection produced while applying an operation.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type MutationIssue = {
-    kind: "validation";
-    severity: "error" | "warning";
-    ruleId: string;
-    addr: CellAddress;
-    value: CellValue;
-    message: string;
-    operationIndex: number;
-} | {
-    kind: "protection";
-    severity: "error";
-    protectedRangeId: string;
-    range: Range;
-    operationIndex: number;
-    message: string;
-};
+export type MutationIssue =
+  | {
+      kind: "validation";
+      severity: "error" | "warning";
+      ruleId: string;
+      addr: CellAddress;
+      value: CellValue;
+      message: string;
+      operationIndex: number;
+    }
+  | {
+      kind: "protection";
+      severity: "error";
+      protectedRangeId: string;
+      range: Range;
+      operationIndex: number;
+      message: string;
+    };
 ```
 
 </details>

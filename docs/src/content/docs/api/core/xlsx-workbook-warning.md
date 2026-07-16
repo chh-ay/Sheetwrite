@@ -60,10 +60,15 @@ cell?: string;
 
 ```ts generated
 export interface XlsxWorkbookWarning {
-    code: "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature";
-    message: string;
-    sheet?: string;
-    cell?: string;
+  code:
+    | "boolean-literal"
+    | "rich-text"
+    | "hyperlink"
+    | "unsupported-cell-value"
+    | "unsupported-feature";
+  message: string;
+  sheet?: string;
+  cell?: string;
 }
 ```
 

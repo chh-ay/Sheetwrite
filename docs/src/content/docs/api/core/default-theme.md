@@ -12,8 +12,8 @@ Default canvas theme used before CSS and explicit theme overrides.
 <div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L143</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const DEFAULT_THEME: Theme;
+const DEFAULT_THEME: Theme
 ```

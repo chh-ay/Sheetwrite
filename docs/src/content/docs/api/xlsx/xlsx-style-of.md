@@ -12,8 +12,8 @@ Translate Sheetwrite's style model into write-excel-file cell properties.
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L26</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function xlsxStyleOf(style: CellStyle | undefined): CellObject;
+function xlsxStyleOf(style: CellStyle | undefined): CellObject
 ```

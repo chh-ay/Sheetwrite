@@ -12,8 +12,8 @@ description: "0-based (row, col) → A1 cell reference (0, 0 → \"A1\")."
 <div><dt>Source</dt><dd><code>packages/core/src/a1.ts#L25</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function cellA1(row: number, col: number): string;
+function cellA1(row: number, col: number): string
 ```

@@ -14,8 +14,8 @@ merges, dimensions, and frozen views.
 <div><dt>Source</dt><dd><code>packages/xlsx/src/workbook.ts#L905</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const excelJsWorkbookBackend: XlsxWorkbookBackend;
+const excelJsWorkbookBackend: XlsxWorkbookBackend
 ```

@@ -51,15 +51,15 @@ end: { row: number; col: number };
 
 ```ts generated
 export interface Range {
-    sheet: SheetId;
-    start: {
-        row: number;
-        col: number;
-    };
-    end: {
-        row: number;
-        col: number;
-    };
+  sheet: SheetId;
+  start: {
+    row: number;
+    col: number;
+  };
+  end: {
+    row: number;
+    col: number;
+  };
 }
 ```
 

@@ -123,17 +123,17 @@ takeStyleIndex: () => Uint32Array
 
 ```ts generated
 class WindowView {
-    free: () => void;
-    nCols: number;
-    nRows: number;
-    takeCondMatches: () => Uint32Array;
-    takeKinds: () => Uint8Array;
-    takeNumbers: () => Float64Array;
-    takeStringIds: () => Uint32Array;
-    takeStringIndex: () => Int32Array;
-    takeStrings: () => string[];
-    takeStyleDict: () => Uint32Array;
-    takeStyleIndex: () => Uint32Array;
+  free: () => void;
+  nCols: number;
+  nRows: number;
+  takeCondMatches: () => Uint32Array;
+  takeKinds: () => Uint8Array;
+  takeNumbers: () => Float64Array;
+  takeStringIds: () => Uint32Array;
+  takeStringIndex: () => Int32Array;
+  takeStrings: () => string[];
+  takeStyleDict: () => Uint32Array;
+  takeStyleIndex: () => Uint32Array;
 }
 ```
 

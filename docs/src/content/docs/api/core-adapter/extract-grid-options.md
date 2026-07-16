@@ -12,8 +12,10 @@ Extracts advanced GridOptions from framework adapter props.
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L121</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function extractGridOptions(source: Record<string, unknown>): GridOptions;
+function extractGridOptions(
+  source: Record<string, unknown>,
+): GridOptions
 ```

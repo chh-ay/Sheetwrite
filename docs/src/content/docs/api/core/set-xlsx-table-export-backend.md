@@ -12,8 +12,10 @@ Registers the optional table XLSX export implementation used by core.
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L240</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function setXlsxTableExportBackend(next: XlsxTableExportBackend): void;
+function setXlsxTableExportBackend(
+  next: XlsxTableExportBackend,
+): void
 ```

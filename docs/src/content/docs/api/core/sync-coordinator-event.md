@@ -15,18 +15,112 @@ Queue, version, connection, or error transition emitted by synchronization.
 ## Variants <span class="api-count">12</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ type: &quot;state&quot;; state: SyncStateSnapshot }</code></div>
-<div class="api-variant"><code>{ type: &quot;restored&quot;; pending: readonly SyncMutationRecord[] }</code></div>
-<div class="api-variant"><code>{ type: &quot;persisting&quot;; mutation: SyncMutationRecord }</code></div>
-<div class="api-variant"><code>{ type: &quot;pending&quot;; mutation: SyncMutationRecord }</code></div>
-<div class="api-variant"><code>{ type: &quot;sending&quot;; mutation: SyncMutationRecord }</code></div>
-<div class="api-variant"><code>{ type: &quot;acknowledged&quot;; clientMutationId: string; version: number; duplicate: boolean; }</code></div>
-<div class="api-variant"><code>{ type: &quot;conflict&quot;; mutation: SyncMutationRecord; response: Extract&lt;PersistenceCommitResponse, { status: &quot;conflict&quot; }&gt;; }</code></div>
-<div class="api-variant"><code>{ type: &quot;remote-applied&quot;; operation: VersionedOperation }</code></div>
-<div class="api-variant"><code>{ type: &quot;reload-required&quot;; expectedVersion: number; receivedVersion: number; snapshot?: WorkbookSnapshot; }</code></div>
-<div class="api-variant"><code>{ type: &quot;reloaded&quot;; serverVersion: number; pending: readonly SyncMutationRecord[] }</code></div>
-<div class="api-variant"><code>{ type: &quot;storage-error&quot;; error: unknown; clientMutationId?: string }</code></div>
-<div class="api-variant"><code>{ type: &quot;error&quot;; error: unknown; clientMutationId?: string }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ type: "state"; state: SyncStateSnapshot }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "restored"; pending: readonly SyncMutationRecord[] }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "persisting"; mutation: SyncMutationRecord }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "pending"; mutation: SyncMutationRecord }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "sending"; mutation: SyncMutationRecord }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "acknowledged";
+  clientMutationId: string;
+  version: number;
+  duplicate: boolean;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "conflict";
+  mutation: SyncMutationRecord;
+  response: Extract<PersistenceCommitResponse, { status: "conflict" }>;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "remote-applied"; operation: VersionedOperation }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "reload-required";
+  expectedVersion: number;
+  receivedVersion: number;
+  snapshot?: WorkbookSnapshot;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "reloaded";
+  serverVersion: number;
+  pending: readonly SyncMutationRecord[];
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "storage-error";
+  error: unknown;
+  clientMutationId?: string;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "error"; error: unknown; clientMutationId?: string }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -35,53 +129,68 @@ Queue, version, connection, or error transition emitted by synchronization.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type SyncCoordinatorEvent = {
-    type: "state";
-    state: SyncStateSnapshot;
-} | {
-    type: "restored";
-    pending: readonly SyncMutationRecord[];
-} | {
-    type: "persisting";
-    mutation: SyncMutationRecord;
-} | {
-    type: "pending";
-    mutation: SyncMutationRecord;
-} | {
-    type: "sending";
-    mutation: SyncMutationRecord;
-} | {
-    type: "acknowledged";
-    clientMutationId: string;
-    version: number;
-    duplicate: boolean;
-} | {
-    type: "conflict";
-    mutation: SyncMutationRecord;
-    response: Extract<PersistenceCommitResponse, {
-        status: "conflict";
-    }>;
-} | {
-    type: "remote-applied";
-    operation: VersionedOperation;
-} | {
-    type: "reload-required";
-    expectedVersion: number;
-    receivedVersion: number;
-    snapshot?: WorkbookSnapshot;
-} | {
-    type: "reloaded";
-    serverVersion: number;
-    pending: readonly SyncMutationRecord[];
-} | {
-    type: "storage-error";
-    error: unknown;
-    clientMutationId?: string;
-} | {
-    type: "error";
-    error: unknown;
-    clientMutationId?: string;
-};
+export type SyncCoordinatorEvent =
+  | {
+      type: "state";
+      state: SyncStateSnapshot;
+    }
+  | {
+      type: "restored";
+      pending: readonly SyncMutationRecord[];
+    }
+  | {
+      type: "persisting";
+      mutation: SyncMutationRecord;
+    }
+  | {
+      type: "pending";
+      mutation: SyncMutationRecord;
+    }
+  | {
+      type: "sending";
+      mutation: SyncMutationRecord;
+    }
+  | {
+      type: "acknowledged";
+      clientMutationId: string;
+      version: number;
+      duplicate: boolean;
+    }
+  | {
+      type: "conflict";
+      mutation: SyncMutationRecord;
+      response: Extract<
+        PersistenceCommitResponse,
+        {
+          status: "conflict";
+        }
+      >;
+    }
+  | {
+      type: "remote-applied";
+      operation: VersionedOperation;
+    }
+  | {
+      type: "reload-required";
+      expectedVersion: number;
+      receivedVersion: number;
+      snapshot?: WorkbookSnapshot;
+    }
+  | {
+      type: "reloaded";
+      serverVersion: number;
+      pending: readonly SyncMutationRecord[];
+    }
+  | {
+      type: "storage-error";
+      error: unknown;
+      clientMutationId?: string;
+    }
+  | {
+      type: "error";
+      error: unknown;
+      clientMutationId?: string;
+    };
 ```
 
 </details>

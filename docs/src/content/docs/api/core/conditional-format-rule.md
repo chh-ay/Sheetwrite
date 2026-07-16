@@ -51,9 +51,9 @@ style: CellStyle;
 
 ```ts generated
 export interface ConditionalFormatRule {
-    range: Range;
-    when: ConditionalFormatPredicate;
-    style: CellStyle;
+  range: Range;
+  when: ConditionalFormatPredicate;
+  style: CellStyle;
 }
 ```
 

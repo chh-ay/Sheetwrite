@@ -69,11 +69,11 @@ style: number
 
 ```ts generated
 class CellOut {
-    free: () => void;
-    kind: number;
-    num: number;
-    string: string | undefined;
-    style: number;
+  free: () => void;
+  kind: number;
+  num: number;
+  string: string | undefined;
+  style: number;
 }
 ```
 

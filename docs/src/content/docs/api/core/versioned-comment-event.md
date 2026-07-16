@@ -51,9 +51,9 @@ clientMutationId?: string;
 
 ```ts generated
 export interface VersionedCommentEvent {
-    version: number;
-    thread: CommentThread;
-    clientMutationId?: string;
+  version: number;
+  thread: CommentThread;
+  clientMutationId?: string;
 }
 ```
 

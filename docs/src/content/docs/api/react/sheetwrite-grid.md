@@ -12,8 +12,10 @@ Advanced framework component for workbook data or datasource input.
 <div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L58</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function SheetwriteGrid(props: SheetwriteGridProps & React.RefAttributes<Grid>): ReactNode;
+function SheetwriteGrid(
+  props: SheetwriteGridProps & React.RefAttributes<Grid>,
+): ReactNode
 ```

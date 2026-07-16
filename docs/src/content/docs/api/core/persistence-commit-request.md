@@ -33,7 +33,7 @@ signal?: AbortSignal;
 
 ```ts generated
 export interface PersistenceCommitRequest extends PendingCommit {
-    signal?: AbortSignal;
+  signal?: AbortSignal;
 }
 ```
 

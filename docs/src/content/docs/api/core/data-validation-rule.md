@@ -78,12 +78,12 @@ helpText?: string;
 
 ```ts generated
 export interface DataValidationRule {
-    id: string;
-    range: Range;
-    condition: DataValidationCondition;
-    policy: ValidationPolicy;
-    allowBlank?: boolean;
-    helpText?: string;
+  id: string;
+  range: Range;
+  condition: DataValidationCondition;
+  policy: ValidationPolicy;
+  allowBlank?: boolean;
+  helpText?: string;
 }
 ```
 

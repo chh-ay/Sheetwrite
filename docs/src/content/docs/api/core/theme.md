@@ -150,20 +150,20 @@ highlight: string;
 
 ```ts generated
 export interface Theme {
-    font: string;
-    bg: string;
-    fg: string;
-    gridLine: string;
-    headerBg: string;
-    headerFg: string;
-    selection: string;
-    selectionBorder: string;
-    rowHeight: number;
-    headerHeight: number;
-    rowHeaderWidth: number;
-    searchMatch: string;
-    searchActiveMatch: string;
-    highlight: string;
+  font: string;
+  bg: string;
+  fg: string;
+  gridLine: string;
+  headerBg: string;
+  headerFg: string;
+  selection: string;
+  selectionBorder: string;
+  rowHeight: number;
+  headerHeight: number;
+  rowHeaderWidth: number;
+  searchMatch: string;
+  searchActiveMatch: string;
+  highlight: string;
 }
 ```
 

@@ -12,21 +12,8 @@ Horizontal text alignment supported by cell styles.
 <div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L7</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">3</span>
-
-<div class="api-variant-list">
-<div class="api-variant"><code>&quot;left&quot;</code></div>
-<div class="api-variant"><code>&quot;center&quot;</code></div>
-<div class="api-variant"><code>&quot;right&quot;</code></div>
-</div>
-
 ## Declaration
-
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
 
 ```ts generated
 export type CellAlign = "left" | "center" | "right";
 ```
-
-</details>

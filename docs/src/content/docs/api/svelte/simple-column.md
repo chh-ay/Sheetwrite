@@ -96,14 +96,14 @@ visible?: boolean;
 
 ```ts generated
 export interface SimpleColumn<Row extends Record<string, CellScalar>> {
-    key: keyof Row & string;
-    title: string;
-    width?: number;
-    type?: CellFormat;
-    numberFormat?: string;
-    headerStyle?: CellStyle;
-    cellStyle?: CellStyle;
-    visible?: boolean;
+  key: keyof Row & string;
+  title: string;
+  width?: number;
+  type?: CellFormat;
+  numberFormat?: string;
+  headerStyle?: CellStyle;
+  cellStyle?: CellStyle;
+  visible?: boolean;
 }
 ```
 

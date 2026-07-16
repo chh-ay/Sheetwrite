@@ -15,8 +15,23 @@ Document location to which a comment thread is attached.
 ## Variants <span class="api-count">2</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ kind: &quot;cell&quot;; address: { sheet: string; row: number; col: number } }</code></div>
-<div class="api-variant"><code>{ kind: &quot;range&quot;; range: Range }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  kind: "cell";
+  address: { sheet: string; row: number; col: number };
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "range"; range: Range }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -25,17 +40,19 @@ Document location to which a comment thread is attached.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type CommentAnchor = {
-    kind: "cell";
-    address: {
+export type CommentAnchor =
+  | {
+      kind: "cell";
+      address: {
         sheet: string;
         row: number;
         col: number;
+      };
+    }
+  | {
+      kind: "range";
+      range: Range;
     };
-} | {
-    kind: "range";
-    range: Range;
-};
 ```
 
 </details>

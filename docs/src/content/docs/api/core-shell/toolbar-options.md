@@ -51,9 +51,9 @@ label?: string;
 
 ```ts generated
 export interface ToolbarOptions {
-    items?: readonly ToolbarItem[];
-    icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
-    label?: string;
+  items?: readonly ToolbarItem[];
+  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  label?: string;
 }
 ```
 

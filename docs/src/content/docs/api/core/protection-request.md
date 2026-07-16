@@ -51,9 +51,9 @@ commitReason: CommitReason;
 
 ```ts generated
 export interface ProtectionRequest {
-    protectedRange: Readonly<ProtectedRange>;
-    operation: Readonly<DocumentOp>;
-    commitReason: CommitReason;
+  protectedRange: Readonly<ProtectedRange>;
+  operation: Readonly<DocumentOp>;
+  commitReason: CommitReason;
 }
 ```
 

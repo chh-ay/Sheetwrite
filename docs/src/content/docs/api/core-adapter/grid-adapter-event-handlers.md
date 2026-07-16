@@ -105,15 +105,15 @@ onInitializationError?: (error: unknown) => void;
 
 ```ts generated
 export interface GridAdapterEventHandlers {
-    onGridChange?: (event: ChangeEvent) => void;
-    onSelectionChange?: (selection: Selection | null) => void;
-    onViewportChange?: (event: GridEvents["scroll"]) => void;
-    onEditBegin?: (event: GridEvents["edit-begin"]) => void;
-    onEditCommit?: (event: GridEvents["edit-commit"]) => void;
-    onSearch?: (result: GridEvents["search"]) => void;
-    onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
-    onReady?: (event: GridReadyEvent) => void;
-    onInitializationError?: (error: unknown) => void;
+  onGridChange?: (event: ChangeEvent) => void;
+  onSelectionChange?: (selection: Selection | null) => void;
+  onViewportChange?: (event: GridEvents["scroll"]) => void;
+  onEditBegin?: (event: GridEvents["edit-begin"]) => void;
+  onEditCommit?: (event: GridEvents["edit-commit"]) => void;
+  onSearch?: (result: GridEvents["search"]) => void;
+  onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onReady?: (event: GridReadyEvent) => void;
+  onInitializationError?: (error: unknown) => void;
 }
 ```
 

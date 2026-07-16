@@ -90,13 +90,13 @@ destroy(): void;
 
 ```ts generated
 export interface GridController {
-    readonly grid: Grid;
-    setTheme(theme: Partial<Theme> | undefined): void;
-    setReadOnly(readOnly: boolean): void;
-    setConfig(config: GridConfig | undefined): void;
-    setOverscan(overscan: number | undefined): void;
-    setMinColumns(minColumns: number | undefined): void;
-    destroy(): void;
+  readonly grid: Grid;
+  setTheme(theme: Partial<Theme> | undefined): void;
+  setReadOnly(readOnly: boolean): void;
+  setConfig(config: GridConfig | undefined): void;
+  setOverscan(overscan: number | undefined): void;
+  setMinColumns(minColumns: number | undefined): void;
+  destroy(): void;
 }
 ```
 

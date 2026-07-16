@@ -51,9 +51,9 @@ readonly clientY: number;
 
 ```ts generated
 export interface ContextMenuContext {
-    readonly cell: CellAddress | null;
-    readonly clientX: number;
-    readonly clientY: number;
+  readonly cell: CellAddress | null;
+  readonly clientX: number;
+  readonly clientY: number;
 }
 ```
 

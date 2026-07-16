@@ -51,9 +51,9 @@ namedRanges?: NamedRangeSnapshot[];
 
 ```ts generated
 export interface Workbook {
-    sheets: Sheet[];
-    activeSheet: SheetId;
-    namedRanges?: NamedRangeSnapshot[];
+  sheets: Sheet[];
+  activeSheet: SheetId;
+  namedRanges?: NamedRangeSnapshot[];
 }
 ```
 

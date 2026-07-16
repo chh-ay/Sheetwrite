@@ -62,10 +62,10 @@ title?: string;
 
 ```ts generated
 export interface ToolbarItem {
-    action?: ToolbarActionName;
-    onClick?: (grid: Grid) => void;
-    icon?: ToolbarIcon;
-    title?: string;
+  action?: ToolbarActionName;
+  onClick?: (grid: Grid) => void;
+  icon?: ToolbarIcon;
+  title?: string;
 }
 ```
 

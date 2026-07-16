@@ -15,10 +15,34 @@ Connection or actor transition emitted by presence coordination.
 ## Variants <span class="api-count">4</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ type: &quot;published&quot;; message: PresenceMessage }</code></div>
-<div class="api-variant"><code>{ type: &quot;updated&quot;; actorId: string }</code></div>
-<div class="api-variant"><code>{ type: &quot;expired&quot;; actorId: string }</code></div>
-<div class="api-variant"><code>{ type: &quot;error&quot;; error: unknown }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ type: "published"; message: PresenceMessage }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "updated"; actorId: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "expired"; actorId: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "error"; error: unknown }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -27,19 +51,23 @@ Connection or actor transition emitted by presence coordination.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type PresenceCoordinatorEvent = {
-    type: "published";
-    message: PresenceMessage;
-} | {
-    type: "updated";
-    actorId: string;
-} | {
-    type: "expired";
-    actorId: string;
-} | {
-    type: "error";
-    error: unknown;
-};
+export type PresenceCoordinatorEvent =
+  | {
+      type: "published";
+      message: PresenceMessage;
+    }
+  | {
+      type: "updated";
+      actorId: string;
+    }
+  | {
+      type: "expired";
+      actorId: string;
+    }
+  | {
+      type: "error";
+      error: unknown;
+    };
 ```
 
 </details>

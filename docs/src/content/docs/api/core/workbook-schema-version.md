@@ -12,8 +12,8 @@ Current workbook snapshot schema version accepted by Sheetwrite.
 <div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L5</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const WORKBOOK_SCHEMA_VERSION: 1;
+const WORKBOOK_SCHEMA_VERSION: 1
 ```

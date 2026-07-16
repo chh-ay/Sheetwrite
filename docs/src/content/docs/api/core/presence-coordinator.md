@@ -78,12 +78,16 @@ remotePresence: () => readonly PresenceMessage[]
 
 ```ts generated
 class PresenceCoordinator {
-    constructor(grid: Grid, transport: PresenceTransport, options: PresenceCoordinatorOptions);
-    destroy: () => void;
-    on: (listener: PresenceListener) => () => void;
-    pruneStale: () => void;
-    publishNow: () => Promise<void>;
-    remotePresence: () => readonly PresenceMessage[];
+  constructor(
+    grid: Grid,
+    transport: PresenceTransport,
+    options: PresenceCoordinatorOptions,
+  );
+  destroy: () => void;
+  on: (listener: PresenceListener) => () => void;
+  pruneStale: () => void;
+  publishNow: () => Promise<void>;
+  remotePresence: () => readonly PresenceMessage[];
 }
 ```
 

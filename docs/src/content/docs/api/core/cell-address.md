@@ -51,9 +51,9 @@ col: number;
 
 ```ts generated
 export interface CellAddress {
-    sheet: SheetId;
-    row: number;
-    col: number;
+  sheet: SheetId;
+  row: number;
+  col: number;
 }
 ```
 

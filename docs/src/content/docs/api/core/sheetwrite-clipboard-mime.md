@@ -12,8 +12,8 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 <div><dt>Source</dt><dd><code>packages/core/src/clipboard-controller.ts#L51</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const SHEETWRITE_CLIPBOARD_MIME: "application/x-sheetwrite+json";
+const SHEETWRITE_CLIPBOARD_MIME: "application/x-sheetwrite+json"
 ```

@@ -25,8 +25,8 @@ parsing is identical everywhere instead of re-derived per consumer.
 <div><dt>Source</dt><dd><code>packages/core/src/cell-input.ts#L28</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function parseCellInput(raw: string, type: CellFormat): CellValue;
+function parseCellInput(raw: string, type: CellFormat): CellValue
 ```

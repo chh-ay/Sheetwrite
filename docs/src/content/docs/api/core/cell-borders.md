@@ -69,11 +69,11 @@ left?: CellBorder;
 
 ```ts generated
 export interface CellBorders {
-    all?: CellBorder;
-    top?: CellBorder;
-    right?: CellBorder;
-    bottom?: CellBorder;
-    left?: CellBorder;
+  all?: CellBorder;
+  top?: CellBorder;
+  right?: CellBorder;
+  bottom?: CellBorder;
+  left?: CellBorder;
 }
 ```
 

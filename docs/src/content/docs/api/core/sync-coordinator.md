@@ -190,24 +190,37 @@ subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) =
 
 ```ts generated
 class SyncCoordinator {
-    constructor(grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOptions);
-    applyVersionedOperation: (operation: VersionedOperation) => void;
-    destroy: () => void;
-    flush: () => Promise<readonly PersistenceCommitResponse[]>;
-    handleResponse: (response: PersistenceCommitResponse, requestedMutationId?: string) => Promise<void>;
-    on: (listener: SyncListener) => () => void;
-    pendingCommits: () => readonly SyncMutationRecord[];
-    pendingCount: number;
-    ready: () => Promise<void>;
-    resumeAfterReload: (snapshot: WorkbookSnapshot) => void;
-    retry: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>;
-    retryPersistence: (clientMutationId: string) => Promise<boolean>;
-    send: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>;
-    sendNext: () => Promise<PersistenceCommitResponse | null>;
-    serverVersion: number;
-    setOnline: (online: boolean) => void;
-    state: SyncStateSnapshot;
-    subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) => () => void;
+  constructor(
+    grid: Grid,
+    adapter: PersistenceAdapter,
+    options: SyncCoordinatorOptions,
+  );
+  applyVersionedOperation: (operation: VersionedOperation) => void;
+  destroy: () => void;
+  flush: () => Promise<readonly PersistenceCommitResponse[]>;
+  handleResponse: (
+    response: PersistenceCommitResponse,
+    requestedMutationId?: string,
+  ) => Promise<void>;
+  on: (listener: SyncListener) => () => void;
+  pendingCommits: () => readonly SyncMutationRecord[];
+  pendingCount: number;
+  ready: () => Promise<void>;
+  resumeAfterReload: (snapshot: WorkbookSnapshot) => void;
+  retry: (
+    clientMutationId: string,
+  ) => Promise<PersistenceCommitResponse | null>;
+  retryPersistence: (clientMutationId: string) => Promise<boolean>;
+  send: (
+    clientMutationId: string,
+  ) => Promise<PersistenceCommitResponse | null>;
+  sendNext: () => Promise<PersistenceCommitResponse | null>;
+  serverVersion: number;
+  setOnline: (online: boolean) => void;
+  state: SyncStateSnapshot;
+  subscribe: (
+    source: RemoteOperationSource | AsyncIterable<VersionedOperation>,
+  ) => () => void;
 }
 ```
 

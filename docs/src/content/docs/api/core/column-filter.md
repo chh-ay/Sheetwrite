@@ -16,11 +16,45 @@ matching is against the cell's resolved value (text or number).
 ## Variants <span class="api-count">5</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ kind: &quot;values&quot;; values: readonly CellScalar[] }</code></div>
-<div class="api-variant"><code>{ kind: &quot;contains&quot;; text: string; matchCase?: boolean }</code></div>
-<div class="api-variant"><code>{ kind: &quot;compare&quot;; op: &quot;gt&quot; | &quot;gte&quot; | &quot;lt&quot; | &quot;lte&quot; | &quot;eq&quot; | &quot;neq&quot;; value: number }</code></div>
-<div class="api-variant"><code>{ kind: &quot;empty&quot; }</code></div>
-<div class="api-variant"><code>{ kind: &quot;nonEmpty&quot; }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "values"; values: readonly CellScalar[] }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "contains"; text: string; matchCase?: boolean }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  kind: "compare";
+  op: "gt" | "gte" | "lt" | "lte" | "eq" | "neq";
+  value: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "empty" }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "nonEmpty" }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -29,22 +63,27 @@ matching is against the cell's resolved value (text or number).
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type ColumnFilter = {
-    kind: "values";
-    values: readonly CellScalar[];
-} | {
-    kind: "contains";
-    text: string;
-    matchCase?: boolean;
-} | {
-    kind: "compare";
-    op: "gt" | "gte" | "lt" | "lte" | "eq" | "neq";
-    value: number;
-} | {
-    kind: "empty";
-} | {
-    kind: "nonEmpty";
-};
+export type ColumnFilter =
+  | {
+      kind: "values";
+      values: readonly CellScalar[];
+    }
+  | {
+      kind: "contains";
+      text: string;
+      matchCase?: boolean;
+    }
+  | {
+      kind: "compare";
+      op: "gt" | "gte" | "lt" | "lte" | "eq" | "neq";
+      value: number;
+    }
+  | {
+      kind: "empty";
+    }
+  | {
+      kind: "nonEmpty";
+    };
 ```
 
 </details>

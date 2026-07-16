@@ -15,8 +15,8 @@ cannot represent as a Date. Construct calendar dates with `Date.UTC(...)`
 <div><dt>Source</dt><dd><code>packages/core/src/date-serial.ts#L29</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function dateToSerial(date: Date): number;
+function dateToSerial(date: Date): number
 ```

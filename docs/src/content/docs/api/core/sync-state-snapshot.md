@@ -60,10 +60,10 @@ serverVersion: number;
 
 ```ts generated
 export interface SyncStateSnapshot {
-    connection: SyncConnectionState;
-    activity: SyncActivityState;
-    pendingCount: number;
-    serverVersion: number;
+  connection: SyncConnectionState;
+  activity: SyncActivityState;
+  pendingCount: number;
+  serverVersion: number;
 }
 ```
 

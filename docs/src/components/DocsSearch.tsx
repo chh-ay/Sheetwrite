@@ -54,9 +54,14 @@ export function DocsSearch() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const commandK = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
+      const slash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey;
+      if (!commandK && !slash) return;
       const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+      // "/" must keep typing semantics inside fields; Ctrl+K may not.
+      if (slash && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+        return;
+      }
       event.preventDefault();
       dialog.current?.showModal();
       input.current?.focus();
@@ -124,9 +129,17 @@ export function DocsSearch() {
           <path d="m16 16 5 5" />
         </svg>
         <span>Search docs</span>
-        <kbd>/</kbd>
+        <kbd>Ctrl K</kbd>
       </button>
-      <dialog className="sw-search-dialog" ref={dialog}>
+      <dialog
+        className="sw-search-dialog"
+        onClick={(event) => {
+          // Clicks on children land on the form; only the backdrop hits the
+          // dialog element itself (it has no padding).
+          if (event.target === event.currentTarget) event.currentTarget.close();
+        }}
+        ref={dialog}
+      >
         <form method="dialog">
           <label>
             <span className="sw-visually-hidden">Search documentation</span>

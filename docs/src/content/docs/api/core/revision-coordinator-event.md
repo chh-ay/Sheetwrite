@@ -15,9 +15,31 @@ State or restore transition emitted by revision coordination.
 ## Variants <span class="api-count">3</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ type: &quot;restored&quot;; targetVersion: number; version: number }</code></div>
-<div class="api-variant"><code>{ type: &quot;conflict&quot;; targetVersion: number; currentVersion: number }</code></div>
-<div class="api-variant"><code>{ type: &quot;error&quot;; error: unknown }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ type: "restored"; targetVersion: number; version: number }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "conflict";
+  targetVersion: number;
+  currentVersion: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "error"; error: unknown }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -26,18 +48,21 @@ State or restore transition emitted by revision coordination.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type RevisionCoordinatorEvent = {
-    type: "restored";
-    targetVersion: number;
-    version: number;
-} | {
-    type: "conflict";
-    targetVersion: number;
-    currentVersion: number;
-} | {
-    type: "error";
-    error: unknown;
-};
+export type RevisionCoordinatorEvent =
+  | {
+      type: "restored";
+      targetVersion: number;
+      version: number;
+    }
+  | {
+      type: "conflict";
+      targetVersion: number;
+      currentVersion: number;
+    }
+  | {
+      type: "error";
+      error: unknown;
+    };
 ```
 
 </details>

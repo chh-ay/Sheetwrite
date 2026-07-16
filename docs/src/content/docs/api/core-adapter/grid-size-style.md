@@ -12,8 +12,10 @@ Converts adapter size props into a host element style object.
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L107</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function gridSizeStyle(size: OptionalGridSizeProps): Record<string, string>;
+function gridSizeStyle(
+  size: OptionalGridSizeProps,
+): Record<string, string>
 ```

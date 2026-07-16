@@ -16,8 +16,10 @@ right strategy for the runtime.
 <div><dt>Source</dt><dd><code>packages/wasm/loader.d.ts#L19</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function load(source?: BufferSource | URL | string | Request | WebAssembly.Module): Promise<void>;
+function load(
+  source?: BufferSource | URL | string | Request | WebAssembly.Module,
+): Promise<void>
 ```

@@ -42,8 +42,8 @@ options: SheetOptions<Blob>;
 
 ```ts generated
 export interface XlsxModel {
-    data: SheetData;
-    options: SheetOptions<Blob>;
+  data: SheetData;
+  options: SheetOptions<Blob>;
 }
 ```
 

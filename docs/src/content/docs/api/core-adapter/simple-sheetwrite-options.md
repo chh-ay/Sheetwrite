@@ -50,10 +50,12 @@ sheetName?: string;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SimpleSheetwriteOptions<Row extends Record<string, CellScalar>> {
-    columns: readonly SimpleColumn<Row>[];
-    defaultRows: readonly Row[];
-    sheetName?: string;
+export interface SimpleSheetwriteOptions<
+  Row extends Record<string, CellScalar>,
+> {
+  columns: readonly SimpleColumn<Row>[];
+  defaultRows: readonly Row[];
+  sheetName?: string;
 }
 ```
 

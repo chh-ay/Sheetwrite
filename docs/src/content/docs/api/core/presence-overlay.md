@@ -70,11 +70,11 @@ ranges: readonly Range[];
 
 ```ts generated
 export interface PresenceOverlay {
-    actorId: string;
-    displayName?: string;
-    color: string;
-    activeSheet: SheetId;
-    ranges: readonly Range[];
+  actorId: string;
+  displayName?: string;
+  color: string;
+  activeSheet: SheetId;
+  ranges: readonly Range[];
 }
 ```
 

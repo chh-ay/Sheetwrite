@@ -87,13 +87,13 @@ style: CellStyle;
 
 ```ts generated
 export interface CellPaintContext {
-    value: CellScalar;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    theme: Theme;
-    style: CellStyle;
+  value: CellScalar;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  theme: Theme;
+  style: CellStyle;
 }
 ```
 

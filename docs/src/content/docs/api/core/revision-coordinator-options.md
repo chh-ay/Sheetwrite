@@ -51,9 +51,9 @@ migrateSnapshot?: (snapshot: unknown) => unknown;
 
 ```ts generated
 export interface RevisionCoordinatorOptions {
-    documentId: string;
-    serverVersion: number;
-    migrateSnapshot?: (snapshot: unknown) => unknown;
+  documentId: string;
+  serverVersion: number;
+  migrateSnapshot?: (snapshot: unknown) => unknown;
 }
 ```
 

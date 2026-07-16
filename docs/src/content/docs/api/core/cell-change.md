@@ -69,11 +69,11 @@ newStyle?: CellStyle;
 
 ```ts generated
 export interface CellChange {
-    addr: CellAddress;
-    oldValue: CellValue;
-    newValue: CellValue;
-    oldStyle?: CellStyle;
-    newStyle?: CellStyle;
+  addr: CellAddress;
+  oldValue: CellValue;
+  newValue: CellValue;
+  oldStyle?: CellStyle;
+  newStyle?: CellStyle;
 }
 ```
 

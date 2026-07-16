@@ -14,8 +14,10 @@ without booting a browser Worker.
 <div><dt>Source</dt><dd><code>packages/core/src/worker.ts#L253</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createWorkerMessageHandler(postAcknowledgement: (message: WorkerAcknowledgement) => void): (message: unknown) => void;
+function createWorkerMessageHandler(
+  postAcknowledgement: (message: WorkerAcknowledgement) => void,
+): (message: unknown) => void
 ```

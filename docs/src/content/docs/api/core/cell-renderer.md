@@ -42,8 +42,8 @@ dom?(c: CellPaintContext): HTMLElement;
 
 ```ts generated
 export interface CellRenderer {
-    canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
-    dom?(c: CellPaintContext): HTMLElement;
+  canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
+  dom?(c: CellPaintContext): HTMLElement;
 }
 ```
 

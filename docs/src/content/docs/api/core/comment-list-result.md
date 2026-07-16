@@ -42,8 +42,8 @@ threads: readonly CommentThread[];
 
 ```ts generated
 export interface CommentListResult {
-    version: number;
-    threads: readonly CommentThread[];
+  version: number;
+  threads: readonly CommentThread[];
 }
 ```
 

@@ -51,9 +51,9 @@ color?: string;
 
 ```ts generated
 export interface PresenceActor {
-    id: string;
-    displayName?: string;
-    color?: string;
+  id: string;
+  displayName?: string;
+  color?: string;
 }
 ```
 

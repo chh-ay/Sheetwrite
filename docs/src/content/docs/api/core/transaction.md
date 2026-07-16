@@ -46,8 +46,8 @@ epoch?: number;
 
 ```ts generated
 export interface Transaction {
-    patches: DocumentOp[];
-    epoch?: number;
+  patches: DocumentOp[];
+  epoch?: number;
 }
 ```
 

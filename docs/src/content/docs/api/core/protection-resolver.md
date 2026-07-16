@@ -12,8 +12,10 @@ Host-owned client UX permission callback for protected mutations.
 <div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L168</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny";
+export type ProtectionResolver = (
+  request: ProtectionRequest,
+) => "allow" | "deny";
 ```

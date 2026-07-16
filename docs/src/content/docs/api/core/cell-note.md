@@ -42,8 +42,8 @@ text: string;
 
 ```ts generated
 export interface CellNote {
-    addr: CellAddress;
-    text: string;
+  addr: CellAddress;
+  text: string;
 }
 ```
 

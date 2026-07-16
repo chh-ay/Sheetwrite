@@ -15,9 +15,36 @@ Applied or conflict acknowledgement for a revision restore.
 ## Variants <span class="api-count">3</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ status: &quot;applied&quot;; version: number; clientMutationId: string; snapshot: WorkbookSnapshot; }</code></div>
-<div class="api-variant"><code>{ status: &quot;duplicate&quot;; version: number; clientMutationId: string }</code></div>
-<div class="api-variant"><code>{ status: &quot;conflict&quot;; currentVersion: number }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "applied";
+  version: number;
+  clientMutationId: string;
+  snapshot: WorkbookSnapshot;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "duplicate";
+  version: number;
+  clientMutationId: string;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ status: "conflict"; currentVersion: number }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -26,19 +53,22 @@ Applied or conflict acknowledgement for a revision restore.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type RevisionRestoreResponse = {
-    status: "applied";
-    version: number;
-    clientMutationId: string;
-    snapshot: WorkbookSnapshot;
-} | {
-    status: "duplicate";
-    version: number;
-    clientMutationId: string;
-} | {
-    status: "conflict";
-    currentVersion: number;
-};
+export type RevisionRestoreResponse =
+  | {
+      status: "applied";
+      version: number;
+      clientMutationId: string;
+      snapshot: WorkbookSnapshot;
+    }
+  | {
+      status: "duplicate";
+      version: number;
+      clientMutationId: string;
+    }
+  | {
+      status: "conflict";
+      currentVersion: number;
+    };
 ```
 
 </details>

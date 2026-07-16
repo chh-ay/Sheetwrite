@@ -15,11 +15,49 @@ State transition emitted by the comment coordinator.
 ## Variants <span class="api-count">5</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ type: &quot;loaded&quot;; version: number; threads: readonly CommentThread[] }</code></div>
-<div class="api-variant"><code>{ type: &quot;changed&quot;; version: number; thread: CommentThread }</code></div>
-<div class="api-variant"><code>{ type: &quot;conflict&quot;; currentVersion: number }</code></div>
-<div class="api-variant"><code>{ type: &quot;gap&quot;; expectedVersion: number; receivedVersion: number }</code></div>
-<div class="api-variant"><code>{ type: &quot;error&quot;; error: unknown }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "loaded";
+  version: number;
+  threads: readonly CommentThread[];
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "changed"; version: number; thread: CommentThread }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "conflict"; currentVersion: number }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  type: "gap";
+  expectedVersion: number;
+  receivedVersion: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "error"; error: unknown }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -28,25 +66,30 @@ State transition emitted by the comment coordinator.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type CommentCoordinatorEvent = {
-    type: "loaded";
-    version: number;
-    threads: readonly CommentThread[];
-} | {
-    type: "changed";
-    version: number;
-    thread: CommentThread;
-} | {
-    type: "conflict";
-    currentVersion: number;
-} | {
-    type: "gap";
-    expectedVersion: number;
-    receivedVersion: number;
-} | {
-    type: "error";
-    error: unknown;
-};
+export type CommentCoordinatorEvent =
+  | {
+      type: "loaded";
+      version: number;
+      threads: readonly CommentThread[];
+    }
+  | {
+      type: "changed";
+      version: number;
+      thread: CommentThread;
+    }
+  | {
+      type: "conflict";
+      currentVersion: number;
+    }
+  | {
+      type: "gap";
+      expectedVersion: number;
+      receivedVersion: number;
+    }
+  | {
+      type: "error";
+      error: unknown;
+    };
 ```
 
 </details>

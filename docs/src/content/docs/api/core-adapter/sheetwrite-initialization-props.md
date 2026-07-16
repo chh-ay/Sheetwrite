@@ -42,8 +42,8 @@ onInitializationError?: (error: unknown) => void;
 
 ```ts generated
 export interface SheetwriteInitializationProps {
-    wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
-    onInitializationError?: (error: unknown) => void;
+  wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
+  onInitializationError?: (error: unknown) => void;
 }
 ```
 

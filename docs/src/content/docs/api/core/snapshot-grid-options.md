@@ -12,7 +12,7 @@ Grid creation options accepted when hydrating a validated snapshot.
 <div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L14</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
 export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data">;

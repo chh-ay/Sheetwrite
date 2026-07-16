@@ -12,8 +12,11 @@ Returns the first reset-sensitive adapter input that changed, if any.
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L130</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function getGridResetReason(previous: GridOptions, next: GridOptions): GridResetReason | null;
+function getGridResetReason(
+  previous: GridOptions,
+  next: GridOptions,
+): GridResetReason | null
 ```

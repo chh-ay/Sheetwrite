@@ -69,11 +69,11 @@ fullyLoaded: boolean;
 
 ```ts generated
 export interface PagedStoreStats {
-    chunks: number;
-    loadedCells: number;
-    dirtyCells: number;
-    allocatedBytes: number;
-    fullyLoaded: boolean;
+  chunks: number;
+  loadedCells: number;
+  dirtyCells: number;
+  allocatedBytes: number;
+  fullyLoaded: boolean;
 }
 ```
 
