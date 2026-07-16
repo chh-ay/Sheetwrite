@@ -21,27 +21,47 @@ Schema-versioned serializable workbook document.
 
 <details class="api-member" id="workbook-snapshot-schema-version" data-pagefind-weight="1">
 <summary><code>schemaVersion</code></summary>
-<pre><code>schemaVersion: 1;</code></pre>
+
+```ts generated
+schemaVersion: 1;
+```
+
 </details>
 
 <details class="api-member" id="workbook-snapshot-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId?: string;</code></pre>
+
+```ts generated
+documentId?: string;
+```
+
 </details>
 
 <details class="api-member" id="workbook-snapshot-version" data-pagefind-weight="1">
 <summary><code>version</code></summary>
-<pre><code>version?: number;</code></pre>
+
+```ts generated
+version?: number;
+```
+
 </details>
 
 <details class="api-member" id="workbook-snapshot-workbook" data-pagefind-weight="1">
 <summary><code>workbook</code></summary>
-<pre><code>workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; };</code></pre>
+
+```ts generated
+workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; };
+```
+
 </details>
 
 <details class="api-member" id="workbook-snapshot-sheets" data-pagefind-weight="1">
 <summary><code>sheets</code></summary>
-<pre><code>sheets: SheetSnapshot[];</code></pre>
+
+```ts generated
+sheets: SheetSnapshot[];
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Schema-versioned serializable workbook document.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface WorkbookSnapshot {
     schemaVersion: 1;
     documentId?: string;

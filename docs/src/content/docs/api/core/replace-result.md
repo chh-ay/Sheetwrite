@@ -21,12 +21,20 @@ Replacement count and refreshed search state returned by replace-all.
 
 <details class="api-member" id="replace-result-replaced" data-pagefind-weight="1">
 <summary><code>replaced</code> <span class="api-member-summary">How many cells were rewritten.</span></summary>
-<pre><code>replaced: number;</code></pre>
+
+```ts generated
+replaced: number;
+```
+
 </details>
 
 <details class="api-member" id="replace-result-result" data-pagefind-weight="1">
 <summary><code>result</code> <span class="api-member-summary">Search state after the replacement (matches re-scanned against the new data).</span></summary>
-<pre><code>result: SearchResult;</code></pre>
+
+```ts generated
+result: SearchResult;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Replacement count and refreshed search state returned by replace-all.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ReplaceResult {
     replaced: number;
     result: SearchResult;

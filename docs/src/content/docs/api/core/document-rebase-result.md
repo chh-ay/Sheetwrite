@@ -27,7 +27,7 @@ Successful rebased operations or a conservative rebase conflict.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type DocumentRebaseResult = {
     status: "rebased";
     operations: readonly DocumentOp[];

@@ -21,37 +21,65 @@ Disposable controller for the framework-neutral spreadsheet shell.
 
 <details class="api-member" id="spreadsheet-shell-grid" data-pagefind-weight="1">
 <summary><code>grid</code> <span class="api-member-summary">The single grid the shell owns; use it for data, search, and actions.</span></summary>
-<pre><code>readonly grid: Grid;</code></pre>
+
+```ts generated
+readonly grid: Grid;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-element" data-pagefind-weight="1">
 <summary><code>element</code> <span class="api-member-summary">The shell's root element (already appended to the mount host).</span></summary>
-<pre><code>readonly element: HTMLElement;</code></pre>
+
+```ts generated
+readonly element: HTMLElement;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-set-theme" data-pagefind-weight="1">
 <summary><code>setTheme</code></summary>
-<pre><code>setTheme(theme: Partial&lt;Theme&gt;): void;</code></pre>
+
+```ts generated
+setTheme(theme: Partial<Theme>): void;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-set-read-only" data-pagefind-weight="1">
 <summary><code>setReadOnly</code></summary>
-<pre><code>setReadOnly(readOnly: boolean): void;</code></pre>
+
+```ts generated
+setReadOnly(readOnly: boolean): void;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-set-grid-config" data-pagefind-weight="1">
 <summary><code>setGridConfig</code> <span class="api-member-summary">Reconfigure the grid; the shell keeps its own toolbar/tabs suppressed.</span></summary>
-<pre><code>setGridConfig(config: GridConfig | undefined): void;</code></pre>
+
+```ts generated
+setGridConfig(config: GridConfig | undefined): void;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-set-active-sheet" data-pagefind-weight="1">
 <summary><code>setActiveSheet</code></summary>
-<pre><code>setActiveSheet(id: SheetId): void;</code></pre>
+
+```ts generated
+setActiveSheet(id: SheetId): void;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-destroy" data-pagefind-weight="1">
 <summary><code>destroy</code></summary>
-<pre><code>destroy(): void;</code></pre>
+
+```ts generated
+destroy(): void;
+```
+
 </details>
 </div>
 
@@ -60,7 +88,7 @@ Disposable controller for the framework-neutral spreadsheet shell.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SpreadsheetShell {
     readonly grid: Grid;
     readonly element: HTMLElement;

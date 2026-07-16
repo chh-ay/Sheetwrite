@@ -17,6 +17,6 @@ Returns the first reset-sensitive adapter input that changed, if any.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(previous: GridOptions, next: GridOptions): GridResetReason | null => ;
+```ts generated
+function getGridResetReason(previous: GridOptions, next: GridOptions): GridResetReason | null;
 ```

@@ -21,17 +21,29 @@ Document identity and version options for revision coordination.
 
 <details class="api-member" id="revision-coordinator-options-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="revision-coordinator-options-server-version" data-pagefind-weight="1">
 <summary><code>serverVersion</code></summary>
-<pre><code>serverVersion: number;</code></pre>
+
+```ts generated
+serverVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="revision-coordinator-options-migrate-snapshot" data-pagefind-weight="1">
 <summary><code>migrateSnapshot</code></summary>
-<pre><code>migrateSnapshot?: (snapshot: unknown) =&gt; unknown;</code></pre>
+
+```ts generated
+migrateSnapshot?: (snapshot: unknown) => unknown;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Document identity and version options for revision coordination.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RevisionCoordinatorOptions {
     documentId: string;
     serverVersion: number;

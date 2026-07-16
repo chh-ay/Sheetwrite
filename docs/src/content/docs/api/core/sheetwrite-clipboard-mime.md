@@ -17,6 +17,6 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-"application/x-sheetwrite+json";
+```ts generated
+const SHEETWRITE_CLIPBOARD_MIME: "application/x-sheetwrite+json";
 ```

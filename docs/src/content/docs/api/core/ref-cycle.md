@@ -17,6 +17,6 @@ Sentinel shown for a reference that participates in a cycle.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-"#CYCLE!";
+```ts generated
+const REF_CYCLE: "#CYCLE!";
 ```

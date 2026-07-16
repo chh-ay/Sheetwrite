@@ -21,17 +21,29 @@ Live workbook schema containing ordered sheets and the active sheet ID.
 
 <details class="api-member" id="workbook-sheets" data-pagefind-weight="1">
 <summary><code>sheets</code> <span class="api-member-summary">Sheets in display/tab order.</span></summary>
-<pre><code>sheets: Sheet[];</code></pre>
+
+```ts generated
+sheets: Sheet[];
+```
+
 </details>
 
 <details class="api-member" id="workbook-active-sheet" data-pagefind-weight="1">
 <summary><code>activeSheet</code> <span class="api-member-summary">Active sheet ID and initial tab presented when the grid is created.</span></summary>
-<pre><code>activeSheet: SheetId;</code></pre>
+
+```ts generated
+activeSheet: SheetId;
+```
+
 </details>
 
 <details class="api-member" id="workbook-named-ranges" data-pagefind-weight="1">
 <summary><code>namedRanges</code> <span class="api-member-summary">Formula names shared by the workbook or shadowed within a sheet scope.</span></summary>
-<pre><code>namedRanges?: NamedRangeSnapshot[];</code></pre>
+
+```ts generated
+namedRanges?: NamedRangeSnapshot[];
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Live workbook schema containing ordered sheets and the active sheet ID.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface Workbook {
     sheets: Sheet[];
     activeSheet: SheetId;

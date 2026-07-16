@@ -17,6 +17,6 @@ Host-owned client UX permission callback for protected mutations.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny";
 ```

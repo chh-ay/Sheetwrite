@@ -30,6 +30,6 @@ tearing the grid down and rebuilding it.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, options: GridOptions, handlers: GridControllerHandlers): GridController => ;
+```ts generated
+function createGridController(host: HTMLElement, options: GridOptions, handlers: GridControllerHandlers): GridController;
 ```

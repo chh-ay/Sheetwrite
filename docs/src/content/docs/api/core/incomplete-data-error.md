@@ -15,13 +15,44 @@ Error thrown when an operation requires datasource cells that are not loaded.
 <div><dt>Source</dt><dd><code>packages/core/src/store/data-engine.ts#L106</code></dd></div>
 </dl>
 
-## Signature
+## Members <span class="api-count">2</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="incomplete-data-error-constructor" data-pagefind-weight="1">
+<summary><code>constructor</code></summary>
+
+```ts generated
+constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete"; }>);
+```
+
+</details>
+
+<details class="api-member" id="incomplete-data-error-capability" data-pagefind-weight="1">
+<summary><code>capability</code></summary>
+
+```ts generated
+capability: { status: "incomplete"; loadedCells: number; totalCells: number; }
+```
+
+</details>
+</div>
+
+## Declaration
 
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
-class IncompleteDataError {
+```ts generated
+class IncompleteDataError extends Error {
+    constructor(sheet: SheetId, capability: Extract<QueryCapability, {
+        status: "incomplete";
+    }>);
+    capability: {
+        status: "incomplete";
+        loadedCells: number;
+        totalCells: number;
+    };
 }
 ```
 

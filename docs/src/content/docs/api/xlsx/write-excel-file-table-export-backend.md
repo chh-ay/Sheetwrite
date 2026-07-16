@@ -17,6 +17,6 @@ Default first-sheet table export backend.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-XlsxTableExportBackend;
+```ts generated
+const writeExcelFileTableExportBackend: XlsxTableExportBackend;
 ```

@@ -17,6 +17,6 @@ Converts adapter size props into a host element style object.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(size: OptionalGridSizeProps): Record<string, string> => ;
+```ts generated
+function gridSizeStyle(size: OptionalGridSizeProps): Record<string, string>;
 ```

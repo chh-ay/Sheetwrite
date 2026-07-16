@@ -21,17 +21,29 @@ Workbook-global or sheet-scoped named range used by formulas and persistence.
 
 <details class="api-member" id="named-range-snapshot-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-<pre><code>name: string;</code></pre>
+
+```ts generated
+name: string;
+```
+
 </details>
 
 <details class="api-member" id="named-range-snapshot-scope" data-pagefind-weight="1">
 <summary><code>scope</code> <span class="api-member-summary">Formula-context sheet whose local definition shadows the workbook definition.</span></summary>
-<pre><code>scope?: SheetId;</code></pre>
+
+```ts generated
+scope?: SheetId;
+```
+
 </details>
 
 <details class="api-member" id="named-range-snapshot-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-<pre><code>range: Range;</code></pre>
+
+```ts generated
+range: Range;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Workbook-global or sheet-scoped named range used by formulas and persistence.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface NamedRangeSnapshot {
     name: string;
     scope?: SheetId;

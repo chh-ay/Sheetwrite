@@ -29,7 +29,7 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ApplyTransactionResult = {
     status: "applied";
     epoch: number;

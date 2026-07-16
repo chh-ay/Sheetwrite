@@ -17,6 +17,6 @@ Grid creation options accepted when hydrating a validated snapshot.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data">;
 ```

@@ -21,12 +21,20 @@ Persistent display and grouping metadata for one document row.
 
 <details class="api-member" id="row-metadata-height" data-pagefind-weight="1">
 <summary><code>height</code></summary>
-<pre><code>height?: number;</code></pre>
+
+```ts generated
+height?: number;
+```
+
 </details>
 
 <details class="api-member" id="row-metadata-hidden" data-pagefind-weight="1">
 <summary><code>hidden</code></summary>
-<pre><code>hidden?: boolean;</code></pre>
+
+```ts generated
+hidden?: boolean;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Persistent display and grouping metadata for one document row.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RowMetadata {
     height?: number;
     hidden?: boolean;

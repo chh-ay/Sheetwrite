@@ -29,7 +29,7 @@ A scalar that can be displayed directly.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type CellScalar = string | number | boolean | null;
 ```
 

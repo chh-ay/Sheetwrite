@@ -30,7 +30,7 @@ Host-controlled online state reported by synchronization.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type SyncConnectionState = "offline" | "connecting" | "online" | "error" | "destroyed";
 ```
 

@@ -47,7 +47,7 @@ Built-in action names accepted by custom context-menu rows.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ContextMenuActionName = "cut" | "copy" | "paste" | "clearContents" | "merge" | "unmerge" | "insertRowAbove" | "insertRowBelow" | "deleteRow" | "insertColumnLeft" | "insertColumnRight" | "deleteColumn" | "hideRow" | "showAllRows" | "autoFitRow" | "hideColumn" | "showAllColumns" | "autoFitColumn" | "clearFilter" | "exportCsv" | "exportXlsx" | "separator";
 ```
 

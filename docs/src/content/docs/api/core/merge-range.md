@@ -21,22 +21,38 @@ Inclusive merged-cell rectangle in data-row/column coordinates.
 
 <details class="api-member" id="merge-range-r0" data-pagefind-weight="1">
 <summary><code>r0</code></summary>
-<pre><code>r0: number;</code></pre>
+
+```ts generated
+r0: number;
+```
+
 </details>
 
 <details class="api-member" id="merge-range-c0" data-pagefind-weight="1">
 <summary><code>c0</code></summary>
-<pre><code>c0: number;</code></pre>
+
+```ts generated
+c0: number;
+```
+
 </details>
 
 <details class="api-member" id="merge-range-r1" data-pagefind-weight="1">
 <summary><code>r1</code></summary>
-<pre><code>r1: number;</code></pre>
+
+```ts generated
+r1: number;
+```
+
 </details>
 
 <details class="api-member" id="merge-range-c1" data-pagefind-weight="1">
 <summary><code>c1</code></summary>
-<pre><code>c1: number;</code></pre>
+
+```ts generated
+c1: number;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Inclusive merged-cell rectangle in data-row/column coordinates.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface MergeRange {
     r0: number;
     c0: number;

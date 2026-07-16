@@ -21,28 +21,48 @@ Host elements and feature options used to create a spreadsheet shell.
 
 <details class="api-member" id="spreadsheet-shell-options-grid" data-pagefind-weight="1">
 <summary><code>grid</code> <span class="api-member-summary">Options for the single grid the shell owns.</span></summary>
-<pre><code>grid: GridOptions;</code></pre>
+
+```ts generated
+grid: GridOptions;
+```
+
 <p class="api-member-doc">Options for the single grid the shell owns. `initSheetwrite` must already be awaited.</p>
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-toolbar" data-pagefind-weight="1">
 <summary><code>toolbar</code> <span class="api-member-summary">Toolbar items (default: the full built-in action set).</span></summary>
-<pre><code>toolbar?: readonly ToolbarItem[];</code></pre>
+
+```ts generated
+toolbar?: readonly ToolbarItem[];
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-on-change" data-pagefind-weight="1">
 <summary><code>onChange</code> <span class="api-member-summary">Event callbacks forwarded from the owned grid.</span></summary>
-<pre><code>onChange?: (event: ChangeEvent) =&gt; void;</code></pre>
+
+```ts generated
+onChange?: (event: ChangeEvent) => void;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-on-selection-change" data-pagefind-weight="1">
 <summary><code>onSelectionChange</code></summary>
-<pre><code>onSelectionChange?: (selection: Selection | null) =&gt; void;</code></pre>
+
+```ts generated
+onSelectionChange?: (selection: Selection | null) => void;
+```
+
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-on-ready" data-pagefind-weight="1">
 <summary><code>onReady</code></summary>
-<pre><code>onReady?: (grid: Grid) =&gt; void;</code></pre>
+
+```ts generated
+onReady?: (grid: Grid) => void;
+```
+
 </details>
 </div>
 
@@ -51,7 +71,7 @@ Host elements and feature options used to create a spreadsheet shell.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SpreadsheetShellOptions {
     grid: GridOptions;
     toolbar?: readonly ToolbarItem[];

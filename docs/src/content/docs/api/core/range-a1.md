@@ -17,6 +17,6 @@ Two cell corners → A1 range ("A1:B3"), collapsing to a single ref when equal.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(a: CellRef, b: CellRef): string => ;
+```ts generated
+function rangeA1(a: CellRef, b: CellRef): string;
 ```

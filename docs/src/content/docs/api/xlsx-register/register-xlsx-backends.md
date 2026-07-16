@@ -17,6 +17,6 @@ Register all concrete XLSX backends with the backend-neutral core contracts.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(): void => ;
+```ts generated
+function registerXlsxBackends(): void;
 ```

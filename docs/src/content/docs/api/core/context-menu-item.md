@@ -21,40 +21,67 @@ Built-in, separator, or custom callback row in the right-click menu.
 
 <details class="api-member" id="context-menu-item-id" data-pagefind-weight="1">
 <summary><code>id</code> <span class="api-member-summary">Stable host identifier, exposed as data-context-menu-item.</span></summary>
-<pre><code>id?: string;</code></pre>
-<p class="api-member-doc">Stable host identifier, exposed as `data-context-menu-item`.</p>
+
+```ts generated
+id?: string;
+```
+
 </details>
 
 <details class="api-member" id="context-menu-item-action" data-pagefind-weight="1">
 <summary><code>action</code> <span class="api-member-summary">Built-in action to bind (or &quot;separator&quot;).</span></summary>
-<pre><code>action?: ContextMenuActionName;</code></pre>
+
+```ts generated
+action?: ContextMenuActionName;
+```
+
 <p class="api-member-doc">Built-in action to bind (or &quot;separator&quot;). Omit when supplying `onClick`.</p>
 </details>
 
 <details class="api-member" id="context-menu-item-on-click" data-pagefind-weight="1">
 <summary><code>onClick</code> <span class="api-member-summary">Custom click handler; receives the grid and the right-clicked cell (null if none).</span></summary>
-<pre><code>onClick?: (grid: Grid, cell: CellAddress | null) =&gt; void;</code></pre>
+
+```ts generated
+onClick?: (grid: Grid, cell: CellAddress | null) => void;
+```
+
 </details>
 
 <details class="api-member" id="context-menu-item-label" data-pagefind-weight="1">
 <summary><code>label</code> <span class="api-member-summary">Menu row text. Defaults per action.</span></summary>
-<pre><code>label?: string;</code></pre>
+
+```ts generated
+label?: string;
+```
+
 </details>
 
 <details class="api-member" id="context-menu-item-shortcut" data-pagefind-weight="1">
 <summary><code>shortcut</code> <span class="api-member-summary">Optional shortcut hint rendered beside the label.</span></summary>
-<pre><code>shortcut?: string;</code></pre>
+
+```ts generated
+shortcut?: string;
+```
+
 </details>
 
 <details class="api-member" id="context-menu-item-visible" data-pagefind-weight="1">
 <summary><code>visible</code> <span class="api-member-summary">Static or request-aware visibility.</span></summary>
-<pre><code>visible?: boolean | ((context: ContextMenuContext) =&gt; boolean);</code></pre>
+
+```ts generated
+visible?: boolean | ((context: ContextMenuContext) => boolean);
+```
+
 <p class="api-member-doc">Static or request-aware visibility. Hidden separators are normalized.</p>
 </details>
 
 <details class="api-member" id="context-menu-item-disabled" data-pagefind-weight="1">
 <summary><code>disabled</code> <span class="api-member-summary">Static or context-aware disabled state.</span></summary>
-<pre><code>disabled?: boolean | ((context: ContextMenuContext) =&gt; boolean);</code></pre>
+
+```ts generated
+disabled?: boolean | ((context: ContextMenuContext) => boolean);
+```
+
 </details>
 </div>
 
@@ -63,7 +90,7 @@ Built-in, separator, or custom callback row in the right-click menu.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ContextMenuItem {
     id?: string;
     action?: ContextMenuActionName;

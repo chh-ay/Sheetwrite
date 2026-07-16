@@ -1,7 +1,7 @@
 {
   "formatVersion": 2,
   "generatedBy": "scripts/docs.ts",
-  "migrationMatrix": {
+  "movedGuideRoutes": {
     "docs/README.md": "/docs/start/installation/",
     "docs/getting-started.md": "/docs/start/installation/",
     "docs/concepts.md": "/docs/concepts/runtime-ownership/",
@@ -23,7 +23,7 @@
     "toXlsxWorkbook"
   ],
   "entryPointCount": 18,
-  "exportCount": 258,
-  "symbolPageCount": 258,
-  "apiSha256": "aacc018f814907d92cb1a438f1359ec50a41028c39b13b8e664da96a79712811"
+  "exportCount": 260,
+  "symbolPageCount": 260,
+  "apiSha256": "0d347271c73b50b25a38761d6edc3f8561745156eccd81c46636ef5523df15f4"
 }

@@ -28,7 +28,7 @@ Reject-or-warn policy attached to a data-validation rule.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ValidationPolicy = "reject" | "warn" | "allow";
 ```
 

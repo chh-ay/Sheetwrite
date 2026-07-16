@@ -21,37 +21,65 @@ Identity, privacy, and timing options for presence coordination.
 
 <details class="api-member" id="presence-coordinator-options-actor" data-pagefind-weight="1">
 <summary><code>actor</code></summary>
-<pre><code>actor: PresenceActor;</code></pre>
+
+```ts generated
+actor: PresenceActor;
+```
+
 </details>
 
 <details class="api-member" id="presence-coordinator-options-privacy" data-pagefind-weight="1">
 <summary><code>privacy</code></summary>
-<pre><code>privacy?: PresencePrivacyOptions;</code></pre>
+
+```ts generated
+privacy?: PresencePrivacyOptions;
+```
+
 </details>
 
 <details class="api-member" id="presence-coordinator-options-heartbeat-ms" data-pagefind-weight="1">
 <summary><code>heartbeatMs</code></summary>
-<pre><code>heartbeatMs?: number;</code></pre>
+
+```ts generated
+heartbeatMs?: number;
+```
+
 </details>
 
 <details class="api-member" id="presence-coordinator-options-timeout-ms" data-pagefind-weight="1">
 <summary><code>timeoutMs</code></summary>
-<pre><code>timeoutMs?: number;</code></pre>
+
+```ts generated
+timeoutMs?: number;
+```
+
 </details>
 
 <details class="api-member" id="presence-coordinator-options-max-actors" data-pagefind-weight="1">
 <summary><code>maxActors</code></summary>
-<pre><code>maxActors?: number;</code></pre>
+
+```ts generated
+maxActors?: number;
+```
+
 </details>
 
 <details class="api-member" id="presence-coordinator-options-max-ranges-per-actor" data-pagefind-weight="1">
 <summary><code>maxRangesPerActor</code></summary>
-<pre><code>maxRangesPerActor?: number;</code></pre>
+
+```ts generated
+maxRangesPerActor?: number;
+```
+
 </details>
 
 <details class="api-member" id="presence-coordinator-options-now" data-pagefind-weight="1">
 <summary><code>now</code></summary>
-<pre><code>now?: () =&gt; number;</code></pre>
+
+```ts generated
+now?: () => number;
+```
+
 </details>
 </div>
 
@@ -60,7 +88,7 @@ Identity, privacy, and timing options for presence coordination.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PresenceCoordinatorOptions {
     actor: PresenceActor;
     privacy?: PresencePrivacyOptions;

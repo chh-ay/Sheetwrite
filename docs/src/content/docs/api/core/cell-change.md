@@ -21,27 +21,47 @@ One committed cell edit, carrying enough to roll back.
 
 <details class="api-member" id="cell-change-addr" data-pagefind-weight="1">
 <summary><code>addr</code></summary>
-<pre><code>addr: CellAddress;</code></pre>
+
+```ts generated
+addr: CellAddress;
+```
+
 </details>
 
 <details class="api-member" id="cell-change-old-value" data-pagefind-weight="1">
 <summary><code>oldValue</code></summary>
-<pre><code>oldValue: CellValue;</code></pre>
+
+```ts generated
+oldValue: CellValue;
+```
+
 </details>
 
 <details class="api-member" id="cell-change-new-value" data-pagefind-weight="1">
 <summary><code>newValue</code></summary>
-<pre><code>newValue: CellValue;</code></pre>
+
+```ts generated
+newValue: CellValue;
+```
+
 </details>
 
 <details class="api-member" id="cell-change-old-style" data-pagefind-weight="1">
 <summary><code>oldStyle</code></summary>
-<pre><code>oldStyle?: CellStyle;</code></pre>
+
+```ts generated
+oldStyle?: CellStyle;
+```
+
 </details>
 
 <details class="api-member" id="cell-change-new-style" data-pagefind-weight="1">
 <summary><code>newStyle</code></summary>
-<pre><code>newStyle?: CellStyle;</code></pre>
+
+```ts generated
+newStyle?: CellStyle;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ One committed cell edit, carrying enough to roll back.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellChange {
     addr: CellAddress;
     oldValue: CellValue;

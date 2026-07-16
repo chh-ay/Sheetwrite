@@ -25,6 +25,6 @@ Test-only: never import from production code.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(options?: CanvasTestStubOptions): () => void => ;
+```ts generated
+function installCanvasTestStubs(options?: CanvasTestStubOptions): () => void;
 ```

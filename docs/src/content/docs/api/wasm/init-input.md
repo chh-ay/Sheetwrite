@@ -30,7 +30,7 @@ Sources accepted by asynchronous initialization: a fetchable URL/request/respons
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 ```
 

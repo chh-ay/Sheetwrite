@@ -17,6 +17,6 @@ Default first-sheet table import backend.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-XlsxTableImportBackend;
+```ts generated
+const readExcelFileTableImportBackend: XlsxTableImportBackend;
 ```

@@ -21,17 +21,29 @@ Host persistence contract for revision history and restore.
 
 <details class="api-member" id="revision-adapter-list-revisions" data-pagefind-weight="1">
 <summary><code>listRevisions</code></summary>
-<pre><code>listRevisions(documentId: string, signal?: AbortSignal): Promise&lt;readonly RevisionSummary[]&gt;;</code></pre>
+
+```ts generated
+listRevisions(documentId: string, signal?: AbortSignal): Promise<readonly RevisionSummary[]>;
+```
+
 </details>
 
 <details class="api-member" id="revision-adapter-load-revision" data-pagefind-weight="1">
 <summary><code>loadRevision</code></summary>
-<pre><code>loadRevision(documentId: string, version: number, signal?: AbortSignal): Promise&lt;unknown&gt;;</code></pre>
+
+```ts generated
+loadRevision(documentId: string, version: number, signal?: AbortSignal): Promise<unknown>;
+```
+
 </details>
 
 <details class="api-member" id="revision-adapter-restore-revision" data-pagefind-weight="1">
 <summary><code>restoreRevision</code> <span class="api-member-summary">Must create a new auditable server version; never rewind storage in place.</span></summary>
-<pre><code>restoreRevision(request: RevisionRestoreRequest): Promise&lt;RevisionRestoreResponse&gt;;</code></pre>
+
+```ts generated
+restoreRevision(request: RevisionRestoreRequest): Promise<RevisionRestoreResponse>;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Host persistence contract for revision history and restore.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RevisionAdapter {
     listRevisions(documentId: string, signal?: AbortSignal): Promise<readonly RevisionSummary[]>;
     loadRevision(documentId: string, version: number, signal?: AbortSignal): Promise<unknown>;

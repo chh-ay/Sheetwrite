@@ -17,9 +17,9 @@ Advanced framework component for workbook data or datasource input.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(this: void, internals: ComponentInternals, props: SheetwriteGridProps): {
+```ts generated
+function SheetwriteGrid(this: void, internals: ComponentInternals, props: SheetwriteGridProps): {
     $on?(type: string, callback: (e: any) => void): () => void;
     $set?(props: Partial<SheetwriteGridProps>): void;
-} => ;
+};
 ```

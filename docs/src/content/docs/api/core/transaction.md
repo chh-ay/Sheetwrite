@@ -25,12 +25,20 @@ undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
 
 <details class="api-member" id="transaction-patches" data-pagefind-weight="1">
 <summary><code>patches</code> <span class="api-member-summary">Ordered document operations submitted as one store commit.</span></summary>
-<pre><code>patches: DocumentOp[];</code></pre>
+
+```ts generated
+patches: DocumentOp[];
+```
+
 </details>
 
 <details class="api-member" id="transaction-epoch" data-pagefind-weight="1">
 <summary><code>epoch</code> <span class="api-member-summary">Expected current store epoch; a mismatch returns a conflict without applying patches.</span></summary>
-<pre><code>epoch?: number;</code></pre>
+
+```ts generated
+epoch?: number;
+```
+
 </details>
 </div>
 
@@ -39,7 +47,7 @@ undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface Transaction {
     patches: DocumentOp[];
     epoch?: number;

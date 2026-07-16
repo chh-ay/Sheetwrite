@@ -21,17 +21,29 @@ Cell and viewport coordinates resolved for one bundled context-menu opening.
 
 <details class="api-member" id="context-menu-context-cell" data-pagefind-weight="1">
 <summary><code>cell</code> <span class="api-member-summary">Right-clicked cell, or null when the pointer is outside the cell body.</span></summary>
-<pre><code>readonly cell: CellAddress | null;</code></pre>
+
+```ts generated
+readonly cell: CellAddress | null;
+```
+
 </details>
 
 <details class="api-member" id="context-menu-context-client-x" data-pagefind-weight="1">
 <summary><code>clientX</code> <span class="api-member-summary">Viewport-relative browser pointer coordinate.</span></summary>
-<pre><code>readonly clientX: number;</code></pre>
+
+```ts generated
+readonly clientX: number;
+```
+
 </details>
 
 <details class="api-member" id="context-menu-context-client-y" data-pagefind-weight="1">
 <summary><code>clientY</code> <span class="api-member-summary">Viewport-relative browser pointer coordinate.</span></summary>
-<pre><code>readonly clientY: number;</code></pre>
+
+```ts generated
+readonly clientY: number;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Cell and viewport coordinates resolved for one bundled context-menu opening.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ContextMenuContext {
     readonly cell: CellAddress | null;
     readonly clientX: number;

@@ -18,7 +18,7 @@ const generatedDataRoot = join(repositoryRoot, "docs/src/generated");
 const generatedManifestPath = join(generatedDataRoot, "public-api.json");
 const docsContractPath = join(generatedDataRoot, "docs-contract.json");
 
-export const MIGRATION_MATRIX = {
+export const MIGRATION_ROUTES = {
   "docs/README.md": "/docs/start/installation/",
   "docs/getting-started.md": "/docs/start/installation/",
   "docs/concepts.md": "/docs/concepts/runtime-ownership/",
@@ -213,6 +213,19 @@ function anchor(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
+const DECLARATION_KEYWORD =
+  /^(?:declare|export|abstract|interface|type|class|enum|function|const|let|var|namespace)\b/;
+
+/** Bare call-signature or type strings from the checker are not statements; wrap them so the TS parser and printer cannot mangle them. */
+function parseableDeclaration(item: Pick<ApiExport, "name" | "signature">): string {
+  const signature = item.signature.trim();
+  if (DECLARATION_KEYWORD.test(signature)) return signature;
+  if (signature.startsWith("<") || signature.startsWith("(")) {
+    return `declare function ${item.name}${signature};`;
+  }
+  return `declare const ${item.name}: ${signature};`;
+}
+
 function declarationShape(signature: string): DeclarationShape {
   const source = ts.createSourceFile(
     "api.d.ts",
@@ -237,13 +250,15 @@ function declarationShape(signature: string): DeclarationShape {
     const named = member as ts.NamedDeclaration;
     const name =
       named.name === undefined
-        ? ts.isCallSignatureDeclaration(member)
-          ? "call"
-          : ts.isConstructSignatureDeclaration(member)
-            ? "new"
-            : ts.isIndexSignatureDeclaration(member)
-              ? "index"
-              : `member-${index + 1}`
+        ? ts.isConstructorDeclaration(member)
+          ? "constructor"
+          : ts.isCallSignatureDeclaration(member)
+            ? "call"
+            : ts.isConstructSignatureDeclaration(member)
+              ? "new"
+              : ts.isIndexSignatureDeclaration(member)
+                ? "index"
+                : `member-${index + 1}`
         : named.name.getText(source).replace(/^["']|["']$/g, "");
     return {
       name,
@@ -258,14 +273,16 @@ function declarationShape(signature: string): DeclarationShape {
 }
 
 function renderDeclaration(signature: string, expanded: boolean): string {
+  // No fence title: the surrounding "Declaration"/"Signature" heading already
+  // names the block, and the extra frame header reads as visual noise.
   if (expanded) {
-    return ['```ts generated title="TypeScript declaration"', signature, "```"].join("\n");
+    return ["```ts generated", signature, "```"].join("\n");
   }
   return [
     '<details class="api-declaration">',
     "<summary>View full TypeScript declaration</summary>",
     "",
-    '```ts generated title="TypeScript declaration"',
+    "```ts generated",
     signature,
     "```",
     "",
@@ -308,8 +325,15 @@ function renderMembers(
       searchAnchor,
       `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
       `<summary><code>${html(member.name)}</code>${summaryDoc}</summary>`,
-      `<pre><code>${html(member.signature)}</code></pre>`,
-      ...(documentation === undefined || documentation === summary
+      "",
+      // A fenced block so member signatures get real syntax highlighting.
+      "```ts generated",
+      member.signature,
+      "```",
+      "",
+      // Skip the body paragraph when it would only restate the summary line.
+      ...(documentation === undefined ||
+      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary
         ? []
         : [`<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, documentation)}</p>`]),
       "</details>",
@@ -333,7 +357,7 @@ export function renderSymbolPage(pkg: ApiPackage, entry: ApiEntryPoint, item: Ap
   const source = packageSourcePath(pkg.name, item.source);
   const summary = documentationMarkdown(pkg, entry, item);
   const description = compactSummary(summary);
-  const shape = declarationShape(item.signature);
+  const shape = declarationShape(parseableDeclaration(item));
   const body = [
     frontmatter(`${item.name} | ${label}`, description, { tableOfContents: false }).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
@@ -368,7 +392,8 @@ export function renderSymbolPage(pkg: ApiPackage, entry: ApiEntryPoint, item: Ap
     shape.members.length > 0 || shape.variants.length > 0 ? "## Declaration" : "## Signature",
     "",
     renderDeclaration(
-      shape.formatted,
+      // `declare` is parser scaffolding, not information a reader needs.
+      shape.formatted.replace(/^declare /, ""),
       shape.members.length === 0 && shape.variants.length === 0 && item.signature.length < 220,
     ),
     "",
@@ -480,18 +505,18 @@ function renderEntryPointInventory(manifest: PublicApiManifest): string {
   return `${lines.join("\n")}\n`;
 }
 
-function renderMigrationMatrix(): string {
+function renderMovedGuides(): string {
   const lines = [
     frontmatter(
-      "Guide migration matrix",
-      "Canonical route for every guide moved into the searchable documentation site.",
+      "Moved guides",
+      "Where each former repository guide now lives in the documentation site.",
     ).trimEnd(),
     "The old loose Markdown files were removed only after every source guide had a canonical routed replacement.",
     "",
     "| Former repository guide | Canonical route |",
     "| --- | --- |",
   ];
-  for (const [oldPath, route] of Object.entries(MIGRATION_MATRIX)) {
+  for (const [oldPath, route] of Object.entries(MIGRATION_ROUTES)) {
     lines.push(`| \`${oldPath}\` | [\`${route}\`](${route}) |`);
   }
   return `${lines.join("\n")}\n`;
@@ -754,7 +779,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   const contract = {
     formatVersion: 2,
     generatedBy: "scripts/docs.ts",
-    migrationMatrix: MIGRATION_MATRIX,
+    movedGuideRoutes: MIGRATION_ROUTES,
     requiredSearchTerms: REQUIRED_SEARCH_TERMS,
     entryPointCount: manifest.packages.reduce((count, pkg) => count + pkg.entryPoints.length, 0),
     exportCount,
@@ -768,8 +793,8 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       content: renderEntryPointInventory(manifest),
     },
     {
-      path: join(contentRoot, "reference/migration-matrix.md"),
-      content: renderMigrationMatrix(),
+      path: join(contentRoot, "reference/moved-guides.md"),
+      content: renderMovedGuides(),
     },
     {
       path: join(contentRoot, "guides/performance-resources.md"),
@@ -821,6 +846,45 @@ async function markdownDocuments(root: string): Promise<MarkdownDocument[]> {
   return documents.sort((left, right) => left.path.localeCompare(right.path));
 }
 
+const CSS_TOKEN_SOURCE_EXTENSIONS = new Set([".css", ".md", ".mdx", ".svelte", ".ts", ".tsx"]);
+
+/** Report every referenced Sheetwrite CSS token that has no source definition. */
+export async function unresolvedCssTokens(root: string): Promise<string[]> {
+  const definitions = new Set<string>();
+  const references = new Map<string, Set<string>>();
+  const visit = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(path);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const extension = entry.name.slice(entry.name.lastIndexOf("."));
+      if (!CSS_TOKEN_SOURCE_EXTENSIONS.has(extension)) continue;
+      const content = await readFile(path, "utf8");
+      for (const match of content.matchAll(/(--sw-[\w-]+)\s*:/g)) {
+        if (match[1] !== undefined) definitions.add(match[1]);
+      }
+      for (const match of content.matchAll(/var\(\s*(--sw-[\w-]+)/g)) {
+        const token = match[1];
+        if (token === undefined) continue;
+        const owners = references.get(token) ?? new Set<string>();
+        owners.add(posix(relative(root, path)));
+        references.set(token, owners);
+      }
+    }
+  };
+  await visit(root);
+  return [...references.entries()]
+    .filter(([token]) => !definitions.has(token))
+    .map(
+      ([token, owners]) =>
+        `undefined Sheetwrite CSS token ${token}: ${[...owners].sort().join(", ")}`,
+    )
+    .sort();
+}
+
 export function parseFences(content: string): Fence[] {
   const fences: Fence[] = [];
   const lines = content.split("\n");
@@ -856,7 +920,7 @@ function routeForContentPath(path: string): string {
   return `/docs/${withoutIndex}${withoutIndex.length === 0 ? "" : "/"}`;
 }
 
-function contentPathForRoute(
+export function contentPathForRoute(
   route: string,
   documents: readonly MarkdownDocument[],
 ): string | undefined {
@@ -1093,10 +1157,10 @@ async function validateMarkdown(
       if (targetWithoutFragment === "") targetPath = document.path;
       else if (targetWithoutFragment.startsWith("/docs/")) {
         targetPath = contentPathForRoute(targetWithoutFragment, documents);
-      } else if (/^\/(?:vanilla|react|vue|svelte|theming)\/?$/.test(targetWithoutFragment)) {
+      } else if (/^\/(?:vanilla|react|vue|svelte)\/?$/.test(targetWithoutFragment)) {
         targetPath = join(
           repositoryRoot,
-          `docs-astro/src/pages/${targetWithoutFragment.replace(/^\//, "").replace(/\/$/, "")}.astro`,
+          `docs/src/routes/${targetWithoutFragment.replace(/^\//, "").replace(/\/$/, "")}.tsx`,
         );
       } else if (targetWithoutFragment.startsWith("/")) {
         failures.push(
@@ -1160,18 +1224,19 @@ async function checkDocs(
     }
   }
 
-  for (const oldPath of Object.keys(MIGRATION_MATRIX)) {
+  for (const oldPath of Object.keys(MIGRATION_ROUTES)) {
     if (await exists(join(repositoryRoot, oldPath)))
       failures.push(`duplicate migrated guide remains: ${oldPath}`);
   }
 
   const documents = await markdownDocuments(contentRoot);
-  for (const route of Object.values(MIGRATION_MATRIX)) {
+  for (const route of Object.values(MIGRATION_ROUTES)) {
     if (contentPathForRoute(route, documents) === undefined) {
       failures.push(`migration route has no page: ${route}`);
     }
   }
   failures.push(...(await validateMarkdown(documents, manifest)));
+  failures.push(...(await unresolvedCssTokens(join(repositoryRoot, "docs/src"))));
 
   const searchedText = documents.map((document) => document.content).join("\n");
   for (const term of REQUIRED_SEARCH_TERMS) {
@@ -1242,26 +1307,31 @@ async function checkDocs(
     );
   }
 
-  const sidebarConfig = await readFile(join(repositoryRoot, "docs-astro/astro.config.mjs"), "utf8");
+  const apiIndex = await readFile(join(contentRoot, "api/index.md"), "utf8");
   for (const apiPagePath of entryPageKeys) {
     const route = `/docs/${posix(relative(contentRoot, apiPagePath)).replace(/\.md$/, "/")}`;
-    if (
-      !sidebarConfig.includes(`link: "${route}"`) &&
-      !sidebarConfig.includes(`link: route("${route}")`)
-    ) {
-      failures.push(`generated API entry page is missing from the sidebar: ${route}`);
+    if (!apiIndex.includes(`](${route})`)) {
+      failures.push(`generated API entry page is missing from the API index: ${route}`);
     }
   }
 
+  const navigationSource = await readFile(
+    join(repositoryRoot, "docs/src/lib/navigation.ts"),
+    "utf8",
+  );
+  if (!navigationSource.includes('href: "/docs/api/"')) {
+    failures.push("generated API index is missing from the documentation navigation");
+  }
+
   const testPages = [
-    join(repositoryRoot, "docs-astro/src/pages/test/xlsx.astro"),
-    join(repositoryRoot, "docs-astro/src/pages/test/collaboration.astro"),
+    join(repositoryRoot, "docs/src/routes/test.xlsx.tsx"),
+    join(repositoryRoot, "docs/src/routes/test.collaboration.tsx"),
   ];
   for (const testPage of testPages) {
-    if ((await exists(testPage)) && !(await readFile(testPage, "utf8")).includes("Layout")) {
-      failures.push(
-        `${posix(relative(repositoryRoot, testPage))} bypasses the noindex test layout`,
-      );
+    if (!(await exists(testPage))) {
+      failures.push(`${posix(relative(repositoryRoot, testPage))} is missing`);
+    } else if (!(await readFile(testPage, "utf8")).includes("noindex, nofollow")) {
+      failures.push(`${posix(relative(repositoryRoot, testPage))} is not marked noindex`);
     }
   }
   return [...new Set(failures)].sort();

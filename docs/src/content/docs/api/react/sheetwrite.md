@@ -20,6 +20,8 @@ use `SheetwriteGrid` when the host already owns a workbook or datasource.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-<Row extends Record<string, CellScalar> ?  : >(props);
+```ts generated
+function Sheetwrite<Row extends Record<string, CellScalar>>(props: SheetwriteProps<Row> & {
+    ref?: ForwardedRef<Grid>;
+}): ReactElement;
 ```

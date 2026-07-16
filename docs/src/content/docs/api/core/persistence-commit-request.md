@@ -21,7 +21,11 @@ Cancellable pending commit submitted to a persistence adapter.
 
 <details class="api-member" id="persistence-commit-request-signal" data-pagefind-weight="1">
 <summary><code>signal</code></summary>
-<pre><code>signal?: AbortSignal;</code></pre>
+
+```ts generated
+signal?: AbortSignal;
+```
+
 </details>
 </div>
 
@@ -30,7 +34,7 @@ Cancellable pending commit submitted to a persistence adapter.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PersistenceCommitRequest extends PendingCommit {
     signal?: AbortSignal;
 }

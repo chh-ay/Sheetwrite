@@ -21,17 +21,29 @@ Host-owned durable queue. Browser storage lives in the optional `./browser` entr
 
 <details class="api-member" id="pending-commit-storage-load" data-pagefind-weight="1">
 <summary><code>load</code></summary>
-<pre><code>load(documentId: string, signal?: AbortSignal): Promise&lt;readonly PendingCommit[]&gt;;</code></pre>
+
+```ts generated
+load(documentId: string, signal?: AbortSignal): Promise<readonly PendingCommit[]>;
+```
+
 </details>
 
 <details class="api-member" id="pending-commit-storage-put" data-pagefind-weight="1">
 <summary><code>put</code></summary>
-<pre><code>put(commit: PendingCommit, signal?: AbortSignal): Promise&lt;void&gt;;</code></pre>
+
+```ts generated
+put(commit: PendingCommit, signal?: AbortSignal): Promise<void>;
+```
+
 </details>
 
 <details class="api-member" id="pending-commit-storage-remove" data-pagefind-weight="1">
 <summary><code>remove</code></summary>
-<pre><code>remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Promise&lt;void&gt;;</code></pre>
+
+```ts generated
+remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Promise<void>;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Host-owned durable queue. Browser storage lives in the optional `./browser` entr
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PendingCommitStorage {
     load(documentId: string, signal?: AbortSignal): Promise<readonly PendingCommit[]>;
     put(commit: PendingCommit, signal?: AbortSignal): Promise<void>;

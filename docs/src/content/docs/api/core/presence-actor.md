@@ -21,17 +21,29 @@ Public collaborator identity attached to presence updates.
 
 <details class="api-member" id="presence-actor-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-<pre><code>id: string;</code></pre>
+
+```ts generated
+id: string;
+```
+
 </details>
 
 <details class="api-member" id="presence-actor-display-name" data-pagefind-weight="1">
 <summary><code>displayName</code></summary>
-<pre><code>displayName?: string;</code></pre>
+
+```ts generated
+displayName?: string;
+```
+
 </details>
 
 <details class="api-member" id="presence-actor-color" data-pagefind-weight="1">
 <summary><code>color</code></summary>
-<pre><code>color?: string;</code></pre>
+
+```ts generated
+color?: string;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Public collaborator identity attached to presence updates.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PresenceActor {
     id: string;
     displayName?: string;

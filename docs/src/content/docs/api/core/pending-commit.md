@@ -21,22 +21,38 @@ Immutable local operation batch awaiting a host acknowledgement.
 
 <details class="api-member" id="pending-commit-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="pending-commit-base-version" data-pagefind-weight="1">
 <summary><code>baseVersion</code></summary>
-<pre><code>baseVersion: number;</code></pre>
+
+```ts generated
+baseVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="pending-commit-client-mutation-id" data-pagefind-weight="1">
 <summary><code>clientMutationId</code></summary>
-<pre><code>clientMutationId: string;</code></pre>
+
+```ts generated
+clientMutationId: string;
+```
+
 </details>
 
 <details class="api-member" id="pending-commit-operations" data-pagefind-weight="1">
 <summary><code>operations</code></summary>
-<pre><code>readonly operations: readonly DocumentOp[];</code></pre>
+
+```ts generated
+readonly operations: readonly DocumentOp[];
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Immutable local operation batch awaiting a host acknowledgement.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PendingCommit {
     documentId: string;
     baseVersion: number;

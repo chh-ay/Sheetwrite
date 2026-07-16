@@ -357,6 +357,9 @@ function classSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
   if (declaration === undefined) return `class ${symbol.getName()}`;
   const instanceType = checker.getDeclaredTypeOfSymbol(symbol);
   const valueType = checker.getTypeOfSymbolAtLocation(symbol, declaration);
+  const heritage = declaration.heritageClauses
+    ?.map((clause) => clause.getText(declaration.getSourceFile()).replace(/\s+/g, " ").trim())
+    .join(" ");
   const constructors = checker
     .getSignaturesOfType(valueType, ts.SignatureKind.Construct)
     .map((signature) =>
@@ -365,18 +368,35 @@ function classSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
         declaration,
         ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
       ),
-    );
+    )
+    // `(args): Instance` is a call signature — invalid inside a class body.
+    // Emit the real `constructor(args)` member (drop the return type).
+    .map((signature) => `constructor${signature.replace(/\)\s*:\s*[^:]*$/, ")")}`)
+    // A default constructor adds nothing the class name doesn't already say.
+    .filter((signature) => signature !== "constructor()");
+  const declaredHere = (property: ts.Symbol): boolean =>
+    property
+      .getDeclarations()
+      ?.some(
+        (memberDeclaration) =>
+          memberDeclaration.getSourceFile() === declaration.getSourceFile() &&
+          memberDeclaration.pos >= declaration.pos &&
+          memberDeclaration.end <= declaration.end,
+      ) ?? false;
   const members = checker
     .getPropertiesOfType(instanceType)
+    // Inherited platform members (Error.name/message/stack) are noise here.
+    .filter(declaredHere)
     .map((property) => publicPropertySignature(property, checker))
     .filter((signature): signature is string => signature !== undefined);
   const staticMembers = checker
     .getPropertiesOfType(valueType)
+    .filter(declaredHere)
     .map((property) => publicPropertySignature(property, checker, "static "))
     .filter((signature): signature is string => signature !== undefined);
-  return `class ${symbol.getName()} { ${[...constructors, ...members, ...staticMembers]
-    .sort()
-    .join("; ")} }`;
+  const body = [...constructors, ...members.sort(), ...staticMembers.sort()].join("; ");
+  const head = heritage ? `class ${symbol.getName()} ${heritage}` : `class ${symbol.getName()}`;
+  return body.length > 0 ? `${head} { ${body} }` : `${head} {}`;
 }
 
 function declarationSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {

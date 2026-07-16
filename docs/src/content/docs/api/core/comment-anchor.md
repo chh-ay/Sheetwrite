@@ -27,7 +27,7 @@ Document location to which a comment thread is attached.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type CommentAnchor = {
     kind: "cell";
     address: {

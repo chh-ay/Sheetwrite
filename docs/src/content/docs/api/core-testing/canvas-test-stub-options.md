@@ -21,13 +21,21 @@ Layout dimensions installed by [`installCanvasTestStubs`](/docs/api/core-testing
 
 <details class="api-member" id="canvas-test-stub-options-width" data-pagefind-weight="1">
 <summary><code>width</code> <span class="api-member-summary">Stubbed clientWidth for every element (happy-dom/jsdom have no layout).</span></summary>
-<pre><code>width?: number;</code></pre>
+
+```ts generated
+width?: number;
+```
+
 <p class="api-member-doc">Stubbed `clientWidth` for every element (happy-dom/jsdom have no layout). Default 800.</p>
 </details>
 
 <details class="api-member" id="canvas-test-stub-options-height" data-pagefind-weight="1">
 <summary><code>height</code> <span class="api-member-summary">Stubbed clientHeight for every element.</span></summary>
-<pre><code>height?: number;</code></pre>
+
+```ts generated
+height?: number;
+```
+
 <p class="api-member-doc">Stubbed `clientHeight` for every element. Default 400.</p>
 </details>
 </div>
@@ -37,7 +45,7 @@ Layout dimensions installed by [`installCanvasTestStubs`](/docs/api/core-testing
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CanvasTestStubOptions {
     width?: number;
     height?: number;

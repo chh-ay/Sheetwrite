@@ -459,7 +459,7 @@
             {
               "name": "CommentCoordinator",
               "kind": "class",
-              "signature": "class CommentCoordinator { (adapter: CommentAdapter, options: CommentCoordinatorOptions): CommentCoordinator; commentThreads: () => readonly CommentThread[]; create: (threadId: string, messageId: string, anchor: CommentAnchor, body: string, clientMutationId: string) => Promise<CommentMutationResponse>; destroy: () => void; load: () => Promise<readonly CommentThread[]>; mutate: (mutation: CommentMutation, clientMutationId: string) => Promise<CommentMutationResponse>; on: (listener: CommentListener) => () => void; reply: (threadId: string, messageId: string, body: string, clientMutationId: string) => Promise<CommentMutationResponse>; resolve: (threadId: string, resolved: boolean, clientMutationId: string) => Promise<CommentMutationResponse>; serverVersion: number }",
+              "signature": "class CommentCoordinator { constructor(adapter: CommentAdapter, options: CommentCoordinatorOptions); commentThreads: () => readonly CommentThread[]; create: (threadId: string, messageId: string, anchor: CommentAnchor, body: string, clientMutationId: string) => Promise<CommentMutationResponse>; destroy: () => void; load: () => Promise<readonly CommentThread[]>; mutate: (mutation: CommentMutation, clientMutationId: string) => Promise<CommentMutationResponse>; on: (listener: CommentListener) => () => void; reply: (threadId: string, messageId: string, body: string, clientMutationId: string) => Promise<CommentMutationResponse>; resolve: (threadId: string, resolved: boolean, clientMutationId: string) => Promise<CommentMutationResponse>; serverVersion: number }",
               "owners": [
                 "src/collaboration.ts"
               ],
@@ -685,7 +685,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L180",
+              "source": "src/grid.ts#L226",
               "jsDocTags": [],
               "documentation": "Creates and mounts an imperative Grid in the supplied host element.",
               "memberDocs": []
@@ -823,7 +823,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L110",
+              "source": "src/grid.ts#L143",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1417,7 +1417,7 @@
             {
               "name": "IncompleteDataError",
               "kind": "class",
-              "signature": "class IncompleteDataError { (sheet: SheetId, capability: Extract<QueryCapability, { status: \"incomplete\"; }>): IncompleteDataError; capability: { status: \"incomplete\"; loadedCells: number; totalCells: number; }; cause?: unknown; message: string; name: string; stack?: string | undefined }",
+              "signature": "class IncompleteDataError extends Error { constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: \"incomplete\"; }>); capability: { status: \"incomplete\"; loadedCells: number; totalCells: number; } }",
               "owners": [
                 "src/store/data-engine.ts"
               ],
@@ -1433,7 +1433,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L128",
+              "source": "src/grid.ts#L174",
               "jsDocTags": [],
               "documentation": "Load the WASM data engine once. Must be awaited before `createGrid`.",
               "memberDocs": []
@@ -1445,7 +1445,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L135",
+              "source": "src/grid.ts#L181",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -1465,7 +1465,7 @@
             {
               "name": "MemoryPersistenceAdapter",
               "kind": "class",
-              "signature": "class MemoryPersistenceAdapter { (...snapshots: readonly WorkbookSnapshot[]): MemoryPersistenceAdapter; commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot> }",
+              "signature": "class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot> }",
               "owners": [
                 "src/persistence.ts"
               ],
@@ -1674,7 +1674,7 @@
             {
               "name": "PersistenceError",
               "kind": "class",
-              "signature": "class PersistenceError { (code: PersistenceErrorCode, message: string, options?: ErrorOptions): PersistenceError; cause?: unknown; code: PersistenceErrorCode; message: string; name: string; stack?: string | undefined }",
+              "signature": "class PersistenceError extends Error { constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions); code: PersistenceErrorCode }",
               "owners": [
                 "src/persistence.ts"
               ],
@@ -1710,7 +1710,7 @@
             {
               "name": "PresenceCoordinator",
               "kind": "class",
-              "signature": "class PresenceCoordinator { (grid: Grid, transport: PresenceTransport, options: PresenceCoordinatorOptions): PresenceCoordinator; destroy: () => void; on: (listener: PresenceListener) => () => void; pruneStale: () => void; publishNow: () => Promise<void>; remotePresence: () => readonly PresenceMessage[] }",
+              "signature": "class PresenceCoordinator { constructor(grid: Grid, transport: PresenceTransport, options: PresenceCoordinatorOptions); destroy: () => void; on: (listener: PresenceListener) => () => void; pruneStale: () => void; publishNow: () => Promise<void>; remotePresence: () => readonly PresenceMessage[] }",
               "owners": [
                 "src/collaboration.ts"
               ],
@@ -1975,7 +1975,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L140",
+              "source": "src/grid.ts#L186",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -2000,7 +2000,7 @@
             {
               "name": "RevisionCoordinator",
               "kind": "class",
-              "signature": "class RevisionCoordinator { (adapter: RevisionAdapter, options: RevisionCoordinatorOptions): RevisionCoordinator; destroy: () => void; list: () => Promise<readonly RevisionSummary[]>; on: (listener: RevisionListener) => () => void; preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions) => Promise<Grid>; restore: (targetVersion: number, clientMutationId: string) => Promise<RevisionRestoreResponse>; serverVersion: number }",
+              "signature": "class RevisionCoordinator { constructor(adapter: RevisionAdapter, options: RevisionCoordinatorOptions); destroy: () => void; list: () => Promise<readonly RevisionSummary[]>; on: (listener: RevisionListener) => () => void; preview: (host: HTMLElement, version: number, options?: SnapshotGridOptions) => Promise<Grid>; restore: (targetVersion: number, clientMutationId: string) => Promise<RevisionRestoreResponse>; serverVersion: number }",
               "owners": [
                 "src/collaboration.ts"
               ],
@@ -2340,7 +2340,7 @@
             {
               "name": "SheetwriteStore",
               "kind": "class",
-              "signature": "class SheetwriteStore { (workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions): SheetwriteStore; acknowledgeOperations: (operations: readonly DocumentOp[]) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => void; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => void; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getFormula: (addr: CellAddress) => string | null; getPagedStats: (sheet: SheetId) => PagedStoreStats; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => void; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => void; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadRows: (sheet: SheetId, start: number, rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; resetRangeMutationAllocationStats: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => void; sortBy: (sheet: SheetId, col: number, ascending: boolean) => void; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void; static fromSnapshot: (input: unknown) => SheetwriteStore; ungroupRows: (sheet: SheetId, start: number, end: number) => void; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null }",
+              "signature": "class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions); acknowledgeOperations: (operations: readonly DocumentOp[]) => void; aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number; applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult; canApplyLocally: (patch: DocumentOp) => boolean; captureRangeHistory: (input: Range) => CompactRangeHistory | null; clearView: (sheet: SheetId) => void; columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>; dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number; dataRowAt: (sheet: SheetId, viewRow: number) => number; dispose: () => void; distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[]; ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void; exportSnapshot: () => WorkbookSnapshot; filterBy: (sheet: SheetId, col: number, needle: string) => void; getCell: (addr: CellAddress) => ResolvedCell; getCellLoadState: (addr: CellAddress) => CellLoadState; getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, cols: readonly number[]) => ClipboardWindowView; getFormula: (addr: CellAddress) => string | null; getPagedStats: (sheet: SheetId) => PagedStoreStats; getRangeMutationAllocationStats: () => RangeMutationAllocationStats; getRefTarget: (addr: CellAddress) => CellAddress | null; getVisibleWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView; getWorkbook: () => Workbook; groupRows: (sheet: SheetId, start: number, end: number) => void; hasView: (sheet: SheetId) => boolean; hiddenRows: (sheet: SheetId) => number[]; hideRows: (sheet: SheetId, rows: readonly number[]) => void; isPaged: (sheet: SheetId) => boolean; isRangeFullyLoaded: (input: Range) => boolean; loadRows: (sheet: SheetId, start: number, rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void; on: (_evt: \"change\", fn: ChangeListener) => () => void; queryCapability: (sheet: SheetId) => QueryCapability; recalculateVolatile: (now?: Date) => void; removeSheetFormulaIdentity: (sheet: SheetId) => boolean; renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean; resetRangeMutationAllocationStats: () => void; rowGroups: (sheet: SheetId) => readonly RowGroup[]; searchCells: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => CellAddress[]; searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; wholeCell?: boolean; columns?: number[]; }) => Uint32Array; setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void; setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void; setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void; showRows: (sheet: SheetId, rows?: readonly number[]) => void; sortBy: (sheet: SheetId, col: number, ascending: boolean) => void; sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void; ungroupRows: (sheet: SheetId, start: number, end: number) => void; viewRowCount: (sheet: SheetId) => number; viewRowOf: (sheet: SheetId, dataRow: number) => number | null; static fromSnapshot: (input: unknown) => SheetwriteStore }",
               "owners": [
                 "src/store.ts"
               ],
@@ -2445,7 +2445,7 @@
             {
               "name": "SnapshotValidationError",
               "kind": "class",
-              "signature": "class SnapshotValidationError { (errors: readonly DocumentValidationError[]): SnapshotValidationError; cause?: unknown; code: \"invalid-snapshot\"; errors: readonly DocumentValidationError[]; message: string; name: string; stack?: string | undefined }",
+              "signature": "class SnapshotValidationError extends Error { constructor(errors: readonly DocumentValidationError[]); code: \"invalid-snapshot\"; errors: readonly DocumentValidationError[] }",
               "owners": [
                 "src/document-protocol.ts"
               ],
@@ -2562,7 +2562,7 @@
             {
               "name": "SyncCoordinator",
               "kind": "class",
-              "signature": "class SyncCoordinator { (grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOptions): SyncCoordinator; applyVersionedOperation: (operation: VersionedOperation) => void; destroy: () => void; flush: () => Promise<readonly PersistenceCommitResponse[]>; handleResponse: (response: PersistenceCommitResponse, requestedMutationId?: string) => Promise<void>; on: (listener: SyncListener) => () => void; pendingCommits: () => readonly SyncMutationRecord[]; pendingCount: number; ready: () => Promise<void>; resumeAfterReload: (snapshot: WorkbookSnapshot) => void; retry: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; retryPersistence: (clientMutationId: string) => Promise<boolean>; send: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; sendNext: () => Promise<PersistenceCommitResponse | null>; serverVersion: number; setOnline: (online: boolean) => void; state: SyncStateSnapshot; subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) => () => void }",
+              "signature": "class SyncCoordinator { constructor(grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOptions); applyVersionedOperation: (operation: VersionedOperation) => void; destroy: () => void; flush: () => Promise<readonly PersistenceCommitResponse[]>; handleResponse: (response: PersistenceCommitResponse, requestedMutationId?: string) => Promise<void>; on: (listener: SyncListener) => () => void; pendingCommits: () => readonly SyncMutationRecord[]; pendingCount: number; ready: () => Promise<void>; resumeAfterReload: (snapshot: WorkbookSnapshot) => void; retry: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; retryPersistence: (clientMutationId: string) => Promise<boolean>; send: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; sendNext: () => Promise<PersistenceCommitResponse | null>; serverVersion: number; setOnline: (online: boolean) => void; state: SyncStateSnapshot; subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) => () => void }",
               "owners": [
                 "src/sync.ts"
               ],
@@ -3525,7 +3525,7 @@
             {
               "name": "IndexedDbPendingCommitStorage",
               "kind": "class",
-              "signature": "class IndexedDbPendingCommitStorage { (options?: IndexedDbPendingCommitStorageOptions): IndexedDbPendingCommitStorage; close: () => void; load: (documentId: string, signal?: AbortSignal) => Promise<readonly PendingCommit[]>; put: (commit: PendingCommit, signal?: AbortSignal) => Promise<void>; remove: (documentId: string, clientMutationId: string, signal?: AbortSignal) => Promise<void> }",
+              "signature": "class IndexedDbPendingCommitStorage implements PendingCommitStorage { constructor(options?: IndexedDbPendingCommitStorageOptions); close: () => void; load: (documentId: string, signal?: AbortSignal) => Promise<readonly PendingCommit[]>; put: (commit: PendingCommit, signal?: AbortSignal) => Promise<void>; remove: (documentId: string, clientMutationId: string, signal?: AbortSignal) => Promise<void> }",
               "owners": [
                 "src/indexeddb.ts"
               ],
@@ -3537,7 +3537,7 @@
             {
               "name": "IndexedDbPendingCommitStorageError",
               "kind": "class",
-              "signature": "class IndexedDbPendingCommitStorageError { (code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions): IndexedDbPendingCommitStorageError; cause?: unknown; code: IndexedDbPendingCommitStorageErrorCode; message: string; name: string; stack?: string | undefined }",
+              "signature": "class IndexedDbPendingCommitStorageError extends Error { constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions); code: IndexedDbPendingCommitStorageErrorCode }",
               "owners": [
                 "src/indexeddb.ts"
               ],
@@ -3873,7 +3873,32 @@
           "source": "src/worker.ts",
           "kind": "typescript",
           "classification": "supported",
-          "exports": []
+          "exports": [
+            {
+              "name": "createWorkerMessageHandler",
+              "kind": "function",
+              "signature": "(postAcknowledgement: (message: WorkerAcknowledgement) => void): (message: unknown) => void",
+              "owners": [
+                "src/worker.ts"
+              ],
+              "source": "src/worker.ts#L253",
+              "jsDocTags": [],
+              "documentation": "Build the worker-side protocol handler. Keeping the mutable render state\ninside the returned closure lets tests exercise the real message contract\nwithout booting a browser Worker.",
+              "memberDocs": []
+            },
+            {
+              "name": "WorkerAcknowledgement",
+              "kind": "type",
+              "signature": "export type WorkerAcknowledgement = { type: \"painted\" };",
+              "owners": [
+                "src/worker.ts"
+              ],
+              "source": "src/worker.ts#L246",
+              "jsDocTags": [],
+              "documentation": "Acknowledgement posted back to the sender after a frame actually painted.",
+              "memberDocs": []
+            }
+          ]
         }
       ]
     },
@@ -5693,7 +5718,7 @@
             {
               "name": "CellOut",
               "kind": "class",
-              "signature": "class CellOut { (): CellOut; free: () => void; kind: number; num: number; string: string | undefined; style: number }",
+              "signature": "class CellOut { free: () => void; kind: number; num: number; string: string | undefined; style: number }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -5705,7 +5730,7 @@
             {
               "name": "CellStore",
               "kind": "class",
-              "signature": "class CellStore { (): CellStore; addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number) => number; addRows: (sheet: number, at: number, count: number) => void; addSheet: (n_cols: number, row_count: number) => number; aggregate: (sheet: number, col: number, op: number) => number; beginPageLoad: () => void; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; endPageLoad: () => void; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; insertCols: (sheet: number, at: number, count: number) => void; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; isSheetAlive: (sheet: number) => boolean; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; pagedStats: (sheet: number) => Float64Array; pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => void; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => void; removeSheet: (sheet: number) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array) => boolean; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setSheetName: (sheet: number, id: string, name: string) => void; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; styleIdAt: (sheet: number, row: number, col: number) => number }",
+              "signature": "class CellStore { addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number) => number; addRows: (sheet: number, at: number, count: number) => void; addSheet: (n_cols: number, row_count: number) => number; aggregate: (sheet: number, col: number, op: number) => number; beginPageLoad: () => void; captureRange: (sheet: number, r0: number, c0: number, rows: number, cols: number) => RangeSnapshot | undefined; cellState: (sheet: number, row: number, col: number) => number; clearCell: (sheet: number, row: number, col: number, style: number) => void; clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, contents: boolean, style: boolean) => boolean; colCount: (sheet: number) => number; dataEdge: (sheet: number, row: number, col: number, d_row: number, d_col: number) => number; dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d_row: number, d_col: number) => number; distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn; endPageLoad: () => void; filterRows: (sheet: number, col: number, needle: string) => Uint32Array; filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Uint8Array, nums: Float64Array, num_counts: Uint32Array, text_counts: Uint32Array, value_nums: Float64Array, value_texts: string[]) => Uint32Array; formulaSource: (sheet: number, row: number, col: number) => string | undefined; free: () => void; getCell: (sheet: number, row: number, col: number) => CellOut; getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array) => WindowView; getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowView; insertCols: (sheet: number, at: number, count: number) => void; isFullyLoaded: (sheet: number) => boolean; isPaged: (sheet: number) => boolean; isSheetAlive: (sheet: number) => boolean; markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: number, end_col: number) => void; pagedStats: (sheet: number) => Float64Array; pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void; poolStrings: (ids: Uint32Array) => string[]; queryResourceStats: () => Float64Array; rangeFullyLoaded: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean; rangeStyleIds: (sheet: number, r0: number, c0: number, r1: number, c1: number) => Uint32Array; recompute: (sheet: number) => void; recomputeVolatile: (serial: number) => boolean; remapRangeStyles: (sheet: number, r0: number, c0: number, r1: number, c1: number, old_ids: Uint32Array, new_ids: Uint32Array) => boolean; removeCols: (sheet: number, at: number, count: number) => void; removeNamedRange: (name: string, scope: number) => boolean; removeRows: (sheet: number, at: number, count: number) => void; removeSheet: (sheet: number) => boolean; renameSheet: (sheet: number, id: string, name: string) => boolean; resetQueryResourceStats: () => void; restoreRange: (sheet: number, r0: number, c0: number, snapshot: RangeSnapshot) => boolean; rowCount: (sheet: number) => number; search: (sheet: number, cols: Uint32Array, query: string, case_insensitive: boolean, whole_cell: boolean) => Uint32Array; setBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array) => boolean; setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void; setColumnNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number) => void; setColumnStrings: (sheet: number, col: number, start_row: number, values: string[], style: number) => void; setColumnStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number) => void; setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, nums: Float64Array, strs: string[], flags: Uint8Array) => void; setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number; setNamedRange: (name: string, scope: number, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number) => boolean; setNumber: (sheet: number, row: number, col: number, value: number, style: number) => void; setSheetName: (sheet: number, id: string, name: string) => void; setString: (sheet: number, row: number, col: number, value: string, style: number) => void; snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array; snapshotTexts: (snapshot: RangeSnapshot) => string[]; sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array; sortRowsMulti: (sheet: number, cols: Uint32Array, ascending: Uint8Array, candidates: Uint32Array) => Uint32Array; styleIdAt: (sheet: number, row: number, col: number) => number }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -5834,7 +5859,7 @@
             {
               "name": "DistinctColumn",
               "kind": "class",
-              "signature": "class DistinctColumn { (): DistinctColumn; free: () => void; takeKinds: () => Uint8Array; takeNumbers: () => Float64Array; takeTexts: () => string[] }",
+              "signature": "class DistinctColumn { free: () => void; takeKinds: () => Uint8Array; takeNumbers: () => Float64Array; takeTexts: () => string[] }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -5922,7 +5947,7 @@
             {
               "name": "RangeSnapshot",
               "kind": "class",
-              "signature": "class RangeSnapshot { (): RangeSnapshot; byteLength: () => number; formulaOffsets: () => Uint32Array; formulaSources: () => string[]; free: () => void; kinds: () => Uint8Array; styleIds: () => Uint32Array }",
+              "signature": "class RangeSnapshot { byteLength: () => number; formulaOffsets: () => Uint32Array; formulaSources: () => string[]; free: () => void; kinds: () => Uint8Array; styleIds: () => Uint32Array }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -5946,7 +5971,7 @@
             {
               "name": "WindowView",
               "kind": "class",
-              "signature": "class WindowView { (): WindowView; free: () => void; nCols: number; nRows: number; takeCondMatches: () => Uint32Array; takeKinds: () => Uint8Array; takeNumbers: () => Float64Array; takeStringIds: () => Uint32Array; takeStringIndex: () => Int32Array; takeStrings: () => string[]; takeStyleDict: () => Uint32Array; takeStyleIndex: () => Uint32Array }",
+              "signature": "class WindowView { free: () => void; nCols: number; nRows: number; takeCondMatches: () => Uint32Array; takeKinds: () => Uint8Array; takeNumbers: () => Float64Array; takeStringIds: () => Uint32Array; takeStringIndex: () => Int32Array; takeStrings: () => string[]; takeStyleDict: () => Uint32Array; takeStyleIndex: () => Uint32Array }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],

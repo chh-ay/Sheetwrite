@@ -21,17 +21,29 @@ Visual border applied to one or more sides of a cell.
 
 <details class="api-member" id="cell-border-color" data-pagefind-weight="1">
 <summary><code>color</code> <span class="api-member-summary">hex color, e.g. &quot;#111111&quot;</span></summary>
-<pre><code>color?: string;</code></pre>
+
+```ts generated
+color?: string;
+```
+
 </details>
 
 <details class="api-member" id="cell-border-width" data-pagefind-weight="1">
 <summary><code>width</code></summary>
-<pre><code>width?: number;</code></pre>
+
+```ts generated
+width?: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-border-style" data-pagefind-weight="1">
 <summary><code>style</code></summary>
-<pre><code>style?: &quot;solid&quot; | &quot;dashed&quot; | &quot;dotted&quot;;</code></pre>
+
+```ts generated
+style?: "solid" | "dashed" | "dotted";
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Visual border applied to one or more sides of a cell.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellBorder {
     color?: string;
     width?: number;

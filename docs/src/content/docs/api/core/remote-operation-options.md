@@ -21,7 +21,11 @@ Classification metadata for host-supplied remote operations.
 
 <details class="api-member" id="remote-operation-options-commit-reason" data-pagefind-weight="1">
 <summary><code>commitReason</code></summary>
-<pre><code>commitReason?: CommitReason;</code></pre>
+
+```ts generated
+commitReason?: CommitReason;
+```
+
 </details>
 </div>
 
@@ -30,7 +34,7 @@ Classification metadata for host-supplied remote operations.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RemoteOperationOptions {
     commitReason?: CommitReason;
 }

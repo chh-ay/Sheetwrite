@@ -21,22 +21,38 @@ Host-provided metadata describing a saved workbook revision.
 
 <details class="api-member" id="revision-summary-version" data-pagefind-weight="1">
 <summary><code>version</code></summary>
-<pre><code>version: number;</code></pre>
+
+```ts generated
+version: number;
+```
+
 </details>
 
 <details class="api-member" id="revision-summary-created-at" data-pagefind-weight="1">
 <summary><code>createdAt</code></summary>
-<pre><code>createdAt: string;</code></pre>
+
+```ts generated
+createdAt: string;
+```
+
 </details>
 
 <details class="api-member" id="revision-summary-actor" data-pagefind-weight="1">
 <summary><code>actor</code></summary>
-<pre><code>actor?: PresenceActor;</code></pre>
+
+```ts generated
+actor?: PresenceActor;
+```
+
 </details>
 
 <details class="api-member" id="revision-summary-label" data-pagefind-weight="1">
 <summary><code>label</code></summary>
-<pre><code>label?: string;</code></pre>
+
+```ts generated
+label?: string;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Host-provided metadata describing a saved workbook revision.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RevisionSummary {
     version: number;
     createdAt: string;

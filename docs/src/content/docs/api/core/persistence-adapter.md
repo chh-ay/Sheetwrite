@@ -21,12 +21,20 @@ Host load and commit contract for versioned workbook persistence.
 
 <details class="api-member" id="persistence-adapter-load" data-pagefind-weight="1">
 <summary><code>load</code></summary>
-<pre><code>load(documentId: string, signal?: AbortSignal): Promise&lt;WorkbookSnapshot&gt;;</code></pre>
+
+```ts generated
+load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
+```
+
 </details>
 
 <details class="api-member" id="persistence-adapter-commit" data-pagefind-weight="1">
 <summary><code>commit</code></summary>
-<pre><code>commit(request: PersistenceCommitRequest): Promise&lt;PersistenceCommitResponse&gt;;</code></pre>
+
+```ts generated
+commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Host load and commit contract for versioned workbook persistence.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PersistenceAdapter {
     load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
     commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;

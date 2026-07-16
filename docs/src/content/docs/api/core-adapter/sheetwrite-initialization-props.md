@@ -21,12 +21,20 @@ Optional explicit WASM source and initialization error callback for adapters.
 
 <details class="api-member" id="sheetwrite-initialization-props-wasm-source" data-pagefind-weight="1">
 <summary><code>wasmSource</code> <span class="api-member-summary">Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins.</span></summary>
-<pre><code>wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;</code></pre>
+
+```ts generated
+wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
+```
+
 </details>
 
 <details class="api-member" id="sheetwrite-initialization-props-on-initialization-error" data-pagefind-weight="1">
 <summary><code>onInitializationError</code> <span class="api-member-summary">Called when WASM initialization fails while the adapter is mounted.</span></summary>
-<pre><code>onInitializationError?: (error: unknown) =&gt; void;</code></pre>
+
+```ts generated
+onInitializationError?: (error: unknown) => void;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Optional explicit WASM source and initialization error callback for adapters.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SheetwriteInitializationProps {
     wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
     onInitializationError?: (error: unknown) => void;

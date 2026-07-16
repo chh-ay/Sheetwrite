@@ -21,7 +21,11 @@ A formula bar piece; `setReadOnly` blocks commits without unmounting.
 
 <details class="api-member" id="formula-bar-piece-set-read-only" data-pagefind-weight="1">
 <summary><code>setReadOnly</code></summary>
-<pre><code>setReadOnly(readOnly: boolean): void;</code></pre>
+
+```ts generated
+setReadOnly(readOnly: boolean): void;
+```
+
 </details>
 </div>
 
@@ -30,7 +34,7 @@ A formula bar piece; `setReadOnly` blocks commits without unmounting.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface FormulaBarPiece extends ShellPiece {
     setReadOnly(readOnly: boolean): void;
 }

@@ -17,6 +17,6 @@ Registers the optional workbook XLSX implementation used by core.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(next: XlsxWorkbookBackend): void => ;
+```ts generated
+function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void;
 ```

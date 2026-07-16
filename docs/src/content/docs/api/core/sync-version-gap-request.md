@@ -21,22 +21,38 @@ Contiguous-version recovery request produced when remote input skips ahead.
 
 <details class="api-member" id="sync-version-gap-request-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="sync-version-gap-request-expected-version" data-pagefind-weight="1">
 <summary><code>expectedVersion</code></summary>
-<pre><code>expectedVersion: number;</code></pre>
+
+```ts generated
+expectedVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="sync-version-gap-request-received-version" data-pagefind-weight="1">
 <summary><code>receivedVersion</code></summary>
-<pre><code>receivedVersion: number;</code></pre>
+
+```ts generated
+receivedVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="sync-version-gap-request-signal" data-pagefind-weight="1">
 <summary><code>signal</code></summary>
-<pre><code>signal: AbortSignal;</code></pre>
+
+```ts generated
+signal: AbortSignal;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Contiguous-version recovery request produced when remote input skips ahead.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SyncVersionGapRequest {
     documentId: string;
     expectedVersion: number;

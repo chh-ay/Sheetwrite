@@ -21,62 +21,105 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <details class="api-member" id="grid-store" data-pagefind-weight="1">
 <summary><code>store</code></summary>
-<pre><code>readonly store: Store;</code></pre>
+
+```ts generated
+readonly store: Store;
+```
+
 </details>
 
 <details class="api-member" id="grid-actions" data-pagefind-weight="1">
 <summary><code>actions</code> <span class="api-member-summary">Imperative action surface for binding custom toolbars/menus.</span></summary>
-<pre><code>readonly actions: GridActions;</code></pre>
+
+```ts generated
+readonly actions: GridActions;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-active-sheet" data-pagefind-weight="1">
 <summary><code>setActiveSheet</code></summary>
-<pre><code>setActiveSheet(id: SheetId): void;</code></pre>
+
+```ts generated
+setActiveSheet(id: SheetId): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-scroll-to-cell" data-pagefind-weight="1">
 <summary><code>scrollToCell</code></summary>
-<pre><code>scrollToCell(addr: CellAddress): void;</code></pre>
+
+```ts generated
+scrollToCell(addr: CellAddress): void;
+```
+
 </details>
 <h3 id="getcellatpoint" class="api-search-anchor">getCellAtPoint</h3>
 <details class="api-member" id="grid-get-cell-at-point" data-pagefind-weight="10">
 <summary><code>getCellAtPoint</code> <span class="api-member-summary">Resolve browser viewport coordinates to an active-sheet cell for host-owned menus and interactions.</span></summary>
-<pre><code>getCellAtPoint(clientX: number, clientY: number): CellAddress | null;</code></pre>
+
+```ts generated
+getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
+```
+
 <p class="api-member-doc">Resolve browser viewport coordinates to an active-sheet cell for host-owned
 menus and interactions. Returns null outside the cell body.</p>
 </details>
 
 <details class="api-member" id="grid-get-active-sheet" data-pagefind-weight="1">
 <summary><code>getActiveSheet</code> <span class="api-member-summary">Id of the currently visible sheet.</span></summary>
-<pre><code>getActiveSheet(): SheetId;</code></pre>
+
+```ts generated
+getActiveSheet(): SheetId;
+```
+
 </details>
 
 <details class="api-member" id="grid-get-cell-input" data-pagefind-weight="1">
 <summary><code>getCellInput</code> <span class="api-member-summary">Editable snapshot of the cell at a view position on the active sheet, or null when out of bounds.</span></summary>
-<pre><code>getCellInput(row: number, col: number): CellInputSnapshot | null;</code></pre>
+
+```ts generated
+getCellInput(row: number, col: number): CellInputSnapshot | null;
+```
+
 <p class="api-member-doc">Editable snapshot of the cell at a view position on the active sheet, or
 null when out of bounds. See <a href="/docs/api/core/cell-input-snapshot/"><code>CellInputSnapshot</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-get-selection" data-pagefind-weight="1">
 <summary><code>getSelection</code></summary>
-<pre><code>getSelection(): Selection | null;</code></pre>
+
+```ts generated
+getSelection(): Selection | null;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-selection" data-pagefind-weight="1">
 <summary><code>setSelection</code></summary>
-<pre><code>setSelection(sel: Selection | null): void;</code></pre>
+
+```ts generated
+setSelection(sel: Selection | null): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-theme" data-pagefind-weight="1">
 <summary><code>setTheme</code> <span class="api-member-summary">Imperative patch: merge theme into the accumulated base theme.</span></summary>
-<pre><code>setTheme(theme: Partial&lt;Theme&gt;): void;</code></pre>
-<p class="api-member-doc">Imperative patch: merge `theme` into the accumulated base theme.</p>
+
+```ts generated
+setTheme(theme: Partial<Theme>): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-replace-theme" data-pagefind-weight="1">
 <summary><code>replaceTheme</code> <span class="api-member-summary">Option-level replacement: re-run construction-time resolution (DEFAULTTHEME &lt; CSS custom properties &lt; theme) with the new partial.</span></summary>
-<pre><code>replaceTheme(theme: Partial&lt;Theme&gt; | undefined): void;</code></pre>
+
+```ts generated
+replaceTheme(theme: Partial<Theme> | undefined): void;
+```
+
 <p class="api-member-doc">Option-level replacement: re-run construction-time resolution
 (`DEFAULT_THEME &lt; CSS custom properties &lt; theme`) with the new partial.
 `undefined` restores the CSS-variable/default resolution. Adapters call
@@ -86,17 +129,29 @@ this for their declarative `theme` prop; imperative patching stays on
 
 <details class="api-member" id="grid-get-effective-theme" data-pagefind-weight="1">
 <summary><code>getEffectiveTheme</code> <span class="api-member-summary">The effective (post-zoom) theme the renderer is currently painting with.</span></summary>
-<pre><code>getEffectiveTheme(): Theme;</code></pre>
+
+```ts generated
+getEffectiveTheme(): Theme;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-read-only" data-pagefind-weight="1">
 <summary><code>setReadOnly</code> <span class="api-member-summary">Update editability without replacing the Grid or clearing session state.</span></summary>
-<pre><code>setReadOnly(readOnly: boolean): void;</code></pre>
+
+```ts generated
+setReadOnly(readOnly: boolean): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-config" data-pagefind-weight="1">
 <summary><code>setConfig</code> <span class="api-member-summary">Reconfigure built-in chrome and keyboard handling without replacing the Grid or clearing selection/history.</span></summary>
-<pre><code>setConfig(config: GridConfig | undefined): void;</code></pre>
+
+```ts generated
+setConfig(config: GridConfig | undefined): void;
+```
+
 <p class="api-member-doc">Reconfigure built-in chrome and keyboard handling without replacing the
 Grid or clearing selection/history. Construction-bound GridOptions are not
 accepted here.</p>
@@ -104,7 +159,11 @@ accepted here.</p>
 <h3 id="applytransaction" class="api-search-anchor">applyTransaction</h3>
 <details class="api-member" id="grid-apply-transaction" data-pagefind-weight="10">
 <summary><code>applyTransaction</code> <span class="api-member-summary">Apply arbitrary patches as one undoable Grid commit.</span></summary>
-<pre><code>applyTransaction(transaction: GridTransaction): ApplyTransactionResult;</code></pre>
+
+```ts generated
+applyTransaction(transaction: GridTransaction): ApplyTransactionResult;
+```
+
 <p class="api-member-doc">Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
 Use `Store.applyTransaction` only for low-level writes that intentionally
 bypass Grid history and policy.</p>
@@ -112,165 +171,285 @@ bypass Grid history and policy.</p>
 
 <details class="api-member" id="grid-export-snapshot" data-pagefind-weight="1">
 <summary><code>exportSnapshot</code> <span class="api-member-summary">Deterministically export the complete authoritative workbook document.</span></summary>
-<pre><code>exportSnapshot(): WorkbookSnapshot;</code></pre>
+
+```ts generated
+exportSnapshot(): WorkbookSnapshot;
+```
+
 </details>
 
 <details class="api-member" id="grid-apply-remote-operations" data-pagefind-weight="1">
 <summary><code>applyRemoteOperations</code> <span class="api-member-summary">Apply host-supplied operations without undo history or outgoing dirty state.</span></summary>
-<pre><code>applyRemoteOperations( operations: readonly DocumentOp[], options?: RemoteOperationOptions, ): ApplyTransactionResult;</code></pre>
+
+```ts generated
+applyRemoteOperations( operations: readonly DocumentOp[], options?: RemoteOperationOptions, ): ApplyTransactionResult;
+```
+
 <p class="api-member-doc">Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: &quot;remote&quot;`.</p>
 </details>
 
 <details class="api-member" id="grid-define-cell-renderer" data-pagefind-weight="1">
 <summary><code>defineCellRenderer</code></summary>
-<pre><code>defineCellRenderer(name: string, renderer: CellRenderer): void;</code></pre>
+
+```ts generated
+defineCellRenderer(name: string, renderer: CellRenderer): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-aggregate" data-pagefind-weight="1">
 <summary><code>aggregate</code> <span class="api-member-summary">Column aggregate over the active sheet's data.</span></summary>
-<pre><code>aggregate(col: number, op: AggregateOp): number;</code></pre>
+
+```ts generated
+aggregate(col: number, op: AggregateOp): number;
+```
+
 </details>
 
 <details class="api-member" id="grid-sort-by" data-pagefind-weight="1">
 <summary><code>sortBy</code> <span class="api-member-summary">Sort the displayed rows by a column (does not mutate stored data).</span></summary>
-<pre><code>sortBy(col: number, ascending?: boolean): void;</code></pre>
+
+```ts generated
+sortBy(col: number, ascending?: boolean): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-sort-by-multi" data-pagefind-weight="1">
 <summary><code>sortByMulti</code> <span class="api-member-summary">Multi-key sort of the displayed rows (first key primary; stable).</span></summary>
-<pre><code>sortByMulti(keys: readonly SortKey[]): void;</code></pre>
+
+```ts generated
+sortByMulti(keys: readonly SortKey[]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-filter-by" data-pagefind-weight="1">
 <summary><code>filterBy</code> <span class="api-member-summary">Filter the displayed rows to those whose column text contains needle.</span></summary>
-<pre><code>filterBy(col: number, needle: string): void;</code></pre>
-<p class="api-member-doc">Filter the displayed rows to those whose column text contains `needle`.</p>
+
+```ts generated
+filterBy(col: number, needle: string): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-column-filter" data-pagefind-weight="1">
 <summary><code>setColumnFilter</code> <span class="api-member-summary">Set or clear (null) one column's filter.</span></summary>
-<pre><code>setColumnFilter(col: number, filter: ColumnFilter | null): void;</code></pre>
+
+```ts generated
+setColumnFilter(col: number, filter: ColumnFilter | null): void;
+```
+
 <p class="api-member-doc">Set or clear (null) one column's filter. All column filters AND together
 and compose with the active sort and hidden rows.</p>
 </details>
 
 <details class="api-member" id="grid-set-sort" data-pagefind-weight="1">
 <summary><code>setSort</code> <span class="api-member-summary">Persisted multi-key sort of the active sheet.</span></summary>
-<pre><code>setSort(keys: readonly SortKey[]): ApplyTransactionResult;</code></pre>
+
+```ts generated
+setSort(keys: readonly SortKey[]): ApplyTransactionResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-get-column-filters" data-pagefind-weight="1">
 <summary><code>getColumnFilters</code> <span class="api-member-summary">Active column filters on the active sheet, keyed by column index.</span></summary>
-<pre><code>getColumnFilters(): ReadonlyMap&lt;number, ColumnFilter&gt;;</code></pre>
+
+```ts generated
+getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
+```
+
 </details>
 
 <details class="api-member" id="grid-distinct-values" data-pagefind-weight="1">
 <summary><code>distinctValues</code> <span class="api-member-summary">Distinct resolved values of a column (Rust scan), capped at limit (default 1000) — the data source for a filter-by-values UI.</span></summary>
-<pre><code>distinctValues(col: number, limit?: number): CellScalar[];</code></pre>
-<p class="api-member-doc">Distinct resolved values of a column (Rust scan), capped at `limit`
-(default 1000) — the data source for a filter-by-values UI.</p>
+
+```ts generated
+distinctValues(col: number, limit?: number): CellScalar[];
+```
+
 </details>
 
 <details class="api-member" id="grid-hide-rows" data-pagefind-weight="1">
 <summary><code>hideRows</code> <span class="api-member-summary">Hide the given data rows (composes with filters/sort).</span></summary>
-<pre><code>hideRows(rows: readonly number[]): void;</code></pre>
+
+```ts generated
+hideRows(rows: readonly number[]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-show-rows" data-pagefind-weight="1">
 <summary><code>showRows</code> <span class="api-member-summary">Show the given data rows again, or every hidden row when omitted.</span></summary>
-<pre><code>showRows(rows?: readonly number[]): void;</code></pre>
+
+```ts generated
+showRows(rows?: readonly number[]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-hidden-rows" data-pagefind-weight="1">
 <summary><code>hiddenRows</code> <span class="api-member-summary">Currently hidden data rows on the active sheet.</span></summary>
-<pre><code>hiddenRows(): readonly number[];</code></pre>
+
+```ts generated
+hiddenRows(): readonly number[];
+```
+
 </details>
 
 <details class="api-member" id="grid-hide-columns" data-pagefind-weight="1">
 <summary><code>hideColumns</code> <span class="api-member-summary">Hide columns through one bulk-safe metadata transaction.</span></summary>
-<pre><code>hideColumns(cols?: readonly number[]): void;</code></pre>
+
+```ts generated
+hideColumns(cols?: readonly number[]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-show-columns" data-pagefind-weight="1">
 <summary><code>showColumns</code> <span class="api-member-summary">Show columns through one bulk-safe metadata transaction.</span></summary>
-<pre><code>showColumns(cols?: readonly number[]): void;</code></pre>
+
+```ts generated
+showColumns(cols?: readonly number[]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-hidden-columns" data-pagefind-weight="1">
 <summary><code>hiddenColumns</code> <span class="api-member-summary">Currently hidden columns on the active sheet.</span></summary>
-<pre><code>hiddenColumns(): readonly number[];</code></pre>
+
+```ts generated
+hiddenColumns(): readonly number[];
+```
+
 </details>
 
 <details class="api-member" id="grid-group-rows" data-pagefind-weight="1">
 <summary><code>groupRows</code> <span class="api-member-summary">Define a collapsible row group over a data-row range (end-inclusive).</span></summary>
-<pre><code>groupRows(start: number, end: number): void;</code></pre>
+
+```ts generated
+groupRows(start: number, end: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-ungroup-rows" data-pagefind-weight="1">
 <summary><code>ungroupRows</code> <span class="api-member-summary">Remove a row group (rows become visible if the group was collapsed).</span></summary>
-<pre><code>ungroupRows(start: number, end: number): void;</code></pre>
+
+```ts generated
+ungroupRows(start: number, end: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-group-collapsed" data-pagefind-weight="1">
 <summary><code>setGroupCollapsed</code> <span class="api-member-summary">Collapse/expand a row group; collapsing hides its rows.</span></summary>
-<pre><code>setGroupCollapsed(start: number, collapsed: boolean): void;</code></pre>
+
+```ts generated
+setGroupCollapsed(start: number, collapsed: boolean): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-row-groups" data-pagefind-weight="1">
 <summary><code>rowGroups</code> <span class="api-member-summary">Row groups on the active sheet.</span></summary>
-<pre><code>rowGroups(): readonly RowGroup[];</code></pre>
+
+```ts generated
+rowGroups(): readonly RowGroup[];
+```
+
 </details>
 
 <details class="api-member" id="grid-clear-view" data-pagefind-weight="1">
 <summary><code>clearView</code> <span class="api-member-summary">Clear any active sort/filter view.</span></summary>
-<pre><code>clearView(): void;</code></pre>
+
+```ts generated
+clearView(): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-undo" data-pagefind-weight="1">
 <summary><code>undo</code> <span class="api-member-summary">Undo the last recorded cell edit.</span></summary>
-<pre><code>undo(): void;</code></pre>
+
+```ts generated
+undo(): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-redo" data-pagefind-weight="1">
 <summary><code>redo</code> <span class="api-member-summary">Redo the last undone cell edit.</span></summary>
-<pre><code>redo(): void;</code></pre>
+
+```ts generated
+redo(): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-export-csv" data-pagefind-weight="1">
 <summary><code>exportCsv</code></summary>
-<pre><code>exportCsv(filename: string): void;</code></pre>
+
+```ts generated
+exportCsv(filename: string): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-export-xlsx" data-pagefind-weight="1">
 <summary><code>exportXlsx</code></summary>
-<pre><code>exportXlsx(filename: string): Promise&lt;void&gt;;</code></pre>
+
+```ts generated
+exportXlsx(filename: string): Promise<void>;
+```
+
 </details>
 
 <details class="api-member" id="grid-search" data-pagefind-weight="1">
 <summary><code>search</code> <span class="api-member-summary">Find cells matching query; highlights matches, emits search, returns the result.</span></summary>
-<pre><code>search(query: string, opts?: SearchOptions): SearchResult;</code></pre>
-<p class="api-member-doc">Find cells matching `query`; highlights matches, emits `search`, returns the result.</p>
+
+```ts generated
+search(query: string, opts?: SearchOptions): SearchResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-find-next" data-pagefind-weight="1">
 <summary><code>findNext</code> <span class="api-member-summary">Move the active match to the next match and scroll it into view.</span></summary>
-<pre><code>findNext(): SearchResult;</code></pre>
+
+```ts generated
+findNext(): SearchResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-find-prev" data-pagefind-weight="1">
 <summary><code>findPrev</code> <span class="api-member-summary">Move the active match to the previous match and scroll it into view.</span></summary>
-<pre><code>findPrev(): SearchResult;</code></pre>
+
+```ts generated
+findPrev(): SearchResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-clear-search" data-pagefind-weight="1">
 <summary><code>clearSearch</code> <span class="api-member-summary">Clear the current search and its highlights.</span></summary>
-<pre><code>clearSearch(): void;</code></pre>
+
+```ts generated
+clearSearch(): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-replace-current" data-pagefind-weight="1">
 <summary><code>replaceCurrent</code> <span class="api-member-summary">Replace the active match with replacement, then advance to the next match (re-scanning against the new data).</span></summary>
-<pre><code>replaceCurrent(replacement: string): SearchResult;</code></pre>
+
+```ts generated
+replaceCurrent(replacement: string): SearchResult;
+```
+
 <p class="api-member-doc">Replace the active match with `replacement`, then advance to the next match
 (re-scanning against the new data). Only literal text/number cells are
 eligible; formula and ref cells are skipped (formula source is never
@@ -281,7 +460,11 @@ one undoable step. No-op when read-only or when there is no active match.</p>
 
 <details class="api-member" id="grid-replace-all" data-pagefind-weight="1">
 <summary><code>replaceAll</code> <span class="api-member-summary">Replace every current match in a single undoable transaction (one undo() restores them all), then re-scan.</span></summary>
-<pre><code>replaceAll(replacement: string): ReplaceResult;</code></pre>
+
+```ts generated
+replaceAll(replacement: string): ReplaceResult;
+```
+
 <p class="api-member-doc">Replace every current match in a single undoable transaction (one
 `undo()` restores them all), then re-scan. Formula/ref cells are skipped
 and not counted. No-op when read-only.</p>
@@ -289,112 +472,194 @@ and not counted. No-op when read-only.</p>
 
 <details class="api-member" id="grid-insert-rows" data-pagefind-weight="1">
 <summary><code>insertRows</code></summary>
-<pre><code>insertRows(at: number, count?: number): void;</code></pre>
+
+```ts generated
+insertRows(at: number, count?: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-remove-rows" data-pagefind-weight="1">
 <summary><code>removeRows</code></summary>
-<pre><code>removeRows(at: number, count?: number): void;</code></pre>
+
+```ts generated
+removeRows(at: number, count?: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-insert-columns" data-pagefind-weight="1">
 <summary><code>insertColumns</code></summary>
-<pre><code>insertColumns(at: number, count?: number): void;</code></pre>
+
+```ts generated
+insertColumns(at: number, count?: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-remove-columns" data-pagefind-weight="1">
 <summary><code>removeColumns</code></summary>
-<pre><code>removeColumns(at: number, count?: number): void;</code></pre>
+
+```ts generated
+removeColumns(at: number, count?: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-add-sheet" data-pagefind-weight="1">
 <summary><code>addSheet</code> <span class="api-member-summary">Add a sheet with a stable ID and make it available to the tab bar.</span></summary>
-<pre><code>addSheet(input: AddSheetInput): SheetId;</code></pre>
+
+```ts generated
+addSheet(input: AddSheetInput): SheetId;
+```
+
 </details>
 
 <details class="api-member" id="grid-remove-sheet" data-pagefind-weight="1">
 <summary><code>removeSheet</code> <span class="api-member-summary">Remove a sheet; at least one sheet always remains.</span></summary>
-<pre><code>removeSheet(id: SheetId): void;</code></pre>
+
+```ts generated
+removeSheet(id: SheetId): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-rename-sheet" data-pagefind-weight="1">
 <summary><code>renameSheet</code></summary>
-<pre><code>renameSheet(id: SheetId, name: string): void;</code></pre>
+
+```ts generated
+renameSheet(id: SheetId, name: string): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-move-sheet" data-pagefind-weight="1">
 <summary><code>moveSheet</code></summary>
-<pre><code>moveSheet(id: SheetId, toIndex: number): void;</code></pre>
+
+```ts generated
+moveSheet(id: SheetId, toIndex: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-conditional-formats" data-pagefind-weight="1">
 <summary><code>setConditionalFormats</code></summary>
-<pre><code>setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;</code></pre>
+
+```ts generated
+setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-validation-rule" data-pagefind-weight="1">
 <summary><code>setValidationRule</code></summary>
-<pre><code>setValidationRule(rule: DataValidationRule): ApplyTransactionResult;</code></pre>
+
+```ts generated
+setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-remove-validation-rule" data-pagefind-weight="1">
 <summary><code>removeValidationRule</code></summary>
-<pre><code>removeValidationRule(id: string): ApplyTransactionResult;</code></pre>
+
+```ts generated
+removeValidationRule(id: string): ApplyTransactionResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-protected-range" data-pagefind-weight="1">
 <summary><code>setProtectedRange</code></summary>
-<pre><code>setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;</code></pre>
+
+```ts generated
+setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-remove-protected-range" data-pagefind-weight="1">
 <summary><code>removeProtectedRange</code></summary>
-<pre><code>removeProtectedRange(id: string): ApplyTransactionResult;</code></pre>
+
+```ts generated
+removeProtectedRange(id: string): ApplyTransactionResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-protection-resolver" data-pagefind-weight="1">
 <summary><code>setProtectionResolver</code></summary>
-<pre><code>setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;</code></pre>
+
+```ts generated
+setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-note" data-pagefind-weight="1">
 <summary><code>setNote</code></summary>
-<pre><code>setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;</code></pre>
+
+```ts generated
+setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-get-note" data-pagefind-weight="1">
 <summary><code>getNote</code></summary>
-<pre><code>getNote(addr: CellAddress): string | null;</code></pre>
+
+```ts generated
+getNote(addr: CellAddress): string | null;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-overscan" data-pagefind-weight="1">
 <summary><code>setOverscan</code> <span class="api-member-summary">Live-update the render window overscan (rows/cols painted beyond the viewport); undefined restores the default.</span></summary>
-<pre><code>setOverscan(overscan?: number): void;</code></pre>
-<p class="api-member-doc">Live-update the render window overscan (rows/cols painted beyond the
-viewport); `undefined` restores the default.</p>
+
+```ts generated
+setOverscan(overscan?: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-min-columns" data-pagefind-weight="1">
 <summary><code>setMinColumns</code> <span class="api-member-summary">Live-update the minimum rendered column count.</span></summary>
-<pre><code>setMinColumns(minColumns?: number): void;</code></pre>
+
+```ts generated
+setMinColumns(minColumns?: number): void;
+```
+
 <p class="api-member-doc">Live-update the minimum rendered column count. Increasing the minimum
 silently extends presentation padding; `undefined` restores the default.</p>
 </details>
 
 <details class="api-member" id="grid-highlight-cells" data-pagefind-weight="1">
 <summary><code>highlightCells</code> <span class="api-member-summary">Highlight arbitrary cell ranges (null clears).</span></summary>
-<pre><code>highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;</code></pre>
+
+```ts generated
+highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
+```
+
 <p class="api-member-doc">Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color.</p>
 </details>
 
 <details class="api-member" id="grid-set-presence-overlays" data-pagefind-weight="1">
 <summary><code>setPresenceOverlays</code> <span class="api-member-summary">Replace ephemeral remote-presence overlays; null clears every collaborator.</span></summary>
-<pre><code>setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;</code></pre>
+
+```ts generated
+setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-style-range" data-pagefind-weight="1">
 <summary><code>styleRange</code> <span class="api-member-summary">Merge style into every cell of range (null clears cell styles) as one undoable transaction.</span></summary>
-<pre><code>styleRange(range: Range, style: Partial&lt;CellStyle&gt; | null): void;</code></pre>
+
+```ts generated
+styleRange(range: Range, style: Partial<CellStyle> | null): void;
+```
+
 <p class="api-member-doc">Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
 unlike <code>highlightCells</code>, which draws a translucent overlay above it.</p>
@@ -402,12 +667,20 @@ unlike <code>highlightCells</code>, which draws a translucent overlay above it.<
 
 <details class="api-member" id="grid-begin-edit" data-pagefind-weight="1">
 <summary><code>beginEdit</code> <span class="api-member-summary">Open the cell editor at a view cell, optionally seeding text / selecting all.</span></summary>
-<pre><code>beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void;</code></pre>
+
+```ts generated
+beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-data-edge" data-pagefind-weight="1">
 <summary><code>dataEdge</code> <span class="api-member-summary">Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the moved axis (row for vertical moves, col for horizontal), or null when the store is not columnar.</span></summary>
-<pre><code>dataEdge(row: number, col: number, dRow: number, dCol: number): number | null;</code></pre>
+
+```ts generated
+dataEdge(row: number, col: number, dRow: number, dCol: number): number | null;
+```
+
 <p class="api-member-doc">Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the
 moved axis (row for vertical moves, col for horizontal), or null when the
 store is not columnar. Under an active sort/filter view, `row` is a view
@@ -417,63 +690,103 @@ their own keymaps (`config.keyboard`).</p>
 
 <details class="api-member" id="grid-set-row-height" data-pagefind-weight="1">
 <summary><code>setRowHeight</code> <span class="api-member-summary">Set one row's persistent display height through document history.</span></summary>
-<pre><code>setRowHeight(row: number, height: number): void;</code></pre>
+
+```ts generated
+setRowHeight(row: number, height: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-column-width" data-pagefind-weight="1">
 <summary><code>setColumnWidth</code> <span class="api-member-summary">Set one column's width via an undoable setColumn patch.</span></summary>
-<pre><code>setColumnWidth(col: number, width: number): void;</code></pre>
-<p class="api-member-doc">Set one column's width via an undoable `setColumn` patch.</p>
+
+```ts generated
+setColumnWidth(col: number, width: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-auto-fit-rows" data-pagefind-weight="1">
 <summary><code>autoFitRows</code> <span class="api-member-summary">Explicitly resize rows to fit wrapped content; never runs during paint.</span></summary>
-<pre><code>autoFitRows(range?: Range): void;</code></pre>
+
+```ts generated
+autoFitRows(range?: Range): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-auto-fit-columns" data-pagefind-weight="1">
 <summary><code>autoFitColumns</code> <span class="api-member-summary">Explicitly resize columns from a bulk worksheet read.</span></summary>
-<pre><code>autoFitColumns(cols?: readonly number[]): void;</code></pre>
+
+```ts generated
+autoFitColumns(cols?: readonly number[]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-frozen" data-pagefind-weight="1">
 <summary><code>setFrozen</code> <span class="api-member-summary">Pin the first rows view rows and cols columns; they stay visible while the body scrolls (0 = unfreeze that axis).</span></summary>
-<pre><code>setFrozen(rows: number, cols?: number): void;</code></pre>
+
+```ts generated
+setFrozen(rows: number, cols?: number): void;
+```
+
 <p class="api-member-doc">Pin the first `rows` view rows and `cols` columns; they stay visible while
 the body scrolls (0 = unfreeze that axis). Persisted on the active sheet.</p>
 </details>
 
 <details class="api-member" id="grid-set-zoom" data-pagefind-weight="1">
 <summary><code>setZoom</code> <span class="api-member-summary">Content zoom factor (0.5–2): scales row/column geometry and fonts.</span></summary>
-<pre><code>setZoom(zoom: number): void;</code></pre>
+
+```ts generated
+setZoom(zoom: number): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-get-zoom" data-pagefind-weight="1">
 <summary><code>getZoom</code></summary>
-<pre><code>getZoom(): number;</code></pre>
+
+```ts generated
+getZoom(): number;
+```
+
 </details>
 <h3 id="rendererkind" class="api-search-anchor">rendererKind</h3>
 <details class="api-member" id="grid-renderer-kind" data-pagefind-weight="10">
 <summary><code>rendererKind</code> <span class="api-member-summary">Which renderer is actually active: &quot;worker&quot; when the OffscreenCanvas worker constructed successfully, &quot;canvas&quot; otherwise (including after a renderer-fallback).</span></summary>
-<pre><code>rendererKind(): &quot;canvas&quot; | &quot;worker&quot;;</code></pre>
-<p class="api-member-doc">Which renderer is actually active: `&quot;worker&quot;` when the OffscreenCanvas
-worker constructed successfully, `&quot;canvas&quot;` otherwise (including after a
-`renderer-fallback`).</p>
+
+```ts generated
+rendererKind(): "canvas" | "worker";
+```
+
 </details>
 
 <details class="api-member" id="grid-on" data-pagefind-weight="1">
 <summary><code>on</code></summary>
-<pre><code>on&lt;E extends keyof GridEvents&gt;(evt: E, fn: (e: GridEvents[E]) =&gt; void): () =&gt; void;</code></pre>
+
+```ts generated
+on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void;
+```
+
 </details>
 
 <details class="api-member" id="grid-refresh" data-pagefind-weight="1">
 <summary><code>refresh</code></summary>
-<pre><code>refresh(): void;</code></pre>
+
+```ts generated
+refresh(): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-destroy" data-pagefind-weight="1">
 <summary><code>destroy</code></summary>
-<pre><code>destroy(): void;</code></pre>
+
+```ts generated
+destroy(): void;
+```
+
 </details>
 </div>
 
@@ -482,7 +795,7 @@ worker constructed successfully, `&quot;canvas&quot;` otherwise (including after
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface Grid {
     readonly store: Store;
     readonly actions: GridActions;

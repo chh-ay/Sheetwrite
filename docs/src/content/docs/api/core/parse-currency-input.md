@@ -21,6 +21,6 @@ renderer uses.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(raw: string): number | null => ;
+```ts generated
+function parseCurrencyInput(raw: string): number | null;
 ```

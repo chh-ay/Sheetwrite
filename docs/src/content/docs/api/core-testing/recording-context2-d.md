@@ -23,42 +23,74 @@ that counts its invocations in `calls`, so tests can assert paint activity
 
 <details class="api-member" id="recording-context2-d-calls" data-pagefind-weight="1">
 <summary><code>calls</code> <span class="api-member-summary">Per-method invocation counts, keyed by the 2D-context method name.</span></summary>
-<pre><code>readonly calls: Record&lt;string, number&gt;;</code></pre>
+
+```ts generated
+readonly calls: Record<string, number>;
+```
+
 </details>
 
 <details class="api-member" id="recording-context2-d-fill-style" data-pagefind-weight="1">
 <summary><code>fillStyle</code></summary>
-<pre><code>fillStyle: string;</code></pre>
+
+```ts generated
+fillStyle: string;
+```
+
 </details>
 
 <details class="api-member" id="recording-context2-d-stroke-style" data-pagefind-weight="1">
 <summary><code>strokeStyle</code></summary>
-<pre><code>strokeStyle: string;</code></pre>
+
+```ts generated
+strokeStyle: string;
+```
+
 </details>
 
 <details class="api-member" id="recording-context2-d-font" data-pagefind-weight="1">
 <summary><code>font</code></summary>
-<pre><code>font: string;</code></pre>
+
+```ts generated
+font: string;
+```
+
 </details>
 
 <details class="api-member" id="recording-context2-d-text-align" data-pagefind-weight="1">
 <summary><code>textAlign</code></summary>
-<pre><code>textAlign: string;</code></pre>
+
+```ts generated
+textAlign: string;
+```
+
 </details>
 
 <details class="api-member" id="recording-context2-d-text-baseline" data-pagefind-weight="1">
 <summary><code>textBaseline</code></summary>
-<pre><code>textBaseline: string;</code></pre>
+
+```ts generated
+textBaseline: string;
+```
+
 </details>
 
 <details class="api-member" id="recording-context2-d-line-width" data-pagefind-weight="1">
 <summary><code>lineWidth</code></summary>
-<pre><code>lineWidth: number;</code></pre>
+
+```ts generated
+lineWidth: number;
+```
+
 </details>
 
 <details class="api-member" id="recording-context2-d-index" data-pagefind-weight="1">
 <summary><code>index</code></summary>
-<pre><code>[method: string]: unknown;</code></pre>
+
+```ts generated
+[method: string]: unknown;
+```
+
 </details>
 </div>
 
@@ -67,7 +99,7 @@ that counts its invocations in `calls`, so tests can assert paint activity
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RecordingContext2D {
     readonly calls: Record<string, number>;
     fillStyle: string;

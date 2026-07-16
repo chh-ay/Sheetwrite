@@ -21,22 +21,38 @@ Immutable observable synchronization state.
 
 <details class="api-member" id="sync-state-snapshot-connection" data-pagefind-weight="1">
 <summary><code>connection</code></summary>
-<pre><code>connection: SyncConnectionState;</code></pre>
+
+```ts generated
+connection: SyncConnectionState;
+```
+
 </details>
 
 <details class="api-member" id="sync-state-snapshot-activity" data-pagefind-weight="1">
 <summary><code>activity</code></summary>
-<pre><code>activity: SyncActivityState;</code></pre>
+
+```ts generated
+activity: SyncActivityState;
+```
+
 </details>
 
 <details class="api-member" id="sync-state-snapshot-pending-count" data-pagefind-weight="1">
 <summary><code>pendingCount</code></summary>
-<pre><code>pendingCount: number;</code></pre>
+
+```ts generated
+pendingCount: number;
+```
+
 </details>
 
 <details class="api-member" id="sync-state-snapshot-server-version" data-pagefind-weight="1">
 <summary><code>serverVersion</code></summary>
-<pre><code>serverVersion: number;</code></pre>
+
+```ts generated
+serverVersion: number;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Immutable observable synchronization state.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SyncStateSnapshot {
     connection: SyncConnectionState;
     activity: SyncActivityState;

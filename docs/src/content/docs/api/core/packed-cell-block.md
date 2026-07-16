@@ -23,37 +23,65 @@ Formula/reference tuples are sparse exceptions keyed by row-major offset.
 
 <details class="api-member" id="packed-cell-block-row-count" data-pagefind-weight="1">
 <summary><code>rowCount</code></summary>
-<pre><code>rowCount: number;</code></pre>
+
+```ts generated
+rowCount: number;
+```
+
 </details>
 
 <details class="api-member" id="packed-cell-block-col-count" data-pagefind-weight="1">
 <summary><code>colCount</code></summary>
-<pre><code>colCount: number;</code></pre>
+
+```ts generated
+colCount: number;
+```
+
 </details>
 
 <details class="api-member" id="packed-cell-block-values" data-pagefind-weight="1">
 <summary><code>values</code></summary>
-<pre><code>values: CellScalar[];</code></pre>
+
+```ts generated
+values: CellScalar[];
+```
+
 </details>
 
 <details class="api-member" id="packed-cell-block-formulas" data-pagefind-weight="1">
 <summary><code>formulas</code></summary>
-<pre><code>formulas?: Array&lt;[offset: number, source: string]&gt;;</code></pre>
+
+```ts generated
+formulas?: Array<[offset: number, source: string]>;
+```
+
 </details>
 
 <details class="api-member" id="packed-cell-block-refs" data-pagefind-weight="1">
 <summary><code>refs</code></summary>
-<pre><code>refs?: Array&lt;[offset: number, target: CellAddress]&gt;;</code></pre>
+
+```ts generated
+refs?: Array<[offset: number, target: CellAddress]>;
+```
+
 </details>
 
 <details class="api-member" id="packed-cell-block-style-table" data-pagefind-weight="1">
 <summary><code>styleTable</code></summary>
-<pre><code>styleTable?: CellStyle[];</code></pre>
+
+```ts generated
+styleTable?: CellStyle[];
+```
+
 </details>
 
 <details class="api-member" id="packed-cell-block-style-ids" data-pagefind-weight="1">
 <summary><code>styleIds</code></summary>
-<pre><code>styleIds?: number[];</code></pre>
+
+```ts generated
+styleIds?: number[];
+```
+
 </details>
 </div>
 
@@ -62,7 +90,7 @@ Formula/reference tuples are sparse exceptions keyed by row-major offset.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PackedCellBlock {
     rowCount: number;
     colCount: number;

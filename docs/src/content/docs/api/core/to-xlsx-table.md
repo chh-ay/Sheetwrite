@@ -17,6 +17,6 @@ Exports a table model through the registered optional XLSX backend.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(workbook: Workbook, store: Store): Promise<Uint8Array> => ;
+```ts generated
+function toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
 ```

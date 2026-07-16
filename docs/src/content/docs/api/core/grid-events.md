@@ -21,59 +21,101 @@ Payload map for events emitted by a Grid.
 
 <details class="api-member" id="grid-events-change" data-pagefind-weight="1">
 <summary><code>change</code></summary>
-<pre><code>change: ChangeEvent;</code></pre>
+
+```ts generated
+change: ChangeEvent;
+```
+
 </details>
 
 <details class="api-member" id="grid-events-selection" data-pagefind-weight="1">
 <summary><code>selection</code></summary>
-<pre><code>selection: { selection: Selection | null };</code></pre>
+
+```ts generated
+selection: { selection: Selection | null };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-scroll" data-pagefind-weight="1">
 <summary><code>scroll</code></summary>
-<pre><code>scroll: { scrollTop: number; firstRow: number; lastRow: number };</code></pre>
+
+```ts generated
+scroll: { scrollTop: number; firstRow: number; lastRow: number };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-edit-begin" data-pagefind-weight="1">
 <summary><code>edit-begin</code></summary>
-<pre><code>&quot;edit-begin&quot;: { addr: CellAddress };</code></pre>
+
+```ts generated
+"edit-begin": { addr: CellAddress };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-edit-commit" data-pagefind-weight="1">
 <summary><code>edit-commit</code></summary>
-<pre><code>&quot;edit-commit&quot;: { addr: CellAddress; value: CellValue };</code></pre>
+
+```ts generated
+"edit-commit": { addr: CellAddress; value: CellValue };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-search" data-pagefind-weight="1">
 <summary><code>search</code></summary>
-<pre><code>search: SearchResult;</code></pre>
+
+```ts generated
+search: SearchResult;
+```
+
 </details>
 
 <details class="api-member" id="grid-events-mutation-rejected" data-pagefind-weight="1">
 <summary><code>mutation-rejected</code></summary>
-<pre><code>&quot;mutation-rejected&quot;: { issues: MutationIssue[] };</code></pre>
+
+```ts generated
+"mutation-rejected": { issues: MutationIssue[] };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-active-sheet" data-pagefind-weight="1">
 <summary><code>active-sheet</code> <span class="api-member-summary">Emitted after the visible sheet changes (direct call or cross-sheet scroll).</span></summary>
-<pre><code>&quot;active-sheet&quot;: { sheet: SheetId };</code></pre>
+
+```ts generated
+"active-sheet": { sheet: SheetId };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-renderer-fallback" data-pagefind-weight="1">
 <summary><code>renderer-fallback</code> <span class="api-member-summary">Emitted once when the worker renderer could not be constructed and the grid fell back to the main-thread canvas renderer.</span></summary>
-<pre><code>&quot;renderer-fallback&quot;: { requested: &quot;worker&quot;; error: unknown };</code></pre>
-<p class="api-member-doc">Emitted once when the worker renderer could not be constructed and the
-grid fell back to the main-thread canvas renderer.</p>
+
+```ts generated
+"renderer-fallback": { requested: "worker"; error: unknown };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-datasource-error" data-pagefind-weight="1">
 <summary><code>datasource-error</code></summary>
-<pre><code>&quot;datasource-error&quot;: { request: Omit&lt;DataSourceRequest, &quot;signal&quot;&gt;; error: unknown };</code></pre>
+
+```ts generated
+"datasource-error": { request: Omit<DataSourceRequest, "signal">; error: unknown };
+```
+
 </details>
 
 <details class="api-member" id="grid-events-export-error" data-pagefind-weight="1">
 <summary><code>export-error</code> <span class="api-member-summary">Built-in toolbar/context-menu export failed after its action was dispatched.</span></summary>
-<pre><code>&quot;export-error&quot;: { format: &quot;xlsx&quot;; error: unknown };</code></pre>
+
+```ts generated
+"export-error": { format: "xlsx"; error: unknown };
+```
+
 </details>
 </div>
 
@@ -82,7 +124,7 @@ grid fell back to the main-thread canvas renderer.</p>
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface GridEvents {
     change: ChangeEvent;
     selection: {

@@ -28,7 +28,7 @@ Applied, duplicate, or conflict acknowledgement from persistence.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type PersistenceCommitResponse = {
     status: "applied";
     version: number;

@@ -19,6 +19,6 @@ calls; Escape restores the displayed reference.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, grid: Grid, options?: NameBoxOptions): ShellPiece => ;
+```ts generated
+function createNameBox(host: HTMLElement, grid: Grid, options?: NameBoxOptions): ShellPiece;
 ```

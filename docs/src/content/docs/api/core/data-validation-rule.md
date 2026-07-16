@@ -21,32 +21,56 @@ One stable, range-scoped data-entry rule. Blank cells are allowed unless disable
 
 <details class="api-member" id="data-validation-rule-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-<pre><code>id: string;</code></pre>
+
+```ts generated
+id: string;
+```
+
 </details>
 
 <details class="api-member" id="data-validation-rule-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-<pre><code>range: Range;</code></pre>
+
+```ts generated
+range: Range;
+```
+
 </details>
 
 <details class="api-member" id="data-validation-rule-condition" data-pagefind-weight="1">
 <summary><code>condition</code></summary>
-<pre><code>condition: DataValidationCondition;</code></pre>
+
+```ts generated
+condition: DataValidationCondition;
+```
+
 </details>
 
 <details class="api-member" id="data-validation-rule-policy" data-pagefind-weight="1">
 <summary><code>policy</code></summary>
-<pre><code>policy: ValidationPolicy;</code></pre>
+
+```ts generated
+policy: ValidationPolicy;
+```
+
 </details>
 
 <details class="api-member" id="data-validation-rule-allow-blank" data-pagefind-weight="1">
 <summary><code>allowBlank</code></summary>
-<pre><code>allowBlank?: boolean;</code></pre>
+
+```ts generated
+allowBlank?: boolean;
+```
+
 </details>
 
 <details class="api-member" id="data-validation-rule-help-text" data-pagefind-weight="1">
 <summary><code>helpText</code></summary>
-<pre><code>helpText?: string;</code></pre>
+
+```ts generated
+helpText?: string;
+```
+
 </details>
 </div>
 
@@ -55,7 +79,7 @@ One stable, range-scoped data-entry rule. Blank cells are allowed unless disable
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface DataValidationRule {
     id: string;
     range: Range;

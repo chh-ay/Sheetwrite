@@ -21,17 +21,29 @@ Inclusive rectangular cell range on a stable sheet ID.
 
 <details class="api-member" id="range-sheet" data-pagefind-weight="1">
 <summary><code>sheet</code></summary>
-<pre><code>sheet: SheetId;</code></pre>
+
+```ts generated
+sheet: SheetId;
+```
+
 </details>
 
 <details class="api-member" id="range-start" data-pagefind-weight="1">
 <summary><code>start</code></summary>
-<pre><code>start: { row: number; col: number };</code></pre>
+
+```ts generated
+start: { row: number; col: number };
+```
+
 </details>
 
 <details class="api-member" id="range-end" data-pagefind-weight="1">
 <summary><code>end</code></summary>
-<pre><code>end: { row: number; col: number };</code></pre>
+
+```ts generated
+end: { row: number; col: number };
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Inclusive rectangular cell range on a stable sheet ID.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface Range {
     sheet: SheetId;
     start: {

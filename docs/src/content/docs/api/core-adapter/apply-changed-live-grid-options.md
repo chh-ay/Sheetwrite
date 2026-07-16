@@ -17,6 +17,6 @@ Applies live-updatable adapter option changes to an existing Grid.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(controller: GridController, previous: GridOptions, next: GridOptions): void => ;
+```ts generated
+function applyChangedLiveGridOptions(controller: GridController, previous: GridOptions, next: GridOptions): void;
 ```

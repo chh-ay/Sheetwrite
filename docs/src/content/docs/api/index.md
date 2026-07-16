@@ -15,7 +15,7 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 | [`@sheetwrite/core/shell.css`](/docs/api/core-shell-css/) | asset | 0 |
 | [`@sheetwrite/core/styles.css`](/docs/api/core-styles-css/) | asset | 0 |
 | [`@sheetwrite/core/testing`](/docs/api/core-testing/) | test-only | 3 |
-| [`@sheetwrite/core/worker`](/docs/api/core-worker/) | supported | 0 |
+| [`@sheetwrite/core/worker`](/docs/api/core-worker/) | supported | 2 |
 
 ## @sheetwrite/react
 

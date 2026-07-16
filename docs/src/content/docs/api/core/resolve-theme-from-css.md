@@ -12,11 +12,11 @@ Read `--sheetwrite-*` CSS custom properties into a partial theme.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L140</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L186</code></dd></div>
 </dl>
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(el: HTMLElement): Partial<Theme> => ;
+```ts generated
+function resolveThemeFromCss(el: HTMLElement): Partial<Theme>;
 ```

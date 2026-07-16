@@ -21,27 +21,47 @@ Cancellable sheet and row interval requested from a DataSource.
 
 <details class="api-member" id="data-source-request-sheet" data-pagefind-weight="1">
 <summary><code>sheet</code></summary>
-<pre><code>sheet: SheetId;</code></pre>
+
+```ts generated
+sheet: SheetId;
+```
+
 </details>
 
 <details class="api-member" id="data-source-request-start" data-pagefind-weight="1">
 <summary><code>start</code></summary>
-<pre><code>start: number;</code></pre>
+
+```ts generated
+start: number;
+```
+
 </details>
 
 <details class="api-member" id="data-source-request-end" data-pagefind-weight="1">
 <summary><code>end</code></summary>
-<pre><code>end: number;</code></pre>
+
+```ts generated
+end: number;
+```
+
 </details>
 
 <details class="api-member" id="data-source-request-signal" data-pagefind-weight="1">
 <summary><code>signal</code></summary>
-<pre><code>signal: AbortSignal;</code></pre>
+
+```ts generated
+signal: AbortSignal;
+```
+
 </details>
 
 <details class="api-member" id="data-source-request-revision" data-pagefind-weight="1">
 <summary><code>revision</code></summary>
-<pre><code>revision: number;</code></pre>
+
+```ts generated
+revision: number;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Cancellable sheet and row interval requested from a DataSource.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface DataSourceRequest {
     sheet: SheetId;
     start: number;

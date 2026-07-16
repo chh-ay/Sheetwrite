@@ -21,12 +21,20 @@ Serializable plain-text note anchored to a cell.
 
 <details class="api-member" id="cell-note-addr" data-pagefind-weight="1">
 <summary><code>addr</code></summary>
-<pre><code>addr: CellAddress;</code></pre>
+
+```ts generated
+addr: CellAddress;
+```
+
 </details>
 
 <details class="api-member" id="cell-note-text" data-pagefind-weight="1">
 <summary><code>text</code></summary>
-<pre><code>text: string;</code></pre>
+
+```ts generated
+text: string;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Serializable plain-text note anchored to a cell.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellNote {
     addr: CellAddress;
     text: string;

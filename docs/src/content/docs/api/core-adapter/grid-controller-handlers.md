@@ -27,40 +27,65 @@ Every field is optional; a missing callback simply drops that event.
 
 <details class="api-member" id="grid-controller-handlers-on-grid-change" data-pagefind-weight="1">
 <summary><code>onGridChange</code> <span class="api-member-summary">Forwarded from the grid's change event (a committed transaction).</span></summary>
-<pre><code>onGridChange?(event: ChangeEvent): void;</code></pre>
-<p class="api-member-doc">Forwarded from the grid's `change` event (a committed transaction).</p>
+
+```ts generated
+onGridChange?(event: ChangeEvent): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-controller-handlers-on-selection-change" data-pagefind-weight="1">
 <summary><code>onSelectionChange</code> <span class="api-member-summary">Forwarded from the grid's selection event; null when nothing is selected.</span></summary>
-<pre><code>onSelectionChange?(selection: Selection | null): void;</code></pre>
-<p class="api-member-doc">Forwarded from the grid's `selection` event; `null` when nothing is selected.</p>
+
+```ts generated
+onSelectionChange?(selection: Selection | null): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-controller-handlers-on-viewport-change" data-pagefind-weight="1">
 <summary><code>onViewportChange</code> <span class="api-member-summary">Forwarded from the grid's scroll event.</span></summary>
-<pre><code>onViewportChange?(event: GridEvents[&quot;scroll&quot;]): void;</code></pre>
-<p class="api-member-doc">Forwarded from the grid's `scroll` event.</p>
+
+```ts generated
+onViewportChange?(event: GridEvents["scroll"]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-controller-handlers-on-edit-begin" data-pagefind-weight="1">
 <summary><code>onEditBegin</code> <span class="api-member-summary">Forwarded when a cell editor opens.</span></summary>
-<pre><code>onEditBegin?(event: GridEvents[&quot;edit-begin&quot;]): void;</code></pre>
+
+```ts generated
+onEditBegin?(event: GridEvents["edit-begin"]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-controller-handlers-on-edit-commit" data-pagefind-weight="1">
 <summary><code>onEditCommit</code> <span class="api-member-summary">Forwarded after a cell editor commits.</span></summary>
-<pre><code>onEditCommit?(event: GridEvents[&quot;edit-commit&quot;]): void;</code></pre>
+
+```ts generated
+onEditCommit?(event: GridEvents["edit-commit"]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-controller-handlers-on-search" data-pagefind-weight="1">
 <summary><code>onSearch</code> <span class="api-member-summary">Forwarded whenever the active search result changes.</span></summary>
-<pre><code>onSearch?(result: GridEvents[&quot;search&quot;]): void;</code></pre>
+
+```ts generated
+onSearch?(result: GridEvents["search"]): void;
+```
+
 </details>
 
 <details class="api-member" id="grid-controller-handlers-on-active-sheet-change" data-pagefind-weight="1">
 <summary><code>onActiveSheetChange</code> <span class="api-member-summary">Forwarded after the visible sheet changes.</span></summary>
-<pre><code>onActiveSheetChange?(event: GridEvents[&quot;active-sheet&quot;]): void;</code></pre>
+
+```ts generated
+onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
+```
+
 </details>
 </div>
 
@@ -69,7 +94,7 @@ Every field is optional; a missing callback simply drops that event.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface GridControllerHandlers {
     onGridChange?(event: ChangeEvent): void;
     onSelectionChange?(selection: Selection | null): void;

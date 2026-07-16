@@ -17,6 +17,6 @@ Extracts advanced GridOptions from framework adapter props.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(source: Record<string, unknown>): GridOptions => ;
+```ts generated
+function extractGridOptions(source: Record<string, unknown>): GridOptions;
 ```

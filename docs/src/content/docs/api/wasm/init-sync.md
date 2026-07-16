@@ -18,8 +18,8 @@ a precompiled `WebAssembly.Module`.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(module: {
+```ts generated
+function initSync(module: {
     module: SyncInitInput;
-} | SyncInitInput): InitOutput => ;
+} | SyncInitInput): InitOutput;
 ```

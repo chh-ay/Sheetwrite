@@ -17,6 +17,6 @@ Formula-preserving, multi-sheet workbook import through the optional XLSX backen
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot> => ;
+```ts generated
+function fromXlsxWorkbook(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>;
 ```

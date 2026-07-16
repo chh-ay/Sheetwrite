@@ -28,7 +28,7 @@ Serializable operation that creates or updates comment state.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type CommentMutation = {
     kind: "create";
     threadId: string;

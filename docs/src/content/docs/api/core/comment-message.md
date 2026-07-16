@@ -21,27 +21,47 @@ One immutable author message in a comment thread.
 
 <details class="api-member" id="comment-message-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-<pre><code>id: string;</code></pre>
+
+```ts generated
+id: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-message-author" data-pagefind-weight="1">
 <summary><code>author</code></summary>
-<pre><code>author: CommentAuthorRef;</code></pre>
+
+```ts generated
+author: CommentAuthorRef;
+```
+
 </details>
 
 <details class="api-member" id="comment-message-body" data-pagefind-weight="1">
 <summary><code>body</code></summary>
-<pre><code>body: string;</code></pre>
+
+```ts generated
+body: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-message-created-at" data-pagefind-weight="1">
 <summary><code>createdAt</code></summary>
-<pre><code>createdAt: string;</code></pre>
+
+```ts generated
+createdAt: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-message-edited-at" data-pagefind-weight="1">
 <summary><code>editedAt</code></summary>
-<pre><code>editedAt?: string;</code></pre>
+
+```ts generated
+editedAt?: string;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ One immutable author message in a comment thread.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CommentMessage {
     id: string;
     author: CommentAuthorRef;

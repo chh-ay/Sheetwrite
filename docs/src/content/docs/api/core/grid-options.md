@@ -21,35 +21,56 @@ Workbook, data, rendering, policy, and built-in UI options used to create a Grid
 
 <details class="api-member" id="grid-options-workbook" data-pagefind-weight="1">
 <summary><code>workbook</code> <span class="api-member-summary">Live workbook schema adopted by the store and updated by document operations.</span></summary>
-<pre><code>workbook: Workbook;</code></pre>
+
+```ts generated
+workbook: Workbook;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-data" data-pagefind-weight="1">
 <summary><code>data</code> <span class="api-member-summary">Eager column-major values loaded into workbook.activeSheet; use instead of datasource.</span></summary>
-<pre><code>data?: ColumnarData;</code></pre>
-<p class="api-member-doc">Eager column-major values loaded into `workbook.activeSheet`; use instead of `datasource`.</p>
+
+```ts generated
+data?: ColumnarData;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-datasource" data-pagefind-weight="1">
 <summary><code>datasource</code> <span class="api-member-summary">Lazy row provider requested for visible windows; use instead of eager data.</span></summary>
-<pre><code>datasource?: DataSource;</code></pre>
-<p class="api-member-doc">Lazy row provider requested for visible windows; use instead of eager `data`.</p>
+
+```ts generated
+datasource?: DataSource;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-datasource-storage" data-pagefind-weight="1">
 <summary><code>datasourceStorage</code> <span class="api-member-summary">Allocation and cache policy for datasource-backed cell storage.</span></summary>
-<pre><code>datasourceStorage?: DataSourceStorageOptions;</code></pre>
+
+```ts generated
+datasourceStorage?: DataSourceStorageOptions;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-renderer" data-pagefind-weight="1">
 <summary><code>renderer</code> <span class="api-member-summary">Paint backend; defaults to main-thread canvas and falls back there if a worker fails.</span></summary>
-<pre><code>renderer?: &quot;canvas&quot; | &quot;worker&quot;;</code></pre>
-<p class="api-member-doc">Paint backend; defaults to main-thread `canvas` and falls back there if a worker fails.</p>
+
+```ts generated
+renderer?: "canvas" | "worker";
+```
+
 </details>
 
 <details class="api-member" id="grid-options-worker-url" data-pagefind-weight="1">
 <summary><code>workerUrl</code> <span class="api-member-summary">URL of the worker renderer module (renderer: &quot;worker&quot;), as served to the BROWSER — the platform Worker constructor does not consult package exports, so a bare specifier like new URL(&quot;@sheetwrite/core/worker&quot;,…</span></summary>
-<pre><code>workerUrl?: string | URL;</code></pre>
+
+```ts generated
+workerUrl?: string | URL;
+```
+
 <p class="api-member-doc">URL of the worker renderer module (`renderer: &quot;worker&quot;`), as served to the
 BROWSER — the platform `Worker` constructor does not consult package
 exports, so a bare specifier like `new URL(&quot;@sheetwrite/core/worker&quot;,
@@ -63,46 +84,76 @@ renderer and emits `renderer-fallback` once.</p>
 
 <details class="api-member" id="grid-options-theme" data-pagefind-weight="1">
 <summary><code>theme</code> <span class="api-member-summary">Overrides merged over the default theme and host CSS custom properties.</span></summary>
-<pre><code>theme?: Partial&lt;Theme&gt;;</code></pre>
+
+```ts generated
+theme?: Partial<Theme>;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-read-only" data-pagefind-weight="1">
 <summary><code>readOnly</code> <span class="api-member-summary">Disables mutating interactions while preserving navigation and selection.</span></summary>
-<pre><code>readOnly?: boolean;</code></pre>
+
+```ts generated
+readOnly?: boolean;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-protection-resolver" data-pagefind-weight="1">
 <summary><code>protectionResolver</code> <span class="api-member-summary">Host-owned client UX permission check.</span></summary>
-<pre><code>protectionResolver?: ProtectionResolver;</code></pre>
+
+```ts generated
+protectionResolver?: ProtectionResolver;
+```
+
 <p class="api-member-doc">Host-owned client UX permission check. Servers must independently authorize
 every submitted operation; this resolver is not an authentication boundary.</p>
 </details>
 
 <details class="api-member" id="grid-options-mutation-policy" data-pagefind-weight="1">
 <summary><code>mutationPolicy</code> <span class="api-member-summary">Atomic rejects the transaction; partial skips denied operation objects.</span></summary>
-<pre><code>mutationPolicy?: MutationPolicyMode;</code></pre>
+
+```ts generated
+mutationPolicy?: MutationPolicyMode;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-renderers" data-pagefind-weight="1">
 <summary><code>renderers</code> <span class="api-member-summary">Custom cell renderers registered up front; also see Grid.defineCellRenderer.</span></summary>
-<pre><code>renderers?: Record&lt;string, CellRenderer&gt;;</code></pre>
-<p class="api-member-doc">Custom cell renderers registered up front; also see `Grid.defineCellRenderer`.</p>
+
+```ts generated
+renderers?: Record<string, CellRenderer>;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-overscan" data-pagefind-weight="1">
 <summary><code>overscan</code> <span class="api-member-summary">Rows rendered above/below the viewport to absorb fast scrolls.</span></summary>
-<pre><code>overscan?: number;</code></pre>
+
+```ts generated
+overscan?: number;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-min-columns" data-pagefind-weight="1">
 <summary><code>minColumns</code> <span class="api-member-summary">Render at least this many columns (empty padding columns past the data, like a spreadsheet).</span></summary>
-<pre><code>minColumns?: number;</code></pre>
+
+```ts generated
+minColumns?: number;
+```
+
 </details>
 
 <details class="api-member" id="grid-options-config" data-pagefind-weight="1">
 <summary><code>config</code> <span class="api-member-summary">Built-in UI controls; providing an object enables the toolbar unless toolbar is false.</span></summary>
-<pre><code>config?: GridConfig;</code></pre>
-<p class="api-member-doc">Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false.</p>
+
+```ts generated
+config?: GridConfig;
+```
+
 </details>
 </div>
 
@@ -111,7 +162,7 @@ every submitted operation; this resolver is not an authentication boundary.</p>
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface GridOptions {
     workbook: Workbook;
     data?: ColumnarData;

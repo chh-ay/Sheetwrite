@@ -45,7 +45,7 @@ Built-in action names accepted by custom toolbar items.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ToolbarActionName = "bold" | "italic" | "underline" | "strikethrough" | "alignLeft" | "alignCenter" | "alignRight" | "textColor" | "fillColor" | "border" | "clearFormat" | "merge" | "unmerge" | "sortAsc" | "sortDesc" | "exportCsv" | "exportXlsx" | "undo" | "redo" | "separator";
 ```
 

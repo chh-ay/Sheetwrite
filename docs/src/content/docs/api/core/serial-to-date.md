@@ -19,6 +19,6 @@ calendar fields are stable regardless of the host time zone.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(serial: number): Date => ;
+```ts generated
+function serialToDate(serial: number): Date;
 ```

@@ -19,6 +19,6 @@ merges, dimensions, and frozen views.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-XlsxWorkbookBackend;
+```ts generated
+const excelJsWorkbookBackend: XlsxWorkbookBackend;
 ```

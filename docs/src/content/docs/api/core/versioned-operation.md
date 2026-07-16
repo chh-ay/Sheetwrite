@@ -21,17 +21,29 @@ Remote document operations paired with a contiguous server version.
 
 <details class="api-member" id="versioned-operation-version" data-pagefind-weight="1">
 <summary><code>version</code></summary>
-<pre><code>version: number;</code></pre>
+
+```ts generated
+version: number;
+```
+
 </details>
 
 <details class="api-member" id="versioned-operation-operations" data-pagefind-weight="1">
 <summary><code>operations</code></summary>
-<pre><code>readonly operations: readonly DocumentOp[];</code></pre>
+
+```ts generated
+readonly operations: readonly DocumentOp[];
+```
+
 </details>
 
 <details class="api-member" id="versioned-operation-client-mutation-id" data-pagefind-weight="1">
 <summary><code>clientMutationId</code></summary>
-<pre><code>clientMutationId?: string;</code></pre>
+
+```ts generated
+clientMutationId?: string;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Remote document operations paired with a contiguous server version.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface VersionedOperation {
     version: number;
     readonly operations: readonly DocumentOp[];

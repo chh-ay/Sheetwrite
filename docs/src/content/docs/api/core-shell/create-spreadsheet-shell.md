@@ -21,6 +21,6 @@ every piece, the grid, and the shell DOM, and is safe to call twice.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, options: SpreadsheetShellOptions): SpreadsheetShell => ;
+```ts generated
+function createSpreadsheetShell(host: HTMLElement, options: SpreadsheetShellOptions): SpreadsheetShell;
 ```

@@ -17,6 +17,6 @@ Translate Sheetwrite's style model into write-excel-file cell properties.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(style: CellStyle | undefined): CellObject => ;
+```ts generated
+function xlsxStyleOf(style: CellStyle | undefined): CellObject;
 ```

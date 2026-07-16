@@ -17,6 +17,6 @@ Registers the optional table XLSX export implementation used by core.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(next: XlsxTableExportBackend): void => ;
+```ts generated
+function setXlsxTableExportBackend(next: XlsxTableExportBackend): void;
 ```

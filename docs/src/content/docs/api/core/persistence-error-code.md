@@ -29,7 +29,7 @@ Stable category for a persistence failure.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type PersistenceErrorCode = "aborted" | "invalid-snapshot" | "not-found" | "commit-rejected";
 ```
 

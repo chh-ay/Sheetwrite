@@ -21,27 +21,47 @@ Allocation and load statistics for one paged datasource sheet.
 
 <details class="api-member" id="paged-store-stats-chunks" data-pagefind-weight="1">
 <summary><code>chunks</code></summary>
-<pre><code>chunks: number;</code></pre>
+
+```ts generated
+chunks: number;
+```
+
 </details>
 
 <details class="api-member" id="paged-store-stats-loaded-cells" data-pagefind-weight="1">
 <summary><code>loadedCells</code></summary>
-<pre><code>loadedCells: number;</code></pre>
+
+```ts generated
+loadedCells: number;
+```
+
 </details>
 
 <details class="api-member" id="paged-store-stats-dirty-cells" data-pagefind-weight="1">
 <summary><code>dirtyCells</code></summary>
-<pre><code>dirtyCells: number;</code></pre>
+
+```ts generated
+dirtyCells: number;
+```
+
 </details>
 
 <details class="api-member" id="paged-store-stats-allocated-bytes" data-pagefind-weight="1">
 <summary><code>allocatedBytes</code></summary>
-<pre><code>allocatedBytes: number;</code></pre>
+
+```ts generated
+allocatedBytes: number;
+```
+
 </details>
 
 <details class="api-member" id="paged-store-stats-fully-loaded" data-pagefind-weight="1">
 <summary><code>fullyLoaded</code></summary>
-<pre><code>fullyLoaded: boolean;</code></pre>
+
+```ts generated
+fullyLoaded: boolean;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Allocation and load statistics for one paged datasource sheet.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PagedStoreStats {
     chunks: number;
     loadedCells: number;

@@ -21,27 +21,47 @@ Versioned restore request submitted to a revision adapter.
 
 <details class="api-member" id="revision-restore-request-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="revision-restore-request-target-version" data-pagefind-weight="1">
 <summary><code>targetVersion</code></summary>
-<pre><code>targetVersion: number;</code></pre>
+
+```ts generated
+targetVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="revision-restore-request-base-version" data-pagefind-weight="1">
 <summary><code>baseVersion</code></summary>
-<pre><code>baseVersion: number;</code></pre>
+
+```ts generated
+baseVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="revision-restore-request-client-mutation-id" data-pagefind-weight="1">
 <summary><code>clientMutationId</code></summary>
-<pre><code>clientMutationId: string;</code></pre>
+
+```ts generated
+clientMutationId: string;
+```
+
 </details>
 
 <details class="api-member" id="revision-restore-request-signal" data-pagefind-weight="1">
 <summary><code>signal</code></summary>
-<pre><code>signal?: AbortSignal;</code></pre>
+
+```ts generated
+signal?: AbortSignal;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Versioned restore request submitted to a revision adapter.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RevisionRestoreRequest {
     documentId: string;
     targetVersion: number;

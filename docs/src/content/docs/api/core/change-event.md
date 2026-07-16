@@ -21,27 +21,47 @@ Payload of the `change` event; flows OUT for API submission/reconcile.
 
 <details class="api-member" id="change-event-transaction" data-pagefind-weight="1">
 <summary><code>transaction</code> <span class="api-member-summary">Operations that actually committed after policy and bounds filtering.</span></summary>
-<pre><code>transaction: Transaction;</code></pre>
+
+```ts generated
+transaction: Transaction;
+```
+
 </details>
 
 <details class="api-member" id="change-event-changes" data-pagefind-weight="1">
 <summary><code>changes</code> <span class="api-member-summary">Cell-level before/after effects; empty for commits that only change metadata.</span></summary>
-<pre><code>changes: CellChange[];</code></pre>
+
+```ts generated
+changes: CellChange[];
+```
+
 </details>
 
 <details class="api-member" id="change-event-commit-reason" data-pagefind-weight="1">
 <summary><code>commitReason</code> <span class="api-member-summary">What produced this commit — see <code>CommitReason</code>.</span></summary>
-<pre><code>commitReason: CommitReason;</code></pre>
+
+```ts generated
+commitReason: CommitReason;
+```
+
 </details>
 
 <details class="api-member" id="change-event-source" data-pagefind-weight="1">
 <summary><code>source</code> <span class="api-member-summary">Remote input is observable but never belongs in outgoing local persistence.</span></summary>
-<pre><code>source: OperationSource;</code></pre>
+
+```ts generated
+source: OperationSource;
+```
+
 </details>
 
 <details class="api-member" id="change-event-epoch" data-pagefind-weight="1">
 <summary><code>epoch</code> <span class="api-member-summary">Store epoch after the commit; emitted store and grid changes include it.</span></summary>
-<pre><code>epoch?: number;</code></pre>
+
+```ts generated
+epoch?: number;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Payload of the `change` event; flows OUT for API submission/reconcile.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ChangeEvent {
     transaction: Transaction;
     changes: CellChange[];

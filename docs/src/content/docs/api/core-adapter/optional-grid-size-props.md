@@ -21,12 +21,20 @@ Optional width and height accepted by advanced framework adapters.
 
 <details class="api-member" id="optional-grid-size-props-height" data-pagefind-weight="1">
 <summary><code>height</code></summary>
-<pre><code>height?: number | string;</code></pre>
+
+```ts generated
+height?: number | string;
+```
+
 </details>
 
 <details class="api-member" id="optional-grid-size-props-fill" data-pagefind-weight="1">
 <summary><code>fill</code></summary>
-<pre><code>fill?: true;</code></pre>
+
+```ts generated
+fill?: true;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Optional width and height accepted by advanced framework adapters.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface OptionalGridSizeProps {
     height?: number | string;
     fill?: true;

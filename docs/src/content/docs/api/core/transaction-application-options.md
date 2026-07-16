@@ -21,13 +21,20 @@ Source and commit classification used when applying a transaction.
 
 <details class="api-member" id="transaction-application-options-source" data-pagefind-weight="1">
 <summary><code>source</code> <span class="api-member-summary">Distinguishes host persistence input from local user/API output.</span></summary>
-<pre><code>source?: OperationSource;</code></pre>
+
+```ts generated
+source?: OperationSource;
+```
+
 </details>
 
 <details class="api-member" id="transaction-application-options-commit-reason" data-pagefind-weight="1">
 <summary><code>commitReason</code> <span class="api-member-summary">Event classification; defaults to api.</span></summary>
-<pre><code>commitReason?: CommitReason;</code></pre>
-<p class="api-member-doc">Event classification; defaults to `api`.</p>
+
+```ts generated
+commitReason?: CommitReason;
+```
+
 </details>
 </div>
 
@@ -36,7 +43,7 @@ Source and commit classification used when applying a transaction.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface TransactionApplicationOptions {
     source?: OperationSource;
     commitReason?: CommitReason;

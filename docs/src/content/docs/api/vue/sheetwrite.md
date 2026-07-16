@@ -20,8 +20,8 @@ Convenience component for local object rows with live option updates.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
-DefineComponent<ExtractPropTypes<{
+```ts generated
+const Sheetwrite: DefineComponent<ExtractPropTypes<{
     columns: {
         type: PropType<readonly {
             key: string;

@@ -21,8 +21,11 @@ A highlight target: a range plus an optional per-range color override.
 
 <details class="api-member" id="highlight-range-color" data-pagefind-weight="1">
 <summary><code>color</code> <span class="api-member-summary">Overrides the call-level color / theme highlight for this range only.</span></summary>
-<pre><code>color?: string;</code></pre>
-<p class="api-member-doc">Overrides the call-level `color` / theme highlight for this range only.</p>
+
+```ts generated
+color?: string;
+```
+
 </details>
 </div>
 
@@ -31,7 +34,7 @@ A highlight target: a range plus an optional per-range color override.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface HighlightRange extends Range {
     color?: string;
 }

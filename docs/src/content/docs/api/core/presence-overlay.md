@@ -22,27 +22,47 @@ enters document operations, snapshots, dirty state, or undo history.
 
 <details class="api-member" id="presence-overlay-actor-id" data-pagefind-weight="1">
 <summary><code>actorId</code></summary>
-<pre><code>actorId: string;</code></pre>
+
+```ts generated
+actorId: string;
+```
+
 </details>
 
 <details class="api-member" id="presence-overlay-display-name" data-pagefind-weight="1">
 <summary><code>displayName</code></summary>
-<pre><code>displayName?: string;</code></pre>
+
+```ts generated
+displayName?: string;
+```
+
 </details>
 
 <details class="api-member" id="presence-overlay-color" data-pagefind-weight="1">
 <summary><code>color</code></summary>
-<pre><code>color: string;</code></pre>
+
+```ts generated
+color: string;
+```
+
 </details>
 
 <details class="api-member" id="presence-overlay-active-sheet" data-pagefind-weight="1">
 <summary><code>activeSheet</code></summary>
-<pre><code>activeSheet: SheetId;</code></pre>
+
+```ts generated
+activeSheet: SheetId;
+```
+
 </details>
 
 <details class="api-member" id="presence-overlay-ranges" data-pagefind-weight="1">
 <summary><code>ranges</code></summary>
-<pre><code>ranges: readonly Range[];</code></pre>
+
+```ts generated
+ranges: readonly Range[];
+```
+
 </details>
 </div>
 
@@ -51,7 +71,7 @@ enters document operations, snapshots, dirty state, or undo history.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PresenceOverlay {
     actorId: string;
     displayName?: string;

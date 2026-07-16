@@ -21,6 +21,6 @@ beyond `columns.length` are ignored, missing trailing cells become `null`, and
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(text: string, columns: readonly Column[]): ColumnarData => ;
+```ts generated
+function fromCsv(text: string, columns: readonly Column[]): ColumnarData;
 ```

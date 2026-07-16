@@ -17,6 +17,6 @@ Browser-only download helper; throws in non-DOM runtimes.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(bytes: Uint8Array | string, filename: string, mime: string): void => ;
+```ts generated
+function downloadBytes(bytes: Uint8Array | string, filename: string, mime: string): void;
 ```

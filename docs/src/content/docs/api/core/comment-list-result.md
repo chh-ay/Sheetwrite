@@ -21,12 +21,20 @@ Versioned comment-thread listing returned by a host adapter.
 
 <details class="api-member" id="comment-list-result-version" data-pagefind-weight="1">
 <summary><code>version</code></summary>
-<pre><code>version: number;</code></pre>
+
+```ts generated
+version: number;
+```
+
 </details>
 
 <details class="api-member" id="comment-list-result-threads" data-pagefind-weight="1">
 <summary><code>threads</code></summary>
-<pre><code>threads: readonly CommentThread[];</code></pre>
+
+```ts generated
+threads: readonly CommentThread[];
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Versioned comment-thread listing returned by a host adapter.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CommentListResult {
     version: number;
     threads: readonly CommentThread[];

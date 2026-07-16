@@ -19,6 +19,6 @@ tokens preceded by an alphanumeric (function names, identifiers) are skipped.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(src: string, dRow: number, dCol: number): string => ;
+```ts generated
+function shiftA1Refs(src: string, dRow: number, dCol: number): string;
 ```

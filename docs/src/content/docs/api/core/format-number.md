@@ -19,6 +19,6 @@ positive/negative/zero/text codes, quoted literals, and backslash escapes.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(value: number | string, code?: string, locale?: string): string => ;
+```ts generated
+function formatNumber(value: number | string, code?: string, locale?: string): string;
 ```

@@ -19,6 +19,6 @@ window, not cell-by-cell.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(sheet: Sheet, store: Store): string => ;
+```ts generated
+function toCsv(sheet: Sheet, store: Store): string;
 ```

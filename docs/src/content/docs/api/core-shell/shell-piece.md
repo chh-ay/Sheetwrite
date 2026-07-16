@@ -21,12 +21,20 @@ A mounted shell piece: its root element plus an idempotent teardown.
 
 <details class="api-member" id="shell-piece-element" data-pagefind-weight="1">
 <summary><code>element</code></summary>
-<pre><code>readonly element: HTMLElement;</code></pre>
+
+```ts generated
+readonly element: HTMLElement;
+```
+
 </details>
 
 <details class="api-member" id="shell-piece-destroy" data-pagefind-weight="1">
 <summary><code>destroy</code></summary>
-<pre><code>destroy(): void;</code></pre>
+
+```ts generated
+destroy(): void;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ A mounted shell piece: its root element plus an idempotent teardown.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ShellPiece {
     readonly element: HTMLElement;
     destroy(): void;
