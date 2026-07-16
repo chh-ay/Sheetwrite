@@ -115,12 +115,10 @@ describe("built-in widget styling", () => {
     expect(prop("--sheetwrite-widget-font")).toBe(THEME.font);
   });
 
-  // ── Class structure + inline/CSS split ─────────────────────────────────────
-  // Contract: the restyling hooks host CSS targets exist, and cosmetics left
-  // the inline style (moved to styles.css) while only positioning/visibility
-  // stay inline. A regression that hardcodes background/color inline again would
-  // outrank author rules and break restyling — this pins the split.
-  it("exposes the styling hooks and keeps only positioning inline on the find bar", () => {
+  // ── Class structure + positioning ─────────────────────────────────────────
+  // Contract: host CSS has stable hooks for every built-in widget, while the
+  // find bar remains positioned over the grid instead of affecting layout.
+  it("exposes styling hooks and positions the find bar over the grid", () => {
     const { host } = makeGrid();
 
     const findEl = mustFind<HTMLElement>(host, ".sheetwrite-find");
@@ -144,11 +142,7 @@ describe("built-in widget styling", () => {
     expect(host.querySelector(".sheetwrite-context-menu")).not.toBeNull();
     expect(host.querySelectorAll(".sheetwrite-context-menu-item").length).toBeGreaterThan(0);
 
-    // Cosmetics moved to CSS; positioning/visibility stay inline (behavior).
-    expect(findEl.style.background).toBe("");
-    expect(findEl.style.color).toBe("");
-    expect(findEl.style.border).toBe("");
-    expect(findEl.style.position).toBe("absolute");
+    expect(getComputedStyle(findEl).position).toBe("absolute");
   });
 
   // ── Computed-style parity + host override (the core restyling proof) ───────

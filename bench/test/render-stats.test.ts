@@ -3,23 +3,26 @@ import { counterbalancedOrder, medianAbsoluteDeviation, summarizeFinite } from "
 
 describe("auditable render statistics", () => {
   test("summarizes odd and even sample sizes", () => {
-    expect(summarizeFinite([1, 3, 5])).toEqual({ median: 3, p95: 4.8, mad: 2, iters: 3 });
-    expect(summarizeFinite([1, 2, 3, 4])).toEqual({
-      median: 2.5,
-      p95: 3.8499999999999996,
-      mad: 1,
-      iters: 4,
-    });
+    const odd = summarizeFinite([1, 3, 5]);
+    expect(odd.median).toBe(3);
+    expect(odd.p95).toBeCloseTo(4.8);
+    expect(odd.mad).toBe(2);
+    expect(odd.iters).toBe(3);
+
+    const even = summarizeFinite([1, 2, 3, 4]);
+    expect(even.median).toBe(2.5);
+    expect(even.p95).toBeCloseTo(3.85);
+    expect(even.mad).toBe(1);
+    expect(even.iters).toBe(4);
   });
 
   test("keeps repeated values and outliers in the sample", () => {
     expect(medianAbsoluteDeviation([7, 7, 7, 7])).toBe(0);
-    expect(summarizeFinite([1, 1, 1, 1_000])).toEqual({
-      median: 1,
-      p95: 850.1499999999996,
-      mad: 0,
-      iters: 4,
-    });
+    const summary = summarizeFinite([1, 1, 1, 1_000]);
+    expect(summary.median).toBe(1);
+    expect(summary.p95).toBeCloseTo(850.15);
+    expect(summary.mad).toBe(0);
+    expect(summary.iters).toBe(4);
   });
 
   test("rejects empty, negative, and non-finite samples", () => {
@@ -31,13 +34,22 @@ describe("auditable render statistics", () => {
 });
 
 describe("deterministic engine ordering", () => {
-  test("uses a seeded AB/BA counterbalance", () => {
-    const first = counterbalancedOrder(["sheetwrite", "handsontable"], 4, 0x51c0ffee);
-    const second = counterbalancedOrder(["sheetwrite", "handsontable"], 4, 0x51c0ffee);
-    expect(second).toEqual(first);
-    expect(first[1]).toEqual([...first[0]!].reverse());
-    expect(first[2]).toEqual(first[0]);
-    expect(first[3]).toEqual(first[1]);
+  test("balances three engines across positions while retaining seed sensitivity", () => {
+    const engines = ["sheetwrite", "handsontable", "third-party"] as const;
+    const orders = [1, 2].map((seed) => counterbalancedOrder(engines, engines.length * 2, seed));
+
+    for (const seededOrders of orders) {
+      expect(seededOrders).toHaveLength(6);
+      for (let position = 0; position < engines.length; position++) {
+        const counts = new Map(engines.map((engine) => [engine, 0]));
+        for (const order of seededOrders) {
+          const engine = order[position]!;
+          counts.set(engine, counts.get(engine)! + 1);
+        }
+        expect([...counts.values()]).toEqual([2, 2, 2]);
+      }
+    }
+    expect(orders[0]![0]).not.toEqual(orders[1]![0]);
   });
 
   test("rejects invalid order configurations", () => {

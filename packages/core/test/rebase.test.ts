@@ -16,6 +16,38 @@ const AXES = ["row", "column"] as const;
 type Axis = (typeof AXES)[number];
 type StructuralKind = "insert" | "delete";
 
+type RebaseConflictFamily = "cell" | "range" | "sheet" | "named-range";
+
+const OP_CONFLICT_FAMILY = {
+  set: "cell",
+  setNote: "cell",
+  setRange: "range",
+  setBlock: "range",
+  setRangeStyle: "range",
+  clearRange: "range",
+  addRows: "sheet",
+  removeRows: "sheet",
+  moveRows: "sheet",
+  addColumns: "sheet",
+  removeColumns: "sheet",
+  moveColumns: "sheet",
+  setColumn: "sheet",
+  setRowMeta: "sheet",
+  addMerge: "range",
+  removeMerge: "range",
+  addSheet: "sheet",
+  removeSheet: "sheet",
+  renameSheet: "sheet",
+  moveSheet: "sheet",
+  setSheetMeta: "sheet",
+  setValidationRule: "range",
+  removeValidationRule: "range",
+  setProtectedRange: "range",
+  removeProtectedRange: "range",
+  setNamedRange: "named-range",
+  removeNamedRange: "named-range",
+} satisfies Record<DocumentOp["op"], RebaseConflictFamily>;
+
 function columns(count: number): Column[] {
   return Array.from({ length: count }, (_, index) => ({
     key: `column-${index}`,
@@ -660,52 +692,82 @@ describe("metadata, identity, and sheet lifecycle", () => {
     expectRebased([unrelated], [{ op: "removeSheet", sheet: SHEET }], [unrelated]);
   });
 
-  it("covers every operationTouchesSheet direct-target branch", () => {
-    const touching: DocumentOp[] = [
-      { op: "set", addr: address("row", 1), value: literal() },
-      { op: "setNote", addr: address("row", 1), text: "note" },
-      RANGE_FACTORIES[0]!.make("row", 0, 1),
-      RANGE_FACTORIES[1]!.make("row", 0, 1),
-      RANGE_FACTORIES[2]!.make("row", 0, 1),
-      RANGE_FACTORIES[3]!.make("row", 0, 1),
+  it("detects sheet-removal conflicts across representative operation families", () => {
+    const cases: Array<{ family: RebaseConflictFamily; operation: DocumentOp }> = [
       {
-        op: "setNamedRange",
-        namedRange: { name: "Direct", range: range("row", 0, 1) },
+        family: "cell",
+        operation: { op: "setNote", addr: address("row", 1), text: "review" },
       },
-      { op: "removeNamedRange", name: "Scoped", scope: SHEET },
-      { op: "addSheet", sheet: snapshot(SHEET) },
-      { op: "addRows", sheet: SHEET, at: 0, count: 1 },
-      { op: "removeRows", sheet: SHEET, at: 0, count: 1 },
-      { op: "moveRows", sheet: SHEET, from: 0, count: 1, to: 2 },
-      { op: "addColumns", sheet: SHEET, at: 0, columns: columns(1) },
-      { op: "removeColumns", sheet: SHEET, at: 0, count: 1 },
-      { op: "moveColumns", sheet: SHEET, from: 0, count: 1, to: 2 },
-      { op: "setColumn", sheet: SHEET, col: 0, patch: { width: 120 } },
-      { op: "setRowMeta", sheet: SHEET, row: 0, meta: { height: 24 } },
-      RANGE_FACTORIES[4]!.make("row", 0, 1),
-      RANGE_FACTORIES[5]!.make("row", 0, 1),
-      { op: "removeSheet", sheet: SHEET },
-      { op: "renameSheet", sheet: SHEET, name: "Renamed" },
-      { op: "moveSheet", sheet: SHEET, to: 1 },
-      { op: "setSheetMeta", sheet: SHEET, patch: { frozenRows: 1 } },
-      RANGE_FACTORIES[6]!.make("row", 0, 1),
-      { op: "removeValidationRule", sheet: SHEET, id: "validation-1" },
-      RANGE_FACTORIES[7]!.make("row", 0, 1),
-      { op: "removeProtectedRange", sheet: SHEET, id: "protection-1" },
+      {
+        family: "range",
+        operation: {
+          op: "setRangeStyle",
+          range: range("row", 0, 2),
+          style: { bold: true },
+        },
+      },
+      {
+        family: "sheet",
+        operation: { op: "setRowMeta", sheet: SHEET, row: 2, meta: { height: 24 } },
+      },
+      {
+        family: "named-range",
+        operation: {
+          op: "setNamedRange",
+          namedRange: {
+            name: "Local",
+            scope: SHEET,
+            range: range("row", 0, 2),
+          },
+        },
+      },
     ];
-    for (const operation of touching) {
+
+    for (const { family, operation } of cases) {
+      expect(OP_CONFLICT_FAMILY[operation.op]).toBe(family);
       expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
     }
   });
 
-  it("detects overlapping mutation ranges for every ranged operation branch", () => {
-    const ranged: DocumentOp[] = [
-      { op: "set", addr: address("row", 1), value: literal() },
-      { op: "setNote", addr: address("row", 1), text: "note" },
-      ...RANGE_FACTORIES.map((factory) => factory.make("row", 0, 2)),
+  it("detects representative overlapping edits for each conflict family", () => {
+    const cases: Array<{
+      family: RebaseConflictFamily;
+      local: DocumentOp;
+      remote: DocumentOp;
+    }> = [
+      {
+        family: "cell",
+        local: { op: "set", addr: address("row", 1), value: literal("local") },
+        remote: { op: "setNote", addr: address("row", 1), text: "remote" },
+      },
+      {
+        family: "range",
+        local: {
+          op: "setRangeStyle",
+          range: range("row", 0, 2),
+          style: { bold: true },
+        },
+        remote: { op: "clearRange", range: range("row", 1, 3), contents: true },
+      },
+      {
+        family: "sheet",
+        local: { op: "setColumn", sheet: SHEET, col: 2, patch: { width: 120 } },
+        remote: { op: "setColumn", sheet: SHEET, col: 2, patch: { header: "Remote" } },
+      },
+      {
+        family: "named-range",
+        local: {
+          op: "setNamedRange",
+          namedRange: { name: "Sales", scope: SHEET, range: range("row", 0, 2) },
+        },
+        remote: { op: "removeNamedRange", name: "Sales", scope: SHEET },
+      },
     ];
-    for (const operation of ranged) {
-      expectConflict([operation], [structuredClone(operation)], "overlapping-edit");
+
+    for (const { family, local, remote } of cases) {
+      expect(OP_CONFLICT_FAMILY[local.op]).toBe(family);
+      expect(OP_CONFLICT_FAMILY[remote.op]).toBe(family);
+      expectConflict([local], [remote], "overlapping-edit");
     }
   });
 

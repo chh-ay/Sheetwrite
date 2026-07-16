@@ -80,45 +80,51 @@ describe("controlled robust comparison", () => {
     expect(absoluteOnly.every((row) => row.absoluteDelta > 0.05 && !row.regression)).toBe(true);
   });
 
-  test("diagnoses every protocol, harness, dataset, sample, schema, source, and runner mismatch", () => {
-    for (const field of [
-      "digest",
-      "protocol",
-      "matrix",
-      "dataset",
-      "sampling",
-      "schema",
-    ] as const) {
-      const observed = { ...TEST_HARNESS, [field]: "changed" };
-      expect(fingerprintMismatches(TEST_HARNESS, observed, "harness").join("\n")).toContain(
-        `harness.${field}`,
-      );
-    }
-    const changedSources = {
-      ...TEST_HARNESS,
-      sources: { ...TEST_HARNESS.sources, changed: "yes" },
+  test("reports generic structural changes with precise, deterministic paths", () => {
+    const expected = {
+      scalar: 1,
+      nested: {
+        changed: "before",
+        removed: true,
+      },
     };
-    expect(fingerprintMismatches(TEST_HARNESS, changedSources, "harness").join("\n")).toContain(
-      "harness.sources",
-    );
-    for (const field of [
-      "os",
-      "arch",
-      "cpu",
-      "bun",
-      "node",
-      "browser",
-      "powerMode",
-      "concurrency",
-    ] as const) {
-      const observed = {
-        ...TEST_RUNNER,
-        [field]: field === "concurrency" ? 2 : "changed",
-      };
-      expect(fingerprintMismatches(TEST_RUNNER, observed, "runner").join("\n")).toContain(
-        `runner.${field}`,
-      );
+    const cases: ReadonlyArray<{
+      readonly observed: Record<string, unknown>;
+      readonly mismatch: string;
+    }> = [
+      {
+        observed: { ...expected, scalar: 2 },
+        mismatch: "fingerprint.scalar: expected 1, observed 2",
+      },
+      {
+        observed: { ...expected, added: "new" },
+        mismatch: 'fingerprint.added: expected undefined, observed "new"',
+      },
+      {
+        observed: { scalar: 1, nested: { changed: "before" } },
+        mismatch: "fingerprint.nested.removed: expected true, observed undefined",
+      },
+      {
+        observed: { ...expected, nested: { ...expected.nested, changed: "after" } },
+        mismatch: 'fingerprint.nested.changed: expected "before", observed "after"',
+      },
+    ];
+
+    for (const { observed, mismatch } of cases) {
+      expect(fingerprintMismatches(expected, observed, "fingerprint")).toEqual([mismatch]);
     }
+
+    const reordered = fingerprintMismatches<Record<string, unknown>>(
+      expected,
+      { scalar: 2, added: "new", nested: { changed: "after" } },
+      "fingerprint",
+    );
+    expect(reordered.map((entry) => entry.slice(0, entry.indexOf(":")))).toEqual([
+      "fingerprint.added",
+      "fingerprint.nested.changed",
+      "fingerprint.nested.removed",
+      "fingerprint.scalar",
+    ]);
   });
 });
 

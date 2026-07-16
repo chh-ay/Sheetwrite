@@ -3,6 +3,7 @@ import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-proto
 import {
   RANGE_AUTO_FIT_CHUNK_CELLS,
   RANGE_WORKLOADS,
+  STRUCTURAL_METRICS,
   type RangeGateArtifact,
   type RangeStructuralResult,
   validateRangeArtifact,
@@ -90,26 +91,8 @@ describe("range structural gate", () => {
     expect(validateRangeArtifact(artifact(), "smoke").results).toHaveLength(RANGE_WORKLOADS.length);
   });
 
-  it("requires every structural metric instead of treating missing values as zero", () => {
-    const metrics = [
-      "addressedCells",
-      "heapDeltaBytes",
-      "wasmDeltaBytes",
-      "documentOperationCount",
-      "jsPatchObjectCount",
-      "ffiCalls",
-      "maxTransferredArrayLength",
-      "retainedRevisionPointsBefore",
-      "retainedRevisionRectanglesBefore",
-      "retainedRevisionPointsAfter",
-      "retainedRevisionRectanglesAfter",
-      "maxVisibleWindowCells",
-      "autoFitChunkCellLimit",
-      "visibleWindowRequests",
-      "scheduledChunks",
-      "historyBytes",
-    ] as const;
-    for (const metric of metrics) {
+  it("requires finite non-negative integer values for every structural metric", () => {
+    for (const metric of STRUCTURAL_METRICS) {
       const candidate = structuredClone(artifact()) as unknown as {
         results: Array<Record<string, unknown>>;
       };
@@ -117,6 +100,20 @@ describe("range structural gate", () => {
       expect(() =>
         validateRangeArtifact(candidate as unknown as RangeGateArtifact, "smoke"),
       ).toThrow(metric);
+    }
+
+    for (const [metric, value, message] of [
+      ["heapDeltaBytes", Number.NaN, "finite and non-negative"],
+      ["ffiCalls", 1.5, "must be an integer"],
+      ["historyBytes", -1, "finite and non-negative"],
+    ] as const) {
+      const candidate = structuredClone(artifact()) as unknown as {
+        results: Array<Record<string, unknown>>;
+      };
+      candidate.results[0]![metric] = value;
+      expect(() =>
+        validateRangeArtifact(candidate as unknown as RangeGateArtifact, "smoke"),
+      ).toThrow(message);
     }
   });
 

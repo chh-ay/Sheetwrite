@@ -3,6 +3,7 @@ import { injectHoverPrelude } from "../docs/src/lib/hover-preludes.js";
 import {
   collectFenceHovers,
   formatHoverSignature,
+  hoverPopoverId,
   isHighQualityHover,
 } from "../docs/src/lib/sheetwrite-code-hovers.js";
 import {
@@ -57,6 +58,29 @@ describe("Sheetwrite code hover signatures", () => {
     expect(signature).toContain("(value: string): string;");
     expect(signature).toContain("precision?: number");
     expect(signature.match(/\): string;/g)?.length).toBe(2);
+  });
+  it("derives stable popover ids from document position instead of render order", () => {
+    const block = {
+      code: "grid.destroy();",
+      language: "ts",
+      meta: "",
+      parentDocument: { positionInDocument: { groupIndex: 3 } },
+    };
+    const hover = {
+      target: "grid",
+      line: 0,
+      character: 0,
+      length: 4,
+    };
+
+    expect(hoverPopoverId(block, hover, 0)).toBe(hoverPopoverId(block, hover, 0));
+    expect(hoverPopoverId(block, hover, 0)).not.toBe(
+      hoverPopoverId(
+        { ...block, parentDocument: { positionInDocument: { groupIndex: 4 } } },
+        hover,
+        0,
+      ),
+    );
   });
 });
 

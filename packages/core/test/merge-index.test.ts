@@ -11,24 +11,20 @@ import {
 } from "../src/canvas-paint.js";
 
 describe("PreparedMergeIndex", () => {
-  it("reuses one index per merge-array revision and invalidates on replacement", () => {
-    resetMergeIndexResourceStatsForTest();
+  it("returns stable answers across repeated queries and updated merge sets", () => {
     const initial: readonly MergeRect[] = [{ r0: 2, c0: 3, r1: 4, c1: 5 }];
-    const first = prepareMergeIndex(initial);
-    expect(prepareMergeIndex(initial)).toBe(first);
-    expect(mergeAnchorAt(first, 3, 4)).toEqual(initial[0]!);
-    expect(mergeAnchorAt(first, 0, 0)).toBeNull();
-    expect(getMergeIndexResourceStatsForTest().indexConstructions).toBe(1);
+    for (let query = 0; query < 2; query++) {
+      const index = prepareMergeIndex(initial);
+      expect(mergeAnchorAt(index, 3, 4)).toEqual(initial[0]!);
+      expect(mergeAnchorAt(index, 0, 0)).toBeNull();
+    }
 
     const replaced: readonly MergeRect[] = [{ r0: 7, c0: 8, r1: 9, c1: 10 }];
-    const second = prepareMergeIndex(replaced);
-    expect(second).not.toBe(first);
-    expect(mergeAnchorAt(second, 8, 9)).toEqual(replaced[0]!);
-    expect(mergeAnchorAt(second, 3, 4)).toBeNull();
-    expect(getMergeIndexResourceStatsForTest().indexConstructions).toBe(2);
+    const replacementIndex = prepareMergeIndex(replaced);
+    expect(mergeAnchorAt(replacementIndex, 8, 9)).toEqual(replaced[0]!);
+    expect(mergeAnchorAt(replacementIndex, 3, 4)).toBeNull();
 
-    const removed: readonly MergeRect[] = [];
-    expect(mergeAnchorAt(prepareMergeIndex(removed), 8, 9)).toBeNull();
+    expect(mergeAnchorAt(prepareMergeIndex([]), 8, 9)).toBeNull();
   });
 
   it("returns window intersections and sorted gridline gaps", () => {

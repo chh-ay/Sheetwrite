@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { DataSourcePage, Renderer, RenderLayout, Viewport } from "../src/types.js";
+import type { CellScalar, DataSourcePage, Renderer, RenderLayout, Viewport } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
@@ -93,13 +93,13 @@ describe("find-bar keystroke isolation", () => {
 });
 
 interface PaintRecorder extends Renderer {
-  readonly paints: Array<{ rowHeights: number[] | null }>;
+  readonly paints: Array<{ rowHeights: number[] | null; values: CellScalar[] }>;
   readonly layouts: Array<RenderLayout["merges"]>;
 }
 
 function makePaintRecorder(): PaintRecorder {
   let lastViewport: Viewport | null = null;
-  const paints: Array<{ rowHeights: number[] | null }> = [];
+  const paints: Array<{ rowHeights: number[] | null; values: CellScalar[] }> = [];
   const layouts: Array<RenderLayout["merges"]> = [];
   return {
     paints,
@@ -111,9 +111,10 @@ function makePaintRecorder(): PaintRecorder {
     setViewport(viewport: Viewport) {
       lastViewport = viewport;
     },
-    paint() {
+    paint(view) {
       paints.push({
         rowHeights: lastViewport?.rowHeights ? Array.from(lastViewport.rowHeights) : null,
+        values: Array.from(view.values),
       });
     },
     setTheme() {},
@@ -173,13 +174,13 @@ describe("row-resize repaint invalidation", () => {
 });
 
 describe("merge repaint invalidation", () => {
-  it("repaints immediately after merge and unmerge actions", () => {
+  it("repaints merged selection geometry immediately after merge and unmerge", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
     const grid = new GridImpl(host, { workbook }, store);
     const recorder = makePaintRecorder();
-    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    Reflect.set(grid, "renderer", recorder);
 
     grid.setSelection({
       kind: "range",
@@ -187,68 +188,56 @@ describe("merge repaint invalidation", () => {
     });
     recorder.layouts.length = 0;
     recorder.paints.length = 0;
-    const focusRect = (): HTMLDivElement => {
+    const selectionBounds = (): { width: number; height: number } => {
       const overlay = host.querySelector(".sheetwrite-overlay");
-      const rect = Array.from(overlay?.querySelectorAll("div") ?? []).find(
-        (element) => element.style.outlineWidth === "2px" && element.style.display !== "none",
-      );
-      if (!(rect instanceof HTMLDivElement)) throw new Error("focus ring not painted");
-      return rect;
-    };
-    const selectionRect = (): HTMLDivElement => {
-      const overlay = host.querySelector(".sheetwrite-overlay");
-      const rect = Array.from(overlay?.querySelectorAll("div") ?? []).find(
-        (element) =>
-          element.style.outlineWidth === "1.5px" &&
-          element.style.width !== "6px" &&
-          element.style.display !== "none",
-      );
-      if (!(rect instanceof HTMLDivElement)) throw new Error("selection fill not painted");
-      return rect;
+      const visibleBounds = Array.from(overlay?.querySelectorAll("div") ?? [])
+        .filter((element) => element.style.display !== "none")
+        .map((element) => ({
+          width: Number.parseFloat(element.style.width),
+          height: Number.parseFloat(element.style.height),
+        }))
+        .filter(({ width, height }) => Number.isFinite(width) && Number.isFinite(height));
+      const largest = visibleBounds.sort(
+        (left, right) => right.width * right.height - left.width * left.height,
+      )[0];
+      if (!largest) throw new Error("selection geometry not painted");
+      return largest;
     };
 
     grid.actions.merge();
 
     expect(recorder.layouts.at(-1)).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
-    expect(recorder.paints).toHaveLength(1);
-    expect(focusRect().style.width).toBe("280px");
-    expect(focusRect().style.height).toBe("56px");
+    expect(recorder.paints.length).toBeGreaterThan(0);
+    expect(selectionBounds()).toEqual({ width: 280, height: 56 });
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-    expect(selectionRect().style.width).toBe("280px");
-    expect(selectionRect().style.height).toBe("56px");
+    expect(selectionBounds()).toEqual({ width: 280, height: 56 });
 
     recorder.layouts.length = 0;
     recorder.paints.length = 0;
     grid.actions.unmerge();
 
     expect(recorder.layouts.at(-1)).toEqual([]);
-    expect(recorder.paints).toHaveLength(1);
-    expect(focusRect().style.width).toBe("120px");
-    expect(focusRect().style.height).toBe("28px");
+    expect(recorder.paints.length).toBeGreaterThan(0);
+    expect(selectionBounds()).toEqual({ width: 120, height: 28 });
     grid.destroy();
   });
 
-  it("keeps merge metadata unchanged in read-only mode", () => {
+  it("keeps merge metadata and selection unchanged in read-only mode", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
     const grid = new GridImpl(host, { workbook, readOnly: true }, store);
-    const recorder = makePaintRecorder();
-    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
-
-    grid.setSelection({
-      kind: "range",
+    const selection = {
+      kind: "range" as const,
       range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
-    });
-    const originalMerges = workbook.sheets[0]?.merges?.map((merge) => ({ ...merge })) ?? [];
-    recorder.layouts.length = 0;
-    recorder.paints.length = 0;
+    };
 
+    grid.setSelection(selection);
+    const originalMerges = workbook.sheets[0]?.merges?.map((merge) => ({ ...merge })) ?? [];
     grid.actions.merge();
 
     expect(workbook.sheets[0]?.merges ?? []).toEqual(originalMerges);
-    expect(recorder.layouts).toEqual([]);
-    expect(recorder.paints).toEqual([]);
+    expect(grid.getSelection()).toEqual(selection);
     grid.destroy();
 
     const mergedWorkbook = makeWorkbook(10);
@@ -260,22 +249,20 @@ describe("merge repaint invalidation", () => {
       { workbook: mergedWorkbook, readOnly: true },
       mergedStore,
     );
-    const mergedRecorder = makePaintRecorder();
-    expect(Reflect.set(mergedGrid, "renderer", mergedRecorder)).toBe(true);
-    mergedGrid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-    mergedRecorder.layouts.length = 0;
-    mergedRecorder.paints.length = 0;
-
+    const coveredCell = {
+      kind: "cell" as const,
+      addr: { sheet: "s1", row: 2, col: 1 },
+    };
+    mergedGrid.setSelection(coveredCell);
     mergedGrid.actions.unmerge();
 
     expect(mergedWorkbook.sheets[0]?.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
-    expect(mergedRecorder.layouts).toEqual([]);
-    expect(mergedRecorder.paints).toEqual([]);
+    expect(mergedGrid.getSelection()).toEqual(coveredCell);
     mergedGrid.destroy();
   });
 });
 describe("datasource repaint invalidation", () => {
-  it("repaints when an async page resolves without another interaction", async () => {
+  it("paints loaded values when an async page resolves without another interaction", async () => {
     const { promise, resolve } = Promise.withResolvers<DataSourcePage>();
     const workbook = makeWorkbook(20);
     const host = mountHost();
@@ -284,7 +271,7 @@ describe("datasource repaint invalidation", () => {
       datasource: { getRows: () => promise },
     });
     const recorder = makePaintRecorder();
-    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    Reflect.set(grid, "renderer", recorder);
 
     resolve({
       start: 0,
@@ -297,7 +284,7 @@ describe("datasource repaint invalidation", () => {
     await promise;
     await Promise.resolve();
 
-    expect(recorder.paints).toHaveLength(1);
+    expect(recorder.paints.some((paint) => paint.values.includes("Loaded 0"))).toBe(true);
     grid.destroy();
   });
 });

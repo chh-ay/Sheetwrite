@@ -16,6 +16,12 @@ describe("hasOpaqueForeground", () => {
     ).toBe(false);
   });
 
+  test("rejects an implicit uniform opaque background", () => {
+    expect(hasOpaqueForeground(new Uint8ClampedArray([14, 21, 38, 255, 14, 21, 38, 255]))).toBe(
+      false,
+    );
+  });
+
   test("accepts an opaque foreground pixel over the background", () => {
     expect(
       hasOpaqueForeground(
@@ -37,6 +43,12 @@ describe("hasOpaqueForeground", () => {
     expect(
       hasOpaqueForeground(new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 0]), [255, 255, 255]),
     ).toBe(false);
+  });
+
+  test("does not treat partially transparent pixels as fully opaque paint", () => {
+    expect(hasOpaqueForeground(new Uint8ClampedArray([12, 34, 56, 128, 255, 0, 255, 254]))).toBe(
+      false,
+    );
   });
 
   test("rejects zero-size input", () => {

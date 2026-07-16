@@ -11,7 +11,6 @@ import {
   fromXlsxTable,
   fromXlsxWorkbook,
   parseCsv,
-  safeHeader,
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
@@ -256,11 +255,31 @@ describe("export", () => {
     expect(toTsv(range, store)).toBe("'=1+1\t7");
   });
 
-  it("tsv: header text is hardened through the shared safeHeader path", () => {
-    expect(safeHeader("=cmd")).toBe("'=cmd");
-    expect(safeHeader("@danger")).toBe("'@danger");
-    expect(safeHeader("\tlead-tab")).toBe("'\tlead-tab");
-    expect(safeHeader("Plain")).toBe("Plain");
+  it("csv: omits hidden columns from both headers and rows", () => {
+    const wb = workbook();
+    wb.sheets[0]!.columns[1]!.visible = false;
+    const store = new SheetwriteStore(wb);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s", row: 0, col: 0 },
+          value: { kind: "literal", value: "visible" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s", row: 0, col: 1 },
+          value: { kind: "literal", value: 99 },
+        },
+      ],
+    });
+
+    expect(toCsv(store.getWorkbook().sheets[0]!, store).slice(1).split("\r\n")).toEqual([
+      "A",
+      "visible",
+      "",
+      "",
+    ]);
   });
 
   it("export: a negative number is left intact (not mistaken for injection)", () => {

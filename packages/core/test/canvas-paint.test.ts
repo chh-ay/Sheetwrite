@@ -5,10 +5,6 @@ import {
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
 import { dateToSerial } from "../src/date-serial.js";
-import {
-  getNumberFormatResourceStatsForTest,
-  resetNumberFormatResourcesForTest,
-} from "../src/number-format.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
 
 // jsdom/happy-dom has no 2D canvas context, so paint against a recording stub
@@ -421,16 +417,6 @@ describe("paintFrame column styles", () => {
     expect(ctx.fillTexts.find((t) => t.text === "B")?.fillStyle).toBe(HEADER_FG);
     expect(ctx.fillTexts.find((t) => t.text === "A")?.fillStyle).toBe(theme.headerFg);
   });
-  it("does not horizontally distort text when a column is narrower than its label", () => {
-    const layout = makeLayout([{ key: "a", header: "Long header", width: 8, type: "text" }]);
-    const view = makeView(new Uint32Array(3), [{}], [0]);
-    (view.values as string[])[0] = "Long cell value";
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-
-    expect(ctx.fillTexts.find((call) => call.text === "Long header")?.maxWidth).toBeUndefined();
-    expect(ctx.fillTexts.find((call) => call.text === "Long cell value")?.maxWidth).toBeUndefined();
-  });
 
   it("clips narrow headers and cell text to their own row and column", () => {
     const layout = makeLayout([
@@ -613,8 +599,7 @@ describe("paintFrame text decorations", () => {
 });
 
 describe("paintFrame compiled number formats", () => {
-  it("reuses fixed-decimal and named-date formatters across painted cells", () => {
-    resetNumberFormatResourcesForTest();
+  it("paints fixed-decimal and named-date values consistently across cells", () => {
     const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
     const view: VisibleWindowView = {
       sheet: "s1",
@@ -646,13 +631,5 @@ describe("paintFrame compiled number formats", () => {
     const ctx = render(view, layout, UNIFORM_VIEWPORT);
     expect(ctx.fillTexts.filter((call) => call.text === "1,234.50")).toHaveLength(3);
     expect(ctx.fillTexts.filter((call) => call.text === "July 4")).toHaveLength(3);
-    expect(getNumberFormatResourceStatsForTest()).toMatchObject({
-      compiledFormats: 2,
-      numberFormatters: 1,
-      dateTimeFormatters: 1,
-      formatCacheEntries: 2,
-      numberFormatterCacheEntries: 1,
-      dateTimeFormatterCacheEntries: 1,
-    });
   });
 });

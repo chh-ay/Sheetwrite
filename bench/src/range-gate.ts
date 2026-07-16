@@ -48,7 +48,7 @@ export interface RangeGateArtifact extends GateIdentity {
   readonly results: readonly RangeStructuralResult[];
 }
 
-const STRUCTURAL_METRICS = [
+export const STRUCTURAL_METRICS = [
   "addressedCells",
   "heapDeltaBytes",
   "wasmDeltaBytes",

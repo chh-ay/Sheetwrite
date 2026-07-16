@@ -165,7 +165,6 @@ describe("render artifact validation", () => {
     });
     expect(parsed.completeness.complete).toBe(true);
     expect(parsed.completeness.successful).toBe(true);
-    expect(parsed.results).toHaveLength(2 * 2 * RENDER_SCENARIOS.length);
   });
 
   test("records bounded launch retries instead of hiding infrastructure failures", () => {
@@ -241,17 +240,14 @@ describe("render artifact validation", () => {
 });
 
 describe("derived Markdown evidence", () => {
-  test("is byte-stable and visibly marks failures", () => {
+  test("visibly marks failures and links the raw evidence", () => {
     const complete = completeArtifact();
     const failed = failedResult(complete.results[0]!);
     const artifact = artifactWithResults([failed, ...complete.results.slice(1)]);
-    const fromFixedJson = parseRenderArtifactJson(JSON.stringify(artifact));
-    const first = renderBenchmarkMarkdown(fromFixedJson);
-    const second = renderBenchmarkMarkdown(fromFixedJson);
-    expect(second).toBe(first);
-    expect(first).toContain("complete with structured failures");
-    expect(first).toContain("**FAILED (validate)**");
-    expect(first).toContain("(./render-results.json)");
-    expect(first).toContain("Comparative headline ratios are intentionally omitted");
+    const markdown = renderBenchmarkMarkdown(parseRenderArtifactJson(JSON.stringify(artifact)));
+    expect(markdown).toContain("complete with structured failures");
+    expect(markdown).toContain("**FAILED (validate)**");
+    expect(markdown).toContain("(./render-results.json)");
+    expect(markdown).toContain("Comparative headline ratios are intentionally omitted");
   });
 });

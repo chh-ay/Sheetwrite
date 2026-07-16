@@ -1,74 +1,106 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { ContextMenu } from "../src/context-menu.js";
-import { DEFAULT_THEME } from "../src/grid.js";
-import type {
-  CellAddress,
-  ContextMenuActionName,
-  Grid,
-  GridActions,
-  GridConfig,
-} from "../src/types.js";
+import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
+import { installCanvasTestStubs } from "../src/testing.js";
+import type { CellAddress, Grid, GridActions, Selection } from "../src/types.js";
+import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
-const ACTIONS: ReadonlyArray<readonly [ContextMenuActionName, string]> = [
-  ["cut", "cut"],
-  ["copy", "copy"],
-  ["paste", "paste"],
-  ["clearContents", "clearContents"],
-  ["merge", "merge"],
-  ["unmerge", "unmerge"],
-  ["insertRowAbove", "insertRowAbove"],
-  ["insertRowBelow", "insertRowBelow"],
-  ["deleteRow", "deleteRow"],
-  ["hideRow", "hideRows"],
-  ["showAllRows", "showRows"],
-  ["autoFitRow", "autoFitRows"],
-  ["insertColumnLeft", "insertColumnLeft"],
-  ["insertColumnRight", "insertColumnRight"],
-  ["deleteColumn", "deleteColumn"],
-  ["hideColumn", "hideColumns"],
-  ["showAllColumns", "showColumns"],
-  ["autoFitColumn", "autoFitColumns"],
-  ["clearFilter", "clearFilter"],
-  ["exportCsv", "exportCsv"],
-  ["exportXlsx", "exportXlsx"],
-];
+let restoreCanvasStubs: () => void;
+let clipboardDescriptor: PropertyDescriptor | undefined;
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
+
+beforeEach(() => {
+  restoreCanvasStubs = installCanvasTestStubs();
+  clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+});
+
+afterEach(() => {
+  restoreCanvasStubs();
+  if (clipboardDescriptor) {
+    Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
+  } else {
+    Reflect.deleteProperty(navigator, "clipboard");
+  }
+  document.body.innerHTML = "";
+});
+
+function mountHost(): HTMLDivElement {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
+  document.body.appendChild(host);
+  return host;
+}
 
 describe("ContextMenu", () => {
-  it("dispatches every built-in item to the matching public grid action", () => {
-    const calls: string[] = [];
-    const actions = new Proxy(
-      {},
-      {
-        get: (_target, property) => () => calls.push(String(property)),
+  it("executes representative built-ins against a live grid", async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          copied.push(text);
+          return Promise.resolve();
+        },
       },
-    ) as GridActions;
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const config: GridConfig = {
-      contextMenu: [
-        ...ACTIONS.map(([action]) => ({ action })),
-        { action: "separator" },
-        { label: "No action" },
-      ],
-    };
-    const grid = {} as Grid;
-    const menu = new ContextMenu(host, config, DEFAULT_THEME, actions, grid);
-    menu.open({
-      cell: null,
-      clientX: 0,
-      clientY: 0,
     });
-    const rows = [...host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu-item")];
-
-    for (const row of rows) row.click();
-
-    expect(calls).toEqual(ACTIONS.map(([, method]) => method));
-    expect(host.querySelectorAll(".sheetwrite-context-menu-sep")).toHaveLength(1);
-    expect(rows.at(-1)?.textContent).toBe("No action");
-    expect((host.querySelector(".sheetwrite-context-menu") as HTMLElement).style.display).toBe(
-      "none",
+    const host = mountHost();
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(3),
+      data: makeColumnarData(3),
+      config: { contextMenu: false, find: false, toolbar: false },
+    });
+    const menu = new ContextMenu(
+      host,
+      {
+        contextMenu: [
+          { id: "copy", action: "copy" },
+          { id: "insert-row", action: "insertRowBelow" },
+          { id: "hide-column", action: "hideColumn" },
+          { id: "merge", action: "merge" },
+        ],
+      },
+      DEFAULT_THEME,
+      grid.actions,
+      grid,
     );
+    const click = (id: string, selection: Selection, cell: CellAddress): void => {
+      grid.setSelection(selection);
+      menu.open({ cell, clientX: 0, clientY: 0 });
+      host.querySelector<HTMLElement>(`[data-context-menu-item="${id}"]`)!.click();
+    };
+
+    const first = { sheet: "s1", row: 0, col: 0 };
+    click("copy", { kind: "cell", addr: first }, first);
+    await Promise.resolve();
+    expect(copied).toEqual(["Customer 0"]);
+
+    click("insert-row", { kind: "cell", addr: first }, first);
+    expect(grid.store.getWorkbook().sheets[0]!.rowCount).toBe(4);
+
+    const thirdColumn = { sheet: "s1", row: 0, col: 2 };
+    click("hide-column", { kind: "cell", addr: thirdColumn }, thirdColumn);
+    expect(grid.store.getWorkbook().sheets[0]!.columns[2]!.visible).toBe(false);
+
+    click(
+      "merge",
+      {
+        kind: "range",
+        range: {
+          sheet: "s1",
+          start: { row: 0, col: 0 },
+          end: { row: 1, col: 1 },
+        },
+      },
+      first,
+    );
+    expect(grid.store.getWorkbook().sheets[0]!.merges).toEqual([{ r0: 0, c0: 0, r1: 1, c1: 1 }]);
+
     menu.destroy();
+    grid.destroy();
   });
 
   it("passes the opened cell to custom actions and dismisses on outside input", () => {

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import {
-  expectedPagedMatrixKeys,
   PAGED_FULL_ROWS,
   PAGED_SMOKE_ROWS,
   type PagedBenchmarkResult,
@@ -130,15 +129,7 @@ function fullFixture(): PagedBenchmarkResult {
 }
 
 describe("paged benchmark exact matrix", () => {
-  test("accepts the exact declared smoke matrix", () => {
-    expect(expectedPagedMatrixKeys("smoke")).toEqual([
-      "rows=10000;workload=startup",
-      "rows=10000;workload=first-page",
-      "rows=10000;workload=distant-page",
-      "rows=10000;probe=empty",
-      "rows=10000;probe=viewport",
-      "rows=10000;probe=dirty",
-    ]);
+  test("accepts the complete declared smoke matrix", () => {
     expect(() => validatePagedBenchmark(smokeFixture(), "smoke")).not.toThrow();
   });
 

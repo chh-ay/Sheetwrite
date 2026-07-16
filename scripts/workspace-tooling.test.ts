@@ -5,7 +5,6 @@ import { join, resolve } from "node:path";
 import {
   assertUniqueOrderedNodes,
   PACKAGE_BUILD_NODES,
-  PACKAGE_TYPECHECK_NODES,
   PUBLISHABLE_PACKAGE_ORDER,
   RELEASE_QUALITY_NODES,
   TYPECHECK_NODES,
@@ -65,7 +64,7 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
   );
   await writeFile(
     join(root, "docs/package.json"),
-    `${JSON.stringify({ name: "@sheetwrite/docs-site", scripts: { typecheck: "typecheck" } })}\n`,
+    `${JSON.stringify({ name: "@sheetwrite/docs-start", scripts: { typecheck: "typecheck" } })}\n`,
   );
   return root;
 }
@@ -101,7 +100,7 @@ describe("canonical workspace graph", () => {
         url: "git+https://github.com/chh-ay/Sheetwrite.git",
         directory: `packages/${directory}`,
       });
-      expect(manifest.homepage).toBe("https://chh-ay.github.io/Sheetwrite/");
+      expect(manifest.homepage).toBe("https://sheetwrite.vercel.app/");
       expect(manifest.bugs?.url).toBe("https://github.com/chh-ay/Sheetwrite/issues");
     }
   });
@@ -173,17 +172,44 @@ describe("canonical workspace graph", () => {
     ).toThrow("duplicate node");
   });
 
-  it("typechecks packages, benchmark, examples, and verification consumers", () => {
-    expect(PACKAGE_TYPECHECK_NODES.map((node) => node.id)).toEqual(
-      PUBLISHABLE_PACKAGE_ORDER.map((name) => `typecheck:${name}`),
-    );
-    expect(TYPECHECK_NODES.map((node) => node.id)).toEqual([
-      ...PUBLISHABLE_PACKAGE_ORDER.map((name) => `typecheck:${name}`),
-      "typecheck:@sheetwrite/bench",
-      "typecheck:@sheetwrite/docs-site",
-      "typecheck:verification",
-      "typecheck:consumer-nodenext",
-    ]);
+  it("covers every discovered workspace and verification typecheck exactly once", async () => {
+    const root = resolve(import.meta.dir, "..");
+    const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
+      readonly workspaces: readonly string[];
+      readonly scripts: Readonly<Record<string, string>>;
+    };
+    const workspaceNames: string[] = [];
+    for (const workspace of rootManifest.workspaces) {
+      const glob = new Bun.Glob(`${workspace}/package.json`);
+      for await (const path of glob.scan({ cwd: root, onlyFiles: true })) {
+        const workspaceManifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
+          readonly name?: string;
+          readonly scripts?: Readonly<Record<string, string>>;
+        };
+        if (workspaceManifest.name && typeof workspaceManifest.scripts?.typecheck === "string") {
+          workspaceNames.push(workspaceManifest.name);
+        }
+      }
+    }
+
+    for (const name of workspaceNames) {
+      expect(TYPECHECK_NODES.filter((node) => node.id === `typecheck:${name}`)).toHaveLength(1);
+    }
+
+    const verificationProjects = Object.values(rootManifest.scripts).flatMap((command) => {
+      const match = /\btsc\b.*(?:^|\s)-p\s+(\S+)/u.exec(command);
+      return match?.[1] ? [match[1]] : [];
+    });
+    for (const project of verificationProjects) {
+      expect(
+        TYPECHECK_NODES.filter((node) =>
+          node.command.some(
+            (argument, index) => argument === "-p" && node.command[index + 1] === project,
+          ),
+        ),
+      ).toHaveLength(1);
+    }
+    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + verificationProjects.length);
   });
 });
 

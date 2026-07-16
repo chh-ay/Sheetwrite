@@ -161,10 +161,18 @@ describe("manifest ownership", () => {
     },
   ];
 
-  it("uses manifest roles rather than chunk names", () => {
-    expect(validateBundlerEvidence(evidence(complete)).assets.map((asset) => asset.path)).toEqual(
-      complete.map((asset) => asset.path),
-    );
+  it("classifies evidence independently of generated chunk filenames", () => {
+    const renamed = complete.map((asset, index) => ({
+      ...asset,
+      path: `dist/generated-${index}.${asset.path.slice(asset.path.lastIndexOf(".") + 1)}`,
+    }));
+    const classification = (assets: unknown[]) =>
+      validateBundlerEvidence(evidence(assets)).assets.map(({ kind, owner, roles }) => ({
+        kind,
+        owner,
+        roles,
+      }));
+    expect(classification(renamed)).toEqual(classification(complete));
   });
 
   it("rejects missing, duplicate, unclassified, and leaked assets", () => {

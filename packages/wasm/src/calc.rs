@@ -1203,10 +1203,56 @@ mod tests {
     }
 
     #[test]
-    fn formula_source_preserves_absolute_references() {
-        let parsed = parse("=$A$1 + A$1 + $A1").expect("formula should parse");
-        assert_eq!(serialize(&parsed), "=(($A$1+A$1)+$A1)");
-        assert_eq!(parse(&serialize(&parsed)), Ok(parsed));
+    fn absolute_reference_flags_round_trip_and_survive_structural_edits() {
+        fn collect_cell_refs(ast: &Ast, refs: &mut Vec<(u32, u32, RefFlags)>) {
+            match ast {
+                Ast::Cell(row, col, flags) => refs.push((*row, *col, *flags)),
+                Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+                    for arg in args {
+                        collect_cell_refs(arg, refs);
+                    }
+                }
+                Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+                    collect_cell_refs(left, refs);
+                    collect_cell_refs(right, refs);
+                }
+                Ast::Neg(inner) => collect_cell_refs(inner, refs),
+                _ => {}
+            }
+        }
+
+        let mut parsed = parse("=$A$1 + A$1 + $A1").expect("formula should parse");
+        let expected_flags = [
+            RefFlags {
+                row_abs: true,
+                col_abs: true,
+            },
+            RefFlags {
+                row_abs: true,
+                col_abs: false,
+            },
+            RefFlags {
+                row_abs: false,
+                col_abs: true,
+            },
+        ];
+        let mut refs = Vec::new();
+        collect_cell_refs(&parsed, &mut refs);
+        assert_eq!(
+            refs,
+            expected_flags.map(|flags| (0, 0, flags)).to_vec()
+        );
+
+        let serialized = serialize(&parsed);
+        assert_eq!(parse(&serialized), Ok(parsed.clone()));
+
+        shift_rows(&mut parsed, 0, 2, 0, 0);
+        refs.clear();
+        collect_cell_refs(&parsed, &mut refs);
+        assert_eq!(
+            refs,
+            expected_flags.map(|flags| (2, 0, flags)).to_vec()
+        );
     }
 
     #[test]

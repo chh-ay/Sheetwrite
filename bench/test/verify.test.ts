@@ -12,7 +12,6 @@ import { summarize } from "../src/stats.js";
 
 function incompleteFormulaFixture(): FormulaBenchmarkResult {
   const workloads = expectedFormulaWorkloadKeys("smoke")
-    .slice(1)
     .map((key) => {
       const match = /^workload=(.*);size=(\d+)$/u.exec(key)!;
       return {
@@ -21,7 +20,8 @@ function incompleteFormulaFixture(): FormulaBenchmarkResult {
         samplesMs: [1, 2],
         stat: summarize([1, 2]),
       };
-    });
+    })
+    .filter((entry) => !(entry.id === "independent-parse-load" && entry.size === 1_000));
   return {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode: "smoke",

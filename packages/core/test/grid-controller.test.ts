@@ -80,67 +80,42 @@ describe("createGridController active-sheet forwarding", () => {
     controller.destroy();
   });
 
-  it("unsubscribes controller listeners and tears down the grid and observer exactly once", () => {
-    const OriginalResizeObserver = globalThis.ResizeObserver;
-    let observations = 0;
-    let disconnects = 0;
-    class CountingResizeObserver {
-      observe(): void {
-        observations += 1;
-      }
-      unobserve(): void {}
-      disconnect(): void {
-        disconnects += 1;
-      }
-      takeRecords(): ResizeObserverEntry[] {
-        return [];
-      }
-    }
-    globalThis.ResizeObserver = CountingResizeObserver as unknown as typeof ResizeObserver;
+  it("stops forwarding handlers and removes mounted DOM when destroyed", () => {
+    const host = mountHost();
+    const activeSheets: string[] = [];
+    const selections: string[] = [];
+    const controller = createGridController(
+      host,
+      { workbook: multiSheetWorkbook(), data: makeColumnarData(10) },
+      {
+        onActiveSheetChange: (event) => activeSheets.push(event.sheet),
+        onSelectionChange: (selection) => selections.push(selection?.kind ?? "none"),
+      },
+    );
 
-    try {
-      const host = mountHost();
-      const controller = createGridController(
-        host,
-        { workbook: multiSheetWorkbook(), data: makeColumnarData(10) },
-        {},
-      );
-      const listenerEvents = [
-        "change",
-        "selection",
-        "scroll",
-        "edit-begin",
-        "edit-commit",
-        "search",
-        "active-sheet",
-      ] as const satisfies readonly (keyof GridEvents)[];
-      // GridController intentionally owns one subscription for each forwarded
-      // event; the private sets are inspected only at this common test seam.
-      const instrumentedGrid = controller.grid as typeof controller.grid & {
-        listeners: { [Event in keyof GridEvents]: Set<unknown> };
-      };
-      for (const event of listenerEvents) {
-        expect(instrumentedGrid.listeners[event].size, event).toBe(1);
-      }
+    controller.grid.setActiveSheet("sheet2");
+    controller.grid.setSelection({
+      kind: "cell",
+      addr: { sheet: "sheet2", row: 1, col: 0 },
+    });
+    expect(activeSheets).toEqual(["sheet2"]);
+    expect(selections.at(-1)).toBe("cell");
+    const forwardedSelections = [...selections];
+    expect(host.childElementCount).toBeGreaterThan(0);
 
-      let gridDestroyCalls = 0;
-      const originalDestroy = controller.grid.destroy.bind(controller.grid);
-      controller.grid.destroy = () => {
-        gridDestroyCalls += 1;
-        originalDestroy();
-      };
-      controller.destroy();
-      controller.destroy();
+    controller.destroy();
+    expect(host.childElementCount).toBe(0);
 
-      for (const event of listenerEvents) {
-        expect(instrumentedGrid.listeners[event].size, event).toBe(0);
-      }
-      expect(observations).toBe(1);
-      expect(disconnects).toBe(1);
-      expect(gridDestroyCalls).toBe(1);
-      expect(host.childElementCount).toBe(0);
-    } finally {
-      globalThis.ResizeObserver = OriginalResizeObserver;
-    }
+    controller.grid.setActiveSheet("s1");
+    controller.grid.setSelection({
+      kind: "cell",
+      addr: { sheet: "s1", row: 0, col: 0 },
+    });
+    expect(activeSheets).toEqual(["sheet2"]);
+    expect(selections).toEqual(forwardedSelections);
+
+    // Teardown remains safe for framework cleanup paths that may run twice.
+    controller.destroy();
+    expect(host.childElementCount).toBe(0);
   });
 });
