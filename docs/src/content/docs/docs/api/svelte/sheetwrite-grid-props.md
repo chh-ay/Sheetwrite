@@ -20,92 +20,92 @@ Advanced framework adapter props for workbook data or datasource ownership.
 <div class="api-member-list">
 
 <details class="api-member" id="sheetwrite-grid-props-workbook" data-pagefind-weight="1">
-<summary><code>workbook</code></summary>
+<summary><code>workbook</code> <span class="api-member-summary">Live workbook schema adopted by the Grid.</span></summary>
 <pre><code>workbook: GridOptions[&quot;workbook&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-data" data-pagefind-weight="1">
-<summary><code>data</code></summary>
+<summary><code>data</code> <span class="api-member-summary">Eager values for the active sheet.</span></summary>
 <pre><code>data?: GridOptions[&quot;data&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-datasource" data-pagefind-weight="1">
-<summary><code>datasource</code></summary>
+<summary><code>datasource</code> <span class="api-member-summary">Lazy visible-row provider.</span></summary>
 <pre><code>datasource?: GridOptions[&quot;datasource&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-datasource-storage" data-pagefind-weight="1">
-<summary><code>datasourceStorage</code></summary>
+<summary><code>datasourceStorage</code> <span class="api-member-summary">Datasource storage policy.</span></summary>
 <pre><code>datasourceStorage?: GridOptions[&quot;datasourceStorage&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-renderer" data-pagefind-weight="1">
-<summary><code>renderer</code></summary>
+<summary><code>renderer</code> <span class="api-member-summary">Canvas or worker paint backend.</span></summary>
 <pre><code>renderer?: GridOptions[&quot;renderer&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-worker-url" data-pagefind-weight="1">
-<summary><code>workerUrl</code></summary>
+<summary><code>workerUrl</code> <span class="api-member-summary">Browser-fetchable worker module URL.</span></summary>
 <pre><code>workerUrl?: GridOptions[&quot;workerUrl&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-theme" data-pagefind-weight="1">
-<summary><code>theme</code></summary>
+<summary><code>theme</code> <span class="api-member-summary">Live resolved-theme overrides.</span></summary>
 <pre><code>theme?: GridOptions[&quot;theme&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-read-only" data-pagefind-weight="1">
-<summary><code>readOnly</code></summary>
+<summary><code>readOnly</code> <span class="api-member-summary">Disables mutations, not navigation.</span></summary>
 <pre><code>readOnly?: GridOptions[&quot;readOnly&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-protection-resolver" data-pagefind-weight="1">
-<summary><code>protectionResolver</code></summary>
+<summary><code>protectionResolver</code> <span class="api-member-summary">Client protected-range check.</span></summary>
 <pre><code>protectionResolver?: GridOptions[&quot;protectionResolver&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-mutation-policy" data-pagefind-weight="1">
-<summary><code>mutationPolicy</code></summary>
+<summary><code>mutationPolicy</code> <span class="api-member-summary">Atomic or partial denial policy.</span></summary>
 <pre><code>mutationPolicy?: GridOptions[&quot;mutationPolicy&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-renderers" data-pagefind-weight="1">
-<summary><code>renderers</code></summary>
+<summary><code>renderers</code> <span class="api-member-summary">Named custom cell renderers.</span></summary>
 <pre><code>renderers?: GridOptions[&quot;renderers&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-overscan" data-pagefind-weight="1">
-<summary><code>overscan</code></summary>
+<summary><code>overscan</code> <span class="api-member-summary">Extra rows painted around the viewport.</span></summary>
 <pre><code>overscan?: GridOptions[&quot;overscan&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-min-columns" data-pagefind-weight="1">
-<summary><code>minColumns</code></summary>
+<summary><code>minColumns</code> <span class="api-member-summary">Minimum column count with padding.</span></summary>
 <pre><code>minColumns?: GridOptions[&quot;minColumns&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-config" data-pagefind-weight="1">
-<summary><code>config</code></summary>
+<summary><code>config</code> <span class="api-member-summary">Built-in UI control configuration.</span></summary>
 <pre><code>config?: GridOptions[&quot;config&quot;];</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-height" data-pagefind-weight="1">
-<summary><code>height</code></summary>
+<summary><code>height</code> <span class="api-member-summary">Host height as pixels or a CSS length.</span></summary>
 <pre><code>height?: number | string;</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-fill" data-pagefind-weight="1">
-<summary><code>fill</code></summary>
+<summary><code>fill</code> <span class="api-member-summary">Fills the parent's available size.</span></summary>
 <pre><code>fill?: true;</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-fallback" data-pagefind-weight="1">
-<summary><code>fallback</code></summary>
+<summary><code>fallback</code> <span class="api-member-summary">Content shown until initialization succeeds.</span></summary>
 <pre><code>fallback?: Snippet;</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-grid" data-pagefind-weight="1">
-<summary><code>grid</code></summary>
+<summary><code>grid</code> <span class="api-member-summary">Bindable live Grid, cleared on reset or unmount.</span></summary>
 <pre><code>grid?: Grid;</code></pre>
 </details>
 </div>

@@ -17,9 +17,15 @@ export type DocumentOp = { op: "set" };
 /** Cancellable host datasource contract. */
 export interface DataSource { getRows(request: unknown): Promise<unknown>; }
 /** Committed grid change payload. */
-export interface ChangeEvent { transaction: { patches: DocumentOp[] }; }
+export interface ChangeEvent {
+  /** Committed transaction body. */
+  transaction: { patches: DocumentOp[] };
+}
 /** Low-level transaction store. */
-export interface Store { applyTransaction(tx: { patches: DocumentOp[] }): void; }
+export interface Store {
+  /** Applies one transaction. */
+  applyTransaction(tx: { patches: DocumentOp[] }): void;
+}
 /** Optional table export backend. */
 export interface XlsxTableExportBackend { toXlsxTable(): Promise<Uint8Array>; }
 /** Optional table import backend. */
@@ -44,7 +50,10 @@ export declare function setXlsxWorkbookBackend(backend: XlsxWorkbookBackend): vo
 export interface Box<T extends string = string> { value: T; }
 `;
 
-async function fixture(index = canonicalDeclarations): Promise<string> {
+async function fixture(
+  index = canonicalDeclarations,
+  extraFiles?: Record<string, string>,
+): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-api-policy-"));
   roots.push(root);
   const packageRoot = join(root, "packages/core");
@@ -62,11 +71,47 @@ async function fixture(index = canonicalDeclarations): Promise<string> {
     }),
   );
   await writeFile(join(packageRoot, "index.d.ts"), index);
+  for (const [name, content] of Object.entries(extraFiles ?? {})) {
+    await writeFile(join(packageRoot, name), content);
+  }
   return root;
 }
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
+});
+
+describe("re-export documentation", () => {
+  it("reads JSDoc from named re-export statements", async () => {
+    const root = await fixture(
+      `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Generated init source union. */\nexport type { GeneratedInput } from "./generated.js";\n`,
+      { "generated.d.ts": "export type GeneratedInput = string | URL;\n" },
+    );
+    const { manifest } = await analyzePublicApi(root);
+    const entry = manifest.packages[0]?.entryPoints[0];
+    const generated = entry?.exports.find((candidate) => candidate.name === "GeneratedInput");
+    expect(generated?.kind).toBe("type");
+    expect(generated?.documentation).toBe("Generated init source union.");
+  });
+
+  it("keeps interface kind, signature, and member docs through re-exports", async () => {
+    const root = await fixture(
+      `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Instantiated module exports. */\nexport type { GeneratedOutput } from "./generated.js";\n`,
+      {
+        "generated.d.ts":
+          "export interface GeneratedOutput {\n  /** Shared linear memory. */\n  readonly memory: object;\n}\n",
+      },
+    );
+    const { manifest } = await analyzePublicApi(root);
+    const entry = manifest.packages[0]?.entryPoints[0];
+    const generated = entry?.exports.find((candidate) => candidate.name === "GeneratedOutput");
+    expect(generated?.kind).toBe("interface");
+    expect(generated?.documentation).toBe("Instantiated module exports.");
+    expect(generated?.signature).toContain("readonly memory: object;");
+    expect(generated?.memberDocs).toEqual([
+      { name: "memory", documentation: "Shared linear memory." },
+    ]);
+  });
 });
 
 describe("public API policy", () => {
@@ -78,6 +123,35 @@ describe("public API policy", () => {
     expect(`${JSON.stringify(first.manifest, null, 2)}\n`).toBe(
       `${JSON.stringify(second.manifest, null, 2)}\n`,
     );
+  });
+
+  it("captures member-level documentation for structured exports", async () => {
+    const root = await fixture();
+    const { manifest } = await analyzePublicApi(root);
+    const entry = manifest.packages[0]?.entryPoints[0];
+    const changeEvent = entry?.exports.find((candidate) => candidate.name === "ChangeEvent");
+    expect(changeEvent?.memberDocs).toEqual([
+      { name: "transaction", documentation: "Committed transaction body." },
+    ]);
+    const store = entry?.exports.find((candidate) => candidate.name === "Store");
+    expect(store?.memberDocs).toEqual([
+      { name: "applyTransaction", documentation: "Applies one transaction." },
+    ]);
+  });
+
+  it("rejects declaration merging that would join structural signatures", async () => {
+    const root = await fixture(
+      `${canonicalDeclarations}\n/** Merged augmentation. */\nexport interface DataSource { extra?: string; }\n`,
+    );
+    const { issues } = await analyzePublicApi(root);
+    expect(
+      issues.some(
+        (issue) =>
+          issue.code === "duplicate-export" &&
+          issue.symbol === "DataSource" &&
+          issue.message.includes("merges multiple structural declarations"),
+      ),
+    ).toBe(true);
   });
 
   it("rejects a forbidden compatibility alias", async () => {

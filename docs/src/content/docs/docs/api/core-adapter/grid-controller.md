@@ -22,38 +22,43 @@ and destroys the grid.
 <div class="api-member-list">
 
 <details class="api-member" id="grid-controller-grid" data-pagefind-weight="1">
-<summary><code>grid</code></summary>
+<summary><code>grid</code> <span class="api-member-summary">The imperative core grid this controller owns.</span></summary>
 <pre><code>readonly grid: Grid;</code></pre>
 </details>
 
 <details class="api-member" id="grid-controller-set-theme" data-pagefind-weight="1">
-<summary><code>setTheme</code></summary>
+<summary><code>setTheme</code> <span class="api-member-summary">Apply the host's declarative theme prop: option-level replacement via <code>Grid.replaceTheme</code>; undefined restores CSS/default resolution.</span></summary>
 <pre><code>setTheme(theme: Partial&lt;Theme&gt; | undefined): void;</code></pre>
+<p class="api-member-doc">Apply the host's declarative theme prop: option-level replacement via
+<code>Grid.replaceTheme</code>; `undefined` restores CSS/default resolution.</p>
 </details>
 
 <details class="api-member" id="grid-controller-set-read-only" data-pagefind-weight="1">
-<summary><code>setReadOnly</code></summary>
+<summary><code>setReadOnly</code> <span class="api-member-summary">Update editability without replacing the owned grid.</span></summary>
 <pre><code>setReadOnly(readOnly: boolean): void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-controller-set-config" data-pagefind-weight="1">
-<summary><code>setConfig</code></summary>
+<summary><code>setConfig</code> <span class="api-member-summary">Update built-in chrome and keyboard configuration without replacing the grid.</span></summary>
 <pre><code>setConfig(config: GridConfig | undefined): void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-controller-set-overscan" data-pagefind-weight="1">
-<summary><code>setOverscan</code></summary>
+<summary><code>setOverscan</code> <span class="api-member-summary">Live-update the render overscan without replacing the grid; undefined restores the default.</span></summary>
 <pre><code>setOverscan(overscan: number | undefined): void;</code></pre>
+<p class="api-member-doc">Live-update the render overscan without replacing the grid; `undefined`
+restores the default.</p>
 </details>
 
 <details class="api-member" id="grid-controller-set-min-columns" data-pagefind-weight="1">
-<summary><code>setMinColumns</code></summary>
+<summary><code>setMinColumns</code> <span class="api-member-summary">Live-update the minimum rendered column count without emitting user edits.</span></summary>
 <pre><code>setMinColumns(minColumns: number | undefined): void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-controller-destroy" data-pagefind-weight="1">
-<summary><code>destroy</code></summary>
+<summary><code>destroy</code> <span class="api-member-summary">Detach every event subscription and destroy the grid.</span></summary>
 <pre><code>destroy(): void;</code></pre>
+<p class="api-member-doc">Detach every event subscription and destroy the grid. Call exactly once.</p>
 </details>
 </div>
 

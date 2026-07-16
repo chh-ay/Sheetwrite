@@ -12,7 +12,7 @@ Host load and commit contract for versioned workbook persistence.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L107</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L109</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>

@@ -12,7 +12,7 @@ One key of a multi-column sort, applied in array order (first = primary).
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L43</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L46</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>

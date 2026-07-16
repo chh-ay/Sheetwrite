@@ -9,7 +9,7 @@ tableOfContents: false
 <span class="api-status">interface</span>
 
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
-shown; each flag toggles one control (all default to `true`).
+shown; control flags default to `true` except the opt-in `export` flag.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
@@ -21,88 +21,95 @@ shown; each flag toggles one control (all default to `true`).
 <div class="api-member-list">
 
 <details class="api-member" id="grid-config-toolbar" data-pagefind-weight="1">
-<summary><code>toolbar</code></summary>
+<summary><code>toolbar</code> <span class="api-member-summary">Show the built-in toolbar (true), hide it (false), or supply a custom item list.</span></summary>
 <pre><code>toolbar?: boolean | ToolbarItem[];</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-bold" data-pagefind-weight="1">
-<summary><code>bold</code></summary>
+<summary><code>bold</code> <span class="api-member-summary">Show the bold control in the default toolbar (default true).</span></summary>
 <pre><code>bold?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-italic" data-pagefind-weight="1">
-<summary><code>italic</code></summary>
+<summary><code>italic</code> <span class="api-member-summary">Show the italic control in the default toolbar (default true).</span></summary>
 <pre><code>italic?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-align" data-pagefind-weight="1">
-<summary><code>align</code></summary>
+<summary><code>align</code> <span class="api-member-summary">Show left, center, and right alignment controls (default true).</span></summary>
 <pre><code>align?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-text-color" data-pagefind-weight="1">
-<summary><code>textColor</code></summary>
+<summary><code>textColor</code> <span class="api-member-summary">Show the text-color control in the default toolbar (default true).</span></summary>
 <pre><code>textColor?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-fill-color" data-pagefind-weight="1">
-<summary><code>fillColor</code></summary>
+<summary><code>fillColor</code> <span class="api-member-summary">Show the fill-color control in the default toolbar (default true).</span></summary>
 <pre><code>fillColor?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-border" data-pagefind-weight="1">
-<summary><code>border</code></summary>
+<summary><code>border</code> <span class="api-member-summary">Show the border control in the default toolbar (default true).</span></summary>
 <pre><code>border?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-clear-format" data-pagefind-weight="1">
-<summary><code>clearFormat</code></summary>
+<summary><code>clearFormat</code> <span class="api-member-summary">Show the clear-format control in the default toolbar (default true).</span></summary>
 <pre><code>clearFormat?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-merge" data-pagefind-weight="1">
-<summary><code>merge</code></summary>
+<summary><code>merge</code> <span class="api-member-summary">Show merge and unmerge controls in the default toolbar (default true).</span></summary>
 <pre><code>merge?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-sort" data-pagefind-weight="1">
-<summary><code>sort</code></summary>
+<summary><code>sort</code> <span class="api-member-summary">Show ascending and descending sort controls in the default toolbar (default true).</span></summary>
 <pre><code>sort?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-export" data-pagefind-weight="1">
-<summary><code>export</code></summary>
+<summary><code>export</code> <span class="api-member-summary">Show CSV/XLSX export controls in the default toolbar (default false).</span></summary>
 <pre><code>export?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
-<summary><code>icons</code></summary>
+<summary><code>icons</code> <span class="api-member-summary">Override built-in toolbar icons by action name.</span></summary>
 <pre><code>icons?: Partial&lt;Record&lt;ToolbarActionName, ToolbarIcon&gt;&gt;;</code></pre>
+<p class="api-member-doc">Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons.</p>
 </details>
 
 <details class="api-member" id="grid-config-context-menu" data-pagefind-weight="1">
-<summary><code>contextMenu</code></summary>
+<summary><code>contextMenu</code> <span class="api-member-summary">Built-in menu, disabled menu, static rows, or a request-aware row factory.</span></summary>
 <pre><code>contextMenu?: boolean | ContextMenuItems;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-undo" data-pagefind-weight="1">
-<summary><code>undo</code></summary>
+<summary><code>undo</code> <span class="api-member-summary">Show undo/redo controls in the built-in toolbar (default true).</span></summary>
 <pre><code>undo?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-find" data-pagefind-weight="1">
-<summary><code>find</code></summary>
+<summary><code>find</code> <span class="api-member-summary">Built-in Ctrl+F find widget: enabled (true, default) or disabled (false).</span></summary>
 <pre><code>find?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-tabs" data-pagefind-weight="1">
-<summary><code>tabs</code></summary>
+<summary><code>tabs</code> <span class="api-member-summary">Bottom sheet-tab bar for multi-sheet workbooks (default true).</span></summary>
 <pre><code>tabs?: boolean;</code></pre>
 </details>
 
 <details class="api-member" id="grid-config-keyboard" data-pagefind-weight="1">
-<summary><code>keyboard</code></summary>
+<summary><code>keyboard</code> <span class="api-member-summary">Built-in keyboard handling.</span></summary>
 <pre><code>keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) =&gt; boolean);</code></pre>
+<p class="api-member-doc">Built-in keyboard handling. `true` (default) keeps the stock Sheets-style
+bindings (navigation, type-to-edit, clipboard, undo/redo, find). `false`
+disables ALL of them — the host owns key events and drives `grid.actions`,
+selection, editing, and search primitives itself. A function is consulted
+first and consumes the event by returning `true`; returning `false` falls
+through to the stock bindings.</p>
 </details>
 </div>
 

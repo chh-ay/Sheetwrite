@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { formatHoverSignature } from "../docs/src/lib/sheetwrite-code-hovers.js";
+import { injectHoverPrelude } from "../docs/src/lib/hover-preludes.js";
+import {
+  collectFenceHovers,
+  formatHoverSignature,
+} from "../docs/src/lib/sheetwrite-code-hovers.js";
 import { SheetwriteTypeEngine } from "../docs/src/lib/sheetwrite-type-engine.js";
 
 describe("Sheetwrite code hover signatures", () => {
@@ -137,5 +141,87 @@ let { columns }: Props = $props();
     expect(repaired.find((hover) => hover.target === "mixed")?.text).toBe(
       "type Mixed = Container<__VLS_Internal, ChangeEvent>",
     );
+  });
+});
+
+describe("Sheetwrite hover preludes", () => {
+  const engine = new SheetwriteTypeEngine({
+    cwd: new URL("../docs/", import.meta.url).pathname,
+  });
+
+  it("maps single-line script positions around an injected prelude", () => {
+    const source = '<script lang="ts">grid.destroy();</script>';
+    const injection = injectHoverPrelude(
+      source,
+      "svelte",
+      "declare const grid: { destroy(): void };",
+    );
+    expect(injection.analysisSource.split("\n")[2]).toBe("grid.destroy();</script>");
+    expect(injection.toOriginal({ line: 1, character: 3 })).toBeNull();
+    expect(injection.toOriginal({ line: 2, character: 0 })).toEqual({
+      line: 0,
+      character: 18,
+      start: 18,
+    });
+  });
+
+  it("types template-only snippets through a synthetic script block", () => {
+    const source = "<button onclick={() => grid.destroy()}>Reset</button>";
+    const injection = injectHoverPrelude(
+      source,
+      "svelte",
+      "declare const grid: { destroy(): void };",
+    );
+    expect(injection.analysisSource.startsWith('<script lang="ts">\n')).toBe(true);
+    expect(injection.toOriginal({ line: 0, character: 0 })).toBeNull();
+    expect(injection.toOriginal({ line: 2, character: 0 })).toBeNull();
+    expect(injection.toOriginal({ line: 3, character: 5 })).toEqual({
+      line: 0,
+      character: 5,
+      start: 5,
+    });
+  });
+
+  it("resolves prelude-backed host state in partial ts snippets", () => {
+    const hovers = collectFenceHovers(
+      "grid.destroy();\nworkbook.sheets.length;\n",
+      "ts",
+      engine,
+      "core",
+    );
+    expect(hovers.every((hover) => hover.line >= 0)).toBe(true);
+    const grid = hovers.find((hover) => hover.target === "grid");
+    expect(grid?.line).toBe(0);
+    expect(grid?.character).toBe(0);
+    expect(grid?.text).toContain("Grid");
+    const workbook = hovers.find((hover) => hover.target === "workbook");
+    expect(workbook?.line).toBe(1);
+    expect(workbook?.text).toContain("Workbook");
+    for (const hover of hovers) {
+      expect(hover.text).not.toContain("/*unresolved*/");
+    }
+  });
+
+  it("maps svelte prelude hovers back to original coordinates", () => {
+    const source = '<script lang="ts">grid.destroy();</script>';
+    const hovers = collectFenceHovers(source, "svelte", engine, "core");
+    const grid = hovers.find((hover) => hover.target === "grid");
+    expect(grid?.line).toBe(0);
+    expect(grid?.character).toBe(18);
+    expect(grid?.text).toContain("Grid");
+  });
+});
+
+describe("Sheetwrite hover preludes end to end", () => {
+  it("resolves template-only svelte snippets through the synthetic script", () => {
+    const engine = new SheetwriteTypeEngine({
+      cwd: new URL("../docs/", import.meta.url).pathname,
+    });
+    const source = "<button onclick={() => grid.destroy()}>Reset</button>";
+    const hovers = collectFenceHovers(source, "svelte", engine, "core");
+    const grid = hovers.find((hover) => hover.target === "grid");
+    expect(grid?.line).toBe(0);
+    expect(grid?.character).toBe(source.indexOf("grid"));
+    expect(grid?.text).toContain("Grid");
   });
 });

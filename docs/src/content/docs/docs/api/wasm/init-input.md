@@ -1,6 +1,6 @@
 ---
 title: "InitInput | @sheetwrite/wasm"
-description: "Source summary unavailable; docs:check rejects this omission."
+description: "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled WebAssembly.Module."
 tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|InitInput -->
@@ -8,11 +8,11 @@ tableOfContents: false
 
 <span class="api-status">type</span>
 
-Source summary unavailable; docs:check rejects this omission.
+Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L281</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L295</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">5</span>

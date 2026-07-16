@@ -12,7 +12,7 @@ Source and commit classification used when applying a transaction.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L45</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L47</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>
@@ -20,13 +20,14 @@ Source and commit classification used when applying a transaction.
 <div class="api-member-list">
 
 <details class="api-member" id="transaction-application-options-source" data-pagefind-weight="1">
-<summary><code>source</code></summary>
+<summary><code>source</code> <span class="api-member-summary">Distinguishes host persistence input from local user/API output.</span></summary>
 <pre><code>source?: OperationSource;</code></pre>
 </details>
 
 <details class="api-member" id="transaction-application-options-commit-reason" data-pagefind-weight="1">
-<summary><code>commitReason</code></summary>
+<summary><code>commitReason</code> <span class="api-member-summary">Event classification; defaults to api.</span></summary>
 <pre><code>commitReason?: CommitReason;</code></pre>
+<p class="api-member-doc">Event classification; defaults to `api`.</p>
 </details>
 </div>
 

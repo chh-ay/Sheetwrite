@@ -16,7 +16,7 @@ sort/filter view — while the `(row, col)` inputs of
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L317</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L334</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">3</span>
@@ -24,18 +24,20 @@ sort/filter view — while the `(row, col)` inputs of
 <div class="api-member-list">
 
 <details class="api-member" id="cell-input-snapshot-address" data-pagefind-weight="1">
-<summary><code>address</code></summary>
+<summary><code>address</code> <span class="api-member-summary">Underlying data address, suitable for a set patch.</span></summary>
 <pre><code>readonly address: CellAddress;</code></pre>
+<p class="api-member-doc">Underlying data address, suitable for a `set` patch.</p>
 </details>
 
 <details class="api-member" id="cell-input-snapshot-text" data-pagefind-weight="1">
-<summary><code>text</code></summary>
+<summary><code>text</code> <span class="api-member-summary">Formula source when the cell is a formula, else the literal display text.</span></summary>
 <pre><code>readonly text: string;</code></pre>
 </details>
 
 <details class="api-member" id="cell-input-snapshot-format" data-pagefind-weight="1">
-<summary><code>format</code></summary>
+<summary><code>format</code> <span class="api-member-summary">Column input format, for parseCellInput.</span></summary>
 <pre><code>readonly format: CellFormat;</code></pre>
+<p class="api-member-doc">Column input format, for `parseCellInput`.</p>
 </details>
 </div>
 

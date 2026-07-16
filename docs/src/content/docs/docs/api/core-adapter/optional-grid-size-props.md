@@ -12,7 +12,7 @@ Optional width and height accepted by advanced framework adapters.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L77</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L101</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>

@@ -12,7 +12,7 @@ Predicate used to decide whether a conditional format applies.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L43</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L51</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">4</span>

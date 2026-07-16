@@ -6,8 +6,11 @@ import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 
 /** Workbook sheet schema used when creating a live grid. */
 export interface Sheet {
+  /** Stable identifier, unique within the workbook and used by every cell address. */
   id: SheetId;
+  /** User-facing sheet name shown in tabs and workbook exports. */
   name: string;
+  /** Ordered schema; array positions are the zero-based column coordinates. */
   columns: Column[];
   /** Row count for both in-memory and datasource-backed sheets. */
   rowCount: number;
@@ -65,8 +68,11 @@ export interface RowGroup {
 
 /** Live workbook schema containing ordered sheets and the active sheet ID. */
 export interface Workbook {
+  /** Sheets in display/tab order. */
   sheets: Sheet[];
+  /** Active sheet ID and initial tab presented when the grid is created. */
   activeSheet: SheetId;
+  /** Formula names shared by the workbook or shadowed within a sheet scope. */
   namedRanges?: NamedRangeSnapshot[];
 }
 

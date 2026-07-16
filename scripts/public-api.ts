@@ -6,6 +6,11 @@ import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 
 export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";
 
+export interface ApiMemberDoc {
+  name: string;
+  documentation: string;
+}
+
 export interface ApiExport {
   name: string;
   kind: string;
@@ -14,6 +19,7 @@ export interface ApiExport {
   source: string;
   jsDocTags: string[];
   documentation: string;
+  memberDocs: ApiMemberDoc[];
 }
 
 export interface ApiEntryPoint {
@@ -295,6 +301,57 @@ function publicPropertySignature(
   )}`;
 }
 
+function memberDocumentation(symbol: ts.Symbol, checker: ts.TypeChecker): ApiMemberDoc[] {
+  const docs = new Map<string, string>();
+  const record = (name: string, documentation: string): void => {
+    if (documentation.length > 0 && !docs.has(name)) docs.set(name, documentation);
+  };
+  const collectFromType = (type: ts.Type): void => {
+    for (const property of checker.getPropertiesOfType(type)) {
+      if (isPrivateSymbol(property) || property.getName() === "prototype") continue;
+      record(
+        property.getName(),
+        ts.displayPartsToString(property.getDocumentationComment(checker)).trim(),
+      );
+    }
+    const signatureKinds = [
+      [ts.SignatureKind.Call, "call"],
+      [ts.SignatureKind.Construct, "new"],
+    ] as const;
+    for (const [kind, name] of signatureKinds) {
+      for (const signature of checker.getSignaturesOfType(type, kind)) {
+        record(name, ts.displayPartsToString(signature.getDocumentationComment(checker)).trim());
+      }
+    }
+    for (const info of checker.getIndexInfosOfType(type)) {
+      const declaration = info.declaration;
+      if (declaration === undefined) continue;
+      const comment = ts
+        .getJSDocCommentsAndTags(declaration)
+        .map((doc) =>
+          doc.kind === ts.SyntaxKind.JSDoc ? (ts.getTextOfJSDocComment(doc.comment) ?? "") : "",
+        )
+        .join(" ")
+        .trim();
+      record("index", comment);
+    }
+  };
+  if (symbol.flags & (ts.SymbolFlags.Interface | ts.SymbolFlags.Class)) {
+    collectFromType(checker.getDeclaredTypeOfSymbol(symbol));
+  }
+  const classDeclaration = symbol.getDeclarations()?.find(ts.isClassDeclaration);
+  if (classDeclaration !== undefined) {
+    collectFromType(checker.getTypeOfSymbolAtLocation(symbol, classDeclaration));
+  }
+  const aliasDeclaration = symbol.getDeclarations()?.find(ts.isTypeAliasDeclaration);
+  if (aliasDeclaration !== undefined) {
+    collectFromType(checker.getTypeAtLocation(aliasDeclaration.type));
+  }
+  return [...docs.entries()]
+    .map(([name, documentation]) => ({ name, documentation }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
 function classSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
   const declaration = symbol.getDeclarations()?.find(ts.isClassDeclaration);
   if (declaration === undefined) return `class ${symbol.getName()}`;
@@ -353,6 +410,22 @@ function declarationSignature(symbol: ts.Symbol, checker: ts.TypeChecker): strin
     location,
     ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
   );
+}
+
+function exportStatementDocumentation(symbol: ts.Symbol): string {
+  for (const declaration of symbol.getDeclarations() ?? []) {
+    if (!ts.isExportSpecifier(declaration)) continue;
+    const statement = declaration.parent.parent;
+    const comment = ts
+      .getJSDocCommentsAndTags(statement)
+      .map((doc) =>
+        doc.kind === ts.SyntaxKind.JSDoc ? (ts.getTextOfJSDocComment(doc.comment) ?? "") : "",
+      )
+      .join(" ")
+      .trim();
+    if (comment.length > 0) return comment;
+  }
+  return "";
 }
 
 function collectTags(symbol: ts.Symbol, checker: ts.TypeChecker): string[] {
@@ -455,11 +528,19 @@ function analyzeEntry(
     };
   }
 
+  const mergedDeclarationSymbols: string[] = [];
   const apiExports = checker
     .getExportsOfModule(moduleSymbol)
     .map((exported): ApiExport => {
       const target = resolvedSymbol(exported, checker);
       const declarations = target.getDeclarations() ?? [];
+      const structuralDeclarations = declarations.filter(
+        (candidate) =>
+          ts.isInterfaceDeclaration(candidate) ||
+          ts.isTypeAliasDeclaration(candidate) ||
+          ts.isEnumDeclaration(candidate),
+      );
+      if (structuralDeclarations.length > 1) mergedDeclarationSymbols.push(exported.getName());
       const owners = new Set(
         declarations.map((declaration) =>
           posix(relative(packageRoot, declaration.getSourceFile().fileName)),
@@ -474,9 +555,12 @@ function analyzeEntry(
                 .line + 1
             }`;
       const tags = new Set([...collectTags(exported, checker), ...collectTags(target, checker)]);
-      const documentation = [exported, target]
-        .map((symbol) => ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim())
-        .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+      const documentation = [
+        exportStatementDocumentation(exported),
+        ...[exported, target].map((symbol) =>
+          ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim(),
+        ),
+      ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
       return {
         name: exported.getName(),
         kind: symbolKind(target),
@@ -485,10 +569,20 @@ function analyzeEntry(
         source,
         jsDocTags: [...tags].sort(),
         documentation: documentation.join("\n\n"),
+        memberDocs: memberDocumentation(target, checker),
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
 
+  for (const symbol of mergedDeclarationSymbols) {
+    issues.push({
+      code: "duplicate-export",
+      message: `${packageName} ${entry.subpath} export ${symbol} merges multiple structural declarations; the joined signature cannot render as one declaration`,
+      package: packageName,
+      entryPoint: entry.subpath,
+      symbol,
+    });
+  }
   for (const apiExport of apiExports) {
     if (apiExport.owners.length > 1) {
       issues.push({
@@ -569,7 +663,12 @@ export function validateManifest(value: unknown): ApiIssue[] {
           !Array.isArray(apiExport.owners) ||
           typeof apiExport.source !== "string" ||
           !Array.isArray(apiExport.jsDocTags) ||
-          typeof apiExport.documentation !== "string"
+          typeof apiExport.documentation !== "string" ||
+          !Array.isArray(apiExport.memberDocs) ||
+          apiExport.memberDocs.some(
+            (member) =>
+              typeof member?.name !== "string" || typeof member.documentation !== "string",
+          )
         ) {
           return malformed(`${pkg.name} ${entry.subpath} contains a partial export`);
         }
@@ -582,7 +681,7 @@ export function validateManifest(value: unknown): ApiIssue[] {
   return [];
 }
 export const PUBLIC_API_BASELINE_SHA256 =
-  "3c4f12c3859521eade5bfebb4edd4b51d6f7c1b1e4ae8490cc824cc83f8736cc";
+  "4f6cc69d3d8d8316b5317901d8c58ebf61e6745e79d1ec88482ce2c210e5f93f";
 
 export function publicApiDigest(manifest: PublicApiManifest): string {
   return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");

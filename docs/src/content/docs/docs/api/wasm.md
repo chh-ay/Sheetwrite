@@ -21,7 +21,7 @@ Source entry: `packages/wasm/loader.d.ts`
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/wasm/cell-out/"><code>CellOut</code><span>Result of a single-cell read.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/cell-store/"><code>CellStore</code><span>The workbook-wide store: every sheet, one string pool.</span></a>
-<a class="api-symbol-card" href="/docs/api/wasm/distinct-column/"><code>DistinctColumn</code><span>Source summary unavailable; docs:check rejects this omission.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/distinct-column/"><code>DistinctColumn</code><span>Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/range-snapshot/"><code>RangeSnapshot</code><span>Opaque, store-local history payload for one dense rectangular cell block.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/window-view/"><code>WindowView</code><span>A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
@@ -37,12 +37,12 @@ Source entry: `packages/wasm/loader.d.ts`
 ### Interfaces <span class="api-count">1</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/wasm/init-output/"><code>InitOutput</code><span>Source summary unavailable; docs:check rejects this omission.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/init-output/"><code>InitOutput</code><span>Result of module initialization: the instantiated exports plus the shared linear memory.</span></a>
 </div>
 
 ### Types <span class="api-count">2</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/wasm/init-input/"><code>InitInput</code><span>Source summary unavailable; docs:check rejects this omission.</span></a>
-<a class="api-symbol-card" href="/docs/api/wasm/sync-init-input/"><code>SyncInitInput</code><span>Source summary unavailable; docs:check rejects this omission.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/init-input/"><code>InitInput</code><span>Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled WebAssembly.Module.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/sync-init-input/"><code>SyncInitInput</code><span>Sources accepted by synchronous initialization: raw module bytes or a precompiled WebAssembly.Module.</span></a>
 </div>

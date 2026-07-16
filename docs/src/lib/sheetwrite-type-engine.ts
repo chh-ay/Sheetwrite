@@ -7,6 +7,9 @@ import {
 } from "@vue/language-core";
 import ts from "typescript";
 
+/** Where a hovered symbol's definitions live; drives the docs hover-quality gate. */
+export type SheetwriteHoverOrigin = "lib" | "workspace" | "snippet";
+
 export interface SheetwriteTypeHover {
   type: "hover";
   text: string;
@@ -17,6 +20,7 @@ export interface SheetwriteTypeHover {
   target: string;
   line: number;
   character: number;
+  origin?: SheetwriteHoverOrigin;
 }
 
 export interface SheetwriteTypeEngineOptions {
@@ -46,6 +50,20 @@ function lineOffsets(source: string): number[] {
     if (source.charCodeAt(index) === 10) offsets.push(index + 1);
   }
   return offsets;
+}
+
+function hoverOrigin(
+  definitions: readonly ts.DefinitionInfo[],
+  virtualFileName: string,
+): SheetwriteHoverOrigin | undefined {
+  let origin: SheetwriteHoverOrigin | undefined;
+  for (const definition of definitions) {
+    const file = normalizedPath(definition.fileName);
+    if (file === virtualFileName) return "snippet";
+    if (!file.includes("/node_modules/")) return "workspace";
+    origin = "lib";
+  }
+  return origin;
 }
 
 function sourcePosition(
@@ -175,11 +193,14 @@ export class SheetwriteTypeEngine {
           const tags = quickInfo?.tags?.map(
             (tag) => [tag.name, displayParts(tag.text)] as [string, string | undefined],
           );
+          const definitions = this.languageService.getDefinitionAtPosition(fileName, start) ?? [];
+          const origin = hoverOrigin(definitions, fileName);
           hovers.push({
             type: "hover",
             text,
             ...(docs ? { docs } : {}),
             ...(tags?.length ? { tags } : {}),
+            ...(origin ? { origin } : {}),
             start,
             length: node.end - start,
             target: node.text,

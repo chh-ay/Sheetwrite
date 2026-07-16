@@ -15,7 +15,7 @@ a currency `numberFormat` (e.g. `$#,##0.00`).
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L62</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L70</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">4</span>

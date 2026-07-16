@@ -12,7 +12,7 @@ Ordered condition and style applied to a cell range.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L50</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L58</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">3</span>

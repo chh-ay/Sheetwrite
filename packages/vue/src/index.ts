@@ -40,41 +40,59 @@ import {
 
 /** Imperative Grid handle exposed by the Vue advanced component. */
 export interface SheetwriteGridExpose {
+  /** Live Grid after readiness, or `null` before initialization and during teardown. */
   grid: Grid | null;
 }
 
 const gridProps = {
+  /** Live workbook schema adopted by the Grid. */
   workbook: { type: Object as PropType<Workbook>, required: true as const },
+  /** Eager column-major values for the active sheet. */
   data: { type: Object as PropType<ColumnarData>, default: undefined },
+  /** Lazy row provider requested for visible windows. */
   datasource: { type: Object as PropType<DataSource>, default: undefined },
+  /** Allocation and cache policy for datasource storage. */
   datasourceStorage: {
     type: Object as PropType<DataSourceStorageOptions>,
     default: undefined,
   },
+  /** Paint backend; defaults to main-thread canvas. */
   renderer: { type: String as PropType<GridOptions["renderer"]>, default: undefined },
+  /** Browser-fetchable worker module URL. */
   workerUrl: {
     type: [String, URL] as unknown as PropType<GridOptions["workerUrl"]>,
     default: undefined,
   },
+  /** Live overrides merged into the resolved Grid theme. */
   theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
+  /** Disables mutation while preserving navigation and selection. */
   readOnly: { type: Boolean, default: undefined },
+  /** Host-owned client permission check for protected ranges. */
   protectionResolver: {
     type: Function as PropType<GridOptions["protectionResolver"]>,
     default: undefined,
   },
+  /** Atomic or partial handling for denied local operations. */
   mutationPolicy: {
     type: String as PropType<GridOptions["mutationPolicy"]>,
     default: undefined,
   },
+  /** Named custom renderers registered when the Grid is created. */
   renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
+  /** Extra rows painted above and below the viewport. */
   overscan: { type: Number, default: undefined },
+  /** Minimum rendered column count, including empty padding columns. */
   minColumns: { type: Number, default: undefined },
+  /** Built-in toolbar, menu, keyboard, find, and tab controls. */
   config: { type: Object as PropType<GridOptions["config"]>, default: undefined },
+  /** Explicit source passed to process-wide WASM initialization. */
   wasmSource: {
     type: [Object, String] as PropType<SheetwriteInitializationProps["wasmSource"]>,
     default: undefined,
   },
+  /** Host height in CSS pixels for numbers or any CSS length string. */
   height: { type: [Number, String], default: undefined },
+  /** Fills the parent's available width and height. */
   fill: { type: Boolean, default: undefined },
 };
 
@@ -251,10 +269,15 @@ export const Sheetwrite = defineComponent({
   name: "SheetwriteComponent",
   inheritAttrs: false,
   props: {
+    /** Ordered schema used to derive the component-owned sheet. */
     columns: { type: Array as PropType<readonly { key: string; title: string }[]>, required: true },
+    /** Rows converted to initial columnar data; missing keys become `null`. */
     defaultRows: { type: Array as PropType<readonly Record<string, CellScalar>[]>, required: true },
+    /** Generated sheet name; defaults to `Sheet 1`. */
     sheetName: { type: String, default: undefined },
+    /** Host height in CSS pixels for numbers or any CSS length string. */
     height: { type: [Number, String], default: undefined },
+    /** Fills the parent; exactly one of `fill` or `height` is required. */
     fill: { type: Boolean, default: undefined },
   },
   setup(props, { attrs, slots }) {

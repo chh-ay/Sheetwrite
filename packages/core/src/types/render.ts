@@ -6,15 +6,25 @@ import type { VisibleWindowView } from "./store.js";
 
 /** Resolved canvas colors, typography, and geometry used for painting. */
 export interface Theme {
+  /** Canvas font shorthand used for unstyled cells. */
   font: string;
+  /** CSS color painted behind body cells. */
   bg: string;
+  /** CSS color used for unstyled cell text. */
   fg: string;
+  /** CSS color used for cell grid lines. */
   gridLine: string;
+  /** CSS color painted behind column and row headers. */
   headerBg: string;
+  /** CSS color used for column letters and row numbers. */
   headerFg: string;
+  /** CSS color painted over the selected region. */
   selection: string;
+  /** CSS color used for the active selection outline. */
   selectionBorder: string;
+  /** Default data-row height in unzoomed CSS pixels. */
   rowHeight: number;
+  /** Column-header height in unzoomed CSS pixels. */
   headerHeight: number;
   /** Width of the left row-number gutter (0 hides it). */
   rowHeaderWidth: number;

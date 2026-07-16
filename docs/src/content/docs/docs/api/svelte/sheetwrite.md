@@ -10,6 +10,8 @@ tableOfContents: false
 
 Convenience component for local object rows. Bind `grid` to access the live `Grid`.
 
+Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperative access; it clears on reset or unmount.
+
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/svelte/src/Sheetwrite.svelte.d.ts#L7</code></dd></div>

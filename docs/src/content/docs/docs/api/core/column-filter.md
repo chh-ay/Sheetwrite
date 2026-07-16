@@ -13,7 +13,7 @@ matching is against the cell's resolved value (text or number).
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L52</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L55</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">5</span>

@@ -30,7 +30,7 @@ Host persistence contract for revision history and restore.
 </details>
 
 <details class="api-member" id="revision-adapter-restore-revision" data-pagefind-weight="1">
-<summary><code>restoreRevision</code></summary>
+<summary><code>restoreRevision</code> <span class="api-member-summary">Must create a new auditable server version; never rewind storage in place.</span></summary>
 <pre><code>restoreRevision(request: RevisionRestoreRequest): Promise&lt;RevisionRestoreResponse&gt;;</code></pre>
 </details>
 </div>

@@ -12,7 +12,7 @@ Optional explicit WASM source and initialization error callback for adapters.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L66</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L78</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>
@@ -20,12 +20,12 @@ Optional explicit WASM source and initialization error callback for adapters.
 <div class="api-member-list">
 
 <details class="api-member" id="sheetwrite-initialization-props-wasm-source" data-pagefind-weight="1">
-<summary><code>wasmSource</code></summary>
+<summary><code>wasmSource</code> <span class="api-member-summary">Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins.</span></summary>
 <pre><code>wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-initialization-props-on-initialization-error" data-pagefind-weight="1">
-<summary><code>onInitializationError</code></summary>
+<summary><code>onInitializationError</code> <span class="api-member-summary">Called when WASM initialization fails while the adapter is mounted.</span></summary>
 <pre><code>onInitializationError?: (error: unknown) =&gt; void;</code></pre>
 </details>
 </div>

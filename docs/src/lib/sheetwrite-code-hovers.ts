@@ -10,6 +10,11 @@ import { originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
 import { ExpressiveCode } from "expressive-code";
 import { format } from "prettier";
 import { svelte2tsx } from "svelte2tsx";
+import {
+  injectHoverPrelude,
+  type PreludeInjection,
+  resolveHoverPrelude,
+} from "./hover-preludes.js";
 import { SheetwriteTypeEngine, type SheetwriteTypeHover } from "./sheetwrite-type-engine.js";
 
 const SUPPORTED_LANGUAGES = new Set(["ts", "tsx", "vue", "svelte"]);
@@ -139,7 +144,7 @@ function svelteScriptDocumentation(
   return documentation;
 }
 
-function mapSvelteHovers(source: string, analyzer: SheetwriteTypeEngine): SheetwriteTypeHover[] {
+function svelteSourceHovers(source: string, analyzer: SheetwriteTypeEngine): SheetwriteTypeHover[] {
   const transformed = svelte2tsx(source, {
     filename: "Component.svelte",
     isTsFile: true,
@@ -180,7 +185,65 @@ function mapSvelteHovers(source: string, analyzer: SheetwriteTypeEngine): Sheetw
       length: node.target.length,
     });
   }
-  return analyzer.resolveFrameworkTypes(hovers, source);
+  return hovers;
+}
+
+function mapSvelteHovers(source: string, analyzer: SheetwriteTypeEngine): SheetwriteTypeHover[] {
+  return analyzer.resolveFrameworkTypes(svelteSourceHovers(source, analyzer), source);
+}
+
+function remapThroughInjection(
+  hovers: readonly SheetwriteTypeHover[],
+  injection: PreludeInjection,
+  originalSource: string,
+): SheetwriteTypeHover[] {
+  const lines = originalSource.split("\n");
+  const remapped: SheetwriteTypeHover[] = [];
+  for (const hover of hovers) {
+    const position = injection.toOriginal({ line: hover.line, character: hover.character });
+    if (position === null) continue;
+    const line = lines[position.line];
+    if (
+      !line ||
+      line.slice(position.character, position.character + hover.target.length) !== hover.target
+    ) {
+      continue;
+    }
+    remapped.push({
+      ...hover,
+      line: position.line,
+      character: position.character,
+      start: position.start,
+    });
+  }
+  return remapped;
+}
+
+export function collectFenceHovers(
+  code: string,
+  language: "ts" | "tsx" | "vue" | "svelte",
+  analyzer: SheetwriteTypeEngine,
+  preludeName?: string,
+): SheetwriteTypeHover[] {
+  if (preludeName === undefined) {
+    return language === "svelte"
+      ? mapSvelteHovers(code, analyzer)
+      : analyzer.analyze(code, language);
+  }
+  const injection = injectHoverPrelude(code, language, resolveHoverPrelude(preludeName));
+  if (language === "svelte") {
+    const mapped = remapThroughInjection(
+      svelteSourceHovers(injection.analysisSource, analyzer),
+      injection,
+      code,
+    );
+    return analyzer.resolveFrameworkTypes(mapped, code);
+  }
+  return remapThroughInjection(
+    analyzer.analyze(injection.analysisSource, language),
+    injection,
+    code,
+  );
 }
 
 class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
@@ -266,10 +329,12 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
         if (options.shouldTransform && !options.shouldTransform(codeBlock)) return;
 
         signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
-        const hovers =
-          codeBlock.language === "svelte"
-            ? mapSvelteHovers(codeBlock.code, analyzer)
-            : analyzer.analyze(codeBlock.code, codeBlock.language as "ts" | "tsx" | "vue");
+        const hovers = collectFenceHovers(
+          codeBlock.code,
+          codeBlock.language as "ts" | "tsx" | "vue" | "svelte",
+          analyzer,
+          codeBlock.metaOptions.getString("prelude"),
+        );
 
         for (const hover of hovers) {
           const line = codeBlock.getLine(hover.line);

@@ -20,28 +20,30 @@ Advanced framework adapter props for workbook data or datasource ownership.
 <div class="api-member-list">
 
 <details class="api-member" id="sheetwrite-grid-props-class-name" data-pagefind-weight="1">
-<summary><code>className</code></summary>
+<summary><code>className</code> <span class="api-member-summary">Additional class appended to the required sheetwrite host class.</span></summary>
 <pre><code>className?: string;</code></pre>
+<p class="api-member-doc">Additional class appended to the required `sheetwrite` host class.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-style" data-pagefind-weight="1">
-<summary><code>style</code></summary>
+<summary><code>style</code> <span class="api-member-summary">Host styles merged before adapter sizing styles.</span></summary>
 <pre><code>style?: CSSProperties;</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-fallback" data-pagefind-weight="1">
-<summary><code>fallback</code></summary>
+<summary><code>fallback</code> <span class="api-member-summary">Content shown while WASM is loading or after initialization fails.</span></summary>
 <pre><code>fallback?: ReactNode;</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-height" data-pagefind-weight="1">
-<summary><code>height</code></summary>
+<summary><code>height</code> <span class="api-member-summary">Host height in CSS pixels for numbers or any CSS length string.</span></summary>
 <pre><code>height?: number | string;</code></pre>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-fill" data-pagefind-weight="1">
-<summary><code>fill</code></summary>
+<summary><code>fill</code> <span class="api-member-summary">Fills the parent's available width and height, taking precedence over height.</span></summary>
 <pre><code>fill?: true;</code></pre>
+<p class="api-member-doc">Fills the parent's available width and height, taking precedence over `height`.</p>
 </details>
 </div>
 

@@ -12,7 +12,7 @@ Reject-or-warn policy attached to a data-validation rule.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L88</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L94</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">3</span>

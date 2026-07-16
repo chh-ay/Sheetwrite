@@ -16,7 +16,7 @@ right strategy for the runtime.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/loader.d.ts#L10</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/loader.d.ts#L19</code></dd></div>
 </dl>
 
 ## Signature

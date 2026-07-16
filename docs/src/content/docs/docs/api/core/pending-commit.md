@@ -12,7 +12,7 @@ Immutable local operation batch awaiting a host acknowledgement.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L58</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L60</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">4</span>

@@ -12,7 +12,7 @@ Host subscription contract for ordered versioned operations.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L113</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L115</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">1</span>

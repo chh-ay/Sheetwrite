@@ -12,7 +12,7 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L53</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L56</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">9</span>
@@ -20,47 +20,48 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 <div class="api-member-list">
 <h3 id="ongridchange" class="api-search-anchor">onGridChange</h3>
 <details class="api-member" id="grid-adapter-event-handlers-on-grid-change" data-pagefind-weight="10">
-<summary><code>onGridChange</code></summary>
+<summary><code>onGridChange</code> <span class="api-member-summary">Receives every committed Grid change, including its applied transaction.</span></summary>
 <pre><code>onGridChange?: (event: ChangeEvent) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-selection-change" data-pagefind-weight="1">
-<summary><code>onSelectionChange</code></summary>
+<summary><code>onSelectionChange</code> <span class="api-member-summary">Receives the current selection, or null after it is cleared.</span></summary>
 <pre><code>onSelectionChange?: (selection: Selection | null) =&gt; void;</code></pre>
+<p class="api-member-doc">Receives the current selection, or `null` after it is cleared.</p>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-viewport-change" data-pagefind-weight="1">
-<summary><code>onViewportChange</code></summary>
+<summary><code>onViewportChange</code> <span class="api-member-summary">Receives visible row bounds and vertical scroll offset after scrolling.</span></summary>
 <pre><code>onViewportChange?: (event: GridEvents[&quot;scroll&quot;]) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-edit-begin" data-pagefind-weight="1">
-<summary><code>onEditBegin</code></summary>
+<summary><code>onEditBegin</code> <span class="api-member-summary">Fires when cell editing begins.</span></summary>
 <pre><code>onEditBegin?: (event: GridEvents[&quot;edit-begin&quot;]) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-edit-commit" data-pagefind-weight="1">
-<summary><code>onEditCommit</code></summary>
+<summary><code>onEditCommit</code> <span class="api-member-summary">Fires after an edit commits its parsed cell value.</span></summary>
 <pre><code>onEditCommit?: (event: GridEvents[&quot;edit-commit&quot;]) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-search" data-pagefind-weight="1">
-<summary><code>onSearch</code></summary>
+<summary><code>onSearch</code> <span class="api-member-summary">Receives refreshed search matches and active-match index.</span></summary>
 <pre><code>onSearch?: (result: GridEvents[&quot;search&quot;]) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-active-sheet-change" data-pagefind-weight="1">
-<summary><code>onActiveSheetChange</code></summary>
+<summary><code>onActiveSheetChange</code> <span class="api-member-summary">Fires after the visible sheet changes.</span></summary>
 <pre><code>onActiveSheetChange?: (event: GridEvents[&quot;active-sheet&quot;]) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-ready" data-pagefind-weight="1">
-<summary><code>onReady</code></summary>
+<summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
 <pre><code>onReady?: (event: GridReadyEvent) =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="grid-adapter-event-handlers-on-initialization-error" data-pagefind-weight="1">
-<summary><code>onInitializationError</code></summary>
+<summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 <pre><code>onInitializationError?: (error: unknown) =&gt; void;</code></pre>
 </details>
 </div>

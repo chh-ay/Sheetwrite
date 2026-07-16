@@ -14,7 +14,7 @@ Formula/reference tuples are sparse exceptions keyed by row-major offset.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L202</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L208</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">7</span>

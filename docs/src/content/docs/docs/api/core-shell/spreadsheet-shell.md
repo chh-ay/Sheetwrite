@@ -20,12 +20,12 @@ Disposable controller for the framework-neutral spreadsheet shell.
 <div class="api-member-list">
 
 <details class="api-member" id="spreadsheet-shell-grid" data-pagefind-weight="1">
-<summary><code>grid</code></summary>
+<summary><code>grid</code> <span class="api-member-summary">The single grid the shell owns; use it for data, search, and actions.</span></summary>
 <pre><code>readonly grid: Grid;</code></pre>
 </details>
 
 <details class="api-member" id="spreadsheet-shell-element" data-pagefind-weight="1">
-<summary><code>element</code></summary>
+<summary><code>element</code> <span class="api-member-summary">The shell's root element (already appended to the mount host).</span></summary>
 <pre><code>readonly element: HTMLElement;</code></pre>
 </details>
 
@@ -40,7 +40,7 @@ Disposable controller for the framework-neutral spreadsheet shell.
 </details>
 
 <details class="api-member" id="spreadsheet-shell-set-grid-config" data-pagefind-weight="1">
-<summary><code>setGridConfig</code></summary>
+<summary><code>setGridConfig</code> <span class="api-member-summary">Reconfigure the grid; the shell keeps its own toolbar/tabs suppressed.</span></summary>
 <pre><code>setGridConfig(config: GridConfig | undefined): void;</code></pre>
 </details>
 
