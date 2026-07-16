@@ -11,8 +11,8 @@ import {
 } from "./public-api.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
-const contentRoot = join(repositoryRoot, "docs/src/content/docs/docs");
-const generatedDataRoot = join(repositoryRoot, "docs/src/generated");
+const contentRoot = join(repositoryRoot, "docs-astro/src/content/docs/docs");
+const generatedDataRoot = join(repositoryRoot, "docs-astro/src/generated");
 const generatedManifestPath = join(generatedDataRoot, "public-api.json");
 const docsContractPath = join(generatedDataRoot, "docs-contract.json");
 
@@ -1061,7 +1061,7 @@ async function validateMarkdown(
       } else if (/^\/(?:vanilla|react|vue|svelte|theming)\/?$/.test(targetWithoutFragment)) {
         targetPath = join(
           repositoryRoot,
-          `docs/src/pages/${targetWithoutFragment.replace(/^\//, "").replace(/\/$/, "")}.astro`,
+          `docs-astro/src/pages/${targetWithoutFragment.replace(/^\//, "").replace(/\/$/, "")}.astro`,
         );
       } else if (targetWithoutFragment.startsWith("/")) {
         failures.push(
@@ -1207,7 +1207,7 @@ async function checkDocs(
     );
   }
 
-  const sidebarConfig = await readFile(join(repositoryRoot, "docs/astro.config.mjs"), "utf8");
+  const sidebarConfig = await readFile(join(repositoryRoot, "docs-astro/astro.config.mjs"), "utf8");
   for (const apiPagePath of entryPageKeys) {
     const route = `/docs/${posix(relative(contentRoot, apiPagePath)).replace(/\.md$/, "/")}`;
     if (
@@ -1219,8 +1219,8 @@ async function checkDocs(
   }
 
   const testPages = [
-    join(repositoryRoot, "docs/src/pages/test/xlsx.astro"),
-    join(repositoryRoot, "docs/src/pages/test/collaboration.astro"),
+    join(repositoryRoot, "docs-astro/src/pages/test/xlsx.astro"),
+    join(repositoryRoot, "docs-astro/src/pages/test/collaboration.astro"),
   ];
   for (const testPage of testPages) {
     if ((await exists(testPage)) && !(await readFile(testPage, "utf8")).includes("Layout")) {
