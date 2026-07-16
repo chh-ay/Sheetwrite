@@ -665,9 +665,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
       launchAttempts,
     },
     config,
-    // Aggregate-only artifacts (docs evidence) drop per-sample arrays; the
-    // gate/baseline artifacts keep raw rounds for spread verification.
-    results: configuration.compactSamples ? results.map((result) => ({ ...result, rawSamples: [] })) : results,
+    results,
     completeness: summarizeCompleteness(config, configuration.rounds, results),
     reproductionCommands: [
       "bun run --filter '@sheetwrite/bench' bench:render",
@@ -678,9 +676,18 @@ async function runDriver(args: readonly string[]): Promise<void> {
   const json = stableJson(artifact);
   const parsed = parseRenderArtifactJson(json, { expectedRunId: runId });
   const markdown = renderBenchmarkMarkdown(parsed);
+  // Aggregate-only artifacts (docs evidence) drop per-sample arrays AFTER the
+  // protocol self-parse above validated them; gate/baseline artifacts keep
+  // raw rounds for spread verification.
+  const outputJson = configuration.compactSamples
+    ? stableJson({
+        ...artifact,
+        results: artifact.results.map((result) => ({ ...result, rawSamples: [] })),
+      })
+    : json;
 
   if (configuration.outputPath) {
-    await Bun.write(configuration.outputPath, json);
+    await Bun.write(configuration.outputPath, outputJson);
     if (!configuration.markdownPath) throw new Error("JSON output requires a Markdown output path");
     await Bun.write(configuration.markdownPath, markdown);
     process.stderr.write(
