@@ -2013,17 +2013,7 @@ body .sw-code-popover__accessible-signature {
   background: var(--sw-accent);
 }
 
-/* p95 notch: a hairline just right of the median fill. Centered on its true
-   position so the 100% (slowest-sample) notch survives the track clip. */
-.bench-bar__p95 {
-  width: 2px;
-  transform: translateX(-50%);
-  background: color-mix(in srgb, var(--sw-fg-muted) 85%, var(--sw-fg));
-}
-
-.bench-bar[data-engine="sheetwrite"] .bench-bar__p95 {
-  background: var(--sw-accent-strong);
-}
+/* Percentile detail intentionally has no visual: median bars only. */
 
 .bench-bar__value {
   grid-area: value;
@@ -2031,12 +2021,6 @@ body .sw-code-popover__accessible-signature {
   font: 500 0.76rem / 1.4 var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
-}
-
-.bench-bar__value small {
-  margin-left: 0.45rem;
-  color: var(--sw-fg-dim);
-  font-size: 0.66rem;
 }
 
 .bench-viz figcaption {
