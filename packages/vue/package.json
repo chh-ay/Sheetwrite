@@ -38,7 +38,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.declarations.json",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
