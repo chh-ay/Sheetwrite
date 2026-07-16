@@ -92,6 +92,7 @@ describe("re-export documentation", () => {
     const generated = entry?.exports.find((candidate) => candidate.name === "GeneratedInput");
     expect(generated?.kind).toBe("type");
     expect(generated?.documentation).toBe("Generated init source union.");
+    expect(generated?.memberDocs).toEqual([]);
   });
 
   it("keeps interface kind, signature, and member docs through re-exports", async () => {

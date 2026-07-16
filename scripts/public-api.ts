@@ -561,15 +561,17 @@ function analyzeEntry(
           ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim(),
         ),
       ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+      const kind = symbolKind(target);
       return {
         name: exported.getName(),
-        kind: symbolKind(target),
+        kind,
         signature: declarationSignature(target, checker),
         owners: [...owners].sort(),
         source,
         jsDocTags: [...tags].sort(),
         documentation: documentation.join("\n\n"),
-        memberDocs: memberDocumentation(target, checker),
+        memberDocs:
+          kind === "interface" || kind === "class" ? memberDocumentation(target, checker) : [],
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
@@ -681,7 +683,7 @@ export function validateManifest(value: unknown): ApiIssue[] {
   return [];
 }
 export const PUBLIC_API_BASELINE_SHA256 =
-  "4f6cc69d3d8d8316b5317901d8c58ebf61e6745e79d1ec88482ce2c210e5f93f";
+  "aacc018f814907d92cb1a438f1359ec50a41028c39b13b8e664da96a79712811";
 
 export function publicApiDigest(manifest: PublicApiManifest): string {
   return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
