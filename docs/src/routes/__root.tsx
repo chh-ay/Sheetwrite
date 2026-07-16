@@ -4,6 +4,9 @@ import "../styles/tokens.css";
 import "../styles/site.css";
 import "../lib/code-popovers.ts";
 
+const THEME_SCRIPT =
+  'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -32,6 +35,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
     <html lang="en" data-theme="dark">
       <head>
         <HeadContent />
+        <script>{THEME_SCRIPT}</script>
       </head>
       <body>
         {children}

@@ -8,80 +8,97 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as DocsProofRouteImport } from "./routes/docs.proof";
-import { Route as IndexRouteImport } from "./routes/index";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocsProofRouteImport } from './routes/docs.proof'
+import { Route as DocsSplatRouteImport } from './routes/docs.$'
 
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const DocsProofRoute = DocsProofRouteImport.update({
-  id: "/docs/proof",
-  path: "/docs/proof",
+  id: '/docs/proof',
+  path: '/docs/proof',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
+const DocsSplatRoute = DocsSplatRouteImport.update({
+  id: '/docs/$',
+  path: '/docs/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
-  "/docs/proof": typeof DocsProofRoute;
+  '/': typeof IndexRoute
+  '/docs/$': typeof DocsSplatRoute
+  '/docs/proof': typeof DocsProofRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
-  "/docs/proof": typeof DocsProofRoute;
+  '/': typeof IndexRoute
+  '/docs/$': typeof DocsSplatRoute
+  '/docs/proof': typeof DocsProofRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
-  "/docs/proof": typeof DocsProofRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/docs/$': typeof DocsSplatRoute
+  '/docs/proof': typeof DocsProofRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/docs/proof";
-  fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/docs/proof";
-  id: "__root__" | "/" | "/docs/proof";
-  fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths: '/' | '/docs/$' | '/docs/proof'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/docs/$' | '/docs/proof'
+  id: '__root__' | '/' | '/docs/$' | '/docs/proof'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  DocsProofRoute: typeof DocsProofRoute;
+  IndexRoute: typeof IndexRoute
+  DocsSplatRoute: typeof DocsSplatRoute
+  DocsProofRoute: typeof DocsProofRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/docs/proof": {
-      id: "/docs/proof";
-      path: "/docs/proof";
-      fullPath: "/docs/proof";
-      preLoaderRoute: typeof DocsProofRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/proof': {
+      id: '/docs/proof'
+      path: '/docs/proof'
+      fullPath: '/docs/proof'
+      preLoaderRoute: typeof DocsProofRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/$': {
+      id: '/docs/$'
+      path: '/docs/$'
+      fullPath: '/docs/$'
+      preLoaderRoute: typeof DocsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DocsSplatRoute: DocsSplatRoute,
   DocsProofRoute: DocsProofRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
-import type { createStart } from "@tanstack/react-start";
-import type { getRouter } from "./router.tsx";
-
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
   }
 }

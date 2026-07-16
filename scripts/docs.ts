@@ -13,8 +13,8 @@ import {
 } from "./public-api.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
-const contentRoot = join(repositoryRoot, "docs-astro/src/content/docs/docs");
-const generatedDataRoot = join(repositoryRoot, "docs-astro/src/generated");
+const contentRoot = join(repositoryRoot, "docs/src/content/docs");
+const generatedDataRoot = join(repositoryRoot, "docs/src/generated");
 const generatedManifestPath = join(generatedDataRoot, "public-api.json");
 const docsContractPath = join(generatedDataRoot, "docs-contract.json");
 
@@ -451,7 +451,7 @@ function renderApiIndex(manifest: PublicApiManifest): string {
     );
     for (const entry of pkg.entryPoints) {
       lines.push(
-        `| [\`${entryLabel(pkg, entry)}\`](./${entrySlug(pkg.name, entry.subpath)}/) | ${entry.classification} | ${entry.exports.length} |`,
+        `| [\`${entryLabel(pkg, entry)}\`](/docs/api/${entrySlug(pkg.name, entry.subpath)}/) | ${entry.classification} | ${entry.exports.length} |`,
       );
     }
     lines.push("");

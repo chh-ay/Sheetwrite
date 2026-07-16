@@ -1,36 +1,53 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/600.css";
 
 :root {
   color-scheme: light;
   --sw-accent: #059669;
   --sw-accent-strong: #047857;
-  --sw-surface-0: #f6f8fb;
+  --sw-accent-soft: #d1fae5;
+  --sw-surface-0: #f7f8fa;
   --sw-surface-1: #ffffff;
-  --sw-surface-2: #eef2f7;
-  --sw-surface-3: #e3e9f1;
-  --sw-fg: #172033;
-  --sw-fg-muted: #5f6b7a;
-  --sw-border: #d8dee9;
-  --sw-font-body: InterVariable, Inter, system-ui, sans-serif;
+  --sw-surface-2: #f0f2f5;
+  --sw-surface-3: #e4e8ee;
+  --sw-fg: #1b2435;
+  --sw-fg-strong: #0b1220;
+  --sw-fg-muted: #5e6879;
+  --sw-fg-dim: #7f8998;
+  --sw-border: #d9dee7;
+  --sw-border-strong: #c2cad6;
+  --sw-shadow: 0 1.2rem 3rem rgb(15 23 42 / 10%);
+  --sw-font-body: "Inter Variable", Inter, system-ui, sans-serif;
   --sw-font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
   --sw-font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --sw-type-keyword: #7c3aed;
+  --sw-type-keyword: #6d28d9;
   --sw-type-name: #0369a1;
   --sw-type-string: #047857;
-  --sw-type-number: #b45309;
+  --sw-type-number: #a34d08;
+  --sw-header-height: 4rem;
+  --sw-sidebar-width: 17.5rem;
+  --sw-content-width: 51rem;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
   --sw-accent: #34d399;
   --sw-accent-strong: #6ee7b7;
+  --sw-accent-soft: #0b3b2f;
   --sw-surface-0: #080b12;
   --sw-surface-1: #0d121d;
   --sw-surface-2: #121a28;
-  --sw-surface-3: #182235;
-  --sw-fg: #e8edf5;
-  --sw-fg-muted: #9ca8ba;
+  --sw-surface-3: #192438;
+  --sw-fg: #dce3ee;
+  --sw-fg-strong: #f8fafc;
+  --sw-fg-muted: #98a5b8;
+  --sw-fg-dim: #69778d;
   --sw-border: #263248;
+  --sw-border-strong: #35445f;
+  --sw-shadow: 0 1.5rem 4rem rgb(0 0 0 / 40%);
   --sw-type-keyword: #c4b5fd;
   --sw-type-name: #7dd3fc;
   --sw-type-string: #6ee7b7;
