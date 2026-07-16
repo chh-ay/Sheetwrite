@@ -2414,17 +2414,30 @@ body .sw-code-popover__accessible-signature {
   color: var(--sw-fg);
 }
 
+.sw-landing :is(a, button):focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
 .sw-landing-topbar {
   display: flex;
+  gap: 1rem;
   align-items: center;
   justify-content: space-between;
   padding: 0.9rem clamp(1rem, 4vw, 3rem);
   border-bottom: 1px solid var(--sw-border);
 }
 
+.sw-landing-topbar__actions {
+  display: flex;
+  gap: 1.1rem;
+  align-items: center;
+}
+
 .sw-landing-topbar nav,
 .sw-landing-footer nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1.4rem;
 }
 
@@ -2442,110 +2455,519 @@ body .sw-code-popover__accessible-signature {
 
 .sw-landing main {
   flex: 1;
-  width: min(64rem, 100% - 2rem);
+  width: min(70rem, 100% - 2.5rem);
   margin: 0 auto;
-  padding: clamp(2.5rem, 8vh, 5rem) 0 4rem;
+  padding: clamp(2.5rem, 8vh, 4.5rem) 0 clamp(3rem, 8vh, 5rem);
+}
+
+/* Hero: a faint spreadsheet grid anchors the top-right corner; the radial
+   mask keeps it away from the display type. */
+.sw-hero {
+  position: relative;
+  isolation: isolate;
+  padding: clamp(1.5rem, 6vh, 3.5rem) 0 clamp(1rem, 3vh, 2rem);
+}
+
+.sw-hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -2rem 0;
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--sw-border) 62%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--sw-border) 62%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 3rem 3rem;
+  mask-image: radial-gradient(
+    46rem 26rem at 82% 12%,
+    color-mix(in srgb, var(--sw-fg) 78%, transparent),
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+.sw-hero__eyebrow {
+  margin: 0 0 1.1rem;
+  color: var(--sw-accent-strong);
+  font: 600 0.72rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .sw-hero h1 {
+  max-width: 21ch;
   margin: 0;
-  font: 650 clamp(2.2rem, 6vw, 3.6rem) / 1.05 var(--sw-font-display);
-  letter-spacing: -0.02em;
   color: var(--sw-fg-strong);
+  font: 650 clamp(2.35rem, 6.5vw, 4rem) / 1.04 var(--sw-font-display);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
 }
 
-.sw-hero p {
-  max-width: 46rem;
-  margin: 1.2rem 0 0;
+.sw-hero__lede {
+  max-width: 44rem;
+  margin: 1.3rem 0 0;
   color: var(--sw-fg-muted);
-  font-size: 1.05rem;
+  font-size: 1.06rem;
+  line-height: 1.65;
 }
 
 .sw-hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.8rem;
-  margin-top: 1.8rem;
+  align-items: center;
+  margin-top: 2rem;
 }
 
 .sw-cta {
-  padding: 0.65rem 1.3rem;
-  border-radius: 0.5rem;
+  padding: 0.68rem 1.35rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
   background: var(--sw-accent-strong);
   color: var(--sw-surface-0);
   font: 600 0.9rem / 1.4 var(--sw-font-body);
   text-decoration: none;
+  transition: background 140ms ease-out;
+}
+
+.sw-cta:hover {
+  background: color-mix(in srgb, var(--sw-accent-strong) 86%, var(--sw-fg-strong));
 }
 
 .sw-cta--ghost {
+  border-color: var(--sw-border-strong);
   background: none;
-  border: 1px solid var(--sw-border);
   color: var(--sw-fg-strong);
+  transition:
+    border-color 140ms ease-out,
+    background 140ms ease-out;
 }
 
+.sw-cta--ghost:hover {
+  border-color: var(--sw-accent);
+  background: var(--sw-surface-2);
+}
+
+/* The install command is a real link into the installation guide; the mono
+   affordance names the destination without any client JS. */
 .sw-hero-install {
-  display: inline-block;
-  margin-top: 1.6rem;
-  padding: 0.55rem 0.9rem;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  align-items: baseline;
+  margin-top: 1.4rem;
+  padding: 0.6rem 0.95rem;
   border: 1px solid var(--sw-border);
-  border-radius: 0.5rem;
+  border-radius: 0.55rem;
   background: var(--sw-surface-1);
-  font: 500 0.85rem / 1.4 var(--sw-font-mono);
+  color: var(--sw-fg-dim);
+  font: 500 0.85rem / 1.5 var(--sw-font-mono);
+  text-decoration: none;
+  transition:
+    border-color 140ms ease-out,
+    background 140ms ease-out;
+}
+
+.sw-hero-install code {
+  color: var(--sw-fg-strong);
+  font: inherit;
+}
+
+.sw-hero-install em {
+  color: var(--sw-accent-strong);
+  font: 600 0.72rem / 1.9 var(--sw-font-mono);
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
+.sw-hero-install:hover {
+  border-color: var(--sw-accent);
+  background: var(--sw-surface-2);
 }
 
 .sw-landing-bench,
-.sw-landing-showcases {
-  margin-top: clamp(3rem, 9vh, 5.5rem);
+.sw-landing-showcases,
+.sw-landing-own {
+  margin-top: clamp(4rem, 11vh, 6.5rem);
 }
 
-.sw-landing-bench h2,
-.sw-landing-showcases h2 {
-  margin: 0 0 1.2rem;
-  font: 650 1.6rem / 1.2 var(--sw-font-display);
+.sw-section-head {
+  margin-bottom: 1.6rem;
+}
+
+.sw-section-eyebrow {
+  margin: 0 0 0.55rem;
+  color: var(--sw-fg-dim);
+  font: 600 0.7rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sw-section-head h2 {
+  margin: 0;
   color: var(--sw-fg-strong);
+  font: 650 clamp(1.55rem, 3vw, 2.05rem) / 1.15 var(--sw-font-display);
+  letter-spacing: -0.015em;
+}
+
+.sw-section-lede {
+  max-width: 46rem;
+  margin: 0.7rem 0 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.97rem;
+  line-height: 1.6;
+}
+
+/* Benchmark showoff: the ratio ladder shares one log scale so the
+   widening gap is the visual; the aside carries the 1M-row absolutes
+   and capture provenance. */
+.sw-bench-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 19rem;
+  gap: 1.1rem;
+  align-items: stretch;
+}
+
+.sw-bench-figure {
+  margin: 0;
 }
 
 .sw-bench-stats {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  background: var(--sw-surface-1);
+  list-style: none;
+}
+
+.sw-bench-stats li {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.5rem;
+  padding: 1.05rem 1.2rem 1.1rem;
+}
+
+.sw-bench-stats li + li {
+  border-top: 1px solid var(--sw-border);
+}
+
+.sw-bench-stat__head {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sw-bench-stat__size {
+  color: var(--sw-fg-muted);
+  font: 600 0.72rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sw-bench-stat__head strong {
+  color: var(--sw-accent-strong);
+  font: 650 1.3rem / 1.1 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-bench-stat__track {
+  position: relative;
+  display: block;
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 0.18rem;
+  background: color-mix(in srgb, var(--sw-surface-3) 80%, transparent);
+}
+
+.sw-bench-stat__track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--sw-accent);
+}
+
+.sw-bench-stat__detail {
+  color: var(--sw-fg-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.sw-bench-stat__detail code {
+  color: var(--sw-fg);
+  font: 500 0.74rem / 1.4 var(--sw-font-mono);
+}
+
+.sw-bench-figure figcaption {
+  margin: 0.75rem 0.15rem 0;
+  color: var(--sw-fg-dim);
+  font-size: 0.74rem;
+}
+
+.sw-bench-aside {
+  display: grid;
+  gap: 0.95rem;
+  align-content: start;
+  padding: 1.2rem 1.25rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  background: var(--sw-surface-1);
+}
+
+.sw-bench-aside__eyebrow {
+  margin: 0;
+  color: var(--sw-fg-dim);
+  font: 600 0.68rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sw-bench-aside__stat {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.sw-bench-aside__stat strong {
+  color: var(--sw-fg-strong);
+  font: 650 1.7rem / 1.1 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-bench-aside__stat span {
+  color: var(--sw-fg-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.sw-bench-capture {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--sw-border);
+}
+
+.sw-bench-capture div {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+}
+
+.sw-bench-capture dt {
+  color: var(--sw-fg-dim);
+  font: 600 0.66rem / 1.9 var(--sw-font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sw-bench-capture dd {
+  overflow: hidden;
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.78rem;
+  line-height: 1.9;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-bench-capture dd code {
+  font: 500 0.74rem / 1.9 var(--sw-font-mono);
+}
+
+.sw-bench-footnote {
+  max-width: 52rem;
+  margin: 1.1rem 0 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.sw-bench-footnote a {
+  color: var(--sw-accent-strong);
+}
+
+.sw-bench-footnote code {
+  font: 500 0.8rem var(--sw-font-mono);
+}
+
+/* Showcase cards: the framework accent lives in a swatch dot and the hover
+   border so text contrast holds in both themes. */
+.sw-landing .sw-landing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.sw-landing .sw-landing-grid > a {
+  --sw-framework-accent: var(--sw-accent);
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  background: var(--sw-surface-1);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease-out,
+    background 140ms ease-out;
+}
+
+.sw-landing .sw-landing-grid > a:hover {
+  border-color: color-mix(in srgb, var(--sw-framework-accent) 55%, var(--sw-border));
+  background: var(--sw-surface-2);
+}
+
+.sw-landing .sw-landing-grid > a[data-framework="react"] {
+  --sw-framework-accent: var(--sw-demo-react-accent);
+}
+
+.sw-landing .sw-landing-grid > a[data-framework="vue"] {
+  --sw-framework-accent: var(--sw-demo-vue-accent);
+}
+
+.sw-landing .sw-landing-grid > a[data-framework="svelte"] {
+  --sw-framework-accent: var(--sw-demo-svelte-accent);
+}
+
+.sw-showcase-card__meta {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--sw-fg-muted);
+  font: 600 0.7rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sw-showcase-card__meta i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--sw-framework-accent);
+}
+
+.sw-landing .sw-landing-grid strong {
+  color: var(--sw-fg-strong);
+  font: 600 1rem / 1.4 var(--sw-font-display);
+}
+
+.sw-showcase-card__cta {
+  margin-top: auto;
+  color: var(--sw-fg-dim);
+  font: 600 0.74rem / 1.4 var(--sw-font-mono);
+}
+
+.sw-landing .sw-landing-grid > a:hover .sw-showcase-card__cta {
+  color: var(--sw-accent-strong);
+}
+
+.sw-own-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.9rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sw-bench-stats li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 1rem 1.1rem;
+.sw-own-grid li {
+  padding: 1.15rem 1.2rem;
   border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
-  background: var(--sw-surface-1);
+  border-radius: 0.75rem;
 }
 
-.sw-bench-stats strong {
-  font: 650 1.5rem / 1.1 var(--sw-font-display);
+.sw-own-grid li > span {
   color: var(--sw-accent-strong);
+  font: 600 0.68rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.sw-bench-stats span {
-  color: var(--sw-fg-muted);
-  font-size: 0.82rem;
+.sw-own-grid h3 {
+  margin: 0.6rem 0 0.35rem;
+  color: var(--sw-fg-strong);
+  font: 600 1.02rem / 1.35 var(--sw-font-display);
 }
 
-.sw-bench-footnote {
-  margin: 1rem 0 0;
+.sw-own-grid p {
+  margin: 0;
   color: var(--sw-fg-muted);
   font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.sw-own-link {
+  display: inline-block;
+  margin-top: 1.2rem;
+  color: var(--sw-accent-strong);
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+.sw-own-link:hover {
+  text-decoration: underline;
 }
 
 .sw-landing-footer {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.5rem;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem clamp(1rem, 4vw, 3rem);
+  margin-top: clamp(3rem, 9vh, 5rem);
+  padding: 1.1rem clamp(1rem, 4vw, 3rem);
   border-top: 1px solid var(--sw-border);
   color: var(--sw-fg-dim);
   font-size: 0.82rem;
+}
+
+@media (max-width: 64rem) {
+  .sw-bench-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sw-landing .sw-landing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 52rem) {
+  .sw-own-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 40rem) {
+  .sw-landing .sw-landing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sw-landing-topbar nav {
+    gap: 0.9rem;
+  }
+
+  .sw-landing-topbar .sw-brand span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-cta,
+  .sw-cta--ghost,
+  .sw-hero-install,
+  .sw-landing .sw-landing-grid > a {
+    transition: none;
+  }
 }
