@@ -7,15 +7,19 @@ description: "Converts adapter size props into a host element style object."
 
 Converts adapter size props into a host element style object.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L107</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function gridSizeStyle(
   size: OptionalGridSizeProps,
 ): Record<string, string>
 ```
+
+</div>

@@ -7,12 +7,12 @@ description: "Imperative grid handle for document commands, events, rendering, a
 
 Imperative grid handle for document commands, events, rendering, and teardown.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L287</code></dd></div>
 </dl>
 
-## Members <span class="api-count">81</span>
+## Members <span class="api-count" data-pagefind-ignore>81</span>
 
 <div class="api-member-list">
 
@@ -789,7 +789,7 @@ destroy(): void;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

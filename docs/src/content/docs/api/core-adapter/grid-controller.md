@@ -9,12 +9,12 @@ The lifecycle handle returned by [`createGridController`](/docs/api/core-adapter
 a theme passthrough, and a single teardown that detaches every subscription
 and destroys the grid.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L43</code></dd></div>
 </dl>
 
-## Members <span class="api-count">7</span>
+## Members <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-member-list">
 
@@ -85,7 +85,7 @@ destroy(): void;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

@@ -10,12 +10,14 @@ Convenience component for local object rows. It derives a single-sheet workbook 
 through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
 use `SheetwriteGrid` when the host already owns a workbook or datasource.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L275</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function Sheetwrite<Row extends Record<string, CellScalar>>(
@@ -24,3 +26,5 @@ function Sheetwrite<Row extends Record<string, CellScalar>>(
   },
 ): ReactElement
 ```
+
+</div>

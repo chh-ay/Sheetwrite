@@ -7,14 +7,14 @@ description: "Predicate used to decide whether a conditional format applies."
 
 Predicate used to decide whether a conditional format applies.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L51</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">4</span>
+## Variants <span class="api-count" data-pagefind-ignore>4</span>
 
-<div class="api-variant-list">
+<div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
 ```ts generated
@@ -47,7 +47,7 @@ Predicate used to decide whether a conditional format applies.
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

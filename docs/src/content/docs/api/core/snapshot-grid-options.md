@@ -7,13 +7,17 @@ description: "Grid creation options accepted when hydrating a validated snapshot
 
 Grid creation options accepted when hydrating a validated snapshot.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L14</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data">;
 ```
+
+</div>

@@ -7,13 +7,17 @@ description: "Object-shaped datasource row keyed by workbook column keys."
 
 Object-shaped datasource row keyed by workbook column keys.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L14</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type RowData = Record<string, DataCell>;
 ```
+
+</div>

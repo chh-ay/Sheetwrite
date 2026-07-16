@@ -7,12 +7,14 @@ description: "Simple framework adapter props for columns and default row objects
 
 Simple framework adapter props for columns and default row objects.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L246</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
@@ -25,3 +27,5 @@ export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
     sheetName?: string;
   };
 ```
+
+</div>

@@ -7,12 +7,12 @@ description: "Host elements and feature options used to create a spreadsheet she
 
 Host elements and feature options used to create a spreadsheet shell.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/shell/spreadsheet-shell.ts#L22</code></dd></div>
 </dl>
 
-## Members <span class="api-count">5</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -65,7 +65,7 @@ onReady?: (grid: Grid) => void;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

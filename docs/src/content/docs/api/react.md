@@ -6,7 +6,7 @@ description: "API reference for @sheetwrite/react."
 
 **Supported public entry point.** Import this entry point as `@sheetwrite/react`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
 <div><dt>Exports</dt><dd>8</dd></div>
 </dl>
@@ -15,7 +15,7 @@ Source entry: `packages/react/src/index.tsx`
 
 ## Exported symbols
 
-### Interfaces <span class="api-count">4</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/react/grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Grid</code></span><span class="api-symbol-card__desc">Imperative grid handle for document commands, events, rendering, and teardown.</span></a>
@@ -24,14 +24,14 @@ Source entry: `packages/react/src/index.tsx`
 <a class="api-symbol-card" href="/docs/api/react/simple-column/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SimpleColumn</code></span><span class="api-symbol-card__desc">Column definition accepted by the adapters’ simple row-object API.</span></a>
 </div>
 
-### Types <span class="api-count">2</span>
+### Types <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/react/cell-scalar/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CellScalar</code></span><span class="api-symbol-card__desc">A scalar that can be displayed directly.</span></a>
 <a class="api-symbol-card" href="/docs/api/react/sheetwrite-props/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteProps</code></span><span class="api-symbol-card__desc">Simple framework adapter props for columns and default row objects.</span></a>
 </div>
 
-### Variables <span class="api-count">2</span>
+### Variables <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/react/sheetwrite/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>Sheetwrite</code></span><span class="api-symbol-card__desc">Convenience component for local object rows.</span></a>

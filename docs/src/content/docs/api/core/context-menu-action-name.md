@@ -7,12 +7,14 @@ description: "Built-in action names accepted by custom context-menu rows."
 
 Built-in action names accepted by custom context-menu rows.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L147</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 export type ContextMenuActionName =
@@ -39,3 +41,5 @@ export type ContextMenuActionName =
   | "exportXlsx"
   | "separator";
 ```
+
+</div>

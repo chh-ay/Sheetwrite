@@ -7,12 +7,12 @@ description: "Stable host-provided identity displayed on a comment message."
 
 Stable host-provided identity displayed on a comment message.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L353</code></dd></div>
 </dl>
 
-## Members <span class="api-count">3</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -46,7 +46,7 @@ avatarUrl?: string;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

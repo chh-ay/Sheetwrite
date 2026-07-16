@@ -6,7 +6,7 @@ description: "API reference for @sheetwrite/core/shell.css."
 
 **CSS or binary asset entry point.** Import this entry point as `@sheetwrite/core/shell.css`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./shell.css</code></dd></div>
 <div><dt>Exports</dt><dd>0</dd></div>
 </dl>

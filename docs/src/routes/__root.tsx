@@ -3,6 +3,7 @@ import { type ReactNode, useEffect } from "react";
 import "../styles/tokens.css";
 import "../styles/site.css";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
+import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 
 const THEME_SCRIPT =
   'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
@@ -61,9 +62,13 @@ export const Route = createRootRoute({
 function RootComponent() {
   useEffect(() => {
     const cleanup = initializeCodeEnhancements();
+    const uninstallReveal = installAnchorReveal();
     // Deterministic signal for interaction tests: listeners are attached.
     document.documentElement.dataset.hydrated = "true";
-    return cleanup;
+    return () => {
+      cleanup();
+      uninstallReveal();
+    };
   }, []);
 
   return (

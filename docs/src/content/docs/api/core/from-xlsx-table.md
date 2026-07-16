@@ -10,15 +10,19 @@ row is treated as the header and its cell text becomes each column's key.
 Numbers stay numbers, date cells use the date-serial convention, strings are
 verbatim, and empty cells become `null`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L281</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function fromXlsxTable(
   data: ArrayBuffer | Uint8Array,
 ): Promise<ColumnarData>
 ```
+
+</div>

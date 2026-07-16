@@ -20,13 +20,17 @@ input-bar conventions:
 Shared by the grid's inline editor and any host-built formula bar, so input
 parsing is identical everywhere instead of re-derived per consumer.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/cell-input.ts#L28</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function parseCellInput(raw: string, type: CellFormat): CellValue
 ```
+
+</div>

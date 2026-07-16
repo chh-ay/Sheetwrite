@@ -7,15 +7,19 @@ description: "Host-owned client UX permission callback for protected mutations."
 
 Host-owned client UX permission callback for protected mutations.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L168</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type ProtectionResolver = (
   request: ProtectionRequest,
 ) => "allow" | "deny";
 ```
+
+</div>

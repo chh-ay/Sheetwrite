@@ -7,14 +7,18 @@ description: "Host-controlled online state reported by synchronization."
 
 Host-controlled online state reported by synchronization.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L20</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type SyncConnectionState =
   "offline" | "connecting" | "online" | "error" | "destroyed";
 ```
+
+</div>

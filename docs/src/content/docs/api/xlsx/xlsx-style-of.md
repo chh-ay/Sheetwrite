@@ -7,13 +7,17 @@ description: "Translate Sheetwrite's style model into write-excel-file cell prop
 
 Translate Sheetwrite's style model into write-excel-file cell properties.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L26</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function xlsxStyleOf(style: CellStyle | undefined): CellObject
 ```
+
+</div>

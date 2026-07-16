@@ -7,12 +7,12 @@ description: "Advanced framework adapter props for workbook data or datasource o
 
 Advanced framework adapter props for workbook data or datasource ownership.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L40</code></dd></div>
 </dl>
 
-## Members <span class="api-count">5</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -64,7 +64,7 @@ fill?: true;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

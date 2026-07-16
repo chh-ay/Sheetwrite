@@ -7,13 +7,17 @@ description: "Horizontal text alignment supported by cell styles."
 
 Horizontal text alignment supported by cell styles.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L7</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type CellAlign = "left" | "center" | "right";
 ```
+
+</div>

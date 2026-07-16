@@ -7,14 +7,14 @@ description: "Queue, version, connection, or error transition emitted by synchro
 
 Queue, version, connection, or error transition emitted by synchronization.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L65</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">12</span>
+## Variants <span class="api-count" data-pagefind-ignore>12</span>
 
-<div class="api-variant-list">
+<div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
 ```ts generated
@@ -125,7 +125,7 @@ Queue, version, connection, or error transition emitted by synchronization.
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

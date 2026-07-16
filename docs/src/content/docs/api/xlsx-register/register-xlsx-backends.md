@@ -7,13 +7,17 @@ description: "Register all concrete XLSX backends with the backend-neutral core 
 
 Register all concrete XLSX backends with the backend-neutral core contracts.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/xlsx/register</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/xlsx/src/registration.ts#L11</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function registerXlsxBackends(): void
 ```
+
+</div>

@@ -346,6 +346,34 @@ a {
   white-space: nowrap;
 }
 
+.sw-search-results a strong {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.sw-search-results a strong code {
+  overflow: hidden;
+  flex: 0 1 auto;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.4rem;
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-2);
+  font: 500 0.68rem / 1.5 var(--sw-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pagefind highlights the matched terms; tint, don't shout. */
+.sw-search-results a span mark {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+  border-radius: 0.2rem;
+}
+
 .sw-sidebar {
   position: fixed;
   z-index: 10;
@@ -465,7 +493,8 @@ a {
   text-wrap: balance;
 }
 
-.sw-document__header span {
+/* Direct child only: the h1 title span must not inherit description styling. */
+.sw-document__header > span {
   display: block;
   max-width: 42rem;
   margin-top: 1.1rem;
@@ -1791,4 +1820,28 @@ body .sw-code-popover__accessible-signature {
 .sw-prose a.sw-code-popover__trigger {
   color: inherit;
   cursor: pointer;
+}
+
+/* A deep-linked member stands out via a quiet accent tint - no ring. */
+.sw-prose .api-member:target,
+.sw-prose .api-member[data-revealed] {
+  border-color: color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
+  background: color-mix(in srgb, var(--sw-accent) 4%, var(--sw-surface-1));
+}
+
+/* Evidence page callouts. */
+.evidence-available,
+.evidence-unavailable {
+  margin: 0 0 1.2rem;
+  border: 1px solid color-mix(in srgb, var(--sw-accent) 30%, var(--sw-border));
+  border-radius: 0.55rem;
+  padding: 0.7rem 0.9rem;
+  background: color-mix(in srgb, var(--sw-accent) 7%, var(--sw-surface-1));
+  font-size: 0.88rem;
+}
+
+.evidence-unavailable {
+  border-color: var(--sw-border);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-muted);
 }

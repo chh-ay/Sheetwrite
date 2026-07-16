@@ -9,12 +9,12 @@ The stub 2D context the canvas test stubs install: every method is a no-op
 that counts its invocations in `calls`, so tests can assert paint activity
 (e.g. `ctx.calls.fillText > 0`) without a real canvas.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/testing</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L8</code></dd></div>
 </dl>
 
-## Members <span class="api-count">8</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -93,7 +93,7 @@ lineWidth: number;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

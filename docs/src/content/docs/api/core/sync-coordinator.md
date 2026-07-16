@@ -9,12 +9,12 @@ Deterministic, transport-neutral optimistic sync. Local rendering is never
 blocked: changes queue immediately, while hosts explicitly call `sendNext`
 or `retry` to perform network work.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L102</code></dd></div>
 </dl>
 
-## Members <span class="api-count">18</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -185,7 +185,7 @@ subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) =
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

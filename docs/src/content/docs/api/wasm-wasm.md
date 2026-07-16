@@ -6,7 +6,7 @@ description: "API reference for @sheetwrite/wasm/wasm."
 
 **CSS or binary asset entry point.** Import this entry point as `@sheetwrite/wasm/wasm`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./pkg/sheetwrite_wasm_bg.wasm</code></dd></div>
 <div><dt>Exports</dt><dd>0</dd></div>
 </dl>

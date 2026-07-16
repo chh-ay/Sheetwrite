@@ -11,12 +11,14 @@ consumed; each remaining row maps positionally onto `columns`. CSV columns
 beyond `columns.length` are ignored, missing trailing cells become `null`, and
 `number` columns coerce their fields to finite numbers.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L179</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function fromCsv(
@@ -24,3 +26,5 @@ function fromCsv(
   columns: readonly Column[],
 ): ColumnarData
 ```
+
+</div>

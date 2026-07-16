@@ -7,13 +7,17 @@ description: "Whether initSheetwrite has completed — the single readiness sour
 
 Whether `initSheetwrite` has completed — the single readiness source.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L181</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function isSheetwriteReady(): boolean
 ```
+
+</div>

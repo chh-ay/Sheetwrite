@@ -7,12 +7,14 @@ description: "Browser-only download helper; throws in non-DOM runtimes."
 
 Browser-only download helper; throws in non-DOM runtimes.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L204</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function downloadBytes(
@@ -21,3 +23,5 @@ function downloadBytes(
   mime: string,
 ): void
 ```
+
+</div>

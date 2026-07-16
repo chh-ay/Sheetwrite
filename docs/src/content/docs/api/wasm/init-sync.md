@@ -8,12 +8,14 @@ description: "Instantiates the given module, which can either be bytes or a prec
 Instantiates the given `module`, which can either be bytes or
 a precompiled `WebAssembly.Module`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L405</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function initSync(
@@ -24,3 +26,5 @@ function initSync(
     | SyncInitInput,
 ): InitOutput
 ```
+
+</div>

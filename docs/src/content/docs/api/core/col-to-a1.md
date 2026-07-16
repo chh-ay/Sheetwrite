@@ -7,13 +7,17 @@ description: "Column index (0-based) → A1 column label (0 → \"A\", 26 → \"
 
 Column index (0-based) → A1 column label (0 → "A", 26 → "AA").
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/a1.ts#L4</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function colToA1(col: number): string
 ```
+
+</div>

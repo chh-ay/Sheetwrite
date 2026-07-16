@@ -7,12 +7,14 @@ description: "Exports a table model through the registered optional XLSX backend
 
 Exports a table model through the registered optional XLSX backend.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L251</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function toXlsxTable(
@@ -20,3 +22,5 @@ function toXlsxTable(
   store: Store,
 ): Promise<Uint8Array>
 ```
+
+</div>

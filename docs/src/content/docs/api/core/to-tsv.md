@@ -7,13 +7,17 @@ description: "TSV for a rectangular range (Excel/Sheets clipboard format)."
 
 TSV for a rectangular range (Excel/Sheets clipboard format).
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L65</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function toTsv(range: Range, store: Store): string
 ```
+
+</div>

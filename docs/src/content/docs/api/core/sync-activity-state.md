@@ -7,12 +7,14 @@ description: "Current persistence activity reported by a sync coordinator."
 
 Current persistence activity reported by a sync coordinator.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L22</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 export type SyncActivityState =
@@ -25,3 +27,5 @@ export type SyncActivityState =
   | "error"
   | "destroyed";
 ```
+
+</div>

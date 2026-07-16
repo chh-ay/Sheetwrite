@@ -11,12 +11,14 @@ formula, overlapping, sheet-lifecycle, and move cases become explicit
 conflicts instead of lossy guesses. This is the collaboration design gate;
 no CRDT dependency is required for the supported cases.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L46</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function rebaseDocumentOperations(
@@ -24,3 +26,5 @@ function rebaseDocumentOperations(
   remoteOperations: readonly DocumentOp[],
 ): DocumentRebaseResult
 ```
+
+</div>

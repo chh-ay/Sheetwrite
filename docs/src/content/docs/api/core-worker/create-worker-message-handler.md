@@ -9,15 +9,19 @@ Build the worker-side protocol handler. Keeping the mutable render state
 inside the returned closure lets tests exercise the real message contract
 without booting a browser Worker.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/worker</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/worker.ts#L253</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 function createWorkerMessageHandler(
   postAcknowledgement: (message: WorkerAcknowledgement) => void,
 ): (message: unknown) => void
 ```
+
+</div>

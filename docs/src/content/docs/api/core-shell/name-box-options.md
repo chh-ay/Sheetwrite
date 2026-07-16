@@ -7,12 +7,12 @@ description: "Host elements and callbacks used to bind a name box to a Grid."
 
 Host elements and callbacks used to bind a name box to a Grid.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L19</code></dd></div>
 </dl>
 
-## Members <span class="api-count">2</span>
+## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
@@ -37,7 +37,7 @@ label?: string;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

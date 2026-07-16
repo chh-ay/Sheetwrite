@@ -7,13 +7,17 @@ description: "Sources accepted by synchronous initialization: raw module bytes o
 
 Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L395</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type SyncInitInput = BufferSource | WebAssembly.Module;
 ```
+
+</div>

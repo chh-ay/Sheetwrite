@@ -6,7 +6,7 @@ description: "API reference for @sheetwrite/react/styles.css."
 
 **CSS or binary asset entry point.** Import this entry point as `@sheetwrite/react/styles.css`.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./styles.css</code></dd></div>
 <div><dt>Exports</dt><dd>0</dd></div>
 </dl>

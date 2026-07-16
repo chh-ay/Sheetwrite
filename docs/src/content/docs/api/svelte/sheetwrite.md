@@ -9,12 +9,14 @@ Convenience component for local object rows. Bind `grid` to access the live `Gri
 
 Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperative access; it clears on reset or unmount.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/svelte/src/Sheetwrite.svelte.d.ts#L7</code></dd></div>
 </dl>
 
 ## Declaration
+
+<div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
 function Sheetwrite(
@@ -26,3 +28,5 @@ function Sheetwrite(
   $set?(props: Partial<SheetwriteProps<Record<string, CellScalar>>>): void;
 }
 ```
+
+</div>

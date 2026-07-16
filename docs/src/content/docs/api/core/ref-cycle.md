@@ -7,13 +7,17 @@ description: "Sentinel shown for a reference that participates in a cycle."
 
 Sentinel shown for a reference that participates in a cycle.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/reference.ts#L5</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 const REF_CYCLE: "#CYCLE!"
 ```
+
+</div>

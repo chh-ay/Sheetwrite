@@ -7,12 +7,12 @@ description: "Ordered condition and style applied to a cell range."
 
 Ordered condition and style applied to a cell range.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L58</code></dd></div>
 </dl>
 
-## Members <span class="api-count">3</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -46,7 +46,7 @@ style: CellStyle;
 
 ## Declaration
 
-<details class="api-declaration">
+<details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated

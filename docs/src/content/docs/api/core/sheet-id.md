@@ -7,13 +7,17 @@ description: "Stable identifier used to address a workbook sheet."
 
 Stable identifier used to address a workbook sheet.
 
-<dl class="api-metadata">
+<dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/types/coordinates.ts#L5</code></dd></div>
 </dl>
 
 ## Declaration
 
+<div class="api-declaration-open" data-pagefind-ignore>
+
 ```ts generated
 export type SheetId = string;
 ```
+
+</div>
