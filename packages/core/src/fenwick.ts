@@ -135,12 +135,13 @@ export class ScaledScroll {
   constructor(
     private totalHeight: number,
     private viewport: number,
-    private readonly cap: number,
+    private cap: number,
   ) {}
 
-  update(totalHeight: number, viewport: number): void {
+  update(totalHeight: number, viewport: number, cap = this.cap): void {
     this.totalHeight = totalHeight;
     this.viewport = viewport;
+    this.cap = cap;
   }
 
   get scaled(): boolean {

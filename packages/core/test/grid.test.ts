@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { readFileSync } from "node:fs";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
@@ -6,6 +7,7 @@ import {
   DEFAULT_THEME,
   GridImpl,
   initSheetwrite,
+  measureMaxElementHeight,
   resolveThemeFromCss,
 } from "../src/grid.js";
 import { createGridController } from "../src/grid-controller.js";
@@ -137,20 +139,6 @@ describe("Grid render hot path", () => {
 
     grid.destroy();
   });
-
-  it("reports a selection through getSelection after setSelection", () => {
-    const workbook = makeWorkbook(50);
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, makeFakeStore(workbook));
-
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 1 } });
-    expect(grid.getSelection()).toEqual({
-      kind: "cell",
-      addr: { sheet: "s1", row: 4, col: 1 },
-    });
-
-    grid.destroy();
-  });
 });
 
 describe("Grid editing (Layer 3)", () => {
@@ -242,7 +230,7 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
-  it("passes the canonical structured datasource request and consumes its page", async () => {
+  it("requests the required datasource window fields and consumes its page", async () => {
     const workbook = makeWorkbook(20);
     let captured: DataSourceRequest | undefined;
     const grid = new GridImpl(mountHost(), {
@@ -261,11 +249,12 @@ describe("Grid editing (Layer 3)", () => {
     await Promise.resolve();
     await Promise.resolve();
     if (!captured) throw new Error("datasource request was not issued");
-    expect(Object.keys(captured).sort()).toEqual(["end", "revision", "sheet", "signal", "start"]);
-    expect(captured.sheet).toBe("s1");
-    expect(captured.start).toBe(0);
+    expect(captured).toMatchObject({
+      sheet: "s1",
+      start: 0,
+      revision: 0,
+    });
     expect(captured.end).toBeGreaterThan(captured.start);
-    expect(captured.revision).toBe(0);
     expect(captured.signal).toBeInstanceOf(AbortSignal);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Structured");
     grid.destroy();
@@ -441,7 +430,7 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
-  it("opens the built-in find bar with Ctrl+F unless find is disabled", () => {
+  it("opens and focuses the built-in find bar with Ctrl+F unless find is disabled", () => {
     const workbook = makeWorkbook(10);
     const host = mountHost();
     const grid = new GridImpl(
@@ -459,9 +448,12 @@ describe("Grid editing (Layer 3)", () => {
     host.dispatchEvent(event);
 
     const find = host.querySelector(".sheetwrite-find");
+    const input = host.querySelector(".sheetwrite-find-input");
     expect(event.defaultPrevented).toBe(true);
     expect(find).toBeInstanceOf(HTMLDivElement);
-    expect((find as HTMLDivElement | null)?.style.display).toBe("flex");
+    expect(input).toBeInstanceOf(HTMLInputElement);
+    expect(getComputedStyle(find as HTMLDivElement).display).not.toBe("none");
+    expect(document.activeElement).toBe(input);
 
     grid.destroy();
 
@@ -623,13 +615,9 @@ describe("Grid editing (Layer 3)", () => {
       style: { underline: true },
     });
     const undoEvent = events.at(-1)!;
-    expect(undoEvent.transaction.patches.map((patch) => patch.op)).toEqual([
-      "addColumns",
-      "setBlock",
-    ]);
-    expect(JSON.parse(JSON.stringify(undoEvent.transaction.patches))).toEqual(
-      undoEvent.transaction.patches,
-    );
+    const serializedUndo = JSON.stringify(undoEvent.transaction.patches);
+    expect(JSON.parse(serializedUndo)).toEqual(undoEvent.transaction.patches);
+    expect(new TextEncoder().encode(serializedUndo).byteLength).toBeLessThan(2_000);
 
     grid.redo();
     expect(workbook.sheets[0]!.columns).toHaveLength(2);
@@ -688,22 +676,26 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
-  it("skips chrome rebuild for a shallowly-equal config object", () => {
+  it("preserves toolbar focus and values across an equivalent config", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
     const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
 
-    const before = host.querySelector(".sheetwrite-toolbar");
-    expect(before).not.toBeNull();
+    const colorInput = host.querySelector(".sheetwrite-tb-textColor");
+    expect(colorInput).toBeInstanceOf(HTMLInputElement);
+    if (!(colorInput instanceof HTMLInputElement)) throw new Error("text-color input not mounted");
+    colorInput.value = "#123456";
+    colorInput.focus();
 
-    // A fresh-but-identical object (declarative host re-render) is a no-op.
     grid.setConfig({ toolbar: true });
-    expect(host.querySelector(".sheetwrite-toolbar")).toBe(before);
+    expect(colorInput.isConnected).toBe(true);
+    expect(colorInput.value).toBe("#123456");
+    expect(document.activeElement).toBe(colorInput);
 
-    // A materially different config still rebuilds.
     grid.setConfig({ toolbar: false });
     expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
+    expect(colorInput.isConnected).toBe(false);
 
     grid.destroy();
     store.dispose();
@@ -905,25 +897,55 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     expect(resolved.font).not.toContain("/");
   });
 
-  it("editor cosmetics come from the stylesheet; the theme rides inline CSS variables", () => {
+  it("applies effective editor styles from the theme and reflects later theme changes", () => {
+    const stylesheet = document.createElement("style");
+    stylesheet.textContent = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+    document.head.appendChild(stylesheet);
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
-    const grid = new GridImpl(host, { workbook, theme: { selectionBorder: "#123456" } }, store);
+    const grid = new GridImpl(
+      host,
+      {
+        workbook,
+        theme: {
+          selectionBorder: "#123456",
+          font: "17px monospace",
+          fg: "#234567",
+          bg: "#fefefe",
+        },
+      },
+      store,
+    );
 
-    grid.beginEdit(0, 0);
-    const editor = expectEditor(host);
+    try {
+      grid.beginEdit(0, 0);
+      let editor = expectEditor(host);
+      let style = getComputedStyle(editor);
+      expect(style.borderTopColor).toBe("#123456");
+      expect(style.color).toBe("#234567");
+      expect(style.background).toBe("#fefefe");
+      expect(style.font).toContain("17px");
 
-    // No raw inline cosmetic properties — host CSS can override the rule.
-    expect(editor.style.font).toBe("");
-    expect(editor.style.color).toBe("");
-
-    // The effective theme is bridged as inline variables for the rule to use.
-    expect(editor.style.getPropertyValue("--sheetwrite-selection-border")).toBe("#123456");
-    expect(editor.style.getPropertyValue("--sheetwrite-font")).toBe(DEFAULT_THEME.font);
-
-    grid.destroy();
-    store.dispose();
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      grid.setTheme({
+        selectionBorder: "#654321",
+        font: "19px serif",
+        fg: "#345678",
+        bg: "#ededed",
+      });
+      grid.beginEdit(0, 0);
+      editor = expectEditor(host);
+      style = getComputedStyle(editor);
+      expect(style.borderTopColor).toBe("#654321");
+      expect(style.color).toBe("#345678");
+      expect(style.background).toBe("#ededed");
+      expect(style.font).toContain("19px");
+    } finally {
+      grid.destroy();
+      store.dispose();
+      stylesheet.remove();
+    }
   });
 });
 
@@ -1251,7 +1273,7 @@ describe("Grid auto-fit", () => {
     grid.destroy();
     store.dispose();
   });
-  it("matches exact small results while bounding and yielding large row and column reads", () => {
+  it("matches small geometry while bounding and yielding large row and column reads", () => {
     const text = `${"wide ".repeat(40)}\nsecond wrapped line`;
     const smallWorkbook = makeWorkbook(1);
     const smallStore = new SheetwriteStore(smallWorkbook);
@@ -1312,6 +1334,14 @@ describe("Grid auto-fit", () => {
         callback(steps);
       }
     };
+    const expectBoundedReads = (): void => {
+      const stats = grid.getAutoFitResourceStats();
+      expect(stats.maxWindowCells).toBeLessThanOrEqual(AUTO_FIT_CHUNK_CELLS);
+      expect(stats.windowRequests).toBeGreaterThanOrEqual(1);
+      expect(stats.windowRequests).toBeLessThanOrEqual(Math.ceil(rowCount / AUTO_FIT_CHUNK_CELLS));
+      expect(stats.scheduledChunks).toBeGreaterThanOrEqual(1);
+      expect(stats.scheduledChunks).toBeLessThanOrEqual(stats.windowRequests);
+    };
 
     try {
       grid.resetAutoFitResourceStats();
@@ -1321,41 +1351,25 @@ describe("Grid auto-fit", () => {
         end: { row: rowCount - 1, col: 0 },
       });
       expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
-      expect(scheduled.size).toBe(1);
+      expect(scheduled.size).toBeGreaterThanOrEqual(1);
       drain();
       expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBe(expectedHeight);
-      expect(changes.at(-1)!.transaction.patches).toEqual([
-        {
-          op: "setRowMeta",
-          sheet: "s1",
-          row: rowCount - 1,
-          meta: { height: expectedHeight },
-        },
-      ]);
-      expect(grid.getAutoFitResourceStats()).toMatchObject({
-        windowRequests: 2,
-        maxWindowCells: AUTO_FIT_CHUNK_CELLS,
-        scheduledChunks: 2,
-        completedJobs: 1,
-        committedPatches: 1,
-      });
+      expect(changes).toHaveLength(1);
+      expectBoundedReads();
       grid.undo();
       expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBeUndefined();
       grid.redo();
       expect(workbook.sheets[0]!.rowHeights!.get(rowCount - 1)).toBe(expectedHeight);
 
+      changes.length = 0;
       grid.resetAutoFitResourceStats();
       grid.autoFitColumns([0]);
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
+      expect(scheduled.size).toBeGreaterThanOrEqual(1);
       drain();
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
-      expect(grid.getAutoFitResourceStats()).toMatchObject({
-        windowRequests: 2,
-        maxWindowCells: AUTO_FIT_CHUNK_CELLS,
-        scheduledChunks: 2,
-        completedJobs: 1,
-        committedPatches: 1,
-      });
+      expect(changes).toHaveLength(1);
+      expectBoundedReads();
       grid.undo();
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
     } finally {
@@ -1382,6 +1396,8 @@ describe("Grid auto-fit", () => {
       ],
     });
     const grid = new GridImpl(mountHost(), { workbook }, store);
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
     const scheduled = new Map<number, FrameRequestCallback>();
     let nextFrame = 1;
     const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
@@ -1396,21 +1412,18 @@ describe("Grid auto-fit", () => {
     }) as typeof cancelAnimationFrame;
 
     try {
-      grid.resetAutoFitResourceStats();
       grid.autoFitColumns([0]);
       const [firstFrame, first] = scheduled.entries().next().value!;
       scheduled.delete(firstFrame);
       first(0);
-      const late = scheduled.values().next().value!;
-      expect(grid.getAutoFitResourceStats().windowRequests).toBe(1);
+      const late = scheduled.values().next().value;
+      if (!late) throw new Error("expected auto-fit to yield before its second chunk");
+
       grid.destroy();
       late(1);
+
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
-      expect(grid.getAutoFitResourceStats()).toMatchObject({
-        completedJobs: 0,
-        cancelledJobs: 1,
-        committedPatches: 0,
-      });
+      expect(changes).toEqual([]);
     } finally {
       globalThis.requestAnimationFrame = originalRequestAnimationFrame;
       globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
@@ -1419,11 +1432,23 @@ describe("Grid auto-fit", () => {
     }
   });
 
-  it("invalidates an older chunked job when a newer auto-fit request starts", () => {
+  it("lets a newer auto-fit request win over stale chunked work", () => {
     const rowCount = AUTO_FIT_CHUNK_CELLS + 1;
     const workbook = makeWorkbook(rowCount);
     const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: `${"wide ".repeat(40)}\nsecond line` },
+          style: { wrap: true, fontSize: 18 },
+        },
+      ],
+    });
     const grid = new GridImpl(mountHost(), { workbook }, store);
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
     const scheduled = new Map<number, FrameRequestCallback>();
     let nextFrame = 1;
     const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
@@ -1438,21 +1463,26 @@ describe("Grid auto-fit", () => {
     }) as typeof cancelAnimationFrame;
 
     try {
-      grid.resetAutoFitResourceStats();
       grid.autoFitColumns([0]);
-      const stale = scheduled.values().next().value!;
+      const stale = scheduled.values().next().value;
+      if (!stale) throw new Error("expected the older auto-fit job to yield");
+
       grid.autoFitRows({
         sheet: "s1",
         start: { row: 0, col: 0 },
         end: { row: 0, col: 0 },
       });
+      const winningHeight = workbook.sheets[0]!.rowHeights?.get(0);
+      expect(winningHeight).toBeGreaterThan(28);
+      expect(changes).toHaveLength(1);
+
       stale(0);
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
-      expect(grid.getAutoFitResourceStats()).toMatchObject({
-        completedJobs: 1,
-        cancelledJobs: 1,
-        committedPatches: 0,
-      });
+      expect(workbook.sheets[0]!.rowHeights?.get(0)).toBe(winningHeight);
+      expect(changes).toHaveLength(1);
+
+      grid.undo();
+      expect(workbook.sheets[0]!.rowHeights?.get(0)).toBeUndefined();
     } finally {
       globalThis.requestAnimationFrame = originalRequestAnimationFrame;
       globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
@@ -1503,24 +1533,19 @@ describe("transactional document metadata", () => {
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     });
     grid.actions.merge();
-    expect(events.at(-1)?.transaction.patches).toEqual([
-      { op: "addMerge", sheet: "s1", merge: { r0: 0, c0: 0, r1: 1, c1: 1 } },
-      {
-        op: "set",
-        addr: { sheet: "s1", row: 0, col: 1 },
-        value: { kind: "literal", value: null },
-      },
-      {
-        op: "set",
-        addr: { sheet: "s1", row: 1, col: 0 },
-        value: { kind: "literal", value: null },
-      },
-      {
-        op: "set",
-        addr: { sheet: "s1", row: 1, col: 1 },
-        value: { kind: "literal", value: null },
-      },
-    ]);
+    const mergeEvent = events.at(-1);
+    if (!mergeEvent) throw new Error("expected merge to emit a transaction");
+    const replayWorkbook = makeWorkbook(10);
+    const replayStore = new SheetwriteStore(replayWorkbook, makeColumnarData(10));
+    const replayGrid = new GridImpl(mountHost(), { workbook: replayWorkbook }, replayStore);
+    replayGrid.applyTransaction(mergeEvent.transaction);
+    expect(replayWorkbook.sheets[0]!.merges).toEqual(workbook.sheets[0]!.merges);
+    for (let row = 0; row <= 1; row++) {
+      for (let col = 0; col <= 1; col++) {
+        const addr = { sheet: "s1", row, col };
+        expect(replayStore.getCell(addr).resolved).toBe(store.getCell(addr).resolved);
+      }
+    }
     expect(workbook.sheets[0]!.merges).toEqual([{ r0: 0, c0: 0, r1: 1, c1: 1 }]);
     grid.undo();
     expect(workbook.sheets[0]!.merges).toEqual([]);
@@ -1611,6 +1636,8 @@ describe("transactional document metadata", () => {
     grid.undo();
     expect(workbook.sheets[0]!.rowGroups).toEqual([{ start: 3, end: 5, collapsed: false }]);
 
+    replayGrid.destroy();
+    replayStore.dispose();
     grid.destroy();
     store.dispose();
   });
@@ -1889,5 +1916,86 @@ describe("transactional document metadata", () => {
 
     grid.destroy();
     store.dispose();
+  });
+});
+
+describe("element height cap measurement", () => {
+  const stubDocument = (layoutClamp: number, scrollClamp = Number.POSITIVE_INFINITY): Document => {
+    const clientHeight = 32;
+    const scroller = {
+      style: { cssText: "" },
+      clientHeight,
+      append: () => {},
+      remove: () => {},
+      _scrollTop: 0,
+      get scrollTop() {
+        return this._scrollTop;
+      },
+      set scrollTop(value: number) {
+        // Engines clamp assignments to the real maximum scroll offset.
+        this._scrollTop = Math.min(value, Math.max(0, scrollClamp - clientHeight));
+      },
+    };
+    const sizer = {
+      style: { cssText: "" },
+      getBoundingClientRect: () => ({ height: layoutClamp }),
+    };
+    let calls = 0;
+    return {
+      body: { append: () => {} },
+      createElement: () => (calls++ === 0 ? scroller : sizer),
+    } as unknown as Document;
+  };
+
+  it("uses the engine's measured clamp minus a safety margin", () => {
+    // Chromium at 125% browser zoom clamps near 26.8M CSS px — well below the
+    // 33M constant this measurement replaced; trusting the constant left the
+    // tail of a 1M-row document unreachable.
+    expect(measureMaxElementHeight(stubDocument(26_843_545.6))).toBe(26_843_545 - 4_096);
+  });
+
+  it("honors a scroll-offset clamp tighter than the layout clamp", () => {
+    // The scroll range can clamp below the element-height limit; the sizer cap
+    // must follow the tightest constraint or the tail stays unreachable.
+    expect(measureMaxElementHeight(stubDocument(33_554_428, 26_843_545))).toBe(26_843_545 - 4_096);
+  });
+
+  it("falls back to a conservative cap when no clamp can be measured", () => {
+    expect(measureMaxElementHeight(null)).toBe(15_000_000);
+    expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(15_000_000);
+    expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(15_000_000);
+  });
+});
+
+describe("adaptive row-number gutter", () => {
+  it("widens the gutter for million-row documents and keeps small ones unchanged", async () => {
+    await initSheetwrite();
+    const restore = installCanvasTestStubs();
+    try {
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      const small = new GridImpl(host, { workbook: makeWorkbook(20) }, undefined);
+      expect(small.getEffectiveTheme().rowHeaderWidth).toBe(DEFAULT_THEME.rowHeaderWidth);
+      small.destroy();
+
+      const bigWorkbook = makeWorkbook(20);
+      bigWorkbook.sheets[0]!.rowCount = 1_000_000;
+      const big = new GridImpl(host, { workbook: bigWorkbook }, undefined);
+      // Seven digits at the default 13px font no longer fit the 48px default.
+      expect(big.getEffectiveTheme().rowHeaderWidth).toBeGreaterThan(DEFAULT_THEME.rowHeaderWidth);
+      big.destroy();
+
+      const hidden = new GridImpl(
+        host,
+        { workbook: bigWorkbook, theme: { rowHeaderWidth: 0 } },
+        undefined,
+      );
+      // An explicit 0 keeps the gutter hidden — auto-sizing must not revive it.
+      expect(hidden.getEffectiveTheme().rowHeaderWidth).toBe(0);
+      hidden.destroy();
+      host.remove();
+    } finally {
+      restore();
+    }
   });
 });

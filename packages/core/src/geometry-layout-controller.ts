@@ -12,7 +12,7 @@ interface GeometryLayoutOptions {
   loadable: SheetwriteStore | null;
   theme: () => Theme;
   zoom: () => number;
-  maxElementHeight: number;
+  maxElementHeight: () => number;
 }
 
 export interface GeometryPaintWindow {
@@ -48,7 +48,7 @@ export class GeometryLayoutController {
     this.scrollScale = new ScaledScroll(
       this.rowIndex.totalHeight + options.theme().headerHeight,
       viewportHeight,
-      options.maxElementHeight,
+      options.maxElementHeight(),
     );
   }
 
@@ -303,7 +303,11 @@ export class GeometryLayoutController {
 
   layoutSize(viewportHeight: number): { width: number; height: number } {
     const theme = this.options.theme();
-    this.scrollScale.update(this.rowIndex.totalHeight + theme.headerHeight, viewportHeight);
+    this.scrollScale.update(
+      this.rowIndex.totalHeight + theme.headerHeight,
+      viewportHeight,
+      this.options.maxElementHeight(),
+    );
     return {
       width: this.columnIndex.totalWidth + theme.rowHeaderWidth,
       height: this.scrollScale.sizerHeight,

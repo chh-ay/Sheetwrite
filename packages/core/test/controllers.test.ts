@@ -188,7 +188,7 @@ describe("GeometryLayoutController", () => {
         loadable: null,
         theme: () => DEFAULT_THEME,
         zoom: () => 1,
-        maxElementHeight: 33_000_000,
+        maxElementHeight: () => 33_000_000,
       },
       160,
     );
@@ -241,7 +241,7 @@ describe("RenderCoordinator", () => {
         loadable: null,
         theme: () => DEFAULT_THEME,
         zoom: () => 1,
-        maxElementHeight: 33_000_000,
+        maxElementHeight: () => 33_000_000,
       },
       180,
     );
