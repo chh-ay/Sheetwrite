@@ -21,6 +21,9 @@ plans/
 test-results/
 playwright-report/
 
+# Bench baseline replay scratch (raw rounds; promoted copies are tracked)
+bench/results/candidates/
+
 # Editor / OS
 .DS_Store
 *.log
