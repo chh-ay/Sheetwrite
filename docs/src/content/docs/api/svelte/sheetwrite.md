@@ -22,11 +22,11 @@ Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperativ
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
-(this: void, internals: ComponentInternals, props: SheetwriteProps<Record<string, CellScalar>>): {
+```ts generated
+function Sheetwrite(this: void, internals: ComponentInternals, props: SheetwriteProps<Record<string, CellScalar>>): {
     $on?(type: string, callback: (e: any) => void): () => void;
     $set?(props: Partial<SheetwriteProps<Record<string, CellScalar>>>): void;
-} => ;
+};
 ```
 
 </details>

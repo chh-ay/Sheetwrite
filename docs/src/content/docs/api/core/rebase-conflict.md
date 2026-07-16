@@ -21,22 +21,38 @@ Reason and affected operations for an unsafe document rebase.
 
 <details class="api-member" id="rebase-conflict-code" data-pagefind-weight="1">
 <summary><code>code</code></summary>
-<pre><code>code: RebaseConflictCode;</code></pre>
+
+```ts generated
+code: RebaseConflictCode;
+```
+
 </details>
 
 <details class="api-member" id="rebase-conflict-local-operation-index" data-pagefind-weight="1">
 <summary><code>localOperationIndex</code></summary>
-<pre><code>localOperationIndex: number;</code></pre>
+
+```ts generated
+localOperationIndex: number;
+```
+
 </details>
 
 <details class="api-member" id="rebase-conflict-remote-operation-index" data-pagefind-weight="1">
 <summary><code>remoteOperationIndex</code></summary>
-<pre><code>remoteOperationIndex: number;</code></pre>
+
+```ts generated
+remoteOperationIndex: number;
+```
+
 </details>
 
 <details class="api-member" id="rebase-conflict-message" data-pagefind-weight="1">
 <summary><code>message</code></summary>
-<pre><code>message: string;</code></pre>
+
+```ts generated
+message: string;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Reason and affected operations for an unsafe document rebase.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RebaseConflict {
     code: RebaseConflictCode;
     localOperationIndex: number;

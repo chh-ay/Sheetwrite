@@ -21,17 +21,29 @@ Zero-based address of one cell on a stable sheet ID.
 
 <details class="api-member" id="cell-address-sheet" data-pagefind-weight="1">
 <summary><code>sheet</code></summary>
-<pre><code>sheet: SheetId;</code></pre>
+
+```ts generated
+sheet: SheetId;
+```
+
 </details>
 
 <details class="api-member" id="cell-address-row" data-pagefind-weight="1">
 <summary><code>row</code></summary>
-<pre><code>row: number;</code></pre>
+
+```ts generated
+row: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-address-col" data-pagefind-weight="1">
 <summary><code>col</code></summary>
-<pre><code>col: number;</code></pre>
+
+```ts generated
+col: number;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Zero-based address of one cell on a stable sheet ID.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellAddress {
     sheet: SheetId;
     row: number;

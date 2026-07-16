@@ -18,6 +18,6 @@ polite live region so screen readers announce changes without interrupting.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, grid: Grid): ShellPiece => ;
+```ts generated
+function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece;
 ```

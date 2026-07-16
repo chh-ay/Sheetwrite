@@ -23,11 +23,135 @@ const LEADING_KIND = /^\(([\w-]+)\)\s+/gm;
 const IMPORT_SUFFIX = /\nimport .*$/s;
 const TYPE_MEMBER = /^[A-Z]\w*(<[^>]*>)?:/;
 const FUNCTION_MEMBER = /^\w+\(/;
+const MEMBER_PATH = /^([A-Z][\w$]*(?:<[^>]*>)?)\.([\w$]+)(\??): ([\s\S]+)$/;
 
 export interface SheetwriteCodeHoverOptions {
   cwd: string;
   fsMap?: Map<string, string>;
   shouldTransform?: (codeBlock: ExpressiveCodeBlock) => boolean;
+}
+
+interface ApiManifestShape {
+  packages: readonly {
+    name: string;
+    entryPoints: readonly {
+      subpath: string;
+      classification: string;
+      exports?: readonly {
+        name: string;
+        memberDocs?: readonly { name: string; documentation: string }[];
+      }[];
+    }[];
+  }[];
+}
+
+interface MemberReference {
+  docs: string;
+  route: string;
+}
+
+function referenceAnchor(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Symbol name -> generated reference route, so every hover on a public API
+ * symbol can link straight to its documentation page. Root entry points win
+ * name collisions; `@sheetwrite/core` wins across packages.
+ */
+export function apiReferenceRoutes(manifest: ApiManifestShape): ReadonlyMap<string, string> {
+  const routes = new Map<string, string>();
+  const packages = [...manifest.packages].sort((a, b) =>
+    a.name === "@sheetwrite/core" ? -1 : b.name === "@sheetwrite/core" ? 1 : 0,
+  );
+  for (const pkg of packages) {
+    const packageSlug = pkg.name.replace("@sheetwrite/", "");
+    const entryPoints = [...pkg.entryPoints].sort((a, b) =>
+      a.subpath === "." ? -1 : b.subpath === "." ? 1 : 0,
+    );
+    for (const entry of entryPoints) {
+      if (entry.classification !== "supported") continue;
+      const slug =
+        entry.subpath === "."
+          ? packageSlug
+          : `${packageSlug}-${entry.subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
+      for (const item of entry.exports ?? []) {
+        if (!routes.has(item.name)) {
+          routes.set(item.name, `/docs/api/${slug}/${referenceAnchor(item.name)}/`);
+        }
+      }
+    }
+  }
+  return routes;
+}
+
+/**
+ * Member name -> owning documentation. Framework template hovers (`@ready`,
+ * `onGridChange={…}`) resolve to synthetic bindings without JSDoc; the member
+ * docs from the API manifest restore the depth and a deep link.
+ */
+export function apiMemberReferences(
+  manifest: ApiManifestShape,
+): ReadonlyMap<string, MemberReference> {
+  const members = new Map<string, MemberReference>();
+  const packages = [...manifest.packages].sort((a, b) =>
+    a.name === "@sheetwrite/core" ? -1 : b.name === "@sheetwrite/core" ? 1 : 0,
+  );
+  for (const pkg of packages) {
+    const packageSlug = pkg.name.replace("@sheetwrite/", "");
+    for (const entry of pkg.entryPoints) {
+      if (entry.classification !== "supported") continue;
+      const slug =
+        entry.subpath === "."
+          ? packageSlug
+          : `${packageSlug}-${entry.subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
+      for (const item of entry.exports ?? []) {
+        for (const member of item.memberDocs ?? []) {
+          if (!member.documentation || members.has(member.name)) continue;
+          members.set(member.name, {
+            docs: member.documentation,
+            route: `/docs/api/${slug}/${referenceAnchor(item.name)}/#${referenceAnchor(item.name)}-${referenceAnchor(member.name)}`,
+          });
+        }
+      }
+    }
+  }
+  return members;
+}
+
+/** `grid-change` template events document as the adapter's `onGridChange` member. */
+function memberLookupNames(target: string): string[] {
+  const names = [target];
+  if (/^[a-z][\w-]*$/.test(target)) {
+    const camel = target
+      .split("-")
+      .map((part, index) => (index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+      .join("");
+    names.push(`on${camel.charAt(0).toUpperCase()}${camel.slice(1)}`);
+  }
+  return names;
+}
+
+function memberDocsFor(
+  target: string,
+  signature: string,
+  members: ReadonlyMap<string, MemberReference>,
+): MemberReference | undefined {
+  // The displayed binding (`let onReady: …`) names the semantic member; the
+  // raw hover target (`ready`, `grid-change`) is only a fallback spelling.
+  const declared = /^(?:let|const|var|function)\s+([A-Za-z_$][\w$]*)/.exec(signature)?.[1];
+  const candidates = declared
+    ? [declared, ...memberLookupNames(target)]
+    : memberLookupNames(target);
+  for (const name of candidates) {
+    const member = members.get(name);
+    if (member) return member;
+  }
+  return undefined;
 }
 
 interface RenderedHover {
@@ -36,6 +160,7 @@ interface RenderedHover {
   narrowSignature: ElementContent[];
   docs?: string;
   tags: readonly [name: string, text: string | undefined][];
+  referenceRoute?: string;
 }
 
 function nestedRendererConfig(config: ResolvedExpressiveCodeEngineConfig) {
@@ -68,8 +193,17 @@ function normalizeQuickInfo(raw: string): string {
   return signature;
 }
 
-async function formatSignature(signature: string, printWidth: number): Promise<string> {
-  if (!signature) return signature;
+/** Rewrites checker member paths into parseable TS so signatures render with syntax colors. */
+function renderableSignature(signature: string): string {
+  const member = signature.match(MEMBER_PATH);
+  if (member) return `interface ${member[1]} { ${member[2]}${member[3]}: ${member[4]} }`;
+  if (/^[a-z_$][\w$]*: /.test(signature)) return `let ${signature}`;
+  return signature;
+}
+
+async function formatSignature(rawSignature: string, printWidth: number): Promise<string> {
+  if (!rawSignature) return rawSignature;
+  const signature = renderableSignature(rawSignature);
 
   const needsDeclaration = /^(const|let|var|function)\b/.test(signature);
   const source = needsDeclaration ? `declare ${signature.replace(/;?$/, ";")}` : signature;
@@ -106,14 +240,19 @@ function codeLineContents(ast: Element): ElementContent[] {
 }
 
 function cleanDocumentation(value: string): string {
-  return value
-    .replace(/\{@link\s+([^}|\s]+)(?:\s*\|\s*([^}]+))?\}/g, (_, target: string, label?: string) =>
-      (label ?? target).trim(),
-    )
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    value
+      // Unwrap fenced examples before inline-code cleanup so no stray fences survive.
+      .replace(/```[\w-]*\s*([\s\S]*?)```/g, "$1")
+      .replace(/\{@link\s+([^}|\s]+)(?:\s*\|\s*([^}]+))?\}/g, (_, target: string, label?: string) =>
+        (label ?? target).trim(),
+      )
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 function resolvedQuickInfo(hover: SheetwriteTypeHover, language: string): string {
@@ -250,6 +389,50 @@ export function collectFenceHovers(
   );
 }
 
+function hashIdentifier(value: string): string {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function hoverPopoverId(
+  codeBlock: Pick<ExpressiveCodeBlock, "code" | "language" | "meta" | "parentDocument">,
+  hover: Pick<SheetwriteTypeHover, "character" | "length" | "line" | "target">,
+  hoverIndex: number,
+): string {
+  const groupIndex = codeBlock.parentDocument?.positionInDocument?.groupIndex;
+  const blockIdentity =
+    groupIndex === undefined
+      ? hashIdentifier(`${codeBlock.language}\0${codeBlock.meta}\0${codeBlock.code}`)
+      : String(groupIndex);
+  return `sheetwrite-code-popover-${blockIdentity}-${hoverIndex}-${hover.line}-${hover.character}-${hover.length}-${hashIdentifier(hover.target)}`;
+}
+
+/** Render a cleaned tag value with bare URLs as real links, like the reference footer. */
+function tagValueContents(value: string): ElementContent[] {
+  const cleaned = cleanDocumentation(value);
+  const contents: ElementContent[] = [];
+  const urlPattern = /https?:\/\/[^\s"'<>)]+/g;
+  let cursor = 0;
+  for (const match of cleaned.matchAll(urlPattern)) {
+    const start = match.index ?? 0;
+    if (start > cursor) contents.push({ type: "text", value: cleaned.slice(cursor, start) });
+    contents.push(
+      h(
+        "a.sw-code-popover__tag-link",
+        { href: match[0], rel: "noreferrer", target: "_blank" },
+        match[0].replace(/^https?:\/\//, "").replace(/\/$/, ""),
+      ),
+    );
+    cursor = start + match[0].length;
+  }
+  if (cursor < cleaned.length) contents.push({ type: "text", value: cleaned.slice(cursor) });
+  return contents;
+}
+
 class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   override readonly name = "sheetwrite-code-hover";
 
@@ -267,6 +450,11 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   }
 
   override render({ nodesToTransform }: AnnotationRenderOptions): Element[] {
+    const kind = this.rendered.docs
+      ? "documented"
+      : this.rendered.referenceRoute
+        ? "reference"
+        : "type";
     return nodesToTransform.map((node) =>
       h("span.sw-code-popover", [
         h(
@@ -275,6 +463,7 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
             tabIndex: 0,
             ariaDescribedBy: this.popoverId,
             dataSwCodePopoverTrigger: this.popoverId,
+            dataHoverKind: kind,
           },
           [node],
         ),
@@ -308,9 +497,17 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
                   this.rendered.tags.map(([name, value]) =>
                     h("span.sw-code-popover__tag", [
                       h("span.sw-code-popover__tag-name", `@${name}`),
-                      value ? ` ${cleanDocumentation(value)}` : "",
+                      ...(value ? [{ type: "text", value: " " } as ElementContent] : []),
+                      ...(value ? tagValueContents(value) : []),
                     ]),
                   ),
+                )
+              : [],
+            this.rendered.referenceRoute
+              ? h(
+                  "a.sw-code-popover__link",
+                  { href: this.rendered.referenceRoute },
+                  "API reference →",
                 )
               : [],
           ],
@@ -323,7 +520,24 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
 export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
   const analyzer = new SheetwriteTypeEngine({ cwd: options.cwd, fsMap: options.fsMap });
   let signatureRenderer: ExpressiveCode | undefined;
-  let popoverSequence = 0;
+  let referenceRoutes: ReadonlyMap<string, string> | undefined;
+  let memberReferences: ReadonlyMap<string, MemberReference> | undefined;
+
+  const resolveManifest = async (): Promise<void> => {
+    if (referenceRoutes && memberReferences) return;
+    try {
+      const { readFile } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const manifestPath = join(options.cwd, "src/generated/public-api.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as ApiManifestShape;
+      referenceRoutes = apiReferenceRoutes(manifest);
+      memberReferences = apiMemberReferences(manifest);
+    } catch {
+      // Docs generation has not run yet; hovers simply render without links.
+      referenceRoutes = new Map();
+      memberReferences = new Map();
+    }
+  };
 
   return definePlugin({
     name: "sheetwrite-code-hovers",
@@ -340,11 +554,21 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           codeBlock.metaOptions.getString("prelude"),
         ).filter((hover) => isHighQualityHover(hover, codeBlock.language));
 
-        for (const hover of hovers) {
+        await resolveManifest();
+        const routes = referenceRoutes ?? new Map<string, string>();
+        const members = memberReferences ?? new Map<string, MemberReference>();
+        for (const [hoverIndex, hover] of hovers.entries()) {
           const line = codeBlock.getLine(hover.line);
           if (!line) continue;
           const accessibleSignature = resolvedQuickInfo(hover, codeBlock.language);
           if (!accessibleSignature) continue;
+          // Import aliases and self-restating declarations waste the reader's hover.
+          if (/^import\s/.test(accessibleSignature)) continue;
+          const hasDetails = Boolean(hover.docs) || (hover.tags?.length ?? 0) > 0;
+          if (!hasDetails) {
+            const restated = accessibleSignature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
+            if (line.text.replace(/\s+/g, " ").includes(restated)) continue;
+          }
           const [wideSignature, narrowSignature] = await Promise.all([
             formatSignature(accessibleSignature, 68),
             formatSignature(accessibleSignature, 34),
@@ -361,8 +585,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
               meta: "",
             }),
           ]);
-          const popoverId = `sheetwrite-code-popover-${popoverSequence}`;
-          popoverSequence += 1;
+          const popoverId = hoverPopoverId(codeBlock, hover, hoverIndex);
           line.addAnnotation(
             new SheetwriteHoverAnnotation(
               hover,
@@ -370,8 +593,10 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 accessibleSignature,
                 wideSignature: codeLineContents(renderedWideSignature.renderedGroupAst),
                 narrowSignature: codeLineContents(renderedNarrowSignature.renderedGroupAst),
-                docs: hover.docs,
+                docs: hover.docs ?? memberDocsFor(hover.target, accessibleSignature, members)?.docs,
                 tags: hover.tags ?? [],
+                referenceRoute:
+                  routes.get(hover.target) ?? memberDocsFor(hover.target, accessibleSignature, members)?.route,
               },
               popoverId,
             ),

@@ -17,6 +17,6 @@ Advanced framework component for workbook data or datasource input.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(props: SheetwriteGridProps & React.RefAttributes<Grid>): ReactNode => ;
+```ts generated
+function SheetwriteGrid(props: SheetwriteGridProps & React.RefAttributes<Grid>): ReactNode;
 ```

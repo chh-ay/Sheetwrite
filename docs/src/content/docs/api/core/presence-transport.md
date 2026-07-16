@@ -21,12 +21,20 @@ Host transport contract for ephemeral presence messages.
 
 <details class="api-member" id="presence-transport-publish" data-pagefind-weight="1">
 <summary><code>publish</code></summary>
-<pre><code>publish(message: PresenceMessage, signal?: AbortSignal): void | Promise&lt;void&gt;;</code></pre>
+
+```ts generated
+publish(message: PresenceMessage, signal?: AbortSignal): void | Promise<void>;
+```
+
 </details>
 
 <details class="api-member" id="presence-transport-subscribe" data-pagefind-weight="1">
 <summary><code>subscribe</code></summary>
-<pre><code>subscribe( listener: (message: PresenceMessage) =&gt; void, signal?: AbortSignal, ): undefined | (() =&gt; void);</code></pre>
+
+```ts generated
+subscribe( listener: (message: PresenceMessage) => void, signal?: AbortSignal, ): undefined | (() => void);
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Host transport contract for ephemeral presence messages.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PresenceTransport {
     publish(message: PresenceMessage, signal?: AbortSignal): void | Promise<void>;
     subscribe(listener: (message: PresenceMessage) => void, signal?: AbortSignal): undefined | (() => void);

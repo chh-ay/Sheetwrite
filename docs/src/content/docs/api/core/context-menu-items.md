@@ -27,7 +27,7 @@ Static rows or a context-aware factory evaluated each time the menu opens.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ContextMenuItems = readonly ContextMenuItem[] | ((context: ContextMenuContext) => readonly ContextMenuItem[]);
 ```
 

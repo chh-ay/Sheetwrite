@@ -25,19 +25,29 @@ sort/filter view — while the `(row, col)` inputs of
 
 <details class="api-member" id="cell-input-snapshot-address" data-pagefind-weight="1">
 <summary><code>address</code> <span class="api-member-summary">Underlying data address, suitable for a set patch.</span></summary>
-<pre><code>readonly address: CellAddress;</code></pre>
-<p class="api-member-doc">Underlying data address, suitable for a `set` patch.</p>
+
+```ts generated
+readonly address: CellAddress;
+```
+
 </details>
 
 <details class="api-member" id="cell-input-snapshot-text" data-pagefind-weight="1">
 <summary><code>text</code> <span class="api-member-summary">Formula source when the cell is a formula, else the literal display text.</span></summary>
-<pre><code>readonly text: string;</code></pre>
+
+```ts generated
+readonly text: string;
+```
+
 </details>
 
 <details class="api-member" id="cell-input-snapshot-format" data-pagefind-weight="1">
 <summary><code>format</code> <span class="api-member-summary">Column input format, for parseCellInput.</span></summary>
-<pre><code>readonly format: CellFormat;</code></pre>
-<p class="api-member-doc">Column input format, for `parseCellInput`.</p>
+
+```ts generated
+readonly format: CellFormat;
+```
+
 </details>
 </div>
 
@@ -46,7 +56,7 @@ sort/filter view — while the `(row, col)` inputs of
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellInputSnapshot {
     readonly address: CellAddress;
     readonly text: string;

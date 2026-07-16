@@ -21,17 +21,29 @@ Comment mutation paired with its assigned server version.
 
 <details class="api-member" id="versioned-comment-event-version" data-pagefind-weight="1">
 <summary><code>version</code></summary>
-<pre><code>version: number;</code></pre>
+
+```ts generated
+version: number;
+```
+
 </details>
 
 <details class="api-member" id="versioned-comment-event-thread" data-pagefind-weight="1">
 <summary><code>thread</code></summary>
-<pre><code>thread: CommentThread;</code></pre>
+
+```ts generated
+thread: CommentThread;
+```
+
 </details>
 
 <details class="api-member" id="versioned-comment-event-client-mutation-id" data-pagefind-weight="1">
 <summary><code>clientMutationId</code></summary>
-<pre><code>clientMutationId?: string;</code></pre>
+
+```ts generated
+clientMutationId?: string;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Comment mutation paired with its assigned server version.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface VersionedCommentEvent {
     version: number;
     thread: CommentThread;

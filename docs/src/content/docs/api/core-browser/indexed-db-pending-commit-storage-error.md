@@ -15,13 +15,38 @@ Typed IndexedDB failure raised by durable pending-commit storage.
 <div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L19</code></dd></div>
 </dl>
 
-## Signature
+## Members <span class="api-count">2</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="indexed-db-pending-commit-storage-error-constructor" data-pagefind-weight="1">
+<summary><code>constructor</code></summary>
+
+```ts generated
+constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions);
+```
+
+</details>
+
+<details class="api-member" id="indexed-db-pending-commit-storage-error-code" data-pagefind-weight="1">
+<summary><code>code</code></summary>
+
+```ts generated
+code: IndexedDbPendingCommitStorageErrorCode
+```
+
+</details>
+</div>
+
+## Declaration
 
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
-class IndexedDbPendingCommitStorageError {
+```ts generated
+class IndexedDbPendingCommitStorageError extends Error {
+    constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions);
+    code: IndexedDbPendingCommitStorageErrorCode;
 }
 ```
 

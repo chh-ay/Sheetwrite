@@ -20,8 +20,8 @@ Advanced framework component for workbook data or datasource input.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
-ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToResolvedProps<ExtractPropTypes<{
+```ts generated
+const SheetwriteGrid: ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToResolvedProps<ExtractPropTypes<{
     workbook: {
         type: PropType<Workbook>;
         required: true;
@@ -346,7 +346,7 @@ ComponentPublicInstanceConstructor<CreateComponentPublicInstanceWithMixins<ToRes
     minColumns: number;
     config: GridConfig | undefined;
     wasmSource: string | BufferSource | Request | URL | WebAssembly.Module | undefined;
-}, {}, string, {}, GlobalComponents, GlobalDirectives, string, ComponentProvideOptions> & VNodeProps & AllowedComponentProps & ComponentCustomProps & (new ());
+}, {}, string, {}, GlobalComponents, GlobalDirectives, string, ComponentProvideOptions> & VNodeProps & AllowedComponentProps & ComponentCustomProps & (new () => InstanceType<typeof SheetwriteGridComponent> & SheetwriteGridExpose);
 ```
 
 </details>

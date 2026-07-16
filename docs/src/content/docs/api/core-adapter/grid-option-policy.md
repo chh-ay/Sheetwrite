@@ -20,23 +20,23 @@ Classification of adapter options as live-updatable or reset-sensitive.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
-{
-    workbook: "reset";
-    data: "reset";
-    datasource: "reset";
-    datasourceStorage: "reset";
-    renderer: "reset";
-    workerUrl: "reset";
-    renderers: "reset";
-    protectionResolver: "reset";
-    mutationPolicy: "reset";
-    theme: "live";
-    readOnly: "live";
-    config: "live";
-    overscan: "live";
-    minColumns: "live";
-}
+```ts generated
+const GRID_OPTION_POLICY: {
+    readonly workbook: "reset";
+    readonly data: "reset";
+    readonly datasource: "reset";
+    readonly datasourceStorage: "reset";
+    readonly renderer: "reset";
+    readonly workerUrl: "reset";
+    readonly renderers: "reset";
+    readonly protectionResolver: "reset";
+    readonly mutationPolicy: "reset";
+    readonly theme: "live";
+    readonly readOnly: "live";
+    readonly config: "live";
+    readonly overscan: "live";
+    readonly minColumns: "live";
+};
 ```
 
 </details>

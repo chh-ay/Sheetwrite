@@ -32,7 +32,7 @@ a currency `numberFormat` (e.g. `$#,##0.00`).
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type CellFormat = "text" | "number" | "date" | "currency";
 ```
 

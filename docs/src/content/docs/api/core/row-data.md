@@ -17,6 +17,6 @@ Object-shaped datasource row keyed by workbook column keys.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type RowData = Record<string, DataCell>;
 ```

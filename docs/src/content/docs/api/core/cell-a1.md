@@ -17,6 +17,6 @@ tableOfContents: false
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(row: number, col: number): string => ;
+```ts generated
+function cellA1(row: number, col: number): string;
 ```

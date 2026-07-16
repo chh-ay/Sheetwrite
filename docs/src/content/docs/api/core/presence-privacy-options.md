@@ -21,22 +21,38 @@ Controls which ephemeral collaborator details may be transmitted.
 
 <details class="api-member" id="presence-privacy-options-share-display-name" data-pagefind-weight="1">
 <summary><code>shareDisplayName</code></summary>
-<pre><code>shareDisplayName?: boolean;</code></pre>
+
+```ts generated
+shareDisplayName?: boolean;
+```
+
 </details>
 
 <details class="api-member" id="presence-privacy-options-share-selection" data-pagefind-weight="1">
 <summary><code>shareSelection</code></summary>
-<pre><code>shareSelection?: boolean;</code></pre>
+
+```ts generated
+shareSelection?: boolean;
+```
+
 </details>
 
 <details class="api-member" id="presence-privacy-options-receive-presence" data-pagefind-weight="1">
 <summary><code>receivePresence</code></summary>
-<pre><code>receivePresence?: boolean;</code></pre>
+
+```ts generated
+receivePresence?: boolean;
+```
+
 </details>
 
 <details class="api-member" id="presence-privacy-options-allow-actor" data-pagefind-weight="1">
 <summary><code>allowActor</code></summary>
-<pre><code>allowActor?: (actor: Readonly&lt;PresenceActor&gt;) =&gt; boolean;</code></pre>
+
+```ts generated
+allowActor?: (actor: Readonly<PresenceActor>) => boolean;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Controls which ephemeral collaborator details may be transmitted.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PresencePrivacyOptions {
     shareDisplayName?: boolean;
     shareSelection?: boolean;

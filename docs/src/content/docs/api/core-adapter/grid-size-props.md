@@ -27,7 +27,7 @@ Explicit width and height accepted by framework adapters.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type GridSizeProps = {
     height: number | string;
     fill?: never;

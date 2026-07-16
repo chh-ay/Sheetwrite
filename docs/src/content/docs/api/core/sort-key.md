@@ -21,12 +21,20 @@ One key of a multi-column sort, applied in array order (first = primary).
 
 <details class="api-member" id="sort-key-col" data-pagefind-weight="1">
 <summary><code>col</code></summary>
-<pre><code>col: number;</code></pre>
+
+```ts generated
+col: number;
+```
+
 </details>
 
 <details class="api-member" id="sort-key-ascending" data-pagefind-weight="1">
 <summary><code>ascending</code></summary>
-<pre><code>ascending: boolean;</code></pre>
+
+```ts generated
+ascending: boolean;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ One key of a multi-column sort, applied in array order (first = primary).
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SortKey {
     col: number;
     ascending: boolean;

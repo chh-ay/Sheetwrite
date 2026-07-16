@@ -17,6 +17,6 @@ Registers the optional table XLSX import implementation used by core.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(next: XlsxTableImportBackend): void => ;
+```ts generated
+function setXlsxTableImportBackend(next: XlsxTableImportBackend): void;
 ```

@@ -21,17 +21,29 @@ Path-qualified validation failure for a document operation.
 
 <details class="api-member" id="document-validation-error-path" data-pagefind-weight="1">
 <summary><code>path</code></summary>
-<pre><code>path: string;</code></pre>
+
+```ts generated
+path: string;
+```
+
 </details>
 
 <details class="api-member" id="document-validation-error-code" data-pagefind-weight="1">
 <summary><code>code</code></summary>
-<pre><code>code: | &quot;unsupported-schema&quot; | &quot;invalid-value&quot; | &quot;duplicate-id&quot; | &quot;missing-reference&quot; | &quot;out-of-bounds&quot; | &quot;overlapping-merge&quot; | &quot;non-serializable&quot;;</code></pre>
+
+```ts generated
+code: | "unsupported-schema" | "invalid-value" | "duplicate-id" | "missing-reference" | "out-of-bounds" | "overlapping-merge" | "non-serializable";
+```
+
 </details>
 
 <details class="api-member" id="document-validation-error-message" data-pagefind-weight="1">
 <summary><code>message</code></summary>
-<pre><code>message: string;</code></pre>
+
+```ts generated
+message: string;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Path-qualified validation failure for a document operation.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface DocumentValidationError {
     path: string;
     code: "unsupported-schema" | "invalid-value" | "duplicate-id" | "missing-reference" | "out-of-bounds" | "overlapping-merge" | "non-serializable";

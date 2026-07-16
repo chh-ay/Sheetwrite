@@ -30,7 +30,7 @@ the WASM calculation engine.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type CellValue = {
     kind: "literal";
     value: CellScalar;

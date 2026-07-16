@@ -21,7 +21,11 @@ Host subscription contract for ordered versioned operations.
 
 <details class="api-member" id="remote-operation-source-subscribe" data-pagefind-weight="1">
 <summary><code>subscribe</code></summary>
-<pre><code>subscribe( listener: (operation: VersionedOperation) =&gt; void, signal?: AbortSignal, ): undefined | (() =&gt; void);</code></pre>
+
+```ts generated
+subscribe( listener: (operation: VersionedOperation) => void, signal?: AbortSignal, ): undefined | (() => void);
+```
+
 </details>
 </div>
 
@@ -30,7 +34,7 @@ Host subscription contract for ordered versioned operations.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface RemoteOperationSource {
     subscribe(listener: (operation: VersionedOperation) => void, signal?: AbortSignal): undefined | (() => void);
 }

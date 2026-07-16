@@ -25,7 +25,11 @@ that participate in read-only policy and undo/redo history.
 
 <details class="api-member" id="grid-transaction-patches" data-pagefind-weight="1">
 <summary><code>patches</code></summary>
-<pre><code>patches: DocumentOp[];</code></pre>
+
+```ts generated
+patches: DocumentOp[];
+```
+
 </details>
 </div>
 
@@ -34,7 +38,7 @@ that participate in read-only policy and undo/redo history.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface GridTransaction {
     patches: DocumentOp[];
 }

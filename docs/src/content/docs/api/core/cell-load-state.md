@@ -29,7 +29,7 @@ Datasource loading state for a resolved cell.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type CellLoadState = "unloaded" | "loaded-empty" | "loaded-value" | "local-edit";
 ```
 

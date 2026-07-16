@@ -21,8 +21,11 @@ Imperative Grid handle exposed by the Vue advanced component.
 
 <details class="api-member" id="sheetwrite-grid-expose-grid" data-pagefind-weight="1">
 <summary><code>grid</code> <span class="api-member-summary">Live Grid after readiness, or null before initialization and during teardown.</span></summary>
-<pre><code>grid: Grid | null;</code></pre>
-<p class="api-member-doc">Live Grid after readiness, or `null` before initialization and during teardown.</p>
+
+```ts generated
+grid: Grid | null;
+```
+
 </details>
 </div>
 
@@ -31,7 +34,7 @@ Imperative Grid handle exposed by the Vue advanced component.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SheetwriteGridExpose {
     grid: Grid | null;
 }

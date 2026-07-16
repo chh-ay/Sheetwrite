@@ -20,6 +20,6 @@ verbatim, and empty cells become `null`.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> => ;
+```ts generated
+function fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
 ```

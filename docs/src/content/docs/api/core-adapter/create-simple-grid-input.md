@@ -17,6 +17,6 @@ Converts simple columns and row objects into canonical workbook and columnar inp
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-<Row extends Record<string, CellScalar> ?  : >(options);
+```ts generated
+function createSimpleGridInput<Row extends Record<string, CellScalar>>(options: SimpleSheetwriteOptions<Row>): SimpleGridInput;
 ```

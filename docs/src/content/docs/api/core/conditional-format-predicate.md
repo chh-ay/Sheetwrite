@@ -29,7 +29,7 @@ Predicate used to decide whether a conditional format applies.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ConditionalFormatPredicate = {
     kind: "greaterThan";
     value: number;

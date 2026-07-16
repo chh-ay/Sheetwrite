@@ -17,6 +17,6 @@ Exhaustive stable target identity used by persistence/logging layers.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(operation: DocumentOp): string => ;
+```ts generated
+function documentOpTarget(operation: DocumentOp): string;
 ```

@@ -30,6 +30,6 @@ parsing is identical everywhere instead of re-derived per consumer.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(raw: string, type: CellFormat): CellValue => ;
+```ts generated
+function parseCellInput(raw: string, type: CellFormat): CellValue;
 ```

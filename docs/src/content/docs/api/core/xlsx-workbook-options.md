@@ -21,12 +21,20 @@ Workbook XLSX conversion options passed to the registered backend.
 
 <details class="api-member" id="xlsx-workbook-options-signal" data-pagefind-weight="1">
 <summary><code>signal</code> <span class="api-member-summary">Abort before or between workbook model operations.</span></summary>
-<pre><code>signal?: AbortSignal;</code></pre>
+
+```ts generated
+signal?: AbortSignal;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-max-cells" data-pagefind-weight="1">
 <summary><code>maxCells</code> <span class="api-member-summary">Maximum populated cells accepted by the in-memory ExcelJS document model.</span></summary>
-<pre><code>maxCells?: number;</code></pre>
+
+```ts generated
+maxCells?: number;
+```
+
 <p class="api-member-doc">Maximum populated cells accepted by the in-memory ExcelJS document model.
 Defaults to 1,000,000. Use a lower host-specific bound for constrained
 browsers; table APIs remain available for larger streaming interchange.</p>
@@ -34,7 +42,11 @@ browsers; table APIs remain available for larger streaming interchange.</p>
 
 <details class="api-member" id="xlsx-workbook-options-on-warning" data-pagefind-weight="1">
 <summary><code>onWarning</code></summary>
-<pre><code>onWarning?: (warning: XlsxWorkbookWarning) =&gt; void;</code></pre>
+
+```ts generated
+onWarning?: (warning: XlsxWorkbookWarning) => void;
+```
+
 </details>
 </div>
 
@@ -43,7 +55,7 @@ browsers; table APIs remain available for larger streaming interchange.</p>
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface XlsxWorkbookOptions {
     signal?: AbortSignal;
     maxCells?: number;

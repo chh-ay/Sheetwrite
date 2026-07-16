@@ -21,12 +21,20 @@ Eager column-oriented values used to initialize a sheet.
 
 <details class="api-member" id="columnar-data-row-count" data-pagefind-weight="1">
 <summary><code>rowCount</code></summary>
-<pre><code>rowCount: number;</code></pre>
+
+```ts generated
+rowCount: number;
+```
+
 </details>
 
 <details class="api-member" id="columnar-data-columns" data-pagefind-weight="1">
 <summary><code>columns</code></summary>
-<pre><code>columns: Record&lt;string, ArrayLike&lt;CellScalar | CellValue&gt;&gt;;</code></pre>
+
+```ts generated
+columns: Record<string, ArrayLike<CellScalar | CellValue>>;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Eager column-oriented values used to initialize a sheet.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ColumnarData {
     rowCount: number;
     columns: Record<string, ArrayLike<CellScalar | CellValue>>;

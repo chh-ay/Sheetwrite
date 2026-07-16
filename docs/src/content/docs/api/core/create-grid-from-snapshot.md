@@ -18,6 +18,6 @@ the hydrated store just like one created through `createGrid`.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, snapshot: unknown, options?: SnapshotGridOptions): Grid => ;
+```ts generated
+function createGridFromSnapshot(host: HTMLElement, snapshot: unknown, options?: SnapshotGridOptions): Grid;
 ```

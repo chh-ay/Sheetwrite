@@ -21,22 +21,38 @@ Serializable client UX policy. A host resolver decides whether a local mutation 
 
 <details class="api-member" id="protected-range-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-<pre><code>id: string;</code></pre>
+
+```ts generated
+id: string;
+```
+
 </details>
 
 <details class="api-member" id="protected-range-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-<pre><code>range: Range;</code></pre>
+
+```ts generated
+range: Range;
+```
+
 </details>
 
 <details class="api-member" id="protected-range-label" data-pagefind-weight="1">
 <summary><code>label</code></summary>
-<pre><code>label?: string;</code></pre>
+
+```ts generated
+label?: string;
+```
+
 </details>
 
 <details class="api-member" id="protected-range-permission-key" data-pagefind-weight="1">
 <summary><code>permissionKey</code></summary>
-<pre><code>permissionKey?: string;</code></pre>
+
+```ts generated
+permissionKey?: string;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Serializable client UX policy. A host resolver decides whether a local mutation 
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ProtectedRange {
     id: string;
     range: Range;

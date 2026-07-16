@@ -21,7 +21,11 @@ Pending commit paired with its current synchronization status.
 
 <details class="api-member" id="sync-mutation-record-status" data-pagefind-weight="1">
 <summary><code>status</code></summary>
-<pre><code>status: SyncMutationStatus;</code></pre>
+
+```ts generated
+status: SyncMutationStatus;
+```
+
 </details>
 </div>
 
@@ -30,7 +34,7 @@ Pending commit paired with its current synchronization status.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SyncMutationRecord extends PendingCommit {
     status: SyncMutationStatus;
 }

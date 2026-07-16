@@ -20,6 +20,6 @@ focus. Returns the mounted piece with an idempotent `destroy`.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, grid: Grid, options?: ToolbarOptions): ShellPiece => ;
+```ts generated
+function createToolbar(host: HTMLElement, grid: Grid, options?: ToolbarOptions): ShellPiece;
 ```

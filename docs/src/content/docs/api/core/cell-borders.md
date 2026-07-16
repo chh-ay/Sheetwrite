@@ -21,27 +21,47 @@ Per-side borders; `all` applies to any side not given its own border.
 
 <details class="api-member" id="cell-borders-all" data-pagefind-weight="1">
 <summary><code>all</code></summary>
-<pre><code>all?: CellBorder;</code></pre>
+
+```ts generated
+all?: CellBorder;
+```
+
 </details>
 
 <details class="api-member" id="cell-borders-top" data-pagefind-weight="1">
 <summary><code>top</code></summary>
-<pre><code>top?: CellBorder;</code></pre>
+
+```ts generated
+top?: CellBorder;
+```
+
 </details>
 
 <details class="api-member" id="cell-borders-right" data-pagefind-weight="1">
 <summary><code>right</code></summary>
-<pre><code>right?: CellBorder;</code></pre>
+
+```ts generated
+right?: CellBorder;
+```
+
 </details>
 
 <details class="api-member" id="cell-borders-bottom" data-pagefind-weight="1">
 <summary><code>bottom</code></summary>
-<pre><code>bottom?: CellBorder;</code></pre>
+
+```ts generated
+bottom?: CellBorder;
+```
+
 </details>
 
 <details class="api-member" id="cell-borders-left" data-pagefind-weight="1">
 <summary><code>left</code></summary>
-<pre><code>left?: CellBorder;</code></pre>
+
+```ts generated
+left?: CellBorder;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Per-side borders; `all` applies to any side not given its own border.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellBorders {
     all?: CellBorder;
     top?: CellBorder;

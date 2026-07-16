@@ -20,6 +20,6 @@ cannot represent as a Date. Construct calendar dates with `Date.UTC(...)`
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(date: Date): number => ;
+```ts generated
+function dateToSerial(date: Date): number;
 ```

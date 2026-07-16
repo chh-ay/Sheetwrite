@@ -27,7 +27,7 @@ Structured warning or rejection produced while applying an operation.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type MutationIssue = {
     kind: "validation";
     severity: "error" | "warning";

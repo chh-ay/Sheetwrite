@@ -21,42 +21,74 @@ Versioned discussion anchored to a document location.
 
 <details class="api-member" id="comment-thread-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-<pre><code>id: string;</code></pre>
+
+```ts generated
+id: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-thread-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-thread-anchor" data-pagefind-weight="1">
 <summary><code>anchor</code></summary>
-<pre><code>anchor: CommentAnchor;</code></pre>
+
+```ts generated
+anchor: CommentAnchor;
+```
+
 </details>
 
 <details class="api-member" id="comment-thread-version" data-pagefind-weight="1">
 <summary><code>version</code></summary>
-<pre><code>version: number;</code></pre>
+
+```ts generated
+version: number;
+```
+
 </details>
 
 <details class="api-member" id="comment-thread-messages" data-pagefind-weight="1">
 <summary><code>messages</code></summary>
-<pre><code>messages: readonly CommentMessage[];</code></pre>
+
+```ts generated
+messages: readonly CommentMessage[];
+```
+
 </details>
 
 <details class="api-member" id="comment-thread-resolved" data-pagefind-weight="1">
 <summary><code>resolved</code></summary>
-<pre><code>resolved: boolean;</code></pre>
+
+```ts generated
+resolved: boolean;
+```
+
 </details>
 
 <details class="api-member" id="comment-thread-resolved-by" data-pagefind-weight="1">
 <summary><code>resolvedBy</code></summary>
-<pre><code>resolvedBy?: CommentAuthorRef;</code></pre>
+
+```ts generated
+resolvedBy?: CommentAuthorRef;
+```
+
 </details>
 
 <details class="api-member" id="comment-thread-resolved-at" data-pagefind-weight="1">
 <summary><code>resolvedAt</code></summary>
-<pre><code>resolvedAt?: string;</code></pre>
+
+```ts generated
+resolvedAt?: string;
+```
+
 </details>
 </div>
 
@@ -65,7 +97,7 @@ Versioned discussion anchored to a document location.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CommentThread {
     id: string;
     documentId: string;

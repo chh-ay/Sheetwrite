@@ -21,37 +21,65 @@ Read-only cell and canvas geometry supplied to a custom renderer.
 
 <details class="api-member" id="cell-paint-context-value" data-pagefind-weight="1">
 <summary><code>value</code></summary>
-<pre><code>value: CellScalar;</code></pre>
+
+```ts generated
+value: CellScalar;
+```
+
 </details>
 
 <details class="api-member" id="cell-paint-context-x" data-pagefind-weight="1">
 <summary><code>x</code></summary>
-<pre><code>x: number;</code></pre>
+
+```ts generated
+x: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-paint-context-y" data-pagefind-weight="1">
 <summary><code>y</code></summary>
-<pre><code>y: number;</code></pre>
+
+```ts generated
+y: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-paint-context-w" data-pagefind-weight="1">
 <summary><code>w</code></summary>
-<pre><code>w: number;</code></pre>
+
+```ts generated
+w: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-paint-context-h" data-pagefind-weight="1">
 <summary><code>h</code></summary>
-<pre><code>h: number;</code></pre>
+
+```ts generated
+h: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-paint-context-theme" data-pagefind-weight="1">
 <summary><code>theme</code></summary>
-<pre><code>theme: Theme;</code></pre>
+
+```ts generated
+theme: Theme;
+```
+
 </details>
 
 <details class="api-member" id="cell-paint-context-style" data-pagefind-weight="1">
 <summary><code>style</code></summary>
-<pre><code>style: CellStyle;</code></pre>
+
+```ts generated
+style: CellStyle;
+```
+
 </details>
 </div>
 
@@ -60,7 +88,7 @@ Read-only cell and canvas geometry supplied to a custom renderer.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellPaintContext {
     value: CellScalar;
     x: number;

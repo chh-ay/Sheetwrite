@@ -12,11 +12,11 @@ Whether `initSheetwrite` has completed — the single readiness source.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L135</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L181</code></dd></div>
 </dl>
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(): boolean => ;
+```ts generated
+function isSheetwriteReady(): boolean;
 ```

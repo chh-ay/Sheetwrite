@@ -27,7 +27,7 @@ Reset-sensitive input change that requires an adapter to replace its Grid.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type GridResetReason = "input-reset" | "renderer-reset";
 ```
 

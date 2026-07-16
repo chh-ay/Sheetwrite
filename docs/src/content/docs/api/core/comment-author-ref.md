@@ -21,17 +21,29 @@ Stable host-provided identity displayed on a comment message.
 
 <details class="api-member" id="comment-author-ref-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-<pre><code>id: string;</code></pre>
+
+```ts generated
+id: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-author-ref-display-name" data-pagefind-weight="1">
 <summary><code>displayName</code></summary>
-<pre><code>displayName?: string;</code></pre>
+
+```ts generated
+displayName?: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-author-ref-avatar-url" data-pagefind-weight="1">
 <summary><code>avatarUrl</code></summary>
-<pre><code>avatarUrl?: string;</code></pre>
+
+```ts generated
+avatarUrl?: string;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Stable host-provided identity displayed on a comment message.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CommentAuthorRef {
     id: string;
     displayName?: string;

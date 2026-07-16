@@ -21,6 +21,6 @@ right strategy for the runtime.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(source?: BufferSource | URL | string | Request | WebAssembly.Module): Promise<void> => ;
+```ts generated
+function load(source?: BufferSource | URL | string | Request | WebAssembly.Module): Promise<void>;
 ```

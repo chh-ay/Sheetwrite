@@ -21,12 +21,20 @@ Pluggable first-row-header, first-sheet table export backend.
 
 <details class="api-member" id="xlsx-table-export-backend-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-<pre><code>name: string;</code></pre>
+
+```ts generated
+name: string;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-table-export-backend-to-xlsx-table" data-pagefind-weight="1">
 <summary><code>toXlsxTable</code></summary>
-<pre><code>toXlsxTable(workbook: Workbook, store: Store): Promise&lt;Uint8Array&gt;;</code></pre>
+
+```ts generated
+toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Pluggable first-row-header, first-sheet table export backend.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface XlsxTableExportBackend {
     name: string;
     toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;

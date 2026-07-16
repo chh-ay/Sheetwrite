@@ -28,7 +28,7 @@ Applied, duplicate, or conflict acknowledgement for a comment mutation.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type CommentMutationResponse = {
     status: "applied";
     version: number;

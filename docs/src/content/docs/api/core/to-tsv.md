@@ -17,6 +17,6 @@ TSV for a rectangular range (Excel/Sheets clipboard format).
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(range: Range, store: Store): string => ;
+```ts generated
+function toTsv(range: Range, store: Store): string;
 ```

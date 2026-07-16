@@ -17,6 +17,6 @@ Formula-preserving, multi-sheet workbook export through the optional XLSX backen
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">, options?: XlsxWorkbookOptions): Promise<Uint8Array> => ;
+```ts generated
+function toXlsxWorkbook(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
 ```

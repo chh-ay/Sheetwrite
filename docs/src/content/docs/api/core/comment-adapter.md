@@ -21,17 +21,29 @@ Host persistence contract for versioned comment threads.
 
 <details class="api-member" id="comment-adapter-list-comments" data-pagefind-weight="1">
 <summary><code>listComments</code></summary>
-<pre><code>listComments(documentId: string, signal?: AbortSignal): Promise&lt;CommentListResult&gt;;</code></pre>
+
+```ts generated
+listComments(documentId: string, signal?: AbortSignal): Promise<CommentListResult>;
+```
+
 </details>
 
 <details class="api-member" id="comment-adapter-mutate-comment" data-pagefind-weight="1">
 <summary><code>mutateComment</code></summary>
-<pre><code>mutateComment(request: CommentMutationRequest): Promise&lt;CommentMutationResponse&gt;;</code></pre>
+
+```ts generated
+mutateComment(request: CommentMutationRequest): Promise<CommentMutationResponse>;
+```
+
 </details>
 
 <details class="api-member" id="comment-adapter-subscribe-comments" data-pagefind-weight="1">
 <summary><code>subscribeComments</code></summary>
-<pre><code>subscribeComments?( documentId: string, listener: (event: VersionedCommentEvent) =&gt; void, signal?: AbortSignal, ): undefined | (() =&gt; void);</code></pre>
+
+```ts generated
+subscribeComments?( documentId: string, listener: (event: VersionedCommentEvent) => void, signal?: AbortSignal, ): undefined | (() => void);
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Host persistence contract for versioned comment threads.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CommentAdapter {
     listComments(documentId: string, signal?: AbortSignal): Promise<CommentListResult>;
     mutateComment(request: CommentMutationRequest): Promise<CommentMutationResponse>;

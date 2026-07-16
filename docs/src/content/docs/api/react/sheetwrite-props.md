@@ -20,7 +20,7 @@ Simple framework adapter props for columns and default row objects.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<SheetwriteGridProps, "workbook" | "data" | "datasource" | "height" | "fill"> & GridSizeProps & {
     columns: readonly SimpleColumn<Row>[];
     defaultRows: readonly Row[];

@@ -21,17 +21,29 @@ Ordered condition and style applied to a cell range.
 
 <details class="api-member" id="conditional-format-rule-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-<pre><code>range: Range;</code></pre>
+
+```ts generated
+range: Range;
+```
+
 </details>
 
 <details class="api-member" id="conditional-format-rule-when" data-pagefind-weight="1">
 <summary><code>when</code></summary>
-<pre><code>when: ConditionalFormatPredicate;</code></pre>
+
+```ts generated
+when: ConditionalFormatPredicate;
+```
+
 </details>
 
 <details class="api-member" id="conditional-format-rule-style" data-pagefind-weight="1">
 <summary><code>style</code></summary>
-<pre><code>style: CellStyle;</code></pre>
+
+```ts generated
+style: CellStyle;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Ordered condition and style applied to a cell range.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ConditionalFormatRule {
     range: Range;
     when: ConditionalFormatPredicate;

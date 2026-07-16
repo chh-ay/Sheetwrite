@@ -21,32 +21,56 @@ Document, version, durability, and online options for synchronization.
 
 <details class="api-member" id="sync-coordinator-options-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="sync-coordinator-options-server-version" data-pagefind-weight="1">
 <summary><code>serverVersion</code></summary>
-<pre><code>serverVersion: number;</code></pre>
+
+```ts generated
+serverVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="sync-coordinator-options-create-mutation-id" data-pagefind-weight="1">
 <summary><code>createMutationId</code></summary>
-<pre><code>createMutationId?: () =&gt; string;</code></pre>
+
+```ts generated
+createMutationId?: () => string;
+```
+
 </details>
 
 <details class="api-member" id="sync-coordinator-options-pending-storage" data-pagefind-weight="1">
 <summary><code>pendingStorage</code></summary>
-<pre><code>pendingStorage?: PendingCommitStorage;</code></pre>
+
+```ts generated
+pendingStorage?: PendingCommitStorage;
+```
+
 </details>
 
 <details class="api-member" id="sync-coordinator-options-initial-connection" data-pagefind-weight="1">
 <summary><code>initialConnection</code></summary>
-<pre><code>initialConnection?: &quot;offline&quot; | &quot;online&quot;;</code></pre>
+
+```ts generated
+initialConnection?: "offline" | "online";
+```
+
 </details>
 
 <details class="api-member" id="sync-coordinator-options-recover-version-gap" data-pagefind-weight="1">
 <summary><code>recoverVersionGap</code> <span class="api-member-summary">Optional host recovery hook.</span></summary>
-<pre><code>recoverVersionGap?: ( request: SyncVersionGapRequest, ) =&gt; Promise&lt;readonly VersionedOperation[] | WorkbookSnapshot&gt;;</code></pre>
+
+```ts generated
+recoverVersionGap?: ( request: SyncVersionGapRequest, ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>;
+```
+
 <p class="api-member-doc">Optional host recovery hook. Return the missing ordered operations, or a
 snapshot for the host to remount before calling `resumeAfterReload`.</p>
 </details>
@@ -57,7 +81,7 @@ snapshot for the host to remount before calling `resumeAfterReload`.</p>
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SyncCoordinatorOptions {
     documentId: string;
     serverVersion: number;

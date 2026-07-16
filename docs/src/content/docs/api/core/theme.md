@@ -21,72 +21,128 @@ Resolved canvas colors, typography, and geometry used for painting.
 
 <details class="api-member" id="theme-font" data-pagefind-weight="1">
 <summary><code>font</code> <span class="api-member-summary">Canvas font shorthand used for unstyled cells.</span></summary>
-<pre><code>font: string;</code></pre>
+
+```ts generated
+font: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-bg" data-pagefind-weight="1">
 <summary><code>bg</code> <span class="api-member-summary">CSS color painted behind body cells.</span></summary>
-<pre><code>bg: string;</code></pre>
+
+```ts generated
+bg: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-fg" data-pagefind-weight="1">
 <summary><code>fg</code> <span class="api-member-summary">CSS color used for unstyled cell text.</span></summary>
-<pre><code>fg: string;</code></pre>
+
+```ts generated
+fg: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-grid-line" data-pagefind-weight="1">
 <summary><code>gridLine</code> <span class="api-member-summary">CSS color used for cell grid lines.</span></summary>
-<pre><code>gridLine: string;</code></pre>
+
+```ts generated
+gridLine: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-header-bg" data-pagefind-weight="1">
 <summary><code>headerBg</code> <span class="api-member-summary">CSS color painted behind column and row headers.</span></summary>
-<pre><code>headerBg: string;</code></pre>
+
+```ts generated
+headerBg: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-header-fg" data-pagefind-weight="1">
 <summary><code>headerFg</code> <span class="api-member-summary">CSS color used for column letters and row numbers.</span></summary>
-<pre><code>headerFg: string;</code></pre>
+
+```ts generated
+headerFg: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-selection" data-pagefind-weight="1">
 <summary><code>selection</code> <span class="api-member-summary">CSS color painted over the selected region.</span></summary>
-<pre><code>selection: string;</code></pre>
+
+```ts generated
+selection: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-selection-border" data-pagefind-weight="1">
 <summary><code>selectionBorder</code> <span class="api-member-summary">CSS color used for the active selection outline.</span></summary>
-<pre><code>selectionBorder: string;</code></pre>
+
+```ts generated
+selectionBorder: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-row-height" data-pagefind-weight="1">
 <summary><code>rowHeight</code> <span class="api-member-summary">Default data-row height in unzoomed CSS pixels.</span></summary>
-<pre><code>rowHeight: number;</code></pre>
+
+```ts generated
+rowHeight: number;
+```
+
 </details>
 
 <details class="api-member" id="theme-header-height" data-pagefind-weight="1">
 <summary><code>headerHeight</code> <span class="api-member-summary">Column-header height in unzoomed CSS pixels.</span></summary>
-<pre><code>headerHeight: number;</code></pre>
+
+```ts generated
+headerHeight: number;
+```
+
 </details>
 
 <details class="api-member" id="theme-row-header-width" data-pagefind-weight="1">
 <summary><code>rowHeaderWidth</code> <span class="api-member-summary">Width of the left row-number gutter (0 hides it).</span></summary>
-<pre><code>rowHeaderWidth: number;</code></pre>
+
+```ts generated
+rowHeaderWidth: number;
+```
+
 </details>
 
 <details class="api-member" id="theme-search-match" data-pagefind-weight="1">
 <summary><code>searchMatch</code> <span class="api-member-summary">Fill behind a search match.</span></summary>
-<pre><code>searchMatch: string;</code></pre>
+
+```ts generated
+searchMatch: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-search-active-match" data-pagefind-weight="1">
 <summary><code>searchActiveMatch</code> <span class="api-member-summary">Fill/outline for the active (current) search match.</span></summary>
-<pre><code>searchActiveMatch: string;</code></pre>
+
+```ts generated
+searchActiveMatch: string;
+```
+
 </details>
 
 <details class="api-member" id="theme-highlight" data-pagefind-weight="1">
 <summary><code>highlight</code> <span class="api-member-summary">Fill for cells highlighted via Grid.highlightCells.</span></summary>
-<pre><code>highlight: string;</code></pre>
+
+```ts generated
+highlight: string;
+```
+
 </details>
 </div>
 
@@ -95,7 +151,7 @@ Resolved canvas colors, typography, and geometry used for painting.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface Theme {
     font: string;
     bg: string;

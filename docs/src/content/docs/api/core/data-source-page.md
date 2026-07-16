@@ -21,17 +21,29 @@ One resolved row page returned by a DataSource.
 
 <details class="api-member" id="data-source-page-start" data-pagefind-weight="1">
 <summary><code>start</code></summary>
-<pre><code>start: number;</code></pre>
+
+```ts generated
+start: number;
+```
+
 </details>
 
 <details class="api-member" id="data-source-page-rows" data-pagefind-weight="1">
 <summary><code>rows</code></summary>
-<pre><code>rows: RowData[];</code></pre>
+
+```ts generated
+rows: RowData[];
+```
+
 </details>
 
 <details class="api-member" id="data-source-page-revision" data-pagefind-weight="1">
 <summary><code>revision</code></summary>
-<pre><code>revision?: string | number;</code></pre>
+
+```ts generated
+revision?: string | number;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ One resolved row page returned by a DataSource.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface DataSourcePage {
     start: number;
     rows: RowData[];

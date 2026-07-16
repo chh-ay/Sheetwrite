@@ -21,27 +21,47 @@ Sparse row-major cells bounded by one rectangular block.
 
 <details class="api-member" id="cell-block-start-row" data-pagefind-weight="1">
 <summary><code>startRow</code></summary>
-<pre><code>startRow: number;</code></pre>
+
+```ts generated
+startRow: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-block-start-col" data-pagefind-weight="1">
 <summary><code>startCol</code></summary>
-<pre><code>startCol: number;</code></pre>
+
+```ts generated
+startCol: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-block-row-count" data-pagefind-weight="1">
 <summary><code>rowCount</code></summary>
-<pre><code>rowCount: number;</code></pre>
+
+```ts generated
+rowCount: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-block-col-count" data-pagefind-weight="1">
 <summary><code>colCount</code></summary>
-<pre><code>colCount: number;</code></pre>
+
+```ts generated
+colCount: number;
+```
+
 </details>
 
 <details class="api-member" id="cell-block-cells" data-pagefind-weight="1">
 <summary><code>cells</code></summary>
-<pre><code>cells: SnapshotCell[];</code></pre>
+
+```ts generated
+cells: SnapshotCell[];
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Sparse row-major cells bounded by one rectangular block.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellBlock {
     startRow: number;
     startCol: number;

@@ -12,11 +12,11 @@ Creates and mounts an imperative Grid in the supplied host element.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L180</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L226</code></dd></div>
 </dl>
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, opts: GridOptions): Grid => ;
+```ts generated
+function createGrid(host: HTMLElement, opts: GridOptions): Grid;
 ```

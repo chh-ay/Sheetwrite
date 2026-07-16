@@ -21,17 +21,29 @@ Local operation and protected-range context supplied to the host policy.
 
 <details class="api-member" id="protection-request-protected-range" data-pagefind-weight="1">
 <summary><code>protectedRange</code></summary>
-<pre><code>protectedRange: Readonly&lt;ProtectedRange&gt;;</code></pre>
+
+```ts generated
+protectedRange: Readonly<ProtectedRange>;
+```
+
 </details>
 
 <details class="api-member" id="protection-request-operation" data-pagefind-weight="1">
 <summary><code>operation</code></summary>
-<pre><code>operation: Readonly&lt;DocumentOp&gt;;</code></pre>
+
+```ts generated
+operation: Readonly<DocumentOp>;
+```
+
 </details>
 
 <details class="api-member" id="protection-request-commit-reason" data-pagefind-weight="1">
 <summary><code>commitReason</code></summary>
-<pre><code>commitReason: CommitReason;</code></pre>
+
+```ts generated
+commitReason: CommitReason;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Local operation and protected-range context supplied to the host policy.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ProtectionRequest {
     protectedRange: Readonly<ProtectedRange>;
     operation: Readonly<DocumentOp>;

@@ -21,12 +21,20 @@ Custom cell renderer hooks for the main-thread canvas or DOM overlay.
 
 <details class="api-member" id="cell-renderer-canvas" data-pagefind-weight="1">
 <summary><code>canvas</code></summary>
-<pre><code>canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;</code></pre>
+
+```ts generated
+canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
+```
+
 </details>
 
 <details class="api-member" id="cell-renderer-dom" data-pagefind-weight="1">
 <summary><code>dom</code></summary>
-<pre><code>dom?(c: CellPaintContext): HTMLElement;</code></pre>
+
+```ts generated
+dom?(c: CellPaintContext): HTMLElement;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Custom cell renderer hooks for the main-thread canvas or DOM overlay.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CellRenderer {
     canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
     dom?(c: CellPaintContext): HTMLElement;

@@ -29,6 +29,6 @@ to a text literal.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(raw: string): number | null => ;
+```ts generated
+function parseDateInput(raw: string): number | null;
 ```

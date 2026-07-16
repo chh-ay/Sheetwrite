@@ -17,6 +17,6 @@ Human phrase for a selection's geometry; blank for null/single-cell.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(selection: Selection | null): string => ;
+```ts generated
+function describeSelection(selection: Selection | null): string;
 ```

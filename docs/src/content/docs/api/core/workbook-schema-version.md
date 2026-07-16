@@ -17,6 +17,6 @@ Current workbook snapshot schema version accepted by Sheetwrite.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-1;
+```ts generated
+const WORKBOOK_SCHEMA_VERSION: 1;
 ```

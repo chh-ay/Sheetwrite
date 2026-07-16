@@ -21,87 +21,155 @@ Serializable complete state for one workbook sheet.
 
 <details class="api-member" id="sheet-snapshot-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-<pre><code>id: SheetId;</code></pre>
+
+```ts generated
+id: SheetId;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-<pre><code>name: string;</code></pre>
+
+```ts generated
+name: string;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-order" data-pagefind-weight="1">
 <summary><code>order</code></summary>
-<pre><code>order: number;</code></pre>
+
+```ts generated
+order: number;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-row-count" data-pagefind-weight="1">
 <summary><code>rowCount</code></summary>
-<pre><code>rowCount: number;</code></pre>
+
+```ts generated
+rowCount: number;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-columns" data-pagefind-weight="1">
 <summary><code>columns</code> <span class="api-member-summary">Keys are stable, unique document column identities as well as datasource keys.</span></summary>
-<pre><code>columns: Column[];</code></pre>
+
+```ts generated
+columns: Column[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-frozen-rows" data-pagefind-weight="1">
 <summary><code>frozenRows</code></summary>
-<pre><code>frozenRows?: number;</code></pre>
+
+```ts generated
+frozenRows?: number;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-frozen-cols" data-pagefind-weight="1">
 <summary><code>frozenCols</code></summary>
-<pre><code>frozenCols?: number;</code></pre>
+
+```ts generated
+frozenCols?: number;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-row-meta" data-pagefind-weight="1">
 <summary><code>rowMeta</code></summary>
-<pre><code>rowMeta?: Array&lt;[row: number, meta: RowMetadata]&gt;;</code></pre>
+
+```ts generated
+rowMeta?: Array<[row: number, meta: RowMetadata]>;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-merges" data-pagefind-weight="1">
 <summary><code>merges</code></summary>
-<pre><code>merges?: MergeRange[];</code></pre>
+
+```ts generated
+merges?: MergeRange[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-conditional-formats" data-pagefind-weight="1">
 <summary><code>conditionalFormats</code></summary>
-<pre><code>conditionalFormats?: ConditionalFormatRule[];</code></pre>
+
+```ts generated
+conditionalFormats?: ConditionalFormatRule[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-validation-rules" data-pagefind-weight="1">
 <summary><code>validationRules</code></summary>
-<pre><code>validationRules?: DataValidationRule[];</code></pre>
+
+```ts generated
+validationRules?: DataValidationRule[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-protected-ranges" data-pagefind-weight="1">
 <summary><code>protectedRanges</code></summary>
-<pre><code>protectedRanges?: ProtectedRange[];</code></pre>
+
+```ts generated
+protectedRanges?: ProtectedRange[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-notes" data-pagefind-weight="1">
 <summary><code>notes</code></summary>
-<pre><code>notes?: CellNote[];</code></pre>
+
+```ts generated
+notes?: CellNote[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-sort-keys" data-pagefind-weight="1">
 <summary><code>sortKeys</code></summary>
-<pre><code>sortKeys?: SortKey[];</code></pre>
+
+```ts generated
+sortKeys?: SortKey[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-filters" data-pagefind-weight="1">
 <summary><code>filters</code></summary>
-<pre><code>filters?: Array&lt;[col: number, filter: ColumnFilter]&gt;;</code></pre>
+
+```ts generated
+filters?: Array<[col: number, filter: ColumnFilter]>;
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-row-groups" data-pagefind-weight="1">
 <summary><code>rowGroups</code></summary>
-<pre><code>rowGroups?: RowGroup[];</code></pre>
+
+```ts generated
+rowGroups?: RowGroup[];
+```
+
 </details>
 
 <details class="api-member" id="sheet-snapshot-cells" data-pagefind-weight="1">
 <summary><code>cells</code></summary>
-<pre><code>cells: CellBlock[];</code></pre>
+
+```ts generated
+cells: CellBlock[];
+```
+
 </details>
 </div>
 
@@ -110,7 +178,7 @@ Serializable complete state for one workbook sheet.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SheetSnapshot {
     id: SheetId;
     name: string;

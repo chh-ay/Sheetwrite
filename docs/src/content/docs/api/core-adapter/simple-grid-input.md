@@ -21,12 +21,20 @@ Normalized workbook and columnar data produced from simple adapter props.
 
 <details class="api-member" id="simple-grid-input-workbook" data-pagefind-weight="1">
 <summary><code>workbook</code></summary>
-<pre><code>workbook: Workbook;</code></pre>
+
+```ts generated
+workbook: Workbook;
+```
+
 </details>
 
 <details class="api-member" id="simple-grid-input-data" data-pagefind-weight="1">
 <summary><code>data</code></summary>
-<pre><code>data: ColumnarData;</code></pre>
+
+```ts generated
+data: ColumnarData;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Normalized workbook and columnar data produced from simple adapter props.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SimpleGridInput {
     workbook: Workbook;
     data: ColumnarData;

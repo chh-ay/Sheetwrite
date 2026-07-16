@@ -27,7 +27,7 @@ Whether a committed change originated locally or from remote host input.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type OperationSource = "local" | "remote";
 ```
 

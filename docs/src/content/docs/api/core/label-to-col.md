@@ -17,6 +17,6 @@ A1 column label → 0-based column index (inverse of [`colToA1`](/docs/api/core/
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(label: string): number => ;
+```ts generated
+function labelToCol(label: string): number;
 ```

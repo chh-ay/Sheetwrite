@@ -21,22 +21,38 @@ Ephemeral collaborator selection and activity update.
 
 <details class="api-member" id="presence-message-actor" data-pagefind-weight="1">
 <summary><code>actor</code></summary>
-<pre><code>actor: PresenceActor;</code></pre>
+
+```ts generated
+actor: PresenceActor;
+```
+
 </details>
 
 <details class="api-member" id="presence-message-active-sheet" data-pagefind-weight="1">
 <summary><code>activeSheet</code></summary>
-<pre><code>activeSheet: string;</code></pre>
+
+```ts generated
+activeSheet: string;
+```
+
 </details>
 
 <details class="api-member" id="presence-message-selections" data-pagefind-weight="1">
 <summary><code>selections</code></summary>
-<pre><code>selections: readonly Range[];</code></pre>
+
+```ts generated
+selections: readonly Range[];
+```
+
 </details>
 
 <details class="api-member" id="presence-message-sent-at" data-pagefind-weight="1">
 <summary><code>sentAt</code></summary>
-<pre><code>sentAt: number;</code></pre>
+
+```ts generated
+sentAt: number;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Ephemeral collaborator selection and activity update.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface PresenceMessage {
     actor: PresenceActor;
     activeSheet: string;

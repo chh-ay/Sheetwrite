@@ -21,7 +21,11 @@ Host callback that asynchronously loads cancellable row pages.
 
 <details class="api-member" id="data-source-get-rows" data-pagefind-weight="1">
 <summary><code>getRows</code> <span class="api-member-summary">Loads the requested half-open row interval; implementations should stop work when its signal aborts.</span></summary>
-<pre><code>getRows(request: DataSourceRequest): Promise&lt;DataSourcePage&gt;;</code></pre>
+
+```ts generated
+getRows(request: DataSourceRequest): Promise<DataSourcePage>;
+```
+
 </details>
 </div>
 
@@ -30,7 +34,7 @@ Host callback that asynchronously loads cancellable row pages.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface DataSource {
     getRows(request: DataSourceRequest): Promise<DataSourcePage>;
 }

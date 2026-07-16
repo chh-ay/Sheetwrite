@@ -21,17 +21,29 @@ Framework-neutral simple columns, rows, sizing, and grid options.
 
 <details class="api-member" id="simple-sheetwrite-options-columns" data-pagefind-weight="1">
 <summary><code>columns</code></summary>
-<pre><code>columns: readonly SimpleColumn&lt;Row&gt;[];</code></pre>
+
+```ts generated
+columns: readonly SimpleColumn<Row>[];
+```
+
 </details>
 
 <details class="api-member" id="simple-sheetwrite-options-default-rows" data-pagefind-weight="1">
 <summary><code>defaultRows</code></summary>
-<pre><code>defaultRows: readonly Row[];</code></pre>
+
+```ts generated
+defaultRows: readonly Row[];
+```
+
 </details>
 
 <details class="api-member" id="simple-sheetwrite-options-sheet-name" data-pagefind-weight="1">
 <summary><code>sheetName</code></summary>
-<pre><code>sheetName?: string;</code></pre>
+
+```ts generated
+sheetName?: string;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Framework-neutral simple columns, rows, sizing, and grid options.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SimpleSheetwriteOptions<Row extends Record<string, CellScalar>> {
     columns: readonly SimpleColumn<Row>[];
     defaultRows: readonly Row[];

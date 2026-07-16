@@ -22,6 +22,6 @@ last stable text.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(host: HTMLElement, grid: Grid, options?: FormulaBarOptions): FormulaBarPiece => ;
+```ts generated
+function createFormulaBar(host: HTMLElement, grid: Grid, options?: FormulaBarOptions): FormulaBarPiece;
 ```

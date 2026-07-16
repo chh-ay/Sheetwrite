@@ -27,7 +27,7 @@ Sources accepted by synchronous initialization: raw module bytes or a precompile
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type SyncInitInput = BufferSource | WebAssembly.Module;
 ```
 

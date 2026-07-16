@@ -21,12 +21,20 @@ Document identity and initial version for comment coordination.
 
 <details class="api-member" id="comment-coordinator-options-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-coordinator-options-server-version" data-pagefind-weight="1">
 <summary><code>serverVersion</code></summary>
-<pre><code>serverVersion?: number;</code></pre>
+
+```ts generated
+serverVersion?: number;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Document identity and initial version for comment coordination.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CommentCoordinatorOptions {
     documentId: string;
     serverVersion?: number;

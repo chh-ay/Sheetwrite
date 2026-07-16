@@ -21,17 +21,29 @@ Optional backend contract for complete workbook XLSX interchange.
 
 <details class="api-member" id="xlsx-workbook-backend-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-<pre><code>name: string;</code></pre>
+
+```ts generated
+name: string;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-workbook-backend-to-xlsx-workbook" data-pagefind-weight="1">
 <summary><code>toXlsxWorkbook</code></summary>
-<pre><code>toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise&lt;Uint8Array&gt;;</code></pre>
+
+```ts generated
+toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-workbook-backend-from-xlsx-workbook" data-pagefind-weight="1">
 <summary><code>fromXlsxWorkbook</code></summary>
-<pre><code>fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise&lt;WorkbookSnapshot&gt;;</code></pre>
+
+```ts generated
+fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<WorkbookSnapshot>;
+```
+
 </details>
 </div>
 
@@ -40,7 +52,7 @@ Optional backend contract for complete workbook XLSX interchange.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface XlsxWorkbookBackend {
     name: string;
     toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;

@@ -21,22 +21,38 @@ Structured fidelity warning emitted during workbook XLSX conversion.
 
 <details class="api-member" id="xlsx-workbook-warning-code" data-pagefind-weight="1">
 <summary><code>code</code></summary>
-<pre><code>code: | &quot;boolean-literal&quot; | &quot;rich-text&quot; | &quot;hyperlink&quot; | &quot;unsupported-cell-value&quot; | &quot;unsupported-feature&quot;;</code></pre>
+
+```ts generated
+code: | "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature";
+```
+
 </details>
 
 <details class="api-member" id="xlsx-workbook-warning-message" data-pagefind-weight="1">
 <summary><code>message</code></summary>
-<pre><code>message: string;</code></pre>
+
+```ts generated
+message: string;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-workbook-warning-sheet" data-pagefind-weight="1">
 <summary><code>sheet</code></summary>
-<pre><code>sheet?: string;</code></pre>
+
+```ts generated
+sheet?: string;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-workbook-warning-cell" data-pagefind-weight="1">
 <summary><code>cell</code></summary>
-<pre><code>cell?: string;</code></pre>
+
+```ts generated
+cell?: string;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Structured fidelity warning emitted during workbook XLSX conversion.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface XlsxWorkbookWarning {
     code: "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature";
     message: string;

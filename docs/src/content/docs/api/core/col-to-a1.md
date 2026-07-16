@@ -17,6 +17,6 @@ Column index (0-based) → A1 column label (0 → "A", 26 → "AA").
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(col: number): string => ;
+```ts generated
+function colToA1(col: number): string;
 ```

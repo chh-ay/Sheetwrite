@@ -21,12 +21,20 @@ Authoritative source value, evaluated value, style, and load state for a cell.
 
 <details class="api-member" id="resolved-cell-resolved" data-pagefind-weight="1">
 <summary><code>resolved</code></summary>
-<pre><code>resolved: CellScalar;</code></pre>
+
+```ts generated
+resolved: CellScalar;
+```
+
 </details>
 
 <details class="api-member" id="resolved-cell-style" data-pagefind-weight="1">
 <summary><code>style</code></summary>
-<pre><code>style: CellStyle;</code></pre>
+
+```ts generated
+style: CellStyle;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Authoritative source value, evaluated value, style, and load state for a cell.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface ResolvedCell {
     resolved: CellScalar;
     style: CellStyle;

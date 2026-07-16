@@ -17,6 +17,6 @@ Validate and canonically order a schema-1 snapshot without hydrating runtime sta
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(input: unknown): DocumentValidationResult => ;
+```ts generated
+function validateWorkbookSnapshot(input: unknown): DocumentValidationResult;
 ```

@@ -21,6 +21,6 @@ no CRDT dependency is required for the supported cases.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(localOperations: readonly DocumentOp[], remoteOperations: readonly DocumentOp[]): DocumentRebaseResult => ;
+```ts generated
+function rebaseDocumentOperations(localOperations: readonly DocumentOp[], remoteOperations: readonly DocumentOp[]): DocumentRebaseResult;
 ```

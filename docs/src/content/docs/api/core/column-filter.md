@@ -31,7 +31,7 @@ matching is against the cell's resolved value (text or number).
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type ColumnFilter = {
     kind: "values";
     values: readonly CellScalar[];

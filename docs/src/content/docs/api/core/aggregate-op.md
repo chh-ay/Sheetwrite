@@ -30,7 +30,7 @@ Column aggregate operation for `Grid.aggregate` / `Store` data ops.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type AggregateOp = "sum" | "avg" | "min" | "max" | "count";
 ```
 

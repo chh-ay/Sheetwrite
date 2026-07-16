@@ -21,27 +21,47 @@ Versioned comment mutation submitted to a host adapter.
 
 <details class="api-member" id="comment-mutation-request-document-id" data-pagefind-weight="1">
 <summary><code>documentId</code></summary>
-<pre><code>documentId: string;</code></pre>
+
+```ts generated
+documentId: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-mutation-request-base-version" data-pagefind-weight="1">
 <summary><code>baseVersion</code></summary>
-<pre><code>baseVersion: number;</code></pre>
+
+```ts generated
+baseVersion: number;
+```
+
 </details>
 
 <details class="api-member" id="comment-mutation-request-client-mutation-id" data-pagefind-weight="1">
 <summary><code>clientMutationId</code></summary>
-<pre><code>clientMutationId: string;</code></pre>
+
+```ts generated
+clientMutationId: string;
+```
+
 </details>
 
 <details class="api-member" id="comment-mutation-request-mutation" data-pagefind-weight="1">
 <summary><code>mutation</code></summary>
-<pre><code>mutation: CommentMutation;</code></pre>
+
+```ts generated
+mutation: CommentMutation;
+```
+
 </details>
 
 <details class="api-member" id="comment-mutation-request-signal" data-pagefind-weight="1">
 <summary><code>signal</code></summary>
-<pre><code>signal?: AbortSignal;</code></pre>
+
+```ts generated
+signal?: AbortSignal;
+```
+
 </details>
 </div>
 
@@ -50,7 +70,7 @@ Versioned comment mutation submitted to a host adapter.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface CommentMutationRequest {
     documentId: string;
     baseVersion: number;

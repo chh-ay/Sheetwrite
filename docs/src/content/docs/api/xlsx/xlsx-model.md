@@ -21,12 +21,20 @@ Tabular workbook model exchanged with the optional XLSX table backend.
 
 <details class="api-member" id="xlsx-model-data" data-pagefind-weight="1">
 <summary><code>data</code></summary>
-<pre><code>data: SheetData;</code></pre>
+
+```ts generated
+data: SheetData;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-model-options" data-pagefind-weight="1">
 <summary><code>options</code></summary>
-<pre><code>options: SheetOptions&lt;Blob&gt;;</code></pre>
+
+```ts generated
+options: SheetOptions<Blob>;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Tabular workbook model exchanged with the optional XLSX table backend.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface XlsxModel {
     data: SheetData;
     options: SheetOptions<Blob>;

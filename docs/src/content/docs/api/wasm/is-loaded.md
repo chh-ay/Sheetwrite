@@ -17,6 +17,6 @@ Whether the WASM module has finished initializing.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(): boolean => ;
+```ts generated
+function isLoaded(): boolean;
 ```

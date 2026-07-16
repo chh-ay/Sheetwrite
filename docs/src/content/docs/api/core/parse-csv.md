@@ -20,6 +20,6 @@ CR / LF / CRLF row breaks. A leading UTF-8 BOM is stripped. This mirrors
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(text: string): string[][] => ;
+```ts generated
+function parseCsv(text: string): string[][];
 ```

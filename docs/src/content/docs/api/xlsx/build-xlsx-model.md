@@ -17,6 +17,6 @@ Build the default writer's complete active-sheet model without serializing it.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(workbook: Workbook, store: Store): XlsxModel | null => ;
+```ts generated
+function buildXlsxModel(workbook: Workbook, store: Store): XlsxModel | null;
 ```

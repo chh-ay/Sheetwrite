@@ -21,22 +21,38 @@ Serializable cell value and optional style inside a snapshot block.
 
 <details class="api-member" id="snapshot-cell-row-offset" data-pagefind-weight="1">
 <summary><code>rowOffset</code></summary>
-<pre><code>rowOffset: number;</code></pre>
+
+```ts generated
+rowOffset: number;
+```
+
 </details>
 
 <details class="api-member" id="snapshot-cell-col-offset" data-pagefind-weight="1">
 <summary><code>colOffset</code></summary>
-<pre><code>colOffset: number;</code></pre>
+
+```ts generated
+colOffset: number;
+```
+
 </details>
 
 <details class="api-member" id="snapshot-cell-value" data-pagefind-weight="1">
 <summary><code>value</code></summary>
-<pre><code>value: CellValue;</code></pre>
+
+```ts generated
+value: CellValue;
+```
+
 </details>
 
 <details class="api-member" id="snapshot-cell-style" data-pagefind-weight="1">
 <summary><code>style</code></summary>
-<pre><code>style?: CellStyle;</code></pre>
+
+```ts generated
+style?: CellStyle;
+```
+
 </details>
 </div>
 
@@ -45,7 +61,7 @@ Serializable cell value and optional style inside a snapshot block.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface SnapshotCell {
     rowOffset: number;
     colOffset: number;

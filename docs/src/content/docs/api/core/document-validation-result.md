@@ -27,7 +27,7 @@ Success or structured errors returned by document validation.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type DocumentValidationResult = {
     ok: true;
     value: WorkbookSnapshot;

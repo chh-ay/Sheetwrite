@@ -17,6 +17,6 @@ Stable identifier used to address a workbook sheet.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export type SheetId = string;
 ```

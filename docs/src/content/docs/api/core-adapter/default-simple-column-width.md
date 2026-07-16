@@ -17,6 +17,6 @@ Default pixel width assigned to simple adapter columns.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-120;
+```ts generated
+const DEFAULT_SIMPLE_COLUMN_WIDTH: 120;
 ```

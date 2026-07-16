@@ -17,6 +17,6 @@ Spreadsheet display text for a resolved scalar.
 
 ## Signature
 
-```ts generated title="TypeScript declaration"
-(value: CellScalar): string => ;
+```ts generated
+function cellScalarToText(value: CellScalar): string;
 ```

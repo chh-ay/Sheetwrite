@@ -21,12 +21,20 @@ Database and store naming options for durable pending commits.
 
 <details class="api-member" id="indexed-db-pending-commit-storage-options-database-name" data-pagefind-weight="1">
 <summary><code>databaseName</code></summary>
-<pre><code>databaseName?: string;</code></pre>
+
+```ts generated
+databaseName?: string;
+```
+
 </details>
 
 <details class="api-member" id="indexed-db-pending-commit-storage-options-store-name" data-pagefind-weight="1">
 <summary><code>storeName</code></summary>
-<pre><code>storeName?: string;</code></pre>
+
+```ts generated
+storeName?: string;
+```
+
 </details>
 </div>
 
@@ -35,7 +43,7 @@ Database and store naming options for durable pending commits.
 <details class="api-declaration">
 <summary>View full TypeScript declaration</summary>
 
-```ts generated title="TypeScript declaration"
+```ts generated
 export interface IndexedDbPendingCommitStorageOptions {
     databaseName?: string;
     storeName?: string;

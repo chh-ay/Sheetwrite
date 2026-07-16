@@ -19,9 +19,79 @@ the owning `CellStore`, so snapshots must only be restored into that store.
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L239</code></dd></div>
 </dl>
 
-## Signature
+## Members <span class="api-count">6</span>
 
-```ts generated title="TypeScript declaration"
+<div class="api-member-list">
+
+<details class="api-member" id="range-snapshot-byte-length" data-pagefind-weight="1">
+<summary><code>byteLength</code></summary>
+
+```ts generated
+byteLength: () => number;
+```
+
+</details>
+
+<details class="api-member" id="range-snapshot-formula-offsets" data-pagefind-weight="1">
+<summary><code>formulaOffsets</code></summary>
+
+```ts generated
+formulaOffsets: () => Uint32Array;
+```
+
+</details>
+
+<details class="api-member" id="range-snapshot-formula-sources" data-pagefind-weight="1">
+<summary><code>formulaSources</code></summary>
+
+```ts generated
+formulaSources: () => string[];
+```
+
+</details>
+
+<details class="api-member" id="range-snapshot-free" data-pagefind-weight="1">
+<summary><code>free</code></summary>
+
+```ts generated
+free: () => void;
+```
+
+</details>
+
+<details class="api-member" id="range-snapshot-kinds" data-pagefind-weight="1">
+<summary><code>kinds</code></summary>
+
+```ts generated
+kinds: () => Uint8Array;
+```
+
+</details>
+
+<details class="api-member" id="range-snapshot-style-ids" data-pagefind-weight="1">
+<summary><code>styleIds</code></summary>
+
+```ts generated
+styleIds: () => Uint32Array
+```
+
+</details>
+</div>
+
+## Declaration
+
+<details class="api-declaration">
+<summary>View full TypeScript declaration</summary>
+
+```ts generated
 class RangeSnapshot {
+    byteLength: () => number;
+    formulaOffsets: () => Uint32Array;
+    formulaSources: () => string[];
+    free: () => void;
+    kinds: () => Uint8Array;
+    styleIds: () => Uint32Array;
 }
 ```
+
+</details>
