@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -10,12 +10,12 @@ function Home() {
       <p className="sw-eyebrow">Sheetwrite documentation migration</p>
       <h1>Host-owned spreadsheets, documented precisely.</h1>
       <p>
-        This TanStack Start route seeds the static crawler and proves that MDX documentation can
-        ship as indexed HTML.
+        Read the contracts behind the canvas renderer, Rust/WASM data engine, and framework
+        adapters.
       </p>
-      <Link className="sw-button" to="/docs/proof">
-        Open the MDX proof
-      </Link>
+      <a className="sw-button" href="/docs/start/installation/">
+        Read the documentation
+      </a>
     </main>
   );
 }
