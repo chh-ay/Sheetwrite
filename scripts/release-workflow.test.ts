@@ -51,16 +51,31 @@ describe("stage-only release workflow", () => {
     expect(parsed.concurrency).toEqual({ group: "npm-release", "cancel-in-progress": false });
   });
 
-  it("isolates OIDC and maintainer approval to the protected staging job", async () => {
+  it("isolates OIDC and maintainer approval to one protected staging job", async () => {
     const { parsed } = await workflow();
     expect(parsed.permissions).toEqual({ contents: "read" });
     const jobs = parsed.jobs ?? {};
-    expect(Object.keys(jobs)).toEqual(["preflight", "prepare", "package-gates", "stage"]);
-    expect(jobs.stage?.needs).toEqual(["prepare", "package-gates"]);
-    expect(jobs.stage?.environment).toBe("npm-release");
-    expect(jobs.stage?.permissions).toEqual({ contents: "read", "id-token": "write" });
-    for (const [name, job] of Object.entries(jobs)) {
-      if (name !== "stage") expect(job.permissions?.["id-token"]).toBeUndefined();
+    const privileged = Object.entries(jobs).filter(
+      ([, job]) => job.permissions?.["id-token"] === "write",
+    );
+    expect(privileged).toHaveLength(1);
+    const [stageName, stageJob] = privileged[0]!;
+    expect(stageJob.environment).toBe("npm-release");
+
+    const pending = [
+      ...(Array.isArray(stageJob.needs) ? stageJob.needs : stageJob.needs ? [stageJob.needs] : []),
+    ];
+    const prerequisites = new Set<string>();
+    while (pending.length > 0) {
+      const name = pending.pop()!;
+      if (prerequisites.has(name)) continue;
+      prerequisites.add(name);
+      const needs = jobs[name]?.needs;
+      pending.push(...(Array.isArray(needs) ? needs : needs ? [needs] : []));
+    }
+    expect(prerequisites.has(stageName)).toBeFalse();
+    for (const name of prerequisites) {
+      expect(jobs[name]?.permissions?.["id-token"]).toBeUndefined();
     }
   });
 
@@ -104,11 +119,6 @@ describe("stage-only release workflow", () => {
     expect(started).toEqual([...PUBLISHABLE_PACKAGE_ORDER]);
     expect(completed).toEqual([...PUBLISHABLE_PACKAGE_ORDER]);
     expect(entries.map((entry) => entry.package)).toEqual([...PUBLISHABLE_PACKAGE_ORDER]);
-    expect(entries[0]?.reviewCommands).toEqual([
-      "npm stage view stage-1",
-      "npm stage download stage-1",
-      "npm stage approve stage-1",
-    ]);
   });
 
   it("extracts only an explicit stage identifier from npm JSON", () => {

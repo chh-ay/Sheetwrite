@@ -42,7 +42,7 @@ The bindable `grid` is published before `onReady({ grid, generation, reason })` 
 
 Grid events cover changes, viewport, selection, editing, search, and active-sheet changes.
 
-For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://chh-ay.github.io/Sheetwrite/docs/start/installation/), [Svelte integration](https://chh-ay.github.io/Sheetwrite/docs/frameworks/svelte/), and [collaboration](https://chh-ay.github.io/Sheetwrite/docs/guides/collaboration/).
+For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Svelte integration](https://sheetwrite.vercel.app/docs/frameworks/svelte/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
 XLSX export, install `@sheetwrite/xlsx` and import
