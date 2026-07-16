@@ -21,7 +21,8 @@
     "bench:check": "bun run src/check.ts",
     "bench:baseline:candidate": "bun run src/generate-baseline.ts",
     "test:gates": "bun test test",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "bench:render:scale": "bun run src/render-driver.ts --rows 1000,10000,100000,1000000 --rounds 10 --output results/render-scale.json --markdown-output results/render-scale.md"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6",
