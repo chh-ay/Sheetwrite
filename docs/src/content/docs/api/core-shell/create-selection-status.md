@@ -13,8 +13,11 @@ polite live region so screen readers announce changes without interrupting.
 <div><dt>Source</dt><dd><code>packages/core/src/shell/selection-status.ts#L31</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece;
+function createSelectionStatus(
+  host: HTMLElement,
+  grid: Grid,
+): ShellPiece
 ```

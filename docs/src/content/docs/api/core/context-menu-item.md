@@ -89,13 +89,13 @@ disabled?: boolean | ((context: ContextMenuContext) => boolean);
 
 ```ts generated
 export interface ContextMenuItem {
-    id?: string;
-    action?: ContextMenuActionName;
-    onClick?: (grid: Grid, cell: CellAddress | null) => void;
-    label?: string;
-    shortcut?: string;
-    visible?: boolean | ((context: ContextMenuContext) => boolean);
-    disabled?: boolean | ((context: ContextMenuContext) => boolean);
+  id?: string;
+  action?: ContextMenuActionName;
+  onClick?: (grid: Grid, cell: CellAddress | null) => void;
+  label?: string;
+  shortcut?: string;
+  visible?: boolean | ((context: ContextMenuContext) => boolean);
+  disabled?: boolean | ((context: ContextMenuContext) => boolean);
 }
 ```
 

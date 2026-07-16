@@ -51,9 +51,16 @@ message: string;
 
 ```ts generated
 export interface DocumentValidationError {
-    path: string;
-    code: "unsupported-schema" | "invalid-value" | "duplicate-id" | "missing-reference" | "out-of-bounds" | "overlapping-merge" | "non-serializable";
-    message: string;
+  path: string;
+  code:
+    | "unsupported-schema"
+    | "invalid-value"
+    | "duplicate-id"
+    | "missing-reference"
+    | "out-of-bounds"
+    | "overlapping-merge"
+    | "non-serializable";
+  message: string;
 }
 ```
 

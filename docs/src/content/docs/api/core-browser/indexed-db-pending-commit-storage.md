@@ -70,11 +70,18 @@ remove: (documentId: string, clientMutationId: string, signal?: AbortSignal) => 
 
 ```ts generated
 class IndexedDbPendingCommitStorage implements PendingCommitStorage {
-    constructor(options?: IndexedDbPendingCommitStorageOptions);
-    close: () => void;
-    load: (documentId: string, signal?: AbortSignal) => Promise<readonly PendingCommit[]>;
-    put: (commit: PendingCommit, signal?: AbortSignal) => Promise<void>;
-    remove: (documentId: string, clientMutationId: string, signal?: AbortSignal) => Promise<void>;
+  constructor(options?: IndexedDbPendingCommitStorageOptions);
+  close: () => void;
+  load: (
+    documentId: string,
+    signal?: AbortSignal,
+  ) => Promise<readonly PendingCommit[]>;
+  put: (commit: PendingCommit, signal?: AbortSignal) => Promise<void>;
+  remove: (
+    documentId: string,
+    clientMutationId: string,
+    signal?: AbortSignal,
+  ) => Promise<void>;
 }
 ```
 

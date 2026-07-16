@@ -12,7 +12,7 @@ Stable identifier used to address a workbook sheet.
 <div><dt>Source</dt><dd><code>packages/core/src/types/coordinates.ts#L5</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
 export type SheetId = string;

@@ -82,12 +82,12 @@ styleIds: () => Uint32Array
 
 ```ts generated
 class RangeSnapshot {
-    byteLength: () => number;
-    formulaOffsets: () => Uint32Array;
-    formulaSources: () => string[];
-    free: () => void;
-    kinds: () => Uint8Array;
-    styleIds: () => Uint32Array;
+  byteLength: () => number;
+  formulaOffsets: () => Uint32Array;
+  formulaSources: () => string[];
+  free: () => void;
+  kinds: () => Uint8Array;
+  styleIds: () => Uint32Array;
 }
 ```
 

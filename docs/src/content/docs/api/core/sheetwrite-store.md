@@ -489,70 +489,119 @@ static fromSnapshot: (input: unknown) => SheetwriteStore
 
 ```ts generated
 class SheetwriteStore implements Store {
-    constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOptions);
-    acknowledgeOperations: (operations: readonly DocumentOp[]) => void;
-    aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number;
-    applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | TransactionApplicationOptions) => ApplyTransactionResult;
-    canApplyLocally: (patch: DocumentOp) => boolean;
-    captureRangeHistory: (input: Range) => CompactRangeHistory | null;
-    clearView: (sheet: SheetId) => void;
-    columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>;
-    dataEdge: (sheet: SheetId, row: number, col: number, dRow: number, dCol: number) => number;
-    dataRowAt: (sheet: SheetId, viewRow: number) => number;
-    dispose: () => void;
-    distinctValues: (sheet: SheetId, col: number, limit?: number) => CellScalar[];
-    ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void;
-    exportSnapshot: () => WorkbookSnapshot;
-    filterBy: (sheet: SheetId, col: number, needle: string) => void;
-    getCell: (addr: CellAddress) => ResolvedCell;
-    getCellLoadState: (addr: CellAddress) => CellLoadState;
-    getClipboardWindow: (sheet: SheetId, viewRows: {
-        start: number;
-        end: number;
-    }, cols: readonly number[]) => ClipboardWindowView;
-    getFormula: (addr: CellAddress) => string | null;
-    getPagedStats: (sheet: SheetId) => PagedStoreStats;
-    getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
-    getRefTarget: (addr: CellAddress) => CellAddress | null;
-    getVisibleWindow: (sheet: SheetId, rows: {
-        start: number;
-        end: number;
-    }, cols: readonly number[]) => VisibleWindowView;
-    getWorkbook: () => Workbook;
-    groupRows: (sheet: SheetId, start: number, end: number) => void;
-    hasView: (sheet: SheetId) => boolean;
-    hiddenRows: (sheet: SheetId) => number[];
-    hideRows: (sheet: SheetId, rows: readonly number[]) => void;
-    isPaged: (sheet: SheetId) => boolean;
-    isRangeFullyLoaded: (input: Range) => boolean;
-    loadRows: (sheet: SheetId, start: number, rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void;
-    on: (_evt: "change", fn: ChangeListener) => () => void;
-    queryCapability: (sheet: SheetId) => QueryCapability;
-    recalculateVolatile: (now?: Date) => void;
-    removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
-    renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
-    resetRangeMutationAllocationStats: () => void;
-    rowGroups: (sheet: SheetId) => readonly RowGroup[];
-    searchCells: (sheet: SheetId, query: string, opts?: {
-        matchCase?: boolean;
-        wholeCell?: boolean;
-        columns?: number[];
-    }) => CellAddress[];
-    searchCellsFlat: (sheet: SheetId, query: string, opts?: {
-        matchCase?: boolean;
-        wholeCell?: boolean;
-        columns?: number[];
-    }) => Uint32Array;
-    setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void;
-    setGroupCollapsed: (sheet: SheetId, start: number, collapsed: boolean) => void;
-    setProtectionResolver: (resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode) => void;
-    showRows: (sheet: SheetId, rows?: readonly number[]) => void;
-    sortBy: (sheet: SheetId, col: number, ascending: boolean) => void;
-    sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void;
-    ungroupRows: (sheet: SheetId, start: number, end: number) => void;
-    viewRowCount: (sheet: SheetId) => number;
-    viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
-    static fromSnapshot: (input: unknown) => SheetwriteStore;
+  constructor(
+    workbook: Workbook,
+    data?: ColumnarData,
+    options?: SheetwriteStoreOptions,
+  );
+  acknowledgeOperations: (operations: readonly DocumentOp[]) => void;
+  aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number;
+  applyTransaction: (
+    tx: Transaction,
+    reasonOrOptions?: CommitReason | TransactionApplicationOptions,
+  ) => ApplyTransactionResult;
+  canApplyLocally: (patch: DocumentOp) => boolean;
+  captureRangeHistory: (input: Range) => CompactRangeHistory | null;
+  clearView: (sheet: SheetId) => void;
+  columnFilters: (sheet: SheetId) => ReadonlyMap<number, ColumnFilter>;
+  dataEdge: (
+    sheet: SheetId,
+    row: number,
+    col: number,
+    dRow: number,
+    dCol: number,
+  ) => number;
+  dataRowAt: (sheet: SheetId, viewRow: number) => number;
+  dispose: () => void;
+  distinctValues: (
+    sheet: SheetId,
+    col: number,
+    limit?: number,
+  ) => CellScalar[];
+  ensureColumns: (sheet: SheetId, columns: readonly Column[]) => void;
+  exportSnapshot: () => WorkbookSnapshot;
+  filterBy: (sheet: SheetId, col: number, needle: string) => void;
+  getCell: (addr: CellAddress) => ResolvedCell;
+  getCellLoadState: (addr: CellAddress) => CellLoadState;
+  getClipboardWindow: (
+    sheet: SheetId,
+    viewRows: {
+      start: number;
+      end: number;
+    },
+    cols: readonly number[],
+  ) => ClipboardWindowView;
+  getFormula: (addr: CellAddress) => string | null;
+  getPagedStats: (sheet: SheetId) => PagedStoreStats;
+  getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
+  getRefTarget: (addr: CellAddress) => CellAddress | null;
+  getVisibleWindow: (
+    sheet: SheetId,
+    rows: {
+      start: number;
+      end: number;
+    },
+    cols: readonly number[],
+  ) => VisibleWindowView;
+  getWorkbook: () => Workbook;
+  groupRows: (sheet: SheetId, start: number, end: number) => void;
+  hasView: (sheet: SheetId) => boolean;
+  hiddenRows: (sheet: SheetId) => number[];
+  hideRows: (sheet: SheetId, rows: readonly number[]) => void;
+  isPaged: (sheet: SheetId) => boolean;
+  isRangeFullyLoaded: (input: Range) => boolean;
+  loadRows: (
+    sheet: SheetId,
+    start: number,
+    rows: readonly RowData[],
+    protect?: (addr: CellAddress) => boolean,
+  ) => void;
+  on: (_evt: "change", fn: ChangeListener) => () => void;
+  queryCapability: (sheet: SheetId) => QueryCapability;
+  recalculateVolatile: (now?: Date) => void;
+  removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
+  renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
+  resetRangeMutationAllocationStats: () => void;
+  rowGroups: (sheet: SheetId) => readonly RowGroup[];
+  searchCells: (
+    sheet: SheetId,
+    query: string,
+    opts?: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+    },
+  ) => CellAddress[];
+  searchCellsFlat: (
+    sheet: SheetId,
+    query: string,
+    opts?: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+    },
+  ) => Uint32Array;
+  setColumnFilter: (
+    sheet: SheetId,
+    col: number,
+    filter: ColumnFilter | null,
+  ) => void;
+  setGroupCollapsed: (
+    sheet: SheetId,
+    start: number,
+    collapsed: boolean,
+  ) => void;
+  setProtectionResolver: (
+    resolver: ProtectionResolver | undefined,
+    mode?: MutationPolicyMode,
+  ) => void;
+  showRows: (sheet: SheetId, rows?: readonly number[]) => void;
+  sortBy: (sheet: SheetId, col: number, ascending: boolean) => void;
+  sortByMulti: (sheet: SheetId, keys: readonly SortKey[]) => void;
+  ungroupRows: (sheet: SheetId, start: number, end: number) => void;
+  viewRowCount: (sheet: SheetId) => number;
+  viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
+  static fromSnapshot: (input: unknown) => SheetwriteStore;
 }
 ```
 

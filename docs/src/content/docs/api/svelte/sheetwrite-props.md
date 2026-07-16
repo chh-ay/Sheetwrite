@@ -12,17 +12,16 @@ Simple framework adapter props for columns and default row objects.
 <div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L55</code></dd></div>
 </dl>
 
-## Signature
-
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
+## Declaration
 
 ```ts generated
-export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<SheetwriteGridProps, "workbook" | "data" | "datasource" | "height" | "fill"> & GridSizeProps & {
+export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
+  SheetwriteGridProps,
+  "workbook" | "data" | "datasource" | "height" | "fill"
+> &
+  GridSizeProps & {
     columns: readonly SimpleColumn<Row>[];
     defaultRows: readonly Row[];
     sheetName?: string;
-};
+  };
 ```
-
-</details>

@@ -51,9 +51,9 @@ reason: GridReadyReason;
 
 ```ts generated
 export interface GridReadyEvent {
-    grid: Grid;
-    generation: number;
-    reason: GridReadyReason;
+  grid: Grid;
+  generation: number;
+  reason: GridReadyReason;
 }
 ```
 

@@ -37,7 +37,7 @@ patches: DocumentOp[];
 
 ```ts generated
 export interface GridTransaction {
-    patches: DocumentOp[];
+  patches: DocumentOp[];
 }
 ```
 

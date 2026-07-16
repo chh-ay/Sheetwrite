@@ -14,8 +14,12 @@ calls; Escape restores the displayed reference.
 <div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L31</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createNameBox(host: HTMLElement, grid: Grid, options?: NameBoxOptions): ShellPiece;
+function createNameBox(
+  host: HTMLElement,
+  grid: Grid,
+  options?: NameBoxOptions,
+): ShellPiece
 ```

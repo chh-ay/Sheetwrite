@@ -87,13 +87,13 @@ destroy(): void;
 
 ```ts generated
 export interface SpreadsheetShell {
-    readonly grid: Grid;
-    readonly element: HTMLElement;
-    setTheme(theme: Partial<Theme>): void;
-    setReadOnly(readOnly: boolean): void;
-    setGridConfig(config: GridConfig | undefined): void;
-    setActiveSheet(id: SheetId): void;
-    destroy(): void;
+  readonly grid: Grid;
+  readonly element: HTMLElement;
+  setTheme(theme: Partial<Theme>): void;
+  setReadOnly(readOnly: boolean): void;
+  setGridConfig(config: GridConfig | undefined): void;
+  setActiveSheet(id: SheetId): void;
+  destroy(): void;
 }
 ```
 

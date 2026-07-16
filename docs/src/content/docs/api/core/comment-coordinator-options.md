@@ -42,8 +42,8 @@ serverVersion?: number;
 
 ```ts generated
 export interface CommentCoordinatorOptions {
-    documentId: string;
-    serverVersion?: number;
+  documentId: string;
+  serverVersion?: number;
 }
 ```
 

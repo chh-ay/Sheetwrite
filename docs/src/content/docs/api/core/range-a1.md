@@ -12,8 +12,8 @@ Two cell corners → A1 range ("A1:B3"), collapsing to a single ref when equal.
 <div><dt>Source</dt><dd><code>packages/core/src/a1.ts#L30</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function rangeA1(a: CellRef, b: CellRef): string;
+function rangeA1(a: CellRef, b: CellRef): string
 ```

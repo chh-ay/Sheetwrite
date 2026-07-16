@@ -51,9 +51,9 @@ active: number;
 
 ```ts generated
 export interface SearchResult {
-    query: string;
-    matches: CellAddress[];
-    active: number;
+  query: string;
+  matches: CellAddress[];
+  active: number;
 }
 ```
 

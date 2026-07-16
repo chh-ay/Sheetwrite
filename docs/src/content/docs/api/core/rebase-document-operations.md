@@ -16,8 +16,11 @@ no CRDT dependency is required for the supported cases.
 <div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L46</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function rebaseDocumentOperations(localOperations: readonly DocumentOp[], remoteOperations: readonly DocumentOp[]): DocumentRebaseResult;
+function rebaseDocumentOperations(
+  localOperations: readonly DocumentOp[],
+  remoteOperations: readonly DocumentOp[],
+): DocumentRebaseResult
 ```

@@ -114,16 +114,34 @@ serverVersion: number
 
 ```ts generated
 class CommentCoordinator {
-    constructor(adapter: CommentAdapter, options: CommentCoordinatorOptions);
-    commentThreads: () => readonly CommentThread[];
-    create: (threadId: string, messageId: string, anchor: CommentAnchor, body: string, clientMutationId: string) => Promise<CommentMutationResponse>;
-    destroy: () => void;
-    load: () => Promise<readonly CommentThread[]>;
-    mutate: (mutation: CommentMutation, clientMutationId: string) => Promise<CommentMutationResponse>;
-    on: (listener: CommentListener) => () => void;
-    reply: (threadId: string, messageId: string, body: string, clientMutationId: string) => Promise<CommentMutationResponse>;
-    resolve: (threadId: string, resolved: boolean, clientMutationId: string) => Promise<CommentMutationResponse>;
-    serverVersion: number;
+  constructor(adapter: CommentAdapter, options: CommentCoordinatorOptions);
+  commentThreads: () => readonly CommentThread[];
+  create: (
+    threadId: string,
+    messageId: string,
+    anchor: CommentAnchor,
+    body: string,
+    clientMutationId: string,
+  ) => Promise<CommentMutationResponse>;
+  destroy: () => void;
+  load: () => Promise<readonly CommentThread[]>;
+  mutate: (
+    mutation: CommentMutation,
+    clientMutationId: string,
+  ) => Promise<CommentMutationResponse>;
+  on: (listener: CommentListener) => () => void;
+  reply: (
+    threadId: string,
+    messageId: string,
+    body: string,
+    clientMutationId: string,
+  ) => Promise<CommentMutationResponse>;
+  resolve: (
+    threadId: string,
+    resolved: boolean,
+    clientMutationId: string,
+  ) => Promise<CommentMutationResponse>;
+  serverVersion: number;
 }
 ```
 

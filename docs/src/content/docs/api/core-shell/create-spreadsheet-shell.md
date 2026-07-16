@@ -16,8 +16,11 @@ every piece, the grid, and the shell DOM, and is safe to call twice.
 <div><dt>Source</dt><dd><code>packages/core/src/shell/spreadsheet-shell.ts#L59</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createSpreadsheetShell(host: HTMLElement, options: SpreadsheetShellOptions): SpreadsheetShell;
+function createSpreadsheetShell(
+  host: HTMLElement,
+  options: SpreadsheetShellOptions,
+): SpreadsheetShell
 ```

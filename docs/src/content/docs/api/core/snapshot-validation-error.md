@@ -51,9 +51,9 @@ errors: readonly DocumentValidationError[]
 
 ```ts generated
 class SnapshotValidationError extends Error {
-    constructor(errors: readonly DocumentValidationError[]);
-    code: "invalid-snapshot";
-    errors: readonly DocumentValidationError[];
+  constructor(errors: readonly DocumentValidationError[]);
+  code: "invalid-snapshot";
+  errors: readonly DocumentValidationError[];
 }
 ```
 

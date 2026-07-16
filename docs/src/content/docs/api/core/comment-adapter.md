@@ -51,9 +51,18 @@ subscribeComments?( documentId: string, listener: (event: VersionedCommentEvent)
 
 ```ts generated
 export interface CommentAdapter {
-    listComments(documentId: string, signal?: AbortSignal): Promise<CommentListResult>;
-    mutateComment(request: CommentMutationRequest): Promise<CommentMutationResponse>;
-    subscribeComments?(documentId: string, listener: (event: VersionedCommentEvent) => void, signal?: AbortSignal): undefined | (() => void);
+  listComments(
+    documentId: string,
+    signal?: AbortSignal,
+  ): Promise<CommentListResult>;
+  mutateComment(
+    request: CommentMutationRequest,
+  ): Promise<CommentMutationResponse>;
+  subscribeComments?(
+    documentId: string,
+    listener: (event: VersionedCommentEvent) => void,
+    signal?: AbortSignal,
+  ): undefined | (() => void);
 }
 ```
 

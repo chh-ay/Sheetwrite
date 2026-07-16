@@ -89,19 +89,13 @@ styleIds?: number[];
 
 ```ts generated
 export interface PackedCellBlock {
-    rowCount: number;
-    colCount: number;
-    values: CellScalar[];
-    formulas?: Array<[
-        offset: number,
-        source: string
-    ]>;
-    refs?: Array<[
-        offset: number,
-        target: CellAddress
-    ]>;
-    styleTable?: CellStyle[];
-    styleIds?: number[];
+  rowCount: number;
+  colCount: number;
+  values: CellScalar[];
+  formulas?: Array<[offset: number, source: string]>;
+  refs?: Array<[offset: number, target: CellAddress]>;
+  styleTable?: CellStyle[];
+  styleIds?: number[];
 }
 ```
 

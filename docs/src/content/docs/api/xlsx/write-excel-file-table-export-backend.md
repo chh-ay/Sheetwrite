@@ -12,8 +12,8 @@ Default first-sheet table export backend.
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L163</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const writeExcelFileTableExportBackend: XlsxTableExportBackend;
+const writeExcelFileTableExportBackend: XlsxTableExportBackend
 ```

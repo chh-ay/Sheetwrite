@@ -12,8 +12,8 @@ Default first-sheet table import backend.
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-import.ts#L58</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const readExcelFileTableImportBackend: XlsxTableImportBackend;
+const readExcelFileTableImportBackend: XlsxTableImportBackend
 ```

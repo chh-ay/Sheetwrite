@@ -42,8 +42,8 @@ commitReason?: CommitReason;
 
 ```ts generated
 export interface TransactionApplicationOptions {
-    source?: OperationSource;
-    commitReason?: CommitReason;
+  source?: OperationSource;
+  commitReason?: CommitReason;
 }
 ```
 

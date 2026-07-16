@@ -232,6 +232,13 @@ a {
   background: var(--sw-surface-2);
 }
 
+/* The global 2px ring hugging the full-width pill reads as a broken border;
+   an accent border with a soft halo matches the input inside the dialog. */
+.sw-search-button:focus-visible {
+  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-accent) 15%, transparent);
+}
+
 .sw-search-button span {
   flex: 1;
 }
@@ -247,6 +254,9 @@ a {
 
 .sw-search-dialog {
   width: min(43rem, calc(100vw - 2rem));
+  /* The global margin reset removes the UA's dialog centering; restore it
+     as a top-centered command palette. */
+  margin: clamp(2rem, 12vh, 7rem) auto auto;
   max-height: min(42rem, calc(100vh - 4rem));
   border: 1px solid var(--sw-border-strong);
   border-radius: 0.85rem;
@@ -259,6 +269,12 @@ a {
 .sw-search-dialog::backdrop {
   background: rgb(4 8 16 / 72%);
   backdrop-filter: blur(5px);
+}
+
+/* The dialog is the focus context; a ring hugging the borderless input
+   inside it reads as a broken double border. */
+.sw-search-dialog input:focus-visible {
+  box-shadow: none;
 }
 
 .sw-search-dialog form {
@@ -1285,31 +1301,39 @@ body .sw-code-popover__tag-link:hover {
   font-size: 0.82rem;
 }
 
-/* Union variants: one surface with hairline dividers. Long variants wrap at
-   member boundaries (after "; ") instead of hiding behind a local scroll. */
+/* Union variants: one surface with hairline dividers; each variant is a
+   docked highlighted fence so identifiers hover and link like declarations. */
 .api-variant-list {
   margin: 1.1rem 0 2.75rem;
   border: 1px solid var(--sw-border);
   border-radius: 0.6rem;
   background: var(--sw-surface-1);
-}
-
-.api-variant {
-  padding: 0.6rem 0.95rem;
+  overflow: hidden;
 }
 
 .api-variant + .api-variant {
   border-top: 1px solid var(--sw-border);
 }
 
-.sw-prose .api-variant > code {
+.sw-prose .api-variant .expressive-code {
+  margin: 0;
+}
+
+.sw-prose .api-variant .expressive-code figure.frame {
   border: 0;
-  padding: 0;
+  border-radius: 0;
   background: transparent;
-  color: var(--sw-fg);
-  font: 500 0.8rem / 1.6 var(--sw-font-mono);
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
+}
+
+.sw-prose .api-variant .expressive-code pre {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.78rem;
+}
+
+.api-variant .expressive-code pre > code {
+  padding-block: 0.55rem;
 }
 
 @media (max-width: 30rem) {
@@ -1761,4 +1785,10 @@ body .sw-code-popover__accessible-signature {
 .sw-prose .expressive-code a.sw-code-ref:hover {
   color: var(--sw-accent-strong);
   text-decoration-color: var(--sw-accent-strong);
+}
+
+/* Trigger-as-anchor (generated fences): hover previews, click navigates. */
+.sw-prose a.sw-code-popover__trigger {
+  color: inherit;
+  cursor: pointer;
 }

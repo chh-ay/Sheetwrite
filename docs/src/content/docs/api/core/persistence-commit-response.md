@@ -15,9 +15,41 @@ Applied, duplicate, or conflict acknowledgement from persistence.
 ## Variants <span class="api-count">3</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ status: &quot;applied&quot;; version: number; clientMutationId: string; canonicalOperations?: readonly DocumentOp[]; }</code></div>
-<div class="api-variant"><code>{ status: &quot;duplicate&quot;; version: number; clientMutationId: string }</code></div>
-<div class="api-variant"><code>{ status: &quot;conflict&quot;; currentVersion: number; operationsSinceBase?: readonly VersionedOperation[]; snapshot?: WorkbookSnapshot; }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "applied";
+  version: number;
+  clientMutationId: string;
+  canonicalOperations?: readonly DocumentOp[];
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "duplicate";
+  version: number;
+  clientMutationId: string;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "conflict";
+  currentVersion: number;
+  operationsSinceBase?: readonly VersionedOperation[];
+  snapshot?: WorkbookSnapshot;
+}
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -26,21 +58,24 @@ Applied, duplicate, or conflict acknowledgement from persistence.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type PersistenceCommitResponse = {
-    status: "applied";
-    version: number;
-    clientMutationId: string;
-    canonicalOperations?: readonly DocumentOp[];
-} | {
-    status: "duplicate";
-    version: number;
-    clientMutationId: string;
-} | {
-    status: "conflict";
-    currentVersion: number;
-    operationsSinceBase?: readonly VersionedOperation[];
-    snapshot?: WorkbookSnapshot;
-};
+export type PersistenceCommitResponse =
+  | {
+      status: "applied";
+      version: number;
+      clientMutationId: string;
+      canonicalOperations?: readonly DocumentOp[];
+    }
+  | {
+      status: "duplicate";
+      version: number;
+      clientMutationId: string;
+    }
+  | {
+      status: "conflict";
+      currentVersion: number;
+      operationsSinceBase?: readonly VersionedOperation[];
+      snapshot?: WorkbookSnapshot;
+    };
 ```
 
 </details>

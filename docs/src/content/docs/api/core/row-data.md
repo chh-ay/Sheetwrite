@@ -12,7 +12,7 @@ Object-shaped datasource row keyed by workbook column keys.
 <div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L14</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
 export type RowData = Record<string, DataCell>;

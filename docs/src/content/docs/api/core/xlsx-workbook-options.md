@@ -54,9 +54,9 @@ onWarning?: (warning: XlsxWorkbookWarning) => void;
 
 ```ts generated
 export interface XlsxWorkbookOptions {
-    signal?: AbortSignal;
-    maxCells?: number;
-    onWarning?: (warning: XlsxWorkbookWarning) => void;
+  signal?: AbortSignal;
+  maxCells?: number;
+  onWarning?: (warning: XlsxWorkbookWarning) => void;
 }
 ```
 

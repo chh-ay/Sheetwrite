@@ -56,9 +56,9 @@ describe("documentation generation", () => {
     expect(entrySlug("@sheetwrite/core", "./styles.css")).toBe("core-styles-css");
   });
 
-  it("links entry indexes to documented symbols with unique member anchors", () => {
+  it("links entry indexes to documented symbols with unique member anchors", async () => {
     const entryPage = renderEntryPage(corePackage, coreEntry);
-    const symbolPage = renderSymbolPage(corePackage, coreEntry, coreEntry.exports[0]!);
+    const symbolPage = await renderSymbolPage(corePackage, coreEntry, coreEntry.exports[0]!);
     expect(entryPage).toContain('href="/docs/api/core/grid/"');
 
     const anchors = [...symbolPage.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]!);

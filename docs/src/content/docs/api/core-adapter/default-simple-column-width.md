@@ -12,8 +12,8 @@ Default pixel width assigned to simple adapter columns.
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L157</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-const DEFAULT_SIMPLE_COLUMN_WIDTH: 120;
+const DEFAULT_SIMPLE_COLUMN_WIDTH: 120
 ```

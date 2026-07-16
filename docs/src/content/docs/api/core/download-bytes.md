@@ -12,8 +12,12 @@ Browser-only download helper; throws in non-DOM runtimes.
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L204</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function downloadBytes(bytes: Uint8Array | string, filename: string, mime: string): void;
+function downloadBytes(
+  bytes: Uint8Array | string,
+  filename: string,
+  mime: string,
+): void
 ```

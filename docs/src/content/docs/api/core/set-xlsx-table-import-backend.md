@@ -12,8 +12,10 @@ Registers the optional table XLSX import implementation used by core.
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L271</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function setXlsxTableImportBackend(next: XlsxTableImportBackend): void;
+function setXlsxTableImportBackend(
+  next: XlsxTableImportBackend,
+): void
 ```

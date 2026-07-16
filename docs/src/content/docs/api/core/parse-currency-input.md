@@ -16,8 +16,8 @@ renderer uses.
 <div><dt>Source</dt><dd><code>packages/core/src/cell-input.ts#L74</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function parseCurrencyInput(raw: string): number | null;
+function parseCurrencyInput(raw: string): number | null
 ```

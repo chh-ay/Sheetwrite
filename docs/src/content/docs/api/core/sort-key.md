@@ -42,8 +42,8 @@ ascending: boolean;
 
 ```ts generated
 export interface SortKey {
-    col: number;
-    ascending: boolean;
+  col: number;
+  ascending: boolean;
 }
 ```
 

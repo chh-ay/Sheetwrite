@@ -12,8 +12,8 @@ TSV for a rectangular range (Excel/Sheets clipboard format).
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L65</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function toTsv(range: Range, store: Store): string;
+function toTsv(range: Range, store: Store): string
 ```

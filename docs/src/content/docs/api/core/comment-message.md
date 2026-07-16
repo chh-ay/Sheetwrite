@@ -69,11 +69,11 @@ editedAt?: string;
 
 ```ts generated
 export interface CommentMessage {
-    id: string;
-    author: CommentAuthorRef;
-    body: string;
-    createdAt: string;
-    editedAt?: string;
+  id: string;
+  author: CommentAuthorRef;
+  body: string;
+  createdAt: string;
+  editedAt?: string;
 }
 ```
 

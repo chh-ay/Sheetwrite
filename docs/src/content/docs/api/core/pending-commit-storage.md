@@ -51,9 +51,16 @@ remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Prom
 
 ```ts generated
 export interface PendingCommitStorage {
-    load(documentId: string, signal?: AbortSignal): Promise<readonly PendingCommit[]>;
-    put(commit: PendingCommit, signal?: AbortSignal): Promise<void>;
-    remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Promise<void>;
+  load(
+    documentId: string,
+    signal?: AbortSignal,
+  ): Promise<readonly PendingCommit[]>;
+  put(commit: PendingCommit, signal?: AbortSignal): Promise<void>;
+  remove(
+    documentId: string,
+    clientMutationId: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
 }
 ```
 

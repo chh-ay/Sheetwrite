@@ -42,8 +42,8 @@ style: CellStyle;
 
 ```ts generated
 export interface ResolvedCell {
-    resolved: CellScalar;
-    style: CellStyle;
+  resolved: CellScalar;
+  style: CellStyle;
 }
 ```
 

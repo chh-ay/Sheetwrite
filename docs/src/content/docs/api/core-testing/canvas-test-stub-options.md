@@ -44,8 +44,8 @@ height?: number;
 
 ```ts generated
 export interface CanvasTestStubOptions {
-    width?: number;
-    height?: number;
+  width?: number;
+  height?: number;
 }
 ```
 

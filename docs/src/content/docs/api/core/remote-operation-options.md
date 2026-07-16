@@ -33,7 +33,7 @@ commitReason?: CommitReason;
 
 ```ts generated
 export interface RemoteOperationOptions {
-    commitReason?: CommitReason;
+  commitReason?: CommitReason;
 }
 ```
 

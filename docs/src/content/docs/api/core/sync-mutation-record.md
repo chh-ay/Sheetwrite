@@ -33,7 +33,7 @@ status: SyncMutationStatus;
 
 ```ts generated
 export interface SyncMutationRecord extends PendingCommit {
-    status: SyncMutationStatus;
+  status: SyncMutationStatus;
 }
 ```
 

@@ -12,8 +12,8 @@ Human phrase for a selection's geometry; blank for null/single-cell.
 <div><dt>Source</dt><dd><code>packages/core/src/shell/selection-status.ts#L12</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function describeSelection(selection: Selection | null): string;
+function describeSelection(selection: Selection | null): string
 ```

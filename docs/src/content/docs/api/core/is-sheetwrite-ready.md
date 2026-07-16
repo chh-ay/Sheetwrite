@@ -12,8 +12,8 @@ Whether `initSheetwrite` has completed — the single readiness source.
 <div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L181</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function isSheetwriteReady(): boolean;
+function isSheetwriteReady(): boolean
 ```

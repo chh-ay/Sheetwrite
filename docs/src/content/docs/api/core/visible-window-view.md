@@ -157,23 +157,23 @@ ffiCalls?: number;
 
 ```ts generated
 export interface VisibleWindowView {
-    sheet: SheetId;
-    rows: {
-        start: number;
-        end: number;
-    };
-    cols: readonly number[];
-    values: ArrayLike<CellScalar>;
-    styleIds: Uint32Array;
-    styles: readonly CellStyle[];
-    valueKinds?: Uint8Array;
-    numberValues?: Float64Array;
-    stringPoolIds?: Uint32Array;
-    stringLocalIds?: Int32Array;
-    stringPoolUpdateIds?: Uint32Array;
-    stringPoolUpdateValues?: readonly string[];
-    localStrings?: readonly string[];
-    ffiCalls?: number;
+  sheet: SheetId;
+  rows: {
+    start: number;
+    end: number;
+  };
+  cols: readonly number[];
+  values: ArrayLike<CellScalar>;
+  styleIds: Uint32Array;
+  styles: readonly CellStyle[];
+  valueKinds?: Uint8Array;
+  numberValues?: Float64Array;
+  stringPoolIds?: Uint32Array;
+  stringLocalIds?: Int32Array;
+  stringPoolUpdateIds?: Uint32Array;
+  stringPoolUpdateValues?: readonly string[];
+  localStrings?: readonly string[];
+  ffiCalls?: number;
 }
 ```
 

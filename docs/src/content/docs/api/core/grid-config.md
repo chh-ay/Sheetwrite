@@ -185,23 +185,23 @@ through to the stock bindings.</p>
 
 ```ts generated
 export interface GridConfig {
-    toolbar?: boolean | ToolbarItem[];
-    bold?: boolean;
-    italic?: boolean;
-    align?: boolean;
-    textColor?: boolean;
-    fillColor?: boolean;
-    border?: boolean;
-    clearFormat?: boolean;
-    merge?: boolean;
-    sort?: boolean;
-    export?: boolean;
-    icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
-    contextMenu?: boolean | ContextMenuItems;
-    undo?: boolean;
-    find?: boolean;
-    tabs?: boolean;
-    keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) => boolean);
+  toolbar?: boolean | ToolbarItem[];
+  bold?: boolean;
+  italic?: boolean;
+  align?: boolean;
+  textColor?: boolean;
+  fillColor?: boolean;
+  border?: boolean;
+  clearFormat?: boolean;
+  merge?: boolean;
+  sort?: boolean;
+  export?: boolean;
+  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  contextMenu?: boolean | ContextMenuItems;
+  undo?: boolean;
+  find?: boolean;
+  tabs?: boolean;
+  keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) => boolean);
 }
 ```
 

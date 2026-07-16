@@ -33,7 +33,10 @@ subscribe( listener: (operation: VersionedOperation) => void, signal?: AbortSign
 
 ```ts generated
 export interface RemoteOperationSource {
-    subscribe(listener: (operation: VersionedOperation) => void, signal?: AbortSignal): undefined | (() => void);
+  subscribe(
+    listener: (operation: VersionedOperation) => void,
+    signal?: AbortSignal,
+  ): undefined | (() => void);
 }
 ```
 

@@ -69,11 +69,11 @@ signal?: AbortSignal;
 
 ```ts generated
 export interface CommentMutationRequest {
-    documentId: string;
-    baseVersion: number;
-    clientMutationId: string;
-    mutation: CommentMutation;
-    signal?: AbortSignal;
+  documentId: string;
+  baseVersion: number;
+  clientMutationId: string;
+  mutation: CommentMutation;
+  signal?: AbortSignal;
 }
 ```
 

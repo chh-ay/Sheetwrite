@@ -42,8 +42,14 @@ subscribe( listener: (message: PresenceMessage) => void, signal?: AbortSignal, )
 
 ```ts generated
 export interface PresenceTransport {
-    publish(message: PresenceMessage, signal?: AbortSignal): void | Promise<void>;
-    subscribe(listener: (message: PresenceMessage) => void, signal?: AbortSignal): undefined | (() => void);
+  publish(
+    message: PresenceMessage,
+    signal?: AbortSignal,
+  ): void | Promise<void>;
+  subscribe(
+    listener: (message: PresenceMessage) => void,
+    signal?: AbortSignal,
+  ): undefined | (() => void);
 }
 ```
 

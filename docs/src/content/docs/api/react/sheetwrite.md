@@ -15,10 +15,12 @@ use `SheetwriteGrid` when the host already owns a workbook or datasource.
 <div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L275</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function Sheetwrite<Row extends Record<string, CellScalar>>(props: SheetwriteProps<Row> & {
+function Sheetwrite<Row extends Record<string, CellScalar>>(
+  props: SheetwriteProps<Row> & {
     ref?: ForwardedRef<Grid>;
-}): ReactElement;
+  },
+): ReactElement
 ```

@@ -69,11 +69,11 @@ cells: SnapshotCell[];
 
 ```ts generated
 export interface CellBlock {
-    startRow: number;
-    startCol: number;
-    rowCount: number;
-    colCount: number;
-    cells: SnapshotCell[];
+  startRow: number;
+  startCol: number;
+  rowCount: number;
+  colCount: number;
+  cells: SnapshotCell[];
 }
 ```
 

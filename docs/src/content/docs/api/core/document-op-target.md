@@ -12,8 +12,8 @@ Exhaustive stable target identity used by persistence/logging layers.
 <div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L1273</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function documentOpTarget(operation: DocumentOp): string;
+function documentOpTarget(operation: DocumentOp): string
 ```

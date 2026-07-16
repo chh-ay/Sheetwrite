@@ -12,8 +12,8 @@ Registers the optional workbook XLSX implementation used by core.
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L327</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void;
+function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void
 ```

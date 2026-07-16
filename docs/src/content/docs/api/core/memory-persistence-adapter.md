@@ -51,9 +51,14 @@ load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>
 
 ```ts generated
 class MemoryPersistenceAdapter implements PersistenceAdapter {
-    constructor(...snapshots: readonly WorkbookSnapshot[]);
-    commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>;
-    load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot>;
+  constructor(...snapshots: readonly WorkbookSnapshot[]);
+  commit: (
+    request: PersistenceCommitRequest,
+  ) => Promise<PersistenceCommitResponse>;
+  load: (
+    documentId: string,
+    signal?: AbortSignal,
+  ) => Promise<WorkbookSnapshot>;
 }
 ```
 

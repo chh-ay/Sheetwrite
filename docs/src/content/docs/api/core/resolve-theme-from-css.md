@@ -12,8 +12,8 @@ Read `--sheetwrite-*` CSS custom properties into a partial theme.
 <div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L186</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function resolveThemeFromCss(el: HTMLElement): Partial<Theme>;
+function resolveThemeFromCss(el: HTMLElement): Partial<Theme>
 ```

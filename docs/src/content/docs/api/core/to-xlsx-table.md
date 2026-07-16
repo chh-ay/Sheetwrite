@@ -12,8 +12,11 @@ Exports a table model through the registered optional XLSX backend.
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L251</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
+function toXlsxTable(
+  workbook: Workbook,
+  store: Store,
+): Promise<Uint8Array>
 ```

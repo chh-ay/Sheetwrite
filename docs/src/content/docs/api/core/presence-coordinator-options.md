@@ -87,13 +87,13 @@ now?: () => number;
 
 ```ts generated
 export interface PresenceCoordinatorOptions {
-    actor: PresenceActor;
-    privacy?: PresencePrivacyOptions;
-    heartbeatMs?: number;
-    timeoutMs?: number;
-    maxActors?: number;
-    maxRangesPerActor?: number;
-    now?: () => number;
+  actor: PresenceActor;
+  privacy?: PresencePrivacyOptions;
+  heartbeatMs?: number;
+  timeoutMs?: number;
+  maxActors?: number;
+  maxRangesPerActor?: number;
+  now?: () => number;
 }
 ```
 

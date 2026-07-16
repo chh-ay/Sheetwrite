@@ -15,8 +15,8 @@ CR / LF / CRLF row breaks. A leading UTF-8 BOM is stripped. This mirrors
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L93</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function parseCsv(text: string): string[][];
+function parseCsv(text: string): string[][]
 ```

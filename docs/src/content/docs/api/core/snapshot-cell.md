@@ -60,10 +60,10 @@ style?: CellStyle;
 
 ```ts generated
 export interface SnapshotCell {
-    rowOffset: number;
-    colOffset: number;
-    value: CellValue;
-    style?: CellStyle;
+  rowOffset: number;
+  colOffset: number;
+  value: CellValue;
+  style?: CellStyle;
 }
 ```
 

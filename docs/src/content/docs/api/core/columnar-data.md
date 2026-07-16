@@ -42,8 +42,8 @@ columns: Record<string, ArrayLike<CellScalar | CellValue>>;
 
 ```ts generated
 export interface ColumnarData {
-    rowCount: number;
-    columns: Record<string, ArrayLike<CellScalar | CellValue>>;
+  rowCount: number;
+  columns: Record<string, ArrayLike<CellScalar | CellValue>>;
 }
 ```
 

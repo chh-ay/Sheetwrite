@@ -12,8 +12,10 @@ Validate and canonically order a schema-1 snapshot without hydrating runtime sta
 <div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L1248</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function validateWorkbookSnapshot(input: unknown): DocumentValidationResult;
+function validateWorkbookSnapshot(
+  input: unknown,
+): DocumentValidationResult
 ```

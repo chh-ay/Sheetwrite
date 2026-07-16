@@ -42,14 +42,20 @@ capability: { status: "incomplete"; loadedCells: number; totalCells: number; }
 
 ```ts generated
 class IncompleteDataError extends Error {
-    constructor(sheet: SheetId, capability: Extract<QueryCapability, {
+  constructor(
+    sheet: SheetId,
+    capability: Extract<
+      QueryCapability,
+      {
         status: "incomplete";
-    }>);
-    capability: {
-        status: "incomplete";
-        loadedCells: number;
-        totalCells: number;
-    };
+      }
+    >,
+  );
+  capability: {
+    status: "incomplete";
+    loadedCells: number;
+    totalCells: number;
+  };
 }
 ```
 

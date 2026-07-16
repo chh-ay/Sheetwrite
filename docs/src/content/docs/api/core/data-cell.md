@@ -15,9 +15,27 @@ Datasource cell value with optional cell-specific styling.
 ## Variants <span class="api-count">3</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>CellScalar</code></div>
-<div class="api-variant"><code>CellValue</code></div>
-<div class="api-variant"><code>{ value: CellValue; style?: CellStyle }</code></div>
+<div class="api-variant">
+
+```ts generated
+CellScalar
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+CellValue
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ value: CellValue; style?: CellStyle }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -26,10 +44,13 @@ Datasource cell value with optional cell-specific styling.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type DataCell = CellScalar | CellValue | {
-    value: CellValue;
-    style?: CellStyle;
-};
+export type DataCell =
+  | CellScalar
+  | CellValue
+  | {
+      value: CellValue;
+      style?: CellStyle;
+    };
 ```
 
 </details>

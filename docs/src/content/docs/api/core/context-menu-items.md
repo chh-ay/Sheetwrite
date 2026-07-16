@@ -12,20 +12,10 @@ Static rows or a context-aware factory evaluated each time the menu opens.
 <div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L200</code></dd></div>
 </dl>
 
-## Variants <span class="api-count">2</span>
-
-<div class="api-variant-list">
-<div class="api-variant"><code>readonly ContextMenuItem[]</code></div>
-<div class="api-variant"><code>((context: ContextMenuContext) =&gt; readonly ContextMenuItem[])</code></div>
-</div>
-
 ## Declaration
 
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
-
 ```ts generated
-export type ContextMenuItems = readonly ContextMenuItem[] | ((context: ContextMenuContext) => readonly ContextMenuItem[]);
+export type ContextMenuItems =
+  | readonly ContextMenuItem[]
+  | ((context: ContextMenuContext) => readonly ContextMenuItem[]);
 ```
-
-</details>

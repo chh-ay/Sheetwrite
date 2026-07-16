@@ -39,6 +39,8 @@ interface ApiManifestShape {
       classification: string;
       exports?: readonly {
         name: string;
+        signature?: string;
+        documentation?: string;
         memberDocs?: readonly { name: string; documentation: string }[];
       }[];
     }[];
@@ -87,6 +89,39 @@ export function apiReferenceRoutes(manifest: ApiManifestShape): ReadonlyMap<stri
     }
   }
   return routes;
+}
+
+export interface SymbolPreview {
+  signature: string;
+  docs?: string;
+}
+
+/**
+ * Symbol name -> declaration + docs for hover previews inside generated
+ * fences, where the type engine has no imports to resolve against. Collision
+ * policy mirrors `apiReferenceRoutes` so preview and link always agree.
+ */
+export function apiSymbolPreviews(manifest: ApiManifestShape): ReadonlyMap<string, SymbolPreview> {
+  const previews = new Map<string, SymbolPreview>();
+  const packages = [...manifest.packages].sort((a, b) =>
+    a.name === "@sheetwrite/core" ? -1 : b.name === "@sheetwrite/core" ? 1 : 0,
+  );
+  for (const pkg of packages) {
+    const entryPoints = [...pkg.entryPoints].sort((a, b) =>
+      a.subpath === "." ? -1 : b.subpath === "." ? 1 : 0,
+    );
+    for (const entry of entryPoints) {
+      if (entry.classification !== "supported") continue;
+      for (const item of entry.exports ?? []) {
+        if (!item.signature || previews.has(item.name)) continue;
+        previews.set(item.name, {
+          signature: item.signature.replace(/^export\s+/, ""),
+          docs: item.documentation || undefined,
+        });
+      }
+    }
+  }
+  return previews;
 }
 
 /**
@@ -161,6 +196,8 @@ interface RenderedHover {
   docs?: string;
   tags: readonly [name: string, text: string | undefined][];
   referenceRoute?: string;
+  /** When set, the trigger itself is an anchor: hover previews, click navigates. */
+  navigable?: boolean;
 }
 
 function nestedRendererConfig(config: ResolvedExpressiveCodeEngineConfig) {
@@ -227,6 +264,32 @@ async function formatSignature(rawSignature: string, printWidth: number): Promis
 
 export async function formatHoverSignature(raw: string, printWidth = 80): Promise<string> {
   return formatSignature(normalizeQuickInfo(raw), printWidth);
+}
+
+/**
+ * Formats a bare type expression (e.g. one union variant) by round-tripping
+ * it through a synthetic alias, so prettier can lay out long object types.
+ */
+export async function formatTypeExpression(type: string, printWidth = 78): Promise<string> {
+  const formatted = await formatSignature(
+    `type __Variant = ${type.replace(/;?\s*$/, "")};`,
+    printWidth,
+  );
+  return formatted.replace(/^type __Variant =\s*/, "").replace(/;$/, "");
+}
+
+/** Pretty-prints a full declaration for the generated reference pages. */
+export async function formatDeclaration(code: string, printWidth = 78): Promise<string> {
+  return formatSignature(code, printWidth);
+}
+
+/** Truncates a formatted declaration for preview use, closing the brace. */
+function capPreviewLines(formatted: string, maxLines: number): string {
+  const lines = formatted.split("\n");
+  if (lines.length <= maxLines) return formatted;
+  const kept = lines.slice(0, maxLines - 1);
+  const remaining = lines.length - kept.length;
+  return [...kept, `  // … ${remaining} more lines — see the API reference`, "}"].join("\n");
 }
 
 function codeLineContents(ast: Element): ElementContent[] {
@@ -458,9 +521,13 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
     return nodesToTransform.map((node) =>
       h("span.sw-code-popover", [
         h(
-          "span.sw-code-popover__trigger",
+          this.rendered.navigable && this.rendered.referenceRoute
+            ? "a.sw-code-popover__trigger"
+            : "span.sw-code-popover__trigger",
           {
-            tabIndex: 0,
+            ...(this.rendered.navigable && this.rendered.referenceRoute
+              ? { href: this.rendered.referenceRoute }
+              : { tabIndex: 0 }),
             ariaDescribedBy: this.popoverId,
             dataSwCodePopoverTrigger: this.popoverId,
             dataHoverKind: kind,
@@ -475,6 +542,9 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
             hidden: true,
             ariaHidden: "true",
             dataSwCodePopoverPanel: "",
+            // Popover text is preview chrome; indexing it lets giant embedded
+            // declarations (e.g. Grid) hijack search rankings on every page.
+            dataPagefindIgnore: "",
           },
           [
             h("span.sw-code-popover__accessible-signature", this.rendered.accessibleSignature),
@@ -577,9 +647,14 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
   let signatureRenderer: ExpressiveCode | undefined;
   let referenceRoutes: ReadonlyMap<string, string> | undefined;
   let memberReferences: ReadonlyMap<string, MemberReference> | undefined;
+  let symbolPreviews: ReadonlyMap<string, SymbolPreview> | undefined;
+  const previewParts = new Map<
+    string,
+    { accessible: string; wide: ElementContent[]; narrow: ElementContent[] }
+  >();
 
   const resolveManifest = async (): Promise<void> => {
-    if (referenceRoutes && memberReferences) return;
+    if (referenceRoutes && memberReferences && symbolPreviews) return;
     try {
       const { readFile } = await import("node:fs/promises");
       const { join } = await import("node:path");
@@ -587,10 +662,12 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
       const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as ApiManifestShape;
       referenceRoutes = apiReferenceRoutes(manifest);
       memberReferences = apiMemberReferences(manifest);
+      symbolPreviews = apiSymbolPreviews(manifest);
     } catch {
       // Docs generation has not run yet; hovers simply render without links.
       referenceRoutes = new Map();
       memberReferences = new Map();
+      symbolPreviews = new Map();
     }
   };
 
@@ -599,19 +676,82 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     hooks: {
       async preprocessCode({ codeBlock, config }) {
         if (!SUPPORTED_LANGUAGES.has(codeBlock.language)) return;
-        // Generated declaration fences get manifest reference links instead of
-        // type-engine hovers: their identifiers have no imports to resolve.
+        // Generated declaration fences carry no imports, so the type engine
+        // cannot resolve their identifiers. The manifest can: each public
+        // symbol gets a preview popover, and the token itself navigates.
         if (/\bgenerated\b/.test(codeBlock.meta)) {
           await resolveManifest();
-          for (const link of collectReferenceLinks(
+          signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
+          const previews = symbolPreviews ?? new Map<string, SymbolPreview>();
+          for (const [linkIndex, link] of collectReferenceLinks(
             codeBlock.code,
             referenceRoutes ?? new Map<string, string>(),
-          )) {
-            codeBlock
-              .getLine(link.line)
-              ?.addAnnotation(
+          ).entries()) {
+            const line = codeBlock.getLine(link.line);
+            if (!line) continue;
+            const name = line.text.slice(link.columnStart, link.columnEnd);
+            const preview = previews.get(name);
+            if (preview === undefined) {
+              line.addAnnotation(
                 new SheetwriteReferenceLinkAnnotation(link.route, link.columnStart, link.columnEnd),
               );
+              continue;
+            }
+            // Symbols repeat across hundreds of generated pages; render each
+            // preview once and clone the hast per use (trees must not share nodes).
+            let parts = previewParts.get(name);
+            if (parts === undefined) {
+              const [wideSignature, narrowSignature] = await Promise.all([
+                formatSignature(preview.signature, 68),
+                formatSignature(preview.signature, 34),
+              ]);
+              // Whole-interface previews (Grid: ~50 members) would embed pages
+              // of HTML at every mention; the popover is a preview, the page
+              // behind the link is the reference.
+              const [renderedWideSignature, renderedNarrowSignature] = await Promise.all([
+                signatureRenderer.render({
+                  code: capPreviewLines(wideSignature, 16),
+                  language: "ts",
+                  meta: "",
+                }),
+                signatureRenderer.render({
+                  code: capPreviewLines(narrowSignature, 20),
+                  language: "ts",
+                  meta: "",
+                }),
+              ]);
+              parts = {
+                accessible: capPreviewLines(wideSignature, 16),
+                wide: codeLineContents(renderedWideSignature.renderedGroupAst),
+                narrow: codeLineContents(renderedNarrowSignature.renderedGroupAst),
+              };
+              previewParts.set(name, parts);
+            }
+            const hover: SheetwriteTypeHover = {
+              type: "hover",
+              target: name,
+              text: preview.signature,
+              start: link.columnStart,
+              line: link.line,
+              character: link.columnStart,
+              length: link.columnEnd - link.columnStart,
+              origin: "workspace",
+            };
+            line.addAnnotation(
+              new SheetwriteHoverAnnotation(
+                hover,
+                {
+                  accessibleSignature: parts.accessible,
+                  wideSignature: structuredClone(parts.wide),
+                  narrowSignature: structuredClone(parts.narrow),
+                  docs: preview.docs,
+                  tags: [],
+                  referenceRoute: link.route,
+                  navigable: true,
+                },
+                hoverPopoverId(codeBlock, hover, linkIndex),
+              ),
+            );
           }
           return;
         }

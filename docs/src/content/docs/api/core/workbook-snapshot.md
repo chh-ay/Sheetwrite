@@ -69,14 +69,14 @@ sheets: SheetSnapshot[];
 
 ```ts generated
 export interface WorkbookSnapshot {
-    schemaVersion: 1;
-    documentId?: string;
-    version?: number;
-    workbook: {
-        activeSheet: SheetId;
-        namedRanges?: NamedRangeSnapshot[];
-    };
-    sheets: SheetSnapshot[];
+  schemaVersion: 1;
+  documentId?: string;
+  version?: number;
+  workbook: {
+    activeSheet: SheetId;
+    namedRanges?: NamedRangeSnapshot[];
+  };
+  sheets: SheetSnapshot[];
 }
 ```
 

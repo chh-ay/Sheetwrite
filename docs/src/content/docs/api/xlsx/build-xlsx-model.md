@@ -12,8 +12,11 @@ Build the default writer's complete active-sheet model without serializing it.
 <div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L80</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function buildXlsxModel(workbook: Workbook, store: Store): XlsxModel | null;
+function buildXlsxModel(
+  workbook: Workbook,
+  store: Store,
+): XlsxModel | null
 ```

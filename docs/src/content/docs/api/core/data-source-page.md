@@ -51,9 +51,9 @@ revision?: string | number;
 
 ```ts generated
 export interface DataSourcePage {
-    start: number;
-    rows: RowData[];
-    revision?: string | number;
+  start: number;
+  rows: RowData[];
+  revision?: string | number;
 }
 ```
 

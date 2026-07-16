@@ -15,10 +15,52 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 ## Variants <span class="api-count">4</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ status: &quot;applied&quot;; epoch: number; transaction: Transaction; warnings?: MutationIssue[]; rejections?: MutationIssue[]; }</code></div>
-<div class="api-variant"><code>{ status: &quot;conflict&quot;; expectedEpoch: number; actualEpoch: number }</code></div>
-<div class="api-variant"><code>{ status: &quot;rejected&quot;; epoch: number; issues: MutationIssue[]; }</code></div>
-<div class="api-variant"><code>{ status: &quot;noop&quot;; epoch: number; reason: &quot;empty&quot; | &quot;out-of-bounds&quot; | &quot;incomplete-data&quot; | &quot;read-only&quot;; }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "applied";
+  epoch: number;
+  transaction: Transaction;
+  warnings?: MutationIssue[];
+  rejections?: MutationIssue[];
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "conflict";
+  expectedEpoch: number;
+  actualEpoch: number;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "rejected";
+  epoch: number;
+  issues: MutationIssue[];
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  status: "noop";
+  epoch: number;
+  reason: "empty" | "out-of-bounds" | "incomplete-data" | "read-only";
+}
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -27,25 +69,29 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type ApplyTransactionResult = {
-    status: "applied";
-    epoch: number;
-    transaction: Transaction;
-    warnings?: MutationIssue[];
-    rejections?: MutationIssue[];
-} | {
-    status: "conflict";
-    expectedEpoch: number;
-    actualEpoch: number;
-} | {
-    status: "rejected";
-    epoch: number;
-    issues: MutationIssue[];
-} | {
-    status: "noop";
-    epoch: number;
-    reason: "empty" | "out-of-bounds" | "incomplete-data" | "read-only";
-};
+export type ApplyTransactionResult =
+  | {
+      status: "applied";
+      epoch: number;
+      transaction: Transaction;
+      warnings?: MutationIssue[];
+      rejections?: MutationIssue[];
+    }
+  | {
+      status: "conflict";
+      expectedEpoch: number;
+      actualEpoch: number;
+    }
+  | {
+      status: "rejected";
+      epoch: number;
+      issues: MutationIssue[];
+    }
+  | {
+      status: "noop";
+      epoch: number;
+      reason: "empty" | "out-of-bounds" | "incomplete-data" | "read-only";
+    };
 ```
 
 </details>

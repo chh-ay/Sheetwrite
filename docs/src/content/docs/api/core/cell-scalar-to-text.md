@@ -12,8 +12,8 @@ Spreadsheet display text for a resolved scalar.
 <div><dt>Source</dt><dd><code>packages/core/src/cell-input.ts#L5</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function cellScalarToText(value: CellScalar): string;
+function cellScalarToText(value: CellScalar): string
 ```

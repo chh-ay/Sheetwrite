@@ -17,8 +17,12 @@ last stable text.
 <div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L136</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createFormulaBar(host: HTMLElement, grid: Grid, options?: FormulaBarOptions): FormulaBarPiece;
+function createFormulaBar(
+  host: HTMLElement,
+  grid: Grid,
+  options?: FormulaBarOptions,
+): FormulaBarPiece
 ```

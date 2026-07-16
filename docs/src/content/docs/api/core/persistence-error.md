@@ -42,8 +42,12 @@ code: PersistenceErrorCode
 
 ```ts generated
 class PersistenceError extends Error {
-    constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions);
-    code: PersistenceErrorCode;
+  constructor(
+    code: PersistenceErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  );
+  code: PersistenceErrorCode;
 }
 ```
 

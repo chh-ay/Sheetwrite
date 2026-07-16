@@ -15,9 +15,38 @@ Serializable operation that creates or updates comment state.
 ## Variants <span class="api-count">3</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ kind: &quot;create&quot;; threadId: string; messageId: string; anchor: CommentAnchor; body: string; }</code></div>
-<div class="api-variant"><code>{ kind: &quot;reply&quot;; threadId: string; messageId: string; body: string }</code></div>
-<div class="api-variant"><code>{ kind: &quot;resolve&quot;; threadId: string; resolved: boolean }</code></div>
+<div class="api-variant">
+
+```ts generated
+{
+  kind: "create";
+  threadId: string;
+  messageId: string;
+  anchor: CommentAnchor;
+  body: string;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  kind: "reply";
+  threadId: string;
+  messageId: string;
+  body: string;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "resolve"; threadId: string; resolved: boolean }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -26,22 +55,25 @@ Serializable operation that creates or updates comment state.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type CommentMutation = {
-    kind: "create";
-    threadId: string;
-    messageId: string;
-    anchor: CommentAnchor;
-    body: string;
-} | {
-    kind: "reply";
-    threadId: string;
-    messageId: string;
-    body: string;
-} | {
-    kind: "resolve";
-    threadId: string;
-    resolved: boolean;
-};
+export type CommentMutation =
+  | {
+      kind: "create";
+      threadId: string;
+      messageId: string;
+      anchor: CommentAnchor;
+      body: string;
+    }
+  | {
+      kind: "reply";
+      threadId: string;
+      messageId: string;
+      body: string;
+    }
+  | {
+      kind: "resolve";
+      threadId: string;
+      resolved: boolean;
+    };
 ```
 
 </details>

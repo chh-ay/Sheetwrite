@@ -15,8 +15,12 @@ focus. Returns the mounted piece with an idempotent `destroy`.
 <div><dt>Source</dt><dd><code>packages/core/src/shell/toolbar-factory.ts#L27</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createToolbar(host: HTMLElement, grid: Grid, options?: ToolbarOptions): ShellPiece;
+function createToolbar(
+  host: HTMLElement,
+  grid: Grid,
+  options?: ToolbarOptions,
+): ShellPiece
 ```

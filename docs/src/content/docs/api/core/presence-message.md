@@ -60,10 +60,10 @@ sentAt: number;
 
 ```ts generated
 export interface PresenceMessage {
-    actor: PresenceActor;
-    activeSheet: string;
-    selections: readonly Range[];
-    sentAt: number;
+  actor: PresenceActor;
+  activeSheet: string;
+  selections: readonly Range[];
+  sentAt: number;
 }
 ```
 

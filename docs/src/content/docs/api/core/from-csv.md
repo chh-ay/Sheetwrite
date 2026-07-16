@@ -16,8 +16,11 @@ beyond `columns.length` are ignored, missing trailing cells become `null`, and
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L179</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function fromCsv(text: string, columns: readonly Column[]): ColumnarData;
+function fromCsv(
+  text: string,
+  columns: readonly Column[],
+): ColumnarData
 ```

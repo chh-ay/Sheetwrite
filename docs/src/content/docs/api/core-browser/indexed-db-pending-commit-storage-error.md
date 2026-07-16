@@ -42,8 +42,12 @@ code: IndexedDbPendingCommitStorageErrorCode
 
 ```ts generated
 class IndexedDbPendingCommitStorageError extends Error {
-    constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions);
-    code: IndexedDbPendingCommitStorageErrorCode;
+  constructor(
+    code: IndexedDbPendingCommitStorageErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  );
+  code: IndexedDbPendingCommitStorageErrorCode;
 }
 ```
 

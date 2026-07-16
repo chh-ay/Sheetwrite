@@ -60,10 +60,10 @@ c1: number;
 
 ```ts generated
 export interface MergeRange {
-    r0: number;
-    c0: number;
-    r1: number;
-    c1: number;
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
 }
 ```
 

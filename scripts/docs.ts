@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
-import { collectFenceHovers, isHighQualityHover } from "../docs/src/lib/sheetwrite-code-hovers.js";
+import {
+  collectFenceHovers,
+  formatDeclaration,
+  formatTypeExpression,
+  isHighQualityHover,
+} from "../docs/src/lib/sheetwrite-code-hovers.js";
 import { SheetwriteTypeEngine } from "../docs/src/lib/sheetwrite-type-engine.js";
 import {
   type ApiEntryPoint,
@@ -267,18 +272,19 @@ function declarationShape(signature: string): DeclarationShape {
   return { formatted, members, variants };
 }
 
-function renderDeclaration(signature: string, expanded: boolean): string {
-  // No fence title: the surrounding "Declaration"/"Signature" heading already
-  // names the block, and the extra frame header reads as visual noise.
+async function renderDeclaration(signature: string, expanded: boolean): Promise<string> {
+  // Pretty-printed so long unions wrap per variant instead of scrolling; no
+  // fence title - the surrounding "Declaration" heading already names it.
+  const formatted = await formatDeclaration(signature);
   if (expanded) {
-    return ["```ts generated", signature, "```"].join("\n");
+    return ["```ts generated", formatted, "```"].join("\n");
   }
   return [
     '<details class="api-declaration">',
     "<summary>View full TypeScript declaration</summary>",
     "",
     "```ts generated",
-    signature,
+    formatted,
     "```",
     "",
     "</details>",
@@ -347,14 +353,18 @@ function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): st
   return `/docs/api/${entrySlug(pkg.name, entry.subpath)}/${anchor(item.name)}/`;
 }
 
-export function renderSymbolPage(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
+export async function renderSymbolPage(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+): Promise<string> {
   const label = entryLabel(pkg, entry);
   const source = packageSourcePath(pkg.name, item.source);
   const summary = documentationMarkdown(pkg, entry, item);
   const description = compactSummary(summary);
   const shape = declarationShape(parseableDeclaration(item));
   const body = [
-    frontmatter(`${item.name} | ${label}`, description, { tableOfContents: false }).trimEnd(),
+    frontmatter(`${item.name} | ${label}`, description).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
     `<div class="api-pagehead"><a class="api-backlink" href="/docs/api/${entrySlug(pkg.name, entry.subpath)}/">${html(label)}</a><span class="api-status" data-kind="${item.kind}">${item.kind}</span></div>`,
     "",
@@ -369,25 +379,41 @@ export function renderSymbolPage(pkg: ApiPackage, entry: ApiEntryPoint, item: Ap
   if (shape.members.length > 0) {
     body.push(renderMembers(pkg, entry, item, shape.members), "");
   }
-  if (shape.variants.length > 0) {
+  // A variants section earns its space only for structured unions; scalar
+  // unions read best inline in the (expanded) declaration, where identifiers
+  // are highlighted, hoverable, and linked.
+  const structuredVariants = shape.variants.some((variant) => variant.includes("{"))
+    ? shape.variants
+    : [];
+  if (structuredVariants.length > 0) {
     body.push(
-      `## Variants <span class="api-count">${shape.variants.length}</span>`,
+      `## Variants <span class="api-count">${structuredVariants.length}</span>`,
       "",
       '<div class="api-variant-list">',
-      ...shape.variants.map(
-        (variant) => `<div class="api-variant"><code>${html(variant)}</code></div>`,
-      ),
-      "</div>",
-      "",
     );
+    for (const variant of structuredVariants) {
+      body.push(
+        '<div class="api-variant">',
+        "",
+        "```ts generated",
+        await formatTypeExpression(variant),
+        "```",
+        "",
+        "</div>",
+      );
+    }
+    body.push("</div>", "");
   }
+  // One consistent model: the code section is always "Declaration", always
+  // pretty-printed. It collapses only when Members/Variants already tell the
+  // story above it; otherwise it is the page's primary content and expands.
   body.push(
-    shape.members.length > 0 || shape.variants.length > 0 ? "## Declaration" : "## Signature",
+    "## Declaration",
     "",
-    renderDeclaration(
+    await renderDeclaration(
       // `declare` is parser scaffolding, not information a reader needs.
       shape.formatted.replace(/^declare /, ""),
-      shape.members.length === 0 && shape.variants.length === 0 && item.signature.length < 220,
+      shape.members.length === 0 && structuredVariants.length === 0,
     ),
     "",
   );
@@ -405,7 +431,7 @@ export function renderEntryPage(pkg: ApiPackage, entry: ApiEntryPoint): string {
           ? "Testing-only public entry point"
           : "CSS or binary asset entry point";
   const body = [
-    frontmatter(label, `API reference for ${label}.`, { tableOfContents: false }).trimEnd(),
+    frontmatter(label, `API reference for ${label}.`).trimEnd(),
     `<span class="api-status" data-status="${entry.classification}">${entry.classification}</span>`,
     "",
     `**${status}.** Import this entry point as \`${label}\`.`,
@@ -761,7 +787,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
         symbolOwners.set(symbolPath, owner);
         apiFiles.push({
           path: symbolPath,
-          content: renderSymbolPage(pkg, entry, item),
+          content: await renderSymbolPage(pkg, entry, item),
         });
       }
     }

@@ -42,8 +42,8 @@ fill?: true;
 
 ```ts generated
 export interface OptionalGridSizeProps {
-    height?: number | string;
-    fill?: true;
+  height?: number | string;
+  fill?: true;
 }
 ```
 

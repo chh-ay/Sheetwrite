@@ -33,7 +33,7 @@ color?: string;
 
 ```ts generated
 export interface HighlightRange extends Range {
-    color?: string;
+  color?: string;
 }
 ```
 

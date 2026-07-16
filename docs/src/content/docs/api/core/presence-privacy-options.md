@@ -60,10 +60,10 @@ allowActor?: (actor: Readonly<PresenceActor>) => boolean;
 
 ```ts generated
 export interface PresencePrivacyOptions {
-    shareDisplayName?: boolean;
-    shareSelection?: boolean;
-    receivePresence?: boolean;
-    allowActor?: (actor: Readonly<PresenceActor>) => boolean;
+  shareDisplayName?: boolean;
+  shareSelection?: boolean;
+  receivePresence?: boolean;
+  allowActor?: (actor: Readonly<PresenceActor>) => boolean;
 }
 ```
 

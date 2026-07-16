@@ -12,67 +12,94 @@ Convenience component for local object rows with live option updates.
 <div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L268</code></dd></div>
 </dl>
 
-## Signature
-
-<details class="api-declaration">
-<summary>View full TypeScript declaration</summary>
+## Declaration
 
 ```ts generated
-const Sheetwrite: DefineComponent<ExtractPropTypes<{
+const Sheetwrite: DefineComponent<
+  ExtractPropTypes<{
     columns: {
-        type: PropType<readonly {
-            key: string;
-            title: string;
-        }[]>;
-        required: true;
+      type: PropType<
+        readonly {
+          key: string;
+          title: string;
+        }[]
+      >;
+      required: true;
     };
     defaultRows: {
-        type: PropType<readonly Record<string, CellScalar>[]>;
-        required: true;
+      type: PropType<readonly Record<string, CellScalar>[]>;
+      required: true;
     };
     sheetName: {
-        type: StringConstructor;
-        default: undefined;
+      type: StringConstructor;
+      default: undefined;
     };
     height: {
-        type: (StringConstructor | NumberConstructor)[];
-        default: undefined;
+      type: (StringConstructor | NumberConstructor)[];
+      default: undefined;
     };
     fill: {
-        type: BooleanConstructor;
-        default: undefined;
+      type: BooleanConstructor;
+      default: undefined;
     };
-}>, () => VNode<RendererNode, RendererElement, {
-    [key: string]: any;
-}>, {}, {}, {}, ComponentOptionsMixin, ComponentOptionsMixin, {}, string, PublicProps, ToResolvedProps<ExtractPropTypes<{
-    columns: {
-        type: PropType<readonly {
+  }>,
+  () => VNode<
+    RendererNode,
+    RendererElement,
+    {
+      [key: string]: any;
+    }
+  >,
+  {},
+  {},
+  {},
+  ComponentOptionsMixin,
+  ComponentOptionsMixin,
+  {},
+  string,
+  PublicProps,
+  ToResolvedProps<
+    ExtractPropTypes<{
+      columns: {
+        type: PropType<
+          readonly {
             key: string;
             title: string;
-        }[]>;
+          }[]
+        >;
         required: true;
-    };
-    defaultRows: {
+      };
+      defaultRows: {
         type: PropType<readonly Record<string, CellScalar>[]>;
         required: true;
-    };
-    sheetName: {
+      };
+      sheetName: {
         type: StringConstructor;
         default: undefined;
-    };
-    height: {
+      };
+      height: {
         type: (StringConstructor | NumberConstructor)[];
         default: undefined;
-    };
-    fill: {
+      };
+      fill: {
         type: BooleanConstructor;
         default: undefined;
-    };
-}>, {}>, {
+      };
+    }>,
+    {}
+  >,
+  {
     fill: boolean;
     height: string | number;
     sheetName: string;
-}, {}, {}, {}, string, ComponentProvideOptions, true, {}, any>;
+  },
+  {},
+  {},
+  {},
+  string,
+  ComponentProvideOptions,
+  true,
+  {},
+  any
+>
 ```
-
-</details>

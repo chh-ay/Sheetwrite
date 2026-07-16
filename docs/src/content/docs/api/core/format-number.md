@@ -14,8 +14,12 @@ positive/negative/zero/text codes, quoted literals, and backslash escapes.
 <div><dt>Source</dt><dd><code>packages/core/src/number-format.ts#L455</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function formatNumber(value: number | string, code?: string, locale?: string): string;
+function formatNumber(
+  value: number | string,
+  code?: string,
+  locale?: string,
+): string
 ```

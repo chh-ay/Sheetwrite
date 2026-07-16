@@ -15,8 +15,20 @@ Successful rebased operations or a conservative rebase conflict.
 ## Variants <span class="api-count">2</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ status: &quot;rebased&quot;; operations: readonly DocumentOp[] }</code></div>
-<div class="api-variant"><code>{ status: &quot;conflict&quot;; conflict: RebaseConflict }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ status: "rebased"; operations: readonly DocumentOp[] }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ status: "conflict"; conflict: RebaseConflict }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -25,13 +37,15 @@ Successful rebased operations or a conservative rebase conflict.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type DocumentRebaseResult = {
-    status: "rebased";
-    operations: readonly DocumentOp[];
-} | {
-    status: "conflict";
-    conflict: RebaseConflict;
-};
+export type DocumentRebaseResult =
+  | {
+      status: "rebased";
+      operations: readonly DocumentOp[];
+    }
+  | {
+      status: "conflict";
+      conflict: RebaseConflict;
+    };
 ```
 
 </details>

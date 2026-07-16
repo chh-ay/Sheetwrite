@@ -60,10 +60,10 @@ label?: string;
 
 ```ts generated
 export interface RevisionSummary {
-    version: number;
-    createdAt: string;
-    actor?: PresenceActor;
-    label?: string;
+  version: number;
+  createdAt: string;
+  actor?: PresenceActor;
+  label?: string;
 }
 ```
 

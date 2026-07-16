@@ -183,28 +183,42 @@ viewRowCount(sheet: SheetId): number;
 
 ```ts generated
 export interface Store {
-    getWorkbook(): Workbook;
-    getCell(addr: CellAddress): ResolvedCell;
-    getFormula(addr: CellAddress): string | null;
-    getRefTarget(addr: CellAddress): CellAddress | null;
-    recalculateVolatile(now?: Date): void;
-    getVisibleWindow(sheet: SheetId, rows: {
-        start: number;
-        end: number;
-    }, cols: readonly number[]): VisibleWindowView;
-    getClipboardWindow?(sheet: SheetId, viewRows: {
-        start: number;
-        end: number;
-    }, cols: readonly number[]): ClipboardWindowView;
-    ensureColumns(sheet: SheetId, columns: readonly Column[]): void;
-    applyTransaction(tx: Transaction, options?: TransactionApplicationOptions): ApplyTransactionResult;
-    setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
-    on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
-    queryCapability?(sheet: SheetId): QueryCapability;
-    getCellLoadState?(addr: CellAddress): CellLoadState;
-    acknowledgeOperations?(operations: readonly DocumentOp[]): void;
-    exportSnapshot?(): WorkbookSnapshot;
-    viewRowCount(sheet: SheetId): number;
+  getWorkbook(): Workbook;
+  getCell(addr: CellAddress): ResolvedCell;
+  getFormula(addr: CellAddress): string | null;
+  getRefTarget(addr: CellAddress): CellAddress | null;
+  recalculateVolatile(now?: Date): void;
+  getVisibleWindow(
+    sheet: SheetId,
+    rows: {
+      start: number;
+      end: number;
+    },
+    cols: readonly number[],
+  ): VisibleWindowView;
+  getClipboardWindow?(
+    sheet: SheetId,
+    viewRows: {
+      start: number;
+      end: number;
+    },
+    cols: readonly number[],
+  ): ClipboardWindowView;
+  ensureColumns(sheet: SheetId, columns: readonly Column[]): void;
+  applyTransaction(
+    tx: Transaction,
+    options?: TransactionApplicationOptions,
+  ): ApplyTransactionResult;
+  setProtectionResolver?(
+    resolver: ProtectionResolver | undefined,
+    mode?: MutationPolicyMode,
+  ): void;
+  on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
+  queryCapability?(sheet: SheetId): QueryCapability;
+  getCellLoadState?(addr: CellAddress): CellLoadState;
+  acknowledgeOperations?(operations: readonly DocumentOp[]): void;
+  exportSnapshot?(): WorkbookSnapshot;
+  viewRowCount(sheet: SheetId): number;
 }
 ```
 

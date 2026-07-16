@@ -24,8 +24,8 @@ to a text literal.
 <div><dt>Source</dt><dd><code>packages/core/src/date-serial.ts#L95</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function parseDateInput(raw: string): number | null;
+function parseDateInput(raw: string): number | null
 ```

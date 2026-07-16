@@ -51,9 +51,9 @@ range: Range;
 
 ```ts generated
 export interface NamedRangeSnapshot {
-    name: string;
-    scope?: SheetId;
-    range: Range;
+  name: string;
+  scope?: SheetId;
+  range: Range;
 }
 ```
 

@@ -12,8 +12,8 @@ Creates and mounts an imperative Grid in the supplied host element.
 <div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L226</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createGrid(host: HTMLElement, opts: GridOptions): Grid;
+function createGrid(host: HTMLElement, opts: GridOptions): Grid
 ```

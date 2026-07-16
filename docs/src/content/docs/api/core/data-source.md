@@ -33,7 +33,7 @@ getRows(request: DataSourceRequest): Promise<DataSourcePage>;
 
 ```ts generated
 export interface DataSource {
-    getRows(request: DataSourceRequest): Promise<DataSourcePage>;
+  getRows(request: DataSourceRequest): Promise<DataSourcePage>;
 }
 ```
 

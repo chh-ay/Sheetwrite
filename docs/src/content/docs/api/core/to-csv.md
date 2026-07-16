@@ -14,8 +14,8 @@ window, not cell-by-cell.
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L46</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function toCsv(sheet: Sheet, store: Store): string;
+function toCsv(sheet: Sheet, store: Store): string
 ```

@@ -17,9 +17,27 @@ the WASM calculation engine.
 ## Variants <span class="api-count">3</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ kind: &quot;literal&quot;; value: CellScalar }</code></div>
-<div class="api-variant"><code>{ kind: &quot;ref&quot;; target: CellAddress }</code></div>
-<div class="api-variant"><code>{ kind: &quot;formula&quot;; src: string }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "literal"; value: CellScalar }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "ref"; target: CellAddress }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "formula"; src: string }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -28,16 +46,19 @@ the WASM calculation engine.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type CellValue = {
-    kind: "literal";
-    value: CellScalar;
-} | {
-    kind: "ref";
-    target: CellAddress;
-} | {
-    kind: "formula";
-    src: string;
-};
+export type CellValue =
+  | {
+      kind: "literal";
+      value: CellScalar;
+    }
+  | {
+      kind: "ref";
+      target: CellAddress;
+    }
+  | {
+      kind: "formula";
+      src: string;
+    };
 ```
 
 </details>

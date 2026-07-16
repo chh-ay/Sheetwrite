@@ -42,8 +42,10 @@ commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
 
 ```ts generated
 export interface PersistenceAdapter {
-    load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
-    commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
+  load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
+  commit(
+    request: PersistenceCommitRequest,
+  ): Promise<PersistenceCommitResponse>;
 }
 ```
 

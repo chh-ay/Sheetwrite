@@ -12,8 +12,11 @@ Formula-preserving, multi-sheet workbook import through the optional XLSX backen
 <div><dt>Source</dt><dd><code>packages/core/src/export.ts#L347</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function fromXlsxWorkbook(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>;
+function fromXlsxWorkbook(
+  data: ArrayBuffer | Uint8Array,
+  options?: XlsxWorkbookOptions,
+): Promise<WorkbookSnapshot>
 ```

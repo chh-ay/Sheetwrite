@@ -177,29 +177,23 @@ cells: CellBlock[];
 
 ```ts generated
 export interface SheetSnapshot {
-    id: SheetId;
-    name: string;
-    order: number;
-    rowCount: number;
-    columns: Column[];
-    frozenRows?: number;
-    frozenCols?: number;
-    rowMeta?: Array<[
-        row: number,
-        meta: RowMetadata
-    ]>;
-    merges?: MergeRange[];
-    conditionalFormats?: ConditionalFormatRule[];
-    validationRules?: DataValidationRule[];
-    protectedRanges?: ProtectedRange[];
-    notes?: CellNote[];
-    sortKeys?: SortKey[];
-    filters?: Array<[
-        col: number,
-        filter: ColumnFilter
-    ]>;
-    rowGroups?: RowGroup[];
-    cells: CellBlock[];
+  id: SheetId;
+  name: string;
+  order: number;
+  rowCount: number;
+  columns: Column[];
+  frozenRows?: number;
+  frozenCols?: number;
+  rowMeta?: Array<[row: number, meta: RowMetadata]>;
+  merges?: MergeRange[];
+  conditionalFormats?: ConditionalFormatRule[];
+  validationRules?: DataValidationRule[];
+  protectedRanges?: ProtectedRange[];
+  notes?: CellNote[];
+  sortKeys?: SortKey[];
+  filters?: Array<[col: number, filter: ColumnFilter]>;
+  rowGroups?: RowGroup[];
+  cells: CellBlock[];
 }
 ```
 

@@ -115,16 +115,16 @@ renderer?: string;
 
 ```ts generated
 export interface Column {
-    key: string;
-    header: string;
-    width: number;
-    type: CellFormat;
-    numberFormat?: string;
-    numberLocale?: string;
-    headerStyle?: CellStyle;
-    cellStyle?: CellStyle;
-    visible?: boolean;
-    renderer?: string;
+  key: string;
+  header: string;
+  width: number;
+  type: CellFormat;
+  numberFormat?: string;
+  numberLocale?: string;
+  headerStyle?: CellStyle;
+  cellStyle?: CellStyle;
+  visible?: boolean;
+  renderer?: string;
 }
 ```
 

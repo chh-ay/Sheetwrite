@@ -51,9 +51,9 @@ avatarUrl?: string;
 
 ```ts generated
 export interface CommentAuthorRef {
-    id: string;
-    displayName?: string;
-    avatarUrl?: string;
+  id: string;
+  displayName?: string;
+  avatarUrl?: string;
 }
 ```
 

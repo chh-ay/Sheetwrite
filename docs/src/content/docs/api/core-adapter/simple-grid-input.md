@@ -42,8 +42,8 @@ data: ColumnarData;
 
 ```ts generated
 export interface SimpleGridInput {
-    workbook: Workbook;
-    data: ColumnarData;
+  workbook: Workbook;
+  data: ColumnarData;
 }
 ```
 

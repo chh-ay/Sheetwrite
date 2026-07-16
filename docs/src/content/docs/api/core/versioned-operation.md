@@ -51,9 +51,9 @@ clientMutationId?: string;
 
 ```ts generated
 export interface VersionedOperation {
-    version: number;
-    readonly operations: readonly DocumentOp[];
-    clientMutationId?: string;
+  version: number;
+  readonly operations: readonly DocumentOp[];
+  clientMutationId?: string;
 }
 ```
 

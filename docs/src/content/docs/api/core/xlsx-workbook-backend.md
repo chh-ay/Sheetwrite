@@ -51,9 +51,15 @@ fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions,
 
 ```ts generated
 export interface XlsxWorkbookBackend {
-    name: string;
-    toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
-    fromXlsxWorkbook(data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>;
+  name: string;
+  toXlsxWorkbook(
+    snapshot: WorkbookSnapshot,
+    options?: XlsxWorkbookOptions,
+  ): Promise<Uint8Array>;
+  fromXlsxWorkbook(
+    data: ArrayBuffer | Uint8Array,
+    options?: XlsxWorkbookOptions,
+  ): Promise<WorkbookSnapshot>;
 }
 ```
 

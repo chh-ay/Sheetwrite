@@ -13,8 +13,12 @@ the hydrated store just like one created through `createGrid`.
 <div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L35</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createGridFromSnapshot(host: HTMLElement, snapshot: unknown, options?: SnapshotGridOptions): Grid;
+function createGridFromSnapshot(
+  host: HTMLElement,
+  snapshot: unknown,
+  options?: SnapshotGridOptions,
+): Grid
 ```

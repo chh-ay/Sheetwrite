@@ -161,20 +161,20 @@ config?: GridConfig;
 
 ```ts generated
 export interface GridOptions {
-    workbook: Workbook;
-    data?: ColumnarData;
-    datasource?: DataSource;
-    datasourceStorage?: DataSourceStorageOptions;
-    renderer?: "canvas" | "worker";
-    workerUrl?: string | URL;
-    theme?: Partial<Theme>;
-    readOnly?: boolean;
-    protectionResolver?: ProtectionResolver;
-    mutationPolicy?: MutationPolicyMode;
-    renderers?: Record<string, CellRenderer>;
-    overscan?: number;
-    minColumns?: number;
-    config?: GridConfig;
+  workbook: Workbook;
+  data?: ColumnarData;
+  datasource?: DataSource;
+  datasourceStorage?: DataSourceStorageOptions;
+  renderer?: "canvas" | "worker";
+  workerUrl?: string | URL;
+  theme?: Partial<Theme>;
+  readOnly?: boolean;
+  protectionResolver?: ProtectionResolver;
+  mutationPolicy?: MutationPolicyMode;
+  renderers?: Record<string, CellRenderer>;
+  overscan?: number;
+  minColumns?: number;
+  config?: GridConfig;
 }
 ```
 

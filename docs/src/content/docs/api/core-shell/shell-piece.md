@@ -42,8 +42,8 @@ destroy(): void;
 
 ```ts generated
 export interface ShellPiece {
-    readonly element: HTMLElement;
-    destroy(): void;
+  readonly element: HTMLElement;
+  destroy(): void;
 }
 ```
 

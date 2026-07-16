@@ -25,8 +25,12 @@ tearing the grid down and rebuilding it.
 <div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L92</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function createGridController(host: HTMLElement, options: GridOptions, handlers: GridControllerHandlers): GridController;
+function createGridController(
+  host: HTMLElement,
+  options: GridOptions,
+  handlers: GridControllerHandlers,
+): GridController
 ```

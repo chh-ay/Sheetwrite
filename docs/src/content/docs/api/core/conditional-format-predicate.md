@@ -15,10 +15,34 @@ Predicate used to decide whether a conditional format applies.
 ## Variants <span class="api-count">4</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ kind: &quot;greaterThan&quot;; value: number }</code></div>
-<div class="api-variant"><code>{ kind: &quot;lessThan&quot;; value: number }</code></div>
-<div class="api-variant"><code>{ kind: &quot;equal&quot;; value: CellScalar }</code></div>
-<div class="api-variant"><code>{ kind: &quot;contains&quot;; text: string; matchCase?: boolean }</code></div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "greaterThan"; value: number }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "lessThan"; value: number }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "equal"; value: CellScalar }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ kind: "contains"; text: string; matchCase?: boolean }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -27,20 +51,24 @@ Predicate used to decide whether a conditional format applies.
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type ConditionalFormatPredicate = {
-    kind: "greaterThan";
-    value: number;
-} | {
-    kind: "lessThan";
-    value: number;
-} | {
-    kind: "equal";
-    value: CellScalar;
-} | {
-    kind: "contains";
-    text: string;
-    matchCase?: boolean;
-};
+export type ConditionalFormatPredicate =
+  | {
+      kind: "greaterThan";
+      value: number;
+    }
+  | {
+      kind: "lessThan";
+      value: number;
+    }
+  | {
+      kind: "equal";
+      value: CellScalar;
+    }
+  | {
+      kind: "contains";
+      text: string;
+      matchCase?: boolean;
+    };
 ```
 
 </details>

@@ -60,10 +60,10 @@ permissionKey?: string;
 
 ```ts generated
 export interface ProtectedRange {
-    id: string;
-    range: Range;
-    label?: string;
-    permissionKey?: string;
+  id: string;
+  range: Range;
+  label?: string;
+  permissionKey?: string;
 }
 ```
 

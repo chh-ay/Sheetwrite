@@ -44,8 +44,8 @@ fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
 
 ```ts generated
 export interface XlsxTableImportBackend {
-    name: string;
-    fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
+  name: string;
+  fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
 }
 ```
 

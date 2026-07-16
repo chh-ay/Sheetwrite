@@ -69,11 +69,11 @@ epoch?: number;
 
 ```ts generated
 export interface ChangeEvent {
-    transaction: Transaction;
-    changes: CellChange[];
-    commitReason: CommitReason;
-    source: OperationSource;
-    epoch?: number;
+  transaction: Transaction;
+  changes: CellChange[];
+  commitReason: CommitReason;
+  source: OperationSource;
+  epoch?: number;
 }
 ```
 

@@ -12,8 +12,8 @@ Column index (0-based) → A1 column label (0 → "A", 26 → "AA").
 <div><dt>Source</dt><dd><code>packages/core/src/a1.ts#L4</code></dd></div>
 </dl>
 
-## Signature
+## Declaration
 
 ```ts generated
-function colToA1(col: number): string;
+function colToA1(col: number): string
 ```

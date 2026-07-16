@@ -51,9 +51,18 @@ restoreRevision(request: RevisionRestoreRequest): Promise<RevisionRestoreRespons
 
 ```ts generated
 export interface RevisionAdapter {
-    listRevisions(documentId: string, signal?: AbortSignal): Promise<readonly RevisionSummary[]>;
-    loadRevision(documentId: string, version: number, signal?: AbortSignal): Promise<unknown>;
-    restoreRevision(request: RevisionRestoreRequest): Promise<RevisionRestoreResponse>;
+  listRevisions(
+    documentId: string,
+    signal?: AbortSignal,
+  ): Promise<readonly RevisionSummary[]>;
+  loadRevision(
+    documentId: string,
+    version: number,
+    signal?: AbortSignal,
+  ): Promise<unknown>;
+  restoreRevision(
+    request: RevisionRestoreRequest,
+  ): Promise<RevisionRestoreResponse>;
 }
 ```
 
