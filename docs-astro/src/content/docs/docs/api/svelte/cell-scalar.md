@@ -1,18 +1,18 @@
 ---
-title: "CellScalar | @sheetwrite/vue"
+title: "CellScalar | @sheetwrite/svelte"
 description: "A scalar that can be displayed directly."
 tableOfContents: false
 ---
-<!-- api-export:@sheetwrite/vue|.|CellScalar -->
-[← @sheetwrite/vue](/docs/api/vue/)
+<!-- api-export:@sheetwrite/svelte|.|CellScalar -->
+[← @sheetwrite/svelte](/docs/api/svelte/)
 
 <span class="api-status">type</span>
 
 A scalar that can be displayed directly.
 
 <dl class="api-metadata">
-<div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/cell.d.ts#L63</code></dd></div>
+<div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/cell.d.ts#L71</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">4</span>

@@ -7597,7 +7597,7 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L63",
+              "source": "../core/dist/types/cell.d.ts#L71",
               "jsDocTags": [],
               "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
@@ -7609,7 +7609,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L270",
+              "source": "../core/dist/types/grid.d.ts#L287",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -7845,7 +7845,20 @@
               "source": "../core/dist/adapter.d.ts#L26",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "generation",
+                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
+                },
+                {
+                  "name": "grid",
+                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
+                },
+                {
+                  "name": "reason",
+                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
+                }
+              ]
             },
             {
               "name": "Sheetwrite",
@@ -8095,6 +8108,22 @@
                   "documentation": "Additional class appended to the required `sheetwrite` host class."
                 },
                 {
+                  "name": "config",
+                  "documentation": "Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false."
+                },
+                {
+                  "name": "data",
+                  "documentation": "Eager column-major values loaded into `workbook.activeSheet`; use instead of `datasource`."
+                },
+                {
+                  "name": "datasource",
+                  "documentation": "Lazy row provider requested for visible windows; use instead of eager `data`."
+                },
+                {
+                  "name": "datasourceStorage",
+                  "documentation": "Allocation and cache policy for datasource-backed cell storage."
+                },
+                {
                   "name": "fallback",
                   "documentation": "Content shown while WASM is loading or after initialization fails."
                 },
@@ -8123,6 +8152,42 @@
                   "documentation": "Atomic rejects the transaction; partial skips denied operation objects."
                 },
                 {
+                  "name": "onActiveSheetChange",
+                  "documentation": "Fires after the visible sheet changes."
+                },
+                {
+                  "name": "onEditBegin",
+                  "documentation": "Fires when cell editing begins."
+                },
+                {
+                  "name": "onEditCommit",
+                  "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onGridChange",
+                  "documentation": "Receives every committed Grid change, including its applied transaction."
+                },
+                {
+                  "name": "onInitializationError",
+                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
+                },
+                {
+                  "name": "onReady",
+                  "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onSearch",
+                  "documentation": "Receives refreshed search matches and active-match index."
+                },
+                {
+                  "name": "onSelectionChange",
+                  "documentation": "Receives the current selection, or `null` after it is cleared."
+                },
+                {
+                  "name": "onViewportChange",
+                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
+                },
+                {
                   "name": "overscan",
                   "documentation": "Rows rendered above/below the viewport to absorb fast scrolls."
                 },
@@ -8131,12 +8196,32 @@
                   "documentation": "Host-owned client UX permission check. Servers must independently authorize\nevery submitted operation; this resolver is not an authentication boundary."
                 },
                 {
+                  "name": "readOnly",
+                  "documentation": "Disables mutating interactions while preserving navigation and selection."
+                },
+                {
+                  "name": "renderer",
+                  "documentation": "Paint backend; defaults to main-thread `canvas` and falls back there if a worker fails."
+                },
+                {
                   "name": "renderers",
                   "documentation": "Custom cell renderers registered up front; also see `Grid.defineCellRenderer`."
                 },
                 {
                   "name": "style",
                   "documentation": "Host styles merged before adapter sizing styles."
+                },
+                {
+                  "name": "theme",
+                  "documentation": "Overrides merged over the default theme and host CSS custom properties."
+                },
+                {
+                  "name": "wasmSource",
+                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
+                },
+                {
+                  "name": "workbook",
+                  "documentation": "Live workbook schema adopted by the store and updated by document operations."
                 },
                 {
                   "name": "workerUrl",
@@ -8372,12 +8457,28 @@
                   "documentation": "Ordered schema used to derive the component-owned sheet."
                 },
                 {
+                  "name": "config",
+                  "documentation": "Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false."
+                },
+                {
+                  "name": "datasourceStorage",
+                  "documentation": "Allocation and cache policy for datasource-backed cell storage."
+                },
+                {
                   "name": "defaultRows",
                   "documentation": "Rows converted to initial columnar data; missing column keys become `null`."
                 },
                 {
                   "name": "fallback",
                   "documentation": "Content shown while WASM is loading or after initialization fails."
+                },
+                {
+                  "name": "fill",
+                  "documentation": "Mutually exclusive with an explicit `height`.\nFills the parent's available width and height."
+                },
+                {
+                  "name": "height",
+                  "documentation": "Host height in CSS pixels for numbers or any CSS length string.\nMutually exclusive with `fill`."
                 },
                 {
                   "name": "inputMode",
@@ -8396,12 +8497,56 @@
                   "documentation": "Atomic rejects the transaction; partial skips denied operation objects."
                 },
                 {
+                  "name": "onActiveSheetChange",
+                  "documentation": "Fires after the visible sheet changes."
+                },
+                {
+                  "name": "onEditBegin",
+                  "documentation": "Fires when cell editing begins."
+                },
+                {
+                  "name": "onEditCommit",
+                  "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onGridChange",
+                  "documentation": "Receives every committed Grid change, including its applied transaction."
+                },
+                {
+                  "name": "onInitializationError",
+                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
+                },
+                {
+                  "name": "onReady",
+                  "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onSearch",
+                  "documentation": "Receives refreshed search matches and active-match index."
+                },
+                {
+                  "name": "onSelectionChange",
+                  "documentation": "Receives the current selection, or `null` after it is cleared."
+                },
+                {
+                  "name": "onViewportChange",
+                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
+                },
+                {
                   "name": "overscan",
                   "documentation": "Rows rendered above/below the viewport to absorb fast scrolls."
                 },
                 {
                   "name": "protectionResolver",
                   "documentation": "Host-owned client UX permission check. Servers must independently authorize\nevery submitted operation; this resolver is not an authentication boundary."
+                },
+                {
+                  "name": "readOnly",
+                  "documentation": "Disables mutating interactions while preserving navigation and selection."
+                },
+                {
+                  "name": "renderer",
+                  "documentation": "Paint backend; defaults to main-thread `canvas` and falls back there if a worker fails."
                 },
                 {
                   "name": "renderers",
@@ -8416,6 +8561,14 @@
                   "documentation": "Host styles merged before adapter sizing styles."
                 },
                 {
+                  "name": "theme",
+                  "documentation": "Overrides merged over the default theme and host CSS custom properties."
+                },
+                {
+                  "name": "wasmSource",
+                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
+                },
+                {
                   "name": "workerUrl",
                   "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER — the platform `Worker` constructor does not consult package\nexports, so a bare specifier like `new URL(\"@sheetwrite/core/worker\",\nimport.meta.url)` is NOT reliable. Either copy\n`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL\nstring (works everywhere), or use your bundler's dependency-worker import\nif it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker\ncan't be constructed, the grid falls back to the main-thread canvas\nrenderer and emits `renderer-fallback` once."
                 }
@@ -8428,10 +8581,43 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L72",
+              "source": "../core/dist/adapter.d.ts#L90",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "cellStyle",
+                  "documentation": "Base style merged beneath cell-specific styles."
+                },
+                {
+                  "name": "headerStyle",
+                  "documentation": "Style applied to the painted column-letter header."
+                },
+                {
+                  "name": "key",
+                  "documentation": "Non-empty row-object key, unique within the column list."
+                },
+                {
+                  "name": "numberFormat",
+                  "documentation": "Excel number-format code used for number, date, or currency display."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Schema header label used by exports."
+                },
+                {
+                  "name": "type",
+                  "documentation": "Input and formatting type; defaults to `text`."
+                },
+                {
+                  "name": "visible",
+                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
+                },
+                {
+                  "name": "width",
+                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
+                }
+              ]
             }
           ]
         },
@@ -8461,7 +8647,7 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L63",
+              "source": "../core/dist/types/cell.d.ts#L71",
               "jsDocTags": [],
               "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
@@ -8473,7 +8659,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L270",
+              "source": "../core/dist/types/grid.d.ts#L287",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -8709,7 +8895,20 @@
               "source": "../core/dist/adapter.d.ts#L26",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "generation",
+                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
+                },
+                {
+                  "name": "grid",
+                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
+                },
+                {
+                  "name": "reason",
+                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
+                }
+              ]
             },
             {
               "name": "Sheetwrite",
@@ -8999,6 +9198,42 @@
                   "documentation": "Atomic or partial denial policy."
                 },
                 {
+                  "name": "onActiveSheetChange",
+                  "documentation": "Fires after the visible sheet changes."
+                },
+                {
+                  "name": "onEditBegin",
+                  "documentation": "Fires when cell editing begins."
+                },
+                {
+                  "name": "onEditCommit",
+                  "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onGridChange",
+                  "documentation": "Receives every committed Grid change, including its applied transaction."
+                },
+                {
+                  "name": "onInitializationError",
+                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
+                },
+                {
+                  "name": "onReady",
+                  "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onSearch",
+                  "documentation": "Receives refreshed search matches and active-match index."
+                },
+                {
+                  "name": "onSelectionChange",
+                  "documentation": "Receives the current selection, or `null` after it is cleared."
+                },
+                {
+                  "name": "onViewportChange",
+                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
+                },
+                {
                   "name": "overscan",
                   "documentation": "Extra rows painted around the viewport."
                 },
@@ -9021,6 +9256,10 @@
                 {
                   "name": "theme",
                   "documentation": "Live resolved-theme overrides."
+                },
+                {
+                  "name": "wasmSource",
+                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
                 },
                 {
                   "name": "workbook",
@@ -9268,8 +9507,16 @@
                   "documentation": "Content shown until initialization succeeds."
                 },
                 {
+                  "name": "fill",
+                  "documentation": "Mutually exclusive with an explicit `height`.\nFills the parent's available width and height."
+                },
+                {
                   "name": "grid",
                   "documentation": "Bindable live Grid, cleared on reset or unmount."
+                },
+                {
+                  "name": "height",
+                  "documentation": "Host height in CSS pixels for numbers or any CSS length string.\nMutually exclusive with `fill`."
                 },
                 {
                   "name": "inputmode",
@@ -9286,6 +9533,42 @@
                 {
                   "name": "mutationPolicy",
                   "documentation": "Atomic or partial denial policy."
+                },
+                {
+                  "name": "onActiveSheetChange",
+                  "documentation": "Fires after the visible sheet changes."
+                },
+                {
+                  "name": "onEditBegin",
+                  "documentation": "Fires when cell editing begins."
+                },
+                {
+                  "name": "onEditCommit",
+                  "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onGridChange",
+                  "documentation": "Receives every committed Grid change, including its applied transaction."
+                },
+                {
+                  "name": "onInitializationError",
+                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
+                },
+                {
+                  "name": "onReady",
+                  "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onSearch",
+                  "documentation": "Receives refreshed search matches and active-match index."
+                },
+                {
+                  "name": "onSelectionChange",
+                  "documentation": "Receives the current selection, or `null` after it is cleared."
+                },
+                {
+                  "name": "onViewportChange",
+                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
                 },
                 {
                   "name": "overscan",
@@ -9316,6 +9599,10 @@
                   "documentation": "Live resolved-theme overrides."
                 },
                 {
+                  "name": "wasmSource",
+                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
+                },
+                {
                   "name": "workerUrl",
                   "documentation": "Browser-fetchable worker module URL."
                 }
@@ -9328,10 +9615,43 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L72",
+              "source": "../core/dist/adapter.d.ts#L90",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "cellStyle",
+                  "documentation": "Base style merged beneath cell-specific styles."
+                },
+                {
+                  "name": "headerStyle",
+                  "documentation": "Style applied to the painted column-letter header."
+                },
+                {
+                  "name": "key",
+                  "documentation": "Non-empty row-object key, unique within the column list."
+                },
+                {
+                  "name": "numberFormat",
+                  "documentation": "Excel number-format code used for number, date, or currency display."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Schema header label used by exports."
+                },
+                {
+                  "name": "type",
+                  "documentation": "Input and formatting type; defaults to `text`."
+                },
+                {
+                  "name": "visible",
+                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
+                },
+                {
+                  "name": "width",
+                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
+                }
+              ]
             }
           ]
         },
@@ -9361,7 +9681,7 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L63",
+              "source": "../core/dist/types/cell.d.ts#L71",
               "jsDocTags": [],
               "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
@@ -9373,7 +9693,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L270",
+              "source": "../core/dist/types/grid.d.ts#L287",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -9609,7 +9929,20 @@
               "source": "../core/dist/adapter.d.ts#L26",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "generation",
+                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
+                },
+                {
+                  "name": "grid",
+                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
+                },
+                {
+                  "name": "reason",
+                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
+                }
+              ]
             },
             {
               "name": "Sheetwrite",
@@ -9659,10 +9992,43 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L72",
+              "source": "../core/dist/adapter.d.ts#L90",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
-              "memberDocs": []
+              "memberDocs": [
+                {
+                  "name": "cellStyle",
+                  "documentation": "Base style merged beneath cell-specific styles."
+                },
+                {
+                  "name": "headerStyle",
+                  "documentation": "Style applied to the painted column-letter header."
+                },
+                {
+                  "name": "key",
+                  "documentation": "Non-empty row-object key, unique within the column list."
+                },
+                {
+                  "name": "numberFormat",
+                  "documentation": "Excel number-format code used for number, date, or currency display."
+                },
+                {
+                  "name": "title",
+                  "documentation": "Schema header label used by exports."
+                },
+                {
+                  "name": "type",
+                  "documentation": "Input and formatting type; defaults to `text`."
+                },
+                {
+                  "name": "visible",
+                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
+                },
+                {
+                  "name": "width",
+                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
+                }
+              ]
             }
           ]
         },

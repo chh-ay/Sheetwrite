@@ -20,7 +20,8 @@ const GENERATED_OUTPUTS = [
   "packages/react/dist",
   "packages/vue/dist",
   "docs/dist",
-  "docs/.astro",
+  "docs-astro/dist",
+  "docs-astro/.astro",
 ] as const;
 
 const RUNTIME_ENTRY_PATHS = [

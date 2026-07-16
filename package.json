@@ -10,6 +10,7 @@
     "packages/*",
     "examples/*",
     "docs",
+    "docs-astro",
     "bench"
   ],
   "engines": {
