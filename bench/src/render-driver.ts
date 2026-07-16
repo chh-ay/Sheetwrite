@@ -47,6 +47,7 @@ interface DriverConfiguration {
   readonly browserExecutable?: string;
   readonly outputPath?: string;
   readonly markdownPath?: string;
+  readonly compactSamples?: boolean;
 }
 
 interface CombinationConfiguration {
@@ -127,6 +128,7 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
     : [smoke ? 200 : 100_000];
   if (new Set(rows).size !== rows.length) throw new TypeError("--rows values must be unique");
 
+  const compactSamples = args.includes("--compact-samples");
   const outputArg = argumentValue(args, "--output");
   const markdownArg = argumentValue(args, "--markdown-output");
   const outputPath = outputArg ?? (smoke ? undefined : DEFAULT_JSON_PATH);
@@ -152,6 +154,7 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
     browserExecutable: argumentValue(args, "--browser-executable"),
     outputPath,
     markdownPath,
+    compactSamples,
   };
 }
 
@@ -662,7 +665,9 @@ async function runDriver(args: readonly string[]): Promise<void> {
       launchAttempts,
     },
     config,
-    results,
+    // Aggregate-only artifacts (docs evidence) drop per-sample arrays; the
+    // gate/baseline artifacts keep raw rounds for spread verification.
+    results: configuration.compactSamples ? results.map((result) => ({ ...result, rawSamples: [] })) : results,
     completeness: summarizeCompleteness(config, configuration.rounds, results),
     reproductionCommands: [
       "bun run --filter '@sheetwrite/bench' bench:render",
