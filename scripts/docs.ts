@@ -783,9 +783,9 @@ function benchPairRow(
   theirs: BenchPairStat | undefined,
   fmt: (value: number) => string,
   betterChip: [string, string],
+  pct: (value: number) => string,
   fadedBar = true,
 ): string {
-  const rowMax = Math.max(ours?.faded ?? 0, theirs?.faded ?? 0, ours?.main ?? 0, theirs?.main ?? 0);
   const bar = (engine: BenchEngine, stats: BenchPairStat | undefined): string => {
     if (stats === undefined) {
       return (
@@ -795,8 +795,6 @@ function benchPairRow(
         `</div>`
       );
     }
-    const pct = (value: number): string =>
-      `${Math.min(100, Math.max(0.6, (value / rowMax) * 100)).toFixed(2)}%`;
     return (
       `<div class="bench-bar" data-engine="${engine}">` +
       `<span class="bench-bar__engine">${BENCH_ENGINE_LABELS[engine]}</span>` +
@@ -837,18 +835,197 @@ function benchPanel(
   metric: "speed" | "memory",
   rows: string[],
   note: string,
+  scale: BenchScale,
 ): string {
   return [
-    `<section class="bench-panel" data-size="${size}" data-metric="${metric}">`,
+    `<section class="bench-panel bench-ruled" data-size="${size}" data-metric="${metric}" style="--bench-segs:${scale.segments}">`,
     `<div class="bench-viz__scale"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis-note">${note}</span><span class="bench-viz__legend">${
       metric === "speed"
         ? '<i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95'
-        : '<i class="bench-legend-swatch" data-kind="median"></i>footprint · faded № = Δ'
+        : '<i class="bench-legend-swatch" data-kind="median"></i><span>footprint</span><span class="bench-viz__legend-note">faded = change</span>'
     }</span></div>`,
+    scale.ruler,
     ...rows,
     "</section>",
   ].join("\n");
 }
+
+interface BenchScale {
+  pct: (value: number) => string;
+  ruler: string;
+  segments: number;
+}
+
+function trimTick(value: number): string {
+  if (value >= 1000) return `${value / 1000}k`;
+  if (value >= 1) return `${Number(value.toFixed(value >= 100 ? 0 : 1))}`;
+  return `${Number(value.toPrecision(1))}`;
+}
+
+function benchRuler(ticks: string[]): string {
+  return (
+    '<div class="bench-bar bench-bar--ruler" aria-hidden="true">' +
+    '<span class="bench-bar__engine"></span>' +
+    `<span class="bench-bar__track">${ticks.join("")}</span>` +
+    '<span class="bench-bar__value"></span>' +
+    "</div>"
+  );
+}
+
+/**
+ * Shared per-panel log scale: every bar maps through the same decade domain,
+ * so lengths compare across rows, and the ruler labels each 10x tick. The
+ * domain is the observed values' decade envelope (capped at five decades so
+ * sub-microsecond noise cannot flatten the axis).
+ */
+function benchLogScale(values: number[], fmt: (value: number) => string): BenchScale {
+  const positive = values.filter((value) => value > 0);
+  const maxValue = positive.length ? Math.max(...positive) : 1;
+  const minValue = positive.length ? Math.min(...positive) : 0.1;
+  const hi = Math.ceil(Math.log10(maxValue));
+  const lo = Math.min(Math.floor(Math.log10(Math.max(minValue, maxValue / 100_000))), hi - 1);
+  const segments = hi - lo;
+  const pct = (value: number): string => {
+    if (!(value > 0)) return "0.60%";
+    const t = ((Math.log10(value) - lo) / segments) * 100;
+    return `${Math.min(100, Math.max(0.6, t)).toFixed(2)}%`;
+  };
+  const ticks: string[] = [];
+  for (let exp = lo; exp <= hi; exp++) {
+    const at = ((exp - lo) / segments) * 100;
+    const label = exp === hi ? fmt(10 ** exp) : trimTick(10 ** exp);
+    ticks.push(`<span class="bench-ruler__tick" style="left:${at.toFixed(2)}%">${label}</span>`);
+  }
+  return { pct, ruler: benchRuler(ticks), segments };
+}
+
+/** Shared linear scale (memory panels: footprints live within one decade). */
+function benchLinearScale(values: number[], fmt: (value: number) => string): BenchScale {
+  const maxValue = Math.max(...values.filter((value) => value > 0), 1);
+  const pct = (value: number): string =>
+    `${Math.min(100, Math.max(0.6, (value / maxValue) * 100)).toFixed(2)}%`;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => {
+    // Every nonzero tick goes through the panel formatter - these are raw
+    // values (bytes for memory), not display numbers.
+    const label = t === 0 ? "0" : fmt(maxValue * t);
+    return `<span class="bench-ruler__tick" style="left:${(t * 100).toFixed(2)}%">${label}</span>`;
+  });
+  return { pct, ruler: benchRuler(ticks), segments: 4 };
+}
+
+/** Collapsible methodology block: protocol prose plus per-scenario meanings. */
+function benchMethod(
+  summary: string,
+  paragraphs: string[],
+  entries: Array<[string, string]>,
+): string {
+  return [
+    '<details class="bench-method" data-pagefind-ignore>',
+    `<summary>${summary}</summary>`,
+    '<div class="bench-method__body">',
+    ...paragraphs.map((paragraph) => `<p>${paragraph}</p>`),
+    "<dl>",
+    ...entries.map(([term, def]) => `<div><dt><code>${term}</code></dt><dd>${def}</dd></div>`),
+    "</dl>",
+    "</div>",
+    "</details>",
+  ].join("\n");
+}
+
+const RENDER_METHOD = benchMethod(
+  "Methodology - what each scenario does",
+  [
+    "One adapter per engine, workbook size, and round mounts a live grid in controlled headless Chromium (fixed viewport, precise-memory flags). All fourteen scenarios then run warm on that mounted grid in counterbalanced engine order; the fixture is rebuilt only after a failed scenario, so one crash cannot leak state into the next measurement. Every scenario validates its effect with correctness checkpoints - the scroll offset really advanced, the editor really opened, the row count really changed, and painted-value sentinels stay intact.",
+    "Bright numbers are the median of each round's median; faded numbers are the median of each round's p95. <strong>Did not complete</strong> is never a timing: it records a crash, timeout, or failed checkpoint, with the failure stage preserved in the raw artifact.",
+  ],
+  [
+    [
+      "scroll-down.top-left",
+      "From the origin, jump-scroll 50 px down: a fresh row band enters the viewport and must paint.",
+    ],
+    [
+      "scroll-down.middle",
+      "The same 50 px jump starting from the vertical middle of the scroll range.",
+    ],
+    [
+      "scroll-smooth.same-window",
+      "Scroll 1 px without changing the visible row window: pure repaint cost, zero new data.",
+    ],
+    ["scroll-right.top-left", "Jump-scroll 50 px right: a fresh column band paints."],
+    ["edit-open.top-left", "Select a cell near the origin and open its editor."],
+    ["edit-open.middle", "Open the editor on the center cell of the workbook."],
+    [
+      "edit-open.bottom-right",
+      "Open the editor on the last row and column - the far end of every index.",
+    ],
+    ["edit-commit.middle", "Commit a typed value into the center cell and paint the result."],
+    ["altering.insert-5-rows-top", "Insert five rows at the top: every following row reindexes."],
+    ["altering.remove-5-rows-top", "Remove those five rows again - the inverse reindex."],
+    [
+      "arrow-down.top-left",
+      "Move the selection one cell down with the arrow key, including the selection overlay repaint.",
+    ],
+    ["arrow-right.middle", "Arrow-key selection move at the workbook center."],
+    ["formatted-paint.top-left", "Repaint a viewport dense with per-cell formatting."],
+    [
+      "merge-heavy.paint",
+      "Repaint a viewport dense with merged ranges; Sheetwrite additionally proves it builds exactly one merge revision index.",
+    ],
+  ],
+);
+
+const DATA_METHOD = benchMethod(
+  "Methodology - what each operation does",
+  [
+    "Both engines run against identical columnar datasets (id, date, customer, city, amount) with a per-operation plan of warmup and timed iterations. Ingest builds a fresh engine instance per timed iteration; window reads rotate their start offset by a coprime stride so no per-window cache can answer twice; sort and filter reset the view between runs; Handsontable's edits run with rendering suspended so only its data path is timed.",
+    "Memory is sampled in isolated subprocesses: the JS heap delta around a single ingest, plus Sheetwrite's WASM linear-memory delta - its cells live off the JS heap entirely.",
+  ],
+  [
+    ["ingest", "Load the full dataset into a fresh engine instance."],
+    ["windowRead", "Read a 50x5 cell window at a rotating offset that sweeps the whole sheet."],
+    ["edit", "1,000 single-cell edits."],
+    ["sort", "Sort by the numeric amount column."],
+    ["filter", "Substring filter over the city column."],
+    ["aggregate", "Numeric aggregation over the amount column."],
+  ],
+);
+
+const FORMULA_METHOD = benchMethod(
+  "Methodology - what each workload does",
+  [
+    "Each workload builds a fresh WASM cell-store fixture of the named dependency shape, then times the recalculation triggered by one action - usually a single edit. The cell count names how many formula cells the fixture holds. Bright numbers are medians across samples; faded numbers are p95; every workload must pass the protocol's safety ceilings.",
+  ],
+  [
+    ["linear-chain", "A chain A1 -> A2 -> ... -> AN; editing the head recomputes the full depth."],
+    ["wide-fan-out-edit", "One scalar feeds N dependent formulas; edit the scalar."],
+    ["diamond-edit", "Fan-out that reconverges (diamond graph); edit the apex."],
+    ["shared-range-edit", "N formulas aggregate one shared range; edit one cell inside it."],
+    ["distinct-range-edit", "Each formula owns its own range; one edit recomputes only its owner."],
+    ["cross-sheet-range-edit", "Summary-sheet formulas range over another sheet; edit the source."],
+    [
+      "scalar-edit-affects-0",
+      "1,000 formulas exist but the edit touches an unrelated cell: pure dependency-lookup cost.",
+    ],
+    ["scalar-edit-affects-1", "One scalar edit invalidating exactly one dependent."],
+    ["scalar-edit-affects-1000", "One scalar edit invalidating 1,000 dependents."],
+    ["scalar-edit-affects-100000", "One scalar edit invalidating 100,000 dependents."],
+    ["topology-remove-add", "Remove and re-add rows so the dependency graph itself changes shape."],
+    ["cycles", "Introduce a reference cycle; detection and cycle-error propagation."],
+    [
+      "removed-sheet-ref",
+      "Formulas referencing a deleted sheet must all degrade to reference errors.",
+    ],
+    ["error-propagation", "An error value (=1/0) flows through every dependent."],
+    [
+      "criteria-range-edit",
+      "Criteria-style aggregation (SUMIF shape) over 100k cells; edit inside the criteria range.",
+    ],
+    [
+      "lookup-range-edit",
+      "Lookup-shape formulas over 100k cells; edit inside the looked-up range.",
+    ],
+  ],
+);
 
 /**
  * Single-engine scaling figure: one row per operation/workload, one bar per
@@ -863,21 +1040,24 @@ function benchScaleFigure(
     entries: Array<{ sizeLabel: string; median: number; p95: number; size: number }>;
   }>,
 ): string[] {
+  const scale = benchLogScale(
+    groups.flatMap((group) => group.entries.flatMap((entry) => [entry.median, entry.p95])),
+    fmtMs,
+  );
   const lines = [
-    '<figure class="bench-viz" data-pagefind-ignore>',
-    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">relative time — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+    `<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:${scale.segments}">`,
+    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+    scale.ruler,
   ];
   for (const group of groups) {
     if (group.entries.length === 0) continue;
-    const rowMax = Math.max(...group.entries.map((entry) => Math.max(entry.median, entry.p95)));
     lines.push(
       '<div class="bench-viz__row" data-outcome="faster">',
       `<div class="bench-viz__head"><code>${group.label}</code></div>`,
     );
     const solo = group.entries.length === 1;
     for (const entry of group.entries) {
-      const pct = (value: number): string =>
-        `${Math.min(100, Math.max(0.6, (value / rowMax) * 100)).toFixed(2)}%`;
+      const pct = scale.pct;
       const track = solo
         ? ""
         : `<span class="bench-bar__track" aria-hidden="true">` +
@@ -936,8 +1116,9 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
       engines.set(result.engine, bucket);
       bucket.push(result);
     }
-    const speedRows: string[] = [];
-    const memoryRows: string[] = [];
+    type Pair = [string, BenchPairStat | undefined, BenchPairStat | undefined];
+    const speedPairs: Pair[] = [];
+    const memoryPairs: Pair[] = [];
     for (const scenario of evidence.config.scenarios) {
       const engines = byScenario.get(scenario);
       const ours = engines?.get("sheetwrite");
@@ -953,27 +1134,42 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
               faded: mid(bucket.map((r) => Math.max(0, r.memory.deltaBytes))),
             }
           : undefined;
-      speedRows.push(
-        benchPairRow(scenario, speedStat(ours), speedStat(theirs), fmtMs, ["faster", "slower"]),
-      );
-      memoryRows.push(
-        benchPairRow(
-          scenario,
-          memoryStat(ours),
-          memoryStat(theirs),
-          fmtMb,
-          ["leaner", "heavier"],
-          false,
-        ),
-      );
+      speedPairs.push([scenario, speedStat(ours), speedStat(theirs)]);
+      memoryPairs.push([scenario, memoryStat(ours), memoryStat(theirs)]);
     }
+    const speedScale = benchLogScale(
+      speedPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main, s.faded] : []))),
+      fmtMs,
+    );
+    const memoryScale = benchLinearScale(
+      memoryPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main] : []))),
+      fmtMb,
+    );
+    const speedRows = speedPairs.map(([scenario, a, b]) =>
+      benchPairRow(scenario, a, b, fmtMs, ["faster", "slower"], speedScale.pct),
+    );
+    const memoryRows = memoryPairs.map(([scenario, a, b]) =>
+      benchPairRow(scenario, a, b, fmtMb, ["leaner", "heavier"], memoryScale.pct, false),
+    );
     parts.push(
-      benchPanel(size, "speed", speedRows, "relative time per row — shorter is faster"),
-      benchPanel(size, "memory", memoryRows, "renderer heap after interaction — shorter is leaner"),
+      benchPanel(
+        size,
+        "speed",
+        speedRows,
+        "log scale — every tick is 10× — shorter is faster",
+        speedScale,
+      ),
+      benchPanel(
+        size,
+        "memory",
+        memoryRows,
+        "renderer heap after interaction — linear — shorter is leaner",
+        memoryScale,
+      ),
     );
   }
   parts.push(
-    "<figcaption>Each row is scaled to its slower (or heavier) engine, so bar lengths compare directly within a row. Bright numbers are the median run; faded numbers are the p95 run (speed) or the interaction's heap delta (memory). Rows marked as not completed are runs the engine could not finish - the recorded failure (crash, timeout, or failed correctness checkpoint) lives in the raw artifact.</figcaption>",
+    "<figcaption>Every bar in a panel shares the ruler's scale (speed is logarithmic - each tick is 10x), so lengths compare across rows as well as within them. Bright numbers are the median run; faded numbers are the p95 run (speed) or the interaction's heap delta (memory). Rows marked as not completed are runs the engine could not finish - the recorded failure (crash, timeout, or failed correctness checkpoint) lives in the raw artifact.</figcaption>",
     "</figure>",
   );
   return parts.join("\n");
@@ -1030,6 +1226,8 @@ async function renderEvidencePage(): Promise<string> {
       "",
       renderBenchWidget(evidence),
       "",
+      RENDER_METHOD,
+      "",
       "Reproduce and validate with:",
       "",
       '```sh verify title="Controlled render evidence"',
@@ -1070,9 +1268,16 @@ async function renderEvidencePage(): Promise<string> {
       const ours = evidence.sheetwrite[String(rows)];
       const theirs = evidence.handsontable[String(rows)];
       if (!ours || !theirs) continue;
+      const scale = benchLogScale(
+        ops.flatMap((op) =>
+          [ours.stats[op], theirs.stats[op]].flatMap((s) => (s ? [s.median, s.p95] : [])),
+        ),
+        fmtMs,
+      );
       lines.push(
-        `<section class="bench-panel" data-size="${rows}" data-metric="speed">`,
-        `<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">relative time per operation — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+        `<section class="bench-panel bench-ruled" data-size="${rows}" data-metric="speed" style="--bench-segs:${scale.segments}">`,
+        `<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+        scale.ruler,
       );
       for (const op of ops) {
         const a = ours.stats[op];
@@ -1085,6 +1290,7 @@ async function renderEvidencePage(): Promise<string> {
             { main: b.median, faded: b.p95 },
             fmtMs,
             ["faster", "slower"],
+            scale.pct,
           ),
         );
       }
@@ -1116,6 +1322,8 @@ async function renderEvidencePage(): Promise<string> {
       ),
     );
     lines.push(
+      "",
+      DATA_METHOD,
       "",
       "Reproduce with:",
       "",
@@ -1159,6 +1367,8 @@ async function renderEvidencePage(): Promise<string> {
       ),
     );
     lines.push(
+      "",
+      FORMULA_METHOD,
       "",
       "Reproduce with:",
       "",

@@ -2014,7 +2014,6 @@ body .sw-code-popover__accessible-signature {
   bottom: 0;
 }
 
-
 .bench-bar__fill {
   left: 0;
   border-radius: 0.16rem;
@@ -2115,6 +2114,16 @@ body .sw-code-popover__accessible-signature {
     grid-template-areas: "engine value";
     row-gap: 0;
   }
+
+  .bench-bar--ruler {
+    grid-template-areas: "track track";
+    row-gap: 0;
+  }
+
+  .bench-bar--ruler .bench-bar__engine,
+  .bench-bar--ruler .bench-bar__value {
+    display: none;
+  }
 }
 
 /* ---- Benchmark widget: size x metric CSS-only tabs (no client JS) ---- */
@@ -2177,14 +2186,30 @@ body .sw-code-popover__accessible-signature {
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }
 
-#bench-size-1000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="1000"][data-metric="speed"],
-#bench-size-1000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="1000"][data-metric="memory"],
-#bench-size-10000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="10000"][data-metric="speed"],
-#bench-size-10000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="10000"][data-metric="memory"],
-#bench-size-100000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="100000"][data-metric="speed"],
-#bench-size-100000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="100000"][data-metric="memory"],
-#bench-size-1000000:checked ~ #bench-metric-speed:checked ~ .bench-panel[data-size="1000000"][data-metric="speed"],
-#bench-size-1000000:checked ~ #bench-metric-memory:checked ~ .bench-panel[data-size="1000000"][data-metric="memory"] {
+#bench-size-1000:checked
+  ~ #bench-metric-speed:checked
+  ~ .bench-panel[data-size="1000"][data-metric="speed"],
+#bench-size-1000:checked
+  ~ #bench-metric-memory:checked
+  ~ .bench-panel[data-size="1000"][data-metric="memory"],
+#bench-size-10000:checked
+  ~ #bench-metric-speed:checked
+  ~ .bench-panel[data-size="10000"][data-metric="speed"],
+#bench-size-10000:checked
+  ~ #bench-metric-memory:checked
+  ~ .bench-panel[data-size="10000"][data-metric="memory"],
+#bench-size-100000:checked
+  ~ #bench-metric-speed:checked
+  ~ .bench-panel[data-size="100000"][data-metric="speed"],
+#bench-size-100000:checked
+  ~ #bench-metric-memory:checked
+  ~ .bench-panel[data-size="100000"][data-metric="memory"],
+#bench-size-1000000:checked
+  ~ #bench-metric-speed:checked
+  ~ .bench-panel[data-size="1000000"][data-metric="speed"],
+#bench-size-1000000:checked
+  ~ #bench-metric-memory:checked
+  ~ .bench-panel[data-size="1000000"][data-metric="memory"] {
   display: block;
 }
 
@@ -2222,10 +2247,8 @@ body .sw-code-popover__accessible-signature {
 /* Default widget state (100k / speed) when no radio has been touched yet.
    The generator cannot emit `checked` - hydrated React would treat the
    input as controlled and revert every user toggle. */
-.bench-widget:not(:has(input[name="bench-size"]:checked))
-  label[for="bench-size-100000"],
-.bench-widget:not(:has(input[name="bench-metric"]:checked))
-  label[for="bench-metric-speed"] {
+.bench-widget:not(:has(input[name="bench-size"]:checked)) label[for="bench-size-100000"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked)) label[for="bench-metric-speed"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }
@@ -2259,8 +2282,7 @@ body .sw-code-popover__accessible-signature {
 
 #bench-data-1000:checked ~ .bench-widget__tabs label[for="bench-data-1000"],
 #bench-data-10000:checked ~ .bench-widget__tabs label[for="bench-data-10000"],
-.bench-widget--data:not(:has(input[name="bench-data-size"]:checked))
-  label[for="bench-data-10000"] {
+.bench-widget--data:not(:has(input[name="bench-data-size"]:checked)) label[for="bench-data-10000"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
 }
@@ -2270,4 +2292,114 @@ body .sw-code-popover__accessible-signature {
 .bench-widget--data:not(:has(input[name="bench-data-size"]:checked))
   .bench-panel[data-size="10000"] {
   display: block;
+}
+
+/* ---- Shared-scale ruler + decade gridlines ---- */
+
+.bench-bar--ruler {
+  margin-top: 0.2rem;
+}
+
+.bench-bar--ruler .bench-bar__track {
+  position: relative;
+  height: 0.9rem;
+  background: none;
+}
+
+.bench-ruler__tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--sw-fg-dim);
+  font: 500 0.6rem / 1 var(--sw-font-mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.bench-ruler__tick:first-child {
+  transform: none;
+}
+
+.bench-ruler__tick:last-child {
+  transform: translateX(-100%);
+}
+
+.bench-ruled .bench-bar:not(.bench-bar--ruler) .bench-bar__track {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--sw-border) 70%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: calc(100% / var(--bench-segs, 4)) 100%;
+}
+
+.bench-viz__legend {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.bench-viz__legend-note {
+  white-space: nowrap;
+}
+
+/* ---- Collapsible methodology blocks ---- */
+
+.bench-method {
+  margin: 0.9rem 0 0;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.5rem;
+  background: var(--sw-surface-1);
+}
+
+.bench-method > summary {
+  padding: 0.55rem 0.9rem;
+  color: var(--sw-fg-muted);
+  font: 600 0.72rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.bench-method > summary:hover {
+  color: var(--sw-fg-strong);
+}
+
+.bench-method__body {
+  padding: 0 0.9rem 0.85rem;
+}
+
+.bench-method__body p {
+  margin: 0.4rem 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.85rem;
+}
+
+.bench-method__body dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 0.9rem;
+  margin: 0.65rem 0 0;
+}
+
+.bench-method__body dl > div {
+  display: contents;
+}
+
+.bench-method__body dt code {
+  font: 600 0.72rem / 1.6 var(--sw-font-mono);
+  color: var(--sw-accent-strong);
+  background: none;
+  padding: 0;
+}
+
+.bench-method__body dd {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 40rem) {
+  .bench-method__body dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
