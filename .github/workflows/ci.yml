@@ -319,13 +319,13 @@ jobs:
         run: |
           bun run docs:generate
           bun run docs:check
-          bun run --filter '@sheetwrite/docs-site' typecheck
-          bun run --filter '@sheetwrite/docs-site' build
+          bun run --filter '@sheetwrite/docs-start' typecheck
+          bun run --filter '@sheetwrite/docs-start' build
       - name: Upload production docs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: production-docs
-          path: docs-astro/dist/
+          path: docs/dist/client/
           if-no-files-found: error
           retention-days: 1
 
@@ -349,7 +349,7 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: production-docs
-          path: docs-astro/dist
+          path: docs/dist/client
       - name: Exercise production site
         run: bun run test:browser
       - name: Upload browser evidence on failure

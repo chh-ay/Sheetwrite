@@ -11,7 +11,6 @@
       "!**/dist",
       "!**/pkg",
       "!**/node_modules",
-      "!**/.astro",
       "!**/*.d.ts",
       "!**/*.svelte",
       "!bench/results",
@@ -50,17 +49,6 @@
     }
   },
   "overrides": [
-    {
-      "includes": ["**/*.astro"],
-      "linter": {
-        "rules": {
-          "correctness": {
-            "noUnusedImports": "off",
-            "noUnusedVariables": "off"
-          }
-        }
-      }
-    },
     {
       "includes": ["docs/src/styles/**/*.css"],
       "linter": {

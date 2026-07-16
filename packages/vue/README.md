@@ -46,7 +46,7 @@ The exposed `grid` handle is published before `@ready="({ grid, generation, reas
 
 Events are `grid-change`, `viewport-change`, `selection-change`, `edit-begin`, `edit-commit`, `search`, `active-sheet-change`, `ready`, and `initialization-error`. Native DOM change/scroll listeners remain available on the host.
 
-For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://chh-ay.github.io/Sheetwrite/docs/start/installation/), [Vue integration](https://chh-ay.github.io/Sheetwrite/docs/frameworks/vue/), and [collaboration](https://chh-ay.github.io/Sheetwrite/docs/guides/collaboration/).
+For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Vue integration](https://sheetwrite.vercel.app/docs/frameworks/vue/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
 
 XLSX is not installed by this adapter. If the toolbar configuration enables
 XLSX export, install `@sheetwrite/xlsx` and import

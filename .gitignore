@@ -5,6 +5,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .astro/
+.tanstack/
 
 # Rust / WASM
 target/
