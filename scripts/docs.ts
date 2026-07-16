@@ -612,6 +612,90 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
   return { commit: meta.commit, dirty: meta.dirty, timestamp: meta.timestamp };
 }
 
+/**
+ * Landing-page benchmark summary. Each engine is aggregated across rounds
+ * exactly like the evidence page, then ratios pair per scenario - never a
+ * ratio of cross-scenario medians. Real numbers only: when the artifact is
+ * missing or invalid the landing renders a "run the protocol" placeholder.
+ */
+async function renderLandingBench(): Promise<string> {
+  const scale = await loadEvidence(
+    "bench/results/render-scale.json",
+    "bun run --filter @sheetwrite/bench bench:render:scale",
+    validateRenderArtifact,
+  );
+  const round1 = (value: number): number => Math.round(value * 10) / 10;
+  if (!("evidence" in scale)) {
+    return `${JSON.stringify({ available: false, reason: scale.reason }, null, 2)}\n`;
+  }
+  const { evidence } = scale;
+  const mid = (values: number[]): number => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+  };
+  const successes = (size: number, engine: string, scenario: string): RenderEvidenceResult[] =>
+    evidence.results.filter(
+      (result) =>
+        result.rows === size &&
+        result.engine === engine &&
+        result.scenarioId === scenario &&
+        result.status === "success",
+    );
+  const sizes = evidence.config.rows.map((size) => {
+    const ratios: Array<{ scenario: string; ratio: number }> = [];
+    let handsontableIncomplete = 0;
+    for (const scenario of evidence.config.scenarios) {
+      const ours = successes(size, "sheetwrite", scenario);
+      const theirs = successes(size, "handsontable", scenario);
+      // Round-aware: a bucket with fewer successes than the declared round
+      // count is incomplete, and only full-round pairs enter the ratios.
+      if (theirs.length < evidence.metadata.rounds) handsontableIncomplete += 1;
+      if (ours.length < evidence.metadata.rounds || theirs.length < evidence.metadata.rounds)
+        continue;
+      ratios.push({
+        scenario,
+        ratio: mid(theirs.map((r) => r.medianMs)) / mid(ours.map((r) => r.medianMs)),
+      });
+    }
+    const best = ratios.reduce(
+      (a, b) => (b.ratio > a.ratio ? b : a),
+      ratios[0] ?? { scenario: "", ratio: Number.NaN },
+    );
+    return {
+      size,
+      comparedScenarios: ratios.length,
+      medianRatio: round1(mid(ratios.map((r) => r.ratio))),
+      bestRatio: round1(best.ratio),
+      bestScenario: best.scenario,
+      handsontableIncomplete,
+    };
+  });
+  const scenarioMedians: number[] = [];
+  const scenarioHeaps: number[] = [];
+  for (const scenario of evidence.config.scenarios) {
+    const bucket = successes(1_000_000, "sheetwrite", scenario);
+    if (bucket.length === 0) continue;
+    scenarioMedians.push(mid(bucket.map((r) => r.medianMs)));
+    scenarioHeaps.push(mid(bucket.map((r) => r.memory.afterBytes)));
+  }
+  const payload = {
+    available: true,
+    capture: {
+      commit: evidence.metadata.commit,
+      timestamp: evidence.metadata.timestamp,
+      browser: `Chromium ${evidence.metadata.browserVersion}`,
+      rounds: evidence.metadata.rounds,
+    },
+    heroStats: {
+      millionRowScenarios: scenarioMedians.length,
+      millionRowMedianMs: round1(mid(scenarioMedians)),
+      millionRowHeapMb: Math.round(mid(scenarioHeaps) / 1_000_000),
+    },
+    sizes,
+  };
+  return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
 async function loadEvidence<T>(
   relPath: string,
   reproduction: string,
@@ -1449,6 +1533,7 @@ async function renderEvidencePage(): Promise<string> {
 export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promise<ExpectedFile[]> {
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
+    { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
   ];
   const symbolOwners = new Map<string, string>();
   for (const pkg of manifest.packages) {

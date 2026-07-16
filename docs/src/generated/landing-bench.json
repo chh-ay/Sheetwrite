@@ -1,0 +1,48 @@
+{
+  "available": true,
+  "capture": {
+    "commit": "47f164385fd9cf9280cbdcddcecd261575269384",
+    "timestamp": "2026-07-16T21:59:29.743Z",
+    "browser": "Chromium 149.0.7827.55",
+    "rounds": 10
+  },
+  "heroStats": {
+    "millionRowScenarios": 14,
+    "millionRowMedianMs": 0.6,
+    "millionRowHeapMb": 108
+  },
+  "sizes": [
+    {
+      "size": 1000,
+      "comparedScenarios": 14,
+      "medianRatio": 7.2,
+      "bestRatio": 96.7,
+      "bestScenario": "scroll-right.top-left",
+      "handsontableIncomplete": 0
+    },
+    {
+      "size": 10000,
+      "comparedScenarios": 14,
+      "medianRatio": 10.7,
+      "bestRatio": 111.3,
+      "bestScenario": "scroll-right.top-left",
+      "handsontableIncomplete": 0
+    },
+    {
+      "size": 100000,
+      "comparedScenarios": 14,
+      "medianRatio": 26.3,
+      "bestRatio": 201.2,
+      "bestScenario": "scroll-right.top-left",
+      "handsontableIncomplete": 0
+    },
+    {
+      "size": 1000000,
+      "comparedScenarios": 12,
+      "medianRatio": 130.3,
+      "bestRatio": 1522.2,
+      "bestScenario": "scroll-smooth.same-window",
+      "handsontableIncomplete": 2
+    }
+  ]
+}

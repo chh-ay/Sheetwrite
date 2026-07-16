@@ -40,10 +40,26 @@ const representativeRoutes = [
   "api/xlsx/",
 ] as const;
 
-test("documentation root redirects to installation", async ({ page }) => {
+test("documentation root serves the overview", async ({ page }) => {
   await page.goto(docsUrl());
+  await expect(page).toHaveURL(docsUrl());
+  await expect(page.locator("main h1")).toHaveText("Build spreadsheets you still own.");
+  await expect(page.locator('.sw-sidebar__nav a[href="/docs/"]')).toBeVisible();
+});
+
+test("site root serves the product landing", async ({ page }) => {
+  const errors = collectErrors(page);
+  const response = await page.goto(siteUrl("/"));
+  expect(response?.ok()).toBe(true);
+  await expect(page.locator("main h1")).toHaveText("Build spreadsheets you still own.");
+  // Benchmark section publishes real generated numbers, never placeholders.
+  const benchStats = page.locator("#benchmarks .sw-bench-stats li");
+  await expect(benchStats.first()).toBeVisible();
+  await expect(page.locator("#benchmarks")).toContainText("Read the full protocol.");
+  await page.getByRole("link", { name: "Get started" }).click();
   await expect(page).toHaveURL(docsUrl("start/installation/"));
-  await expect(page.locator("main h1")).toHaveText("Installation");
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
 });
 
 test.describe("documentation site", () => {
