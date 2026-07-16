@@ -2,7 +2,7 @@
 title: "Performance and delivery evidence"
 description: "Freshness-gated benchmark and package-size evidence for Sheetwrite."
 ---
-Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated, incomplete, or protocol-mismatched run.
+Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.
 
 ## Render benchmark: Sheetwrite vs Handsontable
 
