@@ -80,8 +80,41 @@ import type {
 import { ValidationEditor } from "./validation-editor.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
-/** Chrome caps element height near here; beyond it the sizer is scaled. */
-const MAX_ELEMENT_HEIGHT = 33_000_000;
+/** Conservative sizer ceiling when the real layout clamp cannot be measured. */
+const MAX_ELEMENT_HEIGHT_FALLBACK = 15_000_000;
+/** Keep the sizer safely under the measured clamp so rounding never truncates it. */
+const MAX_ELEMENT_HEIGHT_MARGIN = 4_096;
+
+/**
+ * Browsers clamp both element heights and scroll offsets at engine-specific
+ * ceilings that SHRINK with browser zoom / `devicePixelRatio` (Chromium:
+ * ~33.5M CSS px at 100% zoom, /1.25 at 125%). The two clamps are not the
+ * same and neither is a constant, so the achievable scroll range is measured
+ * end to end with a real scroller probe: force `scrollTop` past any limit and
+ * read back what the engine actually kept. Re-measured on zoom changes.
+ */
+export function measureMaxElementHeight(
+  doc: Document | null | undefined = typeof document === "undefined" ? undefined : document,
+): number {
+  if (!doc?.body) return MAX_ELEMENT_HEIGHT_FALLBACK;
+  const scroller = doc.createElement("div");
+  scroller.style.cssText =
+    "position:absolute;visibility:hidden;left:-9999px;width:32px;height:32px;overflow:scroll;";
+  const sizer = doc.createElement("div");
+  sizer.style.cssText = "width:1px;height:1000000000000px;";
+  scroller.append(sizer);
+  doc.body.append(scroller);
+  const layoutClamp = sizer.getBoundingClientRect().height;
+  scroller.scrollTop = 1_000_000_000_000;
+  const scrollClamp = scroller.scrollTop > 0 ? scroller.scrollTop + scroller.clientHeight : 0;
+  scroller.remove();
+  const measured = Math.min(
+    Number.isFinite(layoutClamp) && layoutClamp > 0 ? layoutClamp : Number.POSITIVE_INFINITY,
+    Number.isFinite(scrollClamp) && scrollClamp > 0 ? scrollClamp : Number.POSITIVE_INFINITY,
+  );
+  if (!Number.isFinite(measured) || measured < 1_000_000) return MAX_ELEMENT_HEIGHT_FALLBACK;
+  return Math.floor(measured) - MAX_ELEMENT_HEIGHT_MARGIN;
+}
 const DEFAULT_OVERSCAN = 6;
 const DEFAULT_COL_WIDTH = 100;
 
@@ -123,6 +156,19 @@ export const DEFAULT_THEME: Theme = {
   searchActiveMatch: "#f59e0b",
   highlight: "#a7f3d080",
 };
+
+/**
+ * Widen the row-number gutter to fit the largest row label; a fixed width
+ * clips at 6-7 digit row counts. An explicit `rowHeaderWidth: 0` still hides
+ * the gutter entirely.
+ */
+function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
+  if (theme.rowHeaderWidth <= 0) return theme.rowHeaderWidth;
+  const digits = String(Math.max(1, dataRowCount)).length;
+  const fontMatch = /(\d+(?:\.\d+)?)px/.exec(theme.font);
+  const fontPx = fontMatch ? Number(fontMatch[1]) : 12;
+  return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
+}
 
 /** Load the WASM data engine once. Must be awaited before `createGrid`. */
 export async function initSheetwrite(
@@ -213,6 +259,8 @@ export class GridImpl implements Grid {
   private readonly renderCoordinator: RenderCoordinator;
   private overscan: number;
   private readOnly: boolean;
+  private maxElementHeight = MAX_ELEMENT_HEIGHT_FALLBACK;
+  private lastDevicePixelRatio = 1;
   private tabBar: HTMLDivElement | null = null;
   private sheetTabs: SheetTabs | null = null;
   private tabBarHeight = 0;
@@ -313,8 +361,11 @@ export class GridImpl implements Grid {
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
     this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(host), ...opts.theme };
-    this.theme = this.baseTheme;
     this.activeSheet = opts.workbook.activeSheet;
+    this.theme = this.withAdaptiveGutter(
+      this.baseTheme,
+      workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
+    );
     this.tabBarHeight = opts.config?.tabs !== false && opts.workbook.sheets.length > 1 ? 28 : 0;
     this.document = new DocumentController({
       store: this.store,
@@ -342,6 +393,8 @@ export class GridImpl implements Grid {
     }
 
     const sheet = this.sheet();
+    this.maxElementHeight = measureMaxElementHeight();
+    this.lastDevicePixelRatio = globalThis.devicePixelRatio ?? 1;
     this.geometry = new GeometryLayoutController(
       {
         sheet: () => this.sheet(),
@@ -349,7 +402,7 @@ export class GridImpl implements Grid {
         loadable: this.loadable,
         theme: () => this.theme,
         zoom: () => this.zoom,
-        maxElementHeight: MAX_ELEMENT_HEIGHT,
+        maxElementHeight: () => this.maxElementHeight,
       },
       host.clientHeight - this.tabBarHeight,
     );
@@ -884,14 +937,32 @@ export class GridImpl implements Grid {
   }
 
   private syncSizer(): void {
+    // Browser zoom moves the layout clamp; a stale cap truncates tall documents.
+    const devicePixelRatio = globalThis.devicePixelRatio ?? 1;
+    if (devicePixelRatio !== this.lastDevicePixelRatio) {
+      this.lastDevicePixelRatio = devicePixelRatio;
+      this.maxElementHeight = measureMaxElementHeight();
+    }
     const size = this.geometry.layoutSize(this.viewportH());
     this.sizer.style.width = `${size.width}px`;
     this.sizer.style.height = `${size.height}px`;
   }
 
+  /** The gutter tracks the active sheet's digit count; identity when unchanged. */
+  private withAdaptiveGutter(theme: Theme, rowCount: number): Theme {
+    const rowHeaderWidth = adaptiveRowHeaderWidth(theme, rowCount);
+    return rowHeaderWidth === theme.rowHeaderWidth ? theme : { ...theme, rowHeaderWidth };
+  }
+
   private rebuildIndex(): void {
     this.geometry.rebuildRows();
     this.datasourceController.resize(this.geometry.rowCount);
+    // Row-count changes can grow the row-number gutter (e.g. crossing 1M rows).
+    const adjusted = this.withAdaptiveGutter(this.theme, this.sheet().rowCount);
+    if (adjusted !== this.theme) {
+      this.theme = adjusted;
+      this.renderer.setTheme(this.theme);
+    }
     this.syncSizer();
   }
 
@@ -1766,6 +1837,7 @@ export class GridImpl implements Grid {
   }
 
   setZoom(zoom: number): void {
+    if (!Number.isFinite(zoom)) return;
     const next = Math.min(2, Math.max(0.5, zoom));
     if (next === this.zoom) return;
     this.zoom = next;
@@ -1784,7 +1856,7 @@ export class GridImpl implements Grid {
   private applyZoomedTheme(): void {
     const base = this.baseTheme;
     const z = this.zoom;
-    this.theme =
+    const scaled =
       z === 1
         ? base
         : {
@@ -1794,6 +1866,7 @@ export class GridImpl implements Grid {
             rowHeaderWidth: base.rowHeaderWidth * z,
             font: scaleFontPx(base.font, z),
           };
+    this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
     this.renderer.setTheme(this.theme);
     this.syncTabBarTheme();
     this.rebuildIndex();
