@@ -1,12 +1,9 @@
 ---
 title: "toXlsxTable | @sheetwrite/core"
 description: "Exports a table model through the registered optional XLSX backend."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|toXlsxTable -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Exports a table model through the registered optional XLSX backend.
 

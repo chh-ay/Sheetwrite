@@ -1,12 +1,9 @@
 ---
 title: "Transaction | @sheetwrite/core"
 description: "Low-level Store transaction."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|Transaction -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Low-level Store transaction. `epoch` provides optional optimistic
 concurrency at the storage boundary.

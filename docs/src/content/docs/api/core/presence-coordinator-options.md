@@ -1,12 +1,9 @@
 ---
 title: "PresenceCoordinatorOptions | @sheetwrite/core"
 description: "Identity, privacy, and timing options for presence coordination."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceCoordinatorOptions -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Identity, privacy, and timing options for presence coordination.
 

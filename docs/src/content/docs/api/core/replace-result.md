@@ -1,12 +1,9 @@
 ---
 title: "ReplaceResult | @sheetwrite/core"
 description: "Replacement count and refreshed search state returned by replace-all."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|ReplaceResult -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Replacement count and refreshed search state returned by replace-all.
 

@@ -1,12 +1,9 @@
 ---
 title: "parseDateInput | @sheetwrite/core"
 description: "Parse a user-typed date string into a serial, or null when it is not a date."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|parseDateInput -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Parse a user-typed date string into a serial, or `null` when it is not a date.
 Accepted forms:

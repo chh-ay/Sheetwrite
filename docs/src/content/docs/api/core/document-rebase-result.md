@@ -1,12 +1,9 @@
 ---
 title: "DocumentRebaseResult | @sheetwrite/core"
 description: "Successful rebased operations or a conservative rebase conflict."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|DocumentRebaseResult -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 Successful rebased operations or a conservative rebase conflict.
 

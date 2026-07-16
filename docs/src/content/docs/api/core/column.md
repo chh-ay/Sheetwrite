@@ -1,12 +1,9 @@
 ---
 title: "Column | @sheetwrite/core"
 description: "Schema and default presentation for one workbook column."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|Column -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Schema and default presentation for one workbook column.
 

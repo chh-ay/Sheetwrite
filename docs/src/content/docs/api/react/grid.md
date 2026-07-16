@@ -1,12 +1,9 @@
 ---
 title: "Grid | @sheetwrite/react"
 description: "Imperative grid handle for document commands, events, rendering, and teardown."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/react|.|Grid -->
-[← @sheetwrite/react](/docs/api/react/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Imperative grid handle for document commands, events, rendering, and teardown.
 

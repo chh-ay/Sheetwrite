@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ShowcasePage } from "../showcases/ShowcasePage.js";
 import { pageMeta } from "../lib/seo.js";
+import { ShowcasePage } from "../showcases/ShowcasePage.js";
 import VanillaShowcase from "../showcases/VanillaShowcase.js";
 
 const description =

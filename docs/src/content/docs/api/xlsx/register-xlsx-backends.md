@@ -1,12 +1,9 @@
 ---
 title: "registerXlsxBackends | @sheetwrite/xlsx"
 description: "Register all concrete XLSX backends with the backend-neutral core contracts."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/xlsx|.|registerXlsxBackends -->
-[← @sheetwrite/xlsx](/docs/api/xlsx/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="function">function</span></div>
 
 Register all concrete XLSX backends with the backend-neutral core contracts.
 

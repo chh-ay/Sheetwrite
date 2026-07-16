@@ -1,12 +1,9 @@
 ---
 title: "Grid | @sheetwrite/svelte"
 description: "Imperative grid handle for document commands, events, rendering, and teardown."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/svelte|.|Grid -->
-[← @sheetwrite/svelte](/docs/api/svelte/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Imperative grid handle for document commands, events, rendering, and teardown.
 

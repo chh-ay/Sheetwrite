@@ -1,12 +1,9 @@
 ---
 title: "isLoaded | @sheetwrite/wasm"
 description: "Whether the WASM module has finished initializing."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|isLoaded -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="function">function</span></div>
 
 Whether the WASM module has finished initializing.
 

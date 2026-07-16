@@ -1,12 +1,9 @@
 ---
 title: "initSheetwrite | @sheetwrite/core"
 description: "Load the WASM data engine once."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|initSheetwrite -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Load the WASM data engine once. Must be awaited before `createGrid`.
 

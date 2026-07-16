@@ -1,12 +1,9 @@
 ---
 title: "parseCellInput | @sheetwrite/core"
 description: "Coerce raw text input into a CellValue, following spreadsheet input-bar conventions: - blank (after trimming) clears the cell to a null literal; - text longer than one character beginning with = becomes a formula; -…"
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|parseCellInput -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Coerce raw text input into a [`CellValue`](/docs/api/core/cell-value/), following spreadsheet
 input-bar conventions:

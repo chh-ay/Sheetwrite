@@ -1,12 +1,9 @@
 ---
 title: "Sheetwrite | @sheetwrite/svelte"
 description: "Convenience component for local object rows."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/svelte|.|Sheetwrite -->
-[← @sheetwrite/svelte](/docs/api/svelte/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Convenience component for local object rows. Bind `grid` to access the live `Grid`.
 

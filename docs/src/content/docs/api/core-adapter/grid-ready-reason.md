@@ -1,12 +1,9 @@
 ---
 title: "GridReadyReason | @sheetwrite/core/adapter"
 description: "Reason an adapter published a ready Grid generation."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridReadyReason -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="type">type</span></div>
 
 Reason an adapter published a ready Grid generation.
 

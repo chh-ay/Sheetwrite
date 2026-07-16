@@ -1,12 +1,9 @@
 ---
 title: "xlsxStyleOf | @sheetwrite/xlsx"
 description: "Translate Sheetwrite's style model into write-excel-file cell properties."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/xlsx|.|xlsxStyleOf -->
-[← @sheetwrite/xlsx](/docs/api/xlsx/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="function">function</span></div>
 
 Translate Sheetwrite's style model into write-excel-file cell properties.
 

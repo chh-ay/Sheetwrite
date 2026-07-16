@@ -1,12 +1,9 @@
 ---
 title: "writeExcelFileTableExportBackend | @sheetwrite/xlsx"
 description: "Default first-sheet table export backend."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/xlsx|.|writeExcelFileTableExportBackend -->
-[← @sheetwrite/xlsx](/docs/api/xlsx/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Default first-sheet table export backend.
 

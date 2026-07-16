@@ -1,12 +1,9 @@
 ---
 title: "downloadBytes | @sheetwrite/core"
 description: "Browser-only download helper; throws in non-DOM runtimes."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|downloadBytes -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Browser-only download helper; throws in non-DOM runtimes.
 

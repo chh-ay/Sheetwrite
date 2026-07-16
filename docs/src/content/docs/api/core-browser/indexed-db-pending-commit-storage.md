@@ -1,12 +1,9 @@
 ---
 title: "IndexedDbPendingCommitStorage | @sheetwrite/core/browser"
 description: "Browser-only durable pending queue."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./browser|IndexedDbPendingCommitStorage -->
-[← @sheetwrite/core/browser](/docs/api/core-browser/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-browser/">@sheetwrite/core/browser</a><span class="api-status" data-kind="class">class</span></div>
 
 Browser-only durable pending queue. Import it from `@sheetwrite/core/browser`;
 the package's root entrypoint never evaluates IndexedDB globals.

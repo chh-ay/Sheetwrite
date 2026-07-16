@@ -1,12 +1,9 @@
 ---
 title: "SheetwriteGrid | @sheetwrite/svelte"
 description: "Advanced framework component for workbook data or datasource input."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/svelte|.|SheetwriteGrid -->
-[← @sheetwrite/svelte](/docs/api/svelte/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Advanced framework component for workbook data or datasource input.
 

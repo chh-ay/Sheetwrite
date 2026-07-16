@@ -1,12 +1,9 @@
 ---
 title: "excelJsWorkbookBackend | @sheetwrite/xlsx"
 description: "ExcelJS is intentionally confined to the optional @sheetwrite/xlsx package."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/xlsx|.|excelJsWorkbookBackend -->
-[← @sheetwrite/xlsx](/docs/api/xlsx/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="variable">variable</span></div>
 
 ExcelJS is intentionally confined to the optional `@sheetwrite/xlsx`
 package. The MIT browser build preserves formulas, worksheets, styles,

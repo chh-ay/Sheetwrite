@@ -1,12 +1,9 @@
 ---
 title: "toCsv | @sheetwrite/core"
 description: "CSV (UTF-8 BOM, CRLF). String values are injection-hardened (a leading = + - @ \\t \\r is prefixed with ')."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|toCsv -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 CSV (UTF-8 BOM, CRLF). String values are injection-hardened (a leading
 `= + - @ \t \r` is prefixed with `'`). Reads the whole sheet as one bulk

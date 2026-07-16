@@ -1,12 +1,9 @@
 ---
 title: "createSelectionStatus | @sheetwrite/core/shell"
 description: "<output role=\"status\"> that follows the grid's selection."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|createSelectionStatus -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
 `<output role="status">` that follows the grid's selection. Text nodes only;
 polite live region so screen readers announce changes without interrupting.

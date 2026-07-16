@@ -1,12 +1,9 @@
 ---
 title: "cellA1 | @sheetwrite/core"
 description: "0-based (row, col) → A1 cell reference (0, 0 → \"A1\")."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|cellA1 -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 0-based (row, col) → A1 cell reference (0, 0 → "A1").
 

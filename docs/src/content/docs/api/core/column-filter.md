@@ -1,12 +1,9 @@
 ---
 title: "ColumnFilter | @sheetwrite/core"
 description: "One column's filter predicate."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|ColumnFilter -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 One column's filter predicate. All active column filters AND together;
 matching is against the cell's resolved value (text or number).

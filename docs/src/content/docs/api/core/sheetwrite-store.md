@@ -1,12 +1,9 @@
 ---
 title: "SheetwriteStore | @sheetwrite/core"
 description: "Stable public facade and the sole transaction, epoch, policy, and event barrier."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|SheetwriteStore -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
 

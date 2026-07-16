@@ -1,12 +1,9 @@
 ---
 title: "RevisionRestoreResponse | @sheetwrite/core"
 description: "Applied or conflict acknowledgement for a revision restore."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|RevisionRestoreResponse -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 Applied or conflict acknowledgement for a revision restore.
 

@@ -1,9 +1,8 @@
 ---
 title: "@sheetwrite/xlsx/register"
 description: "API reference for @sheetwrite/xlsx/register."
-tableOfContents: false
 ---
-<span class="api-status">supported</span>
+<span class="api-status" data-status="supported">supported</span>
 
 **Supported public entry point.** Import this entry point as `@sheetwrite/xlsx/register`.
 
@@ -19,5 +18,5 @@ Source entry: `packages/xlsx/src/register.ts`
 ### Functions <span class="api-count">1</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/xlsx-register/register-xlsx-backends/"><code>registerXlsxBackends</code><span>Register all concrete XLSX backends with the backend-neutral core contracts.</span></a>
+<a class="api-symbol-card" href="/docs/api/xlsx-register/register-xlsx-backends/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>registerXlsxBackends</code></span><span class="api-symbol-card__desc">Register all concrete XLSX backends with the backend-neutral core contracts.</span></a>
 </div>

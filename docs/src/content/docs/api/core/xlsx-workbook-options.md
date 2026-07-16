@@ -1,12 +1,9 @@
 ---
 title: "XlsxWorkbookOptions | @sheetwrite/core"
 description: "Workbook XLSX conversion options passed to the registered backend."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookOptions -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Workbook XLSX conversion options passed to the registered backend.
 

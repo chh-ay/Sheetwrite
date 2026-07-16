@@ -1,12 +1,9 @@
 ---
 title: "WorkerAcknowledgement | @sheetwrite/core/worker"
 description: "Acknowledgement posted back to the sender after a frame actually painted."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./worker|WorkerAcknowledgement -->
-[← @sheetwrite/core/worker](/docs/api/core-worker/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-worker/">@sheetwrite/core/worker</a><span class="api-status" data-kind="type">type</span></div>
 
 Acknowledgement posted back to the sender after a frame actually painted.
 

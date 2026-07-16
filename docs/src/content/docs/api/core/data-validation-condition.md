@@ -1,12 +1,9 @@
 ---
 title: "DataValidationCondition | @sheetwrite/core"
 description: "Serializable condition enforced by a data-validation rule."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|DataValidationCondition -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 Serializable condition enforced by a data-validation rule.
 

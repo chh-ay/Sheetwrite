@@ -1,12 +1,9 @@
 ---
 title: "fromCsv | @sheetwrite/core"
 description: "Parse CSV text into ColumnarData keyed by columns[i].key — the symmetric counterpart to toCsv."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|fromCsv -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Parse CSV `text` into `ColumnarData` keyed by `columns[i].key` — the symmetric
 counterpart to `toCsv`. The first parsed row is treated as the header and

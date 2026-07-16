@@ -1,9 +1,8 @@
 ---
 title: "@sheetwrite/core/shell.css"
 description: "API reference for @sheetwrite/core/shell.css."
-tableOfContents: false
 ---
-<span class="api-status">asset</span>
+<span class="api-status" data-status="asset">asset</span>
 
 **CSS or binary asset entry point.** Import this entry point as `@sheetwrite/core/shell.css`.
 

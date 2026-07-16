@@ -1,12 +1,9 @@
 ---
 title: "installCanvasTestStubs | @sheetwrite/core/testing"
 description: "Install the canvas + layout stubs a DOM test environment (jsdom/happy-dom) needs before createGrid can mount — without them the renderer throws \"Sheetwrite: 2D canvas context is unavailable\"."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./testing|installCanvasTestStubs -->
-[← @sheetwrite/core/testing](/docs/api/core-testing/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-testing/">@sheetwrite/core/testing</a><span class="api-status" data-kind="function">function</span></div>
 
 Install the canvas + layout stubs a DOM test environment (jsdom/happy-dom)
 needs before `createGrid` can mount — without them the renderer throws

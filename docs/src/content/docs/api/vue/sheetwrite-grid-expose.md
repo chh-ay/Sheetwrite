@@ -1,12 +1,9 @@
 ---
 title: "SheetwriteGridExpose | @sheetwrite/vue"
 description: "Imperative Grid handle exposed by the Vue advanced component."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/vue|.|SheetwriteGridExpose -->
-[← @sheetwrite/vue](/docs/api/vue/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Imperative Grid handle exposed by the Vue advanced component.
 

@@ -1,12 +1,9 @@
 ---
 title: "parseCsv | @sheetwrite/core"
 description: "Parse RFC-4180-style CSV into a grid of raw strings: comma-delimited, with \"-quoted fields that may embed commas, newlines, and doubled quotes, plus CR / LF / CRLF row breaks."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|parseCsv -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Parse RFC-4180-style CSV into a grid of raw strings: comma-delimited, with
 `"`-quoted fields that may embed commas, newlines, and doubled quotes, plus

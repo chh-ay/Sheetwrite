@@ -1,12 +1,9 @@
 ---
 title: "buildXlsxModel | @sheetwrite/xlsx"
 description: "Build the default writer's complete active-sheet model without serializing it."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/xlsx|.|buildXlsxModel -->
-[← @sheetwrite/xlsx](/docs/api/xlsx/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="function">function</span></div>
 
 Build the default writer's complete active-sheet model without serializing it.
 

@@ -1,12 +1,9 @@
 ---
 title: "DistinctColumn | @sheetwrite/wasm"
 description: "Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|DistinctColumn -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
 
 Distinct-value scan result for one column: parallel kind/number/text
 arrays whose buffers are surrendered once through the `take*` accessors.

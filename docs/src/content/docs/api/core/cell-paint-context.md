@@ -1,12 +1,9 @@
 ---
 title: "CellPaintContext | @sheetwrite/core"
 description: "Read-only cell and canvas geometry supplied to a custom renderer."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CellPaintContext -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Read-only cell and canvas geometry supplied to a custom renderer.
 

@@ -1,12 +1,9 @@
 ---
 title: "PresenceOverlay | @sheetwrite/core"
 description: "Ephemeral collaborator selection rendered above the grid."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|PresenceOverlay -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Ephemeral collaborator selection rendered above the grid. Presence never
 enters document operations, snapshots, dirty state, or undo history.

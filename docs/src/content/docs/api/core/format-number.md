@@ -1,12 +1,9 @@
 ---
 title: "formatNumber | @sheetwrite/core"
 description: "Deterministic Excel-style number/date formatter."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|formatNumber -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Deterministic Excel-style number/date formatter. Supports explicit locale
 separators, percent/scientific notation, UTC date/time tokens, four-section

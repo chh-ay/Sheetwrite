@@ -1,12 +1,9 @@
 ---
 title: "SyncVersionGapRequest | @sheetwrite/core"
 description: "Contiguous-version recovery request produced when remote input skips ahead."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|SyncVersionGapRequest -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Contiguous-version recovery request produced when remote input skips ahead.
 

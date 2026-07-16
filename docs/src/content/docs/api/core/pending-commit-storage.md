@@ -1,12 +1,9 @@
 ---
 title: "PendingCommitStorage | @sheetwrite/core"
 description: "Host-owned durable queue."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|PendingCommitStorage -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.
 

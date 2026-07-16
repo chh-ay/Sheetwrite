@@ -1,12 +1,9 @@
 ---
 title: "applyChangedLiveGridOptions | @sheetwrite/core/adapter"
 description: "Applies live-updatable adapter option changes to an existing Grid."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|applyChangedLiveGridOptions -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
 
 Applies live-updatable adapter option changes to an existing Grid.
 

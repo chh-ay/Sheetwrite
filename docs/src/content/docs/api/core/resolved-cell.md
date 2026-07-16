@@ -1,12 +1,9 @@
 ---
 title: "ResolvedCell | @sheetwrite/core"
 description: "Authoritative source value, evaluated value, style, and load state for a cell."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|ResolvedCell -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Authoritative source value, evaluated value, style, and load state for a cell.
 

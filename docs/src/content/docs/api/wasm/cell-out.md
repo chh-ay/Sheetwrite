@@ -1,12 +1,9 @@
 ---
 title: "CellOut | @sheetwrite/wasm"
 description: "Result of a single-cell read."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|CellOut -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
 
 Result of a single-cell read.
 

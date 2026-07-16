@@ -1,12 +1,9 @@
 ---
 title: "PersistenceError | @sheetwrite/core"
 description: "Typed failure raised by persistence and synchronization flows."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|PersistenceError -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
 
 Typed failure raised by persistence and synchronization flows.
 

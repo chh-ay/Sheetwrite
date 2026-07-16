@@ -1,12 +1,9 @@
 ---
 title: "GridActions | @sheetwrite/core"
 description: "Imperative operations the toolbar and context menu bind to; also exposed as Grid.actions."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|GridActions -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
 

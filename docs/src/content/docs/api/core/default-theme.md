@@ -1,12 +1,9 @@
 ---
 title: "DEFAULT_THEME | @sheetwrite/core"
 description: "Default canvas theme used before CSS and explicit theme overrides."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|DEFAULT_THEME -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Default canvas theme used before CSS and explicit theme overrides.
 

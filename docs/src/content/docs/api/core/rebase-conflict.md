@@ -1,12 +1,9 @@
 ---
 title: "RebaseConflict | @sheetwrite/core"
 description: "Reason and affected operations for an unsafe document rebase."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|RebaseConflict -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Reason and affected operations for an unsafe document rebase.
 

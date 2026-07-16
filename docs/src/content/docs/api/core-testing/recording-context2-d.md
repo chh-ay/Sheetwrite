@@ -1,12 +1,9 @@
 ---
 title: "RecordingContext2D | @sheetwrite/core/testing"
 description: "The stub 2D context the canvas test stubs install: every method is a no-op that counts its invocations in calls, so tests can assert paint activity (e.g."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./testing|RecordingContext2D -->
-[← @sheetwrite/core/testing](/docs/api/core-testing/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-testing/">@sheetwrite/core/testing</a><span class="api-status" data-kind="interface">interface</span></div>
 
 The stub 2D context the canvas test stubs install: every method is a no-op
 that counts its invocations in `calls`, so tests can assert paint activity

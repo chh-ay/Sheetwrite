@@ -1,12 +1,9 @@
 ---
 title: "Sheetwrite | @sheetwrite/vue"
 description: "Convenience component for local object rows with live option updates."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/vue|.|Sheetwrite -->
-[← @sheetwrite/vue](/docs/api/vue/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Convenience component for local object rows with live option updates.
 

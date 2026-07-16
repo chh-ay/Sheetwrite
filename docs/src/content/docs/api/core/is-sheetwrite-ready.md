@@ -1,12 +1,9 @@
 ---
 title: "isSheetwriteReady | @sheetwrite/core"
 description: "Whether initSheetwrite has completed — the single readiness source."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|isSheetwriteReady -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Whether `initSheetwrite` has completed — the single readiness source.
 

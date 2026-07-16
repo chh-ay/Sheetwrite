@@ -1,12 +1,9 @@
 ---
 title: "createNameBox | @sheetwrite/core/shell"
 description: "A1 jump box: shows the focused cell's reference and navigates on Enter."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|createNameBox -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
 A1 jump box: shows the focused cell's reference and navigates on Enter.
 Invalid or out-of-bounds references set `aria-invalid` and make no grid

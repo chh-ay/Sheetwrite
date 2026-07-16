@@ -1,12 +1,9 @@
 ---
 title: "TransactionApplicationOptions | @sheetwrite/core"
 description: "Source and commit classification used when applying a transaction."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|TransactionApplicationOptions -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Source and commit classification used when applying a transaction.
 

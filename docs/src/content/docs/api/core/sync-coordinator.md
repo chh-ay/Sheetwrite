@@ -1,12 +1,9 @@
 ---
 title: "SyncCoordinator | @sheetwrite/core"
 description: "Deterministic, transport-neutral optimistic sync."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|SyncCoordinator -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
 
 Deterministic, transport-neutral optimistic sync. Local rendering is never
 blocked: changes queue immediately, while hosts explicitly call `sendNext`

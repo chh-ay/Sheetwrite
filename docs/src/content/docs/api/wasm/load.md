@@ -1,12 +1,9 @@
 ---
 title: "load | @sheetwrite/wasm"
 description: "Initialize the WASM module."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|load -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="function">function</span></div>
 
 Initialize the WASM module. Idempotent and re-entrant: concurrent
 same-source callers share one in-flight init; a concurrent different-source

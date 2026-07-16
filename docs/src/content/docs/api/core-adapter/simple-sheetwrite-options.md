@@ -1,12 +1,9 @@
 ---
 title: "SimpleSheetwriteOptions | @sheetwrite/core/adapter"
 description: "Framework-neutral simple columns, rows, sizing, and grid options."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SimpleSheetwriteOptions -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Framework-neutral simple columns, rows, sizing, and grid options.
 

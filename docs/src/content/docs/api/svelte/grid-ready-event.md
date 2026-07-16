@@ -1,12 +1,9 @@
 ---
 title: "GridReadyEvent | @sheetwrite/svelte"
 description: "Grid handle, generation, and reason published after adapter initialization."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/svelte|.|GridReadyEvent -->
-[← @sheetwrite/svelte](/docs/api/svelte/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Grid handle, generation, and reason published after adapter initialization.
 

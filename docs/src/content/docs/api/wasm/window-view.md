@@ -1,12 +1,9 @@
 ---
 title: "WindowView | @sheetwrite/wasm"
 description: "A bulk window of resolved cells, row-major over nrows x ncols."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|WindowView -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
 
 A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 

@@ -1,12 +1,9 @@
 ---
 title: "gridSizeStyle | @sheetwrite/core/adapter"
 description: "Converts adapter size props into a host element style object."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|gridSizeStyle -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="function">function</span></div>
 
 Converts adapter size props into a host element style object.
 

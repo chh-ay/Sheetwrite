@@ -1,12 +1,9 @@
 ---
 title: "CellScalar | @sheetwrite/svelte"
 description: "A scalar that can be displayed directly."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/svelte|.|CellScalar -->
-[← @sheetwrite/svelte](/docs/api/svelte/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>
 
 A scalar that can be displayed directly.
 
