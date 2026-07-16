@@ -124,13 +124,8 @@ function entryLabel(pkg: ApiPackage, entry: ApiEntryPoint): string {
   return entry.subpath === "." ? pkg.name : `${pkg.name}/${entry.subpath.slice(2)}`;
 }
 
-function frontmatter(
-  title: string,
-  description: string,
-  options: { tableOfContents?: boolean } = {},
-): string {
-  const tableOfContents = options.tableOfContents === false ? "tableOfContents: false\n" : "";
-  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n${tableOfContents}---\n\n`;
+function frontmatter(title: string, description: string): string {
+  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n---\n\n`;
 }
 
 interface DeclarationMember {
@@ -361,9 +356,7 @@ export function renderSymbolPage(pkg: ApiPackage, entry: ApiEntryPoint, item: Ap
   const body = [
     frontmatter(`${item.name} | ${label}`, description, { tableOfContents: false }).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
-    `[← ${label}](/docs/api/${entrySlug(pkg.name, entry.subpath)}/)`,
-    "",
-    `<span class="api-status">${item.kind}</span>`,
+    `<div class="api-pagehead"><a class="api-backlink" href="/docs/api/${entrySlug(pkg.name, entry.subpath)}/">${html(label)}</a><span class="api-status" data-kind="${item.kind}">${item.kind}</span></div>`,
     "",
     summary,
     "",
@@ -413,7 +406,7 @@ export function renderEntryPage(pkg: ApiPackage, entry: ApiEntryPoint): string {
           : "CSS or binary asset entry point";
   const body = [
     frontmatter(label, `API reference for ${label}.`, { tableOfContents: false }).trimEnd(),
-    `<span class="api-status">${entry.classification}</span>`,
+    `<span class="api-status" data-status="${entry.classification}">${entry.classification}</span>`,
     "",
     `**${status}.** Import this entry point as \`${label}\`.`,
     "",
@@ -445,8 +438,8 @@ export function renderEntryPage(pkg: ApiPackage, entry: ApiEntryPoint): string {
           const summary = compactSummary(documentationMarkdown(pkg, entry, item));
           return [
             `<a class="api-symbol-card" href="${symbolRoute(pkg, entry, item)}">`,
-            `<code>${html(item.name)}</code>`,
-            `<span>${html(summary)}</span>`,
+            `<span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="${item.kind}" aria-hidden="true">${item.kind.charAt(0).toUpperCase()}</span><code>${html(item.name)}</code></span>`,
+            `<span class="api-symbol-card__desc">${html(summary)}</span>`,
             "</a>",
           ].join("");
         }),
@@ -471,15 +464,17 @@ function renderApiIndex(manifest: PublicApiManifest): string {
     lines.push(
       `## ${pkg.name}`,
       "",
-      "| Entry point | Classification | Symbols |",
-      "| --- | --- | ---: |",
+      '<table class="api-entry-table">',
+      "<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>",
+      "<tbody>",
+      ...pkg.entryPoints.map(
+        (entry) =>
+          `<tr><td><a href="/docs/api/${entrySlug(pkg.name, entry.subpath)}/"><code>${html(entryLabel(pkg, entry))}</code></a></td><td><span class="api-status" data-status="${entry.classification}">${entry.classification}</span></td><td>${entry.exports.length}</td></tr>`,
+      ),
+      "</tbody>",
+      "</table>",
+      "",
     );
-    for (const entry of pkg.entryPoints) {
-      lines.push(
-        `| [\`${entryLabel(pkg, entry)}\`](/docs/api/${entrySlug(pkg.name, entry.subpath)}/) | ${entry.classification} | ${entry.exports.length} |`,
-      );
-    }
-    lines.push("");
   }
   return `${lines.join("\n").trimEnd()}\n`;
 }
@@ -802,6 +797,16 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     },
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
+    {
+      // Sidebar navigation source: one entry per package's primary entry point.
+      path: join(generatedDataRoot, "api-nav.json"),
+      content: stableJson(
+        manifest.packages.map((pkg) => ({
+          label: pkg.name,
+          href: `/docs/api/${entrySlug(pkg.name, ".")}/`,
+        })),
+      ),
+    },
   ].sort((left, right) => left.path.localeCompare(right.path));
 }
 
@@ -1310,7 +1315,9 @@ async function checkDocs(
   const apiIndex = await readFile(join(contentRoot, "api/index.md"), "utf8");
   for (const apiPagePath of entryPageKeys) {
     const route = `/docs/${posix(relative(contentRoot, apiPagePath)).replace(/\.md$/, "/")}`;
-    if (!apiIndex.includes(`](${route})`)) {
+    // The index links entries from raw-HTML table rows; markdown links stay
+    // recognized so prose references also satisfy the contract.
+    if (!apiIndex.includes(`](${route})`) && !apiIndex.includes(`href="${route}"`)) {
       failures.push(`generated API entry page is missing from the API index: ${route}`);
     }
   }

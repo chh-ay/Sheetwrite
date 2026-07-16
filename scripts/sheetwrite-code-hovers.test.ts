@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { injectHoverPrelude } from "../docs/src/lib/hover-preludes.js";
 import {
   collectFenceHovers,
+  collectReferenceLinks,
   formatHoverSignature,
   hoverPopoverId,
   isHighQualityHover,
@@ -279,5 +280,38 @@ describe("Sheetwrite hover preludes end to end", () => {
     expect(grid?.line).toBe(0);
     expect(grid?.character).toBe(source.indexOf("grid"));
     expect(grid?.text).toContain("Grid");
+  });
+});
+
+describe("Generated fence reference links", () => {
+  const routes = new Map([
+    ["Theme", "/docs/api/core/theme/"],
+    ["SheetId", "/docs/api/core/sheet-id/"],
+    ["DEFAULT_THEME", "/docs/api/core/default-theme/"],
+  ]);
+
+  it("links referenced API types but never the declared symbol itself", () => {
+    const links = collectReferenceLinks("const DEFAULT_THEME: Theme;", routes);
+    expect(links).toEqual([
+      { line: 0, columnStart: 21, columnEnd: 26, route: "/docs/api/core/theme/" },
+    ]);
+  });
+
+  it("resolves multi-line declarations with positions per line", () => {
+    const links = collectReferenceLinks(
+      "class Grid {\n    setTheme(theme: Theme): void;\n    sheet(id: SheetId): Theme;\n}",
+      routes,
+    );
+    expect(links.map((link) => [link.line, link.route])).toEqual([
+      [1, "/docs/api/core/theme/"],
+      [2, "/docs/api/core/sheet-id/"],
+      [2, "/docs/api/core/theme/"],
+    ]);
+  });
+
+  it("ignores member accesses, string openers, and unknown names", () => {
+    expect(collectReferenceLinks('const x: options.Theme = "Theme";', routes)).toEqual([]);
+    expect(collectReferenceLinks("const y: Unknown;", routes)).toEqual([]);
+    expect(collectReferenceLinks("const z: Theme;", new Map())).toEqual([]);
   });
 });
