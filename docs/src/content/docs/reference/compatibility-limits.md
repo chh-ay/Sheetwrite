@@ -15,7 +15,7 @@ description: Explicit boundaries for data loading, formulas, protection, collabo
 
 Compatibility statements are feature contracts, not claims of Excel or Google Sheets parity.
 
-- [Formula compatibility matrix](/docs/guides/formulas/#compatibility-matrix)
-- [XLSX compatibility matrix](/docs/guides/data-operations/#xlsx-compatibility)
+- [Supported formulas](/docs/guides/formulas/#supported-formulas)
+- [XLSX compatibility](/docs/guides/data-operations/#xlsx-compatibility)
 - [Accessibility limits](/docs/guides/accessibility/)
 - [Worker fallback](/docs/guides/worker-rendering/)

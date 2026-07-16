@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 
+interface PagefindSubResult {
+  url: string;
+  title: string;
+  excerpt: string;
+}
+
 interface PagefindResultData {
   url: string;
   meta: { title?: string };
   excerpt: string;
+  sub_results?: PagefindSubResult[];
 }
 
 interface PagefindResult {
@@ -14,6 +21,26 @@ interface PagefindResponse {
   results: PagefindResult[];
 }
 
+/** One rendered hit: pages plus their anchored members/headings. */
+interface SearchEntry {
+  url: string;
+  title: string;
+  excerpt: string;
+}
+
+function entriesFor(data: PagefindResultData): SearchEntry[] {
+  const page: SearchEntry = {
+    url: data.url,
+    title: data.meta.title ?? data.url,
+    excerpt: data.excerpt,
+  };
+  const anchored = (data.sub_results ?? [])
+    .filter((sub) => sub.url.includes("#"))
+    .slice(0, 3)
+    .map((sub) => ({ url: sub.url, title: sub.title, excerpt: sub.excerpt }));
+  return [page, ...anchored];
+}
+
 interface PagefindModule {
   search(query: string): Promise<PagefindResponse>;
 }
@@ -22,7 +49,7 @@ export function DocsSearch() {
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PagefindResultData[]>([]);
+  const [results, setResults] = useState<SearchEntry[]>([]);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -53,12 +80,21 @@ export function DocsSearch() {
         const pagefindPath = "/pagefind/pagefind.js";
         const pagefind = (await import(/* @vite-ignore */ pagefindPath)) as PagefindModule;
         const response = await pagefind.search(query);
-        const data = (
-          await Promise.all(response.results.slice(0, 8).map((result) => result.data()))
-        ).map((result) => ({
-          ...result,
-          excerpt: result.excerpt.replaceAll("<mark>", "").replaceAll("</mark>", ""),
-        }));
+        const pages = await Promise.all(
+          response.results.slice(0, 8).map((result) => result.data()),
+        );
+        const seen = new Set<string>();
+        const data: SearchEntry[] = [];
+        for (const page of pages) {
+          for (const entry of entriesFor(page)) {
+            if (seen.has(entry.url)) continue;
+            seen.add(entry.url);
+            data.push({
+              ...entry,
+              excerpt: entry.excerpt.replaceAll("<mark>", "").replaceAll("</mark>", ""),
+            });
+          }
+        }
         if (controller.signal.aborted) return;
         setResults(data);
         setStatus(data.length === 0 ? "No matching pages." : "");
@@ -115,7 +151,7 @@ export function DocsSearch() {
           {status.length > 0 ? <p>{status}</p> : null}
           {results.map((result) => (
             <a href={result.url} key={result.url}>
-              <strong>{result.meta.title ?? result.url}</strong>
+              <strong>{result.title}</strong>
               <span>{result.excerpt}</span>
             </a>
           ))}

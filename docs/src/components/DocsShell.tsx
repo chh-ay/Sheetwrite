@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
-import { DOCS_NAVIGATION } from "../lib/navigation.js";
+import { DOCS_NAVIGATION, SHOWCASE_NAVIGATION } from "../lib/navigation.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 interface DocsShellProps {
-  activeHref: string;
+  activeHref?: string;
   children: ReactNode;
   description: string;
   title: string;
@@ -22,7 +22,7 @@ function Brand() {
   );
 }
 
-function Sidebar({ activeHref }: Readonly<{ activeHref: string }>) {
+function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
       {DOCS_NAVIGATION.map((section) => (
@@ -39,13 +39,27 @@ function Sidebar({ activeHref }: Readonly<{ activeHref: string }>) {
           ))}
         </section>
       ))}
+      <section>
+        <h2>Live showcases</h2>
+        {SHOWCASE_NAVIGATION.map((item) => (
+          <a href={item.href} key={item.href}>
+            {item.label}
+          </a>
+        ))}
+      </section>
     </nav>
   );
 }
 
 export function DocsShell({ activeHref, children, description, title }: Readonly<DocsShellProps>) {
+  // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
+  // better as a chip than as part of a display-size heading.
+  const [titleMain, titlePackage] = title.split(" | ", 2);
   return (
     <div className="sw-docs">
+      <a className="sw-skip-link" href="#main-content">
+        Skip to content
+      </a>
       <header className="sw-docs-header">
         <Brand />
         <DocsSearch />
@@ -61,10 +75,13 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
         </div>
         <Sidebar activeHref={activeHref} />
       </aside>
-      <main className="sw-document" data-pagefind-body>
+      <main className="sw-document" data-pagefind-body id="main-content">
         <header className="sw-document__header">
           <p>Sheetwrite / Documentation</p>
-          <h1>{title}</h1>
+          <h1>
+            {titleMain}
+            {titlePackage ? <code className="sw-title-package">{titlePackage}</code> : null}
+          </h1>
           <span>{description}</span>
         </header>
         <article className="sw-prose">{children}</article>

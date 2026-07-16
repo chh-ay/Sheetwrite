@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: pages-${{ github.event.workflow_run.head_branch || github.ref }}
+  group: docs-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -21,7 +21,7 @@ env:
 
 jobs:
   build:
-    name: build production docs
+    name: verify production docs
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -59,7 +59,8 @@ jobs:
           bun run build:packages
           bun run docs:generate
           bun run docs:check
-          bun run --filter '@sheetwrite/docs-site' build
+          bun run --filter '@sheetwrite/docs-start' typecheck
+          bun run --filter '@sheetwrite/docs-start' build
           bun test scripts/docs.test.ts
 
       - name: Install Chromium
@@ -68,27 +69,10 @@ jobs:
       - name: Smoke production routes and examples
         run: bun run test:browser
 
-      - name: Configure Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - name: Upload verified static site
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          path: docs-astro/dist
-
-  deploy:
-    name: deploy production docs
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    steps:
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+          name: production-docs
+          path: docs/dist/client/
+          if-no-files-found: error
+          retention-days: 1

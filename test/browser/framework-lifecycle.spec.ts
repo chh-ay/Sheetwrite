@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { LIFECYCLE_CELL } from "../../docs-astro/src/components/framework-lifecycle/fixture.js";
+import { LIFECYCLE_CELL } from "../../docs/src/test-fixtures/framework-lifecycle/fixture.js";
 import { hasOpaqueForeground } from "./canvas-assertions.js";
 import { siteUrl } from "./playwright.config.js";
 

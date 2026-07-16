@@ -1,6 +1,6 @@
 ---
-title: "Guide migration matrix"
-description: "Canonical route for every guide moved into the searchable documentation site."
+title: "Moved guides"
+description: "Where each former repository guide now lives in the documentation site."
 ---
 The old loose Markdown files were removed only after every source guide had a canonical routed replacement.
 

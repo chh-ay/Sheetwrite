@@ -27,7 +27,7 @@ grid.store.applyTransaction({
 
 `store.getFormula(address)` returns the source. `store.getCell(address).resolved` returns the evaluated scalar or error sentinel. An unsupported function evaluates to `#NAME?`, but its source remains retrievable and persists through snapshots/XLSX round-trips so a later engine can evaluate it.
 
-## Compatibility matrix
+## Supported formulas
 
 The Rust parser table in `packages/wasm/src/calc.rs` is the engine source of truth. `FORMULA_FUNCTIONS` in `packages/core/src/formula-assist.ts` mirrors that table for autocomplete; parser and assist tests must change with the table.
 

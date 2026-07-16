@@ -1,12 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
-const distRoot = resolve(import.meta.dir, "../docs-astro/dist");
+const distRoot = resolve(import.meta.dir, "../docs/dist/client");
 const defaultPages = [
   "index.html",
   "react/index.html",
   "svelte/index.html",
-  "theming/index.html",
   "vanilla/index.html",
   "vue/index.html",
   "test/collaboration/index.html",
@@ -43,7 +42,7 @@ async function entrypointsFromHtml(relativePath: string): Promise<string[]> {
   const html = await readFile(join(distRoot, relativePath), "utf8");
   const entrypoints: string[] = [];
   for (const match of html.matchAll(
-    /(?:src|component-url|renderer-url|href)=["'][^"']*?(_astro\/[^"']+\.js)["']/g,
+    /(?:src|component-url|renderer-url|href)=["'][^"']*?(assets\/[^"']+\.js)["']/g,
   )) {
     if (match[1] !== undefined) entrypoints.push(join(distRoot, match[1]));
   }

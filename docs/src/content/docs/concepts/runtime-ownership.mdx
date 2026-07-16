@@ -56,11 +56,13 @@ Row positions come from an `OffsetIndex` — a Fenwick (binary-indexed) tree ove
 row heights giving `O(log n)` scrollTop ↔ row mapping and `O(log n)` single-row
 height edits, so variable row heights stay cheap.
 
-Browsers cap an element's height at roughly 33 million pixels. At the default 28px
-row height that is only ~1.2M rows, so for taller content Sheetwrite does **not**
-size the scroll sizer to the true content height. `ScaledScroll` pins the DOM
-sizer to the cap (`MAX_ELEMENT_HEIGHT = 33_000_000`) and maps the capped scrollbar
-position linearly onto the real virtual range:
+Browsers clamp an element's height at an engine-specific ceiling — Chromium sits
+near 33.5 million CSS pixels at 100% zoom, and the ceiling **shrinks with browser
+zoom and `devicePixelRatio`**. At the default 28px row height that can be barely
+~1M rows, so Sheetwrite never trusts a constant: it measures the real clamp with
+a probe element (re-measuring on zoom changes), pins the DOM sizer to that cap,
+and `ScaledScroll` maps the capped scrollbar position linearly onto the real
+virtual range:
 
 ```ts prelude="architecture" partial="requires surrounding host state" title="Partial example"
 // DOM scrollTop -> content-space offset (identity below the cap)

@@ -9,13 +9,56 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VueRouteImport } from './routes/vue'
+import { Route as VanillaRouteImport } from './routes/vanilla'
+import { Route as SvelteRouteImport } from './routes/svelte'
+import { Route as ReactRouteImport } from './routes/react'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocsIndexRouteImport } from './routes/docs.index'
+import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
+import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as DocsProofRouteImport } from './routes/docs.proof'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
+import { Route as TestFrameworkLifecycleFrameworkRouteImport } from './routes/test.framework-lifecycle.$framework'
 
+const VueRoute = VueRouteImport.update({
+  id: '/vue',
+  path: '/vue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VanillaRoute = VanillaRouteImport.update({
+  id: '/vanilla',
+  path: '/vanilla',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SvelteRoute = SvelteRouteImport.update({
+  id: '/svelte',
+  path: '/svelte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReactRoute = ReactRouteImport.update({
+  id: '/react',
+  path: '/react',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestXlsxRoute = TestXlsxRouteImport.update({
+  id: '/test/xlsx',
+  path: '/test/xlsx',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestCollaborationRoute = TestCollaborationRouteImport.update({
+  id: '/test/collaboration',
+  path: '/test/collaboration',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsProofRoute = DocsProofRouteImport.update({
@@ -28,44 +71,165 @@ const DocsSplatRoute = DocsSplatRouteImport.update({
   path: '/docs/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestFrameworkLifecycleFrameworkRoute =
+  TestFrameworkLifecycleFrameworkRouteImport.update({
+    id: '/test/framework-lifecycle/$framework',
+    path: '/test/framework-lifecycle/$framework',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/react': typeof ReactRoute
+  '/svelte': typeof SvelteRoute
+  '/vanilla': typeof VanillaRoute
+  '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/proof': typeof DocsProofRoute
+  '/test/collaboration': typeof TestCollaborationRoute
+  '/test/xlsx': typeof TestXlsxRoute
+  '/docs/': typeof DocsIndexRoute
+  '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/react': typeof ReactRoute
+  '/svelte': typeof SvelteRoute
+  '/vanilla': typeof VanillaRoute
+  '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/proof': typeof DocsProofRoute
+  '/test/collaboration': typeof TestCollaborationRoute
+  '/test/xlsx': typeof TestXlsxRoute
+  '/docs': typeof DocsIndexRoute
+  '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/react': typeof ReactRoute
+  '/svelte': typeof SvelteRoute
+  '/vanilla': typeof VanillaRoute
+  '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/proof': typeof DocsProofRoute
+  '/test/collaboration': typeof TestCollaborationRoute
+  '/test/xlsx': typeof TestXlsxRoute
+  '/docs/': typeof DocsIndexRoute
+  '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/docs/$' | '/docs/proof'
+  fullPaths:
+    | '/'
+    | '/react'
+    | '/svelte'
+    | '/vanilla'
+    | '/vue'
+    | '/docs/$'
+    | '/docs/proof'
+    | '/test/collaboration'
+    | '/test/xlsx'
+    | '/docs/'
+    | '/test/framework-lifecycle/$framework'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/docs/$' | '/docs/proof'
-  id: '__root__' | '/' | '/docs/$' | '/docs/proof'
+  to:
+    | '/'
+    | '/react'
+    | '/svelte'
+    | '/vanilla'
+    | '/vue'
+    | '/docs/$'
+    | '/docs/proof'
+    | '/test/collaboration'
+    | '/test/xlsx'
+    | '/docs'
+    | '/test/framework-lifecycle/$framework'
+  id:
+    | '__root__'
+    | '/'
+    | '/react'
+    | '/svelte'
+    | '/vanilla'
+    | '/vue'
+    | '/docs/$'
+    | '/docs/proof'
+    | '/test/collaboration'
+    | '/test/xlsx'
+    | '/docs/'
+    | '/test/framework-lifecycle/$framework'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ReactRoute: typeof ReactRoute
+  SvelteRoute: typeof SvelteRoute
+  VanillaRoute: typeof VanillaRoute
+  VueRoute: typeof VueRoute
   DocsSplatRoute: typeof DocsSplatRoute
   DocsProofRoute: typeof DocsProofRoute
+  TestCollaborationRoute: typeof TestCollaborationRoute
+  TestXlsxRoute: typeof TestXlsxRoute
+  DocsIndexRoute: typeof DocsIndexRoute
+  TestFrameworkLifecycleFrameworkRoute: typeof TestFrameworkLifecycleFrameworkRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vue': {
+      id: '/vue'
+      path: '/vue'
+      fullPath: '/vue'
+      preLoaderRoute: typeof VueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vanilla': {
+      id: '/vanilla'
+      path: '/vanilla'
+      fullPath: '/vanilla'
+      preLoaderRoute: typeof VanillaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/svelte': {
+      id: '/svelte'
+      path: '/svelte'
+      fullPath: '/svelte'
+      preLoaderRoute: typeof SvelteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/react': {
+      id: '/react'
+      path: '/react'
+      fullPath: '/react'
+      preLoaderRoute: typeof ReactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/xlsx': {
+      id: '/test/xlsx'
+      path: '/test/xlsx'
+      fullPath: '/test/xlsx'
+      preLoaderRoute: typeof TestXlsxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/collaboration': {
+      id: '/test/collaboration'
+      path: '/test/collaboration'
+      fullPath: '/test/collaboration'
+      preLoaderRoute: typeof TestCollaborationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/proof': {
@@ -82,13 +246,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/test/framework-lifecycle/$framework': {
+      id: '/test/framework-lifecycle/$framework'
+      path: '/test/framework-lifecycle/$framework'
+      fullPath: '/test/framework-lifecycle/$framework'
+      preLoaderRoute: typeof TestFrameworkLifecycleFrameworkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ReactRoute: ReactRoute,
+  SvelteRoute: SvelteRoute,
+  VanillaRoute: VanillaRoute,
+  VueRoute: VueRoute,
   DocsSplatRoute: DocsSplatRoute,
   DocsProofRoute: DocsProofRoute,
+  TestCollaborationRoute: TestCollaborationRoute,
+  TestXlsxRoute: TestXlsxRoute,
+  DocsIndexRoute: DocsIndexRoute,
+  TestFrameworkLifecycleFrameworkRoute: TestFrameworkLifecycleFrameworkRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

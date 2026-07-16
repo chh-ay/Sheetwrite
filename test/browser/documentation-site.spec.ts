@@ -19,6 +19,11 @@ function docsUrl(path = ""): string {
   return siteUrl(`/docs/${path}`);
 }
 
+/** Interactive steps need attached listeners; the root component marks hydration. */
+async function waitForHydration(page: Page): Promise<void> {
+  await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15_000 });
+}
+
 const representativeRoutes = [
   "start/installation/",
   "start/first-grid/",
@@ -71,7 +76,7 @@ test.describe("documentation site", () => {
       expect(escapedRequests).toEqual([]);
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
         "href",
-        `https://chh-ay.github.io${SITE_BASE}/docs/${route}`,
+        `https://sheetwrite.vercel.app/docs/${route}`,
       );
     });
   }
@@ -105,6 +110,7 @@ test.describe("documentation site", () => {
       origin: `http://localhost:${SITE_PORT}`,
     });
     await page.goto(docsUrl("start/first-grid/"));
+    await waitForHydration(page);
 
     await expect(page.getByRole("link", { name: "Install Sheetwrite", exact: true })).toBeVisible();
     await page.getByRole("button", { name: /copy/i }).first().click();
@@ -135,14 +141,12 @@ test.describe("documentation site", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(docsUrl("start/installation/"));
     const gutters = await page.evaluate(() => {
-      const pane = document.querySelector(".main-pane")?.getBoundingClientRect();
-      const article = document
-        .querySelector(".content-panel .sl-container")
-        ?.getBoundingClientRect();
-      if (!pane || !article) return null;
+      const sidebar = document.querySelector(".sw-sidebar")?.getBoundingClientRect();
+      const article = document.querySelector(".sw-document")?.getBoundingClientRect();
+      if (!sidebar || !article) return null;
       return {
-        left: article.left - pane.left,
-        right: pane.right - article.right,
+        left: article.left - sidebar.right,
+        right: window.innerWidth - article.right,
       };
     });
 
@@ -150,11 +154,137 @@ test.describe("documentation site", () => {
     expect(Math.abs((gutters?.left ?? 0) - (gutters?.right ?? 0))).toBeLessThanOrEqual(1);
   });
 
+  test("documentation tokens resolve into the critical computed surfaces", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(docsUrl("start/installation/"));
+    const documentation = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const body = getComputedStyle(document.body);
+      const header = document.querySelector<HTMLElement>(".sw-docs-header");
+      const sidebar = document.querySelector<HTMLElement>(".sw-sidebar");
+      const article = document.querySelector<HTMLElement>(".sw-document");
+      const code = document.querySelector<HTMLElement>(".expressive-code pre code");
+      if (!header || !sidebar || !article || !code) return null;
+      return {
+        surfaceToken: root.getPropertyValue("--sw-surface-0").trim(),
+        accentToken: root.getPropertyValue("--sw-accent").trim(),
+        bodyBackground: body.backgroundColor,
+        bodyFont: body.fontFamily,
+        headerHeight: header.getBoundingClientRect().height,
+        sidebarWidth: sidebar.getBoundingClientRect().width,
+        articleWidth: article.getBoundingClientRect().width,
+        codeFont: getComputedStyle(code).fontFamily,
+      };
+    });
+    expect(documentation).not.toBeNull();
+    expect(documentation?.surfaceToken).not.toBe("");
+    expect(documentation?.accentToken).not.toBe("");
+    expect(documentation?.bodyBackground).not.toBe("rgba(0, 0, 0, 0)");
+    expect(documentation?.bodyFont).toContain("Inter");
+    expect(documentation?.headerHeight ?? 0).toBeGreaterThan(40);
+    expect(documentation?.sidebarWidth ?? 0).toBeGreaterThan(200);
+    expect(documentation?.articleWidth ?? 0).toBeGreaterThan(600);
+    expect(documentation?.codeFont).toContain("JetBrains Mono");
+
+    await page.goto(docsUrl("api/core/grid/"));
+    const apiMember = page.locator(".api-member").first();
+    await expect(apiMember).toBeVisible();
+    const memberStyle = await apiMember.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, border: style.borderTopWidth };
+    });
+    expect(memberStyle.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(Number.parseFloat(memberStyle.border)).toBeGreaterThan(0);
+  });
+
+  test("code blocks preserve syntax, chrome, highlighting, focus, and type hovers", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem("sheetwrite-theme", "light"));
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.goto(docsUrl("start/installation/"));
+    await waitForHydration(page);
+
+    const block = page
+      .locator(".expressive-code")
+      .filter({ has: page.locator("figcaption", { hasText: "Vanilla" }) });
+    await expect(block).toBeVisible();
+    const light = await block.evaluate((root) => {
+      const pre = root.querySelector("pre");
+      const title = root.querySelector("figcaption");
+      const trigger = root.querySelector<HTMLElement>("[data-sw-code-popover-trigger]");
+      const tokenColors = [
+        ...new Set(
+          [...root.querySelectorAll<HTMLElement>(".ec-line span[style]")].map(
+            (token) => getComputedStyle(token).color,
+          ),
+        ),
+      ];
+      if (!pre || !title || !trigger) return null;
+      const preStyle = getComputedStyle(pre);
+      const titleStyle = getComputedStyle(title);
+      const triggerStyle = getComputedStyle(trigger);
+      return {
+        preBackground: preStyle.backgroundColor,
+        overflowX: preStyle.overflowX,
+        whiteSpace: preStyle.whiteSpace,
+        titleBackground: titleStyle.backgroundColor,
+        titleBorder: titleStyle.borderBottomWidth,
+        tokenColors,
+        triggerDecoration: triggerStyle.textDecorationLine,
+        triggerDecorationStyle: triggerStyle.textDecorationStyle,
+        triggerCursor: triggerStyle.cursor,
+      };
+    });
+    expect(light).not.toBeNull();
+    expect(light?.preBackground).toBe("rgb(255, 255, 255)");
+    expect(light?.overflowX).toBe("auto");
+    expect(light?.whiteSpace).toBe("pre");
+    expect(light?.titleBackground).not.toBe("rgba(0, 0, 0, 0)");
+    expect(Number.parseFloat(light?.titleBorder ?? "0")).toBeGreaterThan(0);
+    expect(light?.tokenColors.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(light?.triggerDecoration).toContain("underline");
+    expect(light?.triggerDecorationStyle).toBe("wavy");
+    expect(light?.triggerCursor).toBe("help");
+
+    const trigger = block.locator("[data-sw-code-popover-trigger]").first();
+    await trigger.focus();
+    const panelId = await trigger.getAttribute("data-sw-code-popover-trigger");
+    expect(panelId).not.toBeNull();
+    const panel = page.locator(`#${panelId}`);
+    await expect(panel).toBeVisible();
+    await expect(panel).toHaveAttribute("aria-hidden", "false");
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+
+    await page.getByRole("button", { name: /use dark theme/i }).click();
+    await expect
+      .poll(() => block.locator("pre").evaluate((pre) => getComputedStyle(pre).backgroundColor))
+      .not.toBe(light?.preBackground);
+
+    await page.goto(docsUrl("proof"));
+    const markedLine = page.locator(".expressive-code .ec-line.mark");
+    await expect(markedLine).toBeVisible();
+    await expect
+      .poll(() => markedLine.evaluate((line) => getComputedStyle(line).backgroundColor))
+      .not.toBe("rgba(0, 0, 0, 0)");
+
+    // A deterministically overflowing block: the full Grid declaration at a
+    // narrow viewport, revealed from its collapsed disclosure first.
+    await page.setViewportSize({ width: 700, height: 900 });
+    await page.goto(docsUrl("api/core/grid/"));
+    await waitForHydration(page);
+    await page.locator(".api-declaration summary").click();
+    const scrollable = page.locator(".api-declaration .expressive-code pre").first();
+    await expect(scrollable).toHaveAttribute("tabindex", "0");
+    await expect(scrollable).toHaveAttribute("role", "region");
+  });
+
   test("code frame titles share the header baseline without a nested tab", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(docsUrl("start/installation/"));
     const alignment = await page
-      .locator('starlight-tabs [role="tabpanel"]:not([hidden]) .frame.has-title')
+      .locator('.sw-tabs [role="tabpanel"] .frame.has-title')
       .first()
       .evaluate((frame) => {
         const header = frame.querySelector(".header")?.getBoundingClientRect();
@@ -188,6 +318,7 @@ test.describe("documentation site", () => {
       for (const signature of expected) expect(joined).toContain(signature);
     };
     await page.goto(docsUrl("frameworks/react/"));
+    await waitForHydration(page);
     await expectResolvedSignatures(20, [
       "event: ChangeEvent",
       "SheetProps.onReady: (event: GridReadyEvent) => void",
@@ -260,13 +391,16 @@ test.describe("documentation site", () => {
         path: "frameworks/svelte/",
         language: "svelte",
         symbol: "Sheetwrite",
-        docs: "Bind grid to access the live Grid",
+        docs: "Bind grid",
         minimumCount: 20,
-        signature: "grid: Grid | undefined",
+        // The self-restating `grid: Grid | undefined` hover is intentionally
+        // suppressed; the public props type resolving is the stable contract.
+        signature: "SheetwriteProps",
       },
     ] as const;
     for (const example of frameworkHovers) {
       await page.goto(docsUrl(example.path));
+      await waitForHydration(page);
       await expectResolvedSignatures(example.minimumCount, [example.signature]);
       const symbol = page
         .locator(`pre[data-language="${example.language}"] .sw-code-popover__trigger`)
@@ -327,71 +461,58 @@ test.describe("documentation site", () => {
   });
 
   for (const width of [347, 700, 1568] as const) {
-    test(`product landing remains aligned at ${width}px`, async ({ page }) => {
+    test(`documentation landing remains aligned at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 855 });
       await page.goto(siteUrl());
-      await expect(page.locator("main h1")).toHaveCount(1);
-      await expect(page.getByLabel("Interactive revenue workbook")).toBeVisible();
+      await expect(page.locator("main h1")).toHaveText("Build spreadsheets you still own.");
+      await expect(page.getByRole("link", { name: /Install Sheetwrite/ })).toBeVisible();
       const layout = await page.evaluate(() => {
         const main = document.querySelector<HTMLElement>("main");
-        const sections = main ? [...main.querySelectorAll<HTMLElement>(":scope > section")] : [];
-        if (!main || sections.length === 0) return null;
+        const cards = [...document.querySelectorAll<HTMLElement>(".sw-landing-grid > a")];
+        if (!main || cards.length === 0) return null;
         return {
           documentFits: document.documentElement.scrollWidth <= window.innerWidth,
-          sectionsFit: sections.every((section) => {
-            const bounds = section.getBoundingClientRect();
+          cardsFit: cards.every((card) => {
+            const bounds = card.getBoundingClientRect();
             return bounds.left >= 0 && bounds.right <= window.innerWidth + 1;
           }),
         };
       });
       expect(layout).not.toBeNull();
       expect(layout?.documentFits).toBe(true);
-      expect(layout?.sectionsFit).toBe(true);
+      expect(layout?.cardsFit).toBe(true);
       if (width === 1568) {
-        await page.getByLabel("Market").click();
-        await page.getByRole("option", { name: "Tokyo", exact: true }).click();
-        await expect(page.locator(".sw-live-workbook__metrics b").first()).toHaveText("14,286");
-        await page.getByLabel("Find").fill("Account 000042");
-        await expect(page.locator(".sw-live-workbook__controls output")).toContainText("1 matches");
+        await page.getByRole("link", { name: /Install Sheetwrite/ }).click();
+        await expect(page).toHaveURL(docsUrl("start/installation/"));
+        await expect(page.locator("main h1")).toHaveText("Installation");
       }
     });
   }
 
-  test("framework preference synchronizes examples and persists across guides", async ({
-    page,
-  }) => {
+  test("framework tabs synchronize and persist across guides", async ({ page }) => {
     await page.goto(docsUrl("start/installation/"));
-    const preference = page.getByLabel("Preferred framework");
-    await expect(preference).toHaveCount(1);
-    await preference.click();
-    await page.keyboard.press("End");
-    await expect(page.locator(":focus")).toHaveAttribute("data-framework-option", "svelte");
-    await page.keyboard.press("Escape");
-    await expect(preference).toHaveAttribute("aria-expanded", "false");
-    await preference.press("ArrowDown");
-    await page.keyboard.press("Home");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await expect(page.locator('starlight-tabs [role="tab"][aria-selected="true"]')).toHaveText(
-      "React",
-    );
-    await expect(page.locator('starlight-tabs [role="tabpanel"]:not([hidden])')).toContainText(
-      "@sheetwrite/react",
-    );
-    expect(await page.evaluate(() => localStorage.getItem("sheetwrite-docs-framework"))).toBe(
-      "react",
-    );
+    await waitForHydration(page);
+    const reactTab = page.getByRole("tab", { name: "React", exact: true });
+    await expect(reactTab).toBeVisible();
+    await reactTab.click();
+    await expect(reactTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tabpanel")).toContainText("@sheetwrite/react");
+    expect(await page.evaluate(() => localStorage.getItem("sheetwrite-framework"))).toBe("React");
 
     await page.goto(docsUrl("frameworks/lifecycle/"));
-    await expect(page.getByLabel("Preferred framework")).toContainText("React");
-    await expect(page.locator('starlight-tabs [role="tab"][aria-selected="true"]')).toHaveText(
-      "React",
+    await expect(page.getByRole("tab", { name: "React", exact: true })).toHaveAttribute(
+      "aria-selected",
+      "true",
     );
+    await expect(page.getByRole("tabpanel")).toContainText("SheetwriteGrid");
 
-    await page.goto(docsUrl("frameworks/react/"));
-    await page.getByLabel("Preferred framework").click();
-    await page.getByRole("option", { name: "Vue", exact: true }).click();
-    await expect(page).toHaveURL(docsUrl("frameworks/vue/"));
+    await page.getByRole("tab", { name: "Vue", exact: true }).click();
+    expect(await page.evaluate(() => localStorage.getItem("sheetwrite-framework"))).toBe("Vue");
+    await page.goto(docsUrl("start/installation/"));
+    await expect(page.getByRole("tab", { name: "Vue", exact: true })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   for (const framework of ["react", "vue", "svelte"] as const) {
@@ -410,6 +531,7 @@ test.describe("documentation site", () => {
   }) => {
     await page.setViewportSize({ width: 1568, height: 900 });
     await page.goto(docsUrl("api/core/"));
+    await waitForHydration(page);
     await page.locator(`a[href="${SITE_BASE}/docs/api/core/grid/"]`).first().click();
     await expect(page).toHaveURL(/\/docs\/api\/core\/grid\/$/);
     await expect(page.locator("main h1")).toContainText("Grid");
@@ -427,6 +549,7 @@ test.describe("documentation site", () => {
     test(`generated API symbol layout contains no overflow at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(docsUrl("api/core/grid/"));
+      await waitForHydration(page);
       await page.locator("#grid-set-presence-overlays summary").click();
       await page.locator(".api-declaration summary").click();
       const layout = await page.evaluate(() => ({
@@ -466,28 +589,31 @@ test.describe("documentation site", () => {
 
   test("documentation mobile navigation and theme control work", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(docsUrl());
+    // Pin the OS scheme so the toggle's accessible name is deterministic.
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto(docsUrl("start/installation/"));
+    await waitForHydration(page);
 
-    await page.waitForFunction(() => customElements.get("starlight-menu-button") !== undefined);
-    await page
-      .locator("starlight-menu-button")
-      .evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
-    const menuControl = page.locator("starlight-menu-button");
-    const menu = page.getByRole("button", { name: /menu/i }).first();
-    await expect(menu).toBeVisible();
-    await menu.click();
-    await expect(menuControl).toHaveAttribute("aria-expanded", "true");
-    const theme = page.locator("#starlight__sidebar").getByRole("button", { name: "Select theme" });
+    const navigation = page.getByRole("navigation", { name: "Documentation" });
+    await expect(navigation).toBeVisible();
+    await expect(navigation.getByRole("link", { name: "Installation" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    const theme = page.getByRole("button", { name: "Use light theme" });
     await expect(theme).toBeVisible();
-    await theme.press("ArrowDown");
-    await page.keyboard.press("Home");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await expect(theme).toHaveAttribute("aria-expanded", "false");
+    await theme.click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    expect(await page.evaluate(() => localStorage.getItem("sheetwrite-theme"))).toBe("light");
 
-    await page.keyboard.press("Escape");
-    await expect(menuControl).toHaveAttribute("aria-expanded", "false");
+    const layout = await page.evaluate(() => ({
+      fits: document.documentElement.scrollWidth <= window.innerWidth,
+      navigationScrollable:
+        (document.querySelector(".sw-sidebar__nav")?.scrollWidth ?? 0) >=
+        (document.querySelector(".sw-sidebar__nav")?.clientWidth ?? 0),
+    }));
+    expect(layout.fits).toBe(true);
+    expect(layout.navigationScrollable).toBe(true);
   });
 
   test("documentation live example renders request-aware context-menu items", async ({ page }) => {
@@ -516,12 +642,14 @@ test.describe("documentation site", () => {
 
   for (const [term, expectedHref] of Object.entries(searchTargets)) {
     test(`documentation search resolves ${term} to its generated anchor`, async ({ page }) => {
-      await page.goto(docsUrl());
+      // A concrete page: opening search mid /docs/ redirect re-render is racy.
+      await page.goto(docsUrl("start/installation/"));
+      await waitForHydration(page);
       await page
         .getByRole("button", { name: /search/i })
         .first()
         .click();
-      const search = page.locator('input[placeholder="Search"]');
+      const search = page.locator('input[placeholder="Search APIs, guides, and examples"]');
       await search.fill(term);
       const matchingLink = page.locator(`a[href='${expectedHref}']`);
       await expect(matchingLink.first()).toBeVisible({ timeout: 15_000 });
@@ -529,12 +657,15 @@ test.describe("documentation site", () => {
   }
 
   test("documentation search excludes browser-only test routes", async ({ page }) => {
-    await page.goto(docsUrl());
+    await page.goto(docsUrl("start/installation/"));
+    await waitForHydration(page);
     await page
       .getByRole("button", { name: /search/i })
       .first()
       .click();
-    await page.locator('input[placeholder="Search"]').fill("XLSX browser verification");
+    await page
+      .locator('input[placeholder="Search APIs, guides, and examples"]')
+      .fill("XLSX browser verification");
     await expect(page.locator(`a[href^='${SITE_BASE}/test/']`)).toHaveCount(0);
   });
 });
