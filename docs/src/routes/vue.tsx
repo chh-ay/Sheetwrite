@@ -1,16 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { VueShowcaseIsland } from "../showcases/AdapterIslands.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
+import { pageMeta } from "../lib/seo.js";
 
 const description =
   "Stream only the visible window of a million-row datasource, then watch paging, local edits, retries, and server acknowledgement in real time.";
 
 export const Route = createFileRoute("/vue")({
   head: () => ({
-    meta: [
-      { title: "Vue streaming workbook — Sheetwrite" },
-      { name: "description", content: description },
-    ],
+    meta: pageMeta("Vue streaming workbook — Sheetwrite", description),
   }),
   component: VueShowcaseRoute,
 });

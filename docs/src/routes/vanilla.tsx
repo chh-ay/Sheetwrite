@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
+import { pageMeta } from "../lib/seo.js";
 import VanillaShowcase from "../showcases/VanillaShowcase.js";
 
 const description =
@@ -7,10 +8,7 @@ const description =
 
 export const Route = createFileRoute("/vanilla")({
   head: () => ({
-    meta: [
-      { title: "Vanilla imperative workbook — Sheetwrite" },
-      { name: "description", content: description },
-    ],
+    meta: pageMeta("Vanilla imperative workbook — Sheetwrite", description),
   }),
   component: VanillaShowcaseRoute,
 });

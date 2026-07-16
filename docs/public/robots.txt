@@ -1,3 +1,5 @@
+# Fixtures and proof pages carry noindex meta; they must stay crawlable
+# so robots can actually see it, hence no Disallow rules here.
 User-agent: *
 Allow: /
 
