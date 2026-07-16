@@ -850,6 +850,53 @@ function benchPanel(
   ].join("\n");
 }
 
+/**
+ * Single-engine scaling figure: one row per operation/workload, one bar per
+ * input size, normalized within the group so scaling is legible. Groups with a
+ * single size render value-only rows - a lone bar normalized against itself
+ * carries no information.
+ */
+function benchScaleFigure(
+  lead: string,
+  groups: Array<{
+    label: string;
+    entries: Array<{ sizeLabel: string; median: number; p95: number; size: number }>;
+  }>,
+): string[] {
+  const lines = [
+    '<figure class="bench-viz" data-pagefind-ignore>',
+    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">relative time — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+  ];
+  for (const group of groups) {
+    if (group.entries.length === 0) continue;
+    const rowMax = Math.max(...group.entries.map((entry) => Math.max(entry.median, entry.p95)));
+    lines.push(
+      '<div class="bench-viz__row" data-outcome="faster">',
+      `<div class="bench-viz__head"><code>${group.label}</code></div>`,
+    );
+    const solo = group.entries.length === 1;
+    for (const entry of group.entries) {
+      const pct = (value: number): string =>
+        `${Math.min(100, Math.max(0.6, (value / rowMax) * 100)).toFixed(2)}%`;
+      const track = solo
+        ? ""
+        : `<span class="bench-bar__track" aria-hidden="true">` +
+          `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
+          `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>`;
+      lines.push(
+        `<div class="bench-bar${solo ? " bench-bar--solo" : ""}" data-engine="sheetwrite">` +
+          `<span class="bench-bar__engine">${entry.sizeLabel}</span>` +
+          track +
+          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${fmtMs(entry.median)}</b><b class="bench-num" data-stat="p95">${fmtMs(entry.p95)}</b></span>` +
+          `</div>`,
+      );
+    }
+    lines.push("</div>");
+  }
+  lines.push("</figure>");
+  return lines;
+}
+
 /** The two-axis (size x metric) CSS-only tab widget for the render benchmark. */
 function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   const mid = (values: number[]): number => {
@@ -860,11 +907,13 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   const parts: string[] = ['<figure class="bench-viz bench-widget" data-pagefind-ignore>'];
   for (const size of sizes) {
     parts.push(
-      `<input type="radio" name="bench-size" id="bench-size-${size}"${size === 100_000 ? " checked" : ""}>`,
+      // No checked attribute: hydrated React treats it as a controlled input
+      // and reverts user toggles. Default state (100k/speed) lives in CSS.
+      `<input type="radio" name="bench-size" id="bench-size-${size}">`,
     );
   }
   parts.push(
-    '<input type="radio" name="bench-metric" id="bench-metric-speed" checked>',
+    '<input type="radio" name="bench-metric" id="bench-metric-speed">',
     '<input type="radio" name="bench-metric" id="bench-metric-memory">',
     '<div class="bench-widget__tabs">',
     '<div class="bench-tabs" aria-label="Workbook size">',
@@ -1005,14 +1054,25 @@ async function renderEvidencePage(): Promise<string> {
       `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
       "</dl>",
       "",
-      '<figure class="bench-viz" data-pagefind-ignore>',
+      '<figure class="bench-viz bench-widget bench-widget--data" data-pagefind-ignore>',
+      // Uncontrolled radios (a checked attr would make hydrated React revert
+      // user toggles); the 10k default lives in CSS fallbacks.
+      '<input type="radio" name="bench-data-size" id="bench-data-1000">',
+      '<input type="radio" name="bench-data-size" id="bench-data-10000">',
+      '<div class="bench-widget__tabs">',
+      '<div class="bench-tabs" aria-label="Workbook size">',
+      '<label for="bench-data-1000">1k rows</label>',
+      '<label for="bench-data-10000">10k rows</label>',
+      "</div>",
+      "</div>",
     );
     for (const rows of [1_000, 10_000]) {
       const ours = evidence.sheetwrite[String(rows)];
       const theirs = evidence.handsontable[String(rows)];
       if (!ours || !theirs) continue;
       lines.push(
-        `<div class="bench-viz__scale"><span class="bench-viz__lead">${fmtRows(rows)} rows</span><span class="bench-viz__axis-note">relative time per row — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+        `<section class="bench-panel" data-size="${rows}" data-metric="speed">`,
+        `<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">relative time per operation — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
       );
       for (const op of ops) {
         const a = ours.stats[op];
@@ -1028,24 +1088,33 @@ async function renderEvidencePage(): Promise<string> {
           ),
         );
       }
+      lines.push("</section>");
     }
     lines.push(
       "</figure>",
       "",
-      "Sheetwrite alone at scale (Handsontable cannot complete these sizes headlessly):",
+      "Sheetwrite alone at scale — Handsontable cannot complete these sizes headlessly:",
       "",
+      ...benchScaleFigure(
+        "operation",
+        ops.map((op) => ({
+          label: op,
+          entries: [100_000, 500_000, 1_000_000].flatMap((rows) => {
+            const stat = evidence.sheetwrite[String(rows)]?.stats[op];
+            return stat === undefined
+              ? []
+              : [
+                  {
+                    sizeLabel: `${fmtRows(rows)} rows`,
+                    median: stat.median,
+                    p95: stat.p95,
+                    size: rows,
+                  },
+                ];
+          }),
+        })),
+      ),
     );
-    lines.push(
-      "| Rows | Ingest | Window read | Edit | Sort | Filter | Aggregate |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-    );
-    for (const rows of [100_000, 500_000, 1_000_000]) {
-      const block = evidence.sheetwrite[String(rows)];
-      if (!block) continue;
-      lines.push(
-        `| ${rows.toLocaleString("en-US")} | ${ops.map((op) => (block.stats[op] ? fmtMs(block.stats[op].median) : "—")).join(" | ")} |`,
-      );
-    }
     lines.push(
       "",
       "Reproduce with:",
@@ -1070,17 +1139,25 @@ async function renderEvidencePage(): Promise<string> {
       `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
       "</dl>",
       "",
-      "| Workload | Cells | Median | p95 |",
-      "| --- | ---: | ---: | ---: |",
     );
-    const sorted = [...evidence.workloads].sort(
-      (left, right) => left.id.localeCompare(right.id) || left.size - right.size,
+    const workloadIds = [...new Set(evidence.workloads.map((workload) => workload.id))].sort();
+    lines.push(
+      ...benchScaleFigure(
+        "workload",
+        workloadIds.map((id) => ({
+          label: id,
+          entries: evidence.workloads
+            .filter((workload) => workload.id === id)
+            .sort((left, right) => left.size - right.size)
+            .map((workload) => ({
+              sizeLabel: `${workload.size.toLocaleString("en-US")} ${workload.size === 1 ? "cell" : "cells"}`,
+              median: workload.stat.median,
+              p95: workload.stat.p95,
+              size: workload.size,
+            })),
+        })),
+      ),
     );
-    for (const workload of sorted) {
-      lines.push(
-        `| \`${workload.id}\` | ${workload.size.toLocaleString("en-US")} | ${fmtMs(workload.stat.median)} | ${fmtMs(workload.stat.p95)} |`,
-      );
-    }
     lines.push(
       "",
       "Reproduce with:",
