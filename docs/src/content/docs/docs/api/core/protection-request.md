@@ -12,7 +12,7 @@ Local operation and protected-range context supplied to the host policy.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L155</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L161</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">3</span>

@@ -28,6 +28,12 @@ const coreEntry: ApiEntryPoint = {
       source: "src/types/grid.ts#L10",
       jsDocTags: [],
       documentation: "Imperative grid handle.",
+      memberDocs: [
+        {
+          name: "applyTransaction",
+          documentation: "Applies a committed transaction to the {@link Grid}. Bypasses history.",
+        },
+      ],
     },
   ],
 };
@@ -60,6 +66,12 @@ describe("documentation generation", () => {
     expect(first).toContain('id="applytransaction"');
     expect(first).toContain('class="api-member"');
     expect(first).toContain("interface Grid {\n");
+    expect(first).toContain(
+      '<summary><code>applyTransaction</code> <span class="api-member-summary">Applies a committed transaction to the <a href="/docs/api/core/grid/"><code>Grid</code></a>.</span></summary>',
+    );
+    expect(first).toContain(
+      '<p class="api-member-doc">Applies a committed transaction to the <a href="/docs/api/core/grid/"><code>Grid</code></a>. Bypasses history.</p>',
+    );
   });
 
   it("generates an index and focused page for every classified symbol", async () => {

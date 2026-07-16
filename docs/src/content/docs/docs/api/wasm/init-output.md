@@ -1,6 +1,6 @@
 ---
 title: "InitOutput | @sheetwrite/wasm"
-description: "Source summary unavailable; docs:check rejects this omission."
+description: "Result of module initialization: the instantiated exports plus the shared linear memory."
 tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|InitOutput -->
@@ -8,11 +8,11 @@ tableOfContents: false
 
 <span class="api-status">interface</span>
 
-Source summary unavailable; docs:check rejects this omission.
+Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L283</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L297</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">95</span>

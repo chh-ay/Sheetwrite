@@ -45,8 +45,10 @@ Document, version, durability, and online options for synchronization.
 </details>
 
 <details class="api-member" id="sync-coordinator-options-recover-version-gap" data-pagefind-weight="1">
-<summary><code>recoverVersionGap</code></summary>
+<summary><code>recoverVersionGap</code> <span class="api-member-summary">Optional host recovery hook.</span></summary>
 <pre><code>recoverVersionGap?: ( request: SyncVersionGapRequest, ) =&gt; Promise&lt;readonly VersionedOperation[] | WorkbookSnapshot&gt;;</code></pre>
+<p class="api-member-doc">Optional host recovery hook. Return the missing ordered operations, or a
+snapshot for the host to remount before calling `resumeAfterReload`.</p>
 </details>
 </div>
 

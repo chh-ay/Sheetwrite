@@ -22,7 +22,7 @@ that counts its invocations in `calls`, so tests can assert paint activity
 <div class="api-member-list">
 
 <details class="api-member" id="recording-context2-d-calls" data-pagefind-weight="1">
-<summary><code>calls</code></summary>
+<summary><code>calls</code> <span class="api-member-summary">Per-method invocation counts, keyed by the 2D-context method name.</span></summary>
 <pre><code>readonly calls: Record&lt;string, number&gt;;</code></pre>
 </details>
 

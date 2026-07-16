@@ -31,67 +31,73 @@ Lifetime: valid until the next store mutation or window refresh.
 </details>
 
 <details class="api-member" id="visible-window-view-rows" data-pagefind-weight="1">
-<summary><code>rows</code></summary>
+<summary><code>rows</code> <span class="api-member-summary">end-exclusive row range</span></summary>
 <pre><code>rows: { start: number; end: number };</code></pre>
 </details>
 
 <details class="api-member" id="visible-window-view-cols" data-pagefind-weight="1">
-<summary><code>cols</code></summary>
+<summary><code>cols</code> <span class="api-member-summary">visible column indices, in paint order</span></summary>
 <pre><code>cols: readonly number[];</code></pre>
 </details>
 
 <details class="api-member" id="visible-window-view-values" data-pagefind-weight="1">
-<summary><code>values</code></summary>
+<summary><code>values</code> <span class="api-member-summary">row-major resolved values, length (end-start) cols.length</span></summary>
 <pre><code>values: ArrayLike&lt;CellScalar&gt;;</code></pre>
+<p class="api-member-doc">row-major resolved values, length `(end-start) * cols.length`</p>
 </details>
 
 <details class="api-member" id="visible-window-view-style-ids" data-pagefind-weight="1">
-<summary><code>styleIds</code></summary>
+<summary><code>styleIds</code> <span class="api-member-summary">row-major view-local style ids, same length as values</span></summary>
 <pre><code>styleIds: Uint32Array;</code></pre>
+<p class="api-member-doc">row-major view-local style ids, same length as `values`</p>
 </details>
 
 <details class="api-member" id="visible-window-view-styles" data-pagefind-weight="1">
-<summary><code>styles</code></summary>
+<summary><code>styles</code> <span class="api-member-summary">compact window style dictionary indexed by styleIds</span></summary>
 <pre><code>styles: readonly CellStyle[];</code></pre>
+<p class="api-member-doc">compact window style dictionary indexed by `styleIds`</p>
 </details>
 
 <details class="api-member" id="visible-window-view-value-kinds" data-pagefind-weight="1">
-<summary><code>valueKinds</code></summary>
+<summary><code>valueKinds</code> <span class="api-member-summary">Raw cell tags for worker transfer; internal fast path.</span></summary>
 <pre><code>valueKinds?: Uint8Array;</code></pre>
 </details>
 
 <details class="api-member" id="visible-window-view-number-values" data-pagefind-weight="1">
-<summary><code>numberValues</code></summary>
+<summary><code>numberValues</code> <span class="api-member-summary">Raw numeric payloads for worker transfer; internal fast path.</span></summary>
 <pre><code>numberValues?: Float64Array;</code></pre>
 </details>
 
 <details class="api-member" id="visible-window-view-string-pool-ids" data-pagefind-weight="1">
-<summary><code>stringPoolIds</code></summary>
+<summary><code>stringPoolIds</code> <span class="api-member-summary">Raw global string-pool ids for worker transfer; 0xffffffff means none.</span></summary>
 <pre><code>stringPoolIds?: Uint32Array;</code></pre>
+<p class="api-member-doc">Raw global string-pool ids for worker transfer; `0xffffffff` means none.</p>
 </details>
 
 <details class="api-member" id="visible-window-view-string-local-ids" data-pagefind-weight="1">
-<summary><code>stringLocalIds</code></summary>
+<summary><code>stringLocalIds</code> <span class="api-member-summary">Raw local-string indices for formula errors; -1 means none.</span></summary>
 <pre><code>stringLocalIds?: Int32Array;</code></pre>
+<p class="api-member-doc">Raw local-string indices for formula errors; `-1` means none.</p>
 </details>
 
 <details class="api-member" id="visible-window-view-string-pool-update-ids" data-pagefind-weight="1">
-<summary><code>stringPoolUpdateIds</code></summary>
+<summary><code>stringPoolUpdateIds</code> <span class="api-member-summary">String-pool ids resolved by this window and safe for worker cache updates.</span></summary>
 <pre><code>stringPoolUpdateIds?: Uint32Array;</code></pre>
 </details>
 
 <details class="api-member" id="visible-window-view-string-pool-update-values" data-pagefind-weight="1">
-<summary><code>stringPoolUpdateValues</code></summary>
+<summary><code>stringPoolUpdateValues</code> <span class="api-member-summary">String values parallel to stringPoolUpdateIds.</span></summary>
 <pre><code>stringPoolUpdateValues?: readonly string[];</code></pre>
+<p class="api-member-doc">String values parallel to `stringPoolUpdateIds`.</p>
 </details>
 
 <details class="api-member" id="visible-window-view-local-strings" data-pagefind-weight="1">
-<summary><code>localStrings</code></summary>
+<summary><code>localStrings</code> <span class="api-member-summary">Local non-pooled strings, currently formula error sentinels.</span></summary>
 <pre><code>localStrings?: readonly string[];</code></pre>
 </details>
 
 <details class="api-member" id="visible-window-view-ffi-calls" data-pagefind-weight="1">
-<summary><code>ffiCalls</code></summary>
+<summary><code>ffiCalls</code> <span class="api-member-summary">Internal count of WASM boundary calls used to produce this window.</span></summary>
 <pre><code>ffiCalls?: number;</code></pre>
 </details>
 </div>

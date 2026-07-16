@@ -12,7 +12,7 @@ Workbook-global or sheet-scoped named range used by formulas and persistence.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L81</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L87</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">3</span>
@@ -25,7 +25,7 @@ Workbook-global or sheet-scoped named range used by formulas and persistence.
 </details>
 
 <details class="api-member" id="named-range-snapshot-scope" data-pagefind-weight="1">
-<summary><code>scope</code></summary>
+<summary><code>scope</code> <span class="api-member-summary">Formula-context sheet whose local definition shadows the workbook definition.</span></summary>
 <pre><code>scope?: SheetId;</code></pre>
 </details>
 

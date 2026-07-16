@@ -164,6 +164,23 @@ function documentationMarkdown(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiE
   );
 }
 
+function memberDocumentationHtml(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  documentation: string,
+): string {
+  return html(documentation).replace(
+    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
+    (_match, target: string, label: string | undefined) => {
+      const text = label?.trim() || target;
+      const linked = entry.exports.find((candidate) => candidate.name === target);
+      return linked === undefined
+        ? `<code>${text}</code>`
+        : `<a href="${symbolRoute(pkg, entry, linked)}"><code>${text}</code></a>`;
+    },
+  );
+}
+
 function compactSummary(markdown: string): string {
   const plain = markdown
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
@@ -268,16 +285,31 @@ function renderMembers(
         target.owner === item.name,
     ).map(({ term }) => term),
   );
+  const memberDocs = new Map(item.memberDocs.map((member) => [member.name, member.documentation]));
+  const documented = new Set<string>();
   const rows = members.map((member, index) => {
     const id = `${anchor(item.name)}-${anchor(member.name) || index + 1}`;
     const searchAnchor = searchTargets.has(member.name)
       ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
       : "";
+    // Overload rows repeat a member name; the merged documentation renders once,
+    // on the first row. Distinct per-overload docs need AST-ordinal extraction and
+    // wait until the public surface actually contains such a case.
+    const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
+    if (documentation !== undefined) documented.add(member.name);
+    const summary = documentation === undefined ? "" : compactSummary(documentation);
+    const summaryDoc =
+      documentation === undefined
+        ? ""
+        : ` <span class="api-member-summary">${memberDocumentationHtml(pkg, entry, summary)}</span>`;
     return [
       searchAnchor,
       `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
-      `<summary><code>${html(member.name)}</code></summary>`,
+      `<summary><code>${html(member.name)}</code>${summaryDoc}</summary>`,
       `<pre><code>${html(member.signature)}</code></pre>`,
+      ...(documentation === undefined || documentation === summary
+        ? []
+        : [`<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, documentation)}</p>`]),
       "</details>",
     ].join("\n");
   });

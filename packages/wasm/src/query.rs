@@ -670,6 +670,8 @@ fn resolved_text<'a>(sheet: &SheetData, strings: &'a StringPool, index: usize) -
     }
 }
 
+/// Distinct-value scan result for one column: parallel kind/number/text
+/// arrays whose buffers are surrendered once through the `take*` accessors.
 #[derive(Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
@@ -680,14 +682,20 @@ pub struct DistinctColumn {
 
 #[wasm_bindgen]
 impl DistinctColumn {
+    /// Surrenders the per-value kind tags (number/string/boolean codes); the
+    /// column keeps an empty buffer afterwards.
     #[wasm_bindgen(js_name = takeKinds)]
     pub fn take_kinds(&mut self) -> Vec<u8> {
         std::mem::take(&mut self.kinds)
     }
+
+    /// Surrenders the numeric values aligned with the `takeKinds` tags.
     #[wasm_bindgen(js_name = takeNumbers)]
     pub fn take_numbers(&mut self) -> Vec<f64> {
         std::mem::take(&mut self.numbers)
     }
+
+    /// Surrenders the distinct strings aligned with the `takeKinds` tags.
     #[wasm_bindgen(js_name = takeTexts)]
     pub fn take_texts(&mut self) -> Vec<String> {
         std::mem::take(&mut self.texts)

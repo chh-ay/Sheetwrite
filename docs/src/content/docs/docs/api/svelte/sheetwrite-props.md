@@ -12,7 +12,7 @@ Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L37</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L55</code></dd></div>
 </dl>
 
 ## Signature

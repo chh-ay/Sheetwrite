@@ -37,6 +37,7 @@ export interface DataSourcePage {
 
 /** Host callback that asynchronously loads cancellable row pages. */
 export interface DataSource {
+  /** Loads the requested half-open row interval; implementations should stop work when its signal aborts. */
   getRows(request: DataSourceRequest): Promise<DataSourcePage>;
 }
 

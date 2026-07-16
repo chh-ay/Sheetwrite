@@ -12,7 +12,7 @@ A collapsible row group (data-row range, end-inclusive), Sheets-style.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L60</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L63</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">3</span>

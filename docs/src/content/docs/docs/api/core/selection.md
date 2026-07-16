@@ -18,11 +18,11 @@ Current cell, range, row, column, or multi-range selection.
 ## Variants <span class="api-count">5</span>
 
 <div class="api-variant-list">
-<div class="api-variant"><code>{ kind: &quot;cell&quot;; addr: CellAddress }</code></div>
-<div class="api-variant"><code>{ kind: &quot;range&quot;; range: Range }</code></div>
-<div class="api-variant"><code>{ kind: &quot;row&quot;; sheet: SheetId; row: number }</code></div>
-<div class="api-variant"><code>{ kind: &quot;column&quot;; sheet: SheetId; col: number }</code></div>
-<div class="api-variant"><code>{ kind: &quot;multi&quot;; ranges: Range[] }</code></div>
+<div class="api-variant"><code>{ kind: &quot;cell&quot;; addr: CellAddress; }</code></div>
+<div class="api-variant"><code>{ kind: &quot;range&quot;; range: Range; }</code></div>
+<div class="api-variant"><code>{ kind: &quot;row&quot;; sheet: SheetId; row: number; }</code></div>
+<div class="api-variant"><code>{ kind: &quot;column&quot;; sheet: SheetId; col: number; }</code></div>
+<div class="api-variant"><code>{ kind: &quot;multi&quot;; ranges: Range[]; }</code></div>
 </div>
 
 ## Declaration

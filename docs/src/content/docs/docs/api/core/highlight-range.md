@@ -20,8 +20,9 @@ A highlight target: a range plus an optional per-range color override.
 <div class="api-member-list">
 
 <details class="api-member" id="highlight-range-color" data-pagefind-weight="1">
-<summary><code>color</code></summary>
+<summary><code>color</code> <span class="api-member-summary">Overrides the call-level color / theme highlight for this range only.</span></summary>
 <pre><code>color?: string;</code></pre>
+<p class="api-member-doc">Overrides the call-level `color` / theme highlight for this range only.</p>
 </details>
 </div>
 

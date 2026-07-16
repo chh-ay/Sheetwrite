@@ -20,17 +20,17 @@ Cell and viewport coordinates resolved for one bundled context-menu opening.
 <div class="api-member-list">
 
 <details class="api-member" id="context-menu-context-cell" data-pagefind-weight="1">
-<summary><code>cell</code></summary>
+<summary><code>cell</code> <span class="api-member-summary">Right-clicked cell, or null when the pointer is outside the cell body.</span></summary>
 <pre><code>readonly cell: CellAddress | null;</code></pre>
 </details>
 
 <details class="api-member" id="context-menu-context-client-x" data-pagefind-weight="1">
-<summary><code>clientX</code></summary>
+<summary><code>clientX</code> <span class="api-member-summary">Viewport-relative browser pointer coordinate.</span></summary>
 <pre><code>readonly clientX: number;</code></pre>
 </details>
 
 <details class="api-member" id="context-menu-context-client-y" data-pagefind-weight="1">
-<summary><code>clientY</code></summary>
+<summary><code>clientY</code> <span class="api-member-summary">Viewport-relative browser pointer coordinate.</span></summary>
 <pre><code>readonly clientY: number;</code></pre>
 </details>
 </div>

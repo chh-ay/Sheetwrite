@@ -145,23 +145,26 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 </details>
 
 <details class="api-member" id="grid-actions-copy" data-pagefind-weight="1">
-<summary><code>copy</code></summary>
+<summary><code>copy</code> <span class="api-member-summary">Copy the focused rectangle to the system clipboard.</span></summary>
 <pre><code>copy(): Promise&lt;ClipboardOutcome&gt;;</code></pre>
+<p class="api-member-doc">Copy the focused rectangle to the system clipboard. Never rejects.</p>
 </details>
 
 <details class="api-member" id="grid-actions-cut" data-pagefind-weight="1">
-<summary><code>cut</code></summary>
+<summary><code>cut</code> <span class="api-member-summary">Copy + clear the source (after the clipboard accepted).</span></summary>
 <pre><code>cut(): Promise&lt;ClipboardOutcome&gt;;</code></pre>
+<p class="api-member-doc">Copy + clear the source (after the clipboard accepted). Never rejects.</p>
 </details>
 
 <details class="api-member" id="grid-actions-paste" data-pagefind-weight="1">
-<summary><code>paste</code></summary>
+<summary><code>paste</code> <span class="api-member-summary">Paste at the focus cell. Never rejects.</span></summary>
 <pre><code>paste(): Promise&lt;ClipboardOutcome&gt;;</code></pre>
 </details>
 
 <details class="api-member" id="grid-actions-paste-values" data-pagefind-weight="1">
-<summary><code>pasteValues</code></summary>
+<summary><code>pasteValues</code> <span class="api-member-summary">Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V).</span></summary>
 <pre><code>pasteValues(): Promise&lt;ClipboardOutcome&gt;;</code></pre>
+<p class="api-member-doc">Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects.</p>
 </details>
 
 <details class="api-member" id="grid-actions-clear-contents" data-pagefind-weight="1">

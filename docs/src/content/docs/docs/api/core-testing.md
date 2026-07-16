@@ -25,6 +25,6 @@ Source entry: `packages/core/src/testing.ts`
 ### Interfaces <span class="api-count">2</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/core-testing/canvas-test-stub-options/"><code>CanvasTestStubOptions</code><span>Source summary unavailable; docs:check rejects this omission.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-testing/canvas-test-stub-options/"><code>CanvasTestStubOptions</code><span>Layout dimensions installed by installCanvasTestStubs in DOM test environments.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-testing/recording-context2-d/"><code>RecordingContext2D</code><span>The stub 2D context the canvas test stubs install: every method is a no-op that counts its invocations in calls, so tests can assert paint activity (e.g.</span></a>
 </div>

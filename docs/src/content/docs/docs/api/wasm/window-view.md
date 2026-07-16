@@ -12,7 +12,7 @@ A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L239</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L253</code></dd></div>
 </dl>
 
 ## Signature

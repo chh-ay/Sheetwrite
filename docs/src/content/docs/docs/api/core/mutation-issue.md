@@ -12,7 +12,7 @@ Structured warning or rejection produced while applying an operation.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L165</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L171</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">2</span>

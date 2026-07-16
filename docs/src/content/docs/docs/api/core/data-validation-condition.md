@@ -12,7 +12,7 @@ Serializable condition enforced by a data-validation rule.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L91</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L97</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">5</span>

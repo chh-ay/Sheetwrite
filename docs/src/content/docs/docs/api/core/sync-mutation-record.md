@@ -12,7 +12,7 @@ Pending commit paired with its current synchronization status.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L74</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L76</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">1</span>

@@ -12,7 +12,7 @@ Normalized workbook and columnar data produced from simple adapter props.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L155</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L187</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>

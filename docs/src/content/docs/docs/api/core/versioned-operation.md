@@ -12,7 +12,7 @@ Remote document operations paired with a contiguous server version.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L79</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L81</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">3</span>

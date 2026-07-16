@@ -20,13 +20,16 @@ Workbook XLSX conversion options passed to the registered backend.
 <div class="api-member-list">
 
 <details class="api-member" id="xlsx-workbook-options-signal" data-pagefind-weight="1">
-<summary><code>signal</code></summary>
+<summary><code>signal</code> <span class="api-member-summary">Abort before or between workbook model operations.</span></summary>
 <pre><code>signal?: AbortSignal;</code></pre>
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-max-cells" data-pagefind-weight="1">
-<summary><code>maxCells</code></summary>
+<summary><code>maxCells</code> <span class="api-member-summary">Maximum populated cells accepted by the in-memory ExcelJS document model.</span></summary>
 <pre><code>maxCells?: number;</code></pre>
+<p class="api-member-doc">Maximum populated cells accepted by the in-memory ExcelJS document model.
+Defaults to 1,000,000. Use a lower host-specific bound for constrained
+browsers; table APIs remain available for larger streaming interchange.</p>
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-on-warning" data-pagefind-weight="1">

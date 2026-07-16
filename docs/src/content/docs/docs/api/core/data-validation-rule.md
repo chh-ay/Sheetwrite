@@ -12,7 +12,7 @@ One stable, range-scoped data-entry rule. Blank cells are allowed unless disable
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L103</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L109</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">6</span>

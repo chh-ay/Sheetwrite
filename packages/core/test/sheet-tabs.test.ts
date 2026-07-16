@@ -72,7 +72,8 @@ describe("SheetTabs", () => {
     expect(buttons.at(-1)?.getAttribute("aria-label")).toBe("Add sheet");
     buttons.at(-1)?.click();
 
-    buttons[1]!.focus();
+    const tabButtons = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    tabButtons[1]!.focus();
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "F2", bubbles: true }));
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
     host.dispatchEvent(
@@ -85,5 +86,28 @@ describe("SheetTabs", () => {
     );
 
     expect(actions).toEqual(["add", "rename:b", "remove:b", "move:b:2"]);
+  });
+
+  it("renders a pointer remove affordance beside removable tabs", () => {
+    const removed: string[] = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: (id) => activated.push(id),
+      onRemove: (id) => removed.push(id),
+    });
+    tabs.update(SHEETS, "b");
+    const closes = [...host.querySelectorAll<HTMLButtonElement>(".sheetwrite-tab-close")];
+    expect(closes).toHaveLength(3);
+    expect(closes[2]!.getAttribute("aria-label")).toBe("Remove Summary sheet");
+    expect(closes.every((close) => close.tabIndex === 0)).toBe(true);
+    closes[2]!.focus();
+    expect(document.activeElement).toBe(closes[2]!);
+    closes[2]!.click();
+    expect(removed).toEqual(["c"]);
+    expect(activated).toEqual([]);
+
+    // The last remaining sheet never offers removal.
+    tabs.update([{ id: "only", name: "Only" }], "only");
+    expect(host.querySelector(".sheetwrite-tab-close")).toBeNull();
   });
 });

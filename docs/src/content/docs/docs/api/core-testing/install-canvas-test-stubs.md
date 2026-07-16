@@ -20,7 +20,7 @@ Test-only: never import from production code.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core/testing</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L71</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L72</code></dd></div>
 </dl>
 
 ## Signature

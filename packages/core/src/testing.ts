@@ -17,6 +17,7 @@ export interface RecordingContext2D {
   [method: string]: unknown;
 }
 
+/** Layout dimensions installed by {@link installCanvasTestStubs} in DOM test environments. */
 export interface CanvasTestStubOptions {
   /** Stubbed `clientWidth` for every element (happy-dom/jsdom have no layout). Default 800. */
   width?: number;

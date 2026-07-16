@@ -20,12 +20,12 @@ Host elements and callbacks used to bind a formula bar to a Grid.
 <div class="api-member-list">
 
 <details class="api-member" id="formula-bar-options-focus-grid" data-pagefind-weight="1">
-<summary><code>focusGrid</code></summary>
+<summary><code>focusGrid</code> <span class="api-member-summary">Called after Enter commits or Escape cancels, so the grid regains focus.</span></summary>
 <pre><code>focusGrid?: () =&gt; void;</code></pre>
 </details>
 
 <details class="api-member" id="formula-bar-options-label" data-pagefind-weight="1">
-<summary><code>label</code></summary>
+<summary><code>label</code> <span class="api-member-summary">Accessible label (default &quot;Formula bar&quot;).</span></summary>
 <pre><code>label?: string;</code></pre>
 </details>
 </div>

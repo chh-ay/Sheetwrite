@@ -12,7 +12,7 @@ Live workbook schema containing ordered sheets and the active sheet ID.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L67</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L70</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">3</span>
@@ -20,17 +20,17 @@ Live workbook schema containing ordered sheets and the active sheet ID.
 <div class="api-member-list">
 
 <details class="api-member" id="workbook-sheets" data-pagefind-weight="1">
-<summary><code>sheets</code></summary>
+<summary><code>sheets</code> <span class="api-member-summary">Sheets in display/tab order.</span></summary>
 <pre><code>sheets: Sheet[];</code></pre>
 </details>
 
 <details class="api-member" id="workbook-active-sheet" data-pagefind-weight="1">
-<summary><code>activeSheet</code></summary>
+<summary><code>activeSheet</code> <span class="api-member-summary">Active sheet ID and initial tab presented when the grid is created.</span></summary>
 <pre><code>activeSheet: SheetId;</code></pre>
 </details>
 
 <details class="api-member" id="workbook-named-ranges" data-pagefind-weight="1">
-<summary><code>namedRanges</code></summary>
+<summary><code>namedRanges</code> <span class="api-member-summary">Formula names shared by the workbook or shadowed within a sheet scope.</span></summary>
 <pre><code>namedRanges?: NamedRangeSnapshot[];</code></pre>
 </details>
 </div>

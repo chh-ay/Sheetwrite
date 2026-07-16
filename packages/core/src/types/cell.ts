@@ -25,17 +25,25 @@ export interface CellBorders {
 
 /** Serializable formatting applied to a cell or used as a column default. */
 export interface CellStyle {
+  /** Uses the bold variant of the theme font. */
   bold?: boolean;
+  /** Uses the italic variant of the theme font. */
   italic?: boolean;
+  /** Draws a line beneath each rendered text run. */
   underline?: boolean;
+  /** Draws a line through each rendered text run. */
   strikethrough?: boolean;
+  /** Font size in unzoomed CSS pixels; zoom is applied during painting. */
   fontSize?: number;
   /** hex color, e.g. "#111111" */
   color?: string;
   /** hex color, e.g. "#ffffff" */
   backgroundColor?: string;
+  /** Horizontal placement of cell text within its column. */
   align?: CellAlign;
+  /** Wraps text within the cell width; row auto-fit accounts for the resulting line count. */
   wrap?: boolean;
+  /** Border overrides for the cell's individual sides. */
   border?: CellBorders;
 }
 
@@ -76,16 +84,23 @@ export type CellValue =
 
 /** Schema and default presentation for one workbook column. */
 export interface Column {
+  /** Non-empty key, unique within the sheet, used to map input and datasource values. */
   key: string;
+  /** Schema label written by table exports; the canvas header displays positional column letters. */
   header: string;
+  /** Unzoomed column width in CSS pixels. */
   width: number;
+  /** Controls cell input parsing and default value formatting for this column. */
   type: CellFormat;
   /** Excel number-format code, e.g. "#,##0.00" */
   numberFormat?: string;
   /** Explicit BCP 47 locale for separators; omitted keeps the deterministic default. */
   numberLocale?: string;
+  /** Overrides theme styling for the painted column-letter header. */
   headerStyle?: CellStyle;
+  /** Base style merged beneath each cell's own style. */
   cellStyle?: CellStyle;
+  /** Set to `false` to exclude the column from the live view and table exports. */
   visible?: boolean;
   /** Name of a registered custom cell renderer (see `Grid.defineCellRenderer`). */
   renderer?: string;

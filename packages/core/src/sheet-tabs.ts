@@ -77,6 +77,16 @@ export class SheetTabs {
       tab.setAttribute("aria-label", `${sheet.name} sheet`);
       this.buttons.push(tab);
       this.ids.push(id);
+
+      if (this.onRemove && sheets.length > 1) {
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "sheetwrite-tab-close";
+        close.textContent = "×";
+        close.setAttribute("aria-label", `Remove ${sheet.name} sheet`);
+        close.addEventListener("click", () => this.onRemove?.(id));
+        this.host.appendChild(close);
+      }
     }
     if (this.onAdd) {
       const add = document.createElement("button");

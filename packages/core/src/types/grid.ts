@@ -203,22 +203,30 @@ export type ContextMenuItems =
 
 /**
  * Toolbar / feature configuration. When `config` is set the built-in toolbar is
- * shown; each flag toggles one control (all default to `true`).
+ * shown; control flags default to `true` except the opt-in `export` flag.
  */
 export interface GridConfig {
   /** Show the built-in toolbar (true), hide it (false), or supply a custom item list. */
   toolbar?: boolean | ToolbarItem[];
-  /** Per-control toggles for the built-in toolbar (ignored when `toolbar` is a custom list). */
+  /** Show the bold control in the default toolbar (default true). */
   bold?: boolean;
+  /** Show the italic control in the default toolbar (default true). */
   italic?: boolean;
+  /** Show left, center, and right alignment controls (default true). */
   align?: boolean;
+  /** Show the text-color control in the default toolbar (default true). */
   textColor?: boolean;
+  /** Show the fill-color control in the default toolbar (default true). */
   fillColor?: boolean;
+  /** Show the border control in the default toolbar (default true). */
   border?: boolean;
+  /** Show the clear-format control in the default toolbar (default true). */
   clearFormat?: boolean;
+  /** Show merge and unmerge controls in the default toolbar (default true). */
   merge?: boolean;
+  /** Show ascending and descending sort controls in the default toolbar (default true). */
   sort?: boolean;
-  /** Add CSV/XLSX export controls to the built-in toolbar. */
+  /** Show CSV/XLSX export controls in the default toolbar (default false). */
   export?: boolean;
   /** Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons. */
   icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
@@ -243,10 +251,15 @@ export interface GridConfig {
 
 /** Workbook, data, rendering, policy, and built-in UI options used to create a Grid. */
 export interface GridOptions {
+  /** Live workbook schema adopted by the store and updated by document operations. */
   workbook: Workbook;
+  /** Eager column-major values loaded into `workbook.activeSheet`; use instead of `datasource`. */
   data?: ColumnarData;
+  /** Lazy row provider requested for visible windows; use instead of eager `data`. */
   datasource?: DataSource;
+  /** Allocation and cache policy for datasource-backed cell storage. */
   datasourceStorage?: DataSourceStorageOptions;
+  /** Paint backend; defaults to main-thread `canvas` and falls back there if a worker fails. */
   renderer?: "canvas" | "worker";
   /**
    * URL of the worker renderer module (`renderer: "worker"`), as served to the
@@ -260,7 +273,9 @@ export interface GridOptions {
    * renderer and emits `renderer-fallback` once.
    */
   workerUrl?: string | URL;
+  /** Overrides merged over the default theme and host CSS custom properties. */
   theme?: Partial<Theme>;
+  /** Disables mutating interactions while preserving navigation and selection. */
   readOnly?: boolean;
   /**
    * Host-owned client UX permission check. Servers must independently authorize
@@ -275,6 +290,7 @@ export interface GridOptions {
   overscan?: number;
   /** Render at least this many columns (empty padding columns past the data, like a spreadsheet). */
   minColumns?: number;
+  /** Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false. */
   config?: GridConfig;
 }
 
@@ -292,6 +308,7 @@ export interface SearchOptions {
 
 /** Ordered matches and active index produced by a grid search. */
 export interface SearchResult {
+  /** Query string retained for navigation and subsequent replacement. */
   query: string;
   /** Matching cells in row-major order. */
   matches: CellAddress[];

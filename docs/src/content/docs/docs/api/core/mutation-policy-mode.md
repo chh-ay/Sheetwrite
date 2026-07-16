@@ -12,7 +12,7 @@ Atomic or partial handling for locally denied operations.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L127</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L133</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">2</span>

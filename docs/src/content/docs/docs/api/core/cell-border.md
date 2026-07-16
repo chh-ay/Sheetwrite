@@ -20,7 +20,7 @@ Visual border applied to one or more sides of a cell.
 <div class="api-member-list">
 
 <details class="api-member" id="cell-border-color" data-pagefind-weight="1">
-<summary><code>color</code></summary>
+<summary><code>color</code> <span class="api-member-summary">hex color, e.g. &quot;#111111&quot;</span></summary>
 <pre><code>color?: string;</code></pre>
 </details>
 

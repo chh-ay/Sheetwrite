@@ -46,8 +46,37 @@ export interface PresenceOverlay {
 
 /** Current cell, range, row, column, or multi-range selection. */
 export type Selection =
-  | { kind: "cell"; addr: CellAddress }
-  | { kind: "range"; range: Range }
-  | { kind: "row"; sheet: SheetId; row: number }
-  | { kind: "column"; sheet: SheetId; col: number }
-  | { kind: "multi"; ranges: Range[] };
+  | {
+      /** Selects one addressed cell. */
+      kind: "cell";
+      /** Zero-based data address of the selected cell. */
+      addr: CellAddress;
+    }
+  | {
+      /** Selects one inclusive rectangular range. */
+      kind: "range";
+      /** Data-space bounds of the selected rectangle. */
+      range: Range;
+    }
+  | {
+      /** Selects an entire data row. */
+      kind: "row";
+      /** Stable ID of the containing sheet. */
+      sheet: SheetId;
+      /** Zero-based data-row index. */
+      row: number;
+    }
+  | {
+      /** Selects an entire column. */
+      kind: "column";
+      /** Stable ID of the containing sheet. */
+      sheet: SheetId;
+      /** Zero-based column index. */
+      col: number;
+    }
+  | {
+      /** Selects multiple, potentially disjoint rectangles. */
+      kind: "multi";
+      /** Data-space rectangles comprising the selection. */
+      ranges: Range[];
+    };

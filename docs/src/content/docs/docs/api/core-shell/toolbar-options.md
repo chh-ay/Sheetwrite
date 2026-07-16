@@ -20,17 +20,18 @@ Host element and configuration used to create the built-in toolbar.
 <div class="api-member-list">
 
 <details class="api-member" id="toolbar-options-items" data-pagefind-weight="1">
-<summary><code>items</code></summary>
+<summary><code>items</code> <span class="api-member-summary">Items to render; defaults to the full built-in action set.</span></summary>
 <pre><code>items?: readonly ToolbarItem[];</code></pre>
 </details>
 
 <details class="api-member" id="toolbar-options-icons" data-pagefind-weight="1">
-<summary><code>icons</code></summary>
+<summary><code>icons</code> <span class="api-member-summary">Per-action icon overrides, exactly like GridConfig.icons.</span></summary>
 <pre><code>icons?: Partial&lt;Record&lt;ToolbarActionName, ToolbarIcon&gt;&gt;;</code></pre>
+<p class="api-member-doc">Per-action icon overrides, exactly like `GridConfig.icons`.</p>
 </details>
 
 <details class="api-member" id="toolbar-options-label" data-pagefind-weight="1">
-<summary><code>label</code></summary>
+<summary><code>label</code> <span class="api-member-summary">Accessible toolbar label (default &quot;Spreadsheet formatting&quot;).</span></summary>
 <pre><code>label?: string;</code></pre>
 </details>
 </div>

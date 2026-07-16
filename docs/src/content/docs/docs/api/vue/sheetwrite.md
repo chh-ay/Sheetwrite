@@ -12,7 +12,7 @@ Convenience component for local object rows with live option updates.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L250</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L268</code></dd></div>
 </dl>
 
 ## Signature

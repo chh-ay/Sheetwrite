@@ -13,7 +13,9 @@ import type { CommitReason, DocumentOp, MutationIssue, WorkbookSnapshot } from "
  * undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
  */
 export interface Transaction {
+  /** Ordered document operations submitted as one store commit. */
   patches: DocumentOp[];
+  /** Expected current store epoch; a mismatch returns a conflict without applying patches. */
   epoch?: number;
 }
 
@@ -139,11 +141,14 @@ export interface CellChange {
 
 /** Payload of the `change` event; flows OUT for API submission/reconcile. */
 export interface ChangeEvent {
+  /** Operations that actually committed after policy and bounds filtering. */
   transaction: Transaction;
+  /** Cell-level before/after effects; empty for commits that only change metadata. */
   changes: CellChange[];
   /** What produced this commit — see {@link CommitReason}. */
   commitReason: CommitReason;
   /** Remote input is observable but never belongs in outgoing local persistence. */
   source: OperationSource;
+  /** Store epoch after the commit; emitted store and grid changes include it. */
   epoch?: number;
 }

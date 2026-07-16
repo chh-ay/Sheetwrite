@@ -12,7 +12,7 @@ Applied, duplicate, or conflict acknowledgement from persistence.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L91</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L93</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">3</span>

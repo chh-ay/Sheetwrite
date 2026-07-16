@@ -12,7 +12,7 @@ Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L222</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L228</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">17</span>
@@ -40,7 +40,7 @@ Serializable complete state for one workbook sheet.
 </details>
 
 <details class="api-member" id="sheet-snapshot-columns" data-pagefind-weight="1">
-<summary><code>columns</code></summary>
+<summary><code>columns</code> <span class="api-member-summary">Keys are stable, unique document column identities as well as datasource keys.</span></summary>
 <pre><code>columns: Column[];</code></pre>
 </details>
 

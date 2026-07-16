@@ -20,17 +20,18 @@ Host elements and feature options used to create a spreadsheet shell.
 <div class="api-member-list">
 
 <details class="api-member" id="spreadsheet-shell-options-grid" data-pagefind-weight="1">
-<summary><code>grid</code></summary>
+<summary><code>grid</code> <span class="api-member-summary">Options for the single grid the shell owns.</span></summary>
 <pre><code>grid: GridOptions;</code></pre>
+<p class="api-member-doc">Options for the single grid the shell owns. `initSheetwrite` must already be awaited.</p>
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-toolbar" data-pagefind-weight="1">
-<summary><code>toolbar</code></summary>
+<summary><code>toolbar</code> <span class="api-member-summary">Toolbar items (default: the full built-in action set).</span></summary>
 <pre><code>toolbar?: readonly ToolbarItem[];</code></pre>
 </details>
 
 <details class="api-member" id="spreadsheet-shell-options-on-change" data-pagefind-weight="1">
-<summary><code>onChange</code></summary>
+<summary><code>onChange</code> <span class="api-member-summary">Event callbacks forwarded from the owned grid.</span></summary>
 <pre><code>onChange?: (event: ChangeEvent) =&gt; void;</code></pre>
 </details>
 

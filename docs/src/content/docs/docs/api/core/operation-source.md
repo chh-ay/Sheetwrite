@@ -12,7 +12,7 @@ Whether a committed change originated locally or from remote host input.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L42</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L44</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count">2</span>

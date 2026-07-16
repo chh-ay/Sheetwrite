@@ -12,7 +12,7 @@ Persistent display and grouping metadata for one document row.
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L185</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L191</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">2</span>

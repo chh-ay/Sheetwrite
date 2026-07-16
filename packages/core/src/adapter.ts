@@ -44,34 +44,58 @@ export type GridReadyReason = "initial" | GridResetReason;
 
 /** Grid handle, generation, and reason published after adapter initialization. */
 export interface GridReadyEvent {
+  /** Live handle just published by the adapter; replaced on the next reset generation. */
   grid: Grid;
+  /** One-based adapter generation, incremented whenever a Grid is replaced. */
   generation: number;
+  /** Whether readiness followed first initialization, an input reset, or a renderer reset. */
   reason: GridReadyReason;
 }
 
 /** Framework-neutral readiness, change, and error callbacks shared by adapters. */
 export interface GridAdapterEventHandlers {
+  /** Receives every committed Grid change, including its applied transaction. */
   onGridChange?: (event: ChangeEvent) => void;
+  /** Receives the current selection, or `null` after it is cleared. */
   onSelectionChange?: (selection: Selection | null) => void;
+  /** Receives visible row bounds and vertical scroll offset after scrolling. */
   onViewportChange?: (event: GridEvents["scroll"]) => void;
+  /** Fires when cell editing begins. */
   onEditBegin?: (event: GridEvents["edit-begin"]) => void;
+  /** Fires after an edit commits its parsed cell value. */
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
+  /** Receives refreshed search matches and active-match index. */
   onSearch?: (result: GridEvents["search"]) => void;
+  /** Fires after the visible sheet changes. */
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  /** Fires after the adapter publishes a ready Grid generation. */
   onReady?: (event: GridReadyEvent) => void;
+  /** Receives a WASM initialization failure while the adapter remains mounted. */
   onInitializationError?: (error: unknown) => void;
 }
 
 /** Optional explicit WASM source and initialization error callback for adapters. */
 export interface SheetwriteInitializationProps {
+  /** Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins. */
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
+  /** Called when WASM initialization fails while the adapter is mounted. */
   onInitializationError?: (error: unknown) => void;
 }
 
 /** Explicit width and height accepted by framework adapters. */
 export type GridSizeProps =
-  | { height: number | string; fill?: never }
-  | { fill: true; height?: never };
+  | {
+      /** Host height in CSS pixels for numbers or any CSS length string. */
+      height: number | string;
+      /** Mutually exclusive with an explicit `height`. */
+      fill?: never;
+    }
+  | {
+      /** Fills the parent's available width and height. */
+      fill: true;
+      /** Mutually exclusive with `fill`. */
+      height?: never;
+    };
 
 /** Optional width and height accepted by advanced framework adapters. */
 export interface OptionalGridSizeProps {
@@ -134,13 +158,21 @@ export const DEFAULT_SIMPLE_COLUMN_WIDTH = 120;
 
 /** Column definition accepted by the adapters’ simple row-object API. */
 export interface SimpleColumn<Row extends Record<string, CellScalar>> {
+  /** Non-empty row-object key, unique within the column list. */
   key: keyof Row & string;
+  /** Schema header label used by exports. */
   title: string;
+  /** Unzoomed width in CSS pixels; defaults to 120. */
   width?: number;
+  /** Input and formatting type; defaults to `text`. */
   type?: CellFormat;
+  /** Excel number-format code used for number, date, or currency display. */
   numberFormat?: string;
+  /** Style applied to the painted column-letter header. */
   headerStyle?: CellStyle;
+  /** Base style merged beneath cell-specific styles. */
   cellStyle?: CellStyle;
+  /** Set to `false` to exclude the column from the live view and table exports. */
   visible?: boolean;
 }
 

@@ -42,10 +42,15 @@ export interface SheetwriteGridProps
     GridAdapterEventHandlers,
     SheetwriteInitializationProps,
     Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | "children"> {
+  /** Additional class appended to the required `sheetwrite` host class. */
   className?: string;
+  /** Host styles merged before adapter sizing styles. */
   style?: CSSProperties;
+  /** Content shown while WASM is loading or after initialization fails. */
   fallback?: ReactNode;
+  /** Host height in CSS pixels for numbers or any CSS length string. */
   height?: number | string;
+  /** Fills the parent's available width and height, taking precedence over `height`. */
   fill?: true;
 }
 
@@ -243,8 +248,11 @@ export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
   "workbook" | "data" | "datasource" | "height" | "fill"
 > &
   GridSizeProps & {
+    /** Ordered schema used to derive the component-owned sheet. */
     columns: readonly SimpleColumn<Row>[];
+    /** Rows converted to initial columnar data; missing column keys become `null`. */
     defaultRows: readonly Row[];
+    /** Name of the generated sheet; defaults to `Sheet 1`. */
     sheetName?: string;
   };
 
@@ -265,7 +273,10 @@ const SheetwriteComponent = forwardRef<Grid, SheetwriteProps<Record<string, Cell
  * use `SheetwriteGrid` when the host already owns a workbook or datasource.
  */
 export const Sheetwrite = SheetwriteComponent as <Row extends Record<string, CellScalar>>(
-  props: SheetwriteProps<Row> & { ref?: ForwardedRef<Grid> },
+  props: SheetwriteProps<Row> & {
+    /** Receives the live Grid after readiness and `null` on reset or unmount. */
+    ref?: ForwardedRef<Grid>;
+  },
 ) => ReactElement;
 
 export type { CellScalar, Grid } from "@sheetwrite/core";

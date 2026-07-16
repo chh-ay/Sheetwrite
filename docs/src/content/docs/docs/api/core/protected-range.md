@@ -12,7 +12,7 @@ Serializable client UX policy. A host resolver decides whether a local mutation 
 
 <dl class="api-metadata">
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L113</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L119</code></dd></div>
 </dl>
 
 ## Members <span class="api-count">4</span>
