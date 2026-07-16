@@ -577,7 +577,7 @@ async function run(configuration: PageConfiguration): Promise<void> {
   host.setAttribute("aria-label", `${configuration.engine} benchmark grid`);
   stageElement.appendChild(host);
 
-  const adapter: RenderBenchAdapter =
+  let adapter: RenderBenchAdapter =
     configuration.engine === "sheetwrite"
       ? new SheetwriteAdapter(dataset)
       : new HandsontableAdapter(dataset);
@@ -615,6 +615,26 @@ async function run(configuration: PageConfiguration): Promise<void> {
     window.__benchResults = output;
     renderResults(output);
     await settle();
+    if (result.status === "failed") {
+      // A failed scenario can leak mutated document state (e.g. rows it never
+      // rolled back). Rebuild the fixture so later scenarios validate against
+      // the canonical document instead of cascading the wreckage into
+      // spurious failures.
+      setStatus(`rebuilding ${configuration.engine} after ${scenario.id} failure`);
+      try {
+        adapter.destroy();
+      } catch {
+        // The failed engine may be beyond clean teardown; the rebuild below
+        // replaces every observable surface regardless.
+      }
+      host.replaceChildren();
+      adapter =
+        configuration.engine === "sheetwrite"
+          ? new SheetwriteAdapter(dataset)
+          : new HandsontableAdapter(dataset);
+      adapter.mount(host);
+      await settle();
+    }
   }
 
   window.__benchStage = "teardown";

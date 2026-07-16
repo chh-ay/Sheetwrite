@@ -664,12 +664,14 @@ function validateRenderArtifact(value: Record<string, unknown>): ValidatedRender
   }
   // Failed cells are allowed - the page reports them as crashes - but every
   // present result must be internally valid.
+  // Failed cells legitimately carry null samples; only successes must be finite.
   const valid = results.every(
     (result) =>
-      Number.isFinite(result.medianMs) &&
-      Number.isFinite(result.p95Ms) &&
-      Number.isFinite(result.memory?.afterBytes) &&
-      Array.isArray(result.validation),
+      result.status !== "success" ||
+      (Number.isFinite(result.medianMs) &&
+        Number.isFinite(result.p95Ms) &&
+        Number.isFinite(result.memory?.afterBytes) &&
+        Array.isArray(result.validation)),
   );
   if (!valid) return "controlled render results carry non-finite samples";
   return artifact as ValidatedRenderEvidence;
@@ -781,6 +783,7 @@ function benchPairRow(
   theirs: BenchPairStat | undefined,
   fmt: (value: number) => string,
   betterChip: [string, string],
+  fadedBar = true,
 ): string {
   const rowMax = Math.max(ours?.faded ?? 0, theirs?.faded ?? 0, ours?.main ?? 0, theirs?.main ?? 0);
   const bar = (engine: BenchEngine, stats: BenchPairStat | undefined): string => {
@@ -798,7 +801,9 @@ function benchPairRow(
       `<div class="bench-bar" data-engine="${engine}">` +
       `<span class="bench-bar__engine">${BENCH_ENGINE_LABELS[engine]}</span>` +
       `<span class="bench-bar__track" aria-hidden="true">` +
-      `<i class="bench-bar__spread" style="width:${pct(stats.faded)}"></i>` +
+      // A faded tail only renders when it can extend past the fill (speed
+      // p95 >= median); memory deltas sit under the footprint and would hide.
+      (fadedBar ? `<i class="bench-bar__spread" style="width:${pct(stats.faded)}"></i>` : "") +
       `<i class="bench-bar__fill" style="width:${pct(stats.main)}"></i></span>` +
       `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${fmt(stats.main)}</b><b class="bench-num" data-stat="p95">${fmt(stats.faded)}</b></span>` +
       `</div>`
@@ -835,7 +840,11 @@ function benchPanel(
 ): string {
   return [
     `<section class="bench-panel" data-size="${size}" data-metric="${metric}">`,
-    `<div class="bench-viz__scale"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis-note">${note}</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>${metric === "speed" ? "median" : "footprint"}<i class="bench-legend-swatch" data-kind="p95"></i>${metric === "speed" ? "p95" : "delta"}</span></div>`,
+    `<div class="bench-viz__scale"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis-note">${note}</span><span class="bench-viz__legend">${
+      metric === "speed"
+        ? '<i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95'
+        : '<i class="bench-legend-swatch" data-kind="median"></i>footprint · faded № = Δ'
+    }</span></div>`,
     ...rows,
     "</section>",
   ].join("\n");
@@ -899,7 +908,14 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
         benchPairRow(scenario, speedStat(ours), speedStat(theirs), fmtMs, ["faster", "slower"]),
       );
       memoryRows.push(
-        benchPairRow(scenario, memoryStat(ours), memoryStat(theirs), fmtMb, ["leaner", "heavier"]),
+        benchPairRow(
+          scenario,
+          memoryStat(ours),
+          memoryStat(theirs),
+          fmtMb,
+          ["leaner", "heavier"],
+          false,
+        ),
       );
     }
     parts.push(
@@ -908,7 +924,7 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
     );
   }
   parts.push(
-    "<figcaption>Each row is scaled to its slower (or heavier) engine, so bar lengths compare directly within a row. Bright numbers are the median run; faded numbers are the p95 run (speed) or the interaction's heap delta (memory). Rows marked as not completed are runs the engine failed to finish under the protocol timeout.</figcaption>",
+    "<figcaption>Each row is scaled to its slower (or heavier) engine, so bar lengths compare directly within a row. Bright numbers are the median run; faded numbers are the p95 run (speed) or the interaction's heap delta (memory). Rows marked as not completed are runs the engine could not finish - the recorded failure (crash, timeout, or failed correctness checkpoint) lives in the raw artifact.</figcaption>",
     "</figure>",
   );
   return parts.join("\n");

@@ -17,8 +17,11 @@ coverage/
 # Local agent/audit working plans
 plans/
 
-# Browser-test output (Playwright)
-test-results/
+# Browser-test output (Playwright) - except the tracked size evidence artifact
+test-results/*
+!test-results/delivery-size/
+test-results/delivery-size/*
+!test-results/delivery-size/size-report.json
 playwright-report/
 
 # Bench baseline replay scratch and fresh gate captures (promoted copies are tracked)
