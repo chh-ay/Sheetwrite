@@ -10,21 +10,67 @@ Every number on this page comes from a validated local protocol artifact; nothin
 
 Both engines drive the same 100000-row workbook through identical scripted interactions in a controlled Chromium (149.0.7827.55) on 12th Gen Intel(R) Core(TM) i9-12900H. Captured 2026-07-13T20:03:25.716Z at `cacbb406bc64` (clean worktree); raw artifact `bench/results/render-results.json`.
 
-| Interaction | Sheetwrite median | Handsontable median | Relative | Sheetwrite p95 | Handsontable p95 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `scroll-down.top-left` | 3.13 ms | 74.4 ms | **23.8× faster** | 3.58 ms | 80.7 ms |
-| `scroll-down.middle` | 2.91 ms | 0.15 ms | 19.1× slower | 3.19 ms | 0.16 ms |
-| `scroll-right.top-left` | 0.74 ms | 125.5 ms | **168.9× faster** | 0.88 ms | 130.1 ms |
-| `edit-open.top-left` | 0.98 ms | 2.63 ms | **2.7× faster** | 1.18 ms | 3.22 ms |
-| `edit-open.middle` | 1.31 ms | 2.59 ms | **2.0× faster** | 1.68 ms | 2.79 ms |
-| `edit-open.bottom-right` | 0.78 ms | 4.06 ms | **5.2× faster** | 0.86 ms | 4.21 ms |
-| `edit-commit.middle` | 1.43 ms | 63.0 ms | **44.2× faster** | 1.67 ms | 75.8 ms |
-| `altering.insert-5-rows-top` | 5.37 ms | 178.0 ms | **33.2× faster** | 7.15 ms | 187.5 ms |
-| `altering.remove-5-rows-top` | 4.71 ms | 237.8 ms | **50.4× faster** | 4.97 ms | 266.1 ms |
-| `arrow-down.top-left` | 1.05 ms | 3.51 ms | **3.3× faster** | 1.11 ms | 3.55 ms |
-| `arrow-right.middle` | 1.30 ms | 3.69 ms | **2.8× faster** | 1.37 ms | 3.91 ms |
+<figure class="bench-viz">
+<div class="bench-viz__scale" aria-hidden="true"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis"><i style="left:0.00%">0.1</i><i style="left:29.20%">1</i><i style="left:58.39%">10</i><i style="left:87.59%">100 ms</i></span><span class="bench-viz__cols">median · p95</span></div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>scroll-down.top-left</code><span class="bench-viz__ratio"><strong>23.8×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:43.68%"></i><i class="bench-bar__p95" style="left:45.35%"></i></span><span class="bench-bar__value">3.13 ms<small>p95 3.58 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:83.85%"></i><i class="bench-bar__p95" style="left:84.87%"></i></span><span class="bench-bar__value">74.4 ms<small>p95 80.7 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="slower">
+<div class="bench-viz__head"><code>scroll-down.middle</code><span class="bench-viz__ratio"><strong>19.1×</strong> slower</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:42.74%"></i><i class="bench-bar__p95" style="left:43.92%"></i></span><span class="bench-bar__value">2.91 ms<small>p95 3.19 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:5.37%"></i><i class="bench-bar__p95" style="left:5.98%"></i></span><span class="bench-bar__value">0.15 ms<small>p95 0.16 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>scroll-right.top-left</code><span class="bench-viz__ratio"><strong>168.9×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:25.43%"></i><i class="bench-bar__p95" style="left:27.56%"></i></span><span class="bench-bar__value">0.74 ms<small>p95 0.88 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:90.47%"></i><i class="bench-bar__p95" style="left:90.93%"></i></span><span class="bench-bar__value">125.5 ms<small>p95 130.1 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>edit-open.top-left</code><span class="bench-viz__ratio"><strong>2.7×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:28.99%"></i><i class="bench-bar__p95" style="left:31.35%"></i></span><span class="bench-bar__value">0.98 ms<small>p95 1.18 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:41.46%"></i><i class="bench-bar__p95" style="left:44.01%"></i></span><span class="bench-bar__value">2.63 ms<small>p95 3.22 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>edit-open.middle</code><span class="bench-viz__ratio"><strong>2.0×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:32.66%"></i><i class="bench-bar__p95" style="left:35.74%"></i></span><span class="bench-bar__value">1.31 ms<small>p95 1.68 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:41.29%"></i><i class="bench-bar__p95" style="left:42.21%"></i></span><span class="bench-bar__value">2.59 ms<small>p95 2.79 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>edit-open.bottom-right</code><span class="bench-viz__ratio"><strong>5.2×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:26.12%"></i><i class="bench-bar__p95" style="left:27.32%"></i></span><span class="bench-bar__value">0.78 ms<small>p95 0.86 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:46.95%"></i><i class="bench-bar__p95" style="left:47.43%"></i></span><span class="bench-bar__value">4.06 ms<small>p95 4.21 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>edit-commit.middle</code><span class="bench-viz__ratio"><strong>44.2×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:33.69%"></i><i class="bench-bar__p95" style="left:35.68%"></i></span><span class="bench-bar__value">1.43 ms<small>p95 1.67 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:81.74%"></i><i class="bench-bar__p95" style="left:84.09%"></i></span><span class="bench-bar__value">63.0 ms<small>p95 75.8 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>altering.insert-5-rows-top</code><span class="bench-viz__ratio"><strong>33.2×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:50.51%"></i><i class="bench-bar__p95" style="left:54.14%"></i></span><span class="bench-bar__value">5.37 ms<small>p95 7.15 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:94.90%"></i><i class="bench-bar__p95" style="left:95.57%"></i></span><span class="bench-bar__value">178.0 ms<small>p95 187.5 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>altering.remove-5-rows-top</code><span class="bench-viz__ratio"><strong>50.4×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:48.86%"></i><i class="bench-bar__p95" style="left:49.53%"></i></span><span class="bench-bar__value">4.71 ms<small>p95 4.97 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:98.58%"></i><i class="bench-bar__p95" style="left:100.00%"></i></span><span class="bench-bar__value">237.8 ms<small>p95 266.1 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>arrow-down.top-left</code><span class="bench-viz__ratio"><strong>3.3×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:29.82%"></i><i class="bench-bar__p95" style="left:30.54%"></i></span><span class="bench-bar__value">1.05 ms<small>p95 1.11 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:45.12%"></i><i class="bench-bar__p95" style="left:45.25%"></i></span><span class="bench-bar__value">3.51 ms<small>p95 3.55 ms</small></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><code>arrow-right.middle</code><span class="bench-viz__ratio"><strong>2.8×</strong> faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:32.55%"></i><i class="bench-bar__p95" style="left:33.21%"></i></span><span class="bench-bar__value">1.30 ms<small>p95 1.37 ms</small></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__tick" style="left:29.20%"></i><i class="bench-bar__tick" style="left:58.39%"></i><i class="bench-bar__tick" style="left:87.59%"></i><i class="bench-bar__fill" style="width:45.76%"></i><i class="bench-bar__p95" style="left:46.49%"></i></span><span class="bench-bar__value">3.69 ms<small>p95 3.91 ms</small></span></div>
+</div>
+<figcaption>Bars are median interaction cost on a logarithmic axis — every tick is one 10× step, shorter is faster. Notches mark p95; each ratio compares medians.</figcaption>
+</figure>
 
-Relative compares medians of the same scripted interaction; per-round samples, spread, and memory counters live in the raw artifact. Reproduce and validate with:
+Per-round samples, spread, and memory counters live in the raw artifact. Reproduce and validate with:
 
 ```sh verify title="Controlled render evidence"
 bun run --filter @sheetwrite/bench bench:render:prepare

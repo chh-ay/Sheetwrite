@@ -741,27 +741,91 @@ async function renderEvidencePage(): Promise<string> {
       "",
       `Both engines drive the same ${rows}-row workbook through identical scripted interactions in a controlled Chromium (${metadata.browserVersion}) on ${metadata.cpu}. Captured ${metadata.timestamp} at \`${metadata.commit.slice(0, 12)}\` (clean worktree); raw artifact \`${source}\`.`,
       "",
-      "| Interaction | Sheetwrite median | Handsontable median | Relative | Sheetwrite p95 | Handsontable p95 |",
-      "| --- | ---: | ---: | ---: | ---: | ---: |",
     );
     const ms = (value: number): string => `${value.toFixed(value < 10 ? 2 : 1)} ms`;
+    const comparisons: {
+      scenario: string;
+      ours: { median: number; p95: number };
+      theirs: { median: number; p95: number };
+    }[] = [];
     for (const [scenario, engines] of byScenario) {
       const ours = engines.get("sheetwrite");
       const theirs = engines.get("handsontable");
       if (!ours || !theirs) continue;
-      const ourMedian = mid(ours.medians);
-      const theirMedian = mid(theirs.medians);
-      const relative =
-        theirMedian >= ourMedian
-          ? `**${(theirMedian / ourMedian).toFixed(1)}× faster**`
-          : `${(ourMedian / theirMedian).toFixed(1)}× slower`;
+      comparisons.push({
+        scenario,
+        ours: { median: mid(ours.medians), p95: mid(ours.p95s) },
+        theirs: { median: mid(theirs.medians), p95: mid(theirs.p95s) },
+      });
+    }
+    // Paired-bar comparison chart instead of a raw table. Everything is
+    // precomputed here into static HTML (prerender-safe, no client JS); the
+    // medians, p95s, and ratios stay real text for search and screen readers,
+    // while tracks, fills, and axis ticks are aria-hidden decoration styled by
+    // the `bench-` block in docs/src/styles/site.css.
+    // The axis is logarithmic: samples span three decades (0.15-266 ms), so a
+    // linear scale would flatten every sub-10 ms bar into invisibility. Domain
+    // runs from the nearest decade below the fastest sample to the slowest.
+    const samples = comparisons.flatMap(({ ours, theirs }) => [
+      ours.median,
+      ours.p95,
+      theirs.median,
+      theirs.p95,
+    ]);
+    const lowExponent = Math.floor(Math.log10(Math.min(...samples)));
+    const low = 10 ** lowExponent;
+    const high = Math.max(...samples);
+    const decades = Math.log10(high / low);
+    const percent = (value: number): string =>
+      `${Math.min(100, Math.max(0, (Math.log10(value / low) / decades) * 100)).toFixed(2)}%`;
+    const tickValues: number[] = [];
+    for (let exponent = lowExponent; 10 ** exponent <= high; exponent += 1) {
+      tickValues.push(10 ** exponent);
+    }
+    const axisLabels = tickValues
+      .map(
+        (tick, index) =>
+          `<i style="left:${percent(tick)}">${tick}${index === tickValues.length - 1 ? " ms" : ""}</i>`,
+      )
+      .join("");
+    const trackTicks = tickValues
+      .filter((tick) => tick > low)
+      .map((tick) => `<i class="bench-bar__tick" style="left:${percent(tick)}"></i>`)
+      .join("");
+    const engineLabels = { sheetwrite: "Sheetwrite", handsontable: "Handsontable" } as const;
+    const bar = (
+      engine: keyof typeof engineLabels,
+      stats: { median: number; p95: number },
+    ): string =>
+      `<div class="bench-bar" data-engine="${engine}">` +
+      `<span class="bench-bar__engine">${engineLabels[engine]}</span>` +
+      `<span class="bench-bar__track" aria-hidden="true">${trackTicks}` +
+      `<i class="bench-bar__fill" style="width:${percent(stats.median)}"></i>` +
+      `<i class="bench-bar__p95" style="left:${percent(stats.p95)}"></i></span>` +
+      `<span class="bench-bar__value">${ms(stats.median)}<small>p95 ${ms(stats.p95)}</small></span>` +
+      `</div>`;
+    lines.push(
+      '<figure class="bench-viz">',
+      `<div class="bench-viz__scale" aria-hidden="true"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis">${axisLabels}</span><span class="bench-viz__cols">median · p95</span></div>`,
+    );
+    for (const { scenario, ours, theirs } of comparisons) {
+      const faster = theirs.median >= ours.median;
+      const ratio = (faster ? theirs.median / ours.median : ours.median / theirs.median).toFixed(1);
       lines.push(
-        `| \`${scenario}\` | ${ms(ourMedian)} | ${ms(theirMedian)} | ${relative} | ${ms(mid(ours.p95s))} | ${ms(mid(theirs.p95s))} |`,
+        `<div class="bench-viz__row" data-outcome="${faster ? "faster" : "slower"}">`,
+        `<div class="bench-viz__head"><code>${scenario}</code><span class="bench-viz__ratio"><strong>${ratio}×</strong> ${faster ? "faster" : "slower"}</span></div>`,
+        bar("sheetwrite", ours),
+        bar("handsontable", theirs),
+        "</div>",
       );
     }
     lines.push(
+      "<figcaption>Bars are median interaction cost on a logarithmic axis — every tick is one 10× step, shorter is faster. Notches mark p95; each ratio compares medians.</figcaption>",
+      "</figure>",
+    );
+    lines.push(
       "",
-      "Relative compares medians of the same scripted interaction; per-round samples, spread, and memory counters live in the raw artifact. Reproduce and validate with:",
+      "Per-round samples, spread, and memory counters live in the raw artifact. Reproduce and validate with:",
       "",
       '```sh verify title="Controlled render evidence"',
       "bun run --filter @sheetwrite/bench bench:render:prepare",
