@@ -1,12 +1,9 @@
 ---
 title: "InitOutput | @sheetwrite/wasm"
 description: "Result of module initialization: the instantiated exports plus the shared linear memory."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|InitOutput -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Result of module initialization: the instantiated exports plus the shared linear memory.
 

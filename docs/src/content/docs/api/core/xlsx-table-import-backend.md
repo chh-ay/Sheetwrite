@@ -1,12 +1,9 @@
 ---
 title: "XlsxTableImportBackend | @sheetwrite/core"
 description: "Pluggable table import backend."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxTableImportBackend -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Pluggable table import backend. Parses raw `.xlsx` bytes into the same
 `ColumnarData` shape `fromCsv` returns, so host ingestion code can stay

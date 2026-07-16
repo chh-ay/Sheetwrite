@@ -1,12 +1,9 @@
 ---
 title: "RangeSnapshot | @sheetwrite/wasm"
 description: "Opaque, store-local history payload for one dense rectangular cell block."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|RangeSnapshot -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
 
 Opaque, store-local history payload for one dense rectangular cell block.
 

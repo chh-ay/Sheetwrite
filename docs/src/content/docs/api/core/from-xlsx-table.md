@@ -1,12 +1,9 @@
 ---
 title: "fromXlsxTable | @sheetwrite/core"
 description: "Parse the first sheet of .xlsx bytes into ColumnarData."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|fromXlsxTable -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Parse the first sheet of `.xlsx` bytes into `ColumnarData`. The first parsed
 row is treated as the header and its cell text becomes each column's key.

@@ -1,12 +1,9 @@
 ---
 title: "DataSource | @sheetwrite/core"
 description: "Host callback that asynchronously loads cancellable row pages."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|DataSource -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Host callback that asynchronously loads cancellable row pages.
 

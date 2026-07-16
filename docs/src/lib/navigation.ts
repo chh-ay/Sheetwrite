@@ -1,3 +1,5 @@
+import apiNav from "../generated/api-nav.json";
+
 export interface NavigationItem {
   label: string;
   href: string;
@@ -52,12 +54,16 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Reference",
     items: [
       { label: "API contract", href: "/docs/reference/api-contract/" },
-      { label: "Generated API", href: "/docs/api/" },
       { label: "Document operations", href: "/docs/reference/document-operations/" },
       { label: "Events and errors", href: "/docs/reference/events-errors/" },
       { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },
       { label: "Moved guides", href: "/docs/reference/moved-guides/" },
     ],
+  },
+  {
+    // Generated from package exports; api-nav.json is emitted by docs:generate.
+    label: "API packages",
+    items: [{ label: "All entry points", href: "/docs/api/" }, ...apiNav],
   },
 ];
 

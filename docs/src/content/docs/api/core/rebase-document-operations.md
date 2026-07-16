@@ -1,12 +1,9 @@
 ---
 title: "rebaseDocumentOperations | @sheetwrite/core"
 description: "Conservative server-ordered rebase for pending offline work."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|rebaseDocumentOperations -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Conservative server-ordered rebase for pending offline work. Non-overlapping
 literal edits are shifted across row/column insertion and deletion. Ambiguous

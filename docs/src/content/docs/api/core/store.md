@@ -1,12 +1,9 @@
 ---
 title: "Store | @sheetwrite/core"
 description: "Columnar workbook storage, query, transaction, and subscription contract."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|Store -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Columnar workbook storage, query, transaction, and subscription contract.
 

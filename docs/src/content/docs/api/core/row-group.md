@@ -1,12 +1,9 @@
 ---
 title: "RowGroup | @sheetwrite/core"
 description: "A collapsible row group (data-row range, end-inclusive), Sheets-style."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|RowGroup -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 A collapsible row group (data-row range, end-inclusive), Sheets-style.
 

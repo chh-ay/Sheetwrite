@@ -1,12 +1,9 @@
 ---
 title: "createFormulaBar | @sheetwrite/core/shell"
 description: "Detached formula bar: mirrors the focused cell's editable text (exact formula source, else literal text) and commits on Enter through the grid's undoable transaction path, targeting the data address captured with the…"
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|createFormulaBar -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
 Detached formula bar: mirrors the focused cell's editable text (exact
 formula source, else literal text) and commits on Enter through the grid's

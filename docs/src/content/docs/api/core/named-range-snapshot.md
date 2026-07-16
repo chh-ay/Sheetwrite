@@ -1,12 +1,9 @@
 ---
 title: "NamedRangeSnapshot | @sheetwrite/core"
 description: "Workbook-global or sheet-scoped named range used by formulas and persistence."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|NamedRangeSnapshot -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Workbook-global or sheet-scoped named range used by formulas and persistence.
 

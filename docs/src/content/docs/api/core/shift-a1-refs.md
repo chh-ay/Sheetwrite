@@ -1,12 +1,9 @@
 ---
 title: "shiftA1Refs | @sheetwrite/core"
 description: "Shift relative A1 references in a formula by (dRow, dCol) — used when a formula is filled into other cells."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|shiftA1Refs -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Shift relative A1 references in a formula by (dRow, dCol) — used when a
 formula is filled into other cells. Absolute parts ($A, A$1) stay fixed, and

@@ -1,12 +1,9 @@
 ---
 title: "CommentThread | @sheetwrite/core"
 description: "Versioned discussion anchored to a document location."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CommentThread -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Versioned discussion anchored to a document location.
 

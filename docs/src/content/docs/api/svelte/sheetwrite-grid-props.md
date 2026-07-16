@@ -1,12 +1,9 @@
 ---
 title: "SheetwriteGridProps | @sheetwrite/svelte"
 description: "Advanced framework adapter props for workbook data or datasource ownership."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/svelte|.|SheetwriteGridProps -->
-[← @sheetwrite/svelte](/docs/api/svelte/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Advanced framework adapter props for workbook data or datasource ownership.
 

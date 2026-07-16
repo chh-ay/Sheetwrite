@@ -1,12 +1,9 @@
 ---
 title: "GridConfig | @sheetwrite/core"
 description: "Toolbar / feature configuration."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|GridConfig -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
 shown; control flags default to `true` except the opt-in `export` flag.

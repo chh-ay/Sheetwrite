@@ -1,12 +1,9 @@
 ---
 title: "ToolbarIcon | @sheetwrite/core"
 description: "Text, DOM node, or node factory used as toolbar icon content."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|ToolbarIcon -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 Text, DOM node, or node factory used as toolbar icon content.
 

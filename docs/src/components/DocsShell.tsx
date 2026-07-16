@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { DOCS_NAVIGATION, SHOWCASE_NAVIGATION } from "../lib/navigation.js";
 import { DocsSearch } from "./DocsSearch.js";
+import { TableOfContents } from "./TableOfContents.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 interface DocsShellProps {
@@ -85,6 +86,7 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
           <span>{description}</span>
         </header>
         <article className="sw-prose">{children}</article>
+        <TableOfContents />
         <footer className="sw-document__footer">
           <span>Sheetwrite is MIT licensed.</span>
           <a href="https://github.com/chh-ay/Sheetwrite/issues">Report a documentation issue</a>

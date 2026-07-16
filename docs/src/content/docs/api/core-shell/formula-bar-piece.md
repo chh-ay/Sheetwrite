@@ -1,12 +1,9 @@
 ---
 title: "FormulaBarPiece | @sheetwrite/core/shell"
 description: "A formula bar piece; setReadOnly blocks commits without unmounting."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|FormulaBarPiece -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>
 
 A formula bar piece; `setReadOnly` blocks commits without unmounting.
 

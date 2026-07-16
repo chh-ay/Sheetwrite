@@ -1,12 +1,9 @@
 ---
 title: "CellStyle | @sheetwrite/core"
 description: "Serializable formatting applied to a cell or used as a column default."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CellStyle -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Serializable formatting applied to a cell or used as a column default.
 

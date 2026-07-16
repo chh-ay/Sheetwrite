@@ -1,12 +1,9 @@
 ---
 title: "GRID_OPTION_POLICY | @sheetwrite/core/adapter"
 description: "Classification of adapter options as live-updatable or reset-sensitive."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GRID_OPTION_POLICY -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Classification of adapter options as live-updatable or reset-sensitive.
 

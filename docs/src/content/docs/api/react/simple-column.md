@@ -1,12 +1,9 @@
 ---
 title: "SimpleColumn | @sheetwrite/react"
 description: "Column definition accepted by the adapters’ simple row-object API."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/react|.|SimpleColumn -->
-[← @sheetwrite/react](/docs/api/react/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Column definition accepted by the adapters’ simple row-object API.
 

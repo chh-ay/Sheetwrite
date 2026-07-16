@@ -1,12 +1,9 @@
 ---
 title: "createToolbar | @sheetwrite/core/shell"
 description: "Mount a toolbar bound to grid.actions (custom items receive the grid)."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|createToolbar -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
 Mount a toolbar bound to `grid.actions` (custom items receive the grid).
 Mouse clicks never steal grid focus; keyboard users get local

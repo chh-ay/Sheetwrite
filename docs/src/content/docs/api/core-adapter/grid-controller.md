@@ -1,12 +1,9 @@
 ---
 title: "GridController | @sheetwrite/core/adapter"
 description: "The lifecycle handle returned by createGridController: the live grid, a theme passthrough, and a single teardown that detaches every subscription and destroys the grid."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|GridController -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
 
 The lifecycle handle returned by [`createGridController`](/docs/api/core-adapter/create-grid-controller/): the live grid,
 a theme passthrough, and a single teardown that detaches every subscription

@@ -1,12 +1,9 @@
 ---
 title: "VersionedCommentEvent | @sheetwrite/core"
 description: "Comment mutation paired with its assigned server version."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|VersionedCommentEvent -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Comment mutation paired with its assigned server version.
 

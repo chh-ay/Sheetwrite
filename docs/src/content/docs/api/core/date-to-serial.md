@@ -1,12 +1,9 @@
 ---
 title: "dateToSerial | @sheetwrite/core"
 description: "Convert a real UTC Date to the Excel 1900-system serial."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|dateToSerial -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Convert a real UTC `Date` to the Excel 1900-system serial. It is the inverse
 of [`serialToDate`](/docs/api/core/serial-to-date/) except for synthetic serial 60, which JavaScript

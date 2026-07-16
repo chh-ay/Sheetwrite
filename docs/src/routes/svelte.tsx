@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { pageMeta } from "../lib/seo.js";
 import { SvelteShowcaseIsland } from "../showcases/AdapterIslands.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
-import { pageMeta } from "../lib/seo.js";
 
 const description =
   "Edit 500 live formulas, move between model and summary sheets, and inspect committed transactions through a bound Grid handle.";

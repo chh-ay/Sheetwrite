@@ -1,12 +1,9 @@
 ---
 title: "REF_CYCLE | @sheetwrite/core"
 description: "Sentinel shown for a reference that participates in a cycle."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|REF_CYCLE -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Sentinel shown for a reference that participates in a cycle.
 

@@ -1,12 +1,9 @@
 ---
 title: "serialToDate | @sheetwrite/core"
 description: "Convert a date serial back to a Date."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|serialToDate -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Convert a date serial back to a `Date`. Read the result with the UTC accessors
 (`getUTCFullYear`, `getUTCMonth`, …) — which is what the renderer does — so the

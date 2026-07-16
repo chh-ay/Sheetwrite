@@ -1,12 +1,9 @@
 ---
 title: "CanvasTestStubOptions | @sheetwrite/core/testing"
 description: "Layout dimensions installed by installCanvasTestStubs in DOM test environments."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./testing|CanvasTestStubOptions -->
-[← @sheetwrite/core/testing](/docs/api/core-testing/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-testing/">@sheetwrite/core/testing</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Layout dimensions installed by [`installCanvasTestStubs`](/docs/api/core-testing/install-canvas-test-stubs/) in DOM test environments.
 

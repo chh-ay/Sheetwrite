@@ -1,12 +1,9 @@
 ---
 title: "HighlightRange | @sheetwrite/core"
 description: "A highlight target: a range plus an optional per-range color override."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|HighlightRange -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 A highlight target: a range plus an optional per-range color override.
 

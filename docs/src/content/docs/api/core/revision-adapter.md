@@ -1,12 +1,9 @@
 ---
 title: "RevisionAdapter | @sheetwrite/core"
 description: "Host persistence contract for revision history and restore."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|RevisionAdapter -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Host persistence contract for revision history and restore.
 

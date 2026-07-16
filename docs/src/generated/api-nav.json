@@ -1,0 +1,26 @@
+[
+  {
+    "label": "@sheetwrite/core",
+    "href": "/docs/api/core/"
+  },
+  {
+    "label": "@sheetwrite/react",
+    "href": "/docs/api/react/"
+  },
+  {
+    "label": "@sheetwrite/svelte",
+    "href": "/docs/api/svelte/"
+  },
+  {
+    "label": "@sheetwrite/vue",
+    "href": "/docs/api/vue/"
+  },
+  {
+    "label": "@sheetwrite/wasm",
+    "href": "/docs/api/wasm/"
+  },
+  {
+    "label": "@sheetwrite/xlsx",
+    "href": "/docs/api/xlsx/"
+  }
+]

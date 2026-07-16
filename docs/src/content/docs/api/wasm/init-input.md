@@ -1,12 +1,9 @@
 ---
 title: "InitInput | @sheetwrite/wasm"
 description: "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled WebAssembly.Module."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/wasm|.|InitInput -->
-[← @sheetwrite/wasm](/docs/api/wasm/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="type">type</span></div>
 
 Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.
 

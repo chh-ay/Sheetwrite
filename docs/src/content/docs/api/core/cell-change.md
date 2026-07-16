@@ -1,12 +1,9 @@
 ---
 title: "CellChange | @sheetwrite/core"
 description: "One committed cell edit, carrying enough to roll back."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CellChange -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 One committed cell edit, carrying enough to roll back.
 

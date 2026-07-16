@@ -1,12 +1,9 @@
 ---
 title: "PersistenceAdapter | @sheetwrite/core"
 description: "Host load and commit contract for versioned workbook persistence."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|PersistenceAdapter -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Host load and commit contract for versioned workbook persistence.
 

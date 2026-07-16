@@ -1,12 +1,9 @@
 ---
 title: "CellValue | @sheetwrite/core"
 description: "A cell's persisted input: a literal, a cross-reference, or a formula."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CellValue -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 A cell's persisted input: a literal, a cross-reference, or a formula.
 References resolve through the store's reference graph; formulas resolve in

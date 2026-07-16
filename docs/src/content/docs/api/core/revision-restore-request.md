@@ -1,12 +1,9 @@
 ---
 title: "RevisionRestoreRequest | @sheetwrite/core"
 description: "Versioned restore request submitted to a revision adapter."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|RevisionRestoreRequest -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Versioned restore request submitted to a revision adapter.
 

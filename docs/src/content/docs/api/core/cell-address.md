@@ -1,12 +1,9 @@
 ---
 title: "CellAddress | @sheetwrite/core"
 description: "Zero-based address of one cell on a stable sheet ID."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CellAddress -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Zero-based address of one cell on a stable sheet ID.
 

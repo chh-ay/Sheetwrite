@@ -1,12 +1,9 @@
 ---
 title: "CellFormat | @sheetwrite/core"
 description: "How a column's cells are typed, parsed, and rendered: text verbatim, number via its numberFormat, date as an Excel-style serial (see date-serial.ts) rendered by a date numberFormat, and currency as a plain number…"
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CellFormat -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 How a column's cells are typed, parsed, and rendered: `text` verbatim, `number`
 via its `numberFormat`, `date` as an Excel-style serial (see `date-serial.ts`)

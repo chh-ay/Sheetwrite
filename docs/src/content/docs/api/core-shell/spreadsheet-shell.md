@@ -1,12 +1,9 @@
 ---
 title: "SpreadsheetShell | @sheetwrite/core/shell"
 description: "Disposable controller for the framework-neutral spreadsheet shell."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|SpreadsheetShell -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Disposable controller for the framework-neutral spreadsheet shell.
 

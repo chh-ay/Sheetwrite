@@ -1,12 +1,9 @@
 ---
 title: "OptionalGridSizeProps | @sheetwrite/core/adapter"
 description: "Optional width and height accepted by advanced framework adapters."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|OptionalGridSizeProps -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Optional width and height accepted by advanced framework adapters.
 

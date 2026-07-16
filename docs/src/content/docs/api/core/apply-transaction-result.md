@@ -1,12 +1,9 @@
 ---
 title: "ApplyTransactionResult | @sheetwrite/core"
 description: "Outcome of applying a document transaction, including conflict, rejection, and no-op states."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|ApplyTransactionResult -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 Outcome of applying a document transaction, including conflict, rejection, and no-op states.
 

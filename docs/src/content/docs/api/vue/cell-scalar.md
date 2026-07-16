@@ -1,12 +1,9 @@
 ---
 title: "CellScalar | @sheetwrite/vue"
 description: "A scalar that can be displayed directly."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/vue|.|CellScalar -->
-[← @sheetwrite/vue](/docs/api/vue/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>
 
 A scalar that can be displayed directly.
 

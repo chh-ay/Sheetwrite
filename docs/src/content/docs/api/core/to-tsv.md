@@ -1,12 +1,9 @@
 ---
 title: "toTsv | @sheetwrite/core"
 description: "TSV for a rectangular range (Excel/Sheets clipboard format)."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|toTsv -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 TSV for a rectangular range (Excel/Sheets clipboard format).
 

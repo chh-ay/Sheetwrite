@@ -1,12 +1,9 @@
 ---
 title: "SortKey | @sheetwrite/core"
 description: "One key of a multi-column sort, applied in array order (first = primary)."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|SortKey -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 One key of a multi-column sort, applied in array order (first = primary).
 

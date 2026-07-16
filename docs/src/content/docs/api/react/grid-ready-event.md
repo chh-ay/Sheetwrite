@@ -1,12 +1,9 @@
 ---
 title: "GridReadyEvent | @sheetwrite/react"
 description: "Grid handle, generation, and reason published after adapter initialization."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/react|.|GridReadyEvent -->
-[← @sheetwrite/react](/docs/api/react/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Grid handle, generation, and reason published after adapter initialization.
 

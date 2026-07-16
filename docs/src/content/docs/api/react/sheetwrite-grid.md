@@ -1,12 +1,9 @@
 ---
 title: "SheetwriteGrid | @sheetwrite/react"
 description: "Advanced framework component for workbook data or datasource input."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/react|.|SheetwriteGrid -->
-[← @sheetwrite/react](/docs/api/react/)
-
-<span class="api-status">variable</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Advanced framework component for workbook data or datasource input.
 

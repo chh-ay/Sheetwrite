@@ -1,12 +1,9 @@
 ---
 title: "XlsxModel | @sheetwrite/xlsx"
 description: "Tabular workbook model exchanged with the optional XLSX table backend."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/xlsx|.|XlsxModel -->
-[← @sheetwrite/xlsx](/docs/api/xlsx/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Tabular workbook model exchanged with the optional XLSX table backend.
 

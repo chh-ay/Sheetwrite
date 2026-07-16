@@ -1,12 +1,9 @@
 ---
 title: "validateWorkbookSnapshot | @sheetwrite/core"
 description: "Validate and canonically order a schema-1 snapshot without hydrating runtime state."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|validateWorkbookSnapshot -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Validate and canonically order a schema-1 snapshot without hydrating runtime state.
 

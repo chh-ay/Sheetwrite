@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { pageMeta } from "../lib/seo.js";
 import ReactShowcase from "../showcases/ReactShowcase.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
-import { pageMeta } from "../lib/seo.js";
 
 const description =
   "Filter, search, aggregate, and render 100,000 sales rows from React state while Rust/WASM keeps the hot path out of the component tree.";

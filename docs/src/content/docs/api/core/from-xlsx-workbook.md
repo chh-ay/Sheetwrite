@@ -1,12 +1,9 @@
 ---
 title: "fromXlsxWorkbook | @sheetwrite/core"
 description: "Formula-preserving, multi-sheet workbook import through the optional XLSX backend."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|fromXlsxWorkbook -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Formula-preserving, multi-sheet workbook import through the optional XLSX backend.
 

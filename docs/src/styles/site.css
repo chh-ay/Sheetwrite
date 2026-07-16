@@ -33,9 +33,26 @@ a {
   background: color-mix(in srgb, var(--sw-accent) 30%, transparent);
 }
 
+/* Focus affordance: a tight radius-following ring, never a detached outline.
+   Keyboard focus stays visible on every control; only the canvas grid host is
+   exempt because its cell selection is the focus affordance. */
 :focus-visible {
-  outline: 2px solid var(--sw-accent);
-  outline-offset: 3px;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+}
+
+.sheetwrite:focus-visible {
+  box-shadow: none;
+}
+
+.expressive-code pre:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 40%, transparent);
+}
+
+/* Text links get a rounded ring shape so the ring never reads as a bare rectangle. */
+.sw-prose a:focus-visible,
+.sw-document__footer a:focus-visible {
+  border-radius: 0.25rem;
 }
 
 .sw-visually-hidden {
@@ -87,6 +104,22 @@ a {
   stroke-width: 1.5;
 }
 
+.sw-skip-link {
+  position: fixed;
+  top: 0.65rem;
+  left: 0.65rem;
+  z-index: 2000;
+  border-radius: 0.45rem;
+  padding: 0.6rem 0.9rem;
+  color: #052016;
+  background: var(--sw-accent);
+  font-weight: 700;
+  transform: translateY(-300%);
+}
+
+.sw-skip-link:focus-visible {
+  transform: none;
+}
 .sw-docs-header__links {
   display: flex;
   align-items: center;
@@ -387,7 +420,10 @@ a {
     var(--sw-content-width),
     calc(100vw - var(--sw-sidebar-width) - clamp(3rem, 10vw, 12rem))
   );
-  margin-left: calc(var(--sw-sidebar-width) + clamp(2rem, 7vw, 7rem));
+  margin-left: calc(
+    var(--sw-sidebar-width) +
+    max(2rem, (100vw - var(--sw-sidebar-width) - var(--sw-content-width)) / 2)
+  );
   padding: calc(var(--sw-header-height) + 4rem) 0 5rem;
 }
 
@@ -465,6 +501,28 @@ a {
   margin: 1rem 0;
 }
 
+.sw-prose ol,
+.sw-prose ul {
+  margin: 1rem 0;
+  padding-inline-start: 1.5rem;
+}
+
+.sw-prose ol {
+  list-style: decimal;
+}
+
+.sw-prose ul {
+  list-style: disc;
+}
+
+.sw-prose li {
+  margin-block: 0.35rem;
+}
+
+.sw-prose li::marker {
+  color: var(--sw-fg-dim);
+}
+
 .sw-prose a {
   color: var(--sw-accent-strong);
   text-decoration-thickness: 1px;
@@ -485,9 +543,18 @@ a {
   font: 0.82em var(--sw-font-mono);
 }
 
+/* Linked inline code (entry points, symbol references) must read as a link. */
+.sw-prose a > code {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  color: var(--sw-accent-strong);
+}
+
+.sw-prose a:hover > code {
+  background: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
+}
+
 .sw-prose table {
-  display: block;
-  overflow-x: auto;
+  display: table;
   width: 100%;
   margin: 1.5rem 0 2rem;
   border-spacing: 0;
@@ -499,7 +566,6 @@ a {
 
 .sw-prose th,
 .sw-prose td {
-  min-width: 8rem;
   padding: 0.65rem 0.75rem;
   border-bottom: 1px solid var(--sw-border);
   text-align: left;
@@ -530,6 +596,56 @@ a {
 
 .sw-prose .expressive-code .frame {
   box-shadow: none;
+}
+
+.sw-landing-lead {
+  color: var(--sw-fg-strong);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.sw-landing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.sw-landing-grid--frameworks {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sw-prose .sw-landing-grid > a {
+  display: grid;
+  gap: 0.55rem;
+  min-height: 9rem;
+  padding: 1rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.65rem;
+  color: var(--sw-fg);
+  background: var(--sw-surface-1);
+  text-decoration: none;
+}
+
+.sw-prose .sw-landing-grid > a:hover {
+  border-color: var(--sw-accent);
+  background: var(--sw-surface-2);
+}
+
+.sw-landing-grid strong {
+  font-family: var(--sw-font-display);
+  font-size: 1rem;
+}
+
+.sw-landing-grid span {
+  color: var(--sw-fg-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.sw-landing-links {
+  display: grid;
+  gap: 0.6rem;
+  padding-left: 1.1rem;
 }
 
 .sw-tabs {
@@ -618,71 +734,15 @@ a {
   font-size: 0.74rem;
 }
 
-.api-status,
-.api-count {
-  display: inline-flex;
-  border: 1px solid var(--sw-border);
-  border-radius: 999px;
-  padding: 0.15rem 0.45rem;
-  color: var(--sw-fg-muted);
-  background: var(--sw-surface-2);
-  font: 600 0.67rem var(--sw-font-mono);
+body .sw-code-popover__tag-link {
+  color: var(--sw-accent-strong);
+  font-weight: 650;
+  text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
-.api-metadata {
-  display: grid;
-  gap: 0.35rem;
-  margin: 1.5rem 0;
-}
-
-.api-metadata div {
-  display: grid;
-  grid-template-columns: 5rem 1fr;
-  gap: 0.8rem;
-}
-
-.api-metadata dt {
-  color: var(--sw-fg-dim);
-}
-
-.api-metadata dd {
-  margin: 0;
-}
-
-.api-member-list {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.api-member {
-  border: 1px solid var(--sw-border);
-  border-radius: 0.55rem;
-  background: var(--sw-surface-1);
-}
-
-.api-member summary {
-  padding: 0.75rem;
-  color: var(--sw-fg-strong);
-  cursor: pointer;
-}
-
-.api-member pre,
-.api-member p {
-  margin: 0;
-  padding: 0.75rem;
-  border-top: 1px solid var(--sw-border);
-}
-
-.api-member pre {
-  overflow-x: auto;
-  background: var(--sw-surface-2);
-}
-
-.api-member-summary {
-  margin-left: 0.45rem;
-  color: var(--sw-fg-muted);
-  font-family: var(--sw-font-body);
-  font-size: 0.78rem;
+body .sw-code-popover__tag-link:hover {
+  text-decoration: underline;
 }
 
 .sw-document__footer {
@@ -717,62 +777,734 @@ a {
   text-decoration: none;
 }
 
-.sw-code-popover__trigger {
-  border-radius: 0.2rem;
-  text-decoration: underline dotted color-mix(in srgb, var(--sw-accent) 72%, transparent);
-  text-underline-offset: 0.18em;
+.sw-prose .expressive-code {
+  margin-block: 1.4rem 2rem;
 }
 
-.sw-code-popover__trigger:hover,
-.sw-code-popover__trigger[data-popover-open="true"] {
+.sw-prose .expressive-code figure.frame {
+  overflow: hidden;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  box-shadow: none;
+}
+
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header {
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: flex-start;
+  padding-inline: 1rem;
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header::before,
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header::after,
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title::after {
+  content: none;
+}
+
+.sw-prose .expressive-code figure.frame.has-title > figcaption.header > span.title {
+  position: static;
+  display: inline-flex;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sw-fg-muted);
+  font: 650 0.72rem / 1.2 var(--sw-font-body);
+  letter-spacing: 0.01em;
+}
+
+.sw-prose .expressive-code pre {
+  max-width: 100%;
+  font-size: 0.82rem;
+  line-height: 1.68;
+}
+
+/* Generated API reference. These rules intentionally sit after the shared
+   .sw-prose code-frame styling: signature fences dock flush inside their
+   disclosures, so the generic frame border/radius/margins must lose the
+   cascade here. Generated markup must never widen the document; long
+   identifiers wrap or scroll locally. */
+.api-pagehead,
+.api-metadata,
+.api-member-list,
+.api-member,
+.api-declaration,
+.api-symbol-grid,
+.api-symbol-card,
+.api-variant-list,
+.api-variant {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.api-status,
+.api-count {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--sw-border);
+  border-radius: 999px;
+  padding: 0.16rem 0.55rem;
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-2);
+  font: 600 0.67rem / 1.3 var(--sw-font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* Count chips ride mid-cap beside display headings instead of dangling off
+   the baseline. */
+.sw-prose h2 .api-count,
+.sw-prose h3 .api-count {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* One hue system ties kind badges and classification chips together. */
+.api-symbol-badge[data-kind="class"],
+.api-symbol-badge[data-kind="enum"],
+.api-status[data-kind="class"],
+.api-status[data-kind="enum"],
+.api-status[data-status="test-only"] {
+  --api-kind-color: var(--sw-type-number);
+}
+
+.api-symbol-badge[data-kind="function"],
+.api-status[data-kind="function"],
+.api-status[data-status="supported"] {
+  --api-kind-color: var(--sw-accent);
+}
+
+.api-symbol-badge[data-kind="interface"],
+.api-symbol-badge[data-kind="variable"],
+.api-status[data-kind="interface"],
+.api-status[data-kind="variable"] {
+  --api-kind-color: var(--sw-type-name);
+}
+
+.api-symbol-badge[data-kind="type"],
+.api-status[data-kind="type"] {
+  --api-kind-color: var(--sw-type-keyword);
+}
+
+.api-status[data-kind],
+.api-status[data-status="supported"],
+.api-status[data-status="test-only"] {
+  border-color: color-mix(in srgb, var(--api-kind-color) 32%, var(--sw-border));
+  color: color-mix(in srgb, var(--api-kind-color) 72%, var(--sw-fg));
+  background: color-mix(in srgb, var(--api-kind-color) 8%, var(--sw-surface-2));
+}
+
+/* Symbol pages open with one quiet row: back link left, kind chip right. */
+.api-pagehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.sw-prose .api-backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.8rem;
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.sw-prose .api-backlink::before {
+  content: "←";
+  color: var(--sw-fg-dim);
+}
+
+.sw-prose .api-backlink:hover,
+.sw-prose .api-backlink:hover::before {
+  color: var(--sw-accent-strong);
+}
+
+.api-metadata {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.api-metadata div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: baseline;
+}
+
+.api-metadata dt {
+  color: var(--sw-fg-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.api-metadata dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.api-metadata dd code {
+  overflow-wrap: anywhere;
+}
+
+/* Entry-point tables: editorial rules instead of a boxed grid; the numeric
+   column right-aligns and rows light up on hover. */
+.sw-prose .api-entry-table {
+  margin: 1.25rem 0 2.5rem;
+  border: 0;
+  border-radius: 0;
+}
+
+.sw-prose .api-entry-table th,
+.sw-prose .api-entry-table td {
+  padding: 0.55rem 0.75rem;
+  vertical-align: middle;
+}
+
+.sw-prose .api-entry-table th {
+  border-bottom-color: var(--sw-border-strong);
+  color: var(--sw-fg-dim);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sw-prose .api-entry-table tr:last-child td {
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-prose .api-entry-table th:first-child,
+.sw-prose .api-entry-table td:first-child {
+  width: 52%;
+  padding-inline-start: 0.2rem;
+}
+
+.sw-prose .api-entry-table th:last-child,
+.sw-prose .api-entry-table td:last-child {
+  padding-inline-end: 0.2rem;
+  text-align: right;
+}
+
+.sw-prose .api-entry-table td:last-child {
+  color: var(--sw-fg-muted);
+  font: 500 0.8rem var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .api-entry-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--sw-surface-2) 70%, transparent);
+}
+
+.sw-prose .api-entry-table a {
+  text-decoration: none;
+}
+
+.sw-prose .api-entry-table a > code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-accent-strong);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sw-prose .api-entry-table a:hover > code {
+  background: transparent;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+/* Exported-symbol cards: kind badge + strong name over a clamped summary. */
+.api-symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.8rem;
+  margin: 1.1rem 0 2.75rem;
+}
+
+.api-symbol-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  padding: 0.85rem 0.95rem;
+  background: var(--sw-surface-1);
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.api-symbol-card:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  background: var(--sw-surface-2);
+}
+
+.api-symbol-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.api-symbol-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 0.3rem;
+  color: var(--api-kind-color, var(--sw-fg-muted));
+  background: color-mix(in srgb, var(--api-kind-color, var(--sw-fg-muted)) 13%, transparent);
+  font: 650 0.7rem / 1 var(--sw-font-mono);
+}
+
+.sw-prose .api-symbol-card code {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg-strong);
+  font: 600 0.86rem / 1.45 var(--sw-font-mono);
+  overflow-wrap: anywhere;
+  transition: color 120ms ease;
+}
+
+.api-symbol-card:hover code {
+  color: var(--sw-accent-strong);
+}
+
+.api-symbol-card__desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font-size: 0.79rem;
+  line-height: 1.55;
+}
+
+/* Members: a dense flat property list — hairline rows, not stacked cards.
+   Every row keeps a real top border and an opaque background (contract-
+   checked); the background matches the page so the list reads flat. */
+.api-member-list {
+  margin: 1.1rem 0 2.75rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.api-member {
+  border-top: 1px solid var(--sw-border);
+  background: var(--sw-surface-0);
+}
+
+.api-member[open] {
+  border-top-color: var(--sw-border-strong);
+}
+
+/* The declaration stays a single docked panel: summary header, flush fence. */
+.api-declaration {
+  margin: 1.1rem 0 2.2rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  background: var(--sw-surface-1);
+  transition: border-color 120ms ease;
+}
+
+.api-declaration[open] {
+  border-color: var(--sw-border-strong);
+}
+
+.api-member summary,
+.api-declaration summary {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  border-radius: 0.35rem;
+  padding: 0.55rem 0.3rem;
+  color: var(--sw-fg-strong);
+  cursor: pointer;
+  list-style: none;
+  transition: background-color 120ms ease;
+}
+
+.api-declaration summary {
+  border-radius: calc(0.6rem - 1px);
+  padding: 0.7rem 0.95rem;
+}
+
+.api-member summary::-webkit-details-marker,
+.api-declaration summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-member summary::before,
+.api-declaration summary::before {
+  content: "";
+  flex: none;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--sw-fg-dim);
+  transform: rotate(-45deg);
+  transition:
+    transform 140ms ease,
+    color 140ms ease;
+}
+
+.api-member[open] > summary::before,
+.api-declaration[open] > summary::before {
+  color: var(--sw-accent);
+  transform: translateY(-0.1rem) rotate(45deg);
+}
+
+/* Hover tints the row; keyboard focus keeps a quiet inset ring — the loud
+   outer ring read as a selection state on a full-width row. */
+.api-member summary:hover,
+.api-declaration summary:hover {
+  background: color-mix(in srgb, var(--sw-surface-2) 75%, transparent);
+}
+
+/* Focus wraps the WHOLE disclosure (summary + revealed body), never just the
+   summary strip: a quiet inset ring on flat member rows, an outer ring
+   following the declaration panel's radius. */
+.api-member summary:focus-visible,
+.api-declaration summary:focus-visible {
+  box-shadow: none;
+}
+
+.api-member:has(> summary:focus-visible) {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 30%, transparent);
+}
+
+.api-declaration:has(> summary:focus-visible) {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 30%, transparent);
+}
+
+.api-declaration[open] > summary {
+  border-bottom: 1px solid var(--sw-border);
+  border-radius: calc(0.6rem - 1px) calc(0.6rem - 1px) 0 0;
+  background: var(--sw-surface-2);
+}
+
+/* The name never shrinks below its own width (the summary text wraps
+   instead), but a pathologically long identifier still breaks rather than
+   widening the page. */
+.sw-prose .api-member summary code {
+  flex: 0 0 auto;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg-strong);
+  font: 600 0.84rem / 1.5 var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.api-member[open] > summary code {
+  color: var(--sw-accent-strong);
+}
+
+.api-member-summary {
+  color: var(--sw-fg-muted);
+  font-family: var(--sw-font-body);
+  font-size: 0.78rem;
+}
+
+.sw-prose .api-member-summary code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg);
+  font-size: 0.72rem;
+}
+
+.api-declaration > summary {
+  color: var(--sw-fg-muted);
+  font-size: 0.84rem;
+  font-weight: 550;
+}
+
+.api-declaration > summary:hover,
+.api-declaration[open] > summary {
+  color: var(--sw-fg-strong);
+}
+
+/* The declaration fence docks flush inside its panel. */
+.sw-prose .api-declaration .expressive-code {
+  margin-block: 0;
+}
+
+.sw-prose .api-declaration .expressive-code figure.frame {
+  border: 0;
+  border-radius: 0 0 calc(0.6rem - 1px) calc(0.6rem - 1px);
+}
+
+/* Member signatures sit as one compact framed line indented under the name;
+   docs follow as plain prose, not another surface. */
+.sw-prose .api-member .expressive-code {
+  margin: 0.2rem 0 0.85rem 1.32rem;
+}
+
+.sw-prose .api-member .expressive-code figure.frame {
+  border: 1px solid var(--sw-border);
+  border-radius: 0.5rem;
+}
+
+/* Short signatures must not float in a tall empty frame. */
+.sw-prose .api-member .expressive-code pre,
+.sw-prose .api-declaration .expressive-code pre {
+  font-size: 0.78rem;
+}
+
+.api-member .expressive-code pre > code,
+.api-declaration .expressive-code pre > code {
+  padding-block: 0.5rem;
+}
+
+.api-member .api-member-doc {
+  max-width: 47rem;
+  margin: -0.35rem 0 0.9rem;
+  padding: 0 0.3rem 0 1.32rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.82rem;
+}
+
+/* Union variants: one surface with hairline dividers. Long variants wrap at
+   member boundaries (after "; ") instead of hiding behind a local scroll. */
+.api-variant-list {
+  margin: 1.1rem 0 2.75rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  background: var(--sw-surface-1);
+}
+
+.api-variant {
+  padding: 0.6rem 0.95rem;
+}
+
+.api-variant + .api-variant {
+  border-top: 1px solid var(--sw-border);
+}
+
+.sw-prose .api-variant > code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-fg);
+  font: 500 0.8rem / 1.6 var(--sw-font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 30rem) {
+  .api-pagehead {
+    flex-wrap: wrap;
+  }
+
+  .api-metadata div {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+
+  /* The summary line drops below the member name instead of squeezing into a
+     ragged column beside it, and the signature loses its indent. */
+  .api-member summary {
+    flex-wrap: wrap;
+  }
+
+  .api-member-summary {
+    flex: 1 0 100%;
+    padding-left: 1.02rem;
+  }
+
+  .sw-prose .api-member .expressive-code {
+    margin-left: 0;
+  }
+
+  .api-member .api-member-doc {
+    padding-left: 0.3rem;
+  }
+}
+
+/* Hover tiers: documented/reference symbols carry the accent underline; plain
+   type reveals stay quiet so the page doesn't read as a wall of squiggles. */
+.sw-prose .sw-code-popover__trigger {
+  border-radius: 0.2rem;
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 65%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: help;
+  outline: none;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    text-decoration-color 120ms ease;
+}
+
+.sw-prose .sw-code-popover__trigger[data-hover-kind="documented"],
+.sw-prose .sw-code-popover__trigger[data-hover-kind="reference"] {
+  text-decoration: underline wavy color-mix(in srgb, var(--sw-accent) 72%, transparent);
+  text-decoration-thickness: 1px;
+}
+
+.sw-prose .sw-code-popover__trigger:hover,
+.sw-prose .sw-code-popover__trigger[data-popover-open="true"] {
+  text-decoration-color: var(--sw-accent);
+  background: color-mix(in srgb, var(--sw-accent) 11%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 10%, transparent);
+}
+
+.sw-prose .sw-code-popover__trigger:focus-visible {
+  text-decoration-color: var(--sw-accent);
   background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw-accent) 45%, transparent);
 }
 
 body .sw-code-popover__panel {
   z-index: 1000;
   display: block;
-  overflow: auto;
+  box-sizing: border-box;
+  /* Size to content: short signatures get small panels; floating-ui's size
+     middleware supplies the viewport max-width clamp inline. */
   width: max-content;
-  min-width: min(21rem, calc(100vw - 1.5rem));
-  border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
-  padding: 0.75rem;
-  color: var(--sw-fg);
+  max-width: min(34rem, calc(100vw - 1.5rem));
+  overflow: auto;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 0.65rem;
   background: var(--sw-surface-1);
-  box-shadow: var(--sw-shadow);
-  font: 0.8rem / 1.5 var(--sw-font-mono);
+  color: var(--sw-fg);
+  box-shadow:
+    0 1.25rem 3rem rgb(15 23 42 / 22%),
+    0 2px 6px rgb(15 23 42 / 10%);
+  overscroll-behavior: contain;
+  scrollbar-color: var(--sw-border-strong) transparent;
 }
 
 body .sw-code-popover__panel[hidden] {
   display: none;
 }
 
-body .sw-code-popover__signature,
-body .sw-code-popover__docs,
-body .sw-code-popover__tags {
+:root[data-theme="dark"] body .sw-code-popover__panel {
+  box-shadow:
+    0 1.5rem 3.5rem rgb(0 0 0 / 56%),
+    0 2px 8px rgb(0 0 0 / 40%);
+}
+
+body .sw-code-popover__signature {
   display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 1rem 0.9rem 1.15rem;
+  overflow: auto hidden;
+  border-block-start: 2px solid color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-strong);
+  font: 500 0.72rem / 1.54 var(--sw-font-mono);
+  tab-size: 2;
+  text-align: start;
+  white-space: pre;
 }
 
 body .sw-code-popover__signature--narrow {
   display: none;
 }
 
-body .sw-code-popover__docs {
-  max-width: 34rem;
-  margin-top: 0.6rem;
+body .sw-code-popover__signature span[style] {
+  color: var(--1);
+}
+
+:root[data-theme="dark"] body .sw-code-popover__signature span[style] {
+  color: var(--0);
+}
+
+body .sw-code-popover__docs,
+body .sw-code-popover__tags {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.75rem 1rem 0.82rem 1.15rem;
   border-top: 1px solid var(--sw-border);
-  padding-top: 0.6rem;
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font: 450 0.72rem / 1.52 var(--sw-font-body);
+  text-align: start;
+  white-space: normal;
+}
+
+body .sw-code-popover__tags {
+  display: grid;
+  gap: 0.35rem;
+  padding-block-start: 0.65rem;
   color: var(--sw-fg-muted);
-  font-family: var(--sw-font-body);
+}
+
+body .sw-code-popover__tag,
+body .sw-code-popover__tag-name {
+  display: inline;
+}
+
+body .sw-code-popover__tag-name {
+  color: var(--sw-accent-strong);
+  font: 600 0.68rem / 1.4 var(--sw-font-mono);
+}
+
+body .sw-code-popover__link {
+  display: block;
+  padding: 0.55rem 1rem 0.6rem 1.15rem;
+  border-top: 1px solid var(--sw-border);
+  color: var(--sw-accent-strong);
+  background: var(--sw-surface-1);
+  font: 650 0.7rem / 1.4 var(--sw-font-body);
+  text-decoration: none;
+}
+
+body .sw-code-popover__link:hover {
+  background: color-mix(in srgb, var(--sw-accent) 8%, var(--sw-surface-1));
 }
 
 body .sw-code-popover__accessible-signature {
   position: absolute;
   width: 1px;
   height: 1px;
+  padding: 0;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 40rem) {
+  body .sw-code-popover__signature--wide {
+    display: none;
+  }
+
+  body .sw-code-popover__signature--narrow {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-prose .sw-code-popover__trigger {
+    transition: none;
+  }
 }
 
 @media (max-width: 62rem) {
@@ -794,6 +1526,29 @@ body .sw-code-popover__accessible-signature {
   }
 }
 
+.sw-test-fixture {
+  min-height: 100vh;
+  padding: 1rem;
+  background: var(--sw-surface-0);
+}
+
+.sw-test-fixture [data-framework-lifecycle] {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sw-test-fixture output {
+  min-width: 2ch;
+}
+
+@media (max-width: 48rem) {
+  /* Narrow screens scroll wide tables locally instead of stretching the page. */
+  .sw-prose table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
 @media (max-width: 48rem) {
   .sw-docs-header {
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -805,7 +1560,7 @@ body .sw-code-popover__accessible-signature {
   .sw-search-button span,
   .sw-search-button kbd,
   .sw-docs-header__links details,
-  .sw-docs-header__links > a {
+  .sw-docs-header__links > a:not([class]) {
     display: none;
   }
 
@@ -866,6 +1621,11 @@ body .sw-code-popover__accessible-signature {
     grid-column: 2;
   }
 
+  .sw-landing-grid,
+  .sw-landing-grid--frameworks {
+    grid-template-columns: 1fr;
+  }
+
   .sw-document__footer {
     flex-direction: column;
   }
@@ -877,4 +1637,128 @@ body .sw-code-popover__accessible-signature {
   body .sw-code-popover__signature--narrow {
     display: block;
   }
+}
+
+/* Search-target anchors exist for Pagefind sub-results and deep links only;
+   the visible member list already names them. Kept in flow (zero-height) so
+   #anchor navigation still lands on the right member. */
+.sw-prose .api-search-anchor {
+  display: block;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 0;
+  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+}
+
+.sw-title-package {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 0.8rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.45rem;
+  padding: 0.3rem 0.55rem;
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-1);
+  font: 600 0.85rem / 1.2 var(--sw-font-mono);
+  letter-spacing: 0;
+}
+
+/* ---- On-this-page rail (owned by navigation work, not the api block) ---- */
+
+.sw-toc {
+  display: none;
+}
+
+/* The document becomes a two-column unit (prose + rail) once both fit. */
+@media (min-width: 88rem) {
+  .sw-document {
+    display: grid;
+    grid-template-columns: minmax(0, var(--sw-content-width)) 12rem;
+    column-gap: 3rem;
+    width: min(calc(var(--sw-content-width) + 15rem), calc(100vw - var(--sw-sidebar-width) - 4rem));
+    margin-left: calc(
+      var(--sw-sidebar-width) +
+      max(2rem, (100vw - var(--sw-sidebar-width) - var(--sw-content-width) - 15rem) / 2)
+    );
+  }
+
+  .sw-document__header,
+  .sw-document__footer,
+  .sw-document > .sw-prose {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .sw-toc {
+    display: block;
+    position: sticky;
+    top: calc(var(--sw-header-height) + 2.5rem);
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    max-height: calc(100vh - var(--sw-header-height) - 5rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sw-border-strong) transparent;
+    font-size: 0.78rem;
+  }
+}
+
+.sw-toc__label {
+  display: block;
+  margin-bottom: 0.6rem;
+  color: var(--sw-fg-dim);
+  font: 650 0.62rem / 1 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sw-toc ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-toc li[data-depth="1"] {
+  padding-left: 0.75rem;
+}
+
+.sw-toc a {
+  display: block;
+  overflow: hidden;
+  padding: 0.22rem 0.5rem;
+  border-radius: 0.35rem;
+  color: var(--sw-fg-muted);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-toc a:hover {
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-2);
+}
+
+.sw-toc a[aria-current="location"] {
+  color: var(--sw-accent-strong);
+  font-weight: 600;
+}
+
+/* ToC deep links target member rows; keep them clear of the fixed header. */
+.sw-prose .api-member[id] {
+  scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
+}
+
+/* Type identifiers in generated declaration fences link to their API pages. */
+.sw-prose .expressive-code a.sw-code-ref {
+  color: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 65%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+
+.sw-prose .expressive-code a.sw-code-ref:hover {
+  color: var(--sw-accent-strong);
+  text-decoration-color: var(--sw-accent-strong);
 }

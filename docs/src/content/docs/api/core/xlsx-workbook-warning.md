@@ -1,12 +1,9 @@
 ---
 title: "XlsxWorkbookWarning | @sheetwrite/core"
 description: "Structured fidelity warning emitted during workbook XLSX conversion."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookWarning -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Structured fidelity warning emitted during workbook XLSX conversion.
 

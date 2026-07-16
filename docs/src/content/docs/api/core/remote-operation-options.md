@@ -1,12 +1,9 @@
 ---
 title: "RemoteOperationOptions | @sheetwrite/core"
 description: "Classification metadata for host-supplied remote operations."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|RemoteOperationOptions -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Classification metadata for host-supplied remote operations.
 

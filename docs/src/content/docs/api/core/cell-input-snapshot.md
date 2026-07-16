@@ -1,12 +1,9 @@
 ---
 title: "CellInputSnapshot | @sheetwrite/core"
 description: "View-aware editable snapshot of one cell, for hosts building a detached formula bar or cell inspector."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CellInputSnapshot -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 View-aware editable snapshot of one cell, for hosts building a detached
 formula bar or cell inspector. `address` is the translated *data* address —

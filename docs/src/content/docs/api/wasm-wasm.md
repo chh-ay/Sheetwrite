@@ -1,9 +1,8 @@
 ---
 title: "@sheetwrite/wasm/wasm"
 description: "API reference for @sheetwrite/wasm/wasm."
-tableOfContents: false
 ---
-<span class="api-status">asset</span>
+<span class="api-status" data-status="asset">asset</span>
 
 **CSS or binary asset entry point.** Import this entry point as `@sheetwrite/wasm/wasm`.
 

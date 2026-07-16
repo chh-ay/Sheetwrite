@@ -47,7 +47,8 @@ async function positionPopover(trigger: HTMLElement, panel: HTMLElement): Promis
         padding: 12,
         apply({ availableHeight, availableWidth, elements }) {
           Object.assign(elements.floating.style, {
-            maxWidth: `${Math.min(620, availableWidth)}px`,
+            // 544px = the 34rem design cap; inline style wins over the CSS max-width.
+            maxWidth: `${Math.min(544, availableWidth)}px`,
             maxHeight: `${Math.min(480, availableHeight)}px`,
           });
         },

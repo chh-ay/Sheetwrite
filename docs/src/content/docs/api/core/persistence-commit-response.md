@@ -1,12 +1,9 @@
 ---
 title: "PersistenceCommitResponse | @sheetwrite/core"
 description: "Applied, duplicate, or conflict acknowledgement from persistence."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|PersistenceCommitResponse -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 Applied, duplicate, or conflict acknowledgement from persistence.
 

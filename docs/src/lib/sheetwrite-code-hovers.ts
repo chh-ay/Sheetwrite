@@ -517,6 +517,61 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
   }
 }
 
+export interface ReferenceLink {
+  line: number;
+  columnStart: number;
+  columnEnd: number;
+  route: string;
+}
+
+const DECLARED_NAME =
+  /^(?:export\s+)?(?:declare\s+)?(?:abstract\s+)?(?:class|interface|enum|function|const|let|var|type)\s+([A-Za-z_$][\w$]*)/;
+
+/**
+ * Deterministic identifier -> API-route links for generated declaration
+ * fences. Generated signatures carry no imports, so the type engine cannot
+ * resolve their identifiers; the manifest name map can. The declared symbol
+ * itself is skipped (a page linking to itself is noise), as are member
+ * accesses and string-opening positions.
+ */
+export function collectReferenceLinks(
+  code: string,
+  routes: ReadonlyMap<string, string>,
+): ReferenceLink[] {
+  if (routes.size === 0) return [];
+  const declared = code.match(DECLARED_NAME)?.[1];
+  const links: ReferenceLink[] = [];
+  for (const [lineIndex, text] of code.split("\n").entries()) {
+    for (const match of text.matchAll(/[A-Za-z_$][\w$]*/g)) {
+      const name = match[0];
+      if (name === declared) continue;
+      const route = routes.get(name);
+      if (route === undefined) continue;
+      const start = match.index;
+      const before = start > 0 ? text[start - 1] : "";
+      if (before === "." || before === '"' || before === "'") continue;
+      links.push({ line: lineIndex, columnStart: start, columnEnd: start + name.length, route });
+    }
+  }
+  return links;
+}
+
+class SheetwriteReferenceLinkAnnotation extends ExpressiveCodeAnnotation {
+  override readonly name = "sheetwrite-code-ref";
+
+  constructor(
+    private readonly route: string,
+    columnStart: number,
+    columnEnd: number,
+  ) {
+    super({ inlineRange: { columnStart, columnEnd } });
+  }
+
+  override render({ nodesToTransform }: AnnotationRenderOptions): Element[] {
+    return nodesToTransform.map((node) => h("a.sw-code-ref", { href: this.route }, [node]));
+  }
+}
+
 export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
   const analyzer = new SheetwriteTypeEngine({ cwd: options.cwd, fsMap: options.fsMap });
   let signatureRenderer: ExpressiveCode | undefined;
@@ -544,6 +599,22 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     hooks: {
       async preprocessCode({ codeBlock, config }) {
         if (!SUPPORTED_LANGUAGES.has(codeBlock.language)) return;
+        // Generated declaration fences get manifest reference links instead of
+        // type-engine hovers: their identifiers have no imports to resolve.
+        if (/\bgenerated\b/.test(codeBlock.meta)) {
+          await resolveManifest();
+          for (const link of collectReferenceLinks(
+            codeBlock.code,
+            referenceRoutes ?? new Map<string, string>(),
+          )) {
+            codeBlock
+              .getLine(link.line)
+              ?.addAnnotation(
+                new SheetwriteReferenceLinkAnnotation(link.route, link.columnStart, link.columnEnd),
+              );
+          }
+          return;
+        }
         if (options.shouldTransform && !options.shouldTransform(codeBlock)) return;
 
         signatureRenderer ??= new ExpressiveCode(nestedRendererConfig(config));
@@ -596,7 +667,8 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 docs: hover.docs ?? memberDocsFor(hover.target, accessibleSignature, members)?.docs,
                 tags: hover.tags ?? [],
                 referenceRoute:
-                  routes.get(hover.target) ?? memberDocsFor(hover.target, accessibleSignature, members)?.route,
+                  routes.get(hover.target) ??
+                  memberDocsFor(hover.target, accessibleSignature, members)?.route,
               },
               popoverId,
             ),

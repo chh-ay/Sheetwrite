@@ -1,12 +1,9 @@
 ---
 title: "MemoryPersistenceAdapter | @sheetwrite/core"
 description: "Executable database-neutral reference adapter for tests, demos, and local workflows."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|MemoryPersistenceAdapter -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">class</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="class">class</span></div>
 
 Executable database-neutral reference adapter for tests, demos, and local workflows.
 

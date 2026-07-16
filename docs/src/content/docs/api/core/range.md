@@ -1,12 +1,9 @@
 ---
 title: "Range | @sheetwrite/core"
 description: "Inclusive rectangular cell range on a stable sheet ID."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|Range -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Inclusive rectangular cell range on a stable sheet ID.
 

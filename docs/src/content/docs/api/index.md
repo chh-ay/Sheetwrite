@@ -6,48 +6,66 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 
 ## @sheetwrite/core
 
-| Entry point | Classification | Symbols |
-| --- | --- | ---: |
-| [`@sheetwrite/core`](/docs/api/core/) | supported | 176 |
-| [`@sheetwrite/core/adapter`](/docs/api/core-adapter/) | supported | 20 |
-| [`@sheetwrite/core/browser`](/docs/api/core-browser/) | supported | 4 |
-| [`@sheetwrite/core/shell`](/docs/api/core-shell/) | supported | 13 |
-| [`@sheetwrite/core/shell.css`](/docs/api/core-shell-css/) | asset | 0 |
-| [`@sheetwrite/core/styles.css`](/docs/api/core-styles-css/) | asset | 0 |
-| [`@sheetwrite/core/testing`](/docs/api/core-testing/) | test-only | 3 |
-| [`@sheetwrite/core/worker`](/docs/api/core-worker/) | supported | 2 |
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/core/"><code>@sheetwrite/core</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>176</td></tr>
+<tr><td><a href="/docs/api/core-adapter/"><code>@sheetwrite/core/adapter</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>20</td></tr>
+<tr><td><a href="/docs/api/core-browser/"><code>@sheetwrite/core/browser</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>4</td></tr>
+<tr><td><a href="/docs/api/core-shell/"><code>@sheetwrite/core/shell</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>13</td></tr>
+<tr><td><a href="/docs/api/core-shell-css/"><code>@sheetwrite/core/shell.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+<tr><td><a href="/docs/api/core-styles-css/"><code>@sheetwrite/core/styles.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+<tr><td><a href="/docs/api/core-testing/"><code>@sheetwrite/core/testing</code></a></td><td><span class="api-status" data-status="test-only">test-only</span></td><td>3</td></tr>
+<tr><td><a href="/docs/api/core-worker/"><code>@sheetwrite/core/worker</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>2</td></tr>
+</tbody>
+</table>
 
 ## @sheetwrite/react
 
-| Entry point | Classification | Symbols |
-| --- | --- | ---: |
-| [`@sheetwrite/react`](/docs/api/react/) | supported | 8 |
-| [`@sheetwrite/react/styles.css`](/docs/api/react-styles-css/) | asset | 0 |
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/react/"><code>@sheetwrite/react</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>8</td></tr>
+<tr><td><a href="/docs/api/react-styles-css/"><code>@sheetwrite/react/styles.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+</tbody>
+</table>
 
 ## @sheetwrite/svelte
 
-| Entry point | Classification | Symbols |
-| --- | --- | ---: |
-| [`@sheetwrite/svelte`](/docs/api/svelte/) | supported | 8 |
-| [`@sheetwrite/svelte/styles.css`](/docs/api/svelte-styles-css/) | asset | 0 |
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/svelte/"><code>@sheetwrite/svelte</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>8</td></tr>
+<tr><td><a href="/docs/api/svelte-styles-css/"><code>@sheetwrite/svelte/styles.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+</tbody>
+</table>
 
 ## @sheetwrite/vue
 
-| Entry point | Classification | Symbols |
-| --- | --- | ---: |
-| [`@sheetwrite/vue`](/docs/api/vue/) | supported | 7 |
-| [`@sheetwrite/vue/styles.css`](/docs/api/vue-styles-css/) | asset | 0 |
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/vue/"><code>@sheetwrite/vue</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>7</td></tr>
+<tr><td><a href="/docs/api/vue-styles-css/"><code>@sheetwrite/vue/styles.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+</tbody>
+</table>
 
 ## @sheetwrite/wasm
 
-| Entry point | Classification | Symbols |
-| --- | --- | ---: |
-| [`@sheetwrite/wasm`](/docs/api/wasm/) | internal | 11 |
-| [`@sheetwrite/wasm/wasm`](/docs/api/wasm-wasm/) | asset | 0 |
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/wasm/"><code>@sheetwrite/wasm</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>11</td></tr>
+<tr><td><a href="/docs/api/wasm-wasm/"><code>@sheetwrite/wasm/wasm</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
+</tbody>
+</table>
 
 ## @sheetwrite/xlsx
 
-| Entry point | Classification | Symbols |
-| --- | --- | ---: |
-| [`@sheetwrite/xlsx`](/docs/api/xlsx/) | supported | 7 |
-| [`@sheetwrite/xlsx/register`](/docs/api/xlsx-register/) | supported | 1 |
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/xlsx/"><code>@sheetwrite/xlsx</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>7</td></tr>
+<tr><td><a href="/docs/api/xlsx-register/"><code>@sheetwrite/xlsx/register</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>1</td></tr>
+</tbody>
+</table>

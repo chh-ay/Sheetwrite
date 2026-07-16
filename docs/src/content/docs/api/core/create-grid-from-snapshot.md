@@ -1,12 +1,9 @@
 ---
 title: "createGridFromSnapshot | @sheetwrite/core"
 description: "Mount a grid over a validated, non-dirty snapshot."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|createGridFromSnapshot -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
 Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes
 the hydrated store just like one created through `createGrid`.

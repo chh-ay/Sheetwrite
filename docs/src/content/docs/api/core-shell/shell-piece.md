@@ -1,12 +1,9 @@
 ---
 title: "ShellPiece | @sheetwrite/core/shell"
 description: "A mounted shell piece: its root element plus an idempotent teardown."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|ShellPiece -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="interface">interface</span></div>
 
 A mounted shell piece: its root element plus an idempotent teardown.
 

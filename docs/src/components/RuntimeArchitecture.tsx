@@ -15,6 +15,7 @@ const layers = [
 
 export default function RuntimeArchitecture() {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: the figcaption requires <figure>, and the diagram must stay a named region landmark — documentation-site.spec.ts asserts getByRole("region").
     <figure
       aria-label="Sheetwrite runtime ownership and data flow"
       className="sw-architecture"

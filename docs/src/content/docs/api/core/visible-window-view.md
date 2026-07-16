@@ -1,12 +1,9 @@
 ---
 title: "VisibleWindowView | @sheetwrite/core"
 description: "One rectangular window of resolved cells, returned by Store.getVisibleWindow in a single call."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|VisibleWindowView -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 One rectangular window of resolved cells, returned by `Store.getVisibleWindow`
 in a single call. The renderer paints from this view and MUST NOT call

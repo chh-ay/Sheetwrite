@@ -1,12 +1,9 @@
 ---
 title: "GridReadyEvent | @sheetwrite/vue"
 description: "Grid handle, generation, and reason published after adapter initialization."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/vue|.|GridReadyEvent -->
-[← @sheetwrite/vue](/docs/api/vue/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Grid handle, generation, and reason published after adapter initialization.
 

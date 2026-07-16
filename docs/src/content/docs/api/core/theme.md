@@ -1,12 +1,9 @@
 ---
 title: "Theme | @sheetwrite/core"
 description: "Resolved canvas colors, typography, and geometry used for painting."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|Theme -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Resolved canvas colors, typography, and geometry used for painting.
 

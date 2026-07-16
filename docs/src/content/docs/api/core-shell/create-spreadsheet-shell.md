@@ -1,12 +1,9 @@
 ---
 title: "createSpreadsheetShell | @sheetwrite/core/shell"
 description: "Mount a complete spreadsheet shell into host: toolbar row, formula row (name box + formula bar), the grid, and a bottom row with sheet tabs (multi- sheet workbooks only) and a selection status."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./shell|createSpreadsheetShell -->
-[← @sheetwrite/core/shell](/docs/api/core-shell/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-shell/">@sheetwrite/core/shell</a><span class="api-status" data-kind="function">function</span></div>
 
 Mount a complete spreadsheet shell into `host`: toolbar row, formula row
 (name box + formula bar), the grid, and a bottom row with sheet tabs (multi-

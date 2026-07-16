@@ -1,12 +1,9 @@
 ---
 title: "VersionedOperation | @sheetwrite/core"
 description: "Remote document operations paired with a contiguous server version."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|VersionedOperation -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Remote document operations paired with a contiguous server version.
 

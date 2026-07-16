@@ -1,12 +1,9 @@
 ---
 title: "CommentMutationRequest | @sheetwrite/core"
 description: "Versioned comment mutation submitted to a host adapter."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|CommentMutationRequest -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Versioned comment mutation submitted to a host adapter.
 

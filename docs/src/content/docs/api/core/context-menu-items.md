@@ -1,12 +1,9 @@
 ---
 title: "ContextMenuItems | @sheetwrite/core"
 description: "Static rows or a context-aware factory evaluated each time the menu opens."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|.|ContextMenuItems -->
-[← @sheetwrite/core](/docs/api/core/)
-
-<span class="api-status">type</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
 Static rows or a context-aware factory evaluated each time the menu opens.
 

@@ -1,12 +1,9 @@
 ---
 title: "createWorkerMessageHandler | @sheetwrite/core/worker"
 description: "Build the worker-side protocol handler."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./worker|createWorkerMessageHandler -->
-[← @sheetwrite/core/worker](/docs/api/core-worker/)
-
-<span class="api-status">function</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-worker/">@sheetwrite/core/worker</a><span class="api-status" data-kind="function">function</span></div>
 
 Build the worker-side protocol handler. Keeping the mutable render state
 inside the returned closure lets tests exercise the real message contract

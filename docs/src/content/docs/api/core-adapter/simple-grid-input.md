@@ -1,12 +1,9 @@
 ---
 title: "SimpleGridInput | @sheetwrite/core/adapter"
 description: "Normalized workbook and columnar data produced from simple adapter props."
-tableOfContents: false
 ---
 <!-- api-export:@sheetwrite/core|./adapter|SimpleGridInput -->
-[← @sheetwrite/core/adapter](/docs/api/core-adapter/)
-
-<span class="api-status">interface</span>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Normalized workbook and columnar data produced from simple adapter props.
 
