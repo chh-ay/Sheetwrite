@@ -6,7 +6,7 @@ Every number on this page comes from a validated local protocol artifact capture
 
 ## Render benchmark: Sheetwrite vs Handsontable
 
-<div class="evidence-available"><strong>Validated evidence.</strong> 1120/1140 engine/scenario/round runs completed across 4 workbook sizes; every completed run passed its correctness checkpoints; 20 runs did not finish and are shown as such.</div>
+<div class="evidence-available"><strong>Validated evidence.</strong> 1100/1120 engine/scenario/round runs completed across 4 workbook sizes; every completed run passed its correctness checkpoints; 20 runs did not finish and are shown as such.</div>
 
 Both engines drive identical scripted interactions in a controlled browser. Pick a workbook size and a metric:
 

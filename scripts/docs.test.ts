@@ -10,6 +10,7 @@ import {
   parseFences,
   renderEntryPage,
   renderSymbolPage,
+  runCompletionSummary,
   unresolvedCssTokens,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
@@ -147,5 +148,17 @@ describe("documentation generation", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it("never double-counts failed runs in the completion summary", () => {
+    const results = [
+      ...Array.from({ length: 5 }, () => ({ status: "success" })),
+      { status: "failed" },
+      { status: "failed" },
+    ];
+    // results[] already contains the failures; adding failedKeys on top
+    // published 1120/1140 for a 1120-cell matrix.
+    expect(runCompletionSummary(results)).toEqual({ successes: 5, total: 7, failures: 2 });
+    expect(runCompletionSummary([])).toEqual({ successes: 0, total: 0, failures: 0 });
   });
 });
