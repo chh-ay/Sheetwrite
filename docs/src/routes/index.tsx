@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ThemeToggle } from "../components/ThemeToggle.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
 
@@ -21,21 +22,81 @@ interface LandingBenchSize {
   handsontableIncomplete: number;
 }
 
+interface LandingBenchData {
+  available: boolean;
+  capture?: { commit: string; timestamp: string; browser: string; rounds: number };
+  heroStats?: {
+    millionRowScenarios: number;
+    millionRowMedianMs: number;
+    millionRowHeapMb: number;
+  };
+  sizes?: LandingBenchSize[];
+}
+
+const SHOWCASES = [
+  {
+    id: "vanilla",
+    label: "Vanilla",
+    href: "/vanilla/",
+    headline: "An imperative workbook with host-owned chrome.",
+  },
+  {
+    id: "react",
+    label: "React",
+    href: "/react/",
+    headline: "100,000 sales rows behind an operating view.",
+  },
+  {
+    id: "vue",
+    label: "Vue",
+    href: "/vue/",
+    headline: "A million-row workbook on a paged datasource.",
+  },
+  {
+    id: "svelte",
+    label: "Svelte",
+    href: "/svelte/",
+    headline: "Live formulas composed from components.",
+  },
+] as const;
+
+const OWNERSHIP = [
+  {
+    key: "01 · Host",
+    title: "You own the product.",
+    detail: "Lifecycle, persistence, collaboration, and product UI stay in your codebase.",
+  },
+  {
+    key: "02 · TypeScript core",
+    title: "One narrow seam.",
+    detail:
+      "Grid API, transactions, virtualization, interaction, and renderer coordination — ownership crosses in one place.",
+  },
+  {
+    key: "03 · Rust / WASM",
+    title: "The engine owns the speed.",
+    detail: "Columnar cells, formulas, query scans, snapshots, and packed render windows.",
+  },
+] as const;
+
 function fmtRows(rows: number): string {
   return rows >= 1_000_000 ? `${rows / 1_000_000}M` : `${rows / 1_000}k`;
 }
 
+/** Shared log scale across every ratio bar: ×1 is parity (zero width). */
+function ratioWidth(ratio: number, maxRatio: number): string {
+  const domain = Math.log10(maxRatio * 1.25);
+  const pct = (Math.log10(Math.max(ratio, 1)) / domain) * 100;
+  return `${Math.min(100, Math.max(pct, 3)).toFixed(1)}%`;
+}
+
 function Landing() {
-  const bench = landingBench as {
-    available: boolean;
-    capture?: { commit: string; timestamp: string; browser: string; rounds: number };
-    heroStats?: {
-      millionRowScenarios: number;
-      millionRowMedianMs: number;
-      millionRowHeapMb: number;
-    };
-    sizes?: LandingBenchSize[];
-  };
+  const bench = landingBench as LandingBenchData;
+  const evidence =
+    bench.available && bench.sizes && bench.heroStats && bench.capture
+      ? { sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
+      : undefined;
+  const maxRatio = evidence ? Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) : 1;
   return (
     <div className="sw-landing">
       <header className="sw-landing-topbar">
@@ -55,17 +116,21 @@ function Landing() {
           </svg>
           <span>Sheetwrite</span>
         </a>
-        <nav aria-label="Site">
-          <a href="/docs/">Docs</a>
-          <a href="#benchmarks">Benchmarks</a>
-          <a href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
-        </nav>
+        <div className="sw-landing-topbar__actions">
+          <nav aria-label="Site">
+            <a href="/docs/">Docs</a>
+            <a href="#benchmarks">Benchmarks</a>
+            <a href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
+          </nav>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main id="main-content">
         <section className="sw-hero">
+          <p className="sw-hero__eyebrow">Canvas spreadsheet engine · Rust/WASM core · MIT</p>
           <h1>Build spreadsheets you still own.</h1>
-          <p>
+          <p className="sw-hero__lede">
             Sheetwrite is a canvas spreadsheet engine with a Rust/WASM data core and first-party
             Vanilla, React, Vue, and Svelte adapters. Your application owns the document, the
             persistence, and the chrome — the engine owns the speed.
@@ -78,39 +143,91 @@ function Landing() {
               See the numbers
             </a>
           </div>
-          <code className="sw-hero-install">npm install @sheetwrite/core</code>
+          <a className="sw-hero-install" href="/docs/start/installation/">
+            <span aria-hidden="true">$</span>
+            <code>npm install @sheetwrite/core</code>
+            <em>Install Sheetwrite →</em>
+          </a>
         </section>
 
         <section aria-labelledby="benchmarks-title" className="sw-landing-bench" id="benchmarks">
-          <h2 id="benchmarks-title">Measured, not promised</h2>
-          {bench.available && bench.sizes && bench.heroStats && bench.capture ? (
+          <header className="sw-section-head">
+            <p className="sw-section-eyebrow">Protocol evidence</p>
+            <h2 id="benchmarks-title">Measured, not promised</h2>
+            {evidence ? (
+              <p className="sw-section-lede">
+                Median speedups over Handsontable, rendered straight from checked-in protocol
+                artifacts. The gap widens as the data grows.
+              </p>
+            ) : null}
+          </header>
+          {evidence ? (
             <>
-              <ul className="sw-bench-stats">
-                {bench.sizes.map((entry) => (
-                  <li key={entry.size}>
-                    <strong>{entry.medianRatio}× faster</strong>
+              <div className="sw-bench-layout">
+                <figure className="sw-bench-figure">
+                  <ul className="sw-bench-stats">
+                    {evidence.sizes.map((entry) => (
+                      <li key={entry.size}>
+                        <div className="sw-bench-stat__head">
+                          <span className="sw-bench-stat__size">{fmtRows(entry.size)} rows</span>
+                          <strong>{entry.medianRatio}× faster</strong>
+                        </div>
+                        <span aria-hidden="true" className="sw-bench-stat__track">
+                          <i style={{ width: ratioWidth(entry.medianRatio, maxRatio) }} />
+                        </span>
+                        <span className="sw-bench-stat__detail">
+                          median of {entry.comparedScenarios} interactions · best {entry.bestRatio}×
+                          in <code>{entry.bestScenario}</code>
+                          {entry.handsontableIncomplete > 0
+                            ? ` · Handsontable did not finish ${entry.handsontableIncomplete} of ${
+                                entry.comparedScenarios + entry.handsontableIncomplete
+                              }`
+                            : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <figcaption>
+                    Bar length maps the median speedup on a shared log scale — ×1 would be parity.
+                  </figcaption>
+                </figure>
+                <aside aria-label="One million row summary" className="sw-bench-aside">
+                  <p className="sw-bench-aside__eyebrow">At 1,000,000 rows</p>
+                  <p className="sw-bench-aside__stat">
+                    <strong>{evidence.heroStats.millionRowMedianMs} ms</strong>
                     <span>
-                      median across {entry.comparedScenarios} interactions at {fmtRows(entry.size)}{" "}
-                      rows
-                      {entry.handsontableIncomplete > 0
-                        ? `; Handsontable did not finish ${entry.handsontableIncomplete} of them`
-                        : ""}
+                      median interaction across {evidence.heroStats.millionRowScenarios} scenarios
                     </span>
-                  </li>
-                ))}
-                <li>
-                  <strong>{bench.heroStats.millionRowMedianMs} ms</strong>
-                  <span>
-                    median interaction at 1,000,000 rows across{" "}
-                    {bench.heroStats.millionRowScenarios} scenarios ·{" "}
-                    {bench.heroStats.millionRowHeapMb} MB renderer heap
-                  </span>
-                </li>
-              </ul>
+                  </p>
+                  <p className="sw-bench-aside__stat">
+                    <strong>{evidence.heroStats.millionRowHeapMb} MB</strong>
+                    <span>renderer heap</span>
+                  </p>
+                  <dl className="sw-bench-capture">
+                    <div>
+                      <dt>Browser</dt>
+                      <dd>{evidence.capture.browser}</dd>
+                    </div>
+                    <div>
+                      <dt>Rounds</dt>
+                      <dd>{evidence.capture.rounds} counterbalanced</dd>
+                    </div>
+                    <div>
+                      <dt>Commit</dt>
+                      <dd>
+                        <code>{evidence.capture.commit.slice(0, 7)}</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Captured</dt>
+                      <dd>{evidence.capture.timestamp.slice(0, 10)}</dd>
+                    </div>
+                  </dl>
+                </aside>
+              </div>
               <p className="sw-bench-footnote">
-                Ten counterbalanced rounds in controlled {bench.capture.browser}, correctness
-                checkpoints on every interaction, failures recorded as failures.{" "}
-                <a href="/docs/guides/performance-resources/">Read the full protocol.</a>
+                Correctness checkpoints guard every interaction, and failures are recorded as
+                failures. <a href="/docs/guides/performance-resources/">Read the full protocol.</a>
               </p>
             </>
           ) : (
@@ -123,25 +240,45 @@ function Landing() {
         </section>
 
         <section aria-labelledby="showcases-title" className="sw-landing-showcases">
-          <h2 id="showcases-title">Live in every framework</h2>
+          <header className="sw-section-head">
+            <p className="sw-section-eyebrow">Live showcases</p>
+            <h2 id="showcases-title">Live in every framework</h2>
+            <p className="sw-section-lede">
+              Four real integrations running on the real adapters — the same package entry points
+              you install. Open one and type.
+            </p>
+          </header>
           <div className="sw-landing-grid sw-landing-grid--frameworks">
-            <a href="/vanilla/">
-              <strong>Vanilla</strong>
-              <span>An imperative workbook with host-owned chrome.</span>
-            </a>
-            <a href="/react/">
-              <strong>React</strong>
-              <span>100,000 sales rows behind an operating view.</span>
-            </a>
-            <a href="/vue/">
-              <strong>Vue</strong>
-              <span>A million-row workbook on a paged datasource.</span>
-            </a>
-            <a href="/svelte/">
-              <strong>Svelte</strong>
-              <span>Live formulas composed from components.</span>
-            </a>
+            {SHOWCASES.map((showcase) => (
+              <a data-framework={showcase.id} href={showcase.href} key={showcase.id}>
+                <span className="sw-showcase-card__meta">
+                  <i aria-hidden="true" />
+                  {showcase.label}
+                </span>
+                <strong>{showcase.headline}</strong>
+                <span className="sw-showcase-card__cta">Open the live grid →</span>
+              </a>
+            ))}
           </div>
+        </section>
+
+        <section aria-labelledby="ownership-title" className="sw-landing-own">
+          <header className="sw-section-head">
+            <p className="sw-section-eyebrow">Runtime contract</p>
+            <h2 id="ownership-title">The ownership line is explicit</h2>
+          </header>
+          <ol className="sw-own-grid">
+            {OWNERSHIP.map((layer) => (
+              <li key={layer.key}>
+                <span>{layer.key}</span>
+                <h3>{layer.title}</h3>
+                <p>{layer.detail}</p>
+              </li>
+            ))}
+          </ol>
+          <a className="sw-own-link" href="/docs/concepts/runtime-ownership/">
+            Read the runtime-ownership model →
+          </a>
         </section>
       </main>
 
