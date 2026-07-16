@@ -1882,7 +1882,8 @@ body .sw-code-popover__accessible-signature {
   grid-area: lead;
 }
 
-.bench-viz__cols {
+.bench-viz__cols,
+.bench-viz__legend {
   grid-area: cols;
   text-align: right;
 }
@@ -2013,7 +2014,16 @@ body .sw-code-popover__accessible-signature {
   background: var(--sw-accent);
 }
 
-/* Percentile detail intentionally has no visual: median bars only. */
+/* Median->p95 spread: an attached faded tail under the solid median fill. */
+.bench-bar__spread {
+  left: 0;
+  border-radius: 0.16rem;
+  background: color-mix(in srgb, var(--sw-fg-muted) 20%, transparent);
+}
+
+.bench-bar[data-engine="sheetwrite"] .bench-bar__spread {
+  background: color-mix(in srgb, var(--sw-accent) 28%, transparent);
+}
 
 .bench-bar__value {
   grid-area: value;
@@ -2021,6 +2031,36 @@ body .sw-code-popover__accessible-signature {
   font: 500 0.76rem / 1.4 var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+.bench-bar__value small {
+  margin-left: 0.45rem;
+  color: var(--sw-fg-dim);
+  font-size: 0.66rem;
+}
+
+/* Header legend: real swatches teach the fill/tail encoding at a glance. */
+.bench-viz__legend {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  justify-self: end;
+  color: var(--sw-fg-dim);
+  font: 650 0.62rem / 1 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bench-legend-swatch {
+  width: 0.85rem;
+  height: 0.4rem;
+  border-radius: 0.12rem;
+  background: var(--sw-accent);
+}
+
+.bench-legend-swatch[data-kind="p95"] {
+  margin-left: 0.6rem;
+  background: color-mix(in srgb, var(--sw-accent) 28%, transparent);
 }
 
 .bench-viz figcaption {

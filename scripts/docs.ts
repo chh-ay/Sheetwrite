@@ -793,18 +793,24 @@ async function renderEvidencePage(): Promise<string> {
       .map((tick) => `<i class="bench-bar__tick" style="left:${percent(tick)}"></i>`)
       .join("");
     const engineLabels = { sheetwrite: "Sheetwrite", handsontable: "Handsontable" } as const;
-    // Median-only presentation: one bar, one number. Percentile spread lives
-    // in the raw artifact; it confused readers more than it informed them.
-    const bar = (engine: keyof typeof engineLabels, stats: { median: number }): string =>
+    // Solid fill = median; an attached faded tail extends to p95. A visual
+    // legend in the header carries the vocabulary so the rows stay clean.
+    const bar = (
+      engine: keyof typeof engineLabels,
+      stats: { median: number; p95: number },
+    ): string =>
       `<div class="bench-bar" data-engine="${engine}">` +
       `<span class="bench-bar__engine">${engineLabels[engine]}</span>` +
       `<span class="bench-bar__track" aria-hidden="true">${trackTicks}` +
+      `<i class="bench-bar__spread" style="width:${percent(stats.p95)}"></i>` +
       `<i class="bench-bar__fill" style="width:${percent(stats.median)}"></i></span>` +
-      `<span class="bench-bar__value">${ms(stats.median)}</span>` +
+      `<span class="bench-bar__value">${ms(stats.median)}<small>p95 ${ms(stats.p95)}</small></span>` +
       `</div>`;
+    const legend =
+      '<span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span>';
     lines.push(
       '<figure class="bench-viz">',
-      `<div class="bench-viz__scale" aria-hidden="true"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis">${axisLabels}</span><span class="bench-viz__cols">median time</span></div>`,
+      `<div class="bench-viz__scale" aria-hidden="true"><span class="bench-viz__lead">interaction</span><span class="bench-viz__axis">${axisLabels}</span>${legend}</div>`,
     );
     for (const { scenario, ours, theirs } of comparisons) {
       const faster = theirs.median >= ours.median;
@@ -818,7 +824,7 @@ async function renderEvidencePage(): Promise<string> {
       );
     }
     lines.push(
-      "<figcaption>Bars are the median time per interaction on a logarithmic axis — every tick is one 10× step, shorter is faster. Percentiles, spread, and memory counters live in the raw artifact.</figcaption>",
+      "<figcaption>Bars are per-interaction time on a logarithmic axis — every tick is one 10× step, shorter is faster. The solid fill is the median run; the faded tail reaches the slowest 1-in-20 run (p95). Full samples and memory counters live in the raw artifact.</figcaption>",
       "</figure>",
     );
     lines.push(
