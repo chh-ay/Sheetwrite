@@ -1980,6 +1980,13 @@ body .sw-code-popover__accessible-signature {
   margin-top: 0.4rem;
 }
 
+/* Single-size workloads: no track - a lone bar normalized against itself
+   carries no information; the numbers are the row. */
+.bench-bar--solo {
+  grid-template-areas: "engine value";
+  grid-template-columns: minmax(8rem, 1fr) auto;
+}
+
 .bench-bar__engine {
   grid-area: engine;
   color: var(--sw-fg-muted);
@@ -2103,17 +2110,23 @@ body .sw-code-popover__accessible-signature {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0.3rem;
   }
+
+  .bench-bar--solo {
+    grid-template-areas: "engine value";
+    row-gap: 0;
+  }
 }
 
 /* ---- Benchmark widget: size x metric CSS-only tabs (no client JS) ---- */
 
-/* Radios stay focusable (arrow keys switch tabs); labels are the visual UI. */
+/* Radios stay focusable (arrow keys switch tabs); labels are the visual UI.
+   No pointer-events:none - it blocks label-forwarded activation in Chromium. */
 .bench-widget > input[type="radio"] {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: 0;
   opacity: 0;
-  pointer-events: none;
 }
 
 .bench-widget__tabs {
@@ -2204,4 +2217,57 @@ body .sw-code-popover__accessible-signature {
 .bench-viz__ratio[data-kind="crashed"],
 .bench-viz__ratio[data-kind="solo"] {
   color: var(--sw-type-number);
+}
+
+/* Default widget state (100k / speed) when no radio has been touched yet.
+   The generator cannot emit `checked` - hydrated React would treat the
+   input as controlled and revert every user toggle. */
+.bench-widget:not(:has(input[name="bench-size"]:checked))
+  label[for="bench-size-100000"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked))
+  label[for="bench-metric-speed"] {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
+}
+
+.bench-widget:not(:has(input[name="bench-size"]:checked)):not(
+    :has(input[name="bench-metric"]:checked)
+  )
+  .bench-panel[data-size="100000"][data-metric="speed"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked))
+  #bench-size-1000:checked
+  ~ .bench-panel[data-size="1000"][data-metric="speed"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked))
+  #bench-size-10000:checked
+  ~ .bench-panel[data-size="10000"][data-metric="speed"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked))
+  #bench-size-100000:checked
+  ~ .bench-panel[data-size="100000"][data-metric="speed"],
+.bench-widget:not(:has(input[name="bench-metric"]:checked))
+  #bench-size-1000000:checked
+  ~ .bench-panel[data-size="1000000"][data-metric="speed"],
+.bench-widget:not(:has(input[name="bench-size"]:checked))
+  #bench-metric-speed:checked
+  ~ .bench-panel[data-size="100000"][data-metric="speed"],
+.bench-widget:not(:has(input[name="bench-size"]:checked))
+  #bench-metric-memory:checked
+  ~ .bench-panel[data-size="100000"][data-metric="memory"] {
+  display: block;
+}
+
+/* ---- Data engine widget: 1k / 10k head-to-head size tabs ---- */
+
+#bench-data-1000:checked ~ .bench-widget__tabs label[for="bench-data-1000"],
+#bench-data-10000:checked ~ .bench-widget__tabs label[for="bench-data-10000"],
+.bench-widget--data:not(:has(input[name="bench-data-size"]:checked))
+  label[for="bench-data-10000"] {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
+}
+
+#bench-data-1000:checked ~ .bench-panel[data-size="1000"],
+#bench-data-10000:checked ~ .bench-panel[data-size="10000"],
+.bench-widget--data:not(:has(input[name="bench-data-size"]:checked))
+  .bench-panel[data-size="10000"] {
+  display: block;
 }
