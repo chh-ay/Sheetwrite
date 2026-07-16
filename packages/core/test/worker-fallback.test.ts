@@ -52,6 +52,77 @@ describe("worker renderer fallback observability", () => {
     grid.destroy();
   });
 
+  it("falls back after offscreen transfer throws and terminates the constructed worker", async () => {
+    const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+    const transferDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLCanvasElement.prototype,
+      "transferControlToOffscreen",
+    );
+    let instance: TransferFailingWorker | null = null;
+
+    class TransferFailingWorker extends EventTarget {
+      terminations = 0;
+
+      constructor() {
+        super();
+        instance = this;
+      }
+
+      postMessage(): void {}
+
+      terminate(): void {
+        this.terminations += 1;
+      }
+    }
+
+    Object.defineProperty(globalThis, "Worker", {
+      configurable: true,
+      value: TransferFailingWorker,
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
+      configurable: true,
+      value: () => {
+        throw new Error("offscreen transfer rejected");
+      },
+    });
+
+    try {
+      const host = mountHost();
+      const events: Array<GridEvents["renderer-fallback"]> = [];
+      const grid = new GridImpl(host, {
+        workbook: makeWorkbook(5),
+        data: makeColumnarData(5),
+        renderer: "worker",
+        workerUrl: "/worker-with-broken-transfer.js",
+      });
+      grid.on("renderer-fallback", (event) => events.push(event));
+      await Promise.resolve();
+
+      const worker = instance as TransferFailingWorker | null;
+      if (!worker) throw new Error("Worker was not constructed before transfer");
+      expect(grid.rendererKind()).toBe("canvas");
+      expect(host.querySelectorAll("canvas")).toHaveLength(1);
+      expect(worker.terminations).toBe(1);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ requested: "worker" });
+      expect(events[0]?.error).toBeInstanceOf(Error);
+
+      grid.destroy();
+    } finally {
+      if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
+      else Reflect.deleteProperty(globalThis, "Worker");
+      if (transferDescriptor) {
+        Object.defineProperty(
+          HTMLCanvasElement.prototype,
+          "transferControlToOffscreen",
+          transferDescriptor,
+        );
+      } else {
+        Reflect.deleteProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen");
+      }
+    }
+  });
+
   it("falls back exactly once when a constructed worker fails asynchronously", async () => {
     const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
     const transferDescriptor = Object.getOwnPropertyDescriptor(

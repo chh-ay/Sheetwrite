@@ -107,7 +107,7 @@ export interface ClipboardCell {
 export interface ClipboardSnapshot {
   /** Top-left source cell in data coordinates — the formula re-anchor origin. */
   anchor: { row: number; col: number };
-  /** Row-major matrix of copied cells, in the source's view order. */
+  /** Row-major copied cells in the source's view order. */
   cells: ClipboardCell[][];
   /** The exact TSV written to the system clipboard; the paste-time identity check. */
   tsv: string;

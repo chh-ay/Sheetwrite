@@ -89,8 +89,6 @@ const KIND_NUMBER = 1;
 const KIND_STRING = 2;
 const NO_STRING = 0xffffffff;
 
-const stringCache = new Map<number, string>();
-
 /**
  * Hard cap on the pool-id→string cache, mirroring `SheetwriteStore`. A full-sheet
  * sweep would otherwise grow it to O(distinct strings), duplicating the WASM
@@ -99,46 +97,49 @@ const stringCache = new Map<number, string>();
  */
 const STRING_CACHE_CAP = 65_536;
 
-let valuesScratch: CellScalar[] = [];
+interface WorkerRuntimeState {
+  stringCache: Map<number, string>;
+  valuesScratch: CellScalar[];
+  canvas: OffscreenCanvas | null;
+  ctx: OffscreenCanvasRenderingContext2D | null;
+  layout: RenderLayout | null;
+  theme: Theme | null;
+  viewport: Viewport;
+  dpr: number;
+  lastViewport: Viewport | null;
+  lastDpr: number;
+}
 
-let canvas: OffscreenCanvas | null = null;
-let ctx: OffscreenCanvasRenderingContext2D | null = null;
-let layout: RenderLayout | null = null;
-let theme: Theme | null = null;
-let viewport: Viewport = { scrollTop: 0, scrollLeft: 0, width: 0, height: 0 };
-let dpr = 1;
-let lastViewport: Viewport | null = null;
-let lastDpr = 1;
-
-function unpackPackedView(msg: PackedPaintData): VisibleWindowView {
+function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): VisibleWindowView {
   const updateIds = msg.stringPoolUpdateIds;
   const updateValues = msg.stringPoolUpdateValues;
 
   // Cap the pool-id→string cache before this frame's updates are folded in; the
   // just-swept window re-warms from the update payload below.
-  if (stringCache.size >= STRING_CACHE_CAP) stringCache.clear();
+  if (state.stringCache.size >= STRING_CACHE_CAP) state.stringCache.clear();
   if (updateIds && updateValues) {
     for (let i = 0; i < updateIds.length; i++) {
-      stringCache.set(updateIds[i] ?? NO_STRING, updateValues[i] ?? "");
+      state.stringCache.set(updateIds[i] ?? NO_STRING, updateValues[i] ?? "");
     }
   }
 
-  if (valuesScratch.length !== msg.valueKinds.length)
-    valuesScratch = new Array(msg.valueKinds.length);
+  if (state.valuesScratch.length !== msg.valueKinds.length) {
+    state.valuesScratch = new Array(msg.valueKinds.length);
+  }
   const localStrings = msg.localStrings ?? [];
   for (let i = 0; i < msg.valueKinds.length; i++) {
     if (msg.valueKinds[i] === KIND_NUMBER) {
-      valuesScratch[i] = msg.numberValues[i] ?? null;
+      state.valuesScratch[i] = msg.numberValues[i] ?? null;
     } else if (msg.valueKinds[i] === KIND_STRING) {
       const poolId = msg.stringPoolIds[i] ?? NO_STRING;
       if (poolId !== NO_STRING) {
-        valuesScratch[i] = stringCache.get(poolId) ?? null;
+        state.valuesScratch[i] = state.stringCache.get(poolId) ?? null;
       } else {
         const localId = msg.stringLocalIds[i] ?? -1;
-        valuesScratch[i] = localId >= 0 ? (localStrings[localId] ?? null) : null;
+        state.valuesScratch[i] = localId >= 0 ? (localStrings[localId] ?? null) : null;
       }
     } else {
-      valuesScratch[i] = null;
+      state.valuesScratch[i] = null;
     }
   }
 
@@ -146,13 +147,16 @@ function unpackPackedView(msg: PackedPaintData): VisibleWindowView {
     sheet: msg.sheet,
     rows: msg.rows,
     cols: msg.cols,
-    values: valuesScratch,
+    values: state.valuesScratch,
     styleIds: msg.styleIds,
     styles: msg.styles,
   };
 }
 
-function unpackSharedPackedView(msg: SharedPackedMessage): VisibleWindowView {
+function unpackSharedPackedView(
+  msg: SharedPackedMessage,
+  state: WorkerRuntimeState,
+): VisibleWindowView {
   const { buffer, offsets, lengths } = msg.shared;
   const packed: PackedPaintMessage = {
     type: "paintPacked",
@@ -172,102 +176,159 @@ function unpackSharedPackedView(msg: SharedPackedMessage): VisibleWindowView {
     stringPoolUpdateValues: msg.stringPoolUpdateValues,
     localStrings: msg.localStrings,
   };
-  return unpackPackedView(packed);
+  return unpackPackedView(packed, state);
 }
 
 function releaseSharedPackedView(msg: SharedPackedMessage): void {
   Atomics.store(new Int32Array(msg.shared.buffer, 0, 2), 0, 0);
 }
 
-function paintView(view: VisibleWindowView): boolean {
-  if (!ctx || !canvas || !layout || !theme) return false;
-  const damage = blitVerticalScroll(ctx, canvas, theme, lastViewport, viewport, dpr, lastDpr);
-  paintFrame(ctx, view, layout, theme, viewport, dpr, NO_RENDERERS, damage);
-  lastViewport = { ...viewport };
-  lastDpr = dpr;
+function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean {
+  if (!state.ctx || !state.canvas || !state.layout || !state.theme) return false;
+  const damage = blitVerticalScroll(
+    state.ctx,
+    state.canvas,
+    state.theme,
+    state.lastViewport,
+    state.viewport,
+    state.dpr,
+    state.lastDpr,
+  );
+  paintFrame(
+    state.ctx,
+    view,
+    state.layout,
+    state.theme,
+    state.viewport,
+    state.dpr,
+    NO_RENDERERS,
+    damage,
+  );
+  state.lastViewport = { ...state.viewport };
+  state.lastDpr = state.dpr;
   return true;
 }
 
 /** Paint one frame as clipped frozen panes; pane frames never blit. */
-function paintPanesFrame(msg: PanesMessage): boolean {
-  if (!ctx || !canvas || !layout || !theme) return false;
-  lastViewport = null;
+function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean {
+  if (!state.ctx || !state.canvas || !state.layout || !state.theme) return false;
+  state.lastViewport = null;
 
   for (const pane of msg.panes) {
-    const view = pane.packed ? unpackPackedView(pane.packed) : pane.view;
+    const view = pane.packed ? unpackPackedView(pane.packed, state) : pane.view;
     if (!view) continue;
     const paneViewport: Viewport = {
       scrollTop: pane.scrollTop,
       scrollLeft: pane.scrollLeft,
-      width: viewport.width,
-      height: viewport.height,
+      width: state.viewport.width,
+      height: state.viewport.height,
       rowTops: pane.rowTops,
       rowHeights: pane.rowHeights,
     };
-    paintFrame(ctx, view, layout, theme, paneViewport, dpr, NO_RENDERERS, undefined, pane.clip);
+    paintFrame(
+      state.ctx,
+      view,
+      state.layout,
+      state.theme,
+      paneViewport,
+      state.dpr,
+      NO_RENDERERS,
+      undefined,
+      pane.clip,
+    );
   }
 
-  paintFreezeDivider(ctx, theme, viewport, dpr, msg.divider);
+  paintFreezeDivider(state.ctx, state.theme, state.viewport, state.dpr, msg.divider);
   return true;
 }
 
-function acknowledgeFrame(painted: boolean): void {
-  if (painted) postMessage({ type: "painted" });
+/** Acknowledgement posted back to the sender after a frame actually painted. */
+export type WorkerAcknowledgement = { type: "painted" };
+
+/**
+ * Build the worker-side protocol handler. Keeping the mutable render state
+ * inside the returned closure lets tests exercise the real message contract
+ * without booting a browser Worker.
+ */
+export function createWorkerMessageHandler(
+  postAcknowledgement: (message: WorkerAcknowledgement) => void,
+): (message: unknown) => void {
+  const state: WorkerRuntimeState = {
+    stringCache: new Map(),
+    valuesScratch: [],
+    canvas: null,
+    ctx: null,
+    layout: null,
+    theme: null,
+    viewport: { scrollTop: 0, scrollLeft: 0, width: 0, height: 0 },
+    dpr: 1,
+    lastViewport: null,
+    lastDpr: 1,
+  };
+  const acknowledgeFrame = (painted: boolean): void => {
+    if (painted) postAcknowledgement({ type: "painted" });
+  };
+
+  return (input: unknown): void => {
+    if (input === null || typeof input !== "object" || !("type" in input)) return;
+    const msg = input as WorkerMessage;
+    switch (msg.type) {
+      case "init":
+        state.canvas = msg.canvas;
+        state.ctx = state.canvas.getContext("2d", { alpha: false, desynchronized: true });
+        state.theme = msg.theme;
+        state.lastViewport = null;
+        break;
+      case "layout":
+        state.layout = msg.layout;
+        state.lastViewport = null;
+        break;
+      case "theme":
+        state.theme = msg.theme;
+        state.lastViewport = null;
+        break;
+      case "viewport":
+        state.viewport = msg.viewport;
+        state.dpr = msg.dpr;
+        if (state.canvas) {
+          const w = Math.max(1, Math.round(state.viewport.width * state.dpr));
+          const h = Math.max(1, Math.round(state.viewport.height * state.dpr));
+          if (state.canvas.width !== w || state.canvas.height !== h) {
+            state.canvas.width = w;
+            state.canvas.height = h;
+            state.lastViewport = null;
+          }
+        }
+        break;
+      case "paint":
+        acknowledgeFrame(paintView(state, msg.view));
+        break;
+      case "paintPacked":
+        acknowledgeFrame(paintView(state, unpackPackedView(msg, state)));
+        break;
+      case "paintPanes":
+        acknowledgeFrame(paintPanesFrame(state, msg));
+        break;
+      case "paintPackedShared": {
+        let painted = false;
+        try {
+          painted = paintView(state, unpackSharedPackedView(msg, state));
+        } finally {
+          releaseSharedPackedView(msg);
+        }
+        acknowledgeFrame(painted);
+        break;
+      }
+      case "destroy":
+        state.ctx = null;
+        state.canvas = null;
+        state.lastViewport = null;
+        break;
+    }
+  };
 }
 
+const handleWorkerMessage = createWorkerMessageHandler((message) => postMessage(message));
 addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as WorkerMessage;
-  switch (msg.type) {
-    case "init":
-      canvas = msg.canvas;
-      ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
-      theme = msg.theme;
-      lastViewport = null;
-      break;
-    case "layout":
-      layout = msg.layout;
-      lastViewport = null;
-      break;
-    case "theme":
-      theme = msg.theme;
-      lastViewport = null;
-      break;
-    case "viewport":
-      viewport = msg.viewport;
-      dpr = msg.dpr;
-      if (canvas) {
-        const w = Math.max(1, Math.round(viewport.width * dpr));
-        const h = Math.max(1, Math.round(viewport.height * dpr));
-        if (canvas.width !== w || canvas.height !== h) {
-          canvas.width = w;
-          canvas.height = h;
-          lastViewport = null;
-        }
-      }
-      break;
-    case "paint":
-      acknowledgeFrame(paintView(msg.view));
-      break;
-    case "paintPacked":
-      acknowledgeFrame(paintView(unpackPackedView(msg)));
-      break;
-    case "paintPanes":
-      acknowledgeFrame(paintPanesFrame(msg));
-      break;
-    case "paintPackedShared": {
-      let painted = false;
-      try {
-        painted = paintView(unpackSharedPackedView(msg));
-      } finally {
-        releaseSharedPackedView(msg);
-      }
-      acknowledgeFrame(painted);
-      break;
-    }
-    case "destroy":
-      ctx = null;
-      canvas = null;
-      lastViewport = null;
-      break;
-  }
+  handleWorkerMessage(event.data);
 });
