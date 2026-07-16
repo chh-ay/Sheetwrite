@@ -21,8 +21,10 @@ plans/
 test-results/
 playwright-report/
 
-# Bench baseline replay scratch (raw rounds; promoted copies are tracked)
+# Bench baseline replay scratch and fresh gate captures (promoted copies are tracked)
 bench/results/candidates/
+bench/results/render-fresh.json
+bench/results/render-fresh.md
 
 # Editor / OS
 .DS_Store
