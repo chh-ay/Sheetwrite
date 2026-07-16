@@ -1,199 +1,184 @@
-import { describe, expect, it } from "bun:test";
-import { SelectionModel, type SelRect } from "../src/selection.js";
-import { StyleActions } from "../src/style-actions.js";
-import type { CellStyle, DocumentOp, ResolvedCell, Sheet, Store, Theme } from "../src/types.js";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { createGrid, initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
+import { installCanvasTestStubs } from "../src/testing.js";
+import type { Grid } from "../src/types.js";
+import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
-/**
- * Build a `StyleActions` over a real `SelectionModel` and a mutable in-memory
- * style map. `commit` applies each set patch back into the map so a follow-up
- * toggle observes the freshly written style (mirroring the store round-trip).
- */
-function makeHarness(toDataRow: (viewRow: number) => number = (viewRow) => viewRow) {
-  const styles = new Map<string, CellStyle>();
-  const keyOf = (row: number, col: number): string => `${row},${col}`;
+let restoreCanvasStubs: () => void;
 
-  const store = {
-    getCell: (addr: { row: number; col: number }): ResolvedCell => ({
-      resolved: null,
-      style: styles.get(keyOf(addr.row, addr.col)) ?? {},
-    }),
-  } as unknown as Store;
+beforeAll(async () => {
+  await initSheetwrite();
+});
 
-  const selection = new SelectionModel(100, 0, 2);
-  const commits: DocumentOp[][] = [];
+beforeEach(() => {
+  restoreCanvasStubs = installCanvasTestStubs();
+});
 
-  const merges: SelRect[] = [];
+afterEach(() => {
+  restoreCanvasStubs();
+  document.body.innerHTML = "";
+});
 
-  const actions = new StyleActions({
-    store,
-    loadable: null,
-    selection: () => selection,
-    activeSheet: () => "s1",
-    sheet: () => ({ columns: [{}, {}, {}] }) as unknown as Sheet,
-    readOnly: () => false,
-    theme: () => ({ fg: "#000000" }) as unknown as Theme,
-    merges: () => merges,
-    anchorCell: (row, col) => ({ row, col }),
-    toDataRow,
-    commit: (patches) => {
-      commits.push(patches);
-      for (const p of patches) {
-        if (p.op === "set") styles.set(keyOf(p.addr.row, p.addr.col), p.style ?? {});
-        if (p.op === "setRangeStyle") {
-          const r0 = Math.min(p.range.start.row, p.range.end.row);
-          const r1 = Math.max(p.range.start.row, p.range.end.row);
-          const c0 = Math.min(p.range.start.col, p.range.end.col);
-          const c1 = Math.max(p.range.start.col, p.range.end.col);
-          for (let row = r0; row <= r1; row++) {
-            for (let col = c0; col <= c1; col++) {
-              styles.set(
-                keyOf(row, col),
-                p.style === null ? {} : { ...(styles.get(keyOf(row, col)) ?? {}), ...p.style },
-              );
-            }
-          }
-        }
-      }
-    },
+function makeGrid(rowCount = 10): Grid {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
+  document.body.appendChild(host);
+  return createGrid(host, {
+    workbook: makeWorkbook(rowCount),
+    data: makeColumnarData(rowCount),
+    config: { toolbar: false, find: false, contextMenu: false },
   });
-
-  return { actions, selection, commits };
 }
 
 describe("StyleActions underline/strikethrough toggles", () => {
-  it("sets underline across the whole selection in one transaction", () => {
-    const { actions, selection, commits } = makeHarness();
-    selection.selectCell(0, 0);
-    selection.extendTo(0, 1); // 1x2 range spanning columns 0 and 1
-
-    actions.toggleStyle("underline");
-
-    expect(commits).toHaveLength(1); // single undo step
-    const patches = commits[0]!;
-    expect(patches).toHaveLength(1);
-    expect(patches[0]).toEqual({
-      op: "setRangeStyle",
-      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } },
-      style: { underline: true },
-    });
-  });
-
-  it("clears underline on the re-toggle when the focus cell already has it", () => {
-    const { actions, selection, commits } = makeHarness();
-    selection.selectCell(0, 0);
-    selection.extendTo(0, 1);
-
-    actions.toggleStyle("underline");
-    actions.toggleStyle("underline");
-
-    expect(commits).toHaveLength(2);
-    expect(commits[1]).toEqual([
-      {
-        op: "setRangeStyle",
-        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } },
-        style: { underline: false },
+  it("applies underline to the selection and restores every style with one undo", () => {
+    const grid = makeGrid();
+    grid.setSelection({
+      kind: "range",
+      range: {
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 0, col: 1 },
       },
-    ]);
+    });
+
+    grid.actions.toggleUnderline();
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).style.underline).toBe(true);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style.underline).toBe(true);
+
+    grid.actions.undo();
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).style.underline).toBeUndefined();
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style.underline).toBeUndefined();
+    grid.destroy();
   });
 
-  it("toggles strikethrough independently of underline", () => {
-    const { actions, selection, commits } = makeHarness();
-    selection.selectCell(1, 0);
-
-    actions.toggleStyle("strikethrough");
-
-    const patch = commits[0]![0]!;
-    expect(patch.op).toBe("setRangeStyle");
-    if (patch.op === "setRangeStyle") {
-      expect(patch.style?.strikethrough).toBe(true);
-      expect(patch.style?.underline).toBeUndefined();
-    }
-  });
-
-  it("preserves an existing style flag when adding another decoration", () => {
-    const { actions, selection, commits } = makeHarness();
-    selection.selectCell(2, 0);
-
-    actions.toggleStyle("underline");
-    actions.toggleStyle("strikethrough");
-
-    const patch = commits[1]![0]!;
-    if (patch.op === "setRangeStyle") {
-      expect(patch.style?.underline).toBeUndefined();
-      expect(patch.style?.strikethrough).toBe(true);
-    }
-  });
-  it("coalesces a descending sorted-view selection without changing data coordinates", () => {
-    const { actions, selection, commits } = makeHarness((viewRow) => 9 - viewRow);
-    selection.selectCell(0, 0);
-    selection.extendTo(2, 0);
-
-    actions.toggleStyle("underline");
-
-    expect(commits).toEqual([
-      [
+  it("adds strikethrough without losing an existing underline", () => {
+    const grid = makeGrid();
+    const addr = { sheet: "s1", row: 1, col: 0 };
+    grid.applyTransaction({
+      patches: [
         {
           op: "setRangeStyle",
-          range: { sheet: "s1", start: { row: 9, col: 0 }, end: { row: 7, col: 0 } },
+          range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
           style: { underline: true },
         },
       ],
-    ]);
+    });
+    grid.setSelection({ kind: "cell", addr });
+
+    grid.actions.toggleStrikethrough();
+
+    expect(grid.store.getCell(addr).style).toMatchObject({
+      underline: true,
+      strikethrough: true,
+    });
+    grid.destroy();
   });
 
-  it("keeps non-contiguous filtered-view rows as separate compact ranges", () => {
-    const rows = [2, 5, 9];
-    const { actions, selection, commits } = makeHarness((viewRow) => rows[viewRow]!);
-    selection.selectCell(0, 1);
-    selection.extendTo(2, 1);
-
-    actions.toggleStyle("underline");
-
-    expect(commits[0]!.map((patch) => (patch.op === "setRangeStyle" ? patch.range : null))).toEqual(
-      rows.map((row) => ({
+  it("styles the selected rows in a descending sorted view", () => {
+    const grid = makeGrid();
+    const store = grid.store as SheetwriteStore;
+    store.sortBy("s1", 1, false);
+    grid.setSelection({
+      kind: "range",
+      range: {
         sheet: "s1",
-        start: { row, col: 1 },
-        end: { row, col: 1 },
-      })),
-    );
+        start: { row: 0, col: 0 },
+        end: { row: 2, col: 0 },
+      },
+    });
+
+    grid.actions.toggleUnderline();
+
+    for (const row of [7, 8, 9]) {
+      expect(store.getCell({ sheet: "s1", row, col: 0 }).style.underline).toBe(true);
+    }
+    expect(store.getCell({ sheet: "s1", row: 6, col: 0 }).style.underline).toBeUndefined();
+    grid.destroy();
+  });
+
+  it("styles only non-contiguous rows present in a filtered view", () => {
+    const grid = makeGrid();
+    const store = grid.store as SheetwriteStore;
+    store.filterBy("s1", 2, "Berlin");
+    grid.setSelection({
+      kind: "range",
+      range: {
+        sheet: "s1",
+        start: { row: 0, col: 1 },
+        end: { row: 2, col: 1 },
+      },
+    });
+
+    grid.actions.toggleUnderline();
+
+    for (const row of [2, 5, 8]) {
+      expect(store.getCell({ sheet: "s1", row, col: 1 }).style.underline).toBe(true);
+    }
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.underline).toBeUndefined();
+    grid.destroy();
   });
 
   it("does nothing when the selection is empty", () => {
-    const { actions, commits } = makeHarness();
+    const grid = makeGrid();
+    let changes = 0;
+    grid.on("change", () => {
+      changes += 1;
+    });
 
-    actions.toggleStyle("underline");
+    grid.actions.toggleUnderline();
 
-    expect(commits).toHaveLength(0);
+    expect(changes).toBe(0);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).style).toEqual({});
+    grid.destroy();
   });
 });
 
 describe("StyleActions merge policy", () => {
-  it("keeps the anchor and clears every covered cell in one commit", () => {
-    const { actions, selection, commits } = makeHarness();
-    selection.selectCell(1, 0);
-    selection.extendTo(2, 1);
+  it("keeps anchor content, clears covered cells, and restores the merge with one undo", () => {
+    const grid = makeGrid(4);
+    const addresses = [
+      { sheet: "s1", row: 1, col: 0 },
+      { sheet: "s1", row: 1, col: 1 },
+      { sheet: "s1", row: 2, col: 0 },
+      { sheet: "s1", row: 2, col: 1 },
+    ] as const;
+    grid.applyTransaction({
+      patches: addresses.map((addr, index) => ({
+        op: "set" as const,
+        addr,
+        value: { kind: "literal" as const, value: `value-${index}` },
+      })),
+    });
+    grid.setSelection({
+      kind: "range",
+      range: {
+        sheet: "s1",
+        start: { row: 1, col: 0 },
+        end: { row: 2, col: 1 },
+      },
+    });
 
-    actions.mergeSelection();
+    grid.actions.merge();
 
-    expect(commits).toEqual([
-      [
-        { op: "addMerge", sheet: "s1", merge: { r0: 1, c0: 0, r1: 2, c1: 1 } },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 1 },
-          value: { kind: "literal", value: null },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 2, col: 0 },
-          value: { kind: "literal", value: null },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 2, col: 1 },
-          value: { kind: "literal", value: null },
-        },
-      ],
+    expect(grid.store.getWorkbook().sheets[0]!.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
+    expect(addresses.map((addr) => grid.store.getCell(addr).resolved)).toEqual([
+      "value-0",
+      null,
+      null,
+      null,
     ]);
+
+    grid.actions.undo();
+    expect(grid.store.getWorkbook().sheets[0]!.merges ?? []).toEqual([]);
+    expect(addresses.map((addr) => grid.store.getCell(addr).resolved)).toEqual([
+      "value-0",
+      "value-1",
+      "value-2",
+      "value-3",
+    ]);
+    grid.destroy();
   });
 });

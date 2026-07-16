@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 import {
   type DocumentValidationError,
   type DocumentValidationResult,
@@ -7,7 +7,46 @@ import {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../src/document-protocol.js";
+import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
 import type { DocumentOp, WorkbookSnapshot } from "../src/types.js";
+import { makeWorkbook } from "./fixtures.js";
+
+type OperationTargetSource = "address" | "range" | "sheet" | "new-sheet" | "named-range";
+
+const OPERATION_TARGET_SOURCE = {
+  set: "address",
+  setRange: "range",
+  setBlock: "range",
+  setRangeStyle: "range",
+  clearRange: "range",
+  addRows: "sheet",
+  removeRows: "sheet",
+  moveRows: "sheet",
+  addColumns: "sheet",
+  removeColumns: "sheet",
+  moveColumns: "sheet",
+  setColumn: "sheet",
+  setRowMeta: "sheet",
+  addMerge: "sheet",
+  removeMerge: "sheet",
+  addSheet: "new-sheet",
+  removeSheet: "sheet",
+  renameSheet: "sheet",
+  moveSheet: "sheet",
+  setSheetMeta: "sheet",
+  setValidationRule: "sheet",
+  removeValidationRule: "sheet",
+  setProtectedRange: "sheet",
+  removeProtectedRange: "sheet",
+  setNote: "address",
+  setNamedRange: "named-range",
+  removeNamedRange: "named-range",
+} satisfies Record<DocumentOp["op"], OperationTargetSource>;
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
 
 function richSnapshot(): WorkbookSnapshot {
   return {
@@ -691,88 +730,48 @@ describe("workbook document protocol", () => {
     expect(missingScopeResult.errors.map((error) => error.code)).toContain("missing-reference");
   });
 
-  it("keeps the operation union exhaustive, targetable, and JSON-only", () => {
-    const operations: DocumentOp[] = [
-      { op: "set", addr: { sheet: "s", row: 0, col: 0 }, value: { kind: "literal", value: 1 } },
-      {
-        op: "setRange",
-        range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
-        cells: [],
-      },
-      {
-        op: "setBlock",
-        range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-        block: { rowCount: 1, colCount: 1, values: [1] },
-      },
-      {
-        op: "setRangeStyle",
-        range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
-        style: { bold: true },
-      },
-      {
-        op: "clearRange",
-        range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
-        contents: true,
-      },
-      { op: "addRows", sheet: "s", at: 0, count: 1 },
-      { op: "removeRows", sheet: "s", at: 0, count: 1 },
-      { op: "moveRows", sheet: "s", from: 0, count: 1, to: 2 },
-      { op: "addColumns", sheet: "s", at: 0, columns: [] },
-      { op: "removeColumns", sheet: "s", at: 0, count: 1 },
-      { op: "moveColumns", sheet: "s", from: 0, count: 1, to: 2 },
-      { op: "setColumn", sheet: "s", col: 0, patch: { width: 80 } },
-      { op: "setRowMeta", sheet: "s", row: 0, meta: { height: 32 } },
-      { op: "addMerge", sheet: "s", merge: { r0: 0, c0: 0, r1: 1, c1: 1 } },
-      { op: "removeMerge", sheet: "s", merge: { r0: 0, c0: 0, r1: 1, c1: 1 } },
-      {
-        op: "addSheet",
-        sheet: {
-          id: "s",
-          name: "S",
-          order: 0,
-          rowCount: 1,
-          columns: [{ key: "a", header: "A", width: 80, type: "text" }],
-          cells: [],
+  it("keeps operation targeting exhaustive and emitted operations JSON-only", () => {
+    const store = new SheetwriteStore(makeWorkbook(3));
+    const emitted: DocumentOp[] = [];
+    store.on("change", (event) => emitted.push(...event.transaction.patches));
+    const result = store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: "saved" },
         },
-      },
-      { op: "removeSheet", sheet: "s" },
-      { op: "renameSheet", sheet: "s", name: "Renamed" },
-      { op: "moveSheet", sheet: "s", to: 0 },
-      { op: "setSheetMeta", sheet: "s", patch: { frozenRows: 1 } },
-      {
-        op: "setNamedRange",
-        namedRange: {
-          name: "N",
-          range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        { op: "setNote", addr: { sheet: "s1", row: 0, col: 0 }, text: "review" },
+        {
+          op: "setValidationRule",
+          sheet: "s1",
+          rule: {
+            id: "positive",
+            range: {
+              sheet: "s1",
+              start: { row: 0, col: 1 },
+              end: { row: 2, col: 1 },
+            },
+            condition: { kind: "number", min: 0 },
+            policy: "reject",
+          },
         },
-      },
-      { op: "removeNamedRange", name: "N" },
-    ];
+      ],
+    });
 
-    expect(operations.map(documentOpTarget)).toEqual([
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "s",
-      "N",
-      "N",
+    expect(result.status).toBe("applied");
+    expect(emitted.map(documentOpTarget)).toEqual(["s1", "s1", "s1"]);
+    expect(emitted.map((operation) => OPERATION_TARGET_SOURCE[operation.op])).toEqual([
+      "address",
+      "address",
+      "sheet",
     ]);
-    expect(() => JSON.stringify(operations)).not.toThrow();
+    expect(JSON.parse(JSON.stringify(emitted))).toEqual(emitted);
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("saved");
+    expect(store.getWorkbook().sheets[0]!.notes).toEqual([
+      { addr: { sheet: "s1", row: 0, col: 0 }, text: "review" },
+    ]);
+    expect(store.getWorkbook().sheets[0]!.validationRules?.[0]?.id).toBe("positive");
+    store.dispose();
   });
 });

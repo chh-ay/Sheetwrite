@@ -1,13 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import {
+  contentPathForRoute,
   entrySlug,
   expectedGeneratedFiles,
-  MIGRATION_MATRIX,
+  MIGRATION_ROUTES,
   parseFences,
   renderEntryPage,
   renderSymbolPage,
+  unresolvedCssTokens,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
@@ -53,25 +56,18 @@ describe("documentation generation", () => {
     expect(entrySlug("@sheetwrite/core", "./styles.css")).toBe("core-styles-css");
   });
 
-  it("separates entry indexes from focused, structured symbol pages", () => {
+  it("links entry indexes to documented symbols with unique member anchors", () => {
     const entryPage = renderEntryPage(corePackage, coreEntry);
-    const first = renderSymbolPage(corePackage, coreEntry, coreEntry.exports[0]!);
-    const second = renderSymbolPage(corePackage, coreEntry, coreEntry.exports[0]!);
-    expect(first).toBe(second);
+    const symbolPage = renderSymbolPage(corePackage, coreEntry, coreEntry.exports[0]!);
     expect(entryPage).toContain('href="/docs/api/core/grid/"');
-    expect(entryPage).not.toContain("TypeScript declaration");
-    expect(first).toContain("Imperative grid handle.");
-    expect(first).toContain("packages/core/src/types/grid.ts#L10");
-    expect(first).toContain('id="rendererkind"');
-    expect(first).toContain('id="applytransaction"');
-    expect(first).toContain('class="api-member"');
-    expect(first).toContain("interface Grid {\n");
-    expect(first).toContain(
-      '<summary><code>applyTransaction</code> <span class="api-member-summary">Applies a committed transaction to the <a href="/docs/api/core/grid/"><code>Grid</code></a>.</span></summary>',
-    );
-    expect(first).toContain(
-      '<p class="api-member-doc">Applies a committed transaction to the <a href="/docs/api/core/grid/"><code>Grid</code></a>. Bypasses history.</p>',
-    );
+
+    const anchors = [...symbolPage.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]!);
+    expect(new Set(anchors).size).toBe(anchors.length);
+    expect(anchors).toEqual(expect.arrayContaining(["applytransaction", "rendererkind"]));
+    expect(symbolPage).toContain("Imperative grid handle.");
+    expect(symbolPage).toContain("Applies a committed transaction to the");
+    expect(symbolPage).toContain("Bypasses history.");
+    expect(symbolPage).toContain('<a href="/docs/api/core/grid/"><code>Grid</code></a>');
   });
 
   it("generates an index and focused page for every classified symbol", async () => {
@@ -83,15 +79,21 @@ describe("documentation generation", () => {
     expect(inventory?.content).toContain("supported");
   });
 
-  it("keeps the old-guide migration matrix exhaustive with one intentional landing consolidation", () => {
-    expect(Object.keys(MIGRATION_MATRIX)).toHaveLength(12);
-    const routes = Object.values(MIGRATION_MATRIX);
-    expect(new Set(routes).size).toBe(11);
-    expect(routes.filter((route) => route === "/docs/start/installation/")).toHaveLength(2);
-    for (const [source, route] of Object.entries(MIGRATION_MATRIX)) {
-      expect(source).toMatch(/^docs\/.+\.md$/);
-      expect(route).toMatch(/^\/docs\/.+\/$|^\/docs\/$/);
+  it("resolves every moved guide to generated content with one named installation consolidation", async () => {
+    const contentRoot = resolve(import.meta.dir, "../docs/src/content/docs");
+    const generatedContent = (await expectedGeneratedFiles(manifest)).filter(
+      (file) => file.path.startsWith(contentRoot) && /\.mdx?$/u.test(file.path),
+    );
+    const pages = new Bun.Glob("**/*.{md,mdx}");
+    for await (const path of pages.scan({ cwd: contentRoot, onlyFiles: true })) {
+      const absolutePath = join(contentRoot, path);
+      generatedContent.push({ path: absolutePath, content: await readFile(absolutePath, "utf8") });
     }
+    for (const route of Object.values(MIGRATION_ROUTES)) {
+      expect(contentPathForRoute(route, generatedContent)).toBeDefined();
+    }
+    expect(MIGRATION_ROUTES["docs/README.md"]).toBe("/docs/start/installation/");
+    expect(MIGRATION_ROUTES["docs/getting-started.md"]).toBe("/docs/start/installation/");
   });
 
   it("extracts compile and explicit partial fence metadata", () => {
@@ -122,9 +124,28 @@ describe("documentation generation", () => {
       const links = [...readme.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]!);
       for (const link of links) {
         expect(link).toMatch(
-          /^https:\/\/(?:chh-ay\.github\.io\/Sheetwrite\/|github\.com\/chh-ay\/Sheetwrite\/)/,
+          /^https:\/\/(?:sheetwrite\.vercel\.app\/|github\.com\/chh-ay\/Sheetwrite\/)/,
         );
       }
+    }
+  });
+
+  it("rejects referenced Sheetwrite CSS tokens without a definition", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sheetwrite-css-tokens-"));
+    try {
+      await writeFile(
+        join(root, "tokens.css"),
+        ":root { --sw-defined: #fff; color: var(--sw-defined); }\n",
+      );
+      await writeFile(
+        join(root, "component.tsx"),
+        'export const style = "border-color: var(--sw-missing)";\n',
+      );
+      expect(await unresolvedCssTokens(root)).toEqual([
+        "undefined Sheetwrite CSS token --sw-missing: component.tsx",
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 });

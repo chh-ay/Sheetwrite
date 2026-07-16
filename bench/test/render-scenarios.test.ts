@@ -7,6 +7,12 @@ import {
   type ScrollObservation,
 } from "../src/render-scenarios.js";
 
+interface FakeEvidence {
+  readonly formattedSentinels?: readonly [string, string];
+  readonly indexConstructions?: number;
+  readonly candidatesExamined?: number;
+}
+
 class FakeAdapter implements RenderBenchAdapter {
   readonly id = "sheetwrite" as const;
   readonly initialRowCount: number;
@@ -18,11 +24,13 @@ class FakeAdapter implements RenderBenchAdapter {
   private editing = false;
   private top = 0;
   private left = 0;
+  private readonly evidence: FakeEvidence;
 
-  constructor(rows = 200) {
+  constructor(rows = 200, evidence: FakeEvidence = {}) {
     const dataset = makeColumnar(rows);
     this.initialRowCount = rows;
     this.values = toAoA(dataset);
+    this.evidence = evidence;
   }
 
   mount(_host: HTMLElement): void {
@@ -116,7 +124,7 @@ class FakeAdapter implements RenderBenchAdapter {
   repaint(): void {}
 
   formattedSentinels(): readonly [string, string] {
-    return ["1,234.50", "Feb 29, 2024"];
+    return this.evidence.formattedSentinels ?? ["1,234.50", "Feb 29, 2024"];
   }
 
   formatResources() {
@@ -137,7 +145,10 @@ class FakeAdapter implements RenderBenchAdapter {
   resetMergeResources(): void {}
 
   mergeResources() {
-    return { indexConstructions: 1, candidatesExamined: 4 };
+    return {
+      indexConstructions: this.evidence.indexConstructions ?? 1,
+      candidatesExamined: this.evidence.candidatesExamined ?? 4,
+    };
   }
 
   destroy(): void {
@@ -210,31 +221,42 @@ describe("scenario correctness checkpoints", () => {
     );
   });
 
-  test("validates formatted output and bounded formatter construction", () => {
-    const result = runRenderScenario(
-      new FakeAdapter(),
-      dataset,
-      "formatted-paint.top-left",
-      options,
-    );
-    expect(result.status).toBe("success");
-    if (result.status !== "success") throw new Error(result.message);
-    expect(result.validation.map((entry) => entry.checkpoint)).toContain(
-      "formatted-paint exact fixed-decimal and named-date sentinels",
-    );
-    expect(result.resources).toMatchObject({
-      compiledFormats: 2,
-      numberFormatters: 1,
-      dateTimeFormatters: 1,
-    });
+  test("rejects corrupt formatter and merge-index evidence", () => {
+    for (const [adapter, scenario, checkpoint] of [
+      [
+        new FakeAdapter(200, { formattedSentinels: ["wrong", "Feb 29, 2024"] }),
+        "formatted-paint.top-left",
+        "fixed-decimal and named-date sentinels",
+      ],
+      [
+        new FakeAdapter(200, { indexConstructions: 0 }),
+        "merge-heavy.paint",
+        "prepares one revision index",
+      ],
+      [
+        new FakeAdapter(200, { indexConstructions: 2 }),
+        "merge-heavy.paint",
+        "prepares one revision index",
+      ],
+      [new FakeAdapter(200, { candidatesExamined: 0 }), "merge-heavy.paint", "candidate"],
+    ] as const) {
+      const result = runRenderScenario(adapter, dataset, scenario, options);
+      expect(result).toMatchObject({ status: "failed", stage: "validate" });
+      if (result.status !== "failed") throw new Error("expected failed result");
+      expect(result.message).toContain(checkpoint);
+    }
   });
-  test("validates merge-heavy output and structural index counters", () => {
-    const result = runRenderScenario(new FakeAdapter(), dataset, "merge-heavy.paint", options);
-    expect(result.status).toBe("success");
-    if (result.status !== "success") throw new Error(result.message);
-    expect(result.mergeResources).toEqual({
-      indexConstructions: 1,
-      candidatesExamined: 4,
-    });
+
+  test("records valid formatter and merge checkpoints", () => {
+    for (const scenario of ["formatted-paint.top-left", "merge-heavy.paint"] as const) {
+      const result = runRenderScenario(new FakeAdapter(), dataset, scenario, options);
+      expect(result.status).toBe("success");
+      if (result.status !== "success") throw new Error(result.message);
+      expect(
+        result.validation.some(
+          (entry) => entry.passed && entry.checkpoint.includes(scenario.split(".")[0]!),
+        ),
+      ).toBe(true);
+    }
   });
 });

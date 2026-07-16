@@ -1,36 +1,43 @@
-import { describe, expect, it } from "bun:test";
-import {
-  ADAPTER_LIFECYCLE_CONTRACT,
-  GRID_OPTION_CONFORMANCE,
-} from "../../../test/adapter-lifecycle-contract.js";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { GRID_OPTION_CONFORMANCE } from "../../../test/adapter-lifecycle-contract.js";
 import {
   applyChangedLiveGridOptions,
+  createGridController,
   createSimpleGridInput,
   extractGridOptions,
   GRID_OPTION_POLICY,
   getGridResetReason,
   gridSizeStyle,
 } from "../src/adapter.js";
-import type { GridController } from "../src/grid-controller.js";
+import { initSheetwrite } from "../src/grid.js";
 import type { GridOptions } from "../src/types.js";
-import { makeWorkbook } from "./fixtures.js";
+import { installCanvasTestStubs } from "../src/testing.js";
+import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+
+let restoreCanvasStubs: () => void;
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
+
+beforeEach(() => {
+  restoreCanvasStubs = installCanvasTestStubs();
+});
+
+afterEach(() => {
+  restoreCanvasStubs();
+  document.body.innerHTML = "";
+});
+
+function mountHost(): HTMLDivElement {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
+  document.body.appendChild(host);
+  return host;
+}
 
 describe("shared adapter option policy", () => {
-  it("defines all ten lifecycle observables without framework-specific copies", () => {
-    expect(ADAPTER_LIFECYCLE_CONTRACT.map(({ id }) => id)).toEqual([
-      "single-live-grid",
-      "loading-fallback",
-      "current-initialization-error",
-      "retry-after-corrected-input",
-      "stale-initialization-cancellation",
-      "current-callbacks",
-      "live-options",
-      "construction-reset",
-      "exact-cleanup",
-      "publication-agreement",
-    ]);
-  });
-
   it("classifies every GridOptions key and reports its deterministic reset reason", () => {
     const initial: GridOptions = { workbook: makeWorkbook(1) };
     const changedValues: { [Key in keyof GridOptions]-?: GridOptions[Key] } = {
@@ -63,29 +70,48 @@ describe("shared adapter option policy", () => {
     }
   });
 
-  it("applies each changed live option exactly once without recreating", () => {
-    const calls: string[] = [];
-    const controller = {
-      setTheme: () => calls.push("theme"),
-      setReadOnly: () => calls.push("readOnly"),
-      setConfig: () => calls.push("config"),
-      setOverscan: () => calls.push("overscan"),
-      setMinColumns: () => calls.push("minColumns"),
-    } as unknown as GridController;
-    const previous: GridOptions = { workbook: makeWorkbook(1) };
+  it("applies live options to the existing grid and changes its behavior", () => {
+    const host = mountHost();
+    const workbook = makeWorkbook(3);
+    const previous: GridOptions = {
+      workbook,
+      data: makeColumnarData(3),
+      theme: { bg: "#ffffff" },
+      readOnly: false,
+      config: { toolbar: true },
+    };
+    const controller = createGridController(host, previous, {});
+    const originalGrid = controller.grid;
+    const addr = { sheet: "s1", row: 0, col: 0 };
+    expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
+
     const next: GridOptions = {
       ...previous,
-      theme: { bg: "#fff" },
+      theme: { bg: "#123456" },
       readOnly: true,
       config: { toolbar: false },
       overscan: 2,
       minColumns: 4,
     };
     applyChangedLiveGridOptions(controller, previous, next);
-    expect(calls).toEqual(["theme", "readOnly", "config", "overscan", "minColumns"]);
-    calls.length = 0;
-    applyChangedLiveGridOptions(controller, next, next);
-    expect(calls).toEqual([]);
+
+    expect(controller.grid).toBe(originalGrid);
+    expect(originalGrid.getEffectiveTheme().bg).toBe("#123456");
+    expect(host.getAttribute("aria-readonly")).toBe("true");
+    expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
+    originalGrid.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "blocked" } }],
+    });
+    expect(originalGrid.store.getCell(addr).resolved).toBe("Customer 0");
+
+    applyChangedLiveGridOptions(controller, next, { ...next, readOnly: false });
+    originalGrid.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value: "editable" } }],
+    });
+    expect(host.hasAttribute("aria-readonly")).toBe(false);
+    expect(originalGrid.store.getCell(addr).resolved).toBe("editable");
+
+    controller.destroy();
   });
   it("extracts only supported grid options and normalizes explicit host sizing", () => {
     const workbook = makeWorkbook(1);

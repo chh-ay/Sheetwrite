@@ -1,7 +1,9 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { FindBar } from "../src/find-bar.js";
-import { DEFAULT_THEME } from "../src/grid.js";
+import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, SearchResult } from "../src/types.js";
+import { makeWorkbook } from "./fixtures.js";
 
 function result(query: string, active = 0, count = 2): SearchResult {
   return {
@@ -11,98 +13,84 @@ function result(query: string, active = 0, count = 2): SearchResult {
   };
 }
 
+let restoreCanvasStubs: () => void;
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
+
+beforeEach(() => {
+  restoreCanvasStubs = installCanvasTestStubs();
+});
+
+afterEach(() => {
+  restoreCanvasStubs();
+  document.body.innerHTML = "";
+});
+
+function mountHost(): HTMLDivElement {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
+  document.body.appendChild(host);
+  return host;
+}
+
 describe("FindBar", () => {
-  it("searches, navigates, replaces, switches fields, and closes without leaking keystrokes", () => {
-    const calls: string[] = [];
-    const grid = {
-      search: (query: string) => {
-        calls.push(`search:${query}`);
-        return result(query);
+  it("searches and replaces live cells without leaking field keystrokes", () => {
+    const host = mountHost();
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(3),
+      data: {
+        rowCount: 3,
+        columns: {
+          name: ["Ada", "Bob", "Ada"],
+          amount: [1, 2, 3],
+          city: ["London", "Paris", "Rome"],
+        },
       },
-      findPrev: () => {
-        calls.push("previous");
-        return result("Ada", 1);
-      },
-      findNext: () => {
-        calls.push("next");
-        return result("Ada", 0);
-      },
-      replaceCurrent: (replacement: string) => {
-        calls.push(`replace:${replacement}`);
-        return result("Ada", 0, 1);
-      },
-      replaceAll: (replacement: string) => {
-        calls.push(`all:${replacement}`);
-        return { count: 2, result: result("Ada", 0, 0) };
-      },
-      clearSearch: () => calls.push("clear"),
-    } as unknown as Grid;
-    const host = document.createElement("div");
-    host.tabIndex = 0;
-    document.body.appendChild(host);
+      config: { find: false, contextMenu: false, toolbar: false },
+    });
+    const searchEvents: SearchResult[] = [];
+    let changes = 0;
+    grid.on("search", (event) => searchEvents.push(event));
+    grid.on("change", () => {
+      changes += 1;
+    });
     const bar = new FindBar(host, DEFAULT_THEME, grid);
     const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
     const replacement = host.querySelector<HTMLInputElement>(".sheetwrite-find-replace-input")!;
     const count = host.querySelector<HTMLElement>(".sheetwrite-find-count")!;
 
     bar.open();
-    expect(bar.isOpen).toBe(true);
-    expect(document.activeElement).toBe(input);
     input.value = "Ada";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     expect(count.textContent).toBe("1 of 2");
+    let latest = searchEvents.at(-1)!;
+    expect(latest.matches[latest.active]).toEqual({ sheet: "s1", row: 0, col: 0 });
 
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-prev")!.click();
-    expect(count.textContent).toBe("2 of 2");
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.click();
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", shiftKey: true, bubbles: true }),
-    );
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(count.textContent).toBe("2 of 2");
+    latest = searchEvents.at(-1)!;
+    expect(latest.matches[latest.active]).toEqual({ sheet: "s1", row: 2, col: 0 });
 
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "h", ctrlKey: true, bubbles: true, cancelable: true }),
-    );
-    expect(document.activeElement).toBe(replacement);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
+    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Ada");
+
     replacement.value = "Grace";
-    replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace")!.click();
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace-all")!.click();
-    expect(count.textContent).toBe("No results");
+    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Grace");
+    expect(changes).toBe(1);
+    expect(count.textContent).toBe("1 of 1");
 
-    replacement.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "f", metaKey: true, bubbles: true, cancelable: true }),
-    );
-    expect(document.activeElement).toBe(input);
-    host.querySelector<HTMLButtonElement>(".sheetwrite-find-close")!.click();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(bar.isOpen).toBe(false);
     expect(document.activeElement).toBe(host);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
 
-    bar.open();
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    bar.open({ replace: true });
-    replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(calls).toEqual([
-      "search:Ada",
-      "previous",
-      "next",
-      "previous",
-      "next",
-      "search:Ada",
-      "replace:Grace",
-      "replace:Grace",
-      "all:Grace",
-      "search:Ada",
-      "clear",
-      "search:Ada",
-      "clear",
-      "search:Ada",
-      "clear",
-    ]);
-
-    const mouseDown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
-    expect(host.querySelector("button")!.dispatchEvent(mouseDown)).toBe(false);
     bar.destroy();
+    grid.destroy();
   });
 
   it("omits replacement controls in read-only mode and reports idle/no-match states", () => {

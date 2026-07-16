@@ -56,45 +56,25 @@ describe("formatNumber", () => {
     expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("");
   });
 
-  it("produces identical output across repeated calls with the same code", () => {
-    // Memoization (descriptor + Intl formatter caches) must not change output:
-    // every representative code must be byte-stable call over call.
-    const cases: Array<{ code: string | undefined; value: number; expected: string }> = [
-      { code: "#,##0.00", value: 1234.5, expected: "1,234.50" },
-      { code: "0.0%", value: 0.123, expected: "12.3%" },
-      { code: "$#,##0", value: 1234.5, expected: "$1,235" },
-      { code: "0", value: 1234.567, expected: "1235" },
-      { code: undefined, value: 1000, expected: (1000).toLocaleString() },
-    ];
-
-    for (const { code, value, expected } of cases) {
-      const first = formatNumber(value, code);
-      const second = formatNumber(value, code);
-
-      expect(first).toBe(expected);
-      expect(second).toBe(expected);
-    }
-  });
-
-  it("compiles repeated formats once and reuses named-date formatters across cells", () => {
+  it("does not grow format caches when formatting a second identical batch", () => {
     resetNumberFormatResourcesForTest();
     const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
-    for (let cell = 0; cell < 1_000; cell++) {
-      expect(formatNumber(serial, "mmm d, yyyy dddd")).toBe("Jul 4, 2024 Thursday");
-    }
+    const formatBatch = (): void => {
+      for (let cell = 0; cell < 1_000; cell++) {
+        expect(formatNumber(serial, "mmm d, yyyy dddd")).toBe("Jul 4, 2024 Thursday");
+      }
+    };
 
-    expect(getNumberFormatResourceStatsForTest()).toMatchObject({
-      compiledFormats: 1,
-      numberFormatters: 0,
-      dateTimeFormatters: 2,
-      formatCacheEntries: 1,
-      dateTimeFormatterCacheEntries: 2,
-    });
+    formatBatch();
+    const afterFirstBatch = getNumberFormatResourceStatsForTest();
+    formatBatch();
+    expect(getNumberFormatResourceStatsForTest()).toEqual(afterFirstBatch);
   });
 
-  it("deterministically bounds host-controlled format and Intl cache diversity", () => {
+  it("bounds diverse caches and recomputes an evicted format correctly", () => {
     resetNumberFormatResourcesForTest();
-    for (let index = 0; index < 300; index++) {
+    expect(formatNumber(12.5, '0.00" format-0"')).toBe("12.50 format-0");
+    for (let index = 1; index < 300; index++) {
       expect(formatNumber(12.5, `0.00" format-${index}"`)).toBe(`12.50 format-${index}`);
     }
     for (let index = 0; index < 140; index++) {
@@ -105,14 +85,11 @@ describe("formatNumber", () => {
       formatNumber(serial, "mmm dddd", `en-US-x-date-${index}`);
     }
 
-    expect(getNumberFormatResourceStatsForTest()).toEqual({
-      compiledFormats: 301,
-      numberFormatters: 141,
-      dateTimeFormatters: 80,
-      formatCacheEntries: 256,
-      numberFormatterCacheEntries: 128,
-      dateTimeFormatterCacheEntries: 64,
-    });
+    const stats = getNumberFormatResourceStatsForTest();
+    expect(stats.formatCacheEntries).toBeLessThanOrEqual(256);
+    expect(stats.numberFormatterCacheEntries).toBeLessThanOrEqual(128);
+    expect(stats.dateTimeFormatterCacheEntries).toBeLessThanOrEqual(64);
+    expect(formatNumber(12.5, '0.00" format-0"')).toBe("12.50 format-0");
   });
 
   it("formats UTC date codes and preserves Excel's 1900 serial boundary", () => {

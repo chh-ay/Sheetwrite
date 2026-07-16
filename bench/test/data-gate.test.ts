@@ -74,8 +74,7 @@ function smokeFixture(options: FixtureOptions = {}): DataBenchmarkResult {
 }
 
 describe("data benchmark exact matrix", () => {
-  test("exports every declared smoke key and accepts only the complete matrix", () => {
-    expect(expectedDataMatrixKeys("smoke")).toHaveLength(WORKLOADS.length + 1);
+  test("accepts only the complete smoke matrix", () => {
     expect(() => validateDataBenchmark(smokeFixture(), "smoke")).not.toThrow();
   });
 
@@ -103,6 +102,16 @@ describe("data benchmark exact matrix", () => {
   test("requires bounded query resources and exact distinct sentinels", () => {
     expect(() =>
       validateDataBenchmark(smokeFixture({ invalidQueryResources: true }), "smoke"),
+    ).toThrow("query resource counters violate structural bounds");
+  });
+
+  test("rejects a corrupted independent query-resource sentinel", () => {
+    const candidate = structuredClone(smokeFixture()) as unknown as {
+      sheetwrite: Record<string, { queryResources: Record<string, unknown> }>;
+    };
+    candidate.sheetwrite["1000"]!.queryResources.composedFilterMatches = 0;
+    expect(() =>
+      validateDataBenchmark(candidate as unknown as DataBenchmarkResult, "smoke"),
     ).toThrow("query resource counters violate structural bounds");
   });
 

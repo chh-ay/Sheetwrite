@@ -106,63 +106,60 @@ describe("contributor and CI toolchain contract", () => {
     );
   });
 
-  it("fans independent gates out from one canonical artifact build", () => {
+  it("connects every required gate to one reusable artifact build", () => {
     const jobs = parsedWorkflow.jobs ?? {};
-    expect(Object.keys(jobs)).toEqual([
-      "preflight",
-      "unit-coverage",
-      "artifact-build",
-      "packed-consumers",
-      "bundler-consumers",
-      "delivery-size",
-      "docs-build",
-      "browser-smoke",
-      "required",
-    ]);
-    expect(jobs["unit-coverage"]?.needs).toBe("artifact-build");
-    expect(jobs["artifact-build"]?.needs).toBe("preflight");
-    expect(jobs["packed-consumers"]?.needs).toBe("artifact-build");
-    expect(jobs["bundler-consumers"]?.needs).toBe("artifact-build");
-    expect(jobs["delivery-size"]?.needs).toBe("artifact-build");
-    expect(jobs["docs-build"]?.needs).toBe("artifact-build");
-    expect(jobs["browser-smoke"]?.needs).toBe("docs-build");
-    expect(jobs.required?.needs).toEqual([
-      "preflight",
-      "unit-coverage",
-      "artifact-build",
-      "packed-consumers",
-      "bundler-consumers",
-      "delivery-size",
-      "docs-build",
-      "browser-smoke",
-    ]);
+    const needsOf = (name: string): readonly string[] => {
+      const needs = jobs[name]?.needs;
+      return Array.isArray(needs) ? needs : needs ? [needs] : [];
+    };
+    const dependsOn = (name: string, dependency: string, seen = new Set<string>()): boolean => {
+      if (seen.has(name)) return false;
+      seen.add(name);
+      return needsOf(name).some((need) => need === dependency || dependsOn(need, dependency, seen));
+    };
+    const commandsFor = (name: string): string[] =>
+      (jobs[name]?.steps ?? []).flatMap((step) => (step.run ? [step.run] : []));
+
+    const artifactBuilders = Object.keys(jobs).filter((name) =>
+      commandsFor(name).some((command) => command.includes("release:prepare")),
+    );
+    expect(artifactBuilders).toHaveLength(1);
+    const artifactBuild = artifactBuilders[0]!;
+
+    const requiredNeeds = needsOf("required");
+    expect(new Set(requiredNeeds)).toEqual(
+      new Set(Object.keys(jobs).filter((name) => name !== "required")),
+    );
     expect(jobs.required?.name).toBe("Required CI");
-    for (const jobName of [
-      "preflight",
-      "artifact-build",
-      "packed-consumers",
-      "bundler-consumers",
-      "delivery-size",
-    ]) {
-      expect(
-        jobs[jobName]?.steps?.some((step) => step.run === "npm install --global npm@11.18.0"),
-      ).toBe(true);
+    for (const gate of requiredNeeds) {
+      if (gate === artifactBuild || dependsOn(artifactBuild, gate)) continue;
+      expect(dependsOn(gate, artifactBuild)).toBeTrue();
     }
+
+    const consumers = Object.keys(jobs).filter((name) => dependsOn(name, artifactBuild));
+    for (const consumer of consumers) {
+      expect(commandsFor(consumer).some((command) => command.includes("release:prepare"))).toBe(
+        false,
+      );
+      expect(commandsFor(consumer).some((command) => command.includes("npm pack"))).toBe(false);
+    }
+
+    const npmInstalls = Object.keys(jobs)
+      .flatMap(commandsFor)
+      .filter((command) => command.includes("npm install --global npm@"));
+    expect(npmInstalls.length).toBeGreaterThan(0);
+    expect(npmInstalls.every((command) => command.includes(`npm@${NPM_VERSION}`))).toBeTrue();
+
     for (const job of Object.values(jobs)) {
       expect(job["timeout-minutes"]).toBeGreaterThan(0);
     }
-
-    const commands = Object.values(jobs)
-      .flatMap((job) => job.steps ?? [])
-      .flatMap((step) => (step.run ? [step.run] : []))
-      .join("\n");
+    const commands = Object.keys(jobs).flatMap(commandsFor).join("\n");
     expect(commands.match(/release:prepare/g)).toHaveLength(1);
     expect(commands).toContain("verify:packed -- --artifacts");
     expect(commands).toContain("verify:bundlers -- --artifacts");
     expect(commands).toContain("size-report.ts check --artifacts");
     expect(commands).toContain("test:coverage");
     expect(commands).toContain("test:browser");
-    expect(workflow).not.toContain("npm pack");
   });
 
   it("matches the active pinned tools", () => {

@@ -63,25 +63,21 @@ afterEach(() => {
 // ── pure helpers ─────────────────────────────────────────────────────────────
 
 describe("FORMULA_FUNCTIONS catalog", () => {
-  it("mirrors the calc.rs table (all aliases, sorted, unique)", () => {
-    // Every accepted spelling, including aliases and compatibility families.
-    expect(FORMULA_FUNCTIONS.length).toBe(53);
-    expect(new Set(FORMULA_FUNCTIONS).size).toBe(53);
+  it("matches the function names accepted by the calc.rs parser", async () => {
+    const source = await Bun.file(new URL("../../wasm/src/calc.rs", import.meta.url)).text();
+    const parserTable = source.match(
+      /let func = match name\.to_ascii_uppercase\(\)\.as_str\(\) \{([\s\S]*?)\n\s*_ => None,/,
+    );
+    if (!parserTable?.[1]) throw new Error("calc.rs parser function table not found");
+
+    const engineFunctions = [...parserTable[1].matchAll(/"([A-Z][A-Z0-9]*)"/g)].map(
+      (match) => match[1]!,
+    );
+
+    expect(new Set(FORMULA_FUNCTIONS).size).toBe(FORMULA_FUNCTIONS.length);
     expect([...FORMULA_FUNCTIONS]).toEqual([...FORMULA_FUNCTIONS].sort());
-    for (const name of [
-      "SUM",
-      "SUMIFS",
-      "AVG",
-      "AVERAGE",
-      "DATE",
-      "XLOOKUP",
-      "CONCAT",
-      "CONCATENATE",
-      "IFERROR",
-      "EXACT",
-    ]) {
-      expect(FORMULA_FUNCTIONS).toContain(name);
-    }
+    expect(new Set(engineFunctions).size).toBe(engineFunctions.length);
+    expect([...FORMULA_FUNCTIONS]).toEqual(engineFunctions.sort());
   });
 });
 

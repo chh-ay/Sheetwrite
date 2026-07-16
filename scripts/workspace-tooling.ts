@@ -31,7 +31,6 @@ export interface CommandNode {
   readonly id: string;
   readonly command: readonly [string, ...string[]];
   readonly cwd?: string;
-  readonly diagnosticPolicy?: "astro";
 }
 
 interface WorkspaceManifest {
@@ -66,8 +65,8 @@ export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
     command: ["bun", "run", "docs:check"],
   },
   {
-    id: "build:@sheetwrite/docs-site",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs-site", "build"],
+    id: "build:@sheetwrite/docs-start",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "build"],
   },
   {
     id: "verify:example-xlsx-isolation",
@@ -77,9 +76,8 @@ export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
 
 export const EXAMPLE_TYPECHECK_NODES: readonly CommandNode[] = [
   {
-    id: "typecheck:@sheetwrite/docs-site",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs-site", "typecheck"],
-    diagnosticPolicy: "astro",
+    id: "typecheck:@sheetwrite/docs-start",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "typecheck"],
   },
 ];
 
@@ -296,38 +294,15 @@ export function assertUniqueOrderedNodes(nodes: readonly CommandNode[]): void {
   }
 }
 
-function assertCleanAstroDiagnostics(output: string): void {
-  if (/Couldn(?:'|’)t find package|Cannot find package/i.test(output)) {
-    throw new Error("Astro emitted a package-resolution diagnostic");
-  }
-  if (/\b[1-9]\d* (?:errors?|warnings?|hints?)\b/i.test(output)) {
-    throw new Error("Astro emitted non-zero diagnostics");
-  }
-}
-
 async function executeNode(root: string, node: CommandNode): Promise<void> {
   console.log(`::workspace-node::${node.id}`);
-  const capture = node.diagnosticPolicy !== undefined;
   const child = Bun.spawn([...node.command], {
     cwd: resolve(root, node.cwd ?? "."),
     env: { ...process.env, CI: process.env.CI ?? "1" },
     stdin: "inherit",
-    stdout: capture ? "pipe" : "inherit",
-    stderr: capture ? "pipe" : "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
   });
-  if (capture) {
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
-    process.stdout.write(stdout);
-    process.stderr.write(stderr);
-    const output = `${stdout}\n${stderr}`;
-    if (node.diagnosticPolicy === "astro") assertCleanAstroDiagnostics(output);
-    if (exitCode !== 0) throw new Error(`${node.id} failed with exit code ${exitCode}`);
-    return;
-  }
   const exitCode = await child.exited;
   if (exitCode !== 0) throw new Error(`${node.id} failed with exit code ${exitCode}`);
 }

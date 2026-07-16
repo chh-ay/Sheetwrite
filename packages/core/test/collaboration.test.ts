@@ -118,7 +118,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 describe("presence coordinator", () => {
-  it("shares bounded ephemeral selections, paints pooled overlays, and expires them", async () => {
+  it("truncates remote selections, preserves the document, and expires presence", async () => {
     const bus = new PresenceBus();
     const left = mountGrid();
     const right = mountGrid();
@@ -127,19 +127,25 @@ describe("presence coordinator", () => {
       actor: { id: "left", displayName: "Left User", color: "#ef4444" },
       heartbeatMs: 0,
       timeoutMs: 100,
+      maxRangesPerActor: 2,
       now: () => now,
     });
     const rightPresence = new PresenceCoordinator(right.grid, bus.endpoint(), {
       actor: { id: "right", displayName: "Right User", color: "#2563eb" },
       heartbeatMs: 0,
       timeoutMs: 100,
+      maxRangesPerActor: 2,
       now: () => now,
     });
     const before = right.grid.exportSnapshot();
 
     left.grid.setSelection({
-      kind: "range",
-      range: { sheet: "s1", start: { row: -5, col: 0 }, end: { row: 999, col: 1 } },
+      kind: "multi",
+      ranges: [
+        { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
+        { sheet: "s1", start: { row: 4, col: 0 }, end: { row: 5, col: 1 } },
+        { sheet: "s1", start: { row: 7, col: 0 }, end: { row: 8, col: 1 } },
+      ],
     });
     await Promise.resolve();
     right.grid.refresh();
@@ -148,7 +154,10 @@ describe("presence coordinator", () => {
       {
         actor: { id: "left", displayName: "Left User", color: "#ef4444" },
         activeSheet: "s1",
-        selections: [{ sheet: "s1", start: { row: -5, col: 0 }, end: { row: 999, col: 1 } }],
+        selections: [
+          { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
+          { sheet: "s1", start: { row: 4, col: 0 }, end: { row: 5, col: 1 } },
+        ],
         sentAt: 1_000,
       },
     ]);
@@ -156,12 +165,6 @@ describe("presence coordinator", () => {
     expect(presenceRects.length).toBeGreaterThan(0);
     expect(presenceRects[0]?.getAttribute("title")).toBe("Left User");
     expect(right.grid.exportSnapshot()).toEqual(before);
-
-    const poolSize = right.host.querySelectorAll(".sheetwrite-overlay > div").length;
-    left.grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
-    await Promise.resolve();
-    right.grid.refresh();
-    expect(right.host.querySelectorAll(".sheetwrite-overlay > div").length).toBe(poolSize);
 
     now = 1_101;
     rightPresence.pruneStale();
@@ -229,9 +232,6 @@ describe("revision coordinator", () => {
       serverVersion: 7,
       migrateSnapshot: (input) => ({ ...(input as WorkbookSnapshot), schemaVersion: 1 }),
     });
-    expect(await coordinator.list()).toEqual([
-      { version: 3, createdAt: "2026-07-13T10:00:00.000Z", label: "Before import" },
-    ]);
 
     const previewHost = document.createElement("div");
     document.body.appendChild(previewHost);

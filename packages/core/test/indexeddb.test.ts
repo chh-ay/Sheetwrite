@@ -130,7 +130,10 @@ function installControlledFactory(): ControlledIndexedDbFactory {
   return factory;
 }
 
-async function seedRecord(databaseName: string, record: Record<string, unknown>): Promise<void> {
+async function seedRecords(
+  databaseName: string,
+  records: readonly Record<string, unknown>[],
+): Promise<void> {
   const request = indexedDB.open(databaseName, 1);
   request.onupgradeneeded = () => {
     const store = request.result.createObjectStore("pending-commits", {
@@ -141,9 +144,19 @@ async function seedRecord(databaseName: string, record: Record<string, unknown>)
   };
   const database = await requestResult(request);
   const transaction = database.transaction("pending-commits", "readwrite");
-  transaction.objectStore("pending-commits").put(record);
+  const store = transaction.objectStore("pending-commits");
+  for (const record of records) store.put(record);
   await transactionDone(transaction);
   database.close();
+}
+
+async function storedRecords(databaseName: string): Promise<Array<Record<string, unknown>>> {
+  const database = await requestResult(indexedDB.open(databaseName));
+  const transaction = database.transaction("pending-commits", "readonly");
+  const records = await requestResult(transaction.objectStore("pending-commits").getAll());
+  await transactionDone(transaction);
+  database.close();
+  return records as Array<Record<string, unknown>>;
 }
 
 describe("IndexedDbPendingCommitStorage", () => {
@@ -185,30 +198,63 @@ describe("IndexedDbPendingCommitStorage", () => {
     storage.close();
   });
 
-  it("migrates legacy queue records but rejects records from a newer schema", async () => {
-    await seedRecord("legacy-queue", {
-      documentId: "document-a",
-      clientMutationId: "legacy",
-      baseVersion: 1,
-      operations: commit("document-a", "legacy", "legacy").operations,
-    });
-    const legacy = new IndexedDbPendingCommitStorage({ databaseName: "legacy-queue" });
-    expect(await legacy.load("document-a")).toMatchObject([
-      { clientMutationId: "legacy", operations: [{ value: { value: "legacy" } }] },
+  it("persists legacy migration schema and queue order across reopen", async () => {
+    await seedRecords("legacy-queue", [
+      {
+        documentId: "document-a",
+        clientMutationId: "legacy-c",
+        baseVersion: 1,
+        operations: commit("document-a", "legacy-c", "third").operations,
+      },
+      {
+        documentId: "document-a",
+        clientMutationId: "legacy-a",
+        baseVersion: 1,
+        operations: commit("document-a", "legacy-a", "first").operations,
+      },
+      {
+        documentId: "document-a",
+        clientMutationId: "legacy-b",
+        baseVersion: 1,
+        operations: commit("document-a", "legacy-b", "second").operations,
+      },
     ]);
-    // A second read proves migration persisted a current schema/sequence instead
-    // of merely tolerating the old record in memory.
-    expect(await legacy.load("document-a")).toHaveLength(1);
-    legacy.close();
+    const migrating = new IndexedDbPendingCommitStorage({ databaseName: "legacy-queue" });
+    const migratedOrder = (await migrating.load("document-a")).map((item) => item.clientMutationId);
+    expect(migratedOrder).toEqual(["legacy-a", "legacy-b", "legacy-c"]);
+    migrating.close();
 
-    await seedRecord("future-queue", {
-      queueSchemaVersion: 2,
-      sequence: 1,
-      documentId: "document-a",
-      clientMutationId: "future",
-      baseVersion: 1,
-      operations: [],
-    });
+    const persisted = await storedRecords("legacy-queue");
+    expect(persisted.map((record) => record.queueSchemaVersion)).toEqual([1, 1, 1]);
+    expect(
+      persisted
+        .map((record) => record.sequence)
+        .sort((left, right) => Number(left) - Number(right)),
+    ).toEqual([1, 2, 3]);
+
+    const reopened = new IndexedDbPendingCommitStorage({ databaseName: "legacy-queue" });
+    expect((await reopened.load("document-a")).map((item) => item.clientMutationId)).toEqual(
+      migratedOrder,
+    );
+    expect(await reopened.load("document-a")).toMatchObject([
+      { operations: [{ value: { value: "first" } }] },
+      { operations: [{ value: { value: "second" } }] },
+      { operations: [{ value: { value: "third" } }] },
+    ]);
+    reopened.close();
+  });
+
+  it("rejects pending records from a newer schema", async () => {
+    await seedRecords("future-queue", [
+      {
+        queueSchemaVersion: 2,
+        sequence: 1,
+        documentId: "document-a",
+        clientMutationId: "future",
+        baseVersion: 1,
+        operations: [],
+      },
+    ]);
     const future = new IndexedDbPendingCommitStorage({ databaseName: "future-queue" });
     await expect(future.load("document-a")).rejects.toMatchObject({ code: "unsupported-schema" });
     future.close();

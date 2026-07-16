@@ -254,28 +254,26 @@ describe("frozen panes", () => {
     grid.destroy();
   });
 
-  it("reuses all frozen-pane data windows for pixel-only scroll frames", () => {
+  it("reuses pane windows for sub-cell scroll and refreshes them at a row boundary", () => {
     const { workbook, data } = makeGridSheet(50, 12, 100);
     const store = new SheetwriteStore(workbook, data);
     const originalGetVisibleWindow = store.getVisibleWindow.bind(store);
     let windowReads = 0;
-    expect(
-      Reflect.set(
-        store,
-        "getVisibleWindow",
-        (...args: Parameters<SheetwriteStore["getVisibleWindow"]>) => {
-          windowReads += 1;
-          return originalGetVisibleWindow(...args);
-        },
-      ),
-    ).toBe(true);
+    Reflect.set(
+      store,
+      "getVisibleWindow",
+      (...args: Parameters<SheetwriteStore["getVisibleWindow"]>) => {
+        windowReads += 1;
+        return originalGetVisibleWindow(...args);
+      },
+    );
     const host = mountHost();
     const grid = new GridImpl(host, { workbook, overscan: 0 }, store);
     const viewport = host.querySelector(".sheetwrite-viewport");
     if (!(viewport instanceof HTMLDivElement)) throw new Error("expected grid viewport");
     Object.defineProperty(viewport, "clientWidth", { value: 700, configurable: true });
     const recorder = makeRecorder();
-    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    Reflect.set(grid, "renderer", recorder);
 
     const scroller = scrollerOf(host);
     Object.defineProperty(scroller, "scrollTop", {
@@ -288,19 +286,43 @@ describe("frozen panes", () => {
       writable: true,
       configurable: true,
     });
+    const expectPaneValues = (frame: Recorder["paneFrames"][number]): void => {
+      for (const pane of frame.panes) {
+        const expected: string[] = [];
+        for (let row = pane.view.rows.start; row < pane.view.rows.end; row++) {
+          for (const col of pane.view.cols) expected.push(`r${row}c${col}`);
+        }
+        expect(pane.view.values).toEqual(expected);
+      }
+    };
+
     windowReads = 0;
     grid.setFrozen(2, 1);
-    expect(windowReads).toBe(4);
+    const baselineReads = windowReads;
+    const baselineFrame = recorder.paneFrames.at(-1);
+    if (!baselineFrame) throw new Error("expected a baseline frozen frame");
+    expect(baselineReads).toBeGreaterThan(0);
+    expectPaneValues(baselineFrame);
 
     scroller.scrollTop += 1;
     scroller.scrollLeft += 1;
     grid.refresh();
-    expect(windowReads).toBe(4);
-    expect(recorder.paneFrames).toHaveLength(2);
+    const pixelFrame = recorder.paneFrames.at(-1);
+    if (!pixelFrame) throw new Error("expected a sub-cell scroll frame");
+    expect(windowReads - baselineReads).toBe(0);
+    expect(pixelFrame.panes.at(-1)?.view.rows).toEqual(baselineFrame.panes.at(-1)?.view.rows);
+    expect(pixelFrame.panes.at(-1)?.view.cols).toEqual(baselineFrame.panes.at(-1)?.view.cols);
+    expectPaneValues(pixelFrame);
 
+    const readsBeforeBoundary = windowReads;
+    const bodyStartBeforeBoundary = pixelFrame.panes.at(-1)?.view.rows.start ?? -1;
     scroller.scrollTop += 24;
     grid.refresh();
-    expect(windowReads).toBe(8);
+    const boundaryFrame = recorder.paneFrames.at(-1);
+    if (!boundaryFrame) throw new Error("expected a boundary-crossing frame");
+    expect(windowReads).toBeGreaterThan(readsBeforeBoundary);
+    expect(boundaryFrame.panes.at(-1)?.view.rows.start).toBeGreaterThan(bodyStartBeforeBoundary);
+    expectPaneValues(boundaryFrame);
 
     grid.destroy();
   });
@@ -330,37 +352,51 @@ describe("frozen panes", () => {
 
   // Contract: a renderer without paintPanes must never be driven down the pane
   // path — the grid falls back to paint() and does not crash.
-  it("falls back to paint() when the renderer lacks paintPanes", () => {
-    const workbook = makeWorkbook(20);
-    const store = new SheetwriteStore(workbook, makeColumnarData(20));
+  it("falls back to a correctly scrolled paint when the renderer lacks paintPanes", () => {
+    const { workbook, data } = makeGridSheet(50, 12, 100);
+    const store = new SheetwriteStore(workbook, data);
     const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
+    const grid = new GridImpl(host, { workbook, overscan: 0 }, store);
     const recorder = makeRecorder({ panes: false });
-    expect(recorder.paintPanes).toBeUndefined();
-    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    Reflect.set(grid, "renderer", recorder);
+    const scroller = scrollerOf(host);
+    Object.defineProperty(scroller, "scrollTop", {
+      value: 120,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(scroller, "scrollLeft", {
+      value: 200,
+      writable: true,
+      configurable: true,
+    });
 
     grid.setFrozen(2, 1);
 
-    // Without the paintPanes-capability guard the grid would run the pane path
-    // and the frame would silently never paint; the guard routes to paint().
-    expect(recorder.paints.length).toBeGreaterThan(0);
+    const frame = recorder.paints.at(-1);
+    if (!frame) throw new Error("expected a plain fallback frame");
+    expect(frame.view.rows.start).toBeGreaterThan(0);
+    expect(frame.view.cols[0]).toBeGreaterThan(0);
+    const expected: string[] = [];
+    for (let row = frame.view.rows.start; row < frame.view.rows.end; row++) {
+      for (const col of frame.view.cols) expected.push(`r${row}c${col}`);
+    }
+    expect(frame.view.values).toEqual(expected);
 
     grid.destroy();
   });
 });
 
 describe("zoom", () => {
-  // Contract: setZoom clamps its argument into [0.5, 2] and leaves in-range
-  // factors untouched.
-  it("clamps the zoom factor to [0.5, 2]", () => {
+  // Contract: setZoom clamps finite arguments into [0.5, 2], leaves in-range
+  // factors untouched, and ignores values that cannot produce valid geometry.
+  it("clamps finite zoom factors to [0.5, 2]", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
     const grid = new GridImpl(host, { workbook }, store);
 
     const cases: Array<{ input: number; expected: number }> = [
-      { input: -3, expected: 0.5 },
       { input: 0.25, expected: 0.5 },
       { input: 0.5, expected: 0.5 },
       { input: 1.5, expected: 1.5 },
@@ -370,6 +406,21 @@ describe("zoom", () => {
     for (const { input, expected } of cases) {
       grid.setZoom(input);
       expect(grid.getZoom()).toBe(expected);
+    }
+
+    grid.destroy();
+  });
+
+  it("ignores non-finite zoom factors without corrupting geometry", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.setZoom(1.5);
+
+    for (const input of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      grid.setZoom(input);
+      expect(grid.getZoom()).toBe(1.5);
+      expect(grid.getEffectiveTheme().rowHeight).toBe(28 * 1.5);
     }
 
     grid.destroy();

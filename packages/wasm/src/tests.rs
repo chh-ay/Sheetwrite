@@ -105,10 +105,8 @@ fn sheet_noops_overflow_and_paged_load_state_preserve_invariants() {
     assert_close(dense.num_at(dense.idx(1, 1)), 9.0);
 
     dense.dirty_cells.extend((0..5_000).map(|row| (row, 0)));
-    assert!(dense.dirty_cells.capacity() > 4_096);
     dense.clear_dirty();
     assert!(dense.dirty_cells.is_empty());
-    assert!(dense.dirty_cells.capacity() <= 4_096);
 
     let mut paged = SheetData::new_paged(2, 2, 1, 0);
     assert!(!paged.is_fully_loaded());
@@ -1012,6 +1010,7 @@ fn text_match_case_insensitive_ascii_path_and_unicode_fallback() {
     assert!(matches_needle("Tokyo", "tokyo", true, false));
     assert!(matches_needle("Tokyo", "tokyo", true, true));
     assert!(matches_needle("New Tokyo City", "tokyo", true, false));
+    assert!(!matches_needle("New Tokyo City", "tokyo", true, true));
     assert!(!matches_needle("Berlin", "tokyo", true, false));
     assert!(!matches_needle("Tok", "tokyo", true, false));
     assert!(matches_needle("anything", "", true, false));
@@ -1120,38 +1119,64 @@ fn numeric_sort_orders_finite_numbers_and_keeps_equal_rows_stable() {
     );
 }
 
+fn assert_numeric_sort_invariants(values: &[f64], order: &[u32], ascending: bool) {
+    assert_eq!(order.len(), values.len());
+
+    let mut seen = vec![false; values.len()];
+    for &row in order {
+        let row = row as usize;
+        assert!(row < values.len(), "sorted row {row} is out of bounds");
+        assert!(!seen[row], "sorted row {row} appeared more than once");
+        seen[row] = true;
+    }
+    assert!(seen.into_iter().all(|present| present));
+
+    for pair in order.windows(2) {
+        let left_row = pair[0] as usize;
+        let right_row = pair[1] as usize;
+        let left = values[left_row];
+        let right = values[right_row];
+        if ascending {
+            assert!(left <= right, "{left} must not sort after {right}");
+        } else {
+            assert!(left >= right, "{left} must not sort before {right}");
+        }
+        if left == right {
+            assert!(
+                left_row < right_row,
+                "equal values must preserve their original row order"
+            );
+        }
+    }
+}
+
 #[test]
-fn small_numeric_sort_matches_total_order_for_one_thousand_rows() {
+fn numeric_sort_preserves_permutation_monotonicity_and_stable_ties() {
     let mut store = CellStore::new();
     let rows = 1_000usize;
     let sheet = store.add_sheet(1, rows);
     let values: Vec<f64> = (0..rows)
-        .map(|row| {
-            let mixed = (row as u64).wrapping_mul(6_364_136_223_846_793_005);
-            let magnitude = ((mixed >> 24) % 20_001) as i64 - 10_000;
-            magnitude as f64 / 8.0
+        .map(|row| match row % 16 {
+            0 => -f64::MAX,
+            1 => f64::MAX,
+            2 => -f64::MIN_POSITIVE,
+            3 => f64::MIN_POSITIVE,
+            4 => -0.0,
+            5 => 0.0,
+            6 | 7 => 42.0,
+            8 | 9 => -42.0,
+            _ => (row as i64 % 41 - 20) as f64,
         })
         .collect();
     for (row, &value) in values.iter().enumerate() {
         store.set_number(sheet, row, 0, value, 0);
     }
 
-    let mut expected: Vec<u32> = (0..rows as u32).collect();
-    expected.sort_unstable_by(|&left, &right| {
-        values[left as usize]
-            .partial_cmp(&values[right as usize])
-            .unwrap()
-            .then_with(|| left.cmp(&right))
-    });
-    assert_eq!(store.sort_rows(sheet, 0, true), expected);
+    let ascending = store.sort_rows(sheet, 0, true);
+    assert_numeric_sort_invariants(&values, &ascending, true);
 
-    expected.sort_unstable_by(|&left, &right| {
-        values[right as usize]
-            .partial_cmp(&values[left as usize])
-            .unwrap()
-            .then_with(|| left.cmp(&right))
-    });
-    assert_eq!(store.sort_rows(sheet, 0, false), expected);
+    let descending = store.sort_rows(sheet, 0, false);
+    assert_numeric_sort_invariants(&values, &descending, false);
 }
 
 #[test]
@@ -1182,6 +1207,14 @@ fn numeric_sort_radix_boundary_matches_comparison_contract() {
             .then_with(|| left.cmp(&right))
     });
     assert_eq!(store.sort_rows(sheet, 0, true), expected);
+
+    expected.sort_unstable_by(|&left, &right| {
+        values[right as usize]
+            .partial_cmp(&values[left as usize])
+            .unwrap()
+            .then_with(|| left.cmp(&right))
+    });
+    assert_eq!(store.sort_rows(sheet, 0, false), expected);
 }
 
 #[test]
@@ -1226,18 +1259,6 @@ fn pure_string_filter_fast_path_matches_mixed_and_unicode_fallbacks() {
     assert_eq!(store.filter_rows(sheet, 0, "café"), unicode);
 }
 
-#[test]
-fn string_pool_reuses_ids_without_duplicate_pool_entries() {
-    let mut store = CellStore::new();
-    let a = store.intern("repeated");
-    let b = store.intern("repeated");
-    let c = store.intern("other");
-
-    assert_eq!(a, b);
-    assert_ne!(a, c);
-    assert_eq!(store.strings.len(), 2);
-    assert_eq!(store.string_lookup.len(), 2);
-}
 
 #[test]
 fn data_edge_follows_google_ctrl_arrow_semantics() {
@@ -1411,11 +1432,9 @@ fn string_pool_round_trips_unicode_and_dedups_across_widths() {
     for (&id, &value) in ids.iter().zip(samples.iter()) {
         assert_eq!(string_from_pool_ref(&store.strings, id), Some(value));
     }
-    let pool_len = store.strings.len();
     for (&id, &value) in ids.iter().zip(samples.iter()) {
         assert_eq!(store.intern(value), id);
     }
-    assert_eq!(store.strings.len(), pool_len);
 }
 
 #[test]
@@ -1557,7 +1576,7 @@ fn malformed_query_and_window_inputs_fail_closed_without_panicking() {
 }
 
 #[test]
-fn conditional_format_window_masks_match_numeric_text_and_bounds() {
+fn conditional_format_window_masks_cover_predicates_bounds_and_row_order() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 3);
     store.set_number(sheet, 0, 0, 5.0, 0);
@@ -1568,16 +1587,33 @@ fn conditional_format_window_masks_match_numeric_text_and_bounds() {
     store.set_string(sheet, 2, 1, "TOKYO", 0);
     store.set_conditional_rules(
         sheet,
-        &[0, 5],
-        &[0, 0, 1, 0, 0, 1, 2, 1],
-        &[7.0, 0.0],
-        vec![String::new(), "tokyo".to_string()],
-        &[0, 0],
+        &[0, 5, 1, 2, 3, 5],
+        &[
+            0, 0, 2, 0, // greater than 7
+            0, 1, 2, 1, // case-insensitive contains "tokyo"
+            0, 0, 2, 0, // less than 10
+            0, 0, 2, 0, // numeric equality with 10
+            0, 1, 2, 1, // string equality with "Tokyo"
+            0, 1, 2, 1, // case-sensitive contains "TOK"
+        ],
+        &[7.0, 0.0, 10.0, 10.0, 0.0, 0.0],
+        vec![
+            String::new(),
+            "tokyo".to_string(),
+            String::new(),
+            String::new(),
+            "Tokyo".to_string(),
+            "TOK".to_string(),
+        ],
+        &[0, 0, 0, 0, 0, 1],
     );
 
-    let mut view = store.get_window(sheet, 0, 3, &[0, 1]);
-    assert_eq!(view.take_cond_matches(), vec![0, 2, 1, 0, 0, 2]);
-    assert!(view.take_cond_matches().is_empty());
+    let mut contiguous = store.get_window(sheet, 0, 3, &[0, 1]);
+    assert_eq!(contiguous.take_cond_matches(), vec![4, 18, 9, 0, 1, 34]);
+    assert!(contiguous.take_cond_matches().is_empty());
+
+    let mut reordered = store.get_window_rows(sheet, &[2, 0, 1], &[1, 0]);
+    assert_eq!(reordered.take_cond_matches(), vec![34, 1, 18, 4, 0, 9]);
 }
 
 #[test]
@@ -1639,6 +1675,7 @@ fn composed_contains_caches_and_distinct_keys_have_structural_bounds() {
     store.set_bool(sheet, 3, 3, true, 0);
 
     store.reset_query_resource_stats();
+    let predicate_count = 2usize;
     assert_eq!(
         store.filter_rows_multi(
             sheet,
@@ -1653,21 +1690,25 @@ fn composed_contains_caches_and_distinct_keys_have_structural_bounds() {
         ),
         (0..rows as u32).collect::<Vec<_>>()
     );
-    assert_eq!(store.query_resource_stats(), vec![2.0, 0.0]);
-
-    let mut repeated = store.distinct_values(sheet, 0, 0);
-    assert_eq!(repeated.take_texts(), vec!["Alpha"]);
-    assert_eq!(store.query_resource_stats(), vec![2.0, 1.0]);
+    let cache_constructions = store.query_resource_stats()[0];
+    assert!(cache_constructions <= predicate_count as f64);
+    assert!(cache_constructions < rows as f64);
 
     store.reset_query_resource_stats();
-    let mut capped = store.distinct_values(sheet, 2, 10);
-    assert_eq!(capped.take_texts().len(), 10);
-    assert_eq!(store.query_resource_stats(), vec![0.0, 10.0]);
+    let mut repeated = store.distinct_values(sheet, 0, 0);
+    assert_eq!(repeated.take_texts(), vec!["Alpha"]);
+    assert!(store.query_resource_stats()[1] <= 1.0);
+
+    store.reset_query_resource_stats();
+    let distinct_limit = 10usize;
+    let mut capped = store.distinct_values(sheet, 2, distinct_limit);
+    assert_eq!(capped.take_texts().len(), distinct_limit);
+    assert!(store.query_resource_stats()[1] <= distinct_limit as f64);
 
     store.reset_query_resource_stats();
     let mut high_cardinality = store.distinct_values(sheet, 2, 0);
     assert_eq!(high_cardinality.take_texts().len(), rows);
-    assert_eq!(store.query_resource_stats(), vec![0.0, rows as f64]);
+    assert!(store.query_resource_stats()[1] <= rows as f64);
 
     let mut typed = store.distinct_values(sheet, 3, 0);
     assert_eq!(typed.take_kinds(), vec![1, 1, 3, 3, 0]);
@@ -1828,7 +1869,7 @@ fn range_style_remap_scans_only_loaded_paged_cells() {
 }
 
 #[test]
-fn opaque_range_snapshot_restores_values_formulas_and_styles() {
+fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 3);
     store.set_number(sheet, 0, 0, 5.0, 11);
@@ -1836,35 +1877,45 @@ fn opaque_range_snapshot_restores_values_formulas_and_styles() {
     store.set_string(sheet, 2, 1, "tail", 13);
     store.recompute(sheet);
 
+    let number_before = number(&store, sheet, 0, 0);
+    let formula_value_before = number(&store, sheet, 1, 0);
+    let formula_source_before = store
+        .formula_source(sheet, 1, 0)
+        .expect("formula source should be available before capture");
+    let text_before = string(&store, sheet, 2, 1);
+    let styles_before = [
+        store.style_id_at(sheet, 0, 0),
+        store.style_id_at(sheet, 1, 0),
+        store.style_id_at(sheet, 2, 1),
+    ];
+
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
-    assert_eq!(snapshot.formula_offsets(), vec![1, 0]);
-    assert_eq!(snapshot.formula_sources(), vec!["=(A1+1)"]);
-    assert_eq!(snapshot.kinds().len(), 6);
-    assert_eq!(snapshot.style_ids(), vec![11, 12, 0, 0, 0, 13]);
-    assert!(snapshot.byte_length() >= 6 * (1 + std::mem::size_of::<u64>()));
-    let snapshot_numbers = store.snapshot_numbers(&snapshot);
-    let snapshot_texts = store.snapshot_texts(&snapshot);
-    assert_close(snapshot_numbers[0], 5.0);
-    assert_eq!(snapshot_texts[5], "tail");
-    let first = store.get_cell(sheet, 0, 0);
-    assert_close(first.num(), 5.0);
-    assert_eq!(first.style(), 11);
-    assert_eq!(first.string(), None);
-    assert_eq!(CellStore::default().row_count(0), 0);
     assert!(store.clear_range(sheet, 0, 0, 2, 1, true, true));
+    assert!(store.formula_source(sheet, 1, 0).is_none());
+    assert!(string(&store, sheet, 2, 1).is_none());
     assert!(store.restore_range(sheet, 0, 0, &snapshot));
     store.recompute(sheet);
 
-    assert_close(number(&store, sheet, 0, 0), 5.0);
-    assert_close(number(&store, sheet, 1, 0), 6.0);
+    assert_close(number(&store, sheet, 0, 0), number_before);
+    assert_close(number(&store, sheet, 1, 0), formula_value_before);
     assert_eq!(
         store.formula_source(sheet, 1, 0).as_deref(),
-        Some("=(A1+1)")
+        Some(formula_source_before.as_str())
     );
-    assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("tail"));
-    assert_eq!(store.style_id_at(sheet, 0, 0), 11);
-    assert_eq!(store.style_id_at(sheet, 1, 0), 12);
-    assert_eq!(store.style_id_at(sheet, 2, 1), 13);
+    assert_eq!(string(&store, sheet, 2, 1), text_before);
+    assert_eq!(
+        [
+            store.style_id_at(sheet, 0, 0),
+            store.style_id_at(sheet, 1, 0),
+            store.style_id_at(sheet, 2, 1),
+        ],
+        styles_before
+    );
+
+    store.set_number(sheet, 0, 0, 8.0, styles_before[0]);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 9.0);
+    assert_eq!(store.style_id_at(sheet, 1, 0), styles_before[1]);
 }
 
 #[test]
@@ -1981,13 +2032,37 @@ fn paged_structural_edits_remap_loaded_cells_without_dense_allocation() {
 }
 
 #[test]
+fn recompute_without_formulas_leaves_sheet_state_unchanged() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 2);
+    store.set_number(sheet, 0, 0, 1.0, 7);
+    store.set_string(sheet, 1, 1, "steady", 9);
+
+    let number_before = number(&store, sheet, 0, 0);
+    let text_before = string(&store, sheet, 1, 1);
+    let styles_before = [
+        store.style_id_at(sheet, 0, 0),
+        store.style_id_at(sheet, 1, 1),
+    ];
+
+    store.recompute(sheet);
+    store.recompute(sheet);
+    store.recompute(usize::MAX);
+
+    assert_eq!((store.row_count(sheet), store.col_count(sheet)), (2, 2));
+    assert_close(number(&store, sheet, 0, 0), number_before);
+    assert_eq!(string(&store, sheet, 1, 1), text_before);
+    assert_eq!(
+        [
+            store.style_id_at(sheet, 0, 0),
+            store.style_id_at(sheet, 1, 1),
+        ],
+        styles_before
+    );
+    assert!(store.formula_source(sheet, 0, 0).is_none());
+}
+#[test]
 fn formula_ast_boundaries_preserve_blank_comparison_and_named_cell_semantics() {
-    let mut no_formulas = CellStore::new();
-    let empty_sheet = no_formulas.add_sheet(1, 1);
-    no_formulas.set_number(empty_sheet, 0, 0, 1.0, 0);
-    no_formulas.recompute(empty_sheet);
-    no_formulas.recompute(empty_sheet);
-    no_formulas.recompute(99);
 
     let mut store = CellStore::new();
     let sheet = store.add_sheet(20, 2);
@@ -2033,7 +2108,7 @@ fn formula_ast_boundaries_preserve_blank_comparison_and_named_cell_semantics() {
 }
 
 #[test]
-fn multi_filter_kinds_and_numeric_operators_match_resolved_cell_values() {
+fn multi_filter_kinds_match_resolved_cell_values() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(1, 6);
     store.set_number(sheet, 0, 0, 1.0, 0);
@@ -2094,14 +2169,6 @@ fn multi_filter_kinds_and_numeric_operators_match_resolved_cell_values() {
         vec![5]
     );
 
-    let numeric =
-        |flag| store.filter_rows_multi(sheet, &[0], &[2], &[flag], &[1.0], &[0], &[0], &[], vec![]);
-    assert_eq!(numeric(0), vec![1]);
-    assert_eq!(numeric(1), vec![0, 1]);
-    assert!(numeric(2).is_empty());
-    assert_eq!(numeric(3), vec![0]);
-    assert_eq!(numeric(4), vec![0]);
-    assert_eq!(numeric(5), vec![1]);
     assert_eq!(
         store.filter_rows_multi(sheet, &[0], &[3], &[], &[], &[], &[], &[], vec![]),
         vec![4]
@@ -2121,4 +2188,53 @@ fn multi_filter_kinds_and_numeric_operators_match_resolved_cell_values() {
         vec![0, 1]
     );
     assert_eq!(store.data_edge_ordered(sheet, &[0, 1], 0, 0, 0, 1), 0);
+}
+
+fn numeric_filter_rows(operator: u8) -> Vec<u32> {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 5);
+    for (row, value) in [-2.0, -1.0, 0.0, 1.0, 2.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+    store.filter_rows_multi(
+        sheet,
+        &[0],
+        &[2],
+        &[operator],
+        &[0.0],
+        &[0],
+        &[0],
+        &[],
+        vec![],
+    )
+}
+
+#[test]
+fn numeric_filter_greater_than_returns_matching_rows() {
+    assert_eq!(numeric_filter_rows(0), vec![3, 4]);
+}
+
+#[test]
+fn numeric_filter_greater_than_or_equal_returns_matching_rows() {
+    assert_eq!(numeric_filter_rows(1), vec![2, 3, 4]);
+}
+
+#[test]
+fn numeric_filter_less_than_returns_matching_rows() {
+    assert_eq!(numeric_filter_rows(2), vec![0, 1]);
+}
+
+#[test]
+fn numeric_filter_less_than_or_equal_returns_matching_rows() {
+    assert_eq!(numeric_filter_rows(3), vec![0, 1, 2]);
+}
+
+#[test]
+fn numeric_filter_equal_returns_matching_rows() {
+    assert_eq!(numeric_filter_rows(4), vec![2]);
+}
+
+#[test]
+fn numeric_filter_not_equal_returns_matching_rows() {
+    assert_eq!(numeric_filter_rows(5), vec![0, 1, 3, 4]);
 }

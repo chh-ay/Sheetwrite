@@ -9,6 +9,7 @@ import {
   diamondFormulas,
   distinctRangeFormulas,
   fanOutFormulas,
+  type FormulaCell,
   independentFormulas,
   linearChain,
   sharedRangeFormulas,
@@ -41,54 +42,136 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): FormulaBenchmarkResul
   };
 }
 
-describe("formula benchmark datasets", () => {
-  it("builds deterministic independent, chain, and fan-out formulas", () => {
-    expect(independentFormulas(3)).toEqual([
-      { row: 0, col: 1, src: "=A1+1" },
-      { row: 1, col: 1, src: "=A2+1" },
-      { row: 2, col: 1, src: "=A3+1" },
-    ]);
-    expect(linearChain(4)).toEqual([
-      { row: 1, col: 0, src: "=A1+1" },
-      { row: 2, col: 0, src: "=A2+1" },
-      { row: 3, col: 0, src: "=A3+1" },
-    ]);
-    expect(fanOutFormulas(2).map((formula) => formula.src)).toEqual(["=$A$1+1", "=$A$1+2"]);
+function referencedCells(source: string): Array<{ row: number; col: number }> {
+  return [...source.matchAll(/\$?([A-Z]+)\$?(\d+)/gu)].map((match) => {
+    const letters = match[1]!;
+    let col = 0;
+    for (const letter of letters) col = col * 26 + letter.charCodeAt(0) - 64;
+    return { row: Number(match[2]) - 1, col: col - 1 };
   });
+}
 
-  it("builds stable diamond and range topologies", () => {
-    expect(diamondFormulas(2)).toEqual([
-      { row: 0, col: 1, src: "=$A$1+1" },
-      { row: 0, col: 2, src: "=$A$1+2" },
-      { row: 0, col: 3, src: "=B1+C1" },
-      { row: 1, col: 1, src: "=$D$1+1" },
-      { row: 1, col: 2, src: "=$D$1+2" },
-      { row: 1, col: 3, src: "=B2+C2" },
-    ]);
-    expect(sharedRangeFormulas(1, 5)[0]!.src).toBe("=SUM($A$1:$A$5)");
-    expect(distinctRangeFormulas(2).map((formula) => formula.src)).toEqual([
-      "=SUM(A1:A10)",
-      "=SUM(A11:A20)",
-    ]);
+function assertAcyclic(cells: readonly FormulaCell[]): void {
+  const key = ({ row, col }: Pick<FormulaCell, "row" | "col">) => `${row}:${col}`;
+  const formulas = new Map(cells.map((cell) => [key(cell), cell]));
+  const state = new Map<string, "visiting" | "visited">();
+  const visit = (cell: FormulaCell): void => {
+    const cellKey = key(cell);
+    expect(referencedCells(cell.src).some((dependency) => key(dependency) === cellKey)).toBeFalse();
+    if (state.get(cellKey) === "visiting") throw new Error(`formula cycle at ${cellKey}`);
+    if (state.get(cellKey) === "visited") return;
+    state.set(cellKey, "visiting");
+    for (const dependency of referencedCells(cell.src)) {
+      const formula = formulas.get(key(dependency));
+      if (formula) visit(formula);
+    }
+    state.set(cellKey, "visited");
+  };
+  for (const cell of cells) visit(cell);
+}
+
+describe("formula benchmark datasets", () => {
+  it("preserves dependency topology as dataset sizes grow", () => {
+    for (const size of [2, 7]) {
+      const independent = independentFormulas(size);
+      expect(independent).toHaveLength(size);
+      expect(
+        independent.every((cell) => {
+          const [dependency] = referencedCells(cell.src);
+          return cell.col === 1 && dependency?.row === cell.row && dependency.col === 0;
+        }),
+      ).toBeTrue();
+
+      const chain = linearChain(size);
+      expect(chain).toHaveLength(size - 1);
+      expect(
+        chain.every((cell) => {
+          const [dependency] = referencedCells(cell.src);
+          return cell.col === 0 && dependency?.row === cell.row - 1 && dependency.col === 0;
+        }),
+      ).toBeTrue();
+
+      const fanOut = fanOutFormulas(size);
+      expect(fanOut).toHaveLength(size);
+      expect(new Set(fanOut.flatMap((cell) => cell.src.match(/\$[A-Z]+\$\d+/gu) ?? [])).size).toBe(
+        1,
+      );
+
+      const diamonds = diamondFormulas(size);
+      expect(diamonds).toHaveLength(size * 3);
+      for (let row = 0; row < size; row++) {
+        const level = diamonds.filter((cell) => cell.row === row);
+        expect(level.map((cell) => cell.col).sort()).toEqual([1, 2, 3]);
+        const join = level.find((cell) => cell.col === 3)!;
+        expect(referencedCells(join.src)).toEqual([
+          { row, col: 1 },
+          { row, col: 2 },
+        ]);
+        const branchDependencies = level
+          .filter((cell) => cell.col !== 3)
+          .flatMap((cell) => referencedCells(cell.src));
+        expect(
+          new Set(
+            branchDependencies.map(({ row: dependencyRow, col }) => `${dependencyRow}:${col}`),
+          ).size,
+        ).toBe(1);
+      }
+
+      const shared = sharedRangeFormulas(size, size * 10);
+      expect(shared).toHaveLength(size);
+      expect(
+        new Set(shared.map((cell) => cell.src.match(/\$[A-Z]+\$\d+:\$[A-Z]+\$\d+/u)?.[0])).size,
+      ).toBe(1);
+
+      const distinct = distinctRangeFormulas(size);
+      expect(distinct).toHaveLength(size);
+      const ranges = distinct.map((cell) => {
+        const match = /SUM\(A(\d+):A(\d+)\)/u.exec(cell.src);
+        expect(match).not.toBeNull();
+        return { start: Number(match![1]), end: Number(match![2]) };
+      });
+      expect(ranges.every(({ start, end }) => end - start + 1 === 10)).toBeTrue();
+      expect(ranges.slice(1).every((range, index) => range.start === ranges[index]!.end + 1)).toBe(
+        true,
+      );
+
+      for (const formulas of [independent, chain, fanOut, diamonds, shared, distinct]) {
+        assertAcyclic(formulas);
+      }
+    }
   });
 });
 
 describe("formula benchmark result validation", () => {
-  it("accepts exact finite full and smoke matrices", () => {
-    expect(() => validateFormulaBenchmark(formulaFixture("smoke"), "smoke")).not.toThrow();
-    expect(() => validateFormulaBenchmark(formulaFixture("full"), "full")).not.toThrow();
+  it("accepts finite matrices and keeps full evidence materially broader than smoke", () => {
+    const smoke = formulaFixture("smoke");
+    const full = formulaFixture("full");
+    expect(() => validateFormulaBenchmark(smoke, "smoke")).not.toThrow();
+    expect(() => validateFormulaBenchmark(full, "full")).not.toThrow();
+    expect(Math.max(...full.workloads.map((entry) => entry.size))).toBeGreaterThan(
+      Math.max(...smoke.workloads.map((entry) => entry.size)),
+    );
+    expect(Math.max(...full.memory.map((entry) => entry.formulas))).toBeGreaterThan(
+      Math.max(...smoke.memory.map((entry) => entry.formulas)),
+    );
+    expect(new Set(full.workloads.map((entry) => entry.id))).toEqual(
+      new Set(smoke.workloads.map((entry) => entry.id)),
+    );
   });
 
-  it("rejects missing, duplicate, unexpected, and non-finite workload cells by exact key", () => {
+  it("rejects missing, duplicate, unexpected, and malformed named workload cells", () => {
+    const named = { id: "independent-parse-load", size: 1_000 } as const;
+    const key = `workload=${named.id};size=${named.size}`;
+    const matchesNamed = (entry: FormulaBenchmarkResult["workloads"][number]) =>
+      entry.id === named.id && entry.size === named.size;
+
     const missing = formulaFixture();
-    const missingKey = expectedFormulaWorkloadKeys("smoke")[0]!;
-    missing.workloads.shift();
-    expect(() => validateFormulaBenchmark(missing, "smoke")).toThrow(`missing ${missingKey}`);
+    missing.workloads = missing.workloads.filter((entry) => !matchesNamed(entry));
+    expect(() => validateFormulaBenchmark(missing, "smoke")).toThrow(`missing ${key}`);
 
     const duplicate = formulaFixture();
-    const duplicateKey = expectedFormulaWorkloadKeys("smoke")[0]!;
-    duplicate.workloads.push(structuredClone(duplicate.workloads[0]!));
-    expect(() => validateFormulaBenchmark(duplicate, "smoke")).toThrow(`duplicate ${duplicateKey}`);
+    duplicate.workloads.push(structuredClone(duplicate.workloads.find(matchesNamed)!));
+    expect(() => validateFormulaBenchmark(duplicate, "smoke")).toThrow(`duplicate ${key}`);
 
     const unexpected = formulaFixture();
     unexpected.workloads.push({
@@ -102,11 +185,11 @@ describe("formula benchmark result validation", () => {
     );
 
     const invalid = formulaFixture();
-    invalid.workloads[0]!.samplesMs[0] = Number.NaN;
+    invalid.workloads.find(matchesNamed)!.samplesMs[0] = Number.NaN;
     expect(() => validateFormulaBenchmark(invalid, "smoke")).toThrow(/finite and non-negative/);
 
     const malformed = formulaFixture();
-    Object.defineProperty(malformed.workloads[0]!, "size", { value: "1000" });
+    Object.defineProperty(malformed.workloads.find(matchesNamed)!, "size", { value: "1000" });
     expect(() => validateFormulaBenchmark(malformed, "smoke")).toThrow(
       "formula workload contains a malformed identity",
     );

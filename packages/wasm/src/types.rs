@@ -364,11 +364,6 @@ impl StringPool {
         }
     }
 
-    /// Interned-string count; only test assertions read it today.
-    #[cfg(test)]
-    pub(crate) fn len(&self) -> usize {
-        self.spans.len()
-    }
 
     /// Text for a pool id; `None` when out of range. O(1), allocation-free.
     pub(crate) fn get(&self, id: u32) -> Option<&str> {
