@@ -7,7 +7,7 @@ const GRID = ".sw-demo-grid .sheetwrite";
 const CANVAS = `${GRID} .sheetwrite-canvas`;
 const INITIAL_CUSTOMER = "Account 000001";
 const SCROLLED_CUSTOMER = "Account 000101";
-const WORKER_ASSET = /\/_astro\/worker-[A-Za-z0-9_-]+\.js$/;
+const WORKER_ASSET = /\/assets\/worker-[A-Za-z0-9_-]+\.js$/;
 
 interface BrowserErrors {
   console: string[];
@@ -97,10 +97,7 @@ test("production Worker renderer loads, paints, edits, and scrolls", async ({ pa
     transferableCanvas:
       typeof HTMLCanvasElement.prototype.transferControlToOffscreen === "function",
   }));
-  expect(
-    capabilities,
-    `Chromium Worker capability matrix: ${JSON.stringify(capabilities)}`,
-  ).toEqual({
+  expect(capabilities, `Chromium Worker capabilities: ${JSON.stringify(capabilities)}`).toEqual({
     worker: true,
     offscreenCanvas: true,
     transferableCanvas: true,
@@ -158,7 +155,7 @@ test("production Worker renderer loads, paints, edits, and scrolls", async ({ pa
 test("production Worker renderer falls back after a module-load failure", async ({ page }) => {
   const errors = collectErrors(page);
   const failedWorkerUrls: string[] = [];
-  await page.route("**/_astro/worker-*.js", async (route) => {
+  await page.route("**/assets/worker-*.js", async (route) => {
     failedWorkerUrls.push(route.request().url());
     await route.abort("failed");
   });

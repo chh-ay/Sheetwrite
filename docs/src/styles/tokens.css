@@ -30,6 +30,48 @@
   --sw-header-height: 4rem;
   --sw-sidebar-width: 17.5rem;
   --sw-content-width: 51rem;
+  --font-sans: var(--sw-font-body);
+  --font-display: var(--sw-font-display);
+  --font-mono: var(--sw-font-mono);
+  --sw-type-xs: 0.72rem;
+  --sw-type-sm: 0.84rem;
+  --sw-type-base: 1rem;
+  --color-fw-react: #61dafb;
+  --color-fw-vue: #42b883;
+  --color-fw-svelte: #ff5a1f;
+  --sw-demo-surface: #09101c;
+  --sw-demo-raised: #0d1727;
+  --sw-demo-deep: #080e18;
+  --sw-demo-panel: #0b1422;
+  --sw-demo-border: #22314a;
+  --sw-demo-border-strong: #2d405f;
+  --sw-demo-fg: #dce5f3;
+  --sw-demo-fg-strong: #f4f7fb;
+  --sw-demo-fg-soft: #b9c7dc;
+  --sw-demo-muted: #91a4c1;
+  --sw-demo-dim: #60708b;
+  --sw-demo-dimmer: #55657e;
+  --sw-demo-ink: #06100c;
+  --sw-demo-accent: #34d399;
+  --sw-demo-shadow: 0 2rem 6rem rgb(0 0 0 / 32%);
+  --sw-demo-popup-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
+  --sw-demo-accent-strong: #6ee7b7;
+  --sw-demo-react-accent: #58c4dc;
+  --sw-demo-react-accent-strong: #8bd8e8;
+  --sw-demo-vue-accent: #42b883;
+  --sw-demo-vue-accent-strong: #75d0aa;
+  --sw-demo-svelte-accent: #e7653d;
+  --sw-demo-svelte-accent-strong: #ff8a68;
+  --sw-demo-warn: #fbbf24;
+  --sw-demo-danger: #fb7185;
+  --sw-demo-space-1: 0.25rem;
+  --sw-demo-space-2: 0.5rem;
+  --sw-demo-space-3: 0.75rem;
+  --sw-demo-space-4: 1rem;
+  --sw-demo-radius-1: 0.25rem;
+  --sw-demo-radius-2: 0.5rem;
+  --sw-demo-radius-3: 0.75rem;
+  --sw-demo-transition: 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root[data-theme="dark"] {

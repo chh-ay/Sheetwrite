@@ -171,9 +171,9 @@ grid host rather than replacing positioning, visibility, or disabled behavior:
 }
 ```
 
-The recommended runtime-theming pattern (from the theming example page) drives both
-layers together: toggle `data-theme` on a wrapper so the surrounding
-CSS-variable chrome flips, and call `setTheme` so the canvas repaints.
+The recommended runtime-theming pattern drives both layers together: toggle
+`data-theme` on a wrapper so the surrounding CSS-variable chrome flips, and
+call `setTheme` so the canvas repaints.
 
 ```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
 darkBtn.addEventListener("click", () => {

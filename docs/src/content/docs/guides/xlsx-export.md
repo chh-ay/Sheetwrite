@@ -27,7 +27,7 @@ await grid.exportXlsx("sales.xlsx");
 
 The optional package's ExcelJS-backed workbook implementation has browser and resource costs. Load `@sheetwrite/xlsx/register` on the path that needs XLSX rather than in every application entry.
 
-- [Data operations and compatibility matrix](/docs/guides/data-operations/#xlsx-compatibility)
+- [Data operations and XLSX compatibility](/docs/guides/data-operations/#xlsx-compatibility)
 - [`@sheetwrite/xlsx` API](/docs/api/xlsx/)
 - [`@sheetwrite/xlsx/register` API](/docs/api/xlsx-register/)
 - [`toXlsxWorkbook`](/docs/api/core/to-xlsx-workbook/)

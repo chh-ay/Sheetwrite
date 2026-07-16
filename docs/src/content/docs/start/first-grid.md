@@ -3,7 +3,7 @@ title: Your first grid
 description: Initialize Sheetwrite, create a workbook, and observe committed changes.
 ---
 
-This complete TypeScript example uses the imperative core. The framework adapters expose the same `Grid` after their client-only initialization completes.
+This complete TypeScript example uses the imperative core. [Install Sheetwrite](/docs/start/installation/) first; the framework adapters expose the same `Grid` after their client-only initialization completes.
 
 ```ts compile title="Complete first grid"
 import {

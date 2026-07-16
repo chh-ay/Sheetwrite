@@ -15,7 +15,11 @@ const layers = [
 
 export default function RuntimeArchitecture() {
   return (
-    <figure className="sw-architecture" aria-labelledby="runtime-architecture-caption">
+    <figure
+      aria-label="Sheetwrite runtime ownership and data flow"
+      className="sw-architecture"
+      role="region"
+    >
       <div className="sw-architecture__flow">
         {layers.map((layer, index) => (
           <div className="sw-architecture__step" key={layer.label}>
@@ -28,7 +32,7 @@ export default function RuntimeArchitecture() {
           </div>
         ))}
       </div>
-      <figcaption id="runtime-architecture-caption">
+      <figcaption>
         Ownership moves downward through narrow contracts; events and resolved windows move upward.
       </figcaption>
     </figure>

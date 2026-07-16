@@ -44,6 +44,31 @@ function displayParts(parts: readonly ts.SymbolDisplayPart[] | undefined): strin
   return parts?.map((part) => part.text).join("") ?? "";
 }
 
+/** Compiler-generated scaffolding (Vue SFC virtual code, private helpers) is never reader-facing. */
+const INTERNAL_TAG_TEXT = /__(?:VLS|vls)_?\w*|__sheetwrite/;
+
+/**
+ * Join JSDoc tag parts keeping link parts word-separated: quickinfo emits
+ * `{text: url, kind: "linkText"}` directly against the following prose part.
+ */
+function tagText(parts: readonly ts.SymbolDisplayPart[] | undefined): string | undefined {
+  if (!parts?.length) return undefined;
+  let out = "";
+  for (const part of parts) {
+    if (
+      out.length > 0 &&
+      !/\s$/.test(out) &&
+      part.text.length > 0 &&
+      !/^[\s.,;:)\]}]/.test(part.text) &&
+      (/^link/.test(part.kind) || /https?:\/\/\S+$/.test(out))
+    ) {
+      out += " ";
+    }
+    out += part.text;
+  }
+  return out;
+}
+
 function lineOffsets(source: string): number[] {
   const offsets = [0];
   for (let index = 0; index < source.length; index += 1) {
@@ -190,9 +215,9 @@ export class SheetwriteTypeEngine {
         if (text) {
           const { line, character } = sourceFile.getLineAndCharacterOfPosition(start);
           const docs = displayParts(quickInfo?.documentation);
-          const tags = quickInfo?.tags?.map(
-            (tag) => [tag.name, displayParts(tag.text)] as [string, string | undefined],
-          );
+          const tags = quickInfo?.tags
+            ?.map((tag) => [tag.name, tagText(tag.text)] as [string, string | undefined])
+            .filter(([, value]) => !value || !INTERNAL_TAG_TEXT.test(value));
           const definitions = this.languageService.getDefinitionAtPosition(fileName, start) ?? [];
           const origin = hoverOrigin(definitions, fileName);
           hovers.push({

@@ -55,7 +55,8 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Generated API", href: "/docs/api/" },
       { label: "Document operations", href: "/docs/reference/document-operations/" },
       { label: "Events and errors", href: "/docs/reference/events-errors/" },
-      { label: "Migration matrix", href: "/docs/reference/migration-matrix/" },
+      { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },
+      { label: "Moved guides", href: "/docs/reference/moved-guides/" },
     ],
   },
 ];

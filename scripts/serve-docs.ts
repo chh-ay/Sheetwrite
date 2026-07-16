@@ -1,8 +1,8 @@
 import { resolve, sep } from "node:path";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
-const outputRoot = resolve(repositoryRoot, "docs-astro/dist");
-const base = "/Sheetwrite";
+const outputRoot = resolve(repositoryRoot, "docs/dist/client");
+const base = "";
 const port = Number.parseInt(process.env.PORT ?? "4173", 10);
 
 function outputPath(pathname: string): string | null {
