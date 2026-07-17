@@ -1115,13 +1115,13 @@
     padding: 0.75rem;
   }
 
-  .sw-showcase-brand {
+  .sw-showcase-nav > .sw-showcase-brand {
     display: inline-flex;
     gap: 0.75rem;
     align-items: center;
-    color: var(--sw-fg-strong) !important;
-    font: 700 1rem / 1 var(--sw-font-display) !important;
-    letter-spacing: -0.02em !important;
+    color: var(--sw-fg-strong);
+    font: 700 1rem / 1 var(--sw-font-display);
+    letter-spacing: -0.02em;
   }
 
   .sw-showcase-brand svg {
