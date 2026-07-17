@@ -57,6 +57,24 @@ describe("bootstrap release workflow", () => {
     expect(restore).toBeGreaterThan(qualityGate);
     expect(cleanGate).toBeGreaterThan(restore);
   });
+  it("installs every tool required to build release-mode artifacts", async () => {
+    const source = await readFile(bootstrapWorkflowPath, "utf8");
+    const prepareJob = source.slice(
+      source.indexOf("\n  prepare:"),
+      source.indexOf("\n  package-gates:"),
+    );
+    const cargoAudit = prepareJob.indexOf(
+      'cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked',
+    );
+    const cargoLlvmCov = prepareJob.indexOf(
+      'cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked',
+    );
+    const artifactBuild = prepareJob.indexOf("bun run release:prepare");
+
+    expect(cargoAudit).toBeGreaterThan(-1);
+    expect(cargoLlvmCov).toBeGreaterThan(cargoAudit);
+    expect(artifactBuild).toBeGreaterThan(cargoLlvmCov);
+  });
 });
 
 describe("stage-only release workflow", () => {

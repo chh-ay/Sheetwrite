@@ -110,10 +110,12 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: 1.3.14
-      - name: Install dependencies and wasm-pack
+      - name: Install dependencies and release toolchain
         run: |
           bun install --frozen-lockfile
           bun scripts/install-wasm-pack.ts
+          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+          cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
       - name: Build and pack one release artifact set
         run: bun run release:prepare -- --mode release --output test-results/release-artifacts
       - name: Verify canonical artifact manifest
