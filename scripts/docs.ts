@@ -872,6 +872,9 @@ const BENCH_ENGINE_LABELS = { sheetwrite: "Sheetwrite", handsontable: "Handsonta
 type BenchEngine = keyof typeof BENCH_ENGINE_LABELS;
 
 function fmtMs(value: number): string {
+  // "0.00 ms" reads like a broken benchmark; sub-hundredth values are real
+  // measurements in the microsecond range.
+  if (value > 0 && value < 0.0095) return `${Math.max(1, Math.round(value * 1000))} µs`;
   return `${value.toFixed(value < 10 ? 2 : 1)} ms`;
 }
 
@@ -1005,7 +1008,9 @@ function benchLogScale(values: number[], fmt: (value: number) => string): BenchS
   const ticks: string[] = [];
   for (let exp = lo; exp <= hi; exp++) {
     const at = ((exp - lo) / segments) * 100;
-    const label = exp === hi ? fmt(10 ** exp) : trimTick(10 ** exp);
+    const value = 10 ** exp;
+    // The last tick carries the unit; a second reads better than "1000.0 ms".
+    const label = exp === hi ? (value >= 1000 ? `${value / 1000} s` : fmt(value)) : trimTick(value);
     ticks.push(`<span class="bench-ruler__tick" style="left:${at.toFixed(2)}%">${label}</span>`);
   }
   return { pct, ruler: benchRuler(ticks), segments };
@@ -1115,12 +1120,9 @@ const FORMULA_METHOD = benchMethod(
     ["distinct-range-edit", "Each formula owns its own range; one edit recomputes only its owner."],
     ["cross-sheet-range-edit", "Summary-sheet formulas range over another sheet; edit the source."],
     [
-      "scalar-edit-affects-0",
-      "1,000 formulas exist but the edit touches an unrelated cell: pure dependency-lookup cost.",
+      "scalar-edit-affects-N",
+      "One scalar edit invalidating exactly N dependents; N=0 touches an unrelated cell, so it prices pure dependency lookup.",
     ],
-    ["scalar-edit-affects-1", "One scalar edit invalidating exactly one dependent."],
-    ["scalar-edit-affects-1000", "One scalar edit invalidating 1,000 dependents."],
-    ["scalar-edit-affects-100000", "One scalar edit invalidating 100,000 dependents."],
     ["topology-remove-add", "Remove and re-add rows so the dependency graph itself changes shape."],
     ["cycles", "Introduce a reference cycle; detection and cycle-error propagation."],
     [
@@ -1468,11 +1470,39 @@ async function renderEvidencePage(): Promise<string> {
       "</dl>",
       "",
     );
-    const workloadIds = [...new Set(evidence.workloads.map((workload) => workload.id))].sort();
+    // The scalar-edit-affects-N workloads are one scaling series (recompute
+    // cost tracks affected dependents, not sheet size); published as separate
+    // one-row groups their near-zero baselines read like broken benchmarks.
+    const SCALAR_FAMILY = /^scalar-edit-affects-(\d+)$/;
+    const scalarEntries = evidence.workloads
+      .filter((workload) => SCALAR_FAMILY.test(workload.id))
+      .map((workload) => {
+        const affected = Number(SCALAR_FAMILY.exec(workload.id)![1]);
+        return { workload, affected };
+      })
+      .sort((left, right) => left.affected - right.affected);
+    const workloadIds = [
+      ...new Set(
+        evidence.workloads.map((workload) => workload.id).filter((id) => !SCALAR_FAMILY.test(id)),
+      ),
+    ].sort();
+    const scalarGroup =
+      scalarEntries.length === 0
+        ? []
+        : [
+            {
+              label: "scalar-edit-affects",
+              entries: scalarEntries.map(({ workload, affected }) => ({
+                sizeLabel: `${affected.toLocaleString("en-US")} affected`,
+                median: workload.stat.median,
+                p95: workload.stat.p95,
+                size: Math.max(affected, 1),
+              })),
+            },
+          ];
     lines.push(
-      ...benchScaleFigure(
-        "workload",
-        workloadIds.map((id) => ({
+      ...benchScaleFigure("workload", [
+        ...workloadIds.map((id) => ({
           label: id,
           entries: evidence.workloads
             .filter((workload) => workload.id === id)
@@ -1484,7 +1514,8 @@ async function renderEvidencePage(): Promise<string> {
               size: workload.size,
             })),
         })),
-      ),
+        ...scalarGroup,
+      ]),
     );
     lines.push(
       "",

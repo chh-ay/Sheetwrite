@@ -3881,7 +3881,7 @@
               "owners": [
                 "src/worker.ts"
               ],
-              "source": "src/worker.ts#L253",
+              "source": "src/worker.ts#L250",
               "jsDocTags": [],
               "documentation": "Build the worker-side protocol handler. Keeping the mutable render state\ninside the returned closure lets tests exercise the real message contract\nwithout booting a browser Worker.",
               "memberDocs": []
@@ -3893,7 +3893,7 @@
               "owners": [
                 "src/worker.ts"
               ],
-              "source": "src/worker.ts#L246",
+              "source": "src/worker.ts#L243",
               "jsDocTags": [],
               "documentation": "Acknowledgement posted back to the sender after a frame actually painted.",
               "memberDocs": []
