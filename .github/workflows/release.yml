@@ -32,6 +32,7 @@ env:
 jobs:
   preflight:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout requested commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -91,6 +92,7 @@ jobs:
   prepare:
     needs: preflight
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     outputs:
       artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
     steps:
@@ -111,8 +113,11 @@ jobs:
           bun-version: 1.3.14
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Install checksum-pinned wasm-pack
-        run: bun scripts/install-wasm-pack.ts
+      - name: Install release artifact toolchain
+        run: |
+          bun scripts/install-wasm-pack.ts
+          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+          cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
       - name: Build and pack one canonical artifact set
         run: bun run release:prepare -- --mode release --output test-results/release-artifacts
       - name: Verify canonical artifact manifest
@@ -129,6 +134,7 @@ jobs:
   package-gates:
     needs: prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout requested commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -147,7 +153,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Download immutable canonical artifact bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: canonical-release-artifacts
           path: test-results/release-artifacts
@@ -163,6 +169,7 @@ jobs:
   stage:
     needs: [prepare, package-gates]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: npm-release
     permissions:
       contents: read
@@ -183,7 +190,7 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Download immutable canonical artifact bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: canonical-release-artifacts
           path: test-results/release-artifacts
