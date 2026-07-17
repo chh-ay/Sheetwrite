@@ -14,15 +14,25 @@ import {
   WASM_TARGET,
 } from "./workspace-tooling.js";
 
-export const RELEASE_ARTIFACT_SCHEMA_VERSION = 1;
-export const RELEASE_ARTIFACT_MANIFEST = "release-manifest.json";
+export const RELEASE_ARTIFACT_SCHEMA_VERSION = 2;
+export const RELEASE_ARTIFACT_MANIFEST = "release-artifacts.json";
 export const INITIAL_RELEASE_VERSION = "0.1.0";
+export const RELEASE_BUILD_COMMAND = "bun run build:packages";
 
 interface PackageManifest {
   readonly name: string;
   readonly version: string;
   readonly files?: readonly string[];
   readonly dependencies?: Readonly<Record<string, string>>;
+  readonly devDependencies?: Readonly<Record<string, string>>;
+  readonly peerDependencies?: Readonly<Record<string, string>>;
+  readonly scripts?: Readonly<Record<string, string>>;
+  readonly exports?: unknown;
+  readonly types?: unknown;
+  readonly main?: unknown;
+  readonly module?: unknown;
+  readonly browser?: unknown;
+  readonly svelte?: unknown;
   readonly [key: string]: unknown;
 }
 
@@ -58,12 +68,16 @@ export interface ReleasePackageArtifact {
   readonly files: readonly string[];
   readonly shasum: string;
   readonly integrity: string;
+  readonly sha512: string;
+  readonly internalDependencies: Readonly<Record<string, string>>;
 }
 
 export interface ReleaseArtifactManifest {
   readonly schemaVersion: number;
   readonly sourceCommit: string;
+  readonly dirty: boolean;
   readonly toolchain: ReleaseToolchain;
+  readonly buildCommand: typeof RELEASE_BUILD_COMMAND;
   readonly packages: readonly ReleasePackageArtifact[];
 }
 
@@ -116,6 +130,11 @@ export function assertReleaseTreeClean(status: string): void {
   }
 }
 
+export function releaseModeDirty(mode: ReleaseArtifactMode, status: string): boolean {
+  if (mode === "release") assertReleaseTreeClean(status);
+  return status.trim().length > 0;
+}
+
 export function assertOutputDirectoryEmpty(entries: readonly string[]): void {
   if (entries.length > 0) {
     throw new Error(
@@ -139,6 +158,26 @@ export function rewriteWorkspaceRanges(
   );
 }
 
+const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "peerDependencies"] as const;
+
+function collectInternalDependencies(
+  manifest: PackageManifest,
+  versions: ReadonlyMap<string, string>,
+): Record<string, string> {
+  const internal = new Map<string, string>();
+  for (const field of DEPENDENCY_FIELDS) {
+    for (const [name, version] of Object.entries(manifest[field] ?? {})) {
+      if (!versions.has(name)) continue;
+      const expected = versions.get(name);
+      if (version !== expected) {
+        throw new Error(`${manifest.name} internal dependency ${name} must be ${expected}`);
+      }
+      internal.set(name, version);
+    }
+  }
+  return Object.fromEntries([...internal].sort(([left], [right]) => left.localeCompare(right)));
+}
+
 function expectedTarballName(name: string, version: string): string {
   return `${name.replace(/^@/, "").replaceAll("/", "-")}-${version}.tgz`;
 }
@@ -153,6 +192,15 @@ export function expectedArtifactFiles(): readonly string[] {
 export function serializeReleaseManifest(manifest: ReleaseArtifactManifest): string {
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
+export function releaseManifestDigest(bytes: Uint8Array): string {
+  return `sha512-${digest(bytes, "sha512", "base64")}`;
+}
+
+export async function readReleaseManifestDigest(artifactDirectory: string): Promise<string> {
+  return releaseManifestDigest(
+    new Uint8Array(await readFile(join(resolve(artifactDirectory), RELEASE_ARTIFACT_MANIFEST))),
+  );
+}
 
 function assertString(value: unknown, label: string): asserts value is string {
   if (typeof value !== "string" || value.length === 0) throw new Error(`${label} must be a string`);
@@ -163,13 +211,32 @@ function assertInteger(value: unknown, label: string): asserts value is number {
     throw new Error(`${label} must be a non-negative integer`);
   }
 }
+function assertExactKeys(value: object, expected: readonly string[], label: string): void {
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
+    throw new Error(`${label} schema drift: expected ${wanted.join(", ")}`);
+  }
+}
 
 export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void {
+  if (typeof manifest !== "object" || manifest === null) {
+    throw new Error("Release manifest must be an object");
+  }
+  assertExactKeys(
+    manifest,
+    ["schemaVersion", "sourceCommit", "dirty", "toolchain", "buildCommand", "packages"],
+    "Release manifest",
+  );
   if (manifest.schemaVersion !== RELEASE_ARTIFACT_SCHEMA_VERSION) {
     throw new Error(`Unsupported release artifact schema ${String(manifest.schemaVersion)}`);
   }
   if (!/^[0-9a-f]{40}$/.test(manifest.sourceCommit)) {
     throw new Error("Release source commit must be a full Git SHA");
+  }
+  if (typeof manifest.dirty !== "boolean") throw new Error("Release dirty flag must be boolean");
+  if (manifest.buildCommand !== RELEASE_BUILD_COMMAND) {
+    throw new Error(`Release build command must be ${RELEASE_BUILD_COMMAND}`);
   }
   const expectedToolchain: ReleaseToolchain = {
     bun: BUN_VERSION,
@@ -181,8 +248,12 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
     cargoAudit: CARGO_AUDIT_VERSION,
     cargoLlvmCov: CARGO_LLVM_COV_VERSION,
   };
+  if (typeof manifest.toolchain !== "object" || manifest.toolchain === null) {
+    throw new Error("Release toolchain must be an object");
+  }
+  assertExactKeys(manifest.toolchain, Object.keys(expectedToolchain), "Release toolchain");
   for (const [name, expected] of Object.entries(expectedToolchain)) {
-    if (manifest.toolchain?.[name as keyof ReleaseToolchain] !== expected) {
+    if (manifest.toolchain[name as keyof ReleaseToolchain] !== expected) {
       throw new Error(`Release toolchain ${name} must be ${expected}`);
     }
   }
@@ -194,6 +265,26 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
   }
   const seen = new Set<string>();
   for (const [index, artifact] of manifest.packages.entries()) {
+    if (typeof artifact !== "object" || artifact === null) {
+      throw new Error(`Release package ${index} must be an object`);
+    }
+    assertExactKeys(
+      artifact,
+      [
+        "name",
+        "version",
+        "path",
+        "bytes",
+        "unpackedBytes",
+        "fileCount",
+        "files",
+        "shasum",
+        "integrity",
+        "sha512",
+        "internalDependencies",
+      ],
+      `Release package ${index}`,
+    );
     const expectedName = PUBLISHABLE_PACKAGE_ORDER[index];
     if (artifact.name !== expectedName) {
       throw new Error(`Release package ${index} must be ${expectedName ?? "missing"}`);
@@ -227,7 +318,141 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
     if (!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(artifact.integrity)) {
       throw new Error(`${artifact.name} integrity must be SHA-512 SRI`);
     }
+    if (!/^[0-9a-f]{128}$/.test(artifact.sha512)) {
+      throw new Error(`${artifact.name} sha512 must be SHA-512 hex`);
+    }
+    if (
+      typeof artifact.internalDependencies !== "object" ||
+      artifact.internalDependencies === null
+    ) {
+      throw new Error(`${artifact.name} internalDependencies must be an object`);
+    }
+    for (const [name, version] of Object.entries(artifact.internalDependencies)) {
+      if (
+        !PUBLISHABLE_PACKAGE_ORDER.includes(name as never) ||
+        version !== INITIAL_RELEASE_VERSION
+      ) {
+        throw new Error(
+          `${artifact.name} internal dependency ${name} must be ${INITIAL_RELEASE_VERSION}`,
+        );
+      }
+    }
   }
+}
+
+const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
+  "@sheetwrite/wasm": [
+    "README.md",
+    "LICENSE",
+    "loader.d.ts",
+    "loader.mjs",
+    "loader-browser.mjs",
+    "loader-node.mjs",
+    "pkg/sheetwrite_wasm.d.ts",
+    "pkg/sheetwrite_wasm.js",
+    "pkg/sheetwrite_wasm_bg.wasm",
+    "pkg/sheetwrite_wasm_bg.wasm.d.ts",
+  ],
+  "@sheetwrite/core": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/index.js.map",
+    "dist/worker.d.ts",
+    "dist/worker.js",
+    "styles.css",
+    "shell.css",
+  ],
+  "@sheetwrite/xlsx": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/index.js.map",
+  ],
+  "@sheetwrite/react": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
+  "@sheetwrite/vue": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
+  "@sheetwrite/svelte": ["README.md", "LICENSE", "src/Grid.svelte", "src/index.ts", "styles.css"],
+};
+
+function packageTargets(manifest: PackageManifest): string[] {
+  const targets = new Set<string>();
+  const visit = (value: unknown): void => {
+    if (typeof value === "string") {
+      if (value.startsWith("./")) targets.add(value.slice(2));
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (typeof value === "object" && value !== null) {
+      for (const item of Object.values(value)) visit(item);
+    }
+  };
+  visit(manifest.exports);
+  for (const field of ["types", "main", "module", "browser", "svelte"] as const) {
+    const value = manifest[field];
+    if (typeof value === "string") targets.add(value.replace(/^\.\//, ""));
+    else if (field === "browser") visit(value);
+  }
+  return [...targets];
+}
+
+function validatePackedManifest(
+  artifact: ReleasePackageArtifact,
+  manifest: PackageManifest,
+  versions: ReadonlyMap<string, string>,
+): void {
+  if (manifest.name !== artifact.name || manifest.version !== artifact.version) {
+    throw new Error(`${artifact.name} packed manifest identity changed`);
+  }
+  if (manifest.scripts?.prepublishOnly !== undefined) {
+    throw new Error(`${artifact.name} packed manifest retains prepublishOnly`);
+  }
+  for (const field of DEPENDENCY_FIELDS) {
+    for (const [name, version] of Object.entries(manifest[field] ?? {})) {
+      if (version.includes("workspace:")) {
+        throw new Error(`${artifact.name} contains an unpublished workspace range`);
+      }
+      const expected = versions.get(name);
+      if (expected !== undefined && version !== expected) {
+        throw new Error(`${artifact.name} internal dependency ${name} must be ${expected}`);
+      }
+    }
+  }
+  const internalDependencies = collectInternalDependencies(manifest, versions);
+  if (JSON.stringify(internalDependencies) !== JSON.stringify(artifact.internalDependencies)) {
+    throw new Error(`${artifact.name} internal dependency map changed`);
+  }
+  const files = new Set(artifact.files);
+  for (const required of REQUIRED_PACKAGE_FILES[artifact.name] ?? []) {
+    if (!files.has(required))
+      throw new Error(`${artifact.name} is missing required file ${required}`);
+  }
+  for (const target of packageTargets(manifest)) {
+    if (!files.has(target) && !artifact.files.some((file) => file.startsWith(`${target}/`))) {
+      throw new Error(`${artifact.name} package target does not exist with exact case: ${target}`);
+    }
+  }
+  for (const declared of manifest.files ?? []) {
+    const path = declared.replace(/^\.\//, "").replace(/\/$/, "");
+    if (!files.has(path) && !artifact.files.some((file) => file.startsWith(`${path}/`))) {
+      throw new Error(
+        `${artifact.name} declared file target does not exist with exact case: ${declared}`,
+      );
+    }
+  }
+  const forbidden = artifact.files.find(
+    (path) =>
+      (/^(?:src)\//.test(path) && artifact.name !== "@sheetwrite/svelte") ||
+      /^(?:test|tests|coverage|node_modules|\.cache|tmp|temp)\//.test(path) ||
+      /(?:^|\/)(?:\.DS_Store|Thumbs\.db|[^/]+\.tmp)$/.test(path) ||
+      (path.endsWith(".ts") && !path.endsWith(".d.ts") && artifact.name !== "@sheetwrite/svelte"),
+  );
+  if (forbidden !== undefined)
+    throw new Error(`${artifact.name} contains forbidden file ${forbidden}`);
 }
 
 function digest(bytes: Uint8Array, algorithm: "sha1" | "sha512", encoding: "hex" | "base64") {
@@ -254,7 +479,9 @@ async function assertToolchain(): Promise<ReleaseToolchain> {
   validateReleaseManifest({
     schemaVersion: RELEASE_ARTIFACT_SCHEMA_VERSION,
     sourceCommit: "0".repeat(40),
+    dirty: false,
     toolchain,
+    buildCommand: RELEASE_BUILD_COMMAND,
     packages: PUBLISHABLE_PACKAGE_ORDER.map((name) => ({
       name,
       version: INITIAL_RELEASE_VERSION,
@@ -265,6 +492,8 @@ async function assertToolchain(): Promise<ReleaseToolchain> {
       files: [],
       shasum: "0".repeat(40),
       integrity: `sha512-${Buffer.alloc(64).toString("base64")}`,
+      sha512: "0".repeat(128),
+      internalDependencies: {},
     })),
   });
   return toolchain;
@@ -325,23 +554,34 @@ async function loadSourcePackages(): Promise<
   });
 }
 
+interface StagedPackage {
+  readonly root: string;
+  readonly internalDependencies: Readonly<Record<string, string>>;
+}
+
 async function stagePackage(
   source: { readonly directory: string; readonly manifest: PackageManifest },
   stageRoot: string,
   versions: ReadonlyMap<string, string>,
-): Promise<string> {
+): Promise<StagedPackage> {
   const target = join(stageRoot, basename(source.directory));
   await mkdir(target, { recursive: true });
   const paths = new Set([...(source.manifest.files ?? []), "LICENSE", "README.md"]);
   for (const path of paths) {
     await cp(join(source.directory, path), join(target, path), { recursive: true });
   }
+  const scripts = { ...source.manifest.scripts };
+  delete scripts.prepublishOnly;
   const stagedManifest: PackageManifest = {
     ...source.manifest,
     dependencies: rewriteWorkspaceRanges(source.manifest.dependencies, versions),
+    devDependencies: rewriteWorkspaceRanges(source.manifest.devDependencies, versions),
+    peerDependencies: rewriteWorkspaceRanges(source.manifest.peerDependencies, versions),
+    scripts: Object.keys(scripts).length === 0 ? undefined : scripts,
   };
+  const internalDependencies = collectInternalDependencies(stagedManifest, versions);
   await writeFile(join(target, "package.json"), `${JSON.stringify(stagedManifest, null, 2)}\n`);
-  return target;
+  return { root: target, internalDependencies };
 }
 
 export async function verifyReleaseArtifacts(
@@ -364,10 +604,21 @@ export async function verifyReleaseArtifacts(
       `Release artifact directory must contain exactly: ${expectedEntries.join(", ")}`,
     );
   }
+  const sourcePackages = await loadSourcePackages();
+  const sourceVersions = new Map(
+    sourcePackages.map(({ manifest: source }) => [source.name, source.version] as const),
+  );
+  const versions = new Map(
+    manifest.packages.map((artifact) => [artifact.name, artifact.version] as const),
+  );
+  for (const [name, version] of sourceVersions) {
+    if (versions.get(name) !== version) throw new Error(`${name} source version changed`);
+  }
   for (const artifact of manifest.packages) {
     const tarballPath = join(root, artifact.path);
-    if (!(await pathExists(tarballPath)))
+    if (!(await pathExists(tarballPath))) {
       throw new Error(`Missing release tarball ${artifact.path}`);
+    }
     const bytes = new Uint8Array(await readFile(tarballPath));
     if (bytes.byteLength !== artifact.bytes) throw new Error(`${artifact.name} byte size changed`);
     if (digest(bytes, "sha1", "hex") !== artifact.shasum) {
@@ -376,23 +627,40 @@ export async function verifyReleaseArtifacts(
     if (`sha512-${digest(bytes, "sha512", "base64")}` !== artifact.integrity) {
       throw new Error(`${artifact.name} integrity changed`);
     }
-    const tarFiles = (await run(["tar", "-tzf", tarballPath]))
-      .split("\n")
-      .filter((path) => path.startsWith("package/") && path !== "package/")
-      .map((path) => path.slice("package/".length).replace(/\/$/, ""))
-      .filter((path) => path.length > 0)
-      .sort();
+    if (digest(bytes, "sha512", "hex") !== artifact.sha512) {
+      throw new Error(`${artifact.name} sha512 changed`);
+    }
+    const archiveEntries = (await run(["tar", "-tzf", tarballPath])).split("\n").filter(Boolean);
+    const tarFiles: string[] = [];
+    for (const entry of archiveEntries) {
+      if (entry === "package" || entry === "package/") continue;
+      if (!entry.startsWith("package/") || entry.includes("\\") || entry.includes("\0")) {
+        throw new Error(`${artifact.name} contains malicious archive path ${entry}`);
+      }
+      const path = entry.slice("package/".length).replace(/\/$/, "");
+      if (
+        path.length === 0 ||
+        path.startsWith("/") ||
+        path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
+      ) {
+        throw new Error(`${artifact.name} contains malicious archive path ${entry}`);
+      }
+      tarFiles.push(path);
+    }
+    tarFiles.sort();
+    if (new Set(tarFiles).size !== tarFiles.length) {
+      throw new Error(`${artifact.name} archive contains duplicate paths`);
+    }
     if (JSON.stringify(tarFiles) !== JSON.stringify(artifact.files)) {
       throw new Error(`${artifact.name} packed file list changed`);
     }
+    const verboseEntries = await run(["tar", "-tvzf", tarballPath]);
+    if (verboseEntries.split("\n").some((line) => /^[lh]/.test(line))) {
+      throw new Error(`${artifact.name} archive contains a link entry`);
+    }
     const packedManifestText = await run(["tar", "-xOzf", tarballPath, "package/package.json"]);
     const packedManifest = JSON.parse(packedManifestText) as PackageManifest;
-    if (packedManifest.name !== artifact.name || packedManifest.version !== artifact.version) {
-      throw new Error(`${artifact.name} packed manifest identity changed`);
-    }
-    if (packedManifestText.includes("workspace:")) {
-      throw new Error(`${artifact.name} contains an unpublished workspace range`);
-    }
+    validatePackedManifest(artifact, packedManifest, versions);
   }
   return manifest;
 }
@@ -402,11 +670,15 @@ async function ensureEmptyOutput(root: string): Promise<void> {
   assertOutputDirectoryEmpty(await readdir(root));
 }
 
+export type ReleaseArtifactMode = "verification" | "release";
+
 export async function buildReleaseArtifacts(
   artifactDirectory: string,
+  mode: ReleaseArtifactMode = "verification",
 ): Promise<ReleaseArtifactManifest> {
   const outputRoot = resolve(artifactDirectory);
-  assertReleaseTreeClean(await run(["git", "status", "--porcelain", "--untracked-files=all"]));
+  const status = await run(["git", "status", "--porcelain", "--untracked-files=no"]);
+  const dirty = releaseModeDirty(mode, status);
   await ensureEmptyOutput(outputRoot);
   const [sourceCommit, toolchain, sources] = await Promise.all([
     run(["git", "rev-parse", "HEAD"]),
@@ -425,11 +697,11 @@ export async function buildReleaseArtifacts(
     );
     const packages: ReleasePackageArtifact[] = [];
     for (const source of sources) {
-      const packageRoot = await stagePackage(source, stageRoot, versions);
+      const staged = await stagePackage(source, stageRoot, versions);
       const result = parsePackResult(
         await run(
           ["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", tarballRoot],
-          packageRoot,
+          staged.root,
         ),
         source.manifest.name,
       );
@@ -453,11 +725,14 @@ export async function buildReleaseArtifacts(
         files,
         shasum: result.shasum,
         integrity: result.integrity,
+        sha512: digest(tarballBytes, "sha512", "hex"),
+        internalDependencies: staged.internalDependencies,
       };
       if (
         tarballBytes.byteLength !== artifact.bytes ||
         digest(tarballBytes, "sha1", "hex") !== artifact.shasum ||
-        `sha512-${digest(tarballBytes, "sha512", "base64")}` !== artifact.integrity
+        `sha512-${digest(tarballBytes, "sha512", "base64")}` !== artifact.integrity ||
+        digest(tarballBytes, "sha512", "hex") !== artifact.sha512
       ) {
         throw new Error(`${artifact.name} npm pack digest metadata does not match its tarball`);
       }
@@ -466,7 +741,9 @@ export async function buildReleaseArtifacts(
     const manifest: ReleaseArtifactManifest = {
       schemaVersion: RELEASE_ARTIFACT_SCHEMA_VERSION,
       sourceCommit,
+      dirty,
       toolchain,
+      buildCommand: RELEASE_BUILD_COMMAND,
       packages,
     };
     validateReleaseManifest(manifest);
@@ -499,10 +776,11 @@ async function cli(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   if (command === "build") {
     const output = requiredOption(args, "--output");
-    const manifest = await buildReleaseArtifacts(output);
+    const manifest = await buildReleaseArtifacts(output, "verification");
     console.log(
       `Built ${manifest.packages.length} canonical release tarballs in ${resolve(output)}`,
     );
+    console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(output)}`);
     return;
   }
   if (command === "prepare") {
@@ -511,10 +789,11 @@ async function cli(): Promise<void> {
       throw new Error("--mode must be verification or release");
     }
     const output = requiredOption(args, "--output");
-    const manifest = await buildReleaseArtifacts(output);
+    const manifest = await buildReleaseArtifacts(output, mode);
     console.log(
       `Prepared ${manifest.packages.length} canonical release tarballs in ${resolve(output)} (${mode})`,
     );
+    console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(output)}`);
     return;
   }
   if (command === "verify") {
@@ -523,6 +802,7 @@ async function cli(): Promise<void> {
     console.log(
       `Verified ${manifest.packages.length} canonical release tarballs from ${manifest.sourceCommit}`,
     );
+    console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifacts)}`);
     return;
   }
   if (command === "verify-input") {
@@ -531,6 +811,7 @@ async function cli(): Promise<void> {
     console.log(
       `Verified ${manifest.packages.length} canonical release tarballs from ${manifest.sourceCommit}`,
     );
+    console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifacts)}`);
     return;
   }
   throw new Error(

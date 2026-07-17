@@ -38,6 +38,8 @@ function artifact(name: string): ReleasePackageArtifact {
     files: ["package.json"],
     shasum: "0".repeat(40),
     integrity: `sha512-${name}`,
+    sha512: "0".repeat(128),
+    internalDependencies: {},
   };
 }
 

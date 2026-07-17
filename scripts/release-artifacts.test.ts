@@ -1,16 +1,17 @@
-import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   assertOutputDirectoryEmpty,
-  assertReleaseTreeClean,
   INITIAL_RELEASE_VERSION,
   RELEASE_ARTIFACT_MANIFEST,
   RELEASE_ARTIFACT_SCHEMA_VERSION,
+  RELEASE_BUILD_COMMAND,
   type ReleaseArtifactManifest,
+  releaseModeDirty,
   rewriteWorkspaceRanges,
   serializeReleaseManifest,
   validateReleaseManifest,
@@ -43,6 +44,7 @@ function manifest(): ReleaseArtifactManifest {
   return {
     schemaVersion: RELEASE_ARTIFACT_SCHEMA_VERSION,
     sourceCommit: "a".repeat(40),
+    dirty: false,
     toolchain: {
       bun: BUN_VERSION,
       node: NODE_VERSION,
@@ -53,6 +55,7 @@ function manifest(): ReleaseArtifactManifest {
       cargoAudit: CARGO_AUDIT_VERSION,
       cargoLlvmCov: CARGO_LLVM_COV_VERSION,
     },
+    buildCommand: RELEASE_BUILD_COMMAND,
     packages: PUBLISHABLE_PACKAGE_ORDER.map((name) => ({
       name,
       version: INITIAL_RELEASE_VERSION,
@@ -63,6 +66,8 @@ function manifest(): ReleaseArtifactManifest {
       files: ["package.json"],
       shasum: "b".repeat(40),
       integrity: `sha512-${Buffer.alloc(64).toString("base64")}`,
+      sha512: "c".repeat(128),
+      internalDependencies: {},
     })),
   };
 }
@@ -73,22 +78,76 @@ async function temporaryDirectory(): Promise<string> {
   return root;
 }
 
+const REQUIRED_FILES: Readonly<Record<string, readonly string[]>> = {
+  "@sheetwrite/wasm": [
+    "README.md",
+    "LICENSE",
+    "loader.d.ts",
+    "loader.mjs",
+    "loader-browser.mjs",
+    "loader-node.mjs",
+    "pkg/sheetwrite_wasm.d.ts",
+    "pkg/sheetwrite_wasm.js",
+    "pkg/sheetwrite_wasm_bg.wasm",
+    "pkg/sheetwrite_wasm_bg.wasm.d.ts",
+  ],
+  "@sheetwrite/core": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/index.js.map",
+    "dist/worker.d.ts",
+    "dist/worker.js",
+    "styles.css",
+    "shell.css",
+  ],
+  "@sheetwrite/xlsx": [
+    "README.md",
+    "LICENSE",
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/index.js.map",
+  ],
+  "@sheetwrite/react": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
+  "@sheetwrite/vue": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
+  "@sheetwrite/svelte": ["README.md", "LICENSE", "src/Grid.svelte", "src/index.ts", "styles.css"],
+};
+
 async function writeTarball(
   root: string,
   artifactName: string,
   packedName = artifactName,
+  manifestOverrides: Record<string, unknown> = {},
+  maliciousPath = false,
 ): Promise<ReleaseArtifactManifest["packages"][number]> {
   const stageRoot = join(root, `stage-${artifactName.replaceAll("/", "-")}`);
   const packageRoot = join(stageRoot, "package");
   await mkdir(packageRoot, { recursive: true });
-  const packedManifest = `${JSON.stringify({
+  const packedManifestValue = {
     name: packedName,
     version: INITIAL_RELEASE_VERSION,
-  })}\n`;
+    ...manifestOverrides,
+  };
+  const packedManifest = `${JSON.stringify(packedManifestValue)}\n`;
   await writeFile(join(packageRoot, "package.json"), packedManifest);
+  const files = ["package.json", ...(REQUIRED_FILES[artifactName] ?? [])].sort();
+  for (const file of files) {
+    if (file === "package.json") continue;
+    await mkdir(join(packageRoot, file, ".."), { recursive: true });
+    await writeFile(join(packageRoot, file), `${file}\n`);
+  }
 
   const path = tarballName(artifactName);
-  const packed = Bun.spawnSync(["tar", "-czf", join(root, path), "-C", stageRoot, "package"], {
+  const tarArguments = [
+    "-czf",
+    join(root, path),
+    ...(maliciousPath ? ["--transform=s#^package/README.md$#../escape#"] : []),
+    "-C",
+    stageRoot,
+    ...files.map((file) => `package/${file}`),
+  ];
+  const packed = Bun.spawnSync(["tar", ...tarArguments], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -100,11 +159,25 @@ async function writeTarball(
     version: INITIAL_RELEASE_VERSION,
     path,
     bytes: bytes.byteLength,
-    unpackedBytes: Buffer.byteLength(packedManifest),
-    fileCount: 1,
-    files: ["package.json"],
+    unpackedBytes:
+      Buffer.byteLength(packedManifest) +
+      files
+        .filter((file) => file !== "package.json")
+        .reduce((sum, file) => sum + Buffer.byteLength(`${file}\n`), 0),
+    fileCount: files.length,
+    files,
     shasum: createHash("sha1").update(bytes).digest("hex"),
     integrity: `sha512-${createHash("sha512").update(bytes).digest("base64")}`,
+    sha512: createHash("sha512").update(bytes).digest("hex"),
+    internalDependencies: Object.fromEntries(
+      ["dependencies", "devDependencies", "peerDependencies"].flatMap((field) =>
+        Object.entries(
+          (packedManifestValue[field as keyof typeof packedManifestValue] as
+            | Record<string, string>
+            | undefined) ?? {},
+        ).filter(([name]) => PUBLISHABLE_PACKAGE_ORDER.includes(name as never)),
+      ),
+    ),
   };
 }
 
@@ -113,7 +186,7 @@ describe("canonical release artifacts", () => {
     expect(() => validateReleaseManifest(manifest())).not.toThrow();
   });
 
-  it("rewrites only workspace ranges and rejects an unversioned internal dependency", () => {
+  it("rewrites workspace ranges and enforces release cleanliness", () => {
     const versions = new Map([
       ["@sheetwrite/core", "0.1.0"],
       ["@sheetwrite/react", "0.1.0"],
@@ -138,11 +211,10 @@ describe("canonical release artifacts", () => {
     expect(() =>
       rewriteWorkspaceRanges({ "@sheetwrite/missing": "workspace:*" }, versions),
     ).toThrow("No release version found for @sheetwrite/missing");
-  });
-
-  it("rejects a dirty release tree and a non-empty output directory", () => {
-    expect(() => assertReleaseTreeClean("")).not.toThrow();
-    expect(() => assertReleaseTreeClean(" M package.json\n")).toThrow("Release tree is dirty");
+    expect(releaseModeDirty("verification", "")).toBe(false);
+    expect(releaseModeDirty("verification", " M package.json\n")).toBe(true);
+    expect(() => releaseModeDirty("release", "")).not.toThrow();
+    expect(() => releaseModeDirty("release", " M package.json\n")).toThrow("Release tree is dirty");
     expect(() => assertOutputDirectoryEmpty([])).not.toThrow();
     expect(() => assertOutputDirectoryEmpty(["stale.tgz"])).toThrow("not empty");
   });
@@ -205,6 +277,53 @@ describe("canonical release artifacts", () => {
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(
       `${first.name} packed manifest identity changed`,
     );
+  });
+
+  it("rejects lifecycle scripts and missing exact-case package targets", async () => {
+    const lifecycleRoot = await temporaryDirectory();
+    const lifecyclePackages = await Promise.all(
+      PUBLISHABLE_PACKAGE_ORDER.map((name, index) =>
+        writeTarball(
+          lifecycleRoot,
+          name,
+          name,
+          index === 0 ? { scripts: { prepublishOnly: "exit 1" } } : {},
+        ),
+      ),
+    );
+    await writeFile(
+      join(lifecycleRoot, RELEASE_ARTIFACT_MANIFEST),
+      serializeReleaseManifest({ ...manifest(), packages: lifecyclePackages }),
+    );
+    await expect(verifyReleaseArtifacts(lifecycleRoot)).rejects.toThrow("retains prepublishOnly");
+
+    const exportRoot = await temporaryDirectory();
+    const exportPackages = await Promise.all(
+      PUBLISHABLE_PACKAGE_ORDER.map((name, index) =>
+        writeTarball(exportRoot, name, name, index === 0 ? { exports: "./Missing.js" } : {}),
+      ),
+    );
+    await writeFile(
+      join(exportRoot, RELEASE_ARTIFACT_MANIFEST),
+      serializeReleaseManifest({ ...manifest(), packages: exportPackages }),
+    );
+    await expect(verifyReleaseArtifacts(exportRoot)).rejects.toThrow(
+      "package target does not exist with exact case",
+    );
+  });
+
+  it("rejects malicious archive paths before trusting the file list", async () => {
+    const root = await temporaryDirectory();
+    const packages = await Promise.all(
+      PUBLISHABLE_PACKAGE_ORDER.map((name, index) =>
+        writeTarball(root, name, name, {}, index === 0),
+      ),
+    );
+    await writeFile(
+      join(root, RELEASE_ARTIFACT_MANIFEST),
+      serializeReleaseManifest({ ...manifest(), packages }),
+    );
+    await expect(verifyReleaseArtifacts(root)).rejects.toThrow("malicious archive path");
   });
 
   it("rejects an empty artifact directory", async () => {

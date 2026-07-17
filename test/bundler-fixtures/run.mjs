@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -98,6 +99,7 @@ await rm(join(repositoryRoot, "test-results/delivery-size/bundlers"), {
   force: true,
 });
 await mkdir(tarballRoot, { recursive: true });
+let artifactManifestDigest;
 const canonicalTarballs = new Map();
 if (artifactDirectory === undefined) {
   for (const directory of packageDirectories) {
@@ -111,9 +113,9 @@ if (artifactDirectory === undefined) {
   }
 } else {
   const artifactRoot = resolve(repositoryRoot, artifactDirectory);
-  const releaseManifest = JSON.parse(
-    await readFile(join(artifactRoot, "release-manifest.json"), "utf8"),
-  );
+  const releaseManifestBytes = await readFile(join(artifactRoot, "release-artifacts.json"));
+  const releaseManifest = JSON.parse(releaseManifestBytes.toString("utf8"));
+  artifactManifestDigest = `sha512-${createHash("sha512").update(releaseManifestBytes).digest("base64")}`;
   if (!Array.isArray(releaseManifest.packages) || releaseManifest.packages.length !== 6) {
     throw new Error("Canonical release manifest must contain exactly six packages");
   }
@@ -153,4 +155,7 @@ for (const fixture of ["vite", "webpack", "next"]) {
   }
 }
 
+if (artifactManifestDigest !== undefined) {
+  console.log(`\nArtifact manifest SHA-512: ${artifactManifestDigest}`);
+}
 console.log("\nAll bundler fixtures passed");
