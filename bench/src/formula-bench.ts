@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { protocolCaptureMeta } from "./protocol-meta.js";
 import { CellStore, initSync } from "@sheetwrite/wasm";
 import {
   diamondFormulas,
@@ -20,6 +19,7 @@ import {
   validateExactMatrix,
   validateRawStat,
 } from "./gate-protocol.js";
+import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, type Stat, summarize } from "./stats.js";
 
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);

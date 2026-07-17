@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { PanePaint, RenderLayout, Theme, VisibleWindowView } from "../src/types.js";
-import { WorkerRenderer } from "../src/worker-renderer.js";
 import { createWorkerMessageHandler } from "../src/worker.js";
+import { WorkerRenderer } from "../src/worker-renderer.js";
 
 let latestConstructedWorker: RecordingWorker | null = null;
 

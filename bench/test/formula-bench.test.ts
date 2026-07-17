@@ -8,8 +8,8 @@ import {
 import {
   diamondFormulas,
   distinctRangeFormulas,
-  fanOutFormulas,
   type FormulaCell,
+  fanOutFormulas,
   independentFormulas,
   linearChain,
   sharedRangeFormulas,
@@ -23,9 +23,14 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): FormulaBenchmarkResul
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode,
     matrixId: MATRIX_IDS.formula[mode],
-    meta: { bun: "test", platform: "test", arch: "test", commit: "0".repeat(40),
-    dirty: false,
-    timestamp: "2026-07-13T00:00:00Z" },
+    meta: {
+      bun: "test",
+      platform: "test",
+      arch: "test",
+      commit: "0".repeat(40),
+      dirty: false,
+      timestamp: "2026-07-13T00:00:00Z",
+    },
     workloads: expectedFormulaWorkloadKeys(mode).map((key) => {
       const match = /^workload=(.*);size=(\d+)$/u.exec(key);
       if (!match) throw new Error(`invalid fixture key ${key}`);

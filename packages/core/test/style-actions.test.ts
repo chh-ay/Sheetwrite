@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { createGrid, initSheetwrite } from "../src/grid.js";
-import { SheetwriteStore } from "../src/store.js";
+import type { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";

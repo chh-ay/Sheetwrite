@@ -10,8 +10,8 @@ import {
   gridSizeStyle,
 } from "../src/adapter.js";
 import { initSheetwrite } from "../src/grid.js";
-import type { GridOptions } from "../src/types.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import type { GridOptions } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;

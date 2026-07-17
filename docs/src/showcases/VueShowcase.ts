@@ -21,7 +21,6 @@ import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef } from "
 import { VUE_SHOWCASE_THEME } from "./revenue.js";
 import "@sheetwrite/vue/styles.css";
 
-
 // ── Showcase: streaming datasource + versioned sync pipeline ─────────────────
 // One million rows are NEVER materialized up front: the grid asks a paged
 // `DataSource` for exactly the visible window. Local document transactions enter

@@ -3,9 +3,9 @@ import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-proto
 import {
   RANGE_AUTO_FIT_CHUNK_CELLS,
   RANGE_WORKLOADS,
-  STRUCTURAL_METRICS,
   type RangeGateArtifact,
   type RangeStructuralResult,
+  STRUCTURAL_METRICS,
   validateRangeArtifact,
 } from "../src/range-gate.js";
 import { summarize } from "../src/stats.js";

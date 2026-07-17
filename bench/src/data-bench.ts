@@ -33,7 +33,6 @@
 
 // Side-effecting DOM bootstrap MUST be first so Handsontable boots headlessly.
 import "./dom-setup.js";
-import { protocolCaptureMeta } from "./protocol-meta.js";
 
 import { readFileSync } from "node:fs";
 import type { Column, Workbook } from "@sheetwrite/core";
@@ -64,6 +63,7 @@ import {
   validateStat,
 } from "./gate-protocol.js";
 import { createHandsontable } from "./handsontable-runtime.js";
+import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, type MeasureOptions, measure, mib, ms, type Stat, summarize } from "./stats.js";
 
 // ── Configuration ────────────────────────────────────────────────────────────

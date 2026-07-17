@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.4/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -14,7 +14,8 @@
       "!**/*.d.ts",
       "!**/*.svelte",
       "!bench/results",
-      "!docs/src/generated"
+      "!docs/src/generated",
+      "!docs/src/routeTree.gen.ts"
     ]
   },
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
