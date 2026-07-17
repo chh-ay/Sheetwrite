@@ -84,6 +84,8 @@ jobs:
         run: bun run test:coverage
       - name: Browser smoke tests
         run: bun run test:browser
+      - name: Remove generated delivery-size evidence
+        run: git restore --worktree -- test-results/delivery-size/size-report.json
       - name: Assert source remains clean
         run: test -z "$(git status --porcelain --untracked-files=all)"
 

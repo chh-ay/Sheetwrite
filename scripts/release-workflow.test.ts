@@ -7,6 +7,7 @@ import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const workflowPath = resolve(repositoryRoot, ".github/workflows/release.yml");
+const bootstrapWorkflowPath = resolve(repositoryRoot, ".github/workflows/bootstrap-release.yml");
 
 type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> };
 type Job = {
@@ -42,6 +43,21 @@ function artifact(name: string): ReleasePackageArtifact {
     internalDependencies: {},
   };
 }
+
+describe("bootstrap release workflow", () => {
+  it("removes generated size evidence before enforcing a clean source tree", async () => {
+    const source = await readFile(bootstrapWorkflowPath, "utf8");
+    const qualityGate = source.indexOf("bun run verify:release-quality");
+    const restore = source.indexOf(
+      "git restore --worktree -- test-results/delivery-size/size-report.json",
+    );
+    const cleanGate = source.indexOf('test -z "$(git status --porcelain --untracked-files=all)"');
+
+    expect(qualityGate).toBeGreaterThan(-1);
+    expect(restore).toBeGreaterThan(qualityGate);
+    expect(cleanGate).toBeGreaterThan(restore);
+  });
+});
 
 describe("stage-only release workflow", () => {
   it("requires an exact commit and version and serializes release runs", async () => {

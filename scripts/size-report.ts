@@ -975,6 +975,7 @@ async function writeReport(report: SizeReport): Promise<void> {
   await mkdir(dirname(reportPath), { recursive: true });
   await rm(join(evidenceRoot, "failure.json"), { force: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  await runCommand(["bunx", "biome", "format", "--write", reportPath]);
 }
 
 async function writeFailure(error: unknown): Promise<void> {
