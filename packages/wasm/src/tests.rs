@@ -1259,7 +1259,6 @@ fn pure_string_filter_fast_path_matches_mixed_and_unicode_fallbacks() {
     assert_eq!(store.filter_rows(sheet, 0, "café"), unicode);
 }
 
-
 #[test]
 fn data_edge_follows_google_ctrl_arrow_semantics() {
     let mut store = CellStore::new();
@@ -1890,6 +1889,15 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     ];
 
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
+    assert_eq!(snapshot.formula_offsets(), vec![1, 0]);
+    assert_eq!(snapshot.kinds().len(), 6);
+    assert_eq!(snapshot.style_ids(), vec![11, 12, 0, 0, 0, 13]);
+    assert_eq!(
+        snapshot.formula_sources(),
+        vec![formula_source_before.clone()]
+    );
+    assert!(snapshot.byte_length() >= 6 + 6 * 8 + 6 * 4 + formula_source_before.len());
+    assert_eq!(store.get_cell(sheet, 1, 0).style(), 12);
     assert!(store.clear_range(sheet, 0, 0, 2, 1, true, true));
     assert!(store.formula_source(sheet, 1, 0).is_none());
     assert!(string(&store, sheet, 2, 1).is_none());
@@ -1916,6 +1924,36 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     store.recompute(sheet);
     assert_close(number(&store, sheet, 1, 0), 9.0);
     assert_eq!(store.style_id_at(sheet, 1, 0), styles_before[1]);
+}
+
+#[test]
+fn public_store_lifecycle_metadata_preserves_paged_and_named_range_state() {
+    let mut store = CellStore::default();
+    let sheet = store.add_paged_sheet(2, 4, 0, 1_000_000);
+    store.set_sheet_name(sheet, "sheet-1", "Sheet 1");
+
+    assert_eq!(store.cell_state(sheet, 0, 0), 0);
+    store.begin_page_load();
+    store.clear_cell(sheet, 0, 0, 0);
+    assert_eq!(store.cell_state(sheet, 0, 0), 1);
+    store.set_number(sheet, 1, 0, 7.0, 0);
+    assert_eq!(store.cell_state(sheet, 1, 0), 2);
+    store.end_page_load();
+    store.set_bool(sheet, 2, 0, true, 0);
+    assert_eq!(store.cell_state(sheet, 2, 0), 3);
+    store.pin_range(sheet, 0, 3, &[0]);
+
+    assert!(store.set_named_range("LocalData", sheet as i32, sheet, 0, 0, 1, 0));
+    store.set_formula(sheet, 3, 0, "=SUM(LocalData)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 3, 0), 7.0);
+    assert!(store.remove_named_range("LocalData", sheet as i32));
+    assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("#NAME?"));
+
+    assert!(store.set_named_range("RemovedData", -1, sheet, 0, 0, 1, 0));
+    assert!(store.remove_sheet(sheet));
+    assert!(!store.is_sheet_alive(sheet));
+    assert_eq!(store.cell_state(sheet, 0, 0), 0);
 }
 
 #[test]
@@ -2063,7 +2101,6 @@ fn recompute_without_formulas_leaves_sheet_state_unchanged() {
 }
 #[test]
 fn formula_ast_boundaries_preserve_blank_comparison_and_named_cell_semantics() {
-
     let mut store = CellStore::new();
     let sheet = store.add_sheet(20, 2);
     store.set_number(sheet, 0, 0, 5.0, 0);
