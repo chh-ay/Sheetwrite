@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { normalizeSitemap } from "./normalize-sitemap.ts";
+import { normalizeSitemap } from "./normalize-sitemap.js";
 
 const wrap = (urls: string[]): string =>
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls

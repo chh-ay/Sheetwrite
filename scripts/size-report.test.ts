@@ -265,6 +265,7 @@ describe("absolute budget comparison", () => {
         leakage: { ...metric, actual: 0, unit: "count" as const },
       }),
       schemaVersion: SIZE_PROTOCOL_VERSION,
+      meta: { commit: "a".repeat(40), dirty: false, timestamp: "2026-01-01T00:00:00.000Z" },
       toolchain: {},
       packages: [],
       closures: [],

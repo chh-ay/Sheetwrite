@@ -172,7 +172,7 @@ async function writeTarball(
     internalDependencies: Object.fromEntries(
       ["dependencies", "devDependencies", "peerDependencies"].flatMap((field) =>
         Object.entries(
-          (packedManifestValue[field as keyof typeof packedManifestValue] as
+          (packedManifestValue[field as keyof typeof packedManifestValue] as unknown as
             | Record<string, string>
             | undefined) ?? {},
         ).filter(([name]) => PUBLISHABLE_PACKAGE_ORDER.includes(name as never)),
@@ -260,7 +260,9 @@ describe("canonical release artifacts", () => {
     const tarballPath = join(root, first.path);
     const originalBytes = new Uint8Array(await readFile(tarballPath));
     const tamperedBytes = originalBytes.slice();
-    tamperedBytes[tamperedBytes.length - 1] ^= 1;
+    const lastIndex = tamperedBytes.length - 1;
+    if (lastIndex < 0) throw new Error("Expected a non-empty tarball");
+    tamperedBytes[lastIndex] = tamperedBytes[lastIndex]! ^ 1;
     await writeFile(tarballPath, tamperedBytes);
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(`${first.name} shasum changed`);
 

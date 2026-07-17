@@ -1961,15 +1961,16 @@ async function validateMarkdown(
       const partial = /(?:^|\s)partial=(?:"[^"]+"|'[^']+')/.test(fence.meta);
       const prelude = fenceMetaValue(fence.meta, "prelude");
       if (typedLanguage && !generated) {
+        const language = fence.language as "ts" | "tsx" | "vue" | "svelte";
         if (partial && prelude === undefined) {
           failures.push(
             `${posix(relative(repositoryRoot, document.path))}:${fence.line} typed partial fence requires a named hover prelude`,
           );
         }
         try {
-          const hovers = collectFenceHovers(fence.code, fence.language, hoverAnalyzer, prelude);
+          const hovers = collectFenceHovers(fence.code, language, hoverAnalyzer, prelude);
           for (const hover of hovers) {
-            if (isHighQualityHover(hover, fence.language)) continue;
+            if (isHighQualityHover(hover, language)) continue;
             failures.push(
               `${posix(relative(repositoryRoot, document.path))}:${fence.line + hover.line} low-quality hover for ${hover.target}: ${hover.text}`,
             );
