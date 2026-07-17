@@ -1889,6 +1889,14 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     ];
 
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
+    let snapshot_numbers = store.snapshot_numbers(&snapshot);
+    assert_close(snapshot_numbers[0], 5.0);
+    assert_close(snapshot_numbers[1], 6.0);
+    assert_eq!(
+        store.snapshot_texts(&snapshot),
+        vec!["", "", "", "", "", "tail"]
+    );
+    assert!(store.range_fully_loaded(sheet, 0, 0, 2, 1));
     assert_eq!(snapshot.formula_offsets(), vec![1, 0]);
     assert_eq!(snapshot.kinds().len(), 6);
     assert_eq!(snapshot.style_ids(), vec![11, 12, 0, 0, 0, 13]);
