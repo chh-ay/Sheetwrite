@@ -2,7 +2,12 @@
 // from the main thread and paints off-thread via the shared `paintFrame`, so a
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.
-import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
+import {
+  blitVerticalScroll,
+  paintFrame,
+  paintFreezeDivider,
+  snapViewportToDevicePixels,
+} from "./canvas-paint.js";
 import type { CellScalar } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
@@ -185,26 +190,18 @@ function releaseSharedPackedView(msg: SharedPackedMessage): void {
 
 function paintView(state: WorkerRuntimeState, view: VisibleWindowView): boolean {
   if (!state.ctx || !state.canvas || !state.layout || !state.theme) return false;
+  const viewport = snapViewportToDevicePixels(state.viewport, state.dpr);
   const damage = blitVerticalScroll(
     state.ctx,
     state.canvas,
     state.theme,
     state.lastViewport,
-    state.viewport,
+    viewport,
     state.dpr,
     state.lastDpr,
   );
-  paintFrame(
-    state.ctx,
-    view,
-    state.layout,
-    state.theme,
-    state.viewport,
-    state.dpr,
-    NO_RENDERERS,
-    damage,
-  );
-  state.lastViewport = { ...state.viewport };
+  paintFrame(state.ctx, view, state.layout, state.theme, viewport, state.dpr, NO_RENDERERS, damage);
+  state.lastViewport = { ...viewport };
   state.lastDpr = state.dpr;
   return true;
 }
