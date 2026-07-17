@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Sheetwrite</title>
   <rect width="32" height="32" rx="7" fill="#059669"/>
   <path d="M4 11.5h24M11.5 4v24M20.5 11.5V28M11.5 20.5H28" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="1.75"/>
 </svg>

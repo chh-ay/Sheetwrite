@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-
 /** Click-to-copy install command; shared by the landing and showcase pages. */
 export function InstallCommand({ packageName }: Readonly<{ packageName: string }>) {
   const [state, setState] = useState<"idle" | "copied" | "error">("idle");

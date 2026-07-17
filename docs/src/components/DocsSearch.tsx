@@ -141,6 +141,9 @@ export function DocsSearch() {
           // dialog element itself (it has no padding).
           if (event.target === event.currentTarget) event.currentTarget.close();
         }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") event.currentTarget.close();
+        }}
         ref={dialog}
       >
         <form method="dialog">

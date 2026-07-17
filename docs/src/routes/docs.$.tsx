@@ -6,8 +6,8 @@ import {
   documentForSplat,
   normalizeDocumentHref,
 } from "../lib/content.js";
-import { pageMeta } from "../lib/seo.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
+import { pageMeta } from "../lib/seo.js";
 
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
@@ -29,7 +29,10 @@ function DocumentRoute() {
   const params = Route.useParams();
   // SPA navigations (pushState) never fire hashchange; reveal per location.
   const href = useLocation({ select: (location) => location.href });
-  useEffect(() => revealAnchoredMember(), [href]);
+  useEffect(() => {
+    void href;
+    revealAnchoredMember();
+  }, [href]);
   const metadata = Route.useLoaderData();
   const Content = documentComponentForSplat(params._splat);
   if (Content === undefined) return <DocumentNotFound />;

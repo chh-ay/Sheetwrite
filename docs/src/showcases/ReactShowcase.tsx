@@ -5,18 +5,17 @@ import { FileSpreadsheet, Monitor } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createRevenueWorkbook,
+  REACT_SHOWCASE_THEME,
   REVENUE_AMOUNT_COLUMN,
   REVENUE_CITIES,
   REVENUE_CITY_COLUMN,
   REVENUE_DATA,
   REVENUE_ROWS,
-  REACT_SHOWCASE_THEME,
 } from "./revenue.js";
 import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRenderingMode } from "./ui/DemoRenderingMode.js";
 import { DemoSelect } from "./ui/DemoSelect.js";
 import "@sheetwrite/react/styles.css";
-
 
 const workbook = createRevenueWorkbook("#58c4dc24");
 const GRID_CONFIG = { toolbar: true } as const;

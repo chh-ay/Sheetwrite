@@ -26,9 +26,14 @@ function incompleteFormulaFixture(): FormulaBenchmarkResult {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode: "smoke",
     matrixId: MATRIX_IDS.formula.smoke,
-    meta: { bun: "test", platform: "linux", arch: "x64", commit: "0".repeat(40),
-    dirty: false,
-    timestamp: new Date().toISOString() },
+    meta: {
+      bun: "test",
+      platform: "linux",
+      arch: "x64",
+      commit: "0".repeat(40),
+      dirty: false,
+      timestamp: new Date().toISOString(),
+    },
     workloads,
     memory: expectedFormulaMemoryKeys("smoke").map((key) => ({
       formulas: Number(key.slice("memory=formulas=".length)),
