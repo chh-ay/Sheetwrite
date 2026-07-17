@@ -9,7 +9,7 @@
     "url": "git+https://github.com/chh-ay/Sheetwrite.git",
     "directory": "packages/wasm"
   },
-  "homepage": "https://sheetwrite.vercel.app/",
+  "homepage": "https://chh-ay.github.io/Sheetwrite/",
   "bugs": {
     "url": "https://github.com/chh-ay/Sheetwrite/issues"
   },
