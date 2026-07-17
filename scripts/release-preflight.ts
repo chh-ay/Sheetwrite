@@ -55,9 +55,9 @@ async function main(): Promise<void> {
   }
 
   const repository = process.env.GITHUB_REPOSITORY;
-  if (repository !== "chh-ay/Sheetwrite") {
+  if (repository !== "chh-ay/sheetwrite") {
     throw new Error(
-      `Release workflow must run from chh-ay/Sheetwrite, received ${repository ?? "unset"}`,
+      `Release workflow must run from chh-ay/sheetwrite, received ${repository ?? "unset"}`,
     );
   }
   const visibility = await run(["gh", "api", `repos/${repository}`, "--jq", ".visibility"]);

@@ -73,7 +73,7 @@ const grid = createGrid(document.querySelector("#grid")!, {
 });
 ```
 
-Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Installation](https://chh-ay.github.io/Sheetwrite/docs/start/installation/).
+Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Installation](https://sheetwrite.vercel.app/docs/start/installation/).
 
 ## Optional XLSX backend
 
@@ -101,7 +101,7 @@ first-row-header, first-sheet interchange; `toXlsxWorkbook` /
 `fromXlsxWorkbook` preserve multi-sheet snapshots and formula source through
 the in-memory workbook backend. Calling any XLSX function without registration
 throws an error naming the exact package and registration import. CSV and TSV
-remain core-only. See [XLSX and export](https://chh-ay.github.io/Sheetwrite/docs/guides/xlsx-export/)
+remain core-only. See [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
 for limits and compatibility.
 
 ## Persistence
@@ -127,7 +127,7 @@ const backup = grid.exportSnapshot();
 grid.applyRemoteOperations(remoteOperations); // observable, not dirty or undoable
 ```
 
-See [Persistence and collaboration](https://chh-ay.github.io/Sheetwrite/docs/guides/collaboration/)
+See [Persistence and collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/)
 for the host adapter, pending queue, conflict reload, conservative rebase,
 presence, comments, and revisions.
 
@@ -195,4 +195,4 @@ packed declarations and source maps separately from browser raw, gzip, and
 Brotli transfer bytes. Never resolve a breach by removing required tests,
 types, licenses, provenance, or debugging artifacts.
 
-The documentation site will be published at [chh-ay.github.io/Sheetwrite](https://chh-ay.github.io/Sheetwrite/). See [support](SUPPORT.md), [security](SECURITY.md), and [contributing](CONTRIBUTING.md) policies in this repository.
+The documentation site is available at [sheetwrite.vercel.app](https://sheetwrite.vercel.app/). See [support](SUPPORT.md), [security](SECURITY.md), and [contributing](CONTRIBUTING.md) policies in this repository.

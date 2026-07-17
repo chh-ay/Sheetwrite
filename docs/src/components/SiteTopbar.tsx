@@ -34,7 +34,7 @@ export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
         })}
       </nav>
       <div className="sw-showcase-nav__actions">
-        <a href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
+        <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
         <ThemeToggle />
       </div>
     </header>
