@@ -993,10 +993,7 @@
       "name": "core",
       "packageCount": 2,
       "logicalBytes": 2269583,
-      "packages": [
-        "@sheetwrite/core@0.1.0",
-        "@sheetwrite/wasm@0.1.0"
-      ]
+      "packages": ["@sheetwrite/core@0.1.0", "@sheetwrite/wasm@0.1.0"]
     },
     {
       "name": "core-xlsx",
@@ -1195,9 +1192,7 @@
           "path": "test/bundler-fixtures/next/.next/static/aecMvoBGosFM7skr3zI3p/_buildManifest.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 506,
           "gzipBytes": 299,
           "brotliBytes": 257,
@@ -1207,9 +1202,7 @@
           "path": "test/bundler-fixtures/next/.next/static/aecMvoBGosFM7skr3zI3p/_ssgManifest.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 80,
           "gzipBytes": 64,
           "brotliBytes": 67,
@@ -1219,9 +1212,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/255-293e44824f2ec188.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 172538,
           "gzipBytes": 46193,
           "brotliBytes": 37794,
@@ -1231,9 +1222,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/4bd1b696-c023c6e3521b1417.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 173019,
           "gzipBytes": 54423,
           "brotliBytes": 46749,
@@ -1243,9 +1232,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/923-40e86f0e6a3de420.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 12515,
           "gzipBytes": 3491,
           "brotliBytes": 3043,
@@ -1255,9 +1242,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/app/_not-found/page-52855012294ab07e.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 2670,
           "gzipBytes": 994,
           "brotliBytes": 824,
@@ -1267,9 +1252,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/app/layout-e387bf83a41924f7.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 131,
           "gzipBytes": 120,
           "brotliBytes": 109,
@@ -1279,9 +1262,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/app/page-3ceaf4945bfdbae0.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 423,
           "gzipBytes": 321,
           "brotliBytes": 281,
@@ -1291,9 +1272,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/framework-acd67e14855de5a2.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 182716,
           "gzipBytes": 57971,
           "brotliBytes": 49343,
@@ -1303,9 +1282,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/main-a4753544b5b73813.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 127550,
           "gzipBytes": 36777,
           "brotliBytes": 31460,
@@ -1315,9 +1292,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-2a3d823058883a9c.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 557,
           "gzipBytes": 227,
           "brotliBytes": 206,
@@ -1327,9 +1302,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/pages/_app-7d307437aca18ad4.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 234,
           "gzipBytes": 191,
           "brotliBytes": 168,
@@ -1339,9 +1312,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/pages/_error-cb2a52f75f2162e2.js",
           "kind": "javascript",
           "owner": "next-async",
-          "roles": [
-            "next-async"
-          ],
+          "roles": ["next-async"],
           "rawBytes": 218,
           "gzipBytes": 179,
           "brotliBytes": 146,
@@ -1351,9 +1322,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/polyfills-42372ed130431b0a.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 112594,
           "gzipBytes": 39494,
           "brotliBytes": 35158,
@@ -1363,9 +1332,7 @@
           "path": "test/bundler-fixtures/next/.next/static/chunks/webpack-8e7f2d1659451acb.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 3588,
           "gzipBytes": 1761,
           "brotliBytes": 1567,
@@ -1375,9 +1342,7 @@
           "path": "test/bundler-fixtures/next/.next/static/media/sheetwrite_wasm_bg.3595c138.wasm",
           "kind": "wasm",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 295879,
           "gzipBytes": 123417,
           "brotliBytes": 99982,
@@ -1393,11 +1358,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/adapter-q_J_NOTO.js",
           "kind": "javascript",
           "owner": "shared-initial",
-          "roles": [
-            "react-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
+          "roles": ["react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 2051,
           "gzipBytes": 948,
           "brotliBytes": 834,
@@ -1407,9 +1368,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/core-Bb42r0yE.css",
           "kind": "css",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 9381,
           "gzipBytes": 1958,
           "brotliBytes": 1674,
@@ -1419,9 +1378,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/core-C7j7BmmF.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 220,
           "gzipBytes": 193,
           "brotliBytes": 151,
@@ -1431,12 +1388,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/export-BVYUWFZl.js",
           "kind": "javascript",
           "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 24398,
           "gzipBytes": 7857,
           "brotliBytes": 6986,
@@ -1446,12 +1398,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/grid-DiasScNV.js",
           "kind": "javascript",
           "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 258541,
           "gzipBytes": 72403,
           "brotliBytes": 60999,
@@ -1461,9 +1408,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/index-CJs8i7Oc.js",
           "kind": "javascript",
           "owner": "xlsx-async",
-          "roles": [
-            "xlsx-async"
-          ],
+          "roles": ["xlsx-async"],
           "rawBytes": 1077303,
           "gzipBytes": 308865,
           "brotliBytes": 249969,
@@ -1490,11 +1435,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/react-BmVb3bzX.css",
           "kind": "css",
           "owner": "shared-initial",
-          "roles": [
-            "react-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
+          "roles": ["react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 7469,
           "gzipBytes": 1677,
           "brotliBytes": 1429,
@@ -1504,9 +1445,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/react-BnSIkPCi.js",
           "kind": "javascript",
           "owner": "react-initial",
-          "roles": [
-            "react-initial"
-          ],
+          "roles": ["react-initial"],
           "rawBytes": 11256,
           "gzipBytes": 4227,
           "brotliBytes": 3775,
@@ -1516,12 +1455,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/sheetwrite_wasm_bg-hZQdQLYr.wasm",
           "kind": "wasm",
           "owner": "shared-initial",
-          "roles": [
-            "core-initial",
-            "react-initial",
-            "svelte-initial",
-            "vue-initial"
-          ],
+          "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 391514,
           "gzipBytes": 159096,
           "brotliBytes": 126760,
@@ -1531,9 +1465,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/svelte-C1GdADTA.js",
           "kind": "javascript",
           "owner": "svelte-initial",
-          "roles": [
-            "svelte-initial"
-          ],
+          "roles": ["svelte-initial"],
           "rawBytes": 37092,
           "gzipBytes": 14508,
           "brotliBytes": 13216,
@@ -1543,9 +1475,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/vue-BrbU48jY.js",
           "kind": "javascript",
           "owner": "vue-initial",
-          "roles": [
-            "vue-initial"
-          ],
+          "roles": ["vue-initial"],
           "rawBytes": 25099,
           "gzipBytes": 9838,
           "brotliBytes": 9046,
@@ -1555,9 +1485,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/worker-B0y8FYLD.js",
           "kind": "javascript",
           "owner": "worker-async",
-          "roles": [
-            "worker-async"
-          ],
+          "roles": ["worker-async"],
           "rawBytes": 7359,
           "gzipBytes": 1849,
           "brotliBytes": 1623,
@@ -1567,9 +1495,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/worker-CyNZOAxS.js",
           "kind": "javascript",
           "owner": "worker-loader-initial",
-          "roles": [
-            "worker-loader-initial"
-          ],
+          "roles": ["worker-loader-initial"],
           "rawBytes": 158,
           "gzipBytes": 153,
           "brotliBytes": 108,
@@ -1579,9 +1505,7 @@
           "path": "test/bundler-fixtures/vite/dist/assets/xlsx-DXdHhT0r.js",
           "kind": "javascript",
           "owner": "xlsx-loader-initial",
-          "roles": [
-            "xlsx-loader-initial"
-          ],
+          "roles": ["xlsx-loader-initial"],
           "rawBytes": 1543,
           "gzipBytes": 880,
           "brotliBytes": 741,
@@ -1591,9 +1515,7 @@
           "path": "test/bundler-fixtures/vite/dist/recipe-worker-CvnyyVhF.js",
           "kind": "javascript",
           "owner": "worker-async",
-          "roles": [
-            "worker-async"
-          ],
+          "roles": ["worker-async"],
           "rawBytes": 18811,
           "gzipBytes": 7328,
           "brotliBytes": 6652,
@@ -1609,9 +1531,7 @@
           "path": "test/bundler-fixtures/webpack/dist/assets/sheetwrite_wasm_bg-2c73c7ee1f9ec895a069.wasm",
           "kind": "wasm",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 391514,
           "gzipBytes": 159096,
           "brotliBytes": 126760,
@@ -1621,9 +1541,7 @@
           "path": "test/bundler-fixtures/webpack/dist/main.js",
           "kind": "javascript",
           "owner": "core-initial",
-          "roles": [
-            "core-initial"
-          ],
+          "roles": ["core-initial"],
           "rawBytes": 18917,
           "gzipBytes": 5140,
           "brotliBytes": 4522,
@@ -1633,9 +1551,7 @@
           "path": "test/bundler-fixtures/webpack/dist/worker-878-341a7fca207157323a36.js",
           "kind": "javascript",
           "owner": "worker-async",
-          "roles": [
-            "worker-async"
-          ],
+          "roles": ["worker-async"],
           "rawBytes": 18583,
           "gzipBytes": 7147,
           "brotliBytes": 6484,
