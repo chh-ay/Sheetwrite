@@ -79,7 +79,7 @@ export interface RenderGateOptions extends ParseRenderOptions {
   readonly rounds?: number;
 }
 
-/** Apply deterministic gate policy after Plan 051's typed parser. */
+/** Apply deterministic gate policy to the typed benchmark artifact. */
 export function validateRenderGateArtifact(
   value: unknown,
   mode: BenchmarkMode,

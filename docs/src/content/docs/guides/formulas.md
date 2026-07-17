@@ -169,7 +169,7 @@ Lookup errors in the scanned range propagate. Approximate modes validate orderin
 4. **Persistence:** snapshots serialize only the anchor formula. Spill children are recomputed after hydration and never serialized as literals or opaque WASM handles.
 5. **Structure/merges:** row/column changes and merge changes invalidate and atomically recompute the complete spill.
 6. **Clipboard:** copying the full spill exports displayed values; copying the anchor as a formula preserves the source. Pasting over a spill follows collision rules.
-7. **Undo:** history stores the anchor operation and any overwritten pre-spill document cells, while derived children remain runtime state. Bulk projection must use the range-native machinery from Plan 037.
+7. **Undo:** history stores the anchor operation and any overwritten pre-spill document cells, while derived children remain runtime state. Bulk projection must use the existing range-native machinery.
 
 A dedicated `#SPILL!` error and collision tests are prerequisites. Until then, returning a partial array or silently overwriting cells is prohibited.
 
