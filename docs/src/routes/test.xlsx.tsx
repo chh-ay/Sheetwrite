@@ -1,5 +1,5 @@
 import { fromXlsxWorkbook, toXlsxWorkbook, type WorkbookSnapshot } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
@@ -48,6 +48,7 @@ const snapshot: WorkbookSnapshot = {
 };
 
 function XlsxFixture() {
+  registerXlsxBackends();
   const [result, setResult] = useState<{ status: "running" | "ready" | "error"; text: string }>({
     status: "running",
     text: "running",

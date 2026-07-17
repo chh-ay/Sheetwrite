@@ -115,6 +115,18 @@ export default function ReactWorkbook() {
     record("Workbook view reset");
   }
 
+  async function exportWorkbook(): Promise<void> {
+    const grid = gridRef.current;
+    if (!grid) return;
+    try {
+      await import("@sheetwrite/xlsx/register");
+      await grid.exportXlsx("revenue-pipeline.xlsx");
+      record("XLSX export prepared");
+    } catch (error) {
+      record(`XLSX export failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   return (
     <section className="sw-demo-app" data-framework="react">
       <main className="sw-demo-main" id="workbook">
@@ -180,6 +192,9 @@ export default function ReactWorkbook() {
             </DemoButton>
             <DemoButton type="button" onClick={resetWorkbook}>
               Reset
+            </DemoButton>
+            <DemoButton type="button" onClick={() => void exportWorkbook()}>
+              Export XLSX
             </DemoButton>
             <DemoRenderingMode
               label="Rendering thread"

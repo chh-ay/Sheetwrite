@@ -66,6 +66,11 @@ for (const [path, content] of reactGraph) {
     const specifier = match[1];
     if (specifier?.startsWith(".")) lazyEntrypoints.push(resolve(dirname(path), specifier));
   }
+  // Vite 8's preload helper hoists dynamic-import dependencies into
+  // __vite__mapDeps as dist-root-relative asset strings.
+  for (const match of content.matchAll(/["']assets\/([^"']+\.js)["']/g)) {
+    if (match[1] !== undefined) lazyEntrypoints.push(join(distRoot, "assets", match[1]));
+  }
 }
 const lazyGraph = await collectStaticGraph(lazyEntrypoints);
 if (![...lazyGraph.values()].some((content) => content.includes(xlsxMarker))) {
