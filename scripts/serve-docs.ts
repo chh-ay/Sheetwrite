@@ -4,6 +4,10 @@ const repositoryRoot = resolve(import.meta.dir, "..");
 const outputRoot = resolve(repositoryRoot, "docs/dist/client");
 const base = "";
 const port = Number.parseInt(process.env.PORT ?? "4173", 10);
+const LOCAL_VERCEL_SCRIPTS = new Set([
+  "/_vercel/insights/script.js",
+  "/_vercel/speed-insights/script.js",
+]);
 
 function outputPath(pathname: string): string | null {
   if (pathname !== base && !pathname.startsWith(`${base}/`)) return null;
@@ -18,6 +22,11 @@ const server = Bun.serve({
   port,
   async fetch(request) {
     const pathname = decodeURIComponent(new URL(request.url).pathname);
+    if (LOCAL_VERCEL_SCRIPTS.has(pathname)) {
+      return new Response("", {
+        headers: { "content-type": "application/javascript; charset=utf-8" },
+      });
+    }
     const candidate = outputPath(pathname);
     if (candidate !== null) {
       const file = Bun.file(candidate);
