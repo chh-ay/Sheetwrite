@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import {
+  blitVerticalScroll,
   getMergeIndexResourceStatsForTest,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
+  snapViewportToDevicePixels,
 } from "../src/canvas-paint.js";
 import { dateToSerial } from "../src/date-serial.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
@@ -631,5 +633,68 @@ describe("paintFrame compiled number formats", () => {
     const ctx = render(view, layout, UNIFORM_VIEWPORT);
     expect(ctx.fillTexts.filter((call) => call.text === "1,234.50")).toHaveLength(3);
     expect(ctx.fillTexts.filter((call) => call.text === "July 4")).toHaveLength(3);
+  });
+});
+
+describe("scroll blit and damage-band integrity", () => {
+  const blitViewport = (scrollTop: number): Viewport => ({
+    scrollTop,
+    scrollLeft: 0,
+    width: 400,
+    height: 300,
+    contentRevision: 7,
+  });
+
+  function runBlit(prevTop: number, nextTop: number, dpr = 1) {
+    const ctx = makeRecordingCtx();
+    const draws: unknown[][] = [];
+    ctx.drawImage = (...args: unknown[]) => {
+      draws.push(args);
+    };
+    const damage = blitVerticalScroll(
+      ctx as unknown as CanvasRenderingContext2D,
+      {} as HTMLCanvasElement,
+      makeTheme(),
+      blitViewport(prevTop),
+      blitViewport(nextTop),
+      dpr,
+      dpr,
+    );
+    return { damage, draws };
+  }
+
+  it("refuses fractional device-pixel shifts instead of stranding stale glyphs", () => {
+    // A rounded copy plus an exact-offset repaint leaves sub-pixel-shifted
+    // glyph slices that accumulate into ghosting on touchpad scrolls.
+    const { damage, draws } = runBlit(100, 100.4);
+    expect(damage).toBeUndefined();
+    expect(draws).toHaveLength(0);
+  });
+
+  it("still blits exact device-pixel shifts", () => {
+    const { damage, draws } = runBlit(100, 103);
+    expect(draws).toHaveLength(1);
+    expect(damage).toEqual({ x: 0, y: 297, w: 400, h: 3 });
+  });
+
+  it("snaps viewport scroll offsets to the device-pixel grid", () => {
+    const snapped = snapViewportToDevicePixels(blitViewport(100.3), 1.5);
+    // 100.3 * 1.5 = 150.45 -> 150 device px -> 100 css px.
+    expect(snapped.scrollTop).toBe(100);
+    const identity = snapViewportToDevicePixels(blitViewport(100), 1.5);
+    expect(identity.scrollTop).toBe(100);
+  });
+
+  it("paints a row label whose band overlaps the damage strip but whose center does not", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+    const theme = makeTheme({ rowHeaderWidth: 40 });
+    // Row 1 band: y in [44, 68), center 56. Strip covers only its lower
+    // quarter [62, 80): center-point culling would skip the label and let the
+    // strip's background erase the glyph half inside it - sliced digits.
+    const ctx = render(view, layout, UNIFORM_VIEWPORT, theme, { x: 0, y: 62, w: 400, h: 18 });
+    const label = ctx.fillTexts.find((call) => call.text === "2");
+    expect(label).toBeDefined();
+    expect(label?.y).toBe(56);
   });
 });

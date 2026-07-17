@@ -240,6 +240,21 @@ export interface PaintDamage {
   h: number;
 }
 
+/**
+ * Snap scroll offsets to the device-pixel grid. Rasterization then lands on
+ * the same subpixel phase every frame, and vertical scroll deltas stay exact
+ * device-pixel shifts, so the blit fast path never bails - even at fractional
+ * devicePixelRatio (Windows 125%/150%), where raw CSS offsets would strand
+ * sub-pixel-shifted stale glyphs and slice row labels.
+ */
+export function snapViewportToDevicePixels(viewport: Viewport, dpr: number): Viewport {
+  const snap = (value: number): number => Math.round(value * dpr) / dpr;
+  const scrollTop = snap(viewport.scrollTop);
+  const scrollLeft = snap(viewport.scrollLeft);
+  if (scrollTop === viewport.scrollTop && scrollLeft === viewport.scrollLeft) return viewport;
+  return { ...viewport, scrollTop, scrollLeft };
+}
+
 export function blitVerticalScroll(
   ctx: Ctx,
   canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -261,7 +276,13 @@ export function blitVerticalScroll(
   const bodyH = viewport.height - bodyTop;
   if (bodyH <= 0) return undefined;
 
-  const deltaPx = Math.round((viewport.scrollTop - prev.scrollTop) * dpr);
+  // Blit only exact device-pixel shifts. A fractional shift would copy pixels
+  // rounded to the nearest device pixel while the exposed strip repaints at
+  // the true offset - each touchpad scroll then strands sub-pixel-shifted
+  // stale glyph slices that accumulate into visible ghosting.
+  const deltaDevice = (viewport.scrollTop - prev.scrollTop) * dpr;
+  const deltaPx = Math.round(deltaDevice);
+  if (Math.abs(deltaDevice - deltaPx) > 0.001) return undefined;
   const bodyTopPx = Math.round(bodyTop * dpr);
   const heightPx = Math.round(viewport.height * dpr);
   const widthPx = Math.round(viewport.width * dpr);
@@ -567,11 +588,16 @@ export function paintFrame(
     ctx.textBaseline = "middle";
     for (let ri = 0; ri < nRows; ri++) {
       const row = view.rows.start + ri;
-      const cy =
-        rowTops !== undefined && rowHeights !== undefined
-          ? headerHeight + rowTops[ri]! + rowHeights[ri]! / 2 - scrollTop
-          : headerHeight + row * rowHeight - scrollTop + rowHeight / 2;
-      if (cy < paintTop || cy > paintBottom) continue;
+      const bandTop =
+        rowTops !== undefined
+          ? headerHeight + rowTops[ri]! - scrollTop
+          : headerHeight + row * rowHeight - scrollTop;
+      const bandHeight = rowHeights !== undefined ? rowHeights[ri]! : rowHeight;
+      // Cull by row band, not center: a damage strip can cover half a row's
+      // glyphs while the center sits outside it - skipping the row would let
+      // the strip's background erase that half and slice the digits.
+      if (bandTop + bandHeight < paintTop || bandTop > paintBottom) continue;
+      const cy = bandTop + bandHeight / 2;
       ctx.fillText(String(row + 1), g / 2, cy);
     }
     ctx.strokeStyle = theme.gridLine;
