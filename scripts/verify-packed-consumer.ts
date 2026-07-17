@@ -1,7 +1,7 @@
 import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { verifyReleaseArtifacts } from "./release-artifacts.js";
+import { readReleaseManifestDigest, verifyReleaseArtifacts } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
 interface PackageManifest {
@@ -459,6 +459,7 @@ try {
   );
   const tarballs = new Map<string, string>();
   const packageSizes = new Map<string, { packed: number; unpacked: number }>();
+  let artifactManifestDigest: string | undefined;
 
   if (artifactDirectory === undefined) {
     for (const spec of packageSpecs) {
@@ -485,6 +486,7 @@ try {
     }
   } else {
     const release = await verifyReleaseArtifacts(resolve(artifactDirectory));
+    artifactManifestDigest = await readReleaseManifestDigest(resolve(artifactDirectory));
     const artifacts = new Map(release.packages.map((artifact) => [artifact.name, artifact]));
     for (const [index, spec] of packageSpecs.entries()) {
       const manifest = sourceManifests[index];
@@ -559,6 +561,9 @@ try {
     console.log(`${name}: packed=${size.packed}B unpacked=${size.unpacked}B`);
   }
   console.log(`Audited ${auditedLicenseCount} MIT-compatible XLSX runtime package licenses`);
+  if (artifactManifestDigest !== undefined) {
+    console.log(`Artifact manifest SHA-512: ${artifactManifestDigest}`);
+  }
   console.log("Packed tarball consumer verification passed");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });

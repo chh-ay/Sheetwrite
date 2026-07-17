@@ -14,7 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
-import { verifyReleaseArtifacts } from "./release-artifacts.js";
+import { readReleaseManifestDigest, verifyReleaseArtifacts } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
 export const SIZE_PROTOCOL_VERSION = 1;
@@ -1024,6 +1024,11 @@ async function cli(): Promise<void> {
     await writeReport(report);
     console.log(formatTable(report));
     console.log(`JSON report: ${relative(repositoryRoot, reportPath)}`);
+    if (artifactDirectory !== undefined) {
+      console.log(
+        `Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifactDirectory)}`,
+      );
+    }
     if (mode === "report") return;
     if (mode === "candidate") {
       const outputArgument = process.argv.find((argument) => argument.startsWith("--output="));
