@@ -619,11 +619,19 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
  * missing or invalid the landing renders a "run the protocol" placeholder.
  */
 async function renderLandingBench(): Promise<string> {
-  const scale = await loadEvidence(
-    "bench/results/render-scale.json",
-    "bun run --filter @sheetwrite/bench bench:render:scale",
-    validateRenderArtifact,
+  return landingBenchPayload(
+    await loadEvidence(
+      "bench/results/render-scale.json",
+      "bun run --filter @sheetwrite/bench bench:render:scale",
+      validateRenderArtifact,
+    ),
   );
+}
+
+/** Pure payload builder, exported so the finite/fallback contract is testable. */
+export function landingBenchPayload(
+  scale: { evidence: ValidatedRenderEvidence; source: string } | EvidenceState,
+): string {
   const round1 = (value: number): number => Math.round(value * 10) / 10;
   if (!("evidence" in scale)) {
     return `${JSON.stringify({ available: false, reason: scale.reason }, null, 2)}\n`;

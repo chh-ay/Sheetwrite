@@ -6,6 +6,7 @@ import {
   contentPathForRoute,
   entrySlug,
   expectedGeneratedFiles,
+  landingBenchPayload,
   MIGRATION_ROUTES,
   parseFences,
   renderEntryPage,
@@ -160,5 +161,114 @@ describe("documentation generation", () => {
     // published 1120/1140 for a 1120-cell matrix.
     expect(runCompletionSummary(results)).toEqual({ successes: 5, total: 7, failures: 2 });
     expect(runCompletionSummary([])).toEqual({ successes: 0, total: 0, failures: 0 });
+  });
+
+  const benchResult = (
+    engine: string,
+    scenarioId: string,
+    round: number,
+    rows: number,
+    medianMs: number,
+    status = "success",
+  ) => ({
+    engine,
+    scenarioId,
+    round,
+    rows,
+    status,
+    medianMs,
+    p95Ms: medianMs * 1.1,
+    madMs: 0.01,
+    memory: { beforeBytes: 1_000_000, afterBytes: 2_000_000, deltaBytes: 1_000_000 },
+    validation: [],
+  });
+  const benchEvidence = (results: ReturnType<typeof benchResult>[]) => ({
+    protocolVersion: 1,
+    metadata: {
+      commit: "c".repeat(40),
+      dirty: false,
+      timestamp: "2026-07-17T00:00:00.000Z",
+      bunVersion: "1",
+      nodeVersion: "1",
+      browserVersion: "149",
+      os: "linux",
+      arch: "x64",
+      cpu: "test",
+      rounds: 2,
+      launchAttempts: [],
+    },
+    config: {
+      engines: ["sheetwrite", "handsontable"],
+      rows: [1_000, 1_000_000],
+      scenarios: ["a", "b"],
+    },
+    results,
+  });
+
+  it("pairs landing bench ratios per scenario from full-round buckets", () => {
+    const results: ReturnType<typeof benchResult>[] = [];
+    for (const rows of [1_000, 1_000_000]) {
+      for (const scenario of ["a", "b"]) {
+        for (const round of [1, 2]) {
+          results.push(benchResult("sheetwrite", scenario, round, rows, 1));
+          results.push(benchResult("handsontable", scenario, round, rows, 10));
+        }
+      }
+    }
+    const payload = JSON.parse(
+      landingBenchPayload({ evidence: benchEvidence(results), source: "x" }),
+    );
+    expect(payload.available).toBe(true);
+    expect(payload.sizes).toHaveLength(2);
+    expect(payload.sizes[0]).toMatchObject({
+      size: 1_000,
+      comparedScenarios: 2,
+      medianRatio: 10,
+      bestRatio: 10,
+      handsontableIncomplete: 0,
+    });
+    expect(payload.heroStats).toMatchObject({ millionRowScenarios: 2, millionRowMedianMs: 1 });
+  });
+
+  it("omits partial-round pairs and never publishes non-finite landing values", () => {
+    const results = [
+      // scenario a at 1k: Handsontable completes only 1 of 2 rounds.
+      benchResult("sheetwrite", "a", 1, 1_000, 1),
+      benchResult("sheetwrite", "a", 2, 1_000, 1),
+      benchResult("handsontable", "a", 1, 1_000, 10),
+      benchResult("handsontable", "a", 2, 1_000, 10, "failed"),
+      // scenario b at 1k: full-round pair with a 5x gap.
+      benchResult("sheetwrite", "b", 1, 1_000, 1),
+      benchResult("sheetwrite", "b", 2, 1_000, 1),
+      benchResult("handsontable", "b", 1, 1_000, 5),
+      benchResult("handsontable", "b", 2, 1_000, 5),
+      // 1M: Sheetwrite full rounds, no Handsontable at all.
+      benchResult("sheetwrite", "a", 1, 1_000_000, 2),
+      benchResult("sheetwrite", "a", 2, 1_000_000, 2),
+      benchResult("sheetwrite", "b", 1, 1_000_000, 2),
+      benchResult("sheetwrite", "b", 2, 1_000_000, 2),
+    ];
+    const payload = JSON.parse(
+      landingBenchPayload({ evidence: benchEvidence(results), source: "x" }),
+    );
+    expect(payload.available).toBe(true);
+    // The 1M size has zero full-round pairs and must be omitted, not NaN.
+    expect(payload.sizes).toHaveLength(1);
+    expect(payload.sizes[0]).toMatchObject({
+      size: 1_000,
+      comparedScenarios: 1,
+      medianRatio: 5,
+      handsontableIncomplete: 1,
+    });
+    expect(payload.heroStats).toMatchObject({ millionRowScenarios: 2, millionRowMedianMs: 2 });
+
+    // A structurally valid artifact with no comparable pairs downgrades to the
+    // placeholder payload - null must never reach the landing.
+    const none = landingBenchPayload({
+      evidence: benchEvidence(results.slice(0, 4)),
+      source: "x",
+    });
+    expect(JSON.parse(none).available).toBe(false);
+    expect(none).not.toContain("null");
   });
 });
