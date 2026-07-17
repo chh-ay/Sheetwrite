@@ -721,6 +721,10 @@ describe("metadata, identity, and sheet lifecycle", () => {
           },
         },
       },
+      {
+        family: "named-range",
+        operation: { op: "removeNamedRange", name: "Local", scope: SHEET },
+      },
     ];
 
     for (const { family, operation } of cases) {
@@ -743,11 +747,29 @@ describe("metadata, identity, and sheet lifecycle", () => {
       {
         family: "range",
         local: {
+          op: "setRange",
+          range: range("row", 0, 2),
+          cells: [{ rowOffset: 0, colOffset: 0, value: literal("local") }],
+        },
+        remote: {
+          op: "setRangeStyle",
+          range: range("row", 1, 3),
+          style: { italic: true },
+        },
+      },
+      {
+        family: "range",
+        local: {
           op: "setRangeStyle",
           range: range("row", 0, 2),
           style: { bold: true },
         },
         remote: { op: "clearRange", range: range("row", 1, 3), contents: true },
+      },
+      {
+        family: "range",
+        local: { op: "addMerge", sheet: SHEET, merge: { r0: 0, c0: 0, r1: 2, c1: 2 } },
+        remote: { op: "removeMerge", sheet: SHEET, merge: { r0: 1, c0: 1, r1: 3, c1: 3 } },
       },
       {
         family: "sheet",
