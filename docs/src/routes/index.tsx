@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ThemeToggle } from "../components/ThemeToggle.js";
+import { InstallCommand } from "../components/InstallCommand.js";
+import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
 
@@ -99,32 +100,7 @@ function Landing() {
   const maxRatio = evidence ? Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) : 1;
   return (
     <div className="sw-landing">
-      <header className="sw-landing-topbar">
-        <a aria-label="Sheetwrite home" className="sw-brand" href="/">
-          <svg aria-hidden="true" viewBox="0 0 32 32">
-            <rect
-              fill="none"
-              height="24"
-              rx="4"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              width="24"
-              x="4"
-              y="4"
-            />
-            <path d="M4 12h24M12 4v24" fill="none" stroke="currentColor" strokeWidth="2.5" />
-          </svg>
-          <span>Sheetwrite</span>
-        </a>
-        <div className="sw-landing-topbar__actions">
-          <nav aria-label="Site">
-            <a href="/docs/">Docs</a>
-            <a href="#benchmarks">Benchmarks</a>
-            <a href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
-          </nav>
-          <ThemeToggle />
-        </div>
-      </header>
+      <SiteTopbar benchmarksHref="#benchmarks" />
 
       <main id="main-content">
         <section className="sw-hero">
@@ -143,11 +119,9 @@ function Landing() {
               See the numbers
             </a>
           </div>
-          <a className="sw-hero-install" href="/docs/start/installation/">
-            <span aria-hidden="true">$</span>
-            <code>npm install @sheetwrite/core</code>
-            <em>Install Sheetwrite →</em>
-          </a>
+          <div className="sw-hero-install">
+            <InstallCommand packageName="@sheetwrite/core" />
+          </div>
         </section>
 
         <section aria-labelledby="benchmarks-title" className="sw-landing-bench" id="benchmarks">

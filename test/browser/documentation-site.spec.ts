@@ -482,7 +482,9 @@ test.describe("documentation site", () => {
       await page.setViewportSize({ width, height: 855 });
       await page.goto(siteUrl());
       await expect(page.locator("main h1")).toHaveText("Build spreadsheets you still own.");
-      await expect(page.getByRole("link", { name: /Install Sheetwrite/ })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /Copy install command: npm install @sheetwrite\/core/ }),
+      ).toBeVisible();
       const layout = await page.evaluate(() => {
         const main = document.querySelector<HTMLElement>("main");
         const cards = [...document.querySelectorAll<HTMLElement>(".sw-landing-grid > a")];
@@ -499,7 +501,7 @@ test.describe("documentation site", () => {
       expect(layout?.documentFits).toBe(true);
       expect(layout?.cardsFit).toBe(true);
       if (width === 1568) {
-        await page.getByRole("link", { name: /Install Sheetwrite/ }).click();
+        await page.getByRole("link", { name: "Get started" }).click();
         await expect(page).toHaveURL(docsUrl("start/installation/"));
         await expect(page.locator("main h1")).toHaveText("Installation");
       }

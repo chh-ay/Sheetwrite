@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { InstallCommand } from "../components/InstallCommand.js";
+import { SiteTopbar } from "../components/SiteTopbar.js";
 import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
-import { ThemeToggle } from "../components/ThemeToggle.js";
 import "../styles/showcase.css";
 
 export interface ShowcaseProof {
@@ -20,34 +20,6 @@ interface ShowcasePageProps {
   prompt: string;
   sourcePath: string;
   title: string;
-}
-
-function InstallCommand({ packageName }: Readonly<{ packageName: string }>) {
-  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
-  const command = `npm install ${packageName}`;
-  const feedback = state === "copied" ? "Copied" : state === "error" ? "Try again" : "Copy";
-
-  return (
-    <button
-      aria-label={`Copy install command: ${command}`}
-      className="sw-install-command"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(command);
-          setState("copied");
-          window.setTimeout(() => setState("idle"), 1600);
-        } catch {
-          setState("error");
-          window.setTimeout(() => setState("idle"), 2400);
-        }
-      }}
-      type="button"
-    >
-      <span aria-hidden="true">$</span>
-      <code>{command}</code>
-      <strong aria-live="polite">{feedback}</strong>
-    </button>
-  );
 }
 
 export function ShowcasePage({
@@ -71,30 +43,7 @@ export function ShowcasePage({
 
   return (
     <div className="sw-showcase-frame">
-      <header className="sw-showcase-nav sw-product-nav">
-        <a aria-label="Sheetwrite home" className="sw-showcase-brand" href="/">
-          <svg aria-hidden="true" viewBox="0 0 32 32">
-            <rect height="26" rx="5" width="26" x="3" y="3" />
-            <path d="M3 11h26M11 3v26M20 11v18M11 20h18" />
-          </svg>
-          <span>Sheetwrite</span>
-        </a>
-        <nav aria-label="Framework examples">
-          <a href="/docs/start/installation/">Docs</a>
-          {SHOWCASE_NAVIGATION.map((item) => {
-            const id = item.href.replaceAll("/", "");
-            return (
-              <a aria-current={id === active ? "page" : undefined} href={item.href} key={item.href}>
-                {item.label}
-              </a>
-            );
-          })}
-        </nav>
-        <div className="sw-showcase-nav__actions">
-          <a href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
-          <ThemeToggle />
-        </div>
-      </header>
+      <SiteTopbar active={active} />
 
       <main className="sw-showcase-page" data-framework={active}>
         <header className="sw-showcase-page__hero">
@@ -122,7 +71,7 @@ export function ShowcasePage({
           </div>
           <aside className="sw-showcase-page__install" aria-label={`${activeItem.label} setup`}>
             <div>
-              <span>Published package</span>
+              <span>First-party package</span>
               <strong>Start with the real adapter.</strong>
             </div>
             <InstallCommand packageName={packageName} />
@@ -136,7 +85,7 @@ export function ShowcasePage({
               <strong>Live workbook</strong>
               <span>/ {activeItem.label}</span>
             </div>
-            <span>Published package · interactive state</span>
+            <span>Real adapter · interactive state</span>
           </header>
           <div className="sw-showcase-stage__viewport">{children}</div>
           <footer className="sw-showcase-stage__prompt">

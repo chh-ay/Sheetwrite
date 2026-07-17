@@ -1980,13 +1980,6 @@ body .sw-code-popover__accessible-signature {
   margin-top: 0.4rem;
 }
 
-/* Single-size workloads: no track - a lone bar normalized against itself
-   carries no information; the numbers are the row. */
-.bench-bar--solo {
-  grid-template-areas: "engine value";
-  grid-template-columns: minmax(8rem, 1fr) auto;
-}
-
 .bench-bar__engine {
   grid-area: engine;
   color: var(--sw-fg-muted);
@@ -2108,11 +2101,6 @@ body .sw-code-popover__accessible-signature {
       "track track";
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0.3rem;
-  }
-
-  .bench-bar--solo {
-    grid-template-areas: "engine value";
-    row-gap: 0;
   }
 
   .bench-bar--ruler {
@@ -2419,36 +2407,18 @@ body .sw-code-popover__accessible-signature {
   outline-offset: 2px;
 }
 
-.sw-landing-topbar {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.9rem clamp(1rem, 4vw, 3rem);
-  border-bottom: 1px solid var(--sw-border);
-}
-
-.sw-landing-topbar__actions {
-  display: flex;
-  gap: 1.1rem;
-  align-items: center;
-}
-
-.sw-landing-topbar nav,
 .sw-landing-footer nav {
   display: flex;
   flex-wrap: wrap;
   gap: 1.4rem;
 }
 
-.sw-landing-topbar nav a,
 .sw-landing-footer nav a {
   color: var(--sw-fg-muted);
   font: 500 0.85rem / 1.4 var(--sw-font-body);
   text-decoration: none;
 }
 
-.sw-landing-topbar nav a:hover,
 .sw-landing-footer nav a:hover {
   color: var(--sw-fg-strong);
 }
@@ -2555,41 +2525,10 @@ body .sw-code-popover__accessible-signature {
   background: var(--sw-surface-2);
 }
 
-/* The install command is a real link into the installation guide; the mono
-   affordance names the destination without any client JS. */
+/* The hero install wraps the shared click-to-copy command button. */
 .sw-hero-install {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.3rem 0.6rem;
-  align-items: baseline;
+  max-width: 24rem;
   margin-top: 1.4rem;
-  padding: 0.6rem 0.95rem;
-  border: 1px solid var(--sw-border);
-  border-radius: 0.55rem;
-  background: var(--sw-surface-1);
-  color: var(--sw-fg-dim);
-  font: 500 0.85rem / 1.5 var(--sw-font-mono);
-  text-decoration: none;
-  transition:
-    border-color 140ms ease-out,
-    background 140ms ease-out;
-}
-
-.sw-hero-install code {
-  color: var(--sw-fg-strong);
-  font: inherit;
-}
-
-.sw-hero-install em {
-  color: var(--sw-accent-strong);
-  font: 600 0.72rem / 1.9 var(--sw-font-mono);
-  font-style: normal;
-  letter-spacing: 0.06em;
-}
-
-.sw-hero-install:hover {
-  border-color: var(--sw-accent);
-  background: var(--sw-surface-2);
 }
 
 .sw-landing-bench,
@@ -2953,20 +2892,11 @@ body .sw-code-popover__accessible-signature {
   .sw-landing .sw-landing-grid {
     grid-template-columns: 1fr;
   }
-
-  .sw-landing-topbar nav {
-    gap: 0.9rem;
-  }
-
-  .sw-landing-topbar .sw-brand span {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .sw-cta,
   .sw-cta--ghost,
-  .sw-hero-install,
   .sw-landing .sw-landing-grid > a {
     transition: none;
   }

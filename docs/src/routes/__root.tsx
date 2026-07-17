@@ -2,6 +2,9 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { type ReactNode, useEffect } from "react";
 import "../styles/tokens.css";
 import "../styles/site.css";
+// Loaded at the root, not per-route: route-split CSS arrives after the SPA
+// transition paints, flashing an unstyled showcase/landing frame.
+import "../styles/showcase.css";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 

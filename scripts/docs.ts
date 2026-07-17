@@ -1047,8 +1047,8 @@ function benchMethod(
 const RENDER_METHOD = benchMethod(
   "Methodology - what each scenario does",
   [
-    "One adapter per engine, workbook size, and round mounts a live grid in controlled headless Chromium (fixed viewport, precise-memory flags). All fourteen scenarios then run warm on that mounted grid in counterbalanced engine order; the fixture is rebuilt only after a failed scenario, so one crash cannot leak state into the next measurement. Every scenario validates its effect with correctness checkpoints - the scroll offset really advanced, the editor really opened, the row count really changed, and painted-value sentinels stay intact.",
-    "Bright numbers are the median of each round's median; faded numbers are the median of each round's p95. <strong>Did not complete</strong> is never a timing: it records a crash, timeout, or failed checkpoint, with the failure stage preserved in the raw artifact.",
+    "Live grid in controlled headless Chromium. Ten counterbalanced rounds; all fourteen scenarios run warm per mount, and the fixture is rebuilt after any failure so crashes cannot leak state. Every scenario must prove its effect (scroll really moved, editor really opened, rows really changed) or it fails.",
+    "Bright = median round, faded = p95 round. <strong>Did not complete</strong> = recorded crash, timeout, or failed checkpoint - never a timing.",
   ],
   [
     [
@@ -1089,8 +1089,8 @@ const RENDER_METHOD = benchMethod(
 const DATA_METHOD = benchMethod(
   "Methodology - what each operation does",
   [
-    "Both engines run against identical columnar datasets (id, date, customer, city, amount) with a per-operation plan of warmup and timed iterations. Ingest builds a fresh engine instance per timed iteration; window reads rotate their start offset by a coprime stride so no per-window cache can answer twice; sort and filter reset the view between runs; Handsontable's edits run with rendering suspended so only its data path is timed.",
-    "Memory is sampled in isolated subprocesses: the JS heap delta around a single ingest, plus Sheetwrite's WASM linear-memory delta - its cells live off the JS heap entirely.",
+    "Identical columnar datasets, per-operation warmup and iteration plans. Fresh instance per ingest; window reads rotate offsets to defeat caches; sort and filter reset between runs; Handsontable edits run with rendering suspended so only its data path is timed.",
+    "Memory = JS-heap delta around one ingest in an isolated subprocess, plus Sheetwrite's WASM linear-memory delta.",
   ],
   [
     ["ingest", "Load the full dataset into a fresh engine instance."],
@@ -1105,7 +1105,7 @@ const DATA_METHOD = benchMethod(
 const FORMULA_METHOD = benchMethod(
   "Methodology - what each workload does",
   [
-    "Each workload builds a fresh WASM cell-store fixture of the named dependency shape, then times the recalculation triggered by one action - usually a single edit. The cell count names how many formula cells the fixture holds. Bright numbers are medians across samples; faded numbers are p95; every workload must pass the protocol's safety ceilings.",
+    "Each workload builds a fresh WASM cell-store of the named dependency shape and times the recalculation from one action - usually a single edit. Sizes are formula-cell counts; bright = median, faded = p95.",
   ],
   [
     ["linear-chain", "A chain A1 -> A2 -> ... -> AN; editing the head recomputes the full depth."],
@@ -1141,9 +1141,8 @@ const FORMULA_METHOD = benchMethod(
 
 /**
  * Single-engine scaling figure: one row per operation/workload, one bar per
- * input size, normalized within the group so scaling is legible. Groups with a
- * single size render value-only rows - a lone bar normalized against itself
- * carries no information.
+ * input size. Every bar maps through the figure-wide log scale, so even a
+ * single-size workload's bar carries information - its position on the ruler.
  */
 function benchScaleFigure(
   lead: string,
@@ -1167,18 +1166,14 @@ function benchScaleFigure(
       '<div class="bench-viz__row" data-outcome="faster">',
       `<div class="bench-viz__head"><code>${group.label}</code></div>`,
     );
-    const solo = group.entries.length === 1;
     for (const entry of group.entries) {
       const pct = scale.pct;
-      const track = solo
-        ? ""
-        : `<span class="bench-bar__track" aria-hidden="true">` +
-          `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
-          `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>`;
       lines.push(
-        `<div class="bench-bar${solo ? " bench-bar--solo" : ""}" data-engine="sheetwrite">` +
+        `<div class="bench-bar" data-engine="sheetwrite">` +
           `<span class="bench-bar__engine">${entry.sizeLabel}</span>` +
-          track +
+          `<span class="bench-bar__track" aria-hidden="true">` +
+          `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
+          `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>` +
           `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${fmtMs(entry.median)}</b><b class="bench-num" data-stat="p95">${fmtMs(entry.p95)}</b></span>` +
           `</div>`,
       );
@@ -1509,7 +1504,7 @@ async function renderEvidencePage(): Promise<string> {
   if ("evidence" in sizeReport) {
     const { evidence, source } = sizeReport;
     lines.push(
-      '<div class="evidence-available"><strong>Validated evidence.</strong> Published package and bundler-output sizes, gated by absolute budgets in CI.</div>',
+      '<div class="evidence-available"><strong>Validated evidence.</strong> Package tarball and bundler-output sizes, gated by absolute budgets in CI.</div>',
       "",
       '<dl class="bench-meta" data-pagefind-ignore>',
       `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
