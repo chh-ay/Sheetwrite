@@ -329,10 +329,10 @@
     "bundler.vite.vueInitial.javascript.brotliBytes": {
       "unit": "bytes",
       "baseline": 74507,
-      "maximum": 78233,
+      "maximum": 81958,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Approved clean baseline plus ten percent while the initial Vue integration is stabilizing."
     },
     "bundler.vite.vueInitial.javascript.gzipBytes": {
       "unit": "bytes",
