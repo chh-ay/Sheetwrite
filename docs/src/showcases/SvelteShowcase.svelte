@@ -23,7 +23,6 @@ import { Calculator, FileSpreadsheet, ListChecks } from "lucide-svelte";
 import { SVELTE_SHOWCASE_THEME } from "./revenue.js";
 import "@sheetwrite/svelte/styles.css";
 import "@sheetwrite/core/shell.css";
-import "../styles/showcase.css";
 
 const ROWS = 500;
 
@@ -303,7 +302,7 @@ $effect(() => {
       <span>{ROWS.toLocaleString()} formulas</span>
       <span>{changeLog.length} recent commits</span>
       <span>2 linked sheets</span>
-      <span><Calculator size={13} aria-hidden="true" /> Svelte 5 bound Grid</span>
+      <span class="sw-demo-status__binding"><Calculator size={13} aria-hidden="true" /> Svelte 5 bound Grid</span>
     </footer>
   </main>
 </section>

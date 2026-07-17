@@ -16,7 +16,7 @@ import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRenderingMode } from "./ui/DemoRenderingMode.js";
 import { DemoSelect } from "./ui/DemoSelect.js";
 import "@sheetwrite/react/styles.css";
-import "../styles/showcase.css";
+
 
 const workbook = createRevenueWorkbook("#58c4dc24");
 const GRID_CONFIG = { toolbar: true } as const;

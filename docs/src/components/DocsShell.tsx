@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { DOCS_NAVIGATION, SHOWCASE_NAVIGATION } from "../lib/navigation.js";
 import { DocsSearch } from "./DocsSearch.js";
@@ -13,13 +14,13 @@ interface DocsShellProps {
 
 function Brand() {
   return (
-    <a aria-label="Sheetwrite home" className="sw-brand" href="/">
+    <Link aria-label="Sheetwrite home" className="sw-brand" to="/">
       <svg aria-hidden="true" viewBox="0 0 32 32">
         <rect height="26" rx="5" width="26" x="3" y="3" />
         <path d="M3 11h26M11 3v26M20 11v18M11 20h18" />
       </svg>
       <span>Sheetwrite</span>
-    </a>
+    </Link>
   );
 }
 
@@ -30,22 +31,22 @@ function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
         <section key={section.label}>
           <h2>{section.label}</h2>
           {section.items.map((item) => (
-            <a
+            <Link
               aria-current={activeHref === item.href ? "page" : undefined}
-              href={item.href}
               key={item.href}
+              to={item.href}
             >
               {item.label}
-            </a>
+            </Link>
           ))}
         </section>
       ))}
       <section>
         <h2>Live showcases</h2>
         {SHOWCASE_NAVIGATION.map((item) => (
-          <a href={item.href} key={item.href}>
+          <Link key={item.href} to={item.href}>
             {item.label}
-          </a>
+          </Link>
         ))}
       </section>
     </nav>

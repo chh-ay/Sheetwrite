@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { InstallCommand } from "../components/InstallCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
+import { HeroWorkbookIsland } from "../showcases/HeroIsland.js";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -100,27 +101,45 @@ function Landing() {
   const maxRatio = evidence ? Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) : 1;
   return (
     <div className="sw-landing">
-      <SiteTopbar benchmarksHref="#benchmarks" />
+      <SiteTopbar />
 
       <main id="main-content">
         <section className="sw-hero">
-          <p className="sw-hero__eyebrow">Canvas spreadsheet engine · Rust/WASM core · MIT</p>
-          <h1>Build spreadsheets you still own.</h1>
-          <p className="sw-hero__lede">
-            Sheetwrite is a canvas spreadsheet engine with a Rust/WASM data core and first-party
-            Vanilla, React, Vue, and Svelte adapters. Your application owns the document, the
-            persistence, and the chrome — the engine owns the speed.
-          </p>
-          <div className="sw-hero-actions">
-            <a className="sw-cta" href="/docs/start/installation/">
-              Get started
-            </a>
-            <a className="sw-cta sw-cta--ghost" href="#benchmarks">
-              See the numbers
-            </a>
+          <div className="sw-hero__copy">
+            <p className="sw-hero__eyebrow">Canvas spreadsheet engine · Rust/WASM core · MIT</p>
+            <h1>Build spreadsheets you still own.</h1>
+            <p className="sw-hero__lede">
+              Sheetwrite is a canvas spreadsheet engine with a Rust/WASM data core and first-party
+              Vanilla, React, Vue, and Svelte adapters. Your application owns the document, the
+              persistence, and the chrome — the engine owns the speed.
+            </p>
+            <div className="sw-hero-actions">
+              <a className="sw-cta" href="/docs/start/installation/">
+                Get started
+              </a>
+              <a className="sw-cta sw-cta--ghost" href="#benchmarks">
+                See the numbers
+              </a>
+            </div>
+            <div className="sw-hero-install">
+              <InstallCommand packageName="@sheetwrite/core" />
+            </div>
           </div>
-          <div className="sw-hero-install">
-            <InstallCommand packageName="@sheetwrite/core" />
+          <div className="sw-hero-demo">
+            <div className="sw-hero-stage">
+              <header className="sw-hero-stage__bar">
+                <div>
+                  <strong>fy26-plan.sheet</strong>
+                  <span>@sheetwrite/react</span>
+                </div>
+                <span>every FY total is =SUM</span>
+              </header>
+              <HeroWorkbookIsland />
+            </div>
+            <p className="sw-hero-demo__hint">
+              The real adapter, not a video — click a quarter, type a number, and the FY totals
+              recalculate in the Rust engine.
+            </p>
           </div>
         </section>
 
@@ -216,22 +235,19 @@ function Landing() {
         <section aria-labelledby="showcases-title" className="sw-landing-showcases">
           <header className="sw-section-head">
             <p className="sw-section-eyebrow">Live showcases</p>
-            <h2 id="showcases-title">Live in every framework</h2>
+            <h2 id="showcases-title">One engine. Four ways to mount it.</h2>
             <p className="sw-section-lede">
-              Four real integrations running on the real adapters — the same package entry points
-              you install. Open one and type.
+              Vanilla, React, Vue, and Svelte use the same package entry points shown in the docs.
+              Open any grid and edit it.
             </p>
           </header>
           <div className="sw-landing-grid sw-landing-grid--frameworks">
             {SHOWCASES.map((showcase) => (
-              <a data-framework={showcase.id} href={showcase.href} key={showcase.id}>
-                <span className="sw-showcase-card__meta">
-                  <i aria-hidden="true" />
-                  {showcase.label}
-                </span>
+              <Link data-framework={showcase.id} key={showcase.id} to={showcase.href}>
+                <span className="sw-showcase-card__meta">{showcase.label}</span>
                 <strong>{showcase.headline}</strong>
                 <span className="sw-showcase-card__cta">Open the live grid →</span>
-              </a>
+              </Link>
             ))}
           </div>
         </section>
@@ -257,7 +273,10 @@ function Landing() {
       </main>
 
       <footer className="sw-landing-footer">
-        <span>MIT licensed.</span>
+        <p className="sw-landing-footer__brand">
+          <strong>Sheetwrite</strong>
+          <span>MIT licensed.</span>
+        </p>
         <nav aria-label="Footer">
           <a href="/docs/">Documentation</a>
           <a href="/docs/guides/performance-resources/">Benchmarks</a>

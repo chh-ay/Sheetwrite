@@ -1058,10 +1058,7 @@
         color-mix(in srgb, var(--sw-border) 28%, transparent) 1px,
         transparent 1px
       ),
-      linear-gradient(
-        color-mix(in srgb, var(--sw-border) 28%, transparent) 1px,
-        transparent 1px
-      );
+      linear-gradient(color-mix(in srgb, var(--sw-border) 28%, transparent) 1px, transparent 1px);
     background-position: center top;
     background-size: 4rem 4rem;
     font-family: var(--sw-font-body);
@@ -1178,15 +1175,6 @@
     color: var(--sw-accent-strong);
     font: 700 var(--sw-type-xs) / 1 var(--sw-font-mono);
     letter-spacing: 0.14em;
-  }
-
-  .sw-showcase-page__eyebrow > span {
-    padding: 0.375rem 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--sw-accent) 42%, var(--sw-border));
-    border-radius: 0.25rem;
-    color: var(--sw-accent-strong);
-    background: color-mix(in srgb, var(--sw-accent) 9%, transparent);
-    letter-spacing: 0.08em;
   }
 
   .sw-showcase-page__specs {
@@ -1338,7 +1326,6 @@
   .sw-showcase-stage__bar strong {
     color: var(--sw-fg-strong);
   }
-
 
   .sw-showcase-stage__viewport {
     min-width: 0;
@@ -1832,9 +1819,9 @@
 }
 
 :is(
-    .sw-demo-heading__actions button[data-primary="true"],
-    .sw-demo-radio-item[data-checked]
-  ):focus-visible {
+  .sw-demo-heading__actions button[data-primary="true"],
+  .sw-demo-radio-item[data-checked]
+):focus-visible {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-demo-ink) 58%, transparent);
 }
 
@@ -1866,11 +1853,7 @@
   --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-demo-accent) 14%, transparent);
   --sheetwrite-toolbar-bg: var(--sw-demo-panel);
   --sheetwrite-toolbar-fg: var(--sw-demo-fg-soft);
-  --sheetwrite-menu-hover: color-mix(
-    in srgb,
-    var(--sw-demo-accent) 12%,
-    var(--sw-demo-raised)
-  );
+  --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-demo-accent) 12%, var(--sw-demo-raised));
   --sheetwrite-find-shadow: var(--sw-demo-popup-shadow);
   --sheetwrite-menu-shadow: var(--sw-demo-popup-shadow);
   --sheetwrite-assist-bg: var(--sw-demo-raised);
@@ -1885,16 +1868,8 @@
   --sheetwrite-tab-bg: var(--sw-demo-deep);
   --sheetwrite-tab-fg: var(--sw-demo-muted);
   --sheetwrite-tab-border: var(--sw-demo-border);
-  --sheetwrite-tab-hover-bg: color-mix(
-    in srgb,
-    var(--sw-demo-accent) 9%,
-    var(--sw-demo-raised)
-  );
-  --sheetwrite-tab-active-bg: color-mix(
-    in srgb,
-    var(--sw-demo-accent) 14%,
-    var(--sw-demo-deep)
-  );
+  --sheetwrite-tab-hover-bg: color-mix(in srgb, var(--sw-demo-accent) 9%, var(--sw-demo-raised));
+  --sheetwrite-tab-active-bg: color-mix(in srgb, var(--sw-demo-accent) 14%, var(--sw-demo-deep));
   --sheetwrite-tab-active-fg: var(--sw-demo-accent-strong);
 }
 
@@ -2043,9 +2018,7 @@
   color: var(--sw-demo-muted);
 }
 
-:is(.sw-demo-app, .sw-vanilla-app)
-  .sheetwrite-tab-active
-  + .sheetwrite-tab-close {
+:is(.sw-demo-app, .sw-vanilla-app) .sheetwrite-tab-active + .sheetwrite-tab-close {
   color: var(--sheetwrite-tab-active-fg);
 }
 
@@ -2077,44 +2050,20 @@
 @layer components {
   .sw-showcase-page[data-framework="react"] {
     --sw-accent: var(--sw-demo-react-accent);
-    --sw-accent-strong: color-mix(
-      in srgb,
-      var(--sw-demo-react-accent) 72%,
-      var(--sw-fg-strong)
-    );
-    --sw-accent-soft: color-mix(
-      in srgb,
-      var(--sw-demo-react-accent) 16%,
-      var(--sw-surface-1)
-    );
+    --sw-accent-strong: color-mix(in srgb, var(--sw-demo-react-accent) 72%, var(--sw-fg-strong));
+    --sw-accent-soft: color-mix(in srgb, var(--sw-demo-react-accent) 16%, var(--sw-surface-1));
   }
 
   .sw-showcase-page[data-framework="vue"] {
     --sw-accent: var(--sw-demo-vue-accent);
-    --sw-accent-strong: color-mix(
-      in srgb,
-      var(--sw-demo-vue-accent) 72%,
-      var(--sw-fg-strong)
-    );
-    --sw-accent-soft: color-mix(
-      in srgb,
-      var(--sw-demo-vue-accent) 16%,
-      var(--sw-surface-1)
-    );
+    --sw-accent-strong: color-mix(in srgb, var(--sw-demo-vue-accent) 72%, var(--sw-fg-strong));
+    --sw-accent-soft: color-mix(in srgb, var(--sw-demo-vue-accent) 16%, var(--sw-surface-1));
   }
 
   .sw-showcase-page[data-framework="svelte"] {
     --sw-accent: var(--sw-demo-svelte-accent);
-    --sw-accent-strong: color-mix(
-      in srgb,
-      var(--sw-demo-svelte-accent) 72%,
-      var(--sw-fg-strong)
-    );
-    --sw-accent-soft: color-mix(
-      in srgb,
-      var(--sw-demo-svelte-accent) 16%,
-      var(--sw-surface-1)
-    );
+    --sw-accent-strong: color-mix(in srgb, var(--sw-demo-svelte-accent) 72%, var(--sw-fg-strong));
+    --sw-accent-soft: color-mix(in srgb, var(--sw-demo-svelte-accent) 16%, var(--sw-surface-1));
   }
 
   .sw-demo-app[data-framework="react"] {
@@ -2226,11 +2175,7 @@
   .sw-demo-controlbar__controls button:hover:not(:disabled),
   .sw-demo-controlbar__sheet-actions button:hover,
   .sw-demo-controlbar__sheet-actions button[data-active="true"] {
-    border-color: color-mix(
-      in srgb,
-      var(--sw-demo-accent) 54%,
-      var(--sw-demo-border)
-    );
+    border-color: color-mix(in srgb, var(--sw-demo-accent) 54%, var(--sw-demo-border));
     background: color-mix(in srgb, var(--sw-demo-accent) 10%, var(--sw-demo-surface));
     color: var(--sw-demo-accent-strong);
   }
@@ -2297,11 +2242,7 @@
     gap: var(--sw-demo-space-1);
     align-items: center;
     padding-inline: var(--sw-demo-space-2);
-    border: 1px solid color-mix(
-      in srgb,
-      var(--sw-demo-accent) 34%,
-      var(--sw-demo-border)
-    );
+    border: 1px solid color-mix(in srgb, var(--sw-demo-accent) 34%, var(--sw-demo-border));
     border-radius: var(--sw-demo-radius-1);
     color: var(--sw-demo-accent-strong);
     background: color-mix(in srgb, var(--sw-demo-accent) 8%, var(--sw-demo-raised));
@@ -2358,6 +2299,12 @@
     color: var(--sw-demo-muted);
     font: 500 var(--sw-type-xs) / 1 var(--sw-font-mono);
     white-space: nowrap;
+  }
+
+  .sw-demo-status__binding {
+    display: inline-flex;
+    gap: var(--sw-demo-space-1);
+    align-items: center;
   }
 
   .sw-demo-status--metrics > * + *::before {

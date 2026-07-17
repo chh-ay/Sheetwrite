@@ -20,7 +20,7 @@ import { FileSpreadsheet, Server } from "lucide-vue-next";
 import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef } from "vue";
 import { VUE_SHOWCASE_THEME } from "./revenue.js";
 import "@sheetwrite/vue/styles.css";
-import "../styles/showcase.css";
+
 
 // ── Showcase: streaming datasource + versioned sync pipeline ─────────────────
 // One million rows are NEVER materialized up front: the grid asks a paged
