@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "../styles/showcase.css";
+
 
 /** Click-to-copy install command; shared by the landing and showcase pages. */
 export function InstallCommand({ packageName }: Readonly<{ packageName: string }>) {

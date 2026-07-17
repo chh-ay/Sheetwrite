@@ -1,8 +1,8 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { InstallCommand } from "../components/InstallCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
-import "../styles/showcase.css";
 
 export interface ShowcaseProof {
   detail: string;
@@ -48,10 +48,7 @@ export function ShowcasePage({
       <main className="sw-showcase-page" data-framework={active}>
         <header className="sw-showcase-page__hero">
           <div className="sw-showcase-page__hero-copy">
-            <p className="sw-showcase-page__eyebrow">
-              <span aria-hidden="true">LIVE</span>
-              {eyebrow}
-            </p>
+            <p className="sw-showcase-page__eyebrow">{eyebrow}</p>
             <h1>{title}</h1>
             <p>{description}</p>
             <dl className="sw-showcase-page__specs">
@@ -128,7 +125,7 @@ export function ShowcasePage({
             <a href={`https://github.com/chh-ay/Sheetwrite/blob/develop/${sourcePath}`}>
               View source
             </a>
-            <a href={nextItem.href}>Next: {nextItem.label} →</a>
+            <Link to={nextItem.href}>Next: {nextItem.label} →</Link>
           </nav>
         </footer>
       </main>

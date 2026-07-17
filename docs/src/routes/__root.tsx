@@ -1,12 +1,10 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
-import "../styles/tokens.css";
-import "../styles/site.css";
-// Loaded at the root, not per-route: route-split CSS arrives after the SPA
-// transition paints, flashing an unstyled showcase/landing frame.
-import "../styles/showcase.css";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
+import showcaseStylesheet from "../styles/showcase.css?url";
+import siteStylesheet from "../styles/site.css?url";
+import tokensStylesheet from "../styles/tokens.css?url";
 
 const THEME_SCRIPT =
   'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
@@ -33,6 +31,12 @@ export const Route = createRootRoute({
     const canonical = new URL(canonicalPath, SITE_URL).href;
     return {
       links: [
+        // Explicit head links are render-blocking in dev and production. Plain
+        // CSS imports are injected by Vite only after hydration in dev, which
+        // exposed a half-styled SSR frame on full-page route navigation.
+        { rel: "stylesheet", href: tokensStylesheet },
+        { rel: "stylesheet", href: siteStylesheet },
+        { rel: "stylesheet", href: showcaseStylesheet },
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       ],

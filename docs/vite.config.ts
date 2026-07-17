@@ -51,6 +51,12 @@ function markResponsiveCodeBlocks() {
 }
 
 export default defineConfig({
+  // Keep one document-wide stylesheet. TanStack route transitions otherwise
+  // swap route CSS links after the next route has painted, producing a visible
+  // half-styled frame on showcase navigation.
+  build: {
+    cssCodeSplit: false,
+  },
   plugins: [
     {
       ...mdx({
