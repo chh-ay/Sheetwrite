@@ -8,7 +8,6 @@ export function InstallCommand({ packageName }: Readonly<{ packageName: string }
 
   return (
     <button
-      aria-label={`Copy install command: ${command}`}
       className="sw-install-command"
       onClick={async () => {
         try {
@@ -25,6 +24,7 @@ export function InstallCommand({ packageName }: Readonly<{ packageName: string }
       <span aria-hidden="true">$</span>
       <code>{command}</code>
       <strong aria-live="polite">{feedback}</strong>
+      <span className="sw-visually-hidden"> install command</span>
     </button>
   );
 }

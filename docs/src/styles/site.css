@@ -2630,7 +2630,7 @@ body .sw-code-popover__accessible-signature {
   overflow: hidden;
   min-width: 0;
   margin-left: auto;
-  color: var(--sw-demo-dim);
+  color: var(--sw-demo-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

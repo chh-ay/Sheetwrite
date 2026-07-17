@@ -13,17 +13,32 @@ const THEME_SCRIPT =
 
 const SITE_URL = "https://sheetwrite.vercel.app";
 const SITE_DESCRIPTION =
-  "Build production spreadsheets with a typed TypeScript API, a Rust/WASM data engine, Canvas rendering, and framework adapters.";
+  "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters.";
+const SOCIAL_IMAGE_ALT = "Sheetwrite spreadsheet grid showing typed web data";
 const STRUCTURED_DATA = JSON.stringify({
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "Sheetwrite",
-  applicationCategory: "DeveloperApplication",
-  operatingSystem: "Web",
-  description: SITE_DESCRIPTION,
-  url: SITE_URL,
-  codeRepository: "https://github.com/chh-ay/sheetwrite",
-  license: "https://opensource.org/license/mit",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "Sheetwrite",
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      inLanguage: "en",
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": `${SITE_URL}/#source`,
+      name: "Sheetwrite",
+      description: SITE_DESCRIPTION,
+      url: SITE_URL,
+      codeRepository: "https://github.com/chh-ay/sheetwrite",
+      license: "https://opensource.org/license/mit",
+      programmingLanguage: ["TypeScript", "Rust"],
+      runtimePlatform: ["Web", "WebAssembly"],
+      version: "0.1.0",
+    },
+  ],
 });
 
 export const Route = createRootRoute({
@@ -50,16 +65,19 @@ export const Route = createRootRoute({
         { name: "theme-color", content: "#080b12" },
         { property: "og:type", content: "website" },
         { property: "og:site_name", content: "Sheetwrite" },
-        { property: "og:title", content: "Sheetwrite — the spreadsheet engine for the web" },
+        { property: "og:locale", content: "en_US" },
+        { property: "og:title", content: "Sheetwrite — TypeScript spreadsheet engine" },
         { property: "og:description", content: SITE_DESCRIPTION },
         { property: "og:url", content: canonical },
         { property: "og:image", content: `${SITE_URL}/og-sheetwrite.webp` },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: SOCIAL_IMAGE_ALT },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:title", content: "Sheetwrite — the spreadsheet engine for the web" },
+        { name: "twitter:title", content: "Sheetwrite — TypeScript spreadsheet engine" },
         { name: "twitter:description", content: SITE_DESCRIPTION },
         { name: "twitter:image", content: `${SITE_URL}/og-sheetwrite.webp` },
+        { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT },
         { title: "Sheetwrite" },
       ],
       scripts: [{ type: "application/ld+json", children: STRUCTURED_DATA }],
