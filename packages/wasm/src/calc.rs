@@ -1238,10 +1238,7 @@ mod tests {
         ];
         let mut refs = Vec::new();
         collect_cell_refs(&parsed, &mut refs);
-        assert_eq!(
-            refs,
-            expected_flags.map(|flags| (0, 0, flags)).to_vec()
-        );
+        assert_eq!(refs, expected_flags.map(|flags| (0, 0, flags)).to_vec());
 
         let serialized = serialize(&parsed);
         assert_eq!(parse(&serialized), Ok(parsed.clone()));
@@ -1249,10 +1246,7 @@ mod tests {
         shift_rows(&mut parsed, 0, 2, 0, 0);
         refs.clear();
         collect_cell_refs(&parsed, &mut refs);
-        assert_eq!(
-            refs,
-            expected_flags.map(|flags| (2, 0, flags)).to_vec()
-        );
+        assert_eq!(refs, expected_flags.map(|flags| (2, 0, flags)).to_vec());
     }
 
     #[test]

@@ -364,7 +364,6 @@ impl StringPool {
         }
     }
 
-
     /// Text for a pool id; `None` when out of range. O(1), allocation-free.
     pub(crate) fn get(&self, id: u32) -> Option<&str> {
         let span = self.spans.get(id as usize)?;
