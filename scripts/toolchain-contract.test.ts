@@ -24,9 +24,16 @@ const parsedWorkflow = Bun.YAML.parse(workflow) as {
     string,
     {
       name?: string;
+      if?: string;
+      outputs?: Record<string, string>;
       needs?: string | string[];
       "timeout-minutes"?: number;
-      steps?: Array<{ run?: string; uses?: string }>;
+      steps?: Array<{
+        id?: string;
+        run?: string;
+        uses?: string;
+        with?: Record<string, unknown>;
+      }>;
     }
   >;
 };
@@ -167,6 +174,46 @@ describe("contributor and CI toolchain contract", () => {
     expect(commands).toContain("size-report.ts check --artifacts");
     expect(commands).toContain("test:coverage");
     expect(commands).toContain("test:browser");
+  });
+
+  it("gates the exact docs artifact without weakening Required CI", () => {
+    const jobs = parsedWorkflow.jobs ?? {};
+    const preflight = jobs.preflight;
+    const classifier = preflight?.steps?.find((step) => step.id === "paths");
+    expect(preflight?.outputs?.docs_required).toBe("$" + "{{ steps.paths.outputs.docs_required }}");
+    expect(classifier?.run).toContain("ci-paths.ts");
+    expect(new Set(jobs["docs-build"]?.needs as string[])).toEqual(
+      new Set(["preflight", "artifact-build"]),
+    );
+    expect(jobs["docs-build"]?.if).toBe("needs.preflight.outputs.docs_required == 'true'");
+
+    const docsCommand = jobs["docs-build"]?.steps
+      ?.flatMap((step) => (step.run ? [step.run] : []))
+      .join("\n");
+    expect(docsCommand).toContain("docs:generate");
+    expect(docsCommand).not.toContain("docs:check");
+    expect(docsCommand).toContain("@sheetwrite/docs-start' build");
+
+    const requiredCommand = jobs.required?.steps?.find((step) =>
+      step.run?.includes('test "$PREFLIGHT" = success'),
+    )?.run;
+    expect(requiredCommand).toContain('if [ "$DOCS_REQUIRED" = "true" ]');
+    expect(requiredCommand).toContain('test "$DOCS" = skipped');
+    expect(requiredCommand).toContain('test "$BROWSER" = skipped');
+  });
+
+  it("shares a source-keyed Rust compilation cache across build and test jobs", () => {
+    const jobs = parsedWorkflow.jobs ?? {};
+    for (const jobName of ["artifact-build", "unit-coverage"]) {
+      const cache = jobs[jobName]?.steps?.find(
+        (step) =>
+          step.uses?.startsWith("actions/cache@") && step.with?.path === "packages/wasm/target",
+      );
+      expect(cache, jobName).toBeDefined();
+      expect(cache?.with?.key).toContain("wasm-target-");
+      expect(cache?.with?.key).toContain("packages/wasm/src/**/*.rs");
+      expect(cache?.with?.["restore-keys"]).toContain("wasm-target-");
+    }
   });
 
   it("matches the active pinned tools", () => {
