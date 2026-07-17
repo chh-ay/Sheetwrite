@@ -14,7 +14,7 @@ packages/wasm/pkg/
 # Coverage
 coverage/
 
-# Local agent/audit working plans
+# Local agent and audit working files
 plans/
 
 # Browser-test output (Playwright) - except the tracked size evidence artifact
@@ -32,3 +32,5 @@ bench/results/render-fresh.md
 # Editor / OS
 .DS_Store
 *.log
+.vercel
+.env*

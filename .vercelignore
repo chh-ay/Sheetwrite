@@ -1,0 +1,10 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/.tanstack
+**/target
+packages/wasm/pkg
+test-results
+bench/results/candidates
+playwright-report
