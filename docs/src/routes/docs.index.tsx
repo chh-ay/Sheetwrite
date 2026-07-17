@@ -17,7 +17,7 @@ function DocsOverview() {
     <DocsShell
       activeHref="/docs/"
       description="Install the engine, choose an adapter, and build against explicit runtime, data, interaction, and delivery contracts."
-      title="Build spreadsheets you still own."
+      title="Build web spreadsheets you still own."
     >
       <p className="sw-landing-lead">
         Sheetwrite is a canvas spreadsheet engine with a Rust/WASM data core and first-party

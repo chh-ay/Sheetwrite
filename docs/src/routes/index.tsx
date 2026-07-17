@@ -8,8 +8,8 @@ import { HeroWorkbookIsland } from "../showcases/HeroIsland.js";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: pageMeta(
-      "Sheetwrite — build spreadsheets you still own",
-      "A canvas spreadsheet engine with a Rust/WASM data core, first-party Vanilla, React, Vue, and Svelte adapters, and protocol-validated benchmarks.",
+      "Sheetwrite — TypeScript spreadsheet and data grid",
+      "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters. Get started.",
     ),
   }),
   component: Landing,
@@ -107,7 +107,7 @@ function Landing() {
         <section className="sw-hero">
           <div className="sw-hero__copy">
             <p className="sw-hero__eyebrow">Canvas spreadsheet engine · Rust/WASM core · MIT</p>
-            <h1>Build spreadsheets you still own.</h1>
+            <h1>Build web spreadsheets you still own.</h1>
             <p className="sw-hero__lede">
               Sheetwrite is a canvas spreadsheet engine with a Rust/WASM data core and first-party
               Vanilla, React, Vue, and Svelte adapters. Your application owns the document, the

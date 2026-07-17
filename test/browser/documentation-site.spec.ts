@@ -43,7 +43,7 @@ const representativeRoutes = [
 test("documentation root serves the overview", async ({ page }) => {
   await page.goto(docsUrl());
   await expect(page).toHaveURL(docsUrl());
-  await expect(page.locator("main h1")).toHaveText("Build spreadsheets you still own.");
+  await expect(page.locator("main h1")).toHaveText("Build web spreadsheets you still own.");
   await expect(page.locator('.sw-sidebar__nav a[href="/docs/"]')).toBeVisible();
 });
 
@@ -51,7 +51,34 @@ test("site root serves the product landing", async ({ page }) => {
   const errors = collectErrors(page);
   const response = await page.goto(siteUrl("/"));
   expect(response?.ok()).toBe(true);
-  await expect(page.locator("main h1")).toHaveText("Build spreadsheets you still own.");
+  await expect(page.locator("main h1")).toHaveText("Build web spreadsheets you still own.");
+  await expect(page).toHaveTitle("Sheetwrite — TypeScript spreadsheet and data grid");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters. Get started.",
+  );
+  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
+    "content",
+    "Sheetwrite spreadsheet grid showing typed web data",
+  );
+  await expect(page.locator('meta[name="twitter:image:alt"]')).toHaveAttribute(
+    "content",
+    "Sheetwrite spreadsheet grid showing typed web data",
+  );
+  const structuredData = await page
+    .locator('script[type="application/ld+json"]')
+    .evaluateAll((scripts) => scripts.map((script) => JSON.parse(script.textContent ?? "null")));
+  expect(structuredData).toHaveLength(1);
+  expect(
+    structuredData[0]?.["@graph"]?.map((entry: { "@type": string }) => entry["@type"]),
+  ).toEqual(["WebSite", "SoftwareSourceCode"]);
+  expect(structuredData[0]?.["@graph"]?.[1]).toMatchObject({
+    codeRepository: "https://github.com/chh-ay/sheetwrite",
+    license: "https://opensource.org/license/mit",
+    programmingLanguage: ["TypeScript", "Rust"],
+    runtimePlatform: ["Web", "WebAssembly"],
+    version: "0.1.0",
+  });
   // Benchmark section publishes real generated numbers, never placeholders.
   const benchStats = page.locator("#benchmarks .sw-bench-stats li");
   await expect(benchStats.first()).toBeVisible();
@@ -481,9 +508,9 @@ test.describe("documentation site", () => {
     test(`documentation landing remains aligned at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 855 });
       await page.goto(siteUrl());
-      await expect(page.locator("main h1")).toHaveText("Build spreadsheets you still own.");
+      await expect(page.locator("main h1")).toHaveText("Build web spreadsheets you still own.");
       await expect(
-        page.getByRole("button", { name: /Copy install command: npm install @sheetwrite\/core/ }),
+        page.getByRole("button", { name: /npm install @sheetwrite\/core Copy install command/ }),
       ).toBeVisible();
       const layout = await page.evaluate(() => {
         const main = document.querySelector<HTMLElement>("main");
