@@ -45,11 +45,11 @@ function artifact(name: string): ReleasePackageArtifact {
 }
 
 describe("bootstrap release workflow", () => {
-  it("removes generated size evidence before enforcing a clean source tree", async () => {
+  it("removes generated evidence before enforcing a clean source tree", async () => {
     const source = await readFile(bootstrapWorkflowPath, "utf8");
     const qualityGate = source.indexOf("bun run verify:release-quality");
     const restore = source.indexOf(
-      "git restore --worktree -- test-results/delivery-size/size-report.json",
+      "git restore --worktree -- test-results/delivery-size/size-report.json docs/src/content/docs/guides/performance-resources.md",
     );
     const cleanGate = source.indexOf('test -z "$(git status --porcelain --untracked-files=all)"');
 
