@@ -271,4 +271,23 @@ describe("documentation generation", () => {
     expect(JSON.parse(none).available).toBe(false);
     expect(none).not.toContain("null");
   });
+
+  it("downgrades to placeholder when 1M hero buckets lack full rounds", () => {
+    const results = [
+      // Valid, comparable full-round pair at 1k - sizes[] stays non-empty.
+      benchResult("sheetwrite", "a", 1, 1_000, 1),
+      benchResult("sheetwrite", "a", 2, 1_000, 1),
+      benchResult("handsontable", "a", 1, 1_000, 10),
+      benchResult("handsontable", "a", 2, 1_000, 10),
+      // 1M: Sheetwrite completes only 1 of 2 rounds per scenario, so hero
+      // stats have no full-round bucket and must not publish NaN-as-null.
+      benchResult("sheetwrite", "a", 1, 1_000_000, 2),
+      benchResult("sheetwrite", "a", 2, 1_000_000, 2, "failed"),
+      benchResult("sheetwrite", "b", 1, 1_000_000, 2),
+      benchResult("sheetwrite", "b", 2, 1_000_000, 2, "failed"),
+    ];
+    const payload = landingBenchPayload({ evidence: benchEvidence(results), source: "x" });
+    expect(JSON.parse(payload).available).toBe(false);
+    expect(payload).not.toContain("null");
+  });
 });
