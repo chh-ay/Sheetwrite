@@ -240,21 +240,6 @@ export interface PaintDamage {
   h: number;
 }
 
-/**
- * Snap scroll offsets to the device-pixel grid. Rasterization then lands on
- * the same subpixel phase every frame, and vertical scroll deltas stay exact
- * device-pixel shifts, so the blit fast path never bails - even at fractional
- * devicePixelRatio (Windows 125%/150%), where raw CSS offsets would strand
- * sub-pixel-shifted stale glyphs and slice row labels.
- */
-export function snapViewportToDevicePixels(viewport: Viewport, dpr: number): Viewport {
-  const snap = (value: number): number => Math.round(value * dpr) / dpr;
-  const scrollTop = snap(viewport.scrollTop);
-  const scrollLeft = snap(viewport.scrollLeft);
-  if (scrollTop === viewport.scrollTop && scrollLeft === viewport.scrollLeft) return viewport;
-  return { ...viewport, scrollTop, scrollLeft };
-}
-
 export function blitVerticalScroll(
   ctx: Ctx,
   canvas: HTMLCanvasElement | OffscreenCanvas,
