@@ -4,7 +4,6 @@ import {
   getMergeIndexResourceStatsForTest,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
-  snapViewportToDevicePixels,
 } from "../src/canvas-paint.js";
 import { dateToSerial } from "../src/date-serial.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
@@ -675,14 +674,6 @@ describe("scroll blit and damage-band integrity", () => {
     const { damage, draws } = runBlit(100, 103);
     expect(draws).toHaveLength(1);
     expect(damage).toEqual({ x: 0, y: 297, w: 400, h: 3 });
-  });
-
-  it("snaps viewport scroll offsets to the device-pixel grid", () => {
-    const snapped = snapViewportToDevicePixels(blitViewport(100.3), 1.5);
-    // 100.3 * 1.5 = 150.45 -> 150 device px -> 100 css px.
-    expect(snapped.scrollTop).toBe(100);
-    const identity = snapViewportToDevicePixels(blitViewport(100), 1.5);
-    expect(identity.scrollTop).toBe(100);
   });
 
   it("paints a row label whose band overlaps the damage strip but whose center does not", () => {

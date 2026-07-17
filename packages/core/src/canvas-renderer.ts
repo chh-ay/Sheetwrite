@@ -1,9 +1,4 @@
-import {
-  blitVerticalScroll,
-  paintFrame,
-  paintFreezeDivider,
-  snapViewportToDevicePixels,
-} from "./canvas-paint.js";
+import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
 import type {
   CellRenderer,
   PanePaint,
@@ -82,18 +77,29 @@ export class CanvasRenderer implements Renderer {
 
   paint(view: VisibleWindowView): void {
     if (!this.ctx || !this.layout || !this.theme) return;
-    const viewport = snapViewportToDevicePixels(this.viewport, this.dpr);
+    const round = Math.round;
+    this.viewport.scrollTop = round(this.viewport.scrollTop * this.dpr) / this.dpr;
+    this.viewport.scrollLeft = round(this.viewport.scrollLeft * this.dpr) / this.dpr;
     const damage = blitVerticalScroll(
       this.ctx,
       this.canvas!,
       this.theme,
       this.lastViewport,
-      viewport,
+      this.viewport,
       this.dpr,
       this.lastDpr,
     );
-    paintFrame(this.ctx, view, this.layout, this.theme, viewport, this.dpr, this.renderers, damage);
-    this.lastViewport = { ...viewport };
+    paintFrame(
+      this.ctx,
+      view,
+      this.layout,
+      this.theme,
+      this.viewport,
+      this.dpr,
+      this.renderers,
+      damage,
+    );
+    this.lastViewport = { ...this.viewport };
     this.lastDpr = this.dpr;
   }
 
