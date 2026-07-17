@@ -103,6 +103,60 @@ describe("ContextMenu", () => {
     grid.destroy();
   });
 
+  it("dispatches every built-in action to its GridActions method", () => {
+    const host = mountHost();
+    const calls: PropertyKey[] = [];
+    const actions = new Proxy(
+      {},
+      {
+        get: (_target, property) => () => {
+          calls.push(property);
+        },
+      },
+    ) as GridActions;
+    const actionMethods = [
+      ["cut", "cut"],
+      ["paste", "paste"],
+      ["clearContents", "clearContents"],
+      ["unmerge", "unmerge"],
+      ["insertRowAbove", "insertRowAbove"],
+      ["deleteRow", "deleteRow"],
+      ["hideRow", "hideRows"],
+      ["showAllRows", "showRows"],
+      ["autoFitRow", "autoFitRows"],
+      ["insertColumnLeft", "insertColumnLeft"],
+      ["insertColumnRight", "insertColumnRight"],
+      ["deleteColumn", "deleteColumn"],
+      ["showAllColumns", "showColumns"],
+      ["autoFitColumn", "autoFitColumns"],
+      ["clearFilter", "clearFilter"],
+      ["exportCsv", "exportCsv"],
+      ["exportXlsx", "exportXlsx"],
+    ] as const;
+    const menu = new ContextMenu(
+      host,
+      {
+        contextMenu: [
+          ...actionMethods.map(([action]) => ({ id: action, action })),
+          { id: "no-op", label: "No operation" },
+        ],
+      },
+      DEFAULT_THEME,
+      actions,
+      {} as Grid,
+    );
+
+    for (const [action] of actionMethods) {
+      menu.open({ cell: null, clientX: 0, clientY: 0 });
+      host.querySelector<HTMLElement>(`[data-context-menu-item="${action}"]`)!.click();
+    }
+    menu.open({ cell: null, clientX: 0, clientY: 0 });
+    host.querySelector<HTMLElement>('[data-context-menu-item="no-op"]')!.click();
+
+    expect(calls).toEqual(actionMethods.map(([, method]) => method));
+    menu.destroy();
+  });
+
   it("passes the opened cell to custom actions and dismisses on outside input", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);

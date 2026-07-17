@@ -352,6 +352,35 @@ describe("comment coordinator", () => {
     coordinator.destroy();
   });
 
+  it("forwards resolve mutations with the current server version", async () => {
+    let request: CommentMutationRequest | undefined;
+    const adapter: CommentAdapter = {
+      async listComments() {
+        return { version: 3, threads: [serverThread({ version: 3 })] };
+      },
+      async mutateComment(input) {
+        request = input;
+        return { status: "conflict", currentVersion: 4 };
+      },
+    };
+    const coordinator = new CommentCoordinator(adapter, {
+      documentId: "collab-doc",
+      serverVersion: 3,
+    });
+
+    await expect(coordinator.resolve("thread-1", true, "comment-resolve")).resolves.toEqual({
+      status: "conflict",
+      currentVersion: 4,
+    });
+    expect(request).toMatchObject({
+      documentId: "collab-doc",
+      baseVersion: 3,
+      clientMutationId: "comment-resolve",
+      mutation: { kind: "resolve", threadId: "thread-1", resolved: true },
+    });
+    coordinator.destroy();
+  });
+
   it("rejects comment responses without server-owned attribution metadata", async () => {
     const adapter: CommentAdapter = {
       async listComments() {

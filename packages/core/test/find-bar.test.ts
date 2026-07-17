@@ -74,6 +74,14 @@ describe("FindBar", () => {
     latest = searchEvents.at(-1)!;
     expect(latest.matches[latest.active]).toEqual({ sheet: "s1", row: 2, col: 0 });
 
+    const buttonMouseDown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.dispatchEvent(buttonMouseDown);
+    expect(buttonMouseDown.defaultPrevented).toBe(true);
+
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-prev")!.click();
+    expect(count.textContent).toBe("1 of 2");
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.click();
+
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
     expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Ada");
@@ -84,10 +92,26 @@ describe("FindBar", () => {
     expect(changes).toBe(1);
     expect(count.textContent).toBe("1 of 1");
 
+    replacement.value = "Lovelace";
+    replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Lovelace");
+
+    input.value = "Grace";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    replacement.value = "All";
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace-all")!.click();
+    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("All");
+
+    replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(bar.isOpen).toBe(false);
+    bar.open();
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-close")!.click();
+    expect(bar.isOpen).toBe(false);
+    bar.open();
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(bar.isOpen).toBe(false);
     expect(document.activeElement).toBe(host);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Lovelace");
 
     bar.destroy();
     grid.destroy();
