@@ -280,7 +280,7 @@ function Landing() {
         <nav aria-label="Footer">
           <a href="/docs/">Documentation</a>
           <a href="/docs/guides/performance-resources/">Benchmarks</a>
-          <a href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
+          <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
         </nav>
       </footer>
     </div>

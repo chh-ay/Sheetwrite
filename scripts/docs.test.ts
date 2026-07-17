@@ -126,7 +126,7 @@ describe("documentation generation", () => {
       const links = [...readme.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]!);
       for (const link of links) {
         expect(link).toMatch(
-          /^https:\/\/(?:sheetwrite\.vercel\.app\/|github\.com\/chh-ay\/Sheetwrite\/)/,
+          /^https:\/\/(?:sheetwrite\.vercel\.app\/|github\.com\/chh-ay\/sheetwrite\/)/,
         );
       }
     }

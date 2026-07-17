@@ -6,12 +6,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chh-ay/Sheetwrite.git",
+    "url": "git+https://github.com/chh-ay/sheetwrite.git",
     "directory": "packages/react"
   },
-  "homepage": "https://chh-ay.github.io/Sheetwrite/",
+  "homepage": "https://sheetwrite.vercel.app/",
   "bugs": {
-    "url": "https://github.com/chh-ay/Sheetwrite/issues"
+    "url": "https://github.com/chh-ay/sheetwrite/issues"
   },
   "keywords": [
     "spreadsheet",

@@ -1,4 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { type ReactNode, useEffect } from "react";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
@@ -20,7 +22,7 @@ const STRUCTURED_DATA = JSON.stringify({
   operatingSystem: "Web",
   description: SITE_DESCRIPTION,
   url: SITE_URL,
-  codeRepository: "https://github.com/chh-ay/Sheetwrite",
+  codeRepository: "https://github.com/chh-ay/sheetwrite",
   license: "https://opensource.org/license/mit",
 });
 
@@ -94,6 +96,8 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       </head>
       <body>
         {children}
+        <Analytics />
+        <SpeedInsights />
         <Scripts />
       </body>
     </html>

@@ -97,11 +97,11 @@ describe("canonical workspace graph", () => {
       };
       expect(manifest.repository).toEqual({
         type: "git",
-        url: "git+https://github.com/chh-ay/Sheetwrite.git",
+        url: "git+https://github.com/chh-ay/sheetwrite.git",
         directory: `packages/${directory}`,
       });
-      expect(manifest.homepage).toBe("https://chh-ay.github.io/Sheetwrite/");
-      expect(manifest.bugs?.url).toBe("https://github.com/chh-ay/Sheetwrite/issues");
+      expect(manifest.homepage).toBe("https://sheetwrite.vercel.app/");
+      expect(manifest.bugs?.url).toBe("https://github.com/chh-ay/sheetwrite/issues");
     }
   });
 

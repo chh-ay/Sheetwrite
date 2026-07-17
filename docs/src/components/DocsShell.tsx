@@ -66,7 +66,7 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
         <Brand />
         <DocsSearch />
         <nav aria-label="Product links" className="sw-docs-header__links">
-          <a href="https://github.com/chh-ay/Sheetwrite">GitHub</a>
+          <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
           <ThemeToggle />
         </nav>
       </header>
@@ -101,7 +101,7 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
         <TableOfContents />
         <footer className="sw-document__footer" data-pagefind-ignore>
           <span>Sheetwrite is MIT licensed.</span>
-          <a href="https://github.com/chh-ay/Sheetwrite/issues">Report a documentation issue</a>
+          <a href="https://github.com/chh-ay/sheetwrite/issues">Report a documentation issue</a>
         </footer>
       </main>
     </div>

@@ -122,7 +122,7 @@ export function ShowcasePage({
           </div>
           <nav aria-label="Example resources">
             <a href={guide}>Read the guide</a>
-            <a href={`https://github.com/chh-ay/Sheetwrite/blob/develop/${sourcePath}`}>
+            <a href={`https://github.com/chh-ay/sheetwrite/blob/develop/${sourcePath}`}>
               View source
             </a>
             <Link to={nextItem.href}>Next: {nextItem.label} →</Link>

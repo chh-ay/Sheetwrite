@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
@@ -51,6 +51,13 @@ function commandOutput(command: readonly [string, ...string[]]): string {
   }
   return result.stdout.toString().trim();
 }
+
+describe("documentation hosting contract", () => {
+  it("keeps deployment Vercel-only", () => {
+    expect(existsSync(resolve(root, ".github/workflows/docs.yml"))).toBeFalse();
+    expect(existsSync(resolve(root, "vercel.json"))).toBeTrue();
+  });
+});
 
 describe("contributor and CI toolchain contract", () => {
   it("pins Bun while preserving the documented consumer engine range", () => {
