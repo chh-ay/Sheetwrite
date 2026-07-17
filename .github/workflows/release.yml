@@ -78,7 +78,7 @@ jobs:
         run: bun run verify:ci
       - name: Build verification-mode canonical artifacts
         run: bun run release:artifacts
-      - name: Run Plan 063 release quality gates
+      - name: Run release quality gates
         run: bun run verify:release-quality
       - name: Verify every canonical artifact consumer
         run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
