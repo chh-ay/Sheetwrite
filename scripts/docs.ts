@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
@@ -9,6 +10,11 @@ import {
   isHighQualityHover,
 } from "../docs/src/lib/sheetwrite-code-hovers.js";
 import { SheetwriteTypeEngine } from "../docs/src/lib/sheetwrite-type-engine.js";
+import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
+import {
+  collectCapabilityIssues,
+  collectMissingCapabilityFiles,
+} from "../docs/src/showcases/capability-validation.js";
 import {
   type ApiEntryPoint,
   type ApiExport,
@@ -74,6 +80,130 @@ const FORBIDDEN_NAMES = [
   "toXlsx(",
   "fromXlsx(",
 ] as const;
+/**
+ * Sheetwrite-owned adapter surface every framework package must document.
+ * `inputs` mirrors `GRID_OPTION_POLICY` plus explicit WASM initialization, and
+ * `vueEvents` mirrors `handlerEvents` in template casing; `docs.test.ts` locks
+ * both mirrors against `@sheetwrite/core/adapter`.
+ */
+export const ADAPTER_DOC_CONTRACT = {
+  packages: ["@sheetwrite/react", "@sheetwrite/svelte", "@sheetwrite/vue"],
+  inputs: [
+    "workbook",
+    "data",
+    "datasource",
+    "datasourceStorage",
+    "renderer",
+    "workerUrl",
+    "renderers",
+    "protectionResolver",
+    "mutationPolicy",
+    "transactionResourceLimits",
+    "theme",
+    "readOnly",
+    "config",
+    "overscan",
+    "minColumns",
+    "wasmSource",
+  ],
+  handlerEvents: [
+    "onGridChange",
+    "onSelectionChange",
+    "onViewportChange",
+    "onEditBegin",
+    "onEditCommit",
+    "onSearch",
+    "onActiveSheetChange",
+    "onReady",
+    "onInitializationError",
+  ],
+  vueEvents: [
+    "grid-change",
+    "selection-change",
+    "viewport-change",
+    "edit-begin",
+    "edit-commit",
+    "search",
+    "active-sheet-change",
+    "ready",
+    "initialization-error",
+  ],
+  readyReasons: ["initial", "input-reset", "renderer-reset"],
+} as const;
+
+/**
+ * Every adapter package must document the canonical advanced inputs, event
+ * surface, and readiness contract through its generated API pages: the
+ * flattened props/emits interfaces must declare each member with source JSDoc,
+ * and the core adapter entry must document exactly the implemented readiness
+ * reasons.
+ */
+export function adapterContractIssues(manifest: PublicApiManifest): string[] {
+  const failures: string[] = [];
+  const exportOf = (packageName: string, name: string): ApiExport | undefined =>
+    manifest.packages
+      .find((pkg) => pkg.name === packageName)
+      ?.entryPoints.find((entry) => entry.subpath === ".")
+      ?.exports.find((item) => item.name === name);
+
+  const requireMembers = (
+    packageName: string,
+    exportName: string,
+    members: readonly string[],
+  ): void => {
+    const item = exportOf(packageName, exportName);
+    if (item === undefined) {
+      failures.push(`${packageName} does not export ${exportName}`);
+      return;
+    }
+    const documented = new Set(item.memberDocs.map((member) => member.name));
+    for (const member of members) {
+      if (
+        !item.signature.includes(`${member}:`) &&
+        !item.signature.includes(`${member}?:`) &&
+        !item.signature.includes(`"${member}":`) &&
+        !item.signature.includes(`"${member}"?:`)
+      ) {
+        failures.push(`${packageName} ${exportName} does not declare ${member}`);
+      } else if (!documented.has(member)) {
+        failures.push(`${packageName} ${exportName} member ${member} has no documentation`);
+      }
+    }
+  };
+
+  for (const packageName of ADAPTER_DOC_CONTRACT.packages) {
+    requireMembers(packageName, "SheetwriteGridProps", ADAPTER_DOC_CONTRACT.inputs);
+    if (packageName === "@sheetwrite/vue") {
+      requireMembers(packageName, "SheetwriteGridEmits", ADAPTER_DOC_CONTRACT.vueEvents);
+    } else {
+      requireMembers(packageName, "SheetwriteGridProps", ADAPTER_DOC_CONTRACT.handlerEvents);
+    }
+    requireMembers(packageName, "GridReadyEvent", ["grid", "generation", "reason"]);
+  }
+
+  const adapterEntry = manifest.packages
+    .find((pkg) => pkg.name === "@sheetwrite/core")
+    ?.entryPoints.find((entry) => entry.subpath === "./adapter");
+  const documentedReasons = new Set<string>();
+  for (const name of ["GridReadyReason", "GridResetReason"]) {
+    const item = adapterEntry?.exports.find((candidate) => candidate.name === name);
+    for (const match of item?.signature.matchAll(/"([a-z-]+)"/g) ?? []) {
+      documentedReasons.add(match[1] ?? "");
+    }
+  }
+  const canonicalReasons: readonly string[] = ADAPTER_DOC_CONTRACT.readyReasons;
+  if (documentedReasons.size === 0) {
+    failures.push("@sheetwrite/core ./adapter does not document GridReadyReason");
+  } else if (
+    canonicalReasons.some((reason) => !documentedReasons.has(reason)) ||
+    [...documentedReasons].some((literal) => !canonicalReasons.includes(literal))
+  ) {
+    failures.push(
+      `GridReadyReason documents [${[...documentedReasons].sort().join(", ")}] but adapters implement [${canonicalReasons.join(", ")}]`,
+    );
+  }
+  return failures;
+}
 
 interface ExpectedFile {
   path: string;
@@ -2091,6 +2221,7 @@ async function checkDocs(
   }
   failures.push(...(await validateMarkdown(documents, manifest)));
   failures.push(...(await unresolvedCssTokens(join(repositoryRoot, "docs/src"))));
+  failures.push(...adapterContractIssues(manifest));
 
   const searchedText = documents.map((document) => document.content).join("\n");
   for (const term of REQUIRED_SEARCH_TERMS) {
@@ -2222,6 +2353,14 @@ export async function verifyDocs(): Promise<void> {
   const analysis = await analyzePublicApi(repositoryRoot);
   const expected = await expectedGeneratedFiles(analysis.manifest);
   const failures = await checkDocs(analysis.manifest, expected, analysis.issues);
+  // The showcase capability contract gates the docs build: a capability
+  // without an owner, route, browser contract, or shared binding must not ship.
+  failures.push(
+    ...collectCapabilityIssues(CAPABILITY_INVENTORY, CAPABILITY_OWNERS),
+    ...collectMissingCapabilityFiles(CAPABILITY_INVENTORY, CAPABILITY_OWNERS, (path) =>
+      existsSync(join(repositoryRoot, path)),
+    ),
+  );
   if (failures.length > 0) throw new Error(failures.join("\n"));
   console.log("Documentation contract check passed");
 }

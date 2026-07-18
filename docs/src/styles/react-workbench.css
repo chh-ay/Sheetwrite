@@ -1,0 +1,243 @@
+/* React analytics workbench — route-scoped chrome for /react/.
+   Everything is prefixed .sw-rwb and rides the shared showcase tokens. */
+
+.sw-rwb__main {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+/* ── Editing row: formula entry, replace, undo/redo ─────────────────────── */
+
+.sw-rwb-editrow {
+  display: flex;
+  min-height: 3rem;
+  gap: var(--sw-demo-space-1);
+  align-items: center;
+  padding: var(--sw-demo-space-1) var(--sw-demo-space-3);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  border-bottom: 1px solid var(--sw-demo-border);
+  background: var(--sw-demo-panel);
+}
+
+.sw-rwb-editrow__address {
+  flex: none;
+  min-width: 5.5rem;
+  padding: 0.375rem var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-deep);
+  color: var(--sw-demo-accent-strong);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sw-rwb-editrow__field {
+  display: flex;
+  flex: none;
+  min-width: 9rem;
+}
+
+.sw-rwb-editrow__field--formula {
+  flex: 1 0 14rem;
+}
+
+.sw-rwb-editrow__field input {
+  width: 100%;
+  min-height: 2rem;
+  padding-inline: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg);
+  font: 500 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  outline: 0;
+}
+
+.sw-rwb-editrow__field input:focus-visible {
+  border-color: var(--sw-demo-accent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-demo-accent) 42%, transparent);
+}
+
+.sw-rwb-editrow__field input:disabled {
+  opacity: 0.45;
+}
+
+/* DemoButton has no global skin; align it with the control row instruments. */
+.sw-rwb .sw-demo-button {
+  min-height: 2rem;
+  padding-inline: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg-soft);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sw-rwb .sw-demo-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 54%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-accent) 10%, var(--sw-demo-surface));
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-rwb .sw-demo-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sw-rwb .sw-demo-button[aria-pressed="true"] {
+  border-color: var(--sw-demo-accent);
+  background: color-mix(in srgb, var(--sw-demo-accent) 18%, var(--sw-demo-surface));
+  color: var(--sw-demo-accent-strong);
+}
+
+/* ── Deck: derived summaries + data workflow ────────────────────────────── */
+
+.sw-rwb-deck {
+  display: grid;
+  gap: var(--sw-demo-space-2);
+  padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
+  border-top: 1px solid var(--sw-demo-border);
+  background: var(--sw-demo-raised);
+}
+
+.sw-rwb-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--sw-demo-space-2);
+  margin: 0;
+}
+
+.sw-rwb-kpi {
+  display: grid;
+  gap: 0.25rem;
+  padding: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+}
+
+.sw-rwb-kpi[data-focused="true"] {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 54%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-accent) 8%, var(--sw-demo-surface));
+}
+
+.sw-rwb-kpi dt {
+  color: var(--sw-demo-muted);
+  font: 600 var(--sw-type-xs) / 1.1 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sw-rwb-kpi dd {
+  margin: 0;
+  color: var(--sw-demo-fg-strong);
+  font: 650 var(--sw-type-sm) / 1.1 var(--sw-font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-rwb-workflow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-demo-space-1);
+  align-items: center;
+}
+
+/* File input stays real (focusable, label-activated) but paints as a button. */
+.sw-rwb-workflow__import {
+  position: relative;
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  padding-inline: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg-soft);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sw-rwb-workflow__import input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.sw-rwb-workflow__import:hover,
+.sw-rwb-workflow__import:focus-within {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 54%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-accent) 10%, var(--sw-demo-surface));
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-rwb-workflow__import:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sw-rwb-workflow__link {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  padding-inline: var(--sw-demo-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--sw-demo-radius-1);
+  color: var(--sw-demo-accent-strong);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  white-space: nowrap;
+}
+
+.sw-rwb-workflow__link:hover {
+  background: color-mix(in srgb, var(--sw-demo-accent) 10%, transparent);
+}
+
+.sw-rwb-lifecycle {
+  margin-inline-start: auto;
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  padding-inline: var(--sw-demo-space-2);
+  border: 1px solid color-mix(in srgb, var(--sw-demo-accent) 34%, var(--sw-demo-border));
+  border-radius: var(--sw-demo-radius-1);
+  background: color-mix(in srgb, var(--sw-demo-accent) 8%, var(--sw-demo-deep));
+  color: var(--sw-demo-accent-strong);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  white-space: pre-wrap;
+}
+
+/* ── Small screens ──────────────────────────────────────────────────────── */
+
+@media (max-width: 48rem) {
+  .sw-rwb-editrow {
+    padding-inline: var(--sw-demo-space-2);
+  }
+
+  .sw-rwb-editrow__field--formula {
+    flex-basis: 10rem;
+  }
+
+  .sw-rwb-deck {
+    padding-inline: var(--sw-demo-space-2);
+  }
+
+  .sw-rwb-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sw-rwb-lifecycle {
+    margin-inline-start: 0;
+  }
+}

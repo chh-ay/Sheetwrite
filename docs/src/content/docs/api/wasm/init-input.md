@@ -9,7 +9,7 @@ Sources accepted by asynchronous initialization: a fetchable URL/request/respons
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L295</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L305</code></dd></div>
 </dl>
 
 ## Declaration

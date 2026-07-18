@@ -1,15 +1,17 @@
 ---
 title: "downloadBytes | @sheetwrite/core"
-description: "Browser-only download helper; throws in non-DOM runtimes."
+description: "Trigger a browser download from in-memory bytes."
 ---
 <!-- api-export:@sheetwrite/core|.|downloadBytes -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
-Browser-only download helper; throws in non-DOM runtimes.
+Trigger a browser download from in-memory bytes. The temporary anchor is
+removed and its object URL is scheduled for revocation even when DOM append or
+click throws.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L204</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L182</code></dd></div>
 </dl>
 
 ## Declaration

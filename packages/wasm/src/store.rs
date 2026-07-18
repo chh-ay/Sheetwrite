@@ -8,13 +8,41 @@ use wasm_bindgen::prelude::*;
 use crate::calc::{parse, resolve_named_ranges, resolve_sheet_refs, shift_range, NamedRangeRef};
 use crate::eval::DepIndex;
 use crate::sheet::{
-    formula_error_at, payload_num, payload_str_id, CondPred, CondRule, SheetData,
-    DEFAULT_PAGE_CHUNK_ROWS,
+    encode_num, encode_str_id, formula_error_at, payload_num, payload_str_id, CondPred, CondRule,
+    SheetData, DEFAULT_PAGE_CHUNK_ROWS,
 };
 use crate::types::{
     cell_key, string_from_pool, FormulaEntry, FormulaError, FormulaValueKind, StringPool,
     KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
+
+fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
+    let mut slices = Vec::with_capacity(limit);
+    if buf.is_ascii() {
+        let mut start = 0usize;
+        for &len in utf16_lens.iter().take(limit) {
+            let end = (start + len as usize).min(buf.len());
+            slices.push(&buf[start..end]);
+            start = end;
+        }
+        return slices;
+    }
+
+    let mut chars = buf.char_indices().peekable();
+    for &len in utf16_lens.iter().take(limit) {
+        let start = chars.peek().map_or(buf.len(), |&(idx, _)| idx);
+        let mut units = 0u32;
+        while units < len {
+            let Some((_, ch)) = chars.next() else {
+                break;
+            };
+            units += ch.len_utf16() as u32;
+        }
+        let end = chars.peek().map_or(buf.len(), |&(idx, _)| idx);
+        slices.push(&buf[start..end]);
+    }
+    slices
+}
 
 pub(crate) enum InternSlot {
     One(u32),
@@ -160,11 +188,10 @@ impl CellStore {
     /// Allocate a sheet grid and return its numeric handle.
     #[wasm_bindgen(js_name = addSheet)]
     pub fn add_sheet(&mut self, n_cols: usize, row_count: usize) -> usize {
-        let index = self.sheets.len();
-        self.sheets.push(SheetData::new(n_cols, row_count));
-        self.sheet_names.push(String::new());
-        self.sheet_alive.push(true);
-        index
+        match self.try_add_sheet(n_cols, row_count) {
+            Ok(index) => index,
+            Err(error) => wasm_bindgen::throw_str(&error),
+        }
     }
 
     /// Allocate a logical sheet whose cell chunks materialize on page load or edit.
@@ -902,6 +929,116 @@ impl CellStore {
         true
     }
 
+    /// Hydrate one datasource page column while retaining local dirty cells and
+    /// request-revision exceptions. `protected_offsets` is sorted and relative
+    /// to `start_row`.
+    #[wasm_bindgen(js_name = hydratePageNumbers)]
+    pub fn hydrate_page_numbers(
+        &mut self,
+        sheet: usize,
+        col: usize,
+        start_row: usize,
+        values: &[f64],
+        style: u32,
+        protected_offsets: &[u32],
+    ) {
+        let Some(existing) = self.sheets.get(sheet) else {
+            return;
+        };
+        if col >= existing.n_cols || start_row >= existing.row_count {
+            return;
+        }
+
+        let limit = values.len().min(existing.row_count - start_row);
+        let mut protected_index = 0usize;
+        let mut removed_formula = false;
+        let mut wrote = false;
+        let s = &mut self.sheets[sheet];
+        for (offset, &value) in values.iter().take(limit).enumerate() {
+            while protected_offsets
+                .get(protected_index)
+                .is_some_and(|protected| *protected < offset as u32)
+            {
+                protected_index += 1;
+            }
+            if protected_offsets.get(protected_index) == Some(&(offset as u32)) {
+                continue;
+            }
+            let row = start_row + offset;
+            let Some(key) = cell_key(row, col) else {
+                continue;
+            };
+            if !s.hydrate_cell(row, col, KIND_NUMBER, encode_num(value), style) {
+                continue;
+            }
+            removed_formula |= s.formulas.remove(&key).is_some();
+            wrote = true;
+        }
+        if wrote {
+            s.all_dirty = true;
+        }
+        if removed_formula {
+            self.bump_formula_epoch();
+        }
+    }
+
+    /// Packed-string counterpart to [`CellStore::hydrate_page_numbers`].
+    #[wasm_bindgen(js_name = hydratePageStringsPacked)]
+    pub fn hydrate_page_strings_packed(
+        &mut self,
+        sheet: usize,
+        col: usize,
+        start_row: usize,
+        buf: String,
+        utf16_lens: &[u32],
+        style: u32,
+        protected_offsets: &[u32],
+    ) {
+        let Some(existing) = self.sheets.get(sheet) else {
+            return;
+        };
+        if col >= existing.n_cols || start_row >= existing.row_count {
+            return;
+        }
+
+        let limit = utf16_lens.len().min(existing.row_count - start_row);
+        let slices = utf16_slices(&buf, utf16_lens, limit);
+        let mut protected_index = 0usize;
+        let mut removed_formula = false;
+        let mut wrote = false;
+        for (offset, text) in slices.into_iter().enumerate() {
+            while protected_offsets
+                .get(protected_index)
+                .is_some_and(|protected| *protected < offset as u32)
+            {
+                protected_index += 1;
+            }
+            if protected_offsets.get(protected_index) == Some(&(offset as u32)) {
+                continue;
+            }
+            let row = start_row + offset;
+            let Some(key) = cell_key(row, col) else {
+                continue;
+            };
+            if self.sheets[sheet].is_cell_dirty(row, col) {
+                continue;
+            }
+            let id = self.intern(text);
+            let s = &mut self.sheets[sheet];
+            if !s.hydrate_cell(row, col, KIND_STRING, encode_str_id(id), style) {
+                continue;
+            }
+            removed_formula |= s.formulas.remove(&key).is_some();
+            wrote = true;
+        }
+        if wrote {
+            self.sheets[sheet].all_dirty = true;
+        }
+        if removed_formula {
+            self.bump_formula_epoch();
+        }
+    }
+
     /// Bulk-load one column with numbers starting at `start_row`.
     #[wasm_bindgen(js_name = setColumnNumbers)]
     pub fn set_column_numbers(
@@ -1017,32 +1154,7 @@ impl CellStore {
         let limit = utf16_lens.len().min(row_count - start_row);
         let base = col * row_count;
 
-        // Split the buffer into per-row slices. ASCII text (the overwhelmingly
-        // common case) maps one UTF-16 unit to one byte, so slicing is direct;
-        // otherwise one linear char walk converts unit counts to byte offsets.
-        let mut slices: Vec<&str> = Vec::with_capacity(limit);
-        if buf.is_ascii() {
-            let mut start = 0usize;
-            for &len in utf16_lens.iter().take(limit) {
-                let end = (start + len as usize).min(buf.len());
-                slices.push(&buf[start..end]);
-                start = end;
-            }
-        } else {
-            let mut chars = buf.char_indices().peekable();
-            for &len in utf16_lens.iter().take(limit) {
-                let start = chars.peek().map_or(buf.len(), |&(idx, _)| idx);
-                let mut units = 0u32;
-                while units < len {
-                    let Some((_, ch)) = chars.next() else {
-                        break;
-                    };
-                    units += ch.len_utf16() as u32;
-                }
-                let end = chars.peek().map_or(buf.len(), |&(idx, _)| idx);
-                slices.push(&buf[start..end]);
-            }
-        }
+        let slices = utf16_slices(&buf, utf16_lens, limit);
 
         let mut removed_formula = false;
         for (offset, text) in slices.iter().enumerate() {
@@ -1368,6 +1480,19 @@ impl Default for CellStore {
 }
 
 impl CellStore {
+    pub(crate) fn try_add_sheet(
+        &mut self,
+        n_cols: usize,
+        row_count: usize,
+    ) -> Result<usize, String> {
+        let sheet = SheetData::try_new(n_cols, row_count)?;
+        let index = self.sheets.len();
+        self.sheets.push(sheet);
+        self.sheet_names.push(String::new());
+        self.sheet_alive.push(true);
+        Ok(index)
+    }
+
     pub(crate) fn intern(&mut self, s: &str) -> u32 {
         let hash = string_hash(s);
         if let Some(slot) = self.string_lookup.get(&hash) {

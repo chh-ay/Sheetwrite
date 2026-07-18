@@ -21,6 +21,12 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, "IDBKeyRange");
 });
 
+const LOAD_OPTIONS = {
+  maxRecords: 256,
+  maxOperations: 40_000,
+  maxBytes: 32 * 1024 * 1024,
+} as const;
+
 function commit(documentId: string, clientMutationId: string, value: string): PendingCommit {
   return {
     documentId,
@@ -177,23 +183,130 @@ describe("IndexedDbPendingCommitStorage", () => {
     };
     await storage.put(commit("document-a", "mutation-a", "updated"));
 
-    expect((await storage.load("document-a")).map((item) => item.clientMutationId)).toEqual([
-      "mutation-a",
-      "mutation-b",
-    ]);
-    expect(await storage.load("document-a")).toMatchObject([
+    expect(
+      (await storage.load("document-a", LOAD_OPTIONS)).map((item) => item.clientMutationId),
+    ).toEqual(["mutation-a", "mutation-b"]);
+    expect(await storage.load("document-a", LOAD_OPTIONS)).toMatchObject([
       { operations: [{ value: { value: "updated" } }] },
       { operations: [{ value: { value: "second" } }] },
     ]);
-    expect(await storage.load("document-b")).toHaveLength(1);
+    expect(await storage.load("document-b", LOAD_OPTIONS)).toHaveLength(1);
 
     await storage.remove("document-a", "mutation-a");
-    expect((await storage.load("document-a")).map((item) => item.clientMutationId)).toEqual([
-      "mutation-b",
-    ]);
+    expect(
+      (await storage.load("document-a", LOAD_OPTIONS)).map((item) => item.clientMutationId),
+    ).toEqual(["mutation-b"]);
     storage.close();
-    expect((await storage.load("document-a")).map((item) => item.clientMutationId)).toEqual([
-      "mutation-b",
+    expect(
+      (await storage.load("document-a", LOAD_OPTIONS)).map((item) => item.clientMutationId),
+    ).toEqual(["mutation-b"]);
+    storage.close();
+  });
+
+  it("reopens more than 256 pending commits in insertion order", async () => {
+    const databaseName = "large-offline-queue";
+    const storage = new IndexedDbPendingCommitStorage({ databaseName });
+    const ids = Array.from(
+      { length: 300 },
+      (_, index) => `mutation-${String(index).padStart(3, "0")}`,
+    );
+    for (const id of ids) await storage.put(commit("document-a", id, id));
+    storage.close();
+
+    const reopened = new IndexedDbPendingCommitStorage({ databaseName });
+    const loaded = await reopened.load("document-a", {
+      maxRecords: 10_000,
+      maxOperations: 100_000,
+      maxBytes: 128 * 1024 * 1024,
+    });
+    expect(loaded.map((item) => item.clientMutationId)).toEqual(ids);
+    expect(loaded).toHaveLength(300);
+    reopened.close();
+  });
+
+  it("enforces cursor load bounds at the exact record, operation, and byte boundary", async () => {
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: "bounded-cursor" });
+    const first = commit("document-a", "mutation-a", "first");
+    const second = commit("document-a", "mutation-b", "second");
+    await storage.put(first);
+    await storage.put(second);
+    const bytes =
+      new TextEncoder().encode(JSON.stringify(first.operations)).byteLength +
+      new TextEncoder().encode(JSON.stringify(second.operations)).byteLength;
+
+    await expect(
+      storage.load("document-a", {
+        maxRecords: 2,
+        maxOperations: 2,
+        maxBytes: bytes,
+      }),
+    ).resolves.toHaveLength(2);
+    for (const options of [
+      { maxRecords: 1, maxOperations: 2, maxBytes: bytes },
+      { maxRecords: 2, maxOperations: 1, maxBytes: bytes },
+      { maxRecords: 2, maxOperations: 2, maxBytes: bytes - 1 },
+    ]) {
+      await expect(storage.load("document-a", options)).rejects.toMatchObject({
+        code: "limit",
+      });
+    }
+    expect(await storedRecords("bounded-cursor")).toHaveLength(2);
+    await expect(
+      storage.load("document-a", {
+        maxRecords: 2,
+        maxOperations: 2,
+        maxBytes: bytes,
+      }),
+    ).resolves.toHaveLength(2);
+    storage.close();
+  });
+
+  it("loads through ordered cursors without calling getAll", async () => {
+    const databaseName = "cursor-only";
+    const storage = new IndexedDbPendingCommitStorage({ databaseName });
+    await storage.put(commit("document-a", "mutation-a", "first"));
+    const probe = await requestResult(indexedDB.open(databaseName));
+    const transaction = probe.transaction("pending-commits", "readonly");
+    const prototype = Object.getPrototypeOf(transaction.objectStore("pending-commits")) as {
+      getAll: IDBObjectStore["getAll"];
+    };
+    const originalGetAll = prototype.getAll;
+    prototype.getAll = () => {
+      throw new Error("getAll must not be used by pending queue load");
+    };
+    await transactionDone(transaction);
+    probe.close();
+
+    try {
+      await expect(storage.load("document-a", LOAD_OPTIONS)).resolves.toHaveLength(1);
+    } finally {
+      prototype.getAll = originalGetAll;
+      storage.close();
+    }
+  });
+
+  it("atomically replaces only the expected ordered queue", async () => {
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: "atomic-replace" });
+    const first = commit("document-a", "mutation-a", "first");
+    const second = commit("document-a", "mutation-b", "second");
+    await storage.put(first);
+    await storage.put(second);
+    const replacements = [
+      { ...first, baseVersion: 10 },
+      { ...second, baseVersion: 11 },
+    ];
+
+    await storage.replace("document-a", ["mutation-a", "mutation-b"], replacements);
+    expect(await storage.load("document-a", LOAD_OPTIONS)).toMatchObject([
+      { clientMutationId: "mutation-a", baseVersion: 10 },
+      { clientMutationId: "mutation-b", baseVersion: 11 },
+    ]);
+    await expect(
+      storage.replace("document-a", ["mutation-b"], [{ ...second, baseVersion: 20 }]),
+    ).rejects.toMatchObject({ code: "conflict" });
+    expect(await storage.load("document-a", LOAD_OPTIONS)).toMatchObject([
+      { clientMutationId: "mutation-a", baseVersion: 10 },
+      { clientMutationId: "mutation-b", baseVersion: 11 },
     ]);
     storage.close();
   });
@@ -209,19 +322,21 @@ describe("IndexedDbPendingCommitStorage", () => {
       {
         documentId: "document-a",
         clientMutationId: "legacy-a",
-        baseVersion: 1,
+        baseVersion: 3,
         operations: commit("document-a", "legacy-a", "first").operations,
       },
       {
         documentId: "document-a",
         clientMutationId: "legacy-b",
-        baseVersion: 1,
+        baseVersion: 2,
         operations: commit("document-a", "legacy-b", "second").operations,
       },
     ]);
     const migrating = new IndexedDbPendingCommitStorage({ databaseName: "legacy-queue" });
-    const migratedOrder = (await migrating.load("document-a")).map((item) => item.clientMutationId);
-    expect(migratedOrder).toEqual(["legacy-a", "legacy-b", "legacy-c"]);
+    const migratedOrder = (await migrating.load("document-a", LOAD_OPTIONS)).map(
+      (item) => item.clientMutationId,
+    );
+    expect(migratedOrder).toEqual(["legacy-c", "legacy-b", "legacy-a"]);
     migrating.close();
 
     const persisted = await storedRecords("legacy-queue");
@@ -233,13 +348,13 @@ describe("IndexedDbPendingCommitStorage", () => {
     ).toEqual([1, 2, 3]);
 
     const reopened = new IndexedDbPendingCommitStorage({ databaseName: "legacy-queue" });
-    expect((await reopened.load("document-a")).map((item) => item.clientMutationId)).toEqual(
-      migratedOrder,
-    );
-    expect(await reopened.load("document-a")).toMatchObject([
-      { operations: [{ value: { value: "first" } }] },
-      { operations: [{ value: { value: "second" } }] },
+    expect(
+      (await reopened.load("document-a", LOAD_OPTIONS)).map((item) => item.clientMutationId),
+    ).toEqual(migratedOrder);
+    expect(await reopened.load("document-a", LOAD_OPTIONS)).toMatchObject([
       { operations: [{ value: { value: "third" } }] },
+      { operations: [{ value: { value: "second" } }] },
+      { operations: [{ value: { value: "first" } }] },
     ]);
     reopened.close();
   });
@@ -256,7 +371,9 @@ describe("IndexedDbPendingCommitStorage", () => {
       },
     ]);
     const future = new IndexedDbPendingCommitStorage({ databaseName: "future-queue" });
-    await expect(future.load("document-a")).rejects.toMatchObject({ code: "unsupported-schema" });
+    await expect(future.load("document-a", LOAD_OPTIONS)).rejects.toMatchObject({
+      code: "unsupported-schema",
+    });
     future.close();
   });
 
@@ -307,7 +424,7 @@ describe("IndexedDbPendingCommitStorage", () => {
     });
 
     Reflect.deleteProperty(globalThis, "indexedDB");
-    await expect(storage.load("document-a")).rejects.toEqual(
+    await expect(storage.load("document-a", LOAD_OPTIONS)).rejects.toEqual(
       new IndexedDbPendingCommitStorageError(
         "unavailable",
         "IndexedDB is unavailable; use a host PendingCommitStorage adapter",
@@ -318,7 +435,7 @@ describe("IndexedDbPendingCommitStorage", () => {
   it("closes a blocked attempt's late database and permits a retry", async () => {
     const factory = installControlledFactory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "blocked-open" });
-    const blockedLoad = storage.load("document-a");
+    const blockedLoad = storage.load("document-a", LOAD_OPTIONS);
     const blockedRequest = factory.requests[0]!;
     blockedRequest.blocked();
     await expect(blockedLoad).rejects.toMatchObject({ code: "blocked" });
@@ -328,7 +445,7 @@ describe("IndexedDbPendingCommitStorage", () => {
     await Promise.resolve();
     expect(lateDatabase.closeCalls).toBe(1);
 
-    const retry = storage.load("document-a");
+    const retry = storage.load("document-a", LOAD_OPTIONS);
     expect(factory.requests).toHaveLength(2);
     factory.requests[1]!.failed("retry failure");
     await expect(retry).rejects.toMatchObject({
@@ -341,11 +458,11 @@ describe("IndexedDbPendingCommitStorage", () => {
   it("clears a failed open so the next operation starts a fresh attempt", async () => {
     const factory = installControlledFactory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "retry-open" });
-    const first = storage.load("document-a");
+    const first = storage.load("document-a", LOAD_OPTIONS);
     factory.requests[0]!.failed();
     await expect(first).rejects.toMatchObject({ code: "transaction" });
 
-    const second = storage.load("document-a");
+    const second = storage.load("document-a", LOAD_OPTIONS);
     expect(factory.requests).toHaveLength(2);
     factory.requests[1]!.failed("second failure");
     await expect(second).rejects.toMatchObject({ code: "transaction" });
@@ -355,7 +472,7 @@ describe("IndexedDbPendingCommitStorage", () => {
   it("rejects close during open and closes a database delivered afterward", async () => {
     const factory = installControlledFactory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "close-during-open" });
-    const load = storage.load("document-a");
+    const load = storage.load("document-a", LOAD_OPTIONS);
     const request = factory.requests[0]!;
     storage.close();
     const lateDatabase = new ControlledDatabase();
@@ -368,7 +485,7 @@ describe("IndexedDbPendingCommitStorage", () => {
   it("consumes close after rejection without retaining a late connection", async () => {
     const factory = installControlledFactory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "close-after-rejection" });
-    const load = storage.load("document-a");
+    const load = storage.load("document-a", LOAD_OPTIONS);
     const request = factory.requests[0]!;
     request.blocked();
     await expect(load).rejects.toMatchObject({ code: "blocked" });
@@ -383,14 +500,14 @@ describe("IndexedDbPendingCommitStorage", () => {
   it("drops a versionchanged connection and successfully starts a replacement open", async () => {
     const factory = installControlledFactory();
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "versionchange-open" });
-    const firstLoad = storage.load("document-a");
+    const firstLoad = storage.load("document-a", LOAD_OPTIONS);
     const firstDatabase = new ControlledDatabase();
     factory.requests[0]!.succeeded(firstDatabase);
     await expect(firstLoad).rejects.toThrow("controlled database transaction");
 
     firstDatabase.versionchange();
     expect(firstDatabase.closeCalls).toBe(1);
-    const reopenedLoad = storage.load("document-a");
+    const reopenedLoad = storage.load("document-a", LOAD_OPTIONS);
     expect(factory.requests).toHaveLength(2);
     const replacement = new ControlledDatabase();
     factory.requests[1]!.succeeded(replacement);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
+import { assertReviewedActionPins, parseWorkflowContract } from "./workflow-contract.js";
 import {
   BUN_VERSION,
   CARGO_AUDIT_VERSION,
@@ -19,36 +20,12 @@ const packageManifest = JSON.parse(readFileSync(resolve(root, "package.json"), "
 };
 const rustToolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
-const parsedWorkflow = Bun.YAML.parse(workflow) as {
-  jobs?: Record<
-    string,
-    {
-      name?: string;
-      if?: string;
-      outputs?: Record<string, string>;
-      needs?: string | string[];
-      "timeout-minutes"?: number;
-      steps?: Array<{
-        id?: string;
-        run?: string;
-        uses?: string;
-        with?: Record<string, unknown>;
-      }>;
-    }
-  >;
-};
+const parsedWorkflow = parseWorkflowContract(workflow, "CI workflow");
 const nodeVersion = readFileSync(resolve(root, ".node-version"), "utf8").trim();
+const WORKFLOW_BUN_VERSION = "$" + "{{ env.BUN_VERSION }}";
+const WORKFLOW_NODE_VERSION = "$" + "{{ env.NODE_VERSION }}";
 const sizeBudget = JSON.parse(readFileSync(resolve(root, "scripts/size-budgets.json"), "utf8")) as {
   readonly toolchain?: Readonly<Record<string, string>>;
-};
-
-const EXPECTED_ACTION_PINS: Readonly<Record<string, string>> = {
-  "actions/checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
-  "actions/setup-node": "249970729cb0ef3589644e2896645e5dc5ba9c38",
-  "oven-sh/setup-bun": "735343b667d3e6f658f44d0eca948eb6282f2b76",
-  "actions/upload-artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02",
-  "actions/download-artifact": "634f93cb2916e3fdff6788551b99b062d0335ce0",
-  "actions/cache": "0057852bfaa89a56745cba8c7296529d2fc39830",
 };
 
 function commandOutput(command: readonly [string, ...string[]]): string {
@@ -71,7 +48,7 @@ describe("contributor and CI toolchain contract", () => {
     expect(packageManifest.packageManager).toBe(`bun@${BUN_VERSION}`);
     expect(packageManifest.engines?.bun).toBe(">=1.3.0");
     expect(workflow).toContain(`BUN_VERSION: "${BUN_VERSION}"`);
-    expect(workflow).toContain(`bun-version: ${BUN_VERSION}`);
+    expect(workflow).toContain(`bun-version: ${WORKFLOW_BUN_VERSION}`);
   });
 
   it("pins Node and npm as exact release inputs", () => {
@@ -79,8 +56,8 @@ describe("contributor and CI toolchain contract", () => {
     expect(packageManifest.engines?.node).toBe(">=24.3.0 <25");
     expect(workflow).toContain(`NODE_VERSION: "${NODE_VERSION}"`);
     expect(workflow).toContain(`NPM_VERSION: "${NPM_VERSION}"`);
-    expect(workflow).toContain(`node-version: ${NODE_VERSION}`);
-    expect(workflow).toContain(`npm install --global npm@${NPM_VERSION}`);
+    expect(workflow).toContain(`node-version: ${WORKFLOW_NODE_VERSION}`);
+    expect(workflow).toContain('npm install --global "npm@$NPM_VERSION"');
     expect(workflow).toContain('test "$(node --version)" = "v$NODE_VERSION"');
     expect(workflow).toContain('test "$(npm --version)" = "$NPM_VERSION"');
     expect(sizeBudget.toolchain?.node).toBe(NODE_VERSION);
@@ -103,18 +80,9 @@ describe("contributor and CI toolchain contract", () => {
   });
 
   it("pins every third-party action to its reviewed immutable commit", () => {
-    const uses = [...workflow.matchAll(/^\s*uses:\s*([^@\s]+)@([^\s#]+)/gm)];
-    expect(uses.length).toBeGreaterThan(0);
-    for (const match of uses) {
-      const action = match[1];
-      const reference = match[2];
-      expect(action).toBeDefined();
-      expect(reference).toMatch(/^[0-9a-f]{40}$/);
-      expect(reference).toBe(EXPECTED_ACTION_PINS[action!]);
-    }
-    expect(new Set(uses.map((match) => match[1]))).toEqual(
-      new Set(Object.keys(EXPECTED_ACTION_PINS)),
-    );
+    expect(() =>
+      assertReviewedActionPins([{ name: "CI", workflow: parsedWorkflow }]),
+    ).not.toThrow();
     expect(workflow).not.toMatch(
       /(?:bun-version|NODE_VERSION|NPM_VERSION|RUST_VERSION|WASM_PACK_VERSION):\s*(?:latest|stable)\b/,
     );
@@ -124,7 +92,7 @@ describe("contributor and CI toolchain contract", () => {
     const jobs = parsedWorkflow.jobs ?? {};
     const needsOf = (name: string): readonly string[] => {
       const needs = jobs[name]?.needs;
-      return Array.isArray(needs) ? needs : needs ? [needs] : [];
+      return typeof needs === "string" ? [needs] : (needs ?? []);
     };
     const dependsOn = (name: string, dependency: string, seen = new Set<string>()): boolean => {
       if (seen.has(name)) return false;
@@ -160,9 +128,11 @@ describe("contributor and CI toolchain contract", () => {
 
     const npmInstalls = Object.keys(jobs)
       .flatMap(commandsFor)
-      .filter((command) => command.includes("npm install --global npm@"));
+      .filter((command) => command.includes("npm install --global"));
     expect(npmInstalls.length).toBeGreaterThan(0);
-    expect(npmInstalls.every((command) => command.includes(`npm@${NPM_VERSION}`))).toBeTrue();
+    expect(
+      npmInstalls.every((command) => command.includes('npm install --global "npm@$NPM_VERSION"')),
+    ).toBeTrue();
 
     for (const job of Object.values(jobs)) {
       expect(job["timeout-minutes"]).toBeGreaterThan(0);

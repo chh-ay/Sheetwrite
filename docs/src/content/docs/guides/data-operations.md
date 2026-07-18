@@ -190,20 +190,22 @@ downloadBytes(
 | Function | Signature |
 | --- | --- |
 | `fromCsv` | `fromCsv(text: string, columns: readonly Column[]): ColumnarData` |
-| `fromXlsxTable` | `(data: ArrayBuffer \| Uint8Array) => Promise<ColumnarData>` |
+| `fromXlsxTable` | `(data: ArrayBuffer \| Uint8Array, options?: XlsxWorkbookOptions) => Promise<ColumnarData>` |
 | `fromXlsxWorkbook` | `(data: ArrayBuffer \| Uint8Array, options?: XlsxWorkbookOptions) => Promise<WorkbookSnapshot>` |
 | `toCsv` | `toCsv(sheet: Sheet, store: Store): string` |
 | `toTsv` | `toTsv(range: Range, store: Store): string` |
-| `toXlsxTable` | `(workbook: Workbook, store: Store) => Promise<Uint8Array>` |
+| `toXlsxTable` | `(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions) => Promise<Uint8Array>` |
 | `toXlsxWorkbook` | `(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions) => Promise<Uint8Array>` |
 | `downloadBytes` | `downloadBytes(bytes: Uint8Array \| string, filename: string, mime: string): void` |
 
-`XlsxWorkbookOptions.maxCells` defaults to `1_000_000` populated cells. Export
-checks the bound before constructing the ExcelJS workbook; import checks it
-while converting parsed worksheets into a snapshot. `signal` is checked before
-and after parsing/serialization and between worksheets. ExcelJS itself does not
-offer mid-`load` or mid-`writeBuffer` cancellation, so hosts accepting untrusted
-files should also enforce a compressed input-byte limit before calling import.
+`XlsxWorkbookOptions` is the shared resource contract for every table and
+workbook path. `maxCells` bounds logical accepted cells and defaults to
+`1_000_000`; `resourceLimits` overrides the remaining input, archive, XML,
+dimension, and output budgets, which are checked before decompression and
+allocation and reject with a typed `XlsxResourceError`. `signal` is checked
+between bounded codec stages, and structured warnings surface through
+`onWarning`. Both directions materialize the complete file representation in
+memory; there is no streaming mode.
 
 ### XLSX compatibility
 
@@ -234,8 +236,8 @@ snapshot.
 XLSX uses pluggable backends. Calling a table or workbook API without its
 backend throws a configuration error that names both remedies: install
 `@sheetwrite/xlsx`, then import `@sheetwrite/xlsx/register` before calling the
-function. The ordinary core entry does not resolve ExcelJS, `read-excel-file`,
-or `write-excel-file`.
+function. The ordinary core entry never resolves the optional codec, so normal
+grid bundles carry no spreadsheet-file code.
 
 `@sheetwrite/xlsx` is the only concrete implementation package. Its root entry
 is side-effect free and exports `registerXlsxBackends()` plus the three named
@@ -244,10 +246,10 @@ entry performs idempotent registration:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 import {
-  excelJsWorkbookBackend,
-  readExcelFileTableImportBackend,
   registerXlsxBackends,
-  writeExcelFileTableExportBackend,
+  sheetwriteTableExportBackend,
+  sheetwriteTableImportBackend,
+  sheetwriteWorkbookBackend,
 } from "@sheetwrite/xlsx";
 import {
   setXlsxTableExportBackend,
@@ -260,16 +262,18 @@ import {
 
 registerXlsxBackends();
 
-// Or compose individual concrete backends explicitly.
-setXlsxTableExportBackend(writeExcelFileTableExportBackend);
-setXlsxTableImportBackend(readExcelFileTableImportBackend);
-setXlsxWorkbookBackend(excelJsWorkbookBackend);
+// Or compose individual backends explicitly.
+setXlsxTableExportBackend(sheetwriteTableExportBackend);
+setXlsxTableImportBackend(sheetwriteTableImportBackend);
+setXlsxWorkbookBackend(sheetwriteWorkbookBackend);
 ```
 
-The workbook backend is ExcelJS 4.4 under its MIT license. Its browser-capable
-implementation preserves formula source, worksheets, styles, merges,
-dimensions, frozen views, and named ranges. The host can replace it by
-implementing `XlsxWorkbookBackend`; table backend contracts remain unchanged.
+The backends share Sheetwrite's internal bounded OOXML codec, which owns OPC
+part resolution, XML tokenization, styles, and worksheet mapping over one
+audited compression primitive (`fflate`). It preserves formula source,
+worksheets, styles, merges, dimensions, frozen views, and named ranges, and it
+enforces the shared resource limits before decompression. The host can replace
+any role by implementing `XlsxWorkbookBackend` or the table backend contracts.
 
 ## See also
 

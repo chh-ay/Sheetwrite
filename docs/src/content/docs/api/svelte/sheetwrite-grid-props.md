@@ -12,7 +12,7 @@ Advanced framework adapter props for workbook data or datasource ownership.
 <div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L12</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>29</span>
 
 <div class="api-member-list">
 
@@ -106,6 +106,15 @@ mutationPolicy?: GridOptions["mutationPolicy"];
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-transaction-resource-limits" data-pagefind-weight="1">
+<summary><code>transactionResourceLimits</code> <span class="api-member-summary">Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation.</span></summary>
+
+```ts generated
+transactionResourceLimits?: GridOptions["transactionResourceLimits"];
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-renderers" data-pagefind-weight="1">
 <summary><code>renderers</code> <span class="api-member-summary">Named custom cell renderers.</span></summary>
 
@@ -177,6 +186,96 @@ grid?: Grid;
 ```
 
 </details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-grid-change" data-pagefind-weight="1">
+<summary><code>onGridChange</code> <span class="api-member-summary">Receives every committed Grid change, including its applied transaction.</span></summary>
+
+```ts generated
+onGridChange?: (event: ChangeEvent) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-selection-change" data-pagefind-weight="1">
+<summary><code>onSelectionChange</code> <span class="api-member-summary">Receives the current selection, or null after it is cleared.</span></summary>
+
+```ts generated
+onSelectionChange?: (selection: Selection | null) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-viewport-change" data-pagefind-weight="1">
+<summary><code>onViewportChange</code> <span class="api-member-summary">Receives visible row bounds and vertical scroll offset after scrolling.</span></summary>
+
+```ts generated
+onViewportChange?: (event: GridEvents["scroll"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-edit-begin" data-pagefind-weight="1">
+<summary><code>onEditBegin</code> <span class="api-member-summary">Fires when cell editing begins.</span></summary>
+
+```ts generated
+onEditBegin?: (event: GridEvents["edit-begin"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-edit-commit" data-pagefind-weight="1">
+<summary><code>onEditCommit</code> <span class="api-member-summary">Fires after an edit commits its parsed cell value.</span></summary>
+
+```ts generated
+onEditCommit?: (event: GridEvents["edit-commit"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-search" data-pagefind-weight="1">
+<summary><code>onSearch</code> <span class="api-member-summary">Receives refreshed search matches and active-match index.</span></summary>
+
+```ts generated
+onSearch?: (result: GridEvents["search"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-active-sheet-change" data-pagefind-weight="1">
+<summary><code>onActiveSheetChange</code> <span class="api-member-summary">Fires after the visible sheet changes.</span></summary>
+
+```ts generated
+onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-ready" data-pagefind-weight="1">
+<summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
+
+```ts generated
+onReady?: (event: GridReadyEvent) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-initialization-error" data-pagefind-weight="1">
+<summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
+
+```ts generated
+onInitializationError?: (error: unknown) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-wasm-source" data-pagefind-weight="1">
+<summary><code>wasmSource</code> <span class="api-member-summary">Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins.</span></summary>
+
+```ts generated
+wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -185,14 +284,10 @@ grid?: Grid;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SheetwriteGridProps
-  extends
-    Omit<
-      HTMLAttributes<HTMLDivElement>,
-      keyof GridAdapterEventHandlers | "children"
-    >,
-    GridAdapterEventHandlers,
-    SheetwriteInitializationProps {
+export interface SheetwriteGridProps extends Omit<
+  HTMLAttributes<HTMLDivElement>,
+  keyof GridAdapterEventHandlers | "children"
+> {
   workbook: GridOptions["workbook"];
   data?: GridOptions["data"];
   datasource?: GridOptions["datasource"];
@@ -203,6 +298,7 @@ export interface SheetwriteGridProps
   readOnly?: GridOptions["readOnly"];
   protectionResolver?: GridOptions["protectionResolver"];
   mutationPolicy?: GridOptions["mutationPolicy"];
+  transactionResourceLimits?: GridOptions["transactionResourceLimits"];
   renderers?: GridOptions["renderers"];
   overscan?: GridOptions["overscan"];
   minColumns?: GridOptions["minColumns"];
@@ -211,6 +307,16 @@ export interface SheetwriteGridProps
   fill?: true;
   fallback?: Snippet;
   grid?: Grid;
+  onGridChange?: (event: ChangeEvent) => void;
+  onSelectionChange?: (selection: Selection | null) => void;
+  onViewportChange?: (event: GridEvents["scroll"]) => void;
+  onEditBegin?: (event: GridEvents["edit-begin"]) => void;
+  onEditCommit?: (event: GridEvents["edit-commit"]) => void;
+  onSearch?: (result: GridEvents["search"]) => void;
+  onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onReady?: (event: GridReadyEvent) => void;
+  onInitializationError?: (error: unknown) => void;
+  wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 }
 ```
 

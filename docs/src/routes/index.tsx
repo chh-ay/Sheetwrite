@@ -35,30 +35,57 @@ interface LandingBenchData {
   sizes?: LandingBenchSize[];
 }
 
-const SHOWCASES = [
+const CAPABILITY_PROOFS = [
+  {
+    id: "database",
+    label: "Database & documents",
+    href: "/showcases/database/",
+    headline: "Real IndexedDB commits, conflict recovery, and compaction.",
+  },
+  {
+    id: "interoperability",
+    label: "Interoperability",
+    href: "/showcases/interoperability/",
+    headline: "XLSX and CSV/TSV exchange with honest fidelity boundaries.",
+  },
+  {
+    id: "performance",
+    label: "Performance & scale",
+    href: "/showcases/performance/",
+    headline: "A million paged rows with measured Worker evidence.",
+  },
+  {
+    id: "collaboration",
+    label: "Collaboration",
+    href: "/showcases/collaboration/",
+    headline: "Two live clients converging through one shared protocol.",
+  },
+] as const;
+
+const WORKBENCHES = [
   {
     id: "vanilla",
     label: "Vanilla",
     href: "/vanilla/",
-    headline: "An imperative workbook with host-owned chrome.",
+    headline: "The engine and host boundary, framework-free.",
   },
   {
     id: "react",
     label: "React",
     href: "/react/",
-    headline: "100,000 sales rows behind an operating view.",
+    headline: "Controlled analytics: queries, formulas, aggregates.",
   },
   {
     id: "vue",
     label: "Vue",
     href: "/vue/",
-    headline: "A million-row workbook on a paged datasource.",
+    headline: "Business workflow: validation, protection, notes.",
   },
   {
     id: "svelte",
     label: "Svelte",
     href: "/svelte/",
-    headline: "Live formulas composed from components.",
+    headline: "Offline-first collaboration with durable pending work.",
   },
 ] as const;
 
@@ -234,19 +261,33 @@ function Landing() {
 
         <section aria-labelledby="showcases-title" className="sw-landing-showcases">
           <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Live showcases</p>
-            <h2 id="showcases-title">One engine. Four ways to mount it.</h2>
+            <p className="sw-section-eyebrow">Capability proof</p>
+            <h2 id="showcases-title">Evaluate by capability, not by demo.</h2>
             <p className="sw-section-lede">
-              Vanilla, React, Vue, and Svelte use the same package entry points shown in the docs.
-              Open any grid and edit it.
+              Every public capability has one owning live proof, a required interaction, and an
+              executable browser contract.{" "}
+              <Link to="/showcases/">Browse the full capability index →</Link>
             </p>
           </header>
           <div className="sw-landing-grid sw-landing-grid--frameworks">
-            {SHOWCASES.map((showcase) => (
-              <Link data-framework={showcase.id} key={showcase.id} to={showcase.href}>
-                <span className="sw-showcase-card__meta">{showcase.label}</span>
-                <strong>{showcase.headline}</strong>
-                <span className="sw-showcase-card__cta">Open the live grid →</span>
+            {CAPABILITY_PROOFS.map((proof) => (
+              <Link data-proof={proof.id} key={proof.id} to={proof.href}>
+                <span className="sw-showcase-card__meta">{proof.label}</span>
+                <strong>{proof.headline}</strong>
+                <span className="sw-showcase-card__cta">Open the live proof →</span>
+              </Link>
+            ))}
+          </div>
+          <p className="sw-section-lede">
+            Prefer to start from your framework? The same engine mounts four ways — every workbench
+            is a bounded, directly editable product story.
+          </p>
+          <div className="sw-landing-grid sw-landing-grid--frameworks">
+            {WORKBENCHES.map((workbench) => (
+              <Link data-framework={workbench.id} key={workbench.id} to={workbench.href}>
+                <span className="sw-showcase-card__meta">{workbench.label}</span>
+                <strong>{workbench.headline}</strong>
+                <span className="sw-showcase-card__cta">Open the workbench →</span>
               </Link>
             ))}
           </div>

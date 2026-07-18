@@ -9,7 +9,7 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L287</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L289</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>81</span>

@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { GRID_OPTION_POLICY } from "../packages/core/src/adapter.js";
 import {
+  ADAPTER_DOC_CONTRACT,
+  adapterContractIssues,
   contentPathForRoute,
   entrySlug,
   expectedGeneratedFiles,
@@ -289,5 +292,169 @@ describe("documentation generation", () => {
     const payload = landingBenchPayload({ evidence: benchEvidence(results), source: "x" });
     expect(JSON.parse(payload).available).toBe(false);
     expect(payload).not.toContain("null");
+  });
+});
+describe("adapter documentation contract", () => {
+  const memberDocs = (names: readonly string[]) =>
+    names.map((name) => ({ name, documentation: `${name} documentation.` }));
+
+  const apiExport = (
+    name: string,
+    kind: string,
+    signature: string,
+    documented: readonly string[] = [],
+  ) => ({
+    name,
+    kind,
+    signature,
+    owners: ["src/index.ts"],
+    source: "src/index.ts#L1",
+    jsDocTags: [],
+    documentation: `${name} summary.`,
+    memberDocs: memberDocs(documented),
+  });
+
+  const entry = (subpath: string, exports: ReturnType<typeof apiExport>[]): ApiEntryPoint => ({
+    subpath,
+    target: "./dist/index.d.ts",
+    source: "src/index.ts",
+    kind: "typescript",
+    classification: "supported",
+    exports,
+  });
+
+  const propsSignature = (members: readonly string[]) =>
+    `export interface SheetwriteGridProps { ${members
+      .map((name) => (name.includes("-") ? `"${name}"?: unknown;` : `${name}?: unknown;`))
+      .join(" ")} }`;
+
+  const readyEvent = () =>
+    apiExport(
+      "GridReadyEvent",
+      "interface",
+      "export interface GridReadyEvent { grid: Grid; generation: number; reason: GridReadyReason; }",
+      ["grid", "generation", "reason"],
+    );
+
+  const conformingManifest = (): PublicApiManifest => ({
+    formatVersion: 2,
+    packages: [
+      {
+        name: "@sheetwrite/core",
+        entryPoints: [
+          entry("./adapter", [
+            apiExport(
+              "GridReadyReason",
+              "type",
+              'export type GridReadyReason = "initial" | GridResetReason;',
+            ),
+            apiExport(
+              "GridResetReason",
+              "type",
+              'export type GridResetReason = "input-reset" | "renderer-reset";',
+            ),
+          ]),
+        ],
+      },
+      ...(["@sheetwrite/react", "@sheetwrite/svelte"] as const).map((name) => ({
+        name,
+        entryPoints: [
+          entry(".", [
+            apiExport(
+              "SheetwriteGridProps",
+              "interface",
+              propsSignature([
+                ...ADAPTER_DOC_CONTRACT.inputs,
+                ...ADAPTER_DOC_CONTRACT.handlerEvents,
+              ]),
+              [...ADAPTER_DOC_CONTRACT.inputs, ...ADAPTER_DOC_CONTRACT.handlerEvents],
+            ),
+            readyEvent(),
+          ]),
+        ],
+      })),
+      {
+        name: "@sheetwrite/vue",
+        entryPoints: [
+          entry(".", [
+            apiExport(
+              "SheetwriteGridProps",
+              "interface",
+              propsSignature([...ADAPTER_DOC_CONTRACT.inputs]),
+              [...ADAPTER_DOC_CONTRACT.inputs],
+            ),
+            apiExport(
+              "SheetwriteGridEmits",
+              "interface",
+              `export interface SheetwriteGridEmits { ${ADAPTER_DOC_CONTRACT.vueEvents
+                .map((name) => `"${name}": unknown;`)
+                .join(" ")} }`,
+              [...ADAPTER_DOC_CONTRACT.vueEvents],
+            ),
+            readyEvent(),
+          ]),
+        ],
+      },
+    ],
+  });
+
+  it("mirrors the canonical adapter option policy and event casing", () => {
+    expect(new Set<string>(ADAPTER_DOC_CONTRACT.inputs)).toEqual(
+      new Set<string>([...Object.keys(GRID_OPTION_POLICY), "wasmSource"]),
+    );
+    const kebabOf = (handler: string) =>
+      handler
+        .replace(/^on/, "")
+        .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+        .toLowerCase();
+    expect([...ADAPTER_DOC_CONTRACT.vueEvents] as string[]).toEqual(
+      ADAPTER_DOC_CONTRACT.handlerEvents.map(kebabOf),
+    );
+  });
+
+  it("accepts a manifest documenting every canonical input, event, and reason", () => {
+    expect(adapterContractIssues(conformingManifest())).toEqual([]);
+  });
+
+  it("fails when an adapter input or readiness event disappears", () => {
+    const manifest = conformingManifest();
+    const react = manifest.packages[1]?.entryPoints[0]?.exports[0];
+    if (react === undefined) throw new Error("fixture shape changed");
+    react.signature = react.signature.replace("onReady?: unknown;", "");
+    react.memberDocs = react.memberDocs.filter((member) => member.name !== "onReady");
+    expect(adapterContractIssues(manifest)).toContain(
+      "@sheetwrite/react SheetwriteGridProps does not declare onReady",
+    );
+  });
+
+  it("fails when a documented member loses its JSDoc", () => {
+    const manifest = conformingManifest();
+    const svelte = manifest.packages[2]?.entryPoints[0]?.exports[0];
+    if (svelte === undefined) throw new Error("fixture shape changed");
+    svelte.memberDocs = svelte.memberDocs.filter((member) => member.name !== "datasource");
+    expect(adapterContractIssues(manifest)).toContain(
+      "@sheetwrite/svelte SheetwriteGridProps member datasource has no documentation",
+    );
+  });
+
+  it("fails when the Vue emits contract is missing", () => {
+    const manifest = conformingManifest();
+    const vue = manifest.packages[3];
+    if (vue === undefined) throw new Error("fixture shape changed");
+    vue.entryPoints[0]!.exports = vue.entryPoints[0]!.exports.filter(
+      (item) => item.name !== "SheetwriteGridEmits",
+    );
+    expect(adapterContractIssues(manifest)).toContain(
+      "@sheetwrite/vue does not export SheetwriteGridEmits",
+    );
+  });
+
+  it("fails when documented readiness reasons drift from the implementation", () => {
+    const manifest = conformingManifest();
+    const reason = manifest.packages[0]?.entryPoints[0]?.exports[0];
+    if (reason === undefined) throw new Error("fixture shape changed");
+    reason.signature = 'export type GridReadyReason = "initial" | "reset";';
+    const issues = adapterContractIssues(manifest);
+    expect(issues.some((issue) => issue.startsWith("GridReadyReason documents"))).toBe(true);
   });
 });

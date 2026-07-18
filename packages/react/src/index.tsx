@@ -81,6 +81,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       readOnly,
       protectionResolver,
       mutationPolicy,
+      transactionResourceLimits,
       renderers,
       overscan,
       minColumns,
@@ -181,6 +182,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         renderers,
         protectionResolver,
         mutationPolicy,
+        transactionResourceLimits,
         ...liveOptionsRef.current,
       };
       const previousOptions = previousOptionsRef.current;
@@ -222,6 +224,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       workerUrl,
       protectionResolver,
       mutationPolicy,
+      transactionResourceLimits,
       renderers,
     ]);
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
+import { SnapshotResourceError, validateTransactionResources } from "../src/document-protocol.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
@@ -11,12 +12,14 @@ import {
   resolveThemeFromCss,
 } from "../src/grid.js";
 import { createGridController } from "../src/grid-controller.js";
+import { createGridFromSnapshot } from "../src/persistence.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.js";
 import type {
   CellScalar,
   ChangeEvent,
   DataSourceRequest,
+  DocumentOp,
   RowData,
   Store,
   Workbook,
@@ -755,6 +758,115 @@ describe("Grid editing (Layer 3)", () => {
     expect(received).toContain("search");
 
     controller.destroy();
+  });
+});
+
+describe("Grid transaction resource ingress", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("rejects local, remote, and direct-store overflow without state, history, or events", () => {
+    const workbook = makeWorkbook(4);
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      transactionResourceLimits: { maxOperations: 1 },
+    });
+    const changes: ChangeEvent[] = [];
+    let rejectionEvents = 0;
+    grid.on("change", (event) => changes.push(event));
+    grid.on("mutation-rejected", () => {
+      rejectionEvents += 1;
+    });
+    const first = { sheet: "s1", row: 0, col: 0 };
+    const second = { sheet: "s1", row: 1, col: 0 };
+    const third = { sheet: "s1", row: 2, col: 0 };
+
+    const accepted = grid.applyTransaction({
+      patches: [{ op: "set", addr: first, value: { kind: "literal", value: "accepted" } }],
+    });
+    expect(accepted.status).toBe("applied");
+    if (accepted.status !== "applied") throw new Error("Grid count limit unexpectedly rejected");
+    expect(
+      validateTransactionResources(accepted.transaction.patches, {
+        maxOperations: 1,
+        maxEncodedBytes: 8 * 1024 * 1024,
+      }).ok,
+    ).toBe(true);
+
+    const oversized: DocumentOp[] = [
+      { op: "set", addr: second, value: { kind: "literal", value: "blocked" } },
+      { op: "set", addr: third, value: { kind: "literal", value: "blocked" } },
+    ];
+    const local = grid.applyTransaction({ patches: oversized });
+    const remote = grid.applyRemoteOperations(oversized);
+    const direct = grid.store.applyTransaction({ patches: oversized });
+    for (const result of [local, remote, direct]) {
+      expect(result).toMatchObject({
+        status: "rejected",
+        epoch: 1,
+        issues: [
+          {
+            kind: "resource-limit",
+            resource: "operations",
+            actual: 2,
+            max: 1,
+          },
+        ],
+      });
+    }
+    expect(grid.store.getCell(second).resolved).toBeNull();
+    expect(grid.store.getCell(third).resolved).toBeNull();
+    expect(changes).toHaveLength(1);
+    expect(rejectionEvents).toBe(0);
+
+    grid.undo();
+    expect(grid.store.getCell(first).resolved).toBeNull();
+    expect(changes).toHaveLength(2);
+    expect(rejectionEvents).toBe(0);
+    grid.destroy();
+  });
+
+  it("validates Grid overrides before construction", () => {
+    expect(
+      () =>
+        new GridImpl(mountHost(), {
+          workbook: makeWorkbook(2),
+          transactionResourceLimits: { maxEncodedBytes: -1 },
+        }),
+    ).toThrow(RangeError);
+  });
+
+  it("propagates SnapshotGridOptions limits to the hydrated Store and Grid", () => {
+    const source = new SheetwriteStore(makeWorkbook(3));
+    const snapshot = source.exportSnapshot();
+    source.dispose();
+    const grid = createGridFromSnapshot(mountHost(), snapshot, {
+      transactionResourceLimits: { maxOperations: 1 },
+    });
+    const oversized: DocumentOp[] = [
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 0, col: 0 },
+        value: { kind: "literal", value: "one" },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 1, col: 0 },
+        value: { kind: "literal", value: "two" },
+      },
+    ];
+
+    expect(grid.applyTransaction({ patches: oversized })).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+    });
+    expect(grid.store.applyTransaction({ patches: oversized })).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+    });
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBeNull();
+    grid.destroy();
   });
 });
 
@@ -1993,6 +2105,12 @@ describe("adaptive row-number gutter", () => {
       // An explicit 0 keeps the gutter hidden — auto-sizing must not revive it.
       expect(hidden.getEffectiveTheme().rowHeaderWidth).toBe(0);
       hidden.destroy();
+
+      const excessiveWorkbook = makeWorkbook(20);
+      excessiveWorkbook.sheets[0]!.rowCount = 1_000_001;
+      expect(() => new GridImpl(host, { workbook: excessiveWorkbook }, undefined)).toThrow(
+        SnapshotResourceError,
+      );
       host.remove();
     } finally {
       restore();

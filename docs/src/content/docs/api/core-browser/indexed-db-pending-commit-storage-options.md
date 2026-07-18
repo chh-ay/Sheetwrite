@@ -9,7 +9,7 @@ Database and store naming options for durable pending commits.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/browser</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L31</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L34</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

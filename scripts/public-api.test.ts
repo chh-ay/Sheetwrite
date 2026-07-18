@@ -72,7 +72,9 @@ async function fixture(
   );
   await writeFile(join(packageRoot, "index.d.ts"), index);
   for (const [name, content] of Object.entries(extraFiles ?? {})) {
-    await writeFile(join(packageRoot, name), content);
+    const path = join(packageRoot, name);
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(path, content);
   }
   return root;
 }
@@ -112,6 +114,56 @@ describe("re-export documentation", () => {
     expect(generated?.memberDocs).toEqual([
       { name: "memory", documentation: "Shared linear memory." },
     ]);
+  });
+});
+describe("interface heritage flattening", () => {
+  it("inlines repository-owned base members and keeps dependency bases as heritage", async () => {
+    const root = await fixture(
+      `import type { ExternalBase } from "framework";
+${canonicalDeclarations}
+/** Framework-neutral readiness callbacks shared by adapters. */
+export interface OwnedHandlers {
+  /** Fires after readiness. */
+  onReady?: () => void;
+}
+/** Advanced adapter props. */
+export interface AdapterProps extends OwnedHandlers, ExternalBase {
+  /** Local sizing knob. */
+  height?: number;
+}
+`,
+      {
+        "node_modules/framework/package.json": JSON.stringify({
+          name: "framework",
+          types: "./index.d.ts",
+        }),
+        "node_modules/framework/index.d.ts":
+          "export interface ExternalBase { tabIndex?: number; hidden?: boolean; }\n",
+      },
+    );
+    const { manifest } = await analyzePublicApi(root);
+    const entry = manifest.packages[0]?.entryPoints[0];
+    const props = entry?.exports.find((candidate) => candidate.name === "AdapterProps");
+    expect(props?.signature).toContain("height?: number;");
+    expect(props?.signature).toContain("onReady?: () => void;");
+    expect(props?.signature).toContain("extends ExternalBase");
+    expect(props?.signature).not.toContain("OwnedHandlers");
+    expect(props?.signature).not.toContain("tabIndex");
+    expect(props?.signature).not.toContain("hidden");
+    expect(props?.memberDocs).toContainEqual({
+      name: "onReady",
+      documentation: "Fires after readiness.",
+    });
+  });
+
+  it("keeps heritage-free interfaces byte-identical to their source text", async () => {
+    const root = await fixture();
+    const { manifest } = await analyzePublicApi(root);
+    const entry = manifest.packages[0]?.entryPoints[0];
+    const source = entry?.exports.find((candidate) => candidate.name === "DataSource");
+    expect(source?.signature).toBe(
+      "export interface DataSource { getRows(request: unknown): Promise<unknown>; }",
+    );
   });
 });
 

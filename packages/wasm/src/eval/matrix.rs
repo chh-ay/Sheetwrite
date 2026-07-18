@@ -53,3 +53,47 @@ pub(super) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::range_from_ast;
+    use crate::calc::{Ast, NamedRangeRef, RangeFlags, RefFlags, SheetRef};
+    use crate::types::CellRange;
+
+    #[test]
+    fn converts_local_absolute_and_named_references_to_ranges() {
+        let flags = RefFlags::default();
+        assert_eq!(
+            range_from_ast(&Ast::Cell(2, 3, flags), 7),
+            Some(CellRange::new(7, 2, 3, 2, 3))
+        );
+        let sheet = SheetRef {
+            handle: 11,
+            name: "Data".to_string(),
+            quoted: false,
+        };
+        assert_eq!(
+            range_from_ast(&Ast::AbsCell(sheet.clone(), 4, 5, flags), 7),
+            Some(CellRange::new(11, 4, 5, 4, 5))
+        );
+        assert_eq!(
+            range_from_ast(&Ast::AbsRange(sheet, 1, 2, 6, 8, RangeFlags::default()), 7),
+            Some(CellRange::new(11, 1, 2, 6, 8))
+        );
+        assert_eq!(
+            range_from_ast(
+                &Ast::NamedRange(NamedRangeRef {
+                    name: "Input".to_string(),
+                    scope: None,
+                    sheet: 13,
+                    row_start: 1,
+                    col_start: 2,
+                    row_end: 3,
+                    col_end: 4,
+                }),
+                7,
+            ),
+            Some(CellRange::new(13, 1, 2, 3, 4))
+        );
+    }
+}

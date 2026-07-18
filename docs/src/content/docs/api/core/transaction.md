@@ -13,7 +13,7 @@ undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L15</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L27</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

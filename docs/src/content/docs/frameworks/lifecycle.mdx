@@ -14,13 +14,13 @@ Every adapter follows one lifecycle:
 5. reset only when structural ownership changes;
 6. destroy the generation on unmount.
 
-Choose a framework in the header. The tabs below follow that preference.
+Pick a framework in any tab group below; the selection is remembered and reused across documentation pages.
 
 ## Pick the ownership model
 
 Use **`Sheetwrite`** for a data-first, uncontrolled grid: pass columns plus initial rows and let the component own the live document.
 
-Use **`SheetwriteGrid`** for an advanced `Workbook` plus eager data or a `DataSource`. It exposes the imperative `Grid` after readiness and keeps structural configuration under the host's control.
+Use **`SheetwriteGrid`** for an advanced `Workbook` plus eager data or a datasource. It exposes the imperative `Grid` after readiness and keeps structural configuration under the host's control.
 
 <Tabs syncKey="sheetwrite-framework">
   <TabItem label="Vanilla">
@@ -53,12 +53,12 @@ grid.destroy();
 <SheetwriteGrid
   ref={gridRef}
   workbook={workbook}
-  dataSource={dataSource}
+  datasource={datasource}
   onReady={({ grid }) => connect(grid)}
 />
 ```
 
-`defaultRows` is seed data. Changing it after mount does not replace committed edits. A new `resetKey`, source, workbook, or structural column schema creates a new generation.
+`defaultRows` is seed data. Changing it after mount does not replace committed edits; a new `columns`, `defaultRows`, or `sheetName` identity derives a new document and creates a new generation.
 
   </TabItem>
   <TabItem label="Vue">
@@ -74,14 +74,14 @@ grid.destroy();
 
 ```vue prelude="vue" partial="requires workbook and datasource declarations" title="Vue advanced grid"
 <SheetwriteGrid
-  ref="gridRef"
+  ref="gridComponent"
   :workbook="workbook"
-  :data-source="dataSource"
+  :datasource="datasource"
   @ready="({ grid }) => connect(grid)"
 />
 ```
 
-`defaultRows` seeds the document once. A new `resetKey`, source, workbook, or structural column schema creates a new generation.
+The template ref exposes `{ grid }` after readiness. `defaultRows` seeds the document once; a new `columns`, `defaultRows`, or `sheetName` identity creates a new generation.
 
   </TabItem>
   <TabItem label="Svelte">
@@ -104,33 +104,39 @@ grid.destroy();
   const handleReady = ({ grid }: GridReadyEvent) => connect(grid);
 </script>
 
-<SheetwriteGrid bind:this={gridRef} {workbook} {dataSource} onReady={handleReady} />
+<SheetwriteGrid bind:grid={gridRef} {workbook} {datasource} onReady={handleReady} />
 ```
 
-`defaultRows` seeds the document once. A new `resetKey`, source, workbook, or structural column schema creates a new generation.
+`bind:grid` publishes the live handle and clears it on reset or unmount. `defaultRows` seeds the document once; a new `columns`, `defaultRows`, or `sheetName` identity creates a new generation.
 
   </TabItem>
 </Tabs>
 
 ## Readiness is generation-scoped
 
-`onReady` receives `{ grid, generation, reason }`. The first generation uses `reason: "initial"`; replacements report `"reset"`, `"source-change"`, `"columns-change"`, `"workbook-change"`, or `"active-sheet-change"` where applicable.
+`onReady` receives `{ grid, generation, reason }`. `generation` is one-based and increments whenever the adapter replaces its `Grid`. `reason` is exactly one of:
 
-The exposed ref is assigned before `onReady` runs and cleared when that generation is destroyed. Reattach subscriptions and collaboration coordinators inside `onReady`; never retain a stale `Grid` across a reset.
+- `"initial"` — the first generation after mount and WASM initialization;
+- `"input-reset"` — a reset-classified document input changed identity;
+- `"renderer-reset"` — `renderer`, `workerUrl`, or `renderers` changed identity.
+
+The exposed handle (React ref, Vue `expose`, Svelte `bind:grid`) is assigned before `onReady` runs and cleared when that generation is destroyed. Reattach subscriptions and collaboration coordinators inside `onReady`; never retain a stale `Grid` across a reset.
 
 ## Controlled values do not reset the document
 
-Theme, dimensions, read-only state, overscan, renderer options, callbacks, and other live controls update the current generation. They do not recreate the grid or replay `defaultRows`.
+`theme`, `readOnly`, `config`, `overscan`, and `minColumns` are live: changing them updates the current generation in place without recreating the grid or replaying `defaultRows`. Callbacks and host sizing (`height`, `fill`, `className`/`class`, `style`) are also safe to change live.
 
-Structural changes are different:
+Structural changes are different. Every reset-classified input is compared by identity:
 
 | Change | Result |
 | --- | --- |
-| `resetKey` | Explicit new generation |
-| `source` | Retry or initialize against the new WASM source |
-| column keys/order/types | New uncontrolled document generation |
-| advanced `workbook`/`data` identity | New advanced grid generation |
-| theme, height, read-only, overscan | In-place update |
+| `workbook`, `data`, `datasource`, `datasourceStorage` | New generation, `reason: "input-reset"` |
+| `protectionResolver`, `mutationPolicy`, `transactionResourceLimits` | New generation, `reason: "input-reset"` |
+| `renderer`, `workerUrl`, `renderers` | New generation, `reason: "renderer-reset"` |
+| `columns`, `defaultRows`, `sheetName` (simple component) | New derived document, `reason: "input-reset"` |
+| `theme`, `readOnly`, `config`, `overscan`, `minColumns` | In-place update, no reset |
+
+Keep reset-classified inputs referentially stable (module constants, memoized values, or state) unless you intend to create a new generation.
 
 ## Transactions and persistence
 
@@ -146,7 +152,9 @@ Use `event.reason` for audit context, not to reconstruct the transaction. For of
 
 ## Initialization failures
 
-Framework components surface initialization errors instead of rendering a dead grid. React uses `fallback` and `onInitializationError`; Vue and Svelte support fallback content or slots plus their error callback/event. A changed explicit source or a remount can retry.
+Framework components surface initialization errors instead of rendering a dead grid. React uses `fallback` and `onInitializationError`; Vue and Svelte support fallback content or slots plus their error callback/event.
+
+WASM initialization is process-wide and monotonic: every adapter converges on the same runtime, and when several pass an explicit `wasmSource` concurrently, the first source wins. While initialization has not yet succeeded, a changed `wasmSource` or a remount retries it; after the runtime is ready, the source is fixed for the process.
 
 ## Server rendering
 
@@ -157,4 +165,3 @@ Importing an adapter during SSR is safe, but the grid initializes only after a b
 - SvelteKit: a browser-only branch or client-mounted component.
 
 No framework owns the global runtime. All adapters converge on the same monotonic initializer.
-

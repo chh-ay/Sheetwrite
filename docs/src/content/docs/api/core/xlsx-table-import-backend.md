@@ -11,7 +11,7 @@ format-agnostic.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L263</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L306</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -31,7 +31,7 @@ name: string;
 <summary><code>fromXlsxTable</code></summary>
 
 ```ts generated
-fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
+fromXlsxTable( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<ColumnarData>;
 ```
 
 </details>
@@ -45,7 +45,10 @@ fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
 ```ts generated
 export interface XlsxTableImportBackend {
   name: string;
-  fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
+  fromXlsxTable(
+    data: ArrayBuffer | Uint8Array,
+    options?: XlsxWorkbookOptions,
+  ): Promise<ColumnarData>;
 }
 ```
 

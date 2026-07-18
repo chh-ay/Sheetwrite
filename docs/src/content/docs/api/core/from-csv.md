@@ -1,19 +1,19 @@
 ---
 title: "fromCsv | @sheetwrite/core"
-description: "Parse CSV text into ColumnarData keyed by columns[i].key — the symmetric counterpart to toCsv."
+description: "Parse CSV into ColumnarData."
 ---
 <!-- api-export:@sheetwrite/core|.|fromCsv -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
-Parse CSV `text` into `ColumnarData` keyed by `columns[i].key` — the symmetric
-counterpart to `toCsv`. The first parsed row is treated as the header and
-consumed; each remaining row maps positionally onto `columns`. CSV columns
-beyond `columns.length` are ignored, missing trailing cells become `null`, and
-`number` columns coerce their fields to finite numbers.
+Parse CSV into `ColumnarData`. The first record is consumed as a positional
+header. Input fields project onto declared visible columns; hidden declared
+columns are initialized to `null`, matching the visible-column CSV export.
+Extra fields are ignored and missing fields become `null`. The returned
+columnar table is fully materialized in memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L179</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L151</code></dd></div>
 </dl>
 
 ## Declaration
@@ -24,6 +24,7 @@ beyond `columns.length` are ignored, missing trailing cells become `null`, and
 function fromCsv(
   text: string,
   columns: readonly Column[],
+  options?: DelimitedTextOptions,
 ): ColumnarData
 ```
 

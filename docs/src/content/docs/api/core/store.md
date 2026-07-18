@@ -12,7 +12,7 @@ Columnar workbook storage, query, transaction, and subscription contract.
 <div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L108</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>16</span>
+## Members <span class="api-count" data-pagefind-ignore>17</span>
 
 <div class="api-member-list">
 
@@ -72,6 +72,17 @@ The supplied Date is interpreted as an absolute UTC instant.</p>
 getVisibleWindow( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView;
 ```
 
+</details>
+
+<details class="api-member" id="store-get-data-window" data-pagefind-weight="1">
+<summary><code>getDataWindow</code> <span class="api-member-summary">Optional packed canonical data-row window used by file export.</span></summary>
+
+```ts generated
+getDataWindow?( sheet: SheetId, rows: { start: number; end: number }, cols: readonly number[], ): VisibleWindowView;
+```
+
+<p class="api-member-doc">Optional packed canonical data-row window used by file export. Unlike
+`getVisibleWindow`, sort/filter state never remaps `rows`.</p>
 </details>
 
 <details class="api-member" id="store-get-clipboard-window" data-pagefind-weight="1">
@@ -189,6 +200,14 @@ export interface Store {
   getRefTarget(addr: CellAddress): CellAddress | null;
   recalculateVolatile(now?: Date): void;
   getVisibleWindow(
+    sheet: SheetId,
+    rows: {
+      start: number;
+      end: number;
+    },
+    cols: readonly number[],
+  ): VisibleWindowView;
+  getDataWindow?(
     sheet: SheetId,
     rows: {
       start: number;

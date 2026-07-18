@@ -65,6 +65,23 @@ export function parseCellInput(raw: string, type: CellFormat): CellValue {
 }
 
 /**
+ * Parse imported text as a literal using the same boolean, number, date, and
+ * currency rules as {@link parseCellInput}. Unlike interactive entry, a leading
+ * `=` remains inert text. Declared date columns also accept an existing finite
+ * date serial so delimited export/import preserves numeric dates.
+ */
+export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  if (type === "date") {
+    const serial = Number(trimmed);
+    if (Number.isFinite(serial)) return serial;
+  }
+  const parsed = parseCellInput(raw, type);
+  return parsed.kind === "literal" ? parsed.value : raw;
+}
+
+/**
  * Parse a currency-formatted string into a plain number, or `null` when the
  * remaining text is not numeric. Strips currency symbols (`$ € £ ¥ ¤`), thousands
  * grouping (`,`), and whitespace, and reads accounting-style parentheses

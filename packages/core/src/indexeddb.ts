@@ -1,7 +1,8 @@
-import type { PendingCommitStorage } from "./sync.js";
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-byte-length.js";
+import type { PendingCommitLoadOptions, PendingCommitStorage } from "./sync.js";
 import type { PendingCommit } from "./types/transaction.js";
 
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const RECORD_SCHEMA_VERSION = 1;
 const DEFAULT_DATABASE = "sheetwrite-offline";
 const DEFAULT_STORE = "pending-commits";
@@ -13,7 +14,9 @@ export type IndexedDbPendingCommitStorageErrorCode =
   | "aborted"
   | "quota"
   | "unsupported-schema"
-  | "transaction";
+  | "transaction"
+  | "conflict"
+  | "limit";
 
 /** Typed IndexedDB failure raised by durable pending-commit storage. */
 export class IndexedDbPendingCommitStorageError extends Error {
@@ -67,44 +70,24 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
     this.metaStoreName = `${this.storeName}-meta`;
   }
 
-  async load(documentId: string, signal?: AbortSignal): Promise<readonly PendingCommit[]> {
-    throwIfAborted(signal);
-    const database = await this.open(signal);
-    const transaction = database.transaction(this.storeName, "readonly");
-    const store = transaction.objectStore(this.storeName);
-    const index = store.index("by-document");
-    const records = await requestResult<StoredPendingCommit[]>(
-      index.getAll(IDBKeyRange.only(documentId)),
-      signal,
-      transaction,
-    );
-    await transactionDone(transaction, signal);
-
-    const migrations: StoredPendingCommit[] = [];
-    for (const record of records) {
-      const version = record.queueSchemaVersion ?? 0;
-      if (version > RECORD_SCHEMA_VERSION) {
-        throw new IndexedDbPendingCommitStorageError(
-          "unsupported-schema",
-          `Pending queue record schema ${version} is newer than ${RECORD_SCHEMA_VERSION}`,
-        );
-      }
-      if (version === 0 || record.sequence === undefined) migrations.push(record);
+  async load(
+    documentId: string,
+    options: PendingCommitLoadOptions,
+  ): Promise<readonly PendingCommit[]> {
+    assertLoadOptions(options);
+    throwIfAborted(options.signal);
+    const database = await this.open(options.signal);
+    const legacy = await this.inspectForLegacy(database, documentId, options);
+    if (legacy.records.length > 0) {
+      legacy.records.sort(
+        (left, right) =>
+          left.baseVersion - right.baseVersion ||
+          left.clientMutationId.localeCompare(right.clientMutationId),
+      );
+      await this.ensureSequenceFloor(database, documentId, legacy.maxSequence + 1, options.signal);
+      for (const record of legacy.records) await this.put(record, options.signal);
     }
-    for (const record of migrations) {
-      await this.put(record, signal);
-    }
-
-    const reloaded = migrations.length > 0 ? await this.readCurrent(documentId, signal) : records;
-    return reloaded
-      .slice()
-      .sort((a, b) => (a.sequence ?? a.baseVersion) - (b.sequence ?? b.baseVersion))
-      .map(({ documentId: id, baseVersion, clientMutationId, operations }) => ({
-        documentId: id,
-        baseVersion,
-        clientMutationId,
-        operations: cloneJsonValue(operations),
-      }));
+    return this.readOrdered(database, documentId, options);
   }
 
   async put(commit: PendingCommit, signal?: AbortSignal): Promise<void> {
@@ -159,6 +142,84 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
       throw storageError(error, "Unable to remove acknowledged Sheetwrite commit");
     }
   }
+  async replace(
+    documentId: string,
+    expectedClientMutationIds: readonly string[],
+    commits: readonly PendingCommit[],
+    signal?: AbortSignal,
+  ): Promise<void> {
+    throwIfAborted(signal);
+    if (
+      commits.some((commit) => commit.documentId !== documentId) ||
+      new Set(commits.map((commit) => commit.clientMutationId)).size !== commits.length
+    ) {
+      throw new IndexedDbPendingCommitStorageError(
+        "transaction",
+        "Replacement commits must be unique and belong to the target document",
+      );
+    }
+    const database = await this.open(signal);
+    const transaction = database.transaction([this.storeName, this.metaStoreName], "readwrite");
+    const store = transaction.objectStore(this.storeName);
+    const metaStore = transaction.objectStore(this.metaStoreName);
+    const range = IDBKeyRange.bound([documentId, 0], [documentId, Number.MAX_SAFE_INTEGER]);
+    const request = store.index("by-document-sequence").openCursor(range);
+    const completion = transactionDone(transaction, signal);
+    const currentIds: string[] = [];
+    const prepared = Promise.withResolvers<void>();
+    request.onerror = () =>
+      prepared.reject(storageError(request.error, "Unable to inspect pending queue"));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (cursor) {
+        currentIds.push((cursor.value as StoredPendingCommit).clientMutationId);
+        cursor.continue();
+        return;
+      }
+      try {
+        if (
+          currentIds.length !== expectedClientMutationIds.length ||
+          currentIds.some((id, index) => id !== expectedClientMutationIds[index])
+        ) {
+          throw new IndexedDbPendingCommitStorageError(
+            "conflict",
+            "Pending queue changed before atomic replacement",
+          );
+        }
+        for (const id of currentIds) store.delete([documentId, id]);
+        for (let index = 0; index < commits.length; index++) {
+          const commit = commits[index]!;
+          store.put({
+            queueSchemaVersion: RECORD_SCHEMA_VERSION,
+            sequence: index + 1,
+            documentId,
+            baseVersion: commit.baseVersion,
+            clientMutationId: commit.clientMutationId,
+            operations: cloneJsonValue(commit.operations),
+          } satisfies StoredPendingCommit);
+        }
+        metaStore.put({
+          documentId,
+          nextSequence: commits.length + 1,
+        } satisfies QueueMeta);
+        prepared.resolve();
+      } catch (error) {
+        try {
+          transaction.abort();
+        } catch {
+          // The transaction may already have failed.
+        }
+        prepared.reject(error);
+      }
+    };
+    try {
+      await prepared.promise;
+      await completion;
+    } catch (error) {
+      void completion.catch(() => {});
+      throw storageError(error, "Unable to atomically replace pending Sheetwrite commits");
+    }
+  }
 
   close(): void {
     const attempt = this.databaseAttempt;
@@ -182,22 +243,86 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
     );
   }
 
-  private async readCurrent(
+  private async inspectForLegacy(
+    database: IDBDatabase,
     documentId: string,
-    signal?: AbortSignal,
-  ): Promise<StoredPendingCommit[]> {
-    const database = await this.open(signal);
+    options: PendingCommitLoadOptions,
+  ): Promise<{ records: StoredPendingCommit[]; maxSequence: number }> {
     const transaction = database.transaction(this.storeName, "readonly");
-    const records = await requestResult<StoredPendingCommit[]>(
-      transaction
-        .objectStore(this.storeName)
-        .index("by-document")
-        .getAll(IDBKeyRange.only(documentId)),
+    const request = transaction
+      .objectStore(this.storeName)
+      .index("by-document")
+      .openCursor(IDBKeyRange.only(documentId));
+    const completion = transactionDone(transaction, options.signal);
+    const stats: LoadStats = { records: 0, operations: 0, bytes: 0 };
+    const records: StoredPendingCommit[] = [];
+    let maxSequence = 0;
+    try {
+      await walkCursor(request, transaction, options.signal, (record) => {
+        accountStoredRecord(record, options, stats);
+        if (record.sequence === undefined || (record.queueSchemaVersion ?? 0) === 0) {
+          records.push(record);
+        } else {
+          maxSequence = Math.max(maxSequence, record.sequence);
+        }
+      });
+      await completion;
+      return { records, maxSequence };
+    } catch (error) {
+      void completion.catch(() => {});
+      throw error;
+    }
+  }
+
+  private async ensureSequenceFloor(
+    database: IDBDatabase,
+    documentId: string,
+    minimum: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const transaction = database.transaction(this.metaStoreName, "readwrite");
+    const store = transaction.objectStore(this.metaStoreName);
+    const current = await requestResult<QueueMeta | undefined>(
+      store.get(documentId),
       signal,
       transaction,
     );
+    if ((current?.nextSequence ?? 1) < minimum) {
+      store.put({ documentId, nextSequence: minimum } satisfies QueueMeta);
+    }
     await transactionDone(transaction, signal);
-    return records;
+  }
+
+  private async readOrdered(
+    database: IDBDatabase,
+    documentId: string,
+    options: PendingCommitLoadOptions,
+  ): Promise<PendingCommit[]> {
+    const transaction = database.transaction(this.storeName, "readonly");
+    const range = IDBKeyRange.bound([documentId, 0], [documentId, Number.MAX_SAFE_INTEGER]);
+    const request = transaction
+      .objectStore(this.storeName)
+      .index("by-document-sequence")
+      .openCursor(range);
+    const completion = transactionDone(transaction, options.signal);
+    const stats: LoadStats = { records: 0, operations: 0, bytes: 0 };
+    const records: PendingCommit[] = [];
+    try {
+      await walkCursor(request, transaction, options.signal, (record) => {
+        accountStoredRecord(record, options, stats);
+        records.push({
+          documentId: record.documentId,
+          baseVersion: record.baseVersion,
+          clientMutationId: record.clientMutationId,
+          operations: record.operations,
+        });
+      });
+      await completion;
+      return records;
+    } catch (error) {
+      void completion.catch(() => {});
+      throw error;
+    }
   }
 
   private open(signal?: AbortSignal): Promise<IDBDatabase> {
@@ -231,6 +356,11 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
           });
       if (!store.indexNames.contains("by-document")) {
         store.createIndex("by-document", "documentId", { unique: false });
+      }
+      if (!store.indexNames.contains("by-document-sequence")) {
+        store.createIndex("by-document-sequence", ["documentId", "sequence"], {
+          unique: false,
+        });
       }
       if (!database.objectStoreNames.contains(this.metaStoreName)) {
         database.createObjectStore(this.metaStoreName, { keyPath: "documentId" });
@@ -273,6 +403,136 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
     if (this.databaseAttempt === attempt) this.databaseAttempt = undefined;
     attempt.reject(error);
   }
+}
+
+interface LoadStats {
+  records: number;
+  operations: number;
+  bytes: number;
+}
+
+function assertLoadOptions(options: PendingCommitLoadOptions): void {
+  if (
+    !options ||
+    !Number.isSafeInteger(options.maxRecords) ||
+    options.maxRecords < 0 ||
+    !Number.isSafeInteger(options.maxOperations) ||
+    options.maxOperations < 0 ||
+    !Number.isSafeInteger(options.maxBytes) ||
+    options.maxBytes < 0
+  ) {
+    throw new IndexedDbPendingCommitStorageError(
+      "limit",
+      "Pending commit load limits must be nonnegative safe integers",
+    );
+  }
+}
+
+function accountStoredRecord(
+  value: unknown,
+  options: PendingCommitLoadOptions,
+  stats: LoadStats,
+): asserts value is StoredPendingCommit {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new IndexedDbPendingCommitStorageError("transaction", "Pending queue record is invalid");
+  }
+  const record = value as StoredPendingCommit;
+  const version = record.queueSchemaVersion ?? 0;
+  if (version > RECORD_SCHEMA_VERSION) {
+    throw new IndexedDbPendingCommitStorageError(
+      "unsupported-schema",
+      `Pending queue record schema ${version} is newer than ${RECORD_SCHEMA_VERSION}`,
+    );
+  }
+  if (!Array.isArray(record.operations)) {
+    throw new IndexedDbPendingCommitStorageError(
+      "transaction",
+      "Pending queue record operations are invalid",
+    );
+  }
+  if (stats.records + 1 > options.maxRecords) {
+    throw new IndexedDbPendingCommitStorageError(
+      "limit",
+      `Pending queue exceeds the ${options.maxRecords} record limit`,
+    );
+  }
+  if (stats.operations + record.operations.length > options.maxOperations) {
+    throw new IndexedDbPendingCommitStorageError(
+      "limit",
+      `Pending queue exceeds the ${options.maxOperations} operation limit`,
+    );
+  }
+  let bytes: number;
+  try {
+    bytes = boundedJsonByteLength(record.operations, options.maxBytes - stats.bytes);
+  } catch (error) {
+    if (error instanceof JsonByteLengthError && error.code === "limit") {
+      throw new IndexedDbPendingCommitStorageError(
+        "limit",
+        `Pending queue exceeds the ${options.maxBytes} byte limit`,
+        { cause: error },
+      );
+    }
+    throw new IndexedDbPendingCommitStorageError(
+      "transaction",
+      "Pending queue record is not JSON-safe",
+      { cause: error },
+    );
+  }
+  stats.records += 1;
+  stats.operations += record.operations.length;
+  stats.bytes += bytes;
+}
+
+async function walkCursor(
+  request: IDBRequest<IDBCursorWithValue | null>,
+  transaction: IDBTransaction,
+  signal: AbortSignal | undefined,
+  visit: (value: unknown) => void,
+): Promise<void> {
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+  let settled = false;
+  const cleanup = () => signal?.removeEventListener("abort", abort);
+  const fail = (error: unknown) => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    try {
+      transaction.abort();
+    } catch {
+      // A completed transaction does not need cancellation.
+    }
+    reject(error);
+  };
+  const abort = () =>
+    fail(
+      new IndexedDbPendingCommitStorageError("aborted", "IndexedDB operation was aborted", {
+        cause: signal?.reason,
+      }),
+    );
+  if (signal?.aborted) {
+    abort();
+    return promise;
+  }
+  signal?.addEventListener("abort", abort, { once: true });
+  request.onerror = () => fail(storageError(request.error, "IndexedDB cursor failed"));
+  request.onsuccess = () => {
+    if (settled) return;
+    const cursor = request.result;
+    if (!cursor) {
+      settled = true;
+      cleanup();
+      resolve();
+      return;
+    }
+    try {
+      visit(cursor.value);
+      cursor.continue();
+    } catch (error) {
+      fail(error);
+    }
+  };
+  return promise;
 }
 
 function requestResult<T>(

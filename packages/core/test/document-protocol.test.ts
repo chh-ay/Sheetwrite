@@ -1,15 +1,19 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import {
+  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   type DocumentValidationError,
   type DocumentValidationResult,
   documentOpTarget,
   getLastMergeValidationStatsForTest,
+  resolveTransactionResourceLimits,
+  validateTransactionResources,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { DocumentOp, WorkbookSnapshot } from "../src/types.js";
+import type { DataValidationCondition, DocumentOp, WorkbookSnapshot } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 type OperationTargetSource = "address" | "range" | "sheet" | "new-sheet" | "named-range";
@@ -730,6 +734,187 @@ describe("workbook document protocol", () => {
     expect(missingScopeResult.errors.map((error) => error.code)).toContain("missing-reference");
   });
 
+  it("enforces every snapshot resource boundary before normalization", () => {
+    const snapshot = richSnapshot();
+    snapshot.documentId = '雪\u0000"\n\ud800';
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(snapshot)).byteLength;
+    const acceptedLimits = [
+      { maxSheets: 2 },
+      { maxRowsPerSheet: 4 },
+      { maxColumnsPerSheet: 2 },
+      { maxMetadataEntries: 8 },
+      { maxSerializedBytes: serializedBytes },
+      { maxLogicalCellsPerSheet: 8 },
+      { maxDenseCells: 10 },
+    ] as const;
+    for (const resourceLimits of acceptedLimits) {
+      expect(validateWorkbookSnapshot(snapshot, { resourceLimits }).ok).toBe(true);
+      const [resource, limit] = Object.entries(resourceLimits)[0]!;
+      const rejected = validateWorkbookSnapshot(snapshot, {
+        resourceLimits: { [resource]: limit - 1 },
+      });
+      expect(rejected.ok).toBe(false);
+      if (rejected.ok) throw new Error(`${resource} limit unexpectedly accepted`);
+      expect(rejected.errors[0]).toMatchObject({ code: "resource-limit" });
+    }
+
+    const columns = Array.from({ length: 6 }, (_, index) => ({
+      key: `c${index}`,
+      header: `C${index}`,
+      width: 80,
+      type: "text" as const,
+    }));
+    const millionRowSnapshot: WorkbookSnapshot = {
+      schemaVersion: WORKBOOK_SCHEMA_VERSION,
+      workbook: { activeSheet: "paged" },
+      sheets: [
+        {
+          id: "paged",
+          name: "Paged",
+          order: 0,
+          rowCount: DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
+          columns,
+          cells: [],
+        },
+      ],
+    };
+    const paged = validateWorkbookSnapshot(millionRowSnapshot, { storage: "paged" });
+    expect(paged.ok).toBe(true);
+    const dense = validateWorkbookSnapshot(millionRowSnapshot, { storage: "dense" });
+    expect(dense.ok).toBe(false);
+    if (dense.ok) throw new Error("oversized dense capacity unexpectedly accepted");
+    expect(dense.errors[0]).toMatchObject({ code: "resource-limit" });
+
+    millionRowSnapshot.sheets[0]!.rowCount += 1;
+    const excessiveRows = validateWorkbookSnapshot(millionRowSnapshot, { storage: "paged" });
+    expect(excessiveRows.ok).toBe(false);
+    if (excessiveRows.ok) throw new Error("excessive paged rows unexpectedly accepted");
+    expect(excessiveRows.errors[0]).toMatchObject({
+      path: "sheets[0].rowCount",
+      code: "resource-limit",
+    });
+  });
+
+  it("validates typed validation comparisons without weakening legacy bounds", () => {
+    const comparisons: DataValidationCondition[] = [
+      { kind: "number", comparison: { operator: "between", min: 1, max: 3 } },
+      { kind: "number", comparison: { operator: "notBetween", min: 1, max: 3 } },
+      { kind: "number", comparison: { operator: "equal", value: 2 } },
+      { kind: "number", comparison: { operator: "notEqual", value: 2 } },
+      { kind: "number", comparison: { operator: "greaterThan", value: 2 } },
+      { kind: "number", comparison: { operator: "lessThan", value: 2 } },
+      { kind: "number", comparison: { operator: "greaterThanOrEqual", value: 2 } },
+      { kind: "number", comparison: { operator: "lessThanOrEqual", value: 2 } },
+      { kind: "date", comparison: { operator: "notEqual", value: 45_000 } },
+      { kind: "textLength", comparison: { operator: "lessThan", value: 8 } },
+      { kind: "number", min: 0, max: 10 },
+    ];
+    const accepted = richSnapshot();
+    accepted.sheets[1]!.validationRules = comparisons.map((condition, index) => ({
+      id: `comparison-${index}`,
+      range: {
+        sheet: "sheet-a",
+        start: { row: 0, col: 0 },
+        end: { row: 3, col: 1 },
+      },
+      condition,
+      policy: "reject",
+    }));
+    expect(validateWorkbookSnapshot(accepted)).toMatchObject({ ok: true });
+
+    const invalidConditions: unknown[] = [
+      {
+        kind: "number",
+        min: 0,
+        comparison: { operator: "greaterThan", value: 1 },
+      },
+      { kind: "number", comparison: { operator: "notBetween", min: 1 } },
+      { kind: "number", comparison: { operator: "equal", value: 1, min: 1 } },
+      { kind: "number", comparison: { operator: "between", min: 3, max: 1 } },
+      { kind: "number", comparison: { operator: "outside", value: 1 } },
+      { kind: "textLength", comparison: { operator: "equal", value: 1.5 } },
+      { kind: "textLength", comparison: { operator: "between", min: -1, max: 4 } },
+    ];
+    for (const [index, condition] of invalidConditions.entries()) {
+      const rejected = richSnapshot();
+      rejected.sheets[1]!.validationRules = [
+        {
+          id: `invalid-comparison-${index}`,
+          range: {
+            sheet: "sheet-a",
+            start: { row: 0, col: 0 },
+            end: { row: 0, col: 0 },
+          },
+          condition: condition as DataValidationCondition,
+          policy: "reject",
+        },
+      ];
+      expect(validateWorkbookSnapshot(rejected).ok).toBe(false);
+    }
+  });
+
+  it("rejects every dimension-bearing metadata shape outside its sheet", () => {
+    const snapshot = richSnapshot();
+    const sheet = snapshot.sheets[1]!;
+    sheet.frozenRows = sheet.rowCount + 1;
+    sheet.frozenCols = sheet.columns.length + 1;
+    sheet.rowMeta = [[sheet.rowCount, { hidden: true }]];
+    sheet.merges = [{ r0: 0, c0: 0, r1: sheet.rowCount, c1: 0 }];
+    sheet.cells = [
+      {
+        startRow: sheet.rowCount,
+        startCol: 0,
+        rowCount: 1,
+        colCount: 1,
+        cells: [],
+      },
+    ];
+    sheet.validationRules = [
+      {
+        id: "outside",
+        range: {
+          sheet: sheet.id,
+          start: { row: 0, col: 0 },
+          end: { row: sheet.rowCount, col: 0 },
+        },
+        condition: { kind: "number", min: 0 },
+        policy: "reject",
+      },
+    ];
+    sheet.protectedRanges = [
+      {
+        id: "outside",
+        range: {
+          sheet: sheet.id,
+          start: { row: 0, col: 0 },
+          end: { row: 0, col: sheet.columns.length },
+        },
+      },
+    ];
+    sheet.notes = [
+      {
+        addr: { sheet: sheet.id, row: sheet.rowCount, col: 0 },
+        text: "outside",
+      },
+    ];
+
+    const result = validateWorkbookSnapshot(snapshot);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("out-of-bounds metadata unexpectedly accepted");
+    expect(result.errors.map((error) => error.path)).toEqual(
+      expect.arrayContaining([
+        "sheets[1].frozenRows",
+        "sheets[1].frozenCols",
+        "sheets[1].rowMeta[0][0]",
+        "sheets[1].merges[0]",
+        "sheets[1].cells[0]",
+        "sheets[1].validationRules[0].range",
+        "sheets[1].protectedRanges[0].range",
+        "sheets[1].notes[0].addr",
+      ]),
+    );
+  });
+
   it("keeps operation targeting exhaustive and emitted operations JSON-only", () => {
     const store = new SheetwriteStore(makeWorkbook(3));
     const emitted: DocumentOp[] = [];
@@ -773,5 +958,115 @@ describe("workbook document protocol", () => {
     ]);
     expect(store.getWorkbook().sheets[0]!.validationRules?.[0]?.id).toBe("positive");
     store.dispose();
+  });
+});
+
+describe("transaction resource protocol", () => {
+  const setOperation = (text: string): DocumentOp => ({
+    op: "set",
+    addr: { sheet: "s1", row: 0, col: 0 },
+    value: { kind: "literal", value: text },
+  });
+  const jsonBytes = (operations: readonly DocumentOp[]): number =>
+    new TextEncoder().encode(JSON.stringify(operations)).byteLength;
+
+  it("publishes validated inclusive defaults and rejects invalid overrides", () => {
+    expect(DEFAULT_TRANSACTION_RESOURCE_LIMITS).toEqual({
+      maxOperations: 10_000,
+      maxEncodedBytes: 8 * 1024 * 1024,
+    });
+    expect(resolveTransactionResourceLimits({ maxOperations: 7 })).toEqual({
+      maxOperations: 7,
+      maxEncodedBytes: 8 * 1024 * 1024,
+    });
+    for (const invalid of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => resolveTransactionResourceLimits({ maxOperations: invalid })).toThrow(
+        RangeError,
+      );
+      expect(() => resolveTransactionResourceLimits({ maxEncodedBytes: invalid })).toThrow(
+        RangeError,
+      );
+    }
+  });
+
+  it("accepts the default operation-count limit and rejects limit plus one", () => {
+    const operation = setOperation("x");
+    const accepted = Array.from(
+      { length: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations },
+      () => operation,
+    );
+    const result = validateTransactionResources(accepted);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("operation-count limit unexpectedly rejected");
+    expect(result.operationCount).toBe(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations);
+
+    const rejected = validateTransactionResources([...accepted, operation]);
+    expect(rejected).toEqual({
+      ok: false,
+      issue: {
+        kind: "resource-limit",
+        severity: "error",
+        resource: "operations",
+        actual: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations + 1,
+        max: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations,
+        message: `Transaction operation count ${DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations + 1} exceeds maximum ${DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations}`,
+      },
+    });
+  });
+
+  it("accepts an exactly 8 MiB long-string payload and rejects one extra byte", () => {
+    const empty = [setOperation("")];
+    const overhead = jsonBytes(empty);
+    const exactText = "x".repeat(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes - overhead);
+    const exact = [setOperation(exactText)];
+    expect(jsonBytes(exact)).toBe(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes);
+
+    const accepted = validateTransactionResources(exact);
+    expect(accepted).toEqual({
+      ok: true,
+      operationCount: 1,
+      encodedBytes: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes,
+    });
+
+    const rejected = validateTransactionResources([setOperation(`${exactText}x`)]);
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok) throw new Error("limit-plus-one string unexpectedly accepted");
+    expect(rejected.issue).toMatchObject({
+      resource: "encoded-bytes",
+      actual: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes + 1,
+      max: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes,
+    });
+  });
+
+  it("measures packed setBlock fields rather than their logical range area", () => {
+    const packed = (text: string): DocumentOp => ({
+      op: "setBlock",
+      range: {
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 0, col: 0 },
+      },
+      block: { rowCount: 1, colCount: 1, values: [text] },
+    });
+    const acceptedOperations = [packed("packed".repeat(100))];
+    const maxEncodedBytes = jsonBytes(acceptedOperations);
+    expect(
+      validateTransactionResources(acceptedOperations, {
+        maxOperations: 1,
+        maxEncodedBytes,
+      }),
+    ).toEqual({ ok: true, operationCount: 1, encodedBytes: maxEncodedBytes });
+
+    const rejected = validateTransactionResources([packed(`${"packed".repeat(100)}x`)], {
+      maxOperations: 1,
+      maxEncodedBytes,
+    });
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok) throw new Error("oversized packed block unexpectedly accepted");
+    expect(rejected.issue).toMatchObject({
+      resource: "encoded-bytes",
+      actual: maxEncodedBytes + 1,
+      max: maxEncodedBytes,
+    });
   });
 });

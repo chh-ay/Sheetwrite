@@ -73,10 +73,6 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
       if (style.color) css.push(`color:${style.color}`);
       if (style.backgroundColor) css.push(`background-color:${style.backgroundColor}`);
       if (style.align) css.push(`text-align:${style.align}`);
-      const formula =
-        cell.value.kind === "formula"
-          ? ` data-sheetwrite-formula="${escapeHtml(cell.value.src)}"`
-          : "";
       const styleAttr = css.length > 0 ? ` style="${escapeHtml(css.join(";"))}"` : "";
       const text =
         cell.resolved === null
@@ -86,7 +82,7 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
               ? "TRUE"
               : "FALSE"
             : String(cell.resolved);
-      html += `<td${formula}${styleAttr}>${escapeHtml(text)}</td>`;
+      html += `<td${styleAttr}>${escapeHtml(neutralizeInjection(text))}</td>`;
     }
     html += "</tr>";
   }

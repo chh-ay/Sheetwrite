@@ -68,6 +68,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
 ];
 
+/**
+ * Framework workbench deep links. The global topbar links to /showcases/
+ * instead; these power in-page cross-links (ShowcasePage next/prev) and the
+ * landing/hub link graphs. Every href here is a preserved public URL.
+ */
 export const SHOWCASE_NAVIGATION: readonly NavigationItem[] = [
   { label: "Vanilla", href: "/vanilla/" },
   { label: "React", href: "/react/" },

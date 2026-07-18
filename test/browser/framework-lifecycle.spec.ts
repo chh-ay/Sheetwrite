@@ -43,9 +43,9 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
 }
 
 for (const framework of ["react", "vue", "svelte"] as const) {
-  test(`framework lifecycle: ${framework} falls back, retries, becomes ready, and paints`, async ({
-    page,
-  }) => {
+  test(`framework lifecycle: ${framework} falls back, retries, becomes ready, and paints`, {
+    tag: "@portability",
+  }, async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto(siteUrl(`/test/framework-lifecycle/${framework}/`));
 

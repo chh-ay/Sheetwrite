@@ -4,20 +4,22 @@ import { hasOpaqueForeground } from "./canvas-assertions.js";
 
 declare global {
   interface Window {
-    __sheetwriteVueGrid?: Grid;
+    __sheetwriteVueWorkbench?: { grid: Grid };
   }
 }
 
 import { examplePages, SITE_BASE, siteUrl } from "./playwright.config.js";
 
 // The intended fixture datasets: vanilla/react show the revenue accounts
-// workbook, vue streams the million-row orders feed, svelte builds the
-// formula model. First data cell per page.
+// workbook, vue runs the governed business orders workbook, svelte hydrates
+// the offline dispatch log. First data cell mirrored per page (vue's frozen
+// PO column and svelte's frozen ticket column stay out of the ARIA window,
+// so their first mirrored cells are the supplier and site columns).
 const EXPECTED_CELL_VALUE = {
   vanilla: "Account 000001",
   react: "Account 000001",
-  vue: "Customer 0000001",
-  svelte: "Product line 001",
+  vue: "Mekong Freight",
+  svelte: "Riverside depot",
 } satisfies Record<(typeof examplePages)[number], string>;
 
 /**
@@ -74,29 +76,13 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
 }
 
 for (const name of examplePages) {
-  test(`${name} example boots, initializes WASM, and paints cells`, async ({ page }) => {
+  test(`${name} example boots, initializes WASM, and paints cells`, {
+    tag: name === "vanilla" ? "@portability" : "@chromium-only",
+  }, async ({ page }) => {
     const errors = collectErrors(page);
 
     await page.goto(urlOf(name));
     await page.waitForSelector(".sheetwrite", { state: "attached", timeout: 15_000 });
-    if (name === "vue") {
-      // The paged fixture resolves after the mirror's initial loading snapshot.
-      // Wait for the first paged window through the public store handle, then
-      // focus a body cell so the accessibility window refreshes through normal
-      // grid interaction.
-      await expect
-        .poll(
-          () =>
-            page.evaluate(() => {
-              const grid = window.__sheetwriteVueGrid;
-              if (!grid) return "handle-missing";
-              return grid.store.getCell({ sheet: "orders", row: 0, col: 0 }).resolved;
-            }),
-          { timeout: 15_000 },
-        )
-        .toBe(1);
-      await page.locator(".sw-demo-grid .sheetwrite").click({ position: { x: 80, y: 50 } });
-    }
     await expect
       .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
         timeout: 15_000,
@@ -115,7 +101,9 @@ for (const name of examplePages) {
   });
 }
 
-test("workbook XLSX backend preserves formulas in a browser build", async ({ page }) => {
+test("workbook XLSX backend preserves formulas in a browser build", {
+  tag: "@portability",
+}, async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(siteUrl("/test/xlsx/"));
   const result = page.locator("#result");
@@ -131,7 +119,9 @@ test("workbook XLSX backend preserves formulas in a browser build", async ({ pag
   expect(errors.console).toEqual([]);
 });
 
-test("offline queue, two-grid sync, and presence converge in a browser", async ({ page }) => {
+test("offline queue, two-grid sync, and presence converge in a browser", {
+  tag: "@portability",
+}, async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(siteUrl("/test/collaboration/"));
   const result = page.locator("#result");
@@ -156,15 +146,24 @@ test("offline queue, two-grid sync, and presence converge in a browser", async (
   expect(errors.console).toEqual([]);
 });
 
-test("example pages cross-link through the shared nav", async ({ page }) => {
+test("example pages cross-link through the capability hub", async ({ page }) => {
   await page.goto(urlOf("vanilla"));
   await page.waitForSelector(".sw-product-nav");
-  await page.click(`.sw-product-nav a[href="${SITE_BASE}/react/"]`);
+  const showcasesLink = page.locator(`.sw-product-nav a[href="${SITE_BASE}/showcases/"]`);
+  // On a workbench route the hub link is ancestor-current, not page-current.
+  await expect(showcasesLink).toHaveAttribute("aria-current", "true");
+  await showcasesLink.click();
+  await expect(page).toHaveURL(siteUrl("/showcases/"));
+  await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
+  await expect(page.locator("main h1")).toHaveText("Every capability, proven live.");
+  // Framework deep links stay reachable from the hub's workbench cards.
+  await page.locator(`main a[href="${SITE_BASE}/react/"]`).first().click();
   await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
-  await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("React");
 });
 
-test("vanilla example commits an edit through the formula bar and undoes it", async ({ page }) => {
+test("vanilla example commits an edit through the formula bar and undoes it", {
+  tag: "@portability",
+}, async ({ page }) => {
   await page.goto(urlOf("vanilla"));
   await page.waitForSelector(".sheetwrite canvas", { state: "attached" });
 
@@ -187,72 +186,19 @@ test("vanilla example commits an edit through the formula bar and undoes it", as
   await expect(page.locator("#formula")).not.toHaveValue("browser-smoke");
 });
 
-test("vue paged datasource keeps one million rows allocation-lazy", async ({ page }) => {
-  await page.goto(urlOf("vue"));
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
-
-  const stats = async () =>
-    page.evaluate(() => {
-      const store = window.__sheetwriteVueGrid?.store;
-      if (!store || !("getPagedStats" in store) || typeof store.getPagedStats !== "function") {
-        return null;
-      }
-      return store.getPagedStats("orders");
-    });
-  await expect.poll(stats, { timeout: 15_000 }).toMatchObject({
-    fullyLoaded: false,
-  });
-  await expect
-    .poll(async () => (await stats())?.loadedCells ?? 0, { timeout: 15_000 })
-    .toBeGreaterThan(0);
-
-  const initial = await stats();
-  expect(initial).not.toBeNull();
-  expect(initial!.allocatedBytes).toBeLessThanOrEqual(32 * 1024 * 1024);
-  expect(
-    await page.evaluate(
-      () => window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 0, col: 0 }).resolved,
-    ),
-  ).toBe(1);
-
-  await page.evaluate(() => {
-    window.__sheetwriteVueGrid?.scrollToCell({ sheet: "orders", row: 500_000, col: 0 });
-  });
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            window.__sheetwriteVueGrid?.store.getCell({
-              sheet: "orders",
-              row: 500_000,
-              col: 0,
-            }).resolved,
-        ),
-      { timeout: 15_000 },
-    )
-    .toBe(500_001);
-  expect((await stats())!.allocatedBytes).toBeLessThanOrEqual(32 * 1024 * 1024);
-});
-
 test("validation dropdown and checkbox editors are keyboard and ARIA operable", async ({
   page,
 }) => {
   await page.goto(urlOf("vue"));
   await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 0, col: 0 }).resolved,
-      ),
-    )
-    .not.toBe("#LOADING!");
+    .poll(() => page.evaluate(() => Boolean(window.__sheetwriteVueWorkbench?.grid)))
+    .toBe(true);
 
   // The rule is host configuration (public API); the editor itself must open
   // through user input: select the cell, then press Enter on the grid host.
   await page.evaluate(() => {
-    const grid = window.__sheetwriteVueGrid;
+    const grid = window.__sheetwriteVueWorkbench?.grid;
     if (!grid) throw new Error("Vue grid is unavailable");
     grid.setValidationRule({
       id: "browser-list",
@@ -273,13 +219,14 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
     .poll(() =>
       page.evaluate(
         () =>
-          window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 0, col: 0 }).resolved,
+          window.__sheetwriteVueWorkbench?.grid.store.getCell({ sheet: "orders", row: 0, col: 0 })
+            .resolved,
       ),
     )
     .toBe(2);
 
   await page.evaluate(() => {
-    const grid = window.__sheetwriteVueGrid;
+    const grid = window.__sheetwriteVueWorkbench?.grid;
     if (!grid) throw new Error("Vue grid is unavailable");
     grid.setValidationRule({
       id: "browser-checkbox",
@@ -298,57 +245,9 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
     .poll(() =>
       page.evaluate(
         () =>
-          window.__sheetwriteVueGrid?.store.getCell({ sheet: "orders", row: 1, col: 0 }).resolved,
+          window.__sheetwriteVueWorkbench?.grid.store.getCell({ sheet: "orders", row: 1, col: 0 })
+            .resolved,
       ),
     )
     .toBe(true);
-});
-
-test("vue sync demo queues, retries, and acknowledges a stable mutation", async ({ page }) => {
-  const errors = collectErrors(page);
-  await page.goto(urlOf("vue"));
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
-  const sync = page.getByTestId("sync");
-  await expect(sync).toContainText("All changes synced");
-
-  await page.getByRole("button", { name: /Edit visible row/i }).click();
-  await expect(sync).toContainText("1 pending mutation");
-
-  const acknowledge = page.getByRole("button", { name: "Acknowledge", exact: true });
-  await acknowledge.click();
-  await expect(page.locator(".sw-vue-activity")).toContainText("retry ready");
-  await expect(sync).toContainText("1 pending mutation");
-
-  await acknowledge.click();
-  await expect(sync).toContainText("All changes synced · server v1");
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("svelte example commits a formula-bar edit that the model keeps", async ({ page }) => {
-  await page.goto(urlOf("svelte"));
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
-
-  // The model keeps a live SUM in F1.
-  await page.fill(".sheetwrite-shell-namebox", "F1");
-  await page.press(".sheetwrite-shell-namebox", "Enter");
-  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue("=SUM(B1:E1)");
-
-  // Commit a literal through the shell bar and read it back after
-  // re-navigation: the edit must survive in the document, not just the input.
-  await page.fill(".sheetwrite-shell-namebox", "B2");
-  await page.press(".sheetwrite-shell-namebox", "Enter");
-  await page.fill(".sheetwrite-shell-formula", "12345");
-  await page.press(".sheetwrite-shell-formula", "Enter");
-  await page.fill(".sheetwrite-shell-namebox", "B2");
-  await page.press(".sheetwrite-shell-namebox", "Enter");
-  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue("12345");
-  await expect
-    .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents())
-    .toContain("12345");
-
-  // The dependent SUM formula is untouched by the neighboring edit.
-  await page.fill(".sheetwrite-shell-namebox", "F1");
-  await page.press(".sheetwrite-shell-namebox", "Enter");
-  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue("=SUM(B1:E1)");
 });

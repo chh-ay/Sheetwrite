@@ -9,10 +9,10 @@ Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L47</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L79</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>50</span>
+## Members <span class="api-count" data-pagefind-ignore>51</span>
 
 <div class="api-member-list">
 
@@ -187,6 +187,17 @@ getClipboardWindow: (sheet: SheetId, viewRows: { start: number; end: number; }, 
 
 <p class="api-member-doc">Optional packed clipboard read. Custom stores may omit it; the controller
 preserves the per-cell Store fallback contract.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-data-window" data-pagefind-weight="1">
+<summary><code>getDataWindow</code> <span class="api-member-summary">Optional packed canonical data-row window used by file export.</span></summary>
+
+```ts generated
+getDataWindow: (sheet: SheetId, rows: { start: number; end: number; }, cols: readonly number[]) => VisibleWindowView;
+```
+
+<p class="api-member-doc">Optional packed canonical data-row window used by file export. Unlike
+`getVisibleWindow`, sort/filter state never remaps `rows`.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-get-formula" data-pagefind-weight="1">
@@ -476,7 +487,7 @@ viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
 <summary><code>fromSnapshot</code></summary>
 
 ```ts generated
-static fromSnapshot: (input: unknown) => SheetwriteStore
+static fromSnapshot: (input: unknown, options?: SheetwriteStoreOptions) => SheetwriteStore
 ```
 
 </details>
@@ -531,6 +542,14 @@ class SheetwriteStore implements Store {
     },
     cols: readonly number[],
   ) => ClipboardWindowView;
+  getDataWindow: (
+    sheet: SheetId,
+    rows: {
+      start: number;
+      end: number;
+    },
+    cols: readonly number[],
+  ) => VisibleWindowView;
   getFormula: (addr: CellAddress) => string | null;
   getPagedStats: (sheet: SheetId) => PagedStoreStats;
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
@@ -601,7 +620,10 @@ class SheetwriteStore implements Store {
   ungroupRows: (sheet: SheetId, start: number, end: number) => void;
   viewRowCount: (sheet: SheetId) => number;
   viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
-  static fromSnapshot: (input: unknown) => SheetwriteStore;
+  static fromSnapshot: (
+    input: unknown,
+    options?: SheetwriteStoreOptions,
+  ) => SheetwriteStore;
 }
 ```
 

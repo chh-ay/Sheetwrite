@@ -126,3 +126,20 @@ pub(super) fn format_date_serial(serial: f64, format: &str) -> Option<String> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{date_serial, format_date_serial, parse_date_value};
+
+    #[test]
+    fn parses_day_first_dates_and_formats_time_components() {
+        let serial = date_serial(2024, 12, 31).unwrap();
+        assert_eq!(parse_date_value("31/12/2024"), Some(serial));
+        assert_eq!(parse_date_value("31/13/2024"), None);
+        assert_eq!(parse_date_value("12/31/2024/extra"), None);
+        assert_eq!(
+            format_date_serial(serial + 0.5, "yyyy-mm-dd hh:mm:ss").as_deref(),
+            Some("2024-12-31 12:00:00")
+        );
+    }
+}

@@ -86,13 +86,36 @@ fn sheet_resize_rows_preserves_overlap_and_drops_oob_formulas() {
     sheet.resize_rows(2);
     assert_eq!(sheet.row_count, 2);
     assert!(!sheet.formulas.contains_key(&(2, 1)));
+
+    let mut paged = SheetData::new_paged(2, 3, 2, 1_000_000);
+    let paged_index = paged.idx(2, 1);
+    paged.set_kind(paged_index, KIND_NUMBER);
+    paged.set_num(paged_index, 24.0);
+    paged
+        .formulas
+        .insert((2, 1), FormulaEntry::parsed(parse("=A3").unwrap(), 0));
+    paged.resize_rows(2);
+    assert_eq!(paged.row_count, 2);
+    assert_eq!(paged.kind_at(paged.idx(1, 1)), 0);
+    assert!(!paged.formulas.contains_key(&(2, 1)));
 }
 
 #[test]
-fn sheet_noops_overflow_and_paged_load_state_preserve_invariants() {
-    let overflow = SheetData::new(usize::MAX, 2);
-    assert_eq!((overflow.n_cols, overflow.row_count), (0, 0));
+fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
+    assert_eq!(
+        checked_dense_cell_count(1, MAX_DENSE_CELLS),
+        Some(MAX_DENSE_CELLS)
+    );
+    assert_eq!(checked_dense_cell_count(1, MAX_DENSE_CELLS + 1), None);
+    assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
+    assert!(SheetData::try_new(usize::MAX, 2).is_err());
+    let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
+    assert_eq!(at_limit.kind.len(), MAX_DENSE_CELLS);
+    drop(at_limit);
 
+    let mut bounded_store = CellStore::new();
+    assert!(bounded_store.try_add_sheet(1, MAX_DENSE_CELLS + 1).is_err());
+    assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
     dense.resize_rows(2);
@@ -124,6 +147,26 @@ fn sheet_noops_overflow_and_paged_load_state_preserve_invariants() {
     paged.pin_range(1, 1, &[0]);
     paged.pin_range(0, 2, &[0, 1]);
     assert_eq!(paged.paged_stats().map(|stats| stats.1), Some(4));
+}
+
+#[test]
+fn page_hydration_preserves_dirty_and_explicitly_protected_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 3, 4, 1024);
+    store.set_number(sheet, 0, 0, 10.0, 7);
+    store.set_formula(sheet, 1, 0, "=1+1", 9);
+    store.mark_range_clean(sheet, 1, 2, 0, 1);
+
+    store.hydrate_page_numbers(sheet, 0, 0, &[100.0, 200.0, 300.0], 0, &[1]);
+
+    assert_close(number(&store, sheet, 0, 0), 10.0);
+    assert_eq!(store.get_cell(sheet, 0, 0).style(), 7);
+    assert_eq!(store.cell_state(sheet, 0, 0), 3);
+    assert_eq!(store.formula_source(sheet, 1, 0).as_deref(), Some("=(1+1)"));
+    assert_eq!(store.get_cell(sheet, 1, 0).style(), 9);
+    assert_eq!(store.cell_state(sheet, 1, 0), 2);
+    assert_close(number(&store, sheet, 2, 0), 300.0);
+    assert_eq!(store.cell_state(sheet, 2, 0), 2);
 }
 
 #[test]
@@ -491,11 +534,13 @@ fn date_time_functions_use_excel_serials_and_controlled_volatile_inputs() {
 #[test]
 fn criteria_families_apply_wildcards_shapes_and_error_semantics() {
     let mut store = CellStore::new();
-    let sheet = store.add_sheet(10, 5);
+    let sheet = store.add_sheet(13, 7);
     for (row, value) in [1.0, 2.0, 3.0, 4.0].into_iter().enumerate() {
         store.set_number(sheet, row, 0, value, 0);
     }
     store.set_string(sheet, 4, 0, "alpha", 0);
+    store.set_bool(sheet, 5, 0, true, 0);
+    store.set_bool(sheet, 6, 0, false, 0);
     for (row, value) in [10.0, 20.0, 30.0, 40.0, 50.0].into_iter().enumerate() {
         store.set_number(sheet, row, 1, value, 0);
     }
@@ -508,6 +553,9 @@ fn criteria_families_apply_wildcards_shapes_and_error_semantics() {
         (5, "=AVERAGEIFS(B1:B4,A1:A4,\">2\")"),
         (6, "=COUNTIF(A1:A5,\"a*\")"),
         (7, "=SUMIFS(B1:B3,A1:A4,\">0\")"),
+        (8, "=COUNTIF(A1:A4,2)"),
+        (9, "=COUNTIF(A6:A7,\"TRUE\")"),
+        (10, "=COUNTIF(A6:A7,\"FALSE\")"),
     ];
     for (col, source) in formulas {
         store.set_formula(sheet, 0, col + 2, source, 0);
@@ -522,6 +570,9 @@ fn criteria_families_apply_wildcards_shapes_and_error_semantics() {
     assert_close(number(&store, sheet, 0, 7), 35.0);
     assert_close(number(&store, sheet, 0, 8), 1.0);
     assert_eq!(string(&store, sheet, 0, 9).as_deref(), Some("#VALUE!"));
+    assert_close(number(&store, sheet, 0, 10), 1.0);
+    assert_close(number(&store, sheet, 0, 11), 1.0);
+    assert_close(number(&store, sheet, 0, 12), 1.0);
 }
 
 #[test]
@@ -877,6 +928,8 @@ fn public_api_bounds_checks_do_not_panic() {
         let snapshot = store.capture_range(sheet, 0, 0, 1, 1).unwrap();
         store.set_number(99, 0, 0, 1.0, 0);
         store.set_number(sheet, 9, 0, 1.0, 0);
+        store.set_number(sheet, usize::MAX, 0, 1.0, 0);
+        store.set_bool(sheet, usize::MAX, 0, true, 0);
         store.set_string(sheet, 0, 9, "x", 0);
         store.clear_cell(sheet, 9, 9, 0);
         store.set_formula(sheet, 9, 0, "=A1", 0);

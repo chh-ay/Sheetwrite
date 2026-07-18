@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { SnapshotValidationError } from "../src/document-protocol.js";
+import { SnapshotResourceError, SnapshotValidationError } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { ChangeEvent, DocumentOp, Workbook } from "../src/types.js";
@@ -164,5 +164,19 @@ describe("SheetwriteStore facade contract", () => {
     expect(() => SheetwriteStore.fromSnapshot({ schemaVersion: 999 })).toThrow(
       SnapshotValidationError,
     );
+
+    const large = makeWorkbook(1_000_000);
+    for (let index = large.sheets[0]!.columns.length; index < 6; index++) {
+      large.sheets[0]!.columns.push({
+        key: `extra-${index}`,
+        header: `Extra ${index}`,
+        width: 80,
+        type: "text",
+      });
+    }
+    expect(() => new SheetwriteStore(large)).toThrow(SnapshotResourceError);
+    const paged = new SheetwriteStore(large, undefined, { storage: "paged" });
+    expect(paged.isPaged("s1")).toBe(true);
+    paged.dispose();
   });
 });

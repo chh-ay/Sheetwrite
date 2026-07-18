@@ -5,11 +5,12 @@ description: "Applied, duplicate, or conflict acknowledgement from persistence."
 <!-- api-export:@sheetwrite/core|.|PersistenceCommitResponse -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-Applied, duplicate, or conflict acknowledgement from persistence.
+Applied, duplicate, or conflict acknowledgement from persistence. `applied`
+confirms the submitted operations unchanged; normalization must conflict.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L93</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L108</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>
@@ -22,7 +23,6 @@ Applied, duplicate, or conflict acknowledgement from persistence.
   status: "applied";
   version: number;
   clientMutationId: string;
-  canonicalOperations?: readonly DocumentOp[];
 }
 ```
 
@@ -63,7 +63,6 @@ export type PersistenceCommitResponse =
       status: "applied";
       version: number;
       clientMutationId: string;
-      canonicalOperations?: readonly DocumentOp[];
     }
   | {
       status: "duplicate";

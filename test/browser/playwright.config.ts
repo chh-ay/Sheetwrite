@@ -19,10 +19,29 @@ export default defineConfig({
     baseURL: siteUrl(),
     headless: true,
   },
+  projects: [
+    {
+      name: "chromium",
+      use: { browserName: "chromium" },
+    },
+    {
+      name: "firefox",
+      grep: /@portability/,
+      use: { browserName: "firefox" },
+    },
+    {
+      name: "webkit",
+      grep: /@portability/,
+      use: { browserName: "webkit" },
+    },
+  ],
   webServer: {
     command: `PORT=${SITE_PORT} bun scripts/serve-docs.ts`,
     cwd: fileURLToPath(new URL("../../", import.meta.url)),
     url: siteUrl(),
     timeout: 120_000,
+    // Concurrent local focused runs share one static dist server; CI must
+    // always start fresh so it can never bind a stale dist (hash-mismatch 500s).
+    reuseExistingServer: !process.env.CI,
   },
 });

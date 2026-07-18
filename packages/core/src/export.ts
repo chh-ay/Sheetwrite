@@ -1,19 +1,19 @@
-import { cellScalarToText } from "./cell-input.js";
+import { cellScalarToText, parseCellLiteralInput } from "./cell-input.js";
 import { neutralizeInjection } from "./clipboard.js";
-import type { CellFormat, CellScalar, Column } from "./types/cell.js";
+import {
+  assertDelimitedTextDimensions,
+  type DelimitedTextOptions,
+  encodeDelimitedText,
+  parseDelimitedText,
+  resolveDelimitedTextResourceLimits,
+} from "./delimited-text.js";
+import { IncompleteDataError } from "./store.js";
+import type { CellScalar, Column } from "./types/cell.js";
 import type { Range } from "./types/coordinates.js";
 import type { ColumnarData } from "./types/data.js";
 import type { Sheet, Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import type { Store } from "./types/store.js";
-
-function csvField(text: string): string {
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function tsvField(text: string): string {
-  return /[\t\n\r"]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
 
 /**
  * Neutralize a TEXT field before it is quoted: a string beginning with one of
@@ -38,175 +38,152 @@ function visibleColumns(sheet: Sheet): number[] {
   return out;
 }
 
-/**
- * CSV (UTF-8 BOM, CRLF). String values are injection-hardened (a leading
- * `= + - @ \t \r` is prefixed with `'`). Reads the whole sheet as one bulk
- * window, not cell-by-cell.
- */
-export function toCsv(sheet: Sheet, store: Store): string {
-  const cols = visibleColumns(sheet);
-  const n = cols.length;
-  const view = store.getVisibleWindow(sheet.id, { start: 0, end: sheet.rowCount }, cols);
-
-  const headerLine = cols.map((c) => csvField(safeHeader(sheet.columns[c]!.header))).join(",");
-  const lines: string[] = [headerLine];
-  for (let r = 0; r < sheet.rowCount; r++) {
-    const row: string[] = new Array(n);
-    for (let cj = 0; cj < n; cj++) {
-      const value = view.values[r * n + cj] ?? null;
-      row[cj] = csvField(safeText(value));
-    }
-    lines.push(row.join(","));
-  }
-  return `\ufeff${lines.join("\r\n")}`;
+function assertCompleteData(store: Store, sheet: string): void {
+  const capability = store.queryCapability?.(sheet);
+  if (capability?.status === "incomplete") throw new IncompleteDataError(sheet, capability);
 }
 
-/** TSV for a rectangular range (Excel/Sheets clipboard format). */
-export function toTsv(range: Range, store: Store): string {
-  const cols: number[] = [];
-  for (let c = range.start.col; c <= range.end.col; c++) cols.push(c);
-  const n = cols.length;
-  const nRows = range.end.row - range.start.row + 1;
-  const view = store.getVisibleWindow(
-    range.sheet,
-    { start: range.start.row, end: range.end.row + 1 },
-    cols,
-  );
+/**
+ * Export the current visible CSV view (UTF-8 BOM, CRLF): visible columns and
+ * view-ordered rows surviving sort, filter, hidden-row, and group state. String
+ * values beginning with `= + - @ \t \r` are prefixed with `'`. The synchronous
+ * API returns one in-memory string, but fetches at most
+ * `maxWriterWindowRows` view rows from the store per read.
+ *
+ * @throws {@link IncompleteDataError} before serialization when a paged sheet is incomplete.
+ * @throws {@link DelimitedTextResourceError} when a configured resource ceiling is exceeded.
+ */
+export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions = {}): string {
+  assertCompleteData(store, sheet.id);
+  const limits = resolveDelimitedTextResourceLimits(options);
+  const cols = visibleColumns(sheet);
+  const viewRows = store.viewRowCount(sheet.id);
+  assertDelimitedTextDimensions(viewRows + 1, cols.length, limits, "export");
 
-  const rows: string[] = [];
-  for (let r = 0; r < nRows; r++) {
-    const cells: string[] = new Array(n);
-    for (let cj = 0; cj < n; cj++) cells[cj] = tsvField(safeText(view.values[r * n + cj] ?? null));
-    rows.push(cells.join("\t"));
+  function* rows(): Generator<readonly string[]> {
+    yield cols.map((column) => safeHeader(sheet.columns[column]!.header));
+    for (let start = 0; start < viewRows; start += limits.maxWriterWindowRows) {
+      const end = Math.min(viewRows, start + limits.maxWriterWindowRows);
+      const view = store.getVisibleWindow(sheet.id, { start, end }, cols);
+      for (let row = 0; row < end - start; row++) {
+        const fields: string[] = new Array(cols.length);
+        for (let column = 0; column < cols.length; column++) {
+          fields[column] = safeText(view.values[row * cols.length + column] ?? null);
+        }
+        yield fields;
+      }
+    }
   }
-  return rows.join("\r\n");
+
+  return encodeDelimitedText(rows(), ",", options, { bom: true, operation: "export" });
+}
+
+/**
+ * Export a canonical data-space range as clipboard-compatible TSV (CRLF, no
+ * BOM). Reversed corners are normalized; active sort and filter views do not
+ * remap the supplied row coordinates. Values are injection-hardened. The
+ * synchronous API returns one in-memory string and fetches at most
+ * `maxWriterWindowRows` canonical rows per packed store read.
+ *
+ * @throws {@link IncompleteDataError} before serialization when a paged sheet is incomplete.
+ * @throws {@link DelimitedTextResourceError} when a configured resource ceiling is exceeded.
+ */
+export function toTsv(range: Range, store: Store, options: DelimitedTextOptions = {}): string {
+  assertCompleteData(store, range.sheet);
+  const limits = resolveDelimitedTextResourceLimits(options);
+  const startRow = Math.min(range.start.row, range.end.row);
+  const endRow = Math.max(range.start.row, range.end.row);
+  const startColumn = Math.min(range.start.col, range.end.col);
+  const endColumn = Math.max(range.start.col, range.end.col);
+  const rowCount = endRow - startRow + 1;
+  const columnCount = endColumn - startColumn + 1;
+  assertDelimitedTextDimensions(rowCount, columnCount, limits, "export");
+
+  function* rows(): Generator<readonly string[]> {
+    const columns = Array.from({ length: columnCount }, (_, index) => startColumn + index);
+    for (
+      let chunkStart = startRow;
+      chunkStart <= endRow;
+      chunkStart += limits.maxWriterWindowRows
+    ) {
+      const chunkEnd = Math.min(endRow + 1, chunkStart + limits.maxWriterWindowRows);
+      const window = store.getDataWindow?.(
+        range.sheet,
+        { start: chunkStart, end: chunkEnd },
+        columns,
+      );
+      for (let row = chunkStart; row < chunkEnd; row++) {
+        const fields: string[] = new Array(columnCount);
+        for (let column = 0; column < columnCount; column++) {
+          const value = window
+            ? (window.values[(row - chunkStart) * columnCount + column] ?? null)
+            : store.getCell({ sheet: range.sheet, row, col: startColumn + column }).resolved;
+          fields[column] = safeText(value);
+        }
+        yield fields;
+      }
+    }
+  }
+
+  return encodeDelimitedText(rows(), "\t", options, { operation: "export" });
 }
 
 // ── CSV / TSV import ─────────────────────────────────────────────────────────
 
 /**
- * Parse RFC-4180-style CSV into a grid of raw strings: comma-delimited, with
- * `"`-quoted fields that may embed commas, newlines, and doubled quotes, plus
- * CR / LF / CRLF row breaks. A leading UTF-8 BOM is stripped. This mirrors
- * `parseTsv` from clipboard.ts exactly, but splits on commas instead of tabs.
+ * Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,
+ * bare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional
+ * leading UTF-8 BOM. The synchronous API consumes an existing in-memory string
+ * and returns an in-memory grid; it does not claim streaming. Scanning enforces
+ * resource ceilings before materializing the next oversized field or record.
  */
-export function parseCsv(text: string): string[][] {
-  // Drop a leading UTF-8 BOM so the first header cell is not "\ufeffName".
-  const input = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let quoted = false;
-  let i = 0;
-
-  const endField = () => {
-    row.push(field);
-    field = "";
-  };
-  const endRow = () => {
-    endField();
-    rows.push(row);
-    row = [];
-  };
-
-  while (i < input.length) {
-    const ch = input[i]!;
-    if (quoted) {
-      if (ch === '"') {
-        if (input[i + 1] === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        quoted = false;
-        i++;
-        continue;
-      }
-      field += ch;
-      i++;
-      continue;
-    }
-    if (ch === '"' && field === "") {
-      quoted = true;
-      i++;
-    } else if (ch === ",") {
-      endField();
-      i++;
-    } else if (ch === "\r") {
-      // swallow CRLF as one row break
-      if (input[i + 1] === "\n") i++;
-      endRow();
-      i++;
-    } else if (ch === "\n") {
-      endRow();
-      i++;
-    } else {
-      field += ch;
-      i++;
-    }
-  }
-
-  // trailing field/row unless the text ended exactly on a row break
-  if (field !== "" || row.length > 0) endRow();
-  return rows;
+export function parseCsv(text: string, options: DelimitedTextOptions = {}): string[][] {
+  return parseDelimitedText(text, ",", options);
 }
 
 /**
- * Coerce one raw CSV field into a `CellScalar` for a column of the given type.
- * A missing or empty field becomes `null`; a `number` column parses a finite
- * number/currency (non-numeric text falls back to `null`); every other type
- * keeps the raw string.
+ * Parse CSV into `ColumnarData`. The first record is consumed as a positional
+ * header. Input fields project onto declared visible columns; hidden declared
+ * columns are initialized to `null`, matching the visible-column CSV export.
+ * Extra fields are ignored and missing fields become `null`. The returned
+ * columnar table is fully materialized in memory.
  */
-function coerceField(raw: string | undefined, type: CellFormat): CellScalar {
-  if (raw === undefined || raw === "") return null;
+export function fromCsv(
+  text: string,
+  columns: readonly Column[],
+  options: DelimitedTextOptions = {},
+): ColumnarData {
+  const limits = resolveDelimitedTextResourceLimits(options);
+  const grid = parseDelimitedText(text, ",", options);
+  const rowCount = Math.max(0, grid.length - 1);
+  assertDelimitedTextDimensions(rowCount, columns.length, limits, "import");
 
-  if (type === "number" || type === "currency") {
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return raw;
-}
-
-/**
- * Parse CSV `text` into `ColumnarData` keyed by `columns[i].key` — the symmetric
- * counterpart to `toCsv`. The first parsed row is treated as the header and
- * consumed; each remaining row maps positionally onto `columns`. CSV columns
- * beyond `columns.length` are ignored, missing trailing cells become `null`, and
- * `number` columns coerce their fields to finite numbers.
- */
-export function fromCsv(text: string, columns: readonly Column[]): ColumnarData {
-  const grid = parseCsv(text);
-
-  // The first parsed row is the header; the body is everything after it.
-  const body = grid.slice(1);
-  const rowCount = body.length;
-
-  // One output array per declared column, sized to the body up front.
   const result: Record<string, CellScalar[]> = Object.create(null);
-  for (const column of columns) {
-    result[column.key] = new Array<CellScalar>(rowCount);
-  }
+  for (const column of columns) result[column.key] = new Array<CellScalar>(rowCount).fill(null);
 
-  for (let r = 0; r < rowCount; r++) {
-    const cells = body[r]!;
-    for (let c = 0; c < columns.length; c++) {
-      const column = columns[c]!;
-      result[column.key]![r] = coerceField(cells[c], column.type);
+  const projected = columns.filter((column) => column.visible !== false);
+  for (let row = 0; row < rowCount; row++) {
+    const fields = grid[row + 1]!;
+    for (let column = 0; column < projected.length; column++) {
+      const target = projected[column]!;
+      result[target.key]![row] =
+        fields[column] === undefined ? null : parseCellLiteralInput(fields[column]!, target.type);
     }
   }
 
   return { rowCount, columns: result };
 }
 
-/** Browser-only download helper; throws in non-DOM runtimes. */
+/**
+ * Trigger a browser download from in-memory bytes. The temporary anchor is
+ * removed and its object URL is scheduled for revocation even when DOM append or
+ * click throws.
+ */
 export function downloadBytes(bytes: Uint8Array | string, filename: string, mime: string): void {
   if (typeof document === "undefined") {
     throw new Error("Sheetwrite: downloadBytes requires a browser environment");
   }
 
-  // A view over a SharedArrayBuffer is rejected by Blob; copy only then.
   const needsCopy =
     typeof bytes !== "string" &&
     typeof SharedArrayBuffer !== "undefined" &&
@@ -214,16 +191,78 @@ export function downloadBytes(bytes: Uint8Array | string, filename: string, mime
   const part: BlobPart = needsCopy ? new Uint8Array(bytes) : (bytes as BlobPart);
   const blob = new Blob([part], { type: mime });
   const url = URL.createObjectURL(blob);
+  let anchor: HTMLAnchorElement | undefined;
+  try {
+    anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+  } finally {
+    try {
+      anchor?.remove();
+    } finally {
+      // A synchronous revoke can race download navigation in some engines.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+  }
+}
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+/** Resource dimensions bounded by every XLSX import and export path. */
+export interface XlsxResourceLimits {
+  maxInputBytes: number;
+  maxOutputBytes: number;
+  maxArchiveEntries: number;
+  maxEntryUncompressedBytes: number;
+  maxTotalUncompressedBytes: number;
+  maxCompressionRatio: number;
+  maxSheets: number;
+  maxRowsPerSheet: number;
+  maxColumnsPerSheet: number;
+  maxCells: number;
+  maxMerges: number;
+  maxSharedStrings: number;
+  maxStyles: number;
+  maxXmlElements: number;
+  maxXmlDepth: number;
+  maxXmlAttributesPerElement: number;
+  maxXmlTextBytes: number;
+}
 
-  // A synchronous revoke can race the download navigation in some engines.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+/** Conservative defaults used by the optional XLSX codec. */
+export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object.freeze({
+  maxInputBytes: 32 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+  maxArchiveEntries: 1_024,
+  maxEntryUncompressedBytes: 64 * 1024 * 1024,
+  maxTotalUncompressedBytes: 256 * 1024 * 1024,
+  maxCompressionRatio: 100,
+  maxSheets: 256,
+  maxRowsPerSheet: 1_048_576,
+  maxColumnsPerSheet: 16_384,
+  maxCells: 1_000_000,
+  maxMerges: 100_000,
+  maxSharedStrings: 1_000_000,
+  maxStyles: 65_536,
+  maxXmlElements: 2_000_000,
+  maxXmlDepth: 64,
+  maxXmlAttributesPerElement: 128,
+  maxXmlTextBytes: 16 * 1024 * 1024,
+});
+
+/** Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data. */
+export class XlsxResourceError extends RangeError {
+  readonly code = "XLSX_RESOURCE_LIMIT";
+
+  constructor(
+    readonly resource: keyof XlsxResourceLimits,
+    readonly limit: number,
+    readonly actual: number,
+    readonly operation: "import" | "export",
+  ) {
+    super(`Sheetwrite: XLSX ${operation} ${resource} limit is ${limit}; observed ${actual}`);
+    this.name = "XlsxResourceError";
+  }
 }
 
 /**
@@ -231,7 +270,7 @@ export function downloadBytes(bytes: Uint8Array | string, filename: string, mime
  */
 export interface XlsxTableExportBackend {
   name: string;
-  toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
+  toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
 }
 
 let tableExportBackend: XlsxTableExportBackend | null = null;
@@ -248,9 +287,13 @@ function missingXlsxBackend(functionName: string): Error {
 }
 
 /** Exports a table model through the registered optional XLSX backend. */
-export function toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array> {
+export function toXlsxTable(
+  workbook: Workbook,
+  store: Store,
+  options?: XlsxWorkbookOptions,
+): Promise<Uint8Array> {
   if (!tableExportBackend) throw missingXlsxBackend("toXlsxTable");
-  return tableExportBackend.toXlsxTable(workbook, store);
+  return tableExportBackend.toXlsxTable(workbook, store, options);
 }
 
 // ── xlsx import ──────────────────────────────────────────────────────────────
@@ -262,7 +305,10 @@ export function toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Arra
  */
 export interface XlsxTableImportBackend {
   name: string;
-  fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData>;
+  fromXlsxTable(
+    data: ArrayBuffer | Uint8Array,
+    options?: XlsxWorkbookOptions,
+  ): Promise<ColumnarData>;
 }
 
 let tableImportBackend: XlsxTableImportBackend | null = null;
@@ -278,36 +324,43 @@ export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
  * Numbers stay numbers, date cells use the date-serial convention, strings are
  * verbatim, and empty cells become `null`.
  */
-export function fromXlsxTable(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
+export function fromXlsxTable(
+  data: ArrayBuffer | Uint8Array,
+  options?: XlsxWorkbookOptions,
+): Promise<ColumnarData> {
   if (!tableImportBackend) throw missingXlsxBackend("fromXlsxTable");
-  return tableImportBackend.fromXlsxTable(data);
+  return tableImportBackend.fromXlsxTable(data, options);
 }
 
 // ── Workbook-level XLSX round-trip ───────────────────────────────────────────
 
-/** Structured fidelity warning emitted during workbook XLSX conversion. */
+/** Structured fidelity warning emitted during XLSX conversion. */
 export interface XlsxWorkbookWarning {
   code:
     | "boolean-literal"
     | "rich-text"
     | "hyperlink"
     | "unsupported-cell-value"
-    | "unsupported-feature";
+    | "unsupported-feature"
+    | "external-relationship"
+    | "external-formula"
+    | "format-loss"
+    | "validation-loss"
+    | "invalid-metadata";
   message: string;
   sheet?: string;
   cell?: string;
+  part?: string;
 }
 
-/** Workbook XLSX conversion options passed to the registered backend. */
+/** Shared options passed to every registered table and workbook XLSX backend. */
 export interface XlsxWorkbookOptions {
-  /** Abort before or between workbook model operations. */
+  /** Abort before or between bounded codec operations. */
   signal?: AbortSignal;
-  /**
-   * Maximum populated cells accepted by the in-memory ExcelJS document model.
-   * Defaults to 1,000,000. Use a lower host-specific bound for constrained
-   * browsers; table APIs remain available for larger streaming interchange.
-   */
+  /** Maximum logical cells processed. Defaults to 1,000,000. */
   maxCells?: number;
+  /** Overrides for all other XLSX resource dimensions. */
+  resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
   onWarning?: (warning: XlsxWorkbookWarning) => void;
 }
 

@@ -99,6 +99,40 @@ export function validConditionalRules(
   });
 }
 
+function validValidationComparison(value: unknown, textLength: boolean): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const comparison = value as Record<string, unknown>;
+  const operator = comparison.operator;
+  const validOperand = (operand: unknown): operand is number =>
+    textLength
+      ? typeof operand === "number" && Number.isSafeInteger(operand) && operand >= 0
+      : typeof operand === "number" && Number.isFinite(operand);
+
+  if (operator === "between" || operator === "notBetween") {
+    return (
+      validOperand(comparison.min) &&
+      validOperand(comparison.max) &&
+      comparison.min <= comparison.max &&
+      comparison.value === undefined
+    );
+  }
+  if (
+    ![
+      "equal",
+      "notEqual",
+      "greaterThan",
+      "lessThan",
+      "greaterThanOrEqual",
+      "lessThanOrEqual",
+    ].includes(String(operator))
+  ) {
+    return false;
+  }
+  return (
+    validOperand(comparison.value) && comparison.min === undefined && comparison.max === undefined
+  );
+}
+
 export function validValidationRules(sheet: Sheet, rules: readonly DataValidationRule[]): boolean {
   const ids = new Set<string>();
   for (const rule of rules) {
@@ -123,17 +157,27 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
         (condition.max !== undefined && !Number.isFinite(condition.max)) ||
         (condition.min !== undefined &&
           condition.max !== undefined &&
-          condition.min > condition.max)
+          condition.min > condition.max) ||
+        (condition.comparison !== undefined &&
+          (condition.min !== undefined ||
+            condition.max !== undefined ||
+            !validValidationComparison(condition.comparison, false)))
       ) {
         return false;
       }
     } else if (condition.kind === "textLength") {
       if (
-        (condition.min !== undefined && !integerAt(condition.min)) ||
-        (condition.max !== undefined && !integerAt(condition.max)) ||
+        (condition.min !== undefined &&
+          (!Number.isSafeInteger(condition.min) || condition.min < 0)) ||
+        (condition.max !== undefined &&
+          (!Number.isSafeInteger(condition.max) || condition.max < 0)) ||
         (condition.min !== undefined &&
           condition.max !== undefined &&
-          condition.min > condition.max)
+          condition.min > condition.max) ||
+        (condition.comparison !== undefined &&
+          (condition.min !== undefined ||
+            condition.max !== undefined ||
+            !validValidationComparison(condition.comparison, true)))
       ) {
         return false;
       }

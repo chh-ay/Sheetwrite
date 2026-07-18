@@ -9,10 +9,10 @@ Structured warning or rejection produced while applying an operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L171</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L204</code></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>2</span>
+## Variants <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -44,6 +44,25 @@ Structured warning or rejection produced while applying an operation.
 ```
 
 </div>
+<div class="api-variant">
+
+```ts generated
+{
+  kind: "resource-limit";
+  severity: "error";
+  resource:
+    | "operations"
+    | "encoded-bytes"
+    | "pending-commits"
+    | "pending-operations"
+    | "pending-encoded-bytes";
+  actual: number;
+  max: number;
+  message: string;
+}
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -68,6 +87,19 @@ export type MutationIssue =
       protectedRangeId: string;
       range: Range;
       operationIndex: number;
+      message: string;
+    }
+  | {
+      kind: "resource-limit";
+      severity: "error";
+      resource:
+        | "operations"
+        | "encoded-bytes"
+        | "pending-commits"
+        | "pending-operations"
+        | "pending-encoded-bytes";
+      actual: number;
+      max: number;
       message: string;
     };
 ```

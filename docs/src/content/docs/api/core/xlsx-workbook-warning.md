@@ -1,18 +1,18 @@
 ---
 title: "XlsxWorkbookWarning | @sheetwrite/core"
-description: "Structured fidelity warning emitted during workbook XLSX conversion."
+description: "Structured fidelity warning emitted during XLSX conversion."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookWarning -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Structured fidelity warning emitted during workbook XLSX conversion.
+Structured fidelity warning emitted during XLSX conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L289</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L338</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -20,7 +20,7 @@ Structured fidelity warning emitted during workbook XLSX conversion.
 <summary><code>code</code></summary>
 
 ```ts generated
-code: | "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature";
+code: | "boolean-literal" | "rich-text" | "hyperlink" | "unsupported-cell-value" | "unsupported-feature" | "external-relationship" | "external-formula" | "format-loss" | "validation-loss" | "invalid-metadata";
 ```
 
 </details>
@@ -51,6 +51,15 @@ cell?: string;
 ```
 
 </details>
+
+<details class="api-member" id="xlsx-workbook-warning-part" data-pagefind-weight="1">
+<summary><code>part</code></summary>
+
+```ts generated
+part?: string;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -65,10 +74,16 @@ export interface XlsxWorkbookWarning {
     | "rich-text"
     | "hyperlink"
     | "unsupported-cell-value"
-    | "unsupported-feature";
+    | "unsupported-feature"
+    | "external-relationship"
+    | "external-formula"
+    | "format-loss"
+    | "validation-loss"
+    | "invalid-metadata";
   message: string;
   sheet?: string;
   cell?: string;
+  part?: string;
 }
 ```
 

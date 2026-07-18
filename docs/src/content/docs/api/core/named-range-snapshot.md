@@ -9,7 +9,7 @@ Workbook-global or sheet-scoped named range used by formulas and persistence.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L87</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L92</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

@@ -5,10 +5,11 @@ import { type FormulaBenchmarkResult, validateFormulaBenchmark } from "./formula
 import { type PagedBenchmarkResult, validatePagedBenchmark } from "./paged-bench.js";
 import { validateRenderGateArtifact } from "./render-gate.js";
 import { renderBenchmarkMarkdown } from "./render-protocol.js";
+import { validateXlsxBenchmarkArtifact } from "./xlsx-bench.js";
 
 const BENCH_ROOT = new URL("..", import.meta.url).pathname;
 const ARTIFACT_ROOT = resolve(BENCH_ROOT, "../test-results/performance-gates");
-type GateFamily = "data" | "paged" | "formula" | "render";
+type GateFamily = "data" | "paged" | "formula" | "render" | "xlsx";
 
 interface CommandResult {
   readonly exitCode: number;
@@ -47,6 +48,8 @@ function validateFamily(family: GateFamily, value: unknown): void {
     validatePagedBenchmark(value as PagedBenchmarkResult, "smoke");
   } else if (family === "formula") {
     validateFormulaBenchmark(value as FormulaBenchmarkResult, "smoke");
+  } else if (family === "xlsx") {
+    validateXlsxBenchmarkArtifact(value);
   } else {
     validateRenderGateArtifact(value, "smoke", {
       nowMs: Date.now(),
@@ -113,7 +116,10 @@ async function verifyFixture(specification: string): Promise<void> {
   const separator = specification.indexOf(":");
   const family = specification.slice(0, separator) as GateFamily;
   const path = specification.slice(separator + 1);
-  if (!(["data", "paged", "formula", "render"] as const).includes(family) || path.length === 0) {
+  if (
+    !(["data", "paged", "formula", "render", "xlsx"] as const).includes(family) ||
+    path.length === 0
+  ) {
     throw new Error("--fixture must be family:/path/to/result.json");
   }
   const raw = readFileSync(resolve(path), "utf8");
@@ -138,7 +144,9 @@ export async function runVerification(args: readonly string[]): Promise<number> 
       return 0;
     } catch (error) {
       writeFailure(
-        (["data", "paged", "formula", "render"] as const).includes(family) ? family : "data",
+        (["data", "paged", "formula", "render", "xlsx"] as const).includes(family)
+          ? family
+          : "data",
         error,
       );
       return 1;
@@ -149,6 +157,7 @@ export async function runVerification(args: readonly string[]): Promise<number> 
     ["data", "src/data-bench.ts"],
     ["paged", "src/paged-bench.ts"],
     ["formula", "src/formula-bench.ts"],
+    ["xlsx", "src/xlsx-bench.ts"],
   ] as const) {
     try {
       await verifyCommandFamily(family, script);

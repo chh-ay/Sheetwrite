@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { DOCS_NAVIGATION, SHOWCASE_NAVIGATION } from "../lib/navigation.js";
+import { DOCS_NAVIGATION } from "../lib/navigation.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { TableOfContents } from "./TableOfContents.js";
 import { ThemeToggle } from "./ThemeToggle.js";
@@ -43,11 +43,7 @@ function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
       ))}
       <section>
         <h2>Live showcases</h2>
-        {SHOWCASE_NAVIGATION.map((item) => (
-          <Link key={item.href} to={item.href}>
-            {item.label}
-          </Link>
-        ))}
+        <Link to="/showcases/">All capabilities</Link>
       </section>
     </nav>
   );

@@ -9,7 +9,7 @@ Stable category for a persistence failure.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L17</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L25</code></dd></div>
 </dl>
 
 ## Declaration
@@ -18,7 +18,11 @@ Stable category for a persistence failure.
 
 ```ts generated
 export type PersistenceErrorCode =
-  "aborted" | "invalid-snapshot" | "not-found" | "commit-rejected";
+  | "aborted"
+  | "invalid-snapshot"
+  | "resource-limit"
+  | "not-found"
+  | "commit-rejected";
 ```
 
 </div>

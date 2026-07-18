@@ -1,5 +1,6 @@
 import {
   SnapshotValidationError,
+  type SnapshotValidationOptions,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../document-protocol.js";
@@ -15,8 +16,11 @@ export interface DecodedWorkbookSnapshot {
 }
 
 /** Validate once at the trust boundary and convert persisted metadata to live collections. */
-export function decodeWorkbookSnapshot(input: unknown): DecodedWorkbookSnapshot {
-  const checked = validateWorkbookSnapshot(input);
+export function decodeWorkbookSnapshot(
+  input: unknown,
+  options: SnapshotValidationOptions = {},
+): DecodedWorkbookSnapshot {
+  const checked = validateWorkbookSnapshot(input, options);
   if (!checked.ok) throw new SnapshotValidationError(checked.errors);
   const snapshot = checked.value;
   const workbook: Workbook = {
@@ -32,6 +36,7 @@ export function decodeWorkbookSnapshot(input: unknown): DecodedWorkbookSnapshot 
       return {
         id: source.id,
         name: source.name,
+        visibility: source.visibility,
         rowCount: source.rowCount,
         columns: cloneJsonValue(source.columns) ?? [],
         frozenRows: source.frozenRows,
@@ -122,6 +127,7 @@ export class StoreSnapshotCodec {
         id: sheet.id,
         name: sheet.name,
         order,
+        ...(sheet.visibility !== undefined ? { visibility: sheet.visibility } : {}),
         rowCount: sheet.rowCount,
         columns: cloneJsonValue(sheet.columns) ?? [],
         ...(sheet.frozenRows !== undefined ? { frozenRows: sheet.frozenRows } : {}),

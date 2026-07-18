@@ -398,11 +398,87 @@ function classSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
   const head = heritage ? `class ${symbol.getName()} ${heritage}` : `class ${symbol.getName()}`;
   return body.length > 0 ? `${head} { ${body} }` : `${head} {}`;
 }
+/**
+ * True when a heritage base resolves to declarations owned by this repository
+ * rather than a dependency or the TypeScript libs. Workspace packages resolve
+ * through realpath, so third-party bases are exactly the ones that still live
+ * under `node_modules`.
+ */
+function isSheetwriteOwnedBase(
+  base: ts.ExpressionWithTypeArguments,
+  checker: ts.TypeChecker,
+): boolean {
+  const type = checker.getTypeAtLocation(base);
+  const symbol = type.aliasSymbol ?? type.getSymbol();
+  const declarations = symbol?.getDeclarations();
+  if (declarations === undefined || declarations.length === 0) return false;
+  return declarations.every(
+    (declaration) => !declaration.getSourceFile().fileName.includes("node_modules"),
+  );
+}
+
+/**
+ * Interface signature with Sheetwrite-owned heritage flattened: members
+ * inherited from bases declared in this repository are inlined so adapter and
+ * option pages document their full usable surface, while framework/library
+ * bases (React/Vue/Svelte attributes, lib utility types) stay heritage-only
+ * and never dump third-party internals into the manifest.
+ */
+function interfaceSignature(
+  symbol: ts.Symbol,
+  declaration: ts.InterfaceDeclaration,
+  checker: ts.TypeChecker,
+): string {
+  const sourceFile = declaration.getSourceFile();
+  const externalHeritage: string[] = [];
+  let ownedBases = 0;
+  for (const clause of declaration.heritageClauses ?? []) {
+    for (const base of clause.types) {
+      if (isSheetwriteOwnedBase(base, checker)) ownedBases += 1;
+      else externalHeritage.push(normalizeText(base.getText(sourceFile)));
+    }
+  }
+  if (ownedBases === 0) return normalizeText(declaration.getText());
+
+  const members: string[] = [];
+  const seen = new Set<string>();
+  for (const member of declaration.members) {
+    const text = normalizeText(member.getText(sourceFile));
+    members.push(text.endsWith(";") || text.endsWith(",") ? text : `${text};`);
+    const name = (member as ts.NamedDeclaration).name?.getText(sourceFile);
+    if (name !== undefined) seen.add(name.replace(/^["']|["']$/g, ""));
+  }
+  for (const property of checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(symbol))) {
+    const name = property.getName();
+    if (seen.has(name) || isPrivateSymbol(property) || name === "prototype") continue;
+    const memberDeclaration = property.getDeclarations()?.[0];
+    if (memberDeclaration === undefined) continue;
+    if (memberDeclaration.getSourceFile().fileName.includes("node_modules")) continue;
+    seen.add(name);
+    const text = normalizeText(memberDeclaration.getText());
+    members.push(text.endsWith(";") || text.endsWith(",") ? text : `${text};`);
+  }
+
+  const modifiers = declaration.modifiers?.map((modifier) => modifier.getText(sourceFile)) ?? [];
+  const typeParameters =
+    declaration.typeParameters === undefined || declaration.typeParameters.length === 0
+      ? ""
+      : `<${declaration.typeParameters
+          .map((parameter) => normalizeText(parameter.getText(sourceFile)))
+          .join(", ")}>`;
+  const heritage = externalHeritage.length > 0 ? ` extends ${externalHeritage.join(", ")}` : "";
+  const head = `${[...modifiers, "interface"].join(" ")} ${declaration.name.text}${typeParameters}${heritage}`;
+  return members.length > 0 ? `${head} { ${members.join(" ")} }` : `${head} {}`;
+}
 
 function declarationSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
   const declarations = symbol.getDeclarations() ?? [];
   if (symbol.flags & ts.SymbolFlags.Class) return classSignature(symbol, checker);
   if (symbol.flags & (ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Enum)) {
+    const interfaceDeclarations = declarations.filter(ts.isInterfaceDeclaration);
+    if (interfaceDeclarations.length === 1 && interfaceDeclarations[0]!.heritageClauses) {
+      return interfaceSignature(symbol, interfaceDeclarations[0]!, checker);
+    }
     return declarations
       .map((declaration) => normalizeText(declaration.getText()))
       .sort()
@@ -703,7 +779,7 @@ export function validateManifest(value: unknown): ApiIssue[] {
   return [];
 }
 export const PUBLIC_API_BASELINE_SHA256 =
-  "2342d3cd34bc4cf4bda20fb3a2584d1a56184977890d72ad90230c3e729d4007";
+  "ce08977b14987882d9763ba4a16e6d9b23fdcc48356ea8dcd168d4022d92678d";
 
 export function publicApiDigest(manifest: PublicApiManifest): string {
   return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");

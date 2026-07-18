@@ -7,9 +7,12 @@ description: "Serializable condition enforced by a data-validation rule."
 
 Serializable condition enforced by a data-validation rule.
 
+`min` and `max` remain inclusive legacy bounds. Use `comparison` when the
+operator itself is significant; comparison and legacy bounds are mutually exclusive.
+
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L97</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L124</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>
@@ -29,21 +32,37 @@ Serializable condition enforced by a data-validation rule.
 <div class="api-variant">
 
 ```ts generated
-{ kind: "number"; min?: number; max?: number }
+{
+  kind: "number";
+  min?: number;
+  max?: number;
+  integer?: boolean;
+  comparison?: DataValidationComparison;
+}
 ```
 
 </div>
 <div class="api-variant">
 
 ```ts generated
-{ kind: "date"; min?: number; max?: number }
+{
+  kind: "date";
+  min?: number;
+  max?: number;
+  comparison?: DataValidationComparison;
+}
 ```
 
 </div>
 <div class="api-variant">
 
 ```ts generated
-{ kind: "textLength"; min?: number; max?: number }
+{
+  kind: "textLength";
+  min?: number;
+  max?: number;
+  comparison?: DataValidationComparison;
+}
 ```
 
 </div>
@@ -76,16 +95,20 @@ export type DataValidationCondition =
       kind: "number";
       min?: number;
       max?: number;
+      integer?: boolean;
+      comparison?: DataValidationComparison;
     }
   | {
       kind: "date";
       min?: number;
       max?: number;
+      comparison?: DataValidationComparison;
     }
   | {
       kind: "textLength";
       min?: number;
       max?: number;
+      comparison?: DataValidationComparison;
     }
   | {
       kind: "checkbox";

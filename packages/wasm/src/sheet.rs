@@ -1,6 +1,7 @@
 //! One sheet's column-major scalar grid and its structural edits.
 
-use std::collections::{HashMap, HashSet};
+use std::cell::{Cell, RefCell};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, NO_STRING};
 
@@ -94,7 +95,7 @@ struct CellChunk {
     style: Vec<u32>,
     loaded: Vec<u64>,
     dirty: Vec<u64>,
-    last_access: u64,
+    last_access: Cell<u64>,
 }
 
 impl CellChunk {
@@ -106,7 +107,7 @@ impl CellChunk {
             style: vec![0; rows],
             loaded: vec![0; words],
             dirty: vec![0; words],
-            last_access,
+            last_access: Cell::new(last_access),
         }
     }
 
@@ -141,7 +142,10 @@ pub(crate) struct PagedStorage {
     byte_budget: usize,
     chunks: HashMap<(usize, usize), CellChunk>,
     pinned: HashSet<(usize, usize)>,
-    clock: u64,
+    evictable: RefCell<BTreeSet<(u64, usize, usize)>>,
+    clock: Cell<u64>,
+    eviction_candidate_checks: u64,
+    evictions: u64,
 }
 
 impl PagedStorage {
@@ -151,7 +155,10 @@ impl PagedStorage {
             byte_budget,
             chunks: HashMap::new(),
             pinned: HashSet::new(),
-            clock: 0,
+            evictable: RefCell::new(BTreeSet::new()),
+            clock: Cell::new(0),
+            eviction_candidate_checks: 0,
+            evictions: 0,
         }
     }
 
@@ -166,36 +173,58 @@ impl PagedStorage {
             + words * std::mem::size_of::<u64>() * 2
     }
 
+    fn next_access(&self) -> u64 {
+        let next = self.clock.get().wrapping_add(1);
+        self.clock.set(next);
+        next
+    }
+
+    fn touch(&self, key: (usize, usize)) {
+        let Some(chunk) = self.chunks.get(&key) else {
+            return;
+        };
+        let eligible = !self.pinned.contains(&key) && !chunk.has_dirty();
+        let previous = chunk.last_access.get();
+        let mut evictable = self.evictable.borrow_mut();
+        if eligible {
+            evictable.remove(&(previous, key.0, key.1));
+        }
+        let access = self.next_access();
+        chunk.last_access.set(access);
+        if eligible {
+            evictable.insert((access, key.0, key.1));
+        }
+    }
+
     fn evict_for_chunk(&mut self) {
         if self.byte_budget == 0 {
             return;
         }
         let chunk_bytes = self.chunk_bytes();
         while (self.chunks.len() + 1) * chunk_bytes > self.byte_budget {
-            let candidate = self
-                .chunks
-                .iter()
-                .filter(|(key, chunk)| !self.pinned.contains(key) && !chunk.has_dirty())
-                .min_by_key(|(_, chunk)| chunk.last_access)
-                .map(|(key, _)| *key);
-            let Some(key) = candidate else {
+            let candidate = self.evictable.get_mut().pop_first();
+            let Some((_, col, chunk_index)) = candidate else {
                 break;
             };
-            self.chunks.remove(&key);
+            self.eviction_candidate_checks = self.eviction_candidate_checks.saturating_add(1);
+            self.chunks.remove(&(col, chunk_index));
+            self.evictions = self.evictions.saturating_add(1);
         }
     }
 
     fn ensure_chunk(&mut self, key: (usize, usize)) -> &mut CellChunk {
         if !self.chunks.contains_key(&key) {
             self.evict_for_chunk();
-            self.clock = self.clock.wrapping_add(1);
+            let access = self.next_access();
             self.chunks
-                .insert(key, CellChunk::new(self.chunk_rows, self.clock));
+                .insert(key, CellChunk::new(self.chunk_rows, access));
+            if !self.pinned.contains(&key) {
+                self.evictable.get_mut().insert((access, key.0, key.1));
+            }
+        } else {
+            self.touch(key);
         }
-        self.clock = self.clock.wrapping_add(1);
-        let chunk = self.chunks.get_mut(&key).expect("inserted paged chunk");
-        chunk.last_access = self.clock;
-        chunk
+        self.chunks.get_mut(&key).expect("inserted paged chunk")
     }
 
     fn read(&self, row: usize, col: usize) -> (u8, u64, u32, bool, bool) {
@@ -203,6 +232,7 @@ impl PagedStorage {
         let Some(chunk) = self.chunks.get(&key) else {
             return (KIND_EMPTY, 0, 0, false, false);
         };
+        self.touch(key);
         if !CellChunk::bit(&chunk.loaded, offset) {
             return (KIND_EMPTY, 0, 0, false, false);
         }
@@ -217,33 +247,84 @@ impl PagedStorage {
 
     fn write(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32, dirty: bool) {
         let (key, offset) = self.key_offset(row, col);
-        let chunk = self.ensure_chunk(key);
-        chunk.kind[offset] = kind;
-        chunk.payload[offset] = payload;
-        chunk.style[offset] = style;
-        CellChunk::set_bit(&mut chunk.loaded, offset, true);
-        if dirty {
-            CellChunk::set_bit(&mut chunk.dirty, offset, true);
+        let pinned = self.pinned.contains(&key);
+        let (became_dirty, access) = {
+            let chunk = self.ensure_chunk(key);
+            let was_dirty = chunk.has_dirty();
+            chunk.kind[offset] = kind;
+            chunk.payload[offset] = payload;
+            chunk.style[offset] = style;
+            CellChunk::set_bit(&mut chunk.loaded, offset, true);
+            if dirty {
+                CellChunk::set_bit(&mut chunk.dirty, offset, true);
+            }
+            (!was_dirty && chunk.has_dirty(), chunk.last_access.get())
+        };
+        if became_dirty && !pinned {
+            self.evictable.get_mut().remove(&(access, key.0, key.1));
         }
+    }
+
+    fn hydrate(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32) -> bool {
+        let (key, offset) = self.key_offset(row, col);
+        if self
+            .chunks
+            .get(&key)
+            .is_some_and(|chunk| CellChunk::bit(&chunk.dirty, offset))
+        {
+            self.touch(key);
+            return false;
+        }
+        self.write(row, col, kind, payload, style, false);
+        true
     }
 
     fn mark_clean(&mut self, row: usize, col: usize) {
         let (key, offset) = self.key_offset(row, col);
-        if let Some(chunk) = self.chunks.get_mut(&key) {
+        let pinned = self.pinned.contains(&key);
+        let became_clean = self.chunks.get_mut(&key).and_then(|chunk| {
+            let was_dirty = chunk.has_dirty();
             CellChunk::set_bit(&mut chunk.dirty, offset, false);
+            (was_dirty && !chunk.has_dirty()).then_some(chunk.last_access.get())
+        });
+        if let Some(access) = became_clean {
+            if !pinned {
+                self.evictable.get_mut().insert((access, key.0, key.1));
+            }
         }
     }
 
     fn pin_range(&mut self, r0: usize, r1: usize, cols: &[u32]) {
-        self.pinned.clear();
+        let mut next = HashSet::new();
         for &col in cols {
             for chunk in r0 / self.chunk_rows..=r1 / self.chunk_rows {
-                let key = (col as usize, chunk);
-                self.pinned.insert(key);
-                if let Some(existing) = self.chunks.get_mut(&key) {
-                    self.clock = self.clock.wrapping_add(1);
-                    existing.last_access = self.clock;
+                next.insert((col as usize, chunk));
+            }
+        }
+
+        for key in self.pinned.difference(&next) {
+            if let Some(chunk) = self.chunks.get(key) {
+                if !chunk.has_dirty() {
+                    self.evictable
+                        .get_mut()
+                        .insert((chunk.last_access.get(), key.0, key.1));
                 }
+            }
+        }
+        for key in next.difference(&self.pinned) {
+            if let Some(chunk) = self.chunks.get(key) {
+                if !chunk.has_dirty() {
+                    self.evictable
+                        .get_mut()
+                        .remove(&(chunk.last_access.get(), key.0, key.1));
+                }
+            }
+        }
+        self.pinned = next;
+        let access = self.next_access();
+        for &key in &self.pinned {
+            if let Some(chunk) = self.chunks.get(&key) {
+                chunk.last_access.set(access);
             }
         }
     }
@@ -265,6 +346,7 @@ impl PagedStorage {
                 ));
             }
         }
+        entries.sort_unstable_by_key(|entry| (entry.1, entry.0));
         entries
     }
 
@@ -299,6 +381,14 @@ impl PagedStorage {
     }
 }
 
+pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
+
+pub(crate) fn checked_dense_cell_count(n_cols: usize, row_count: usize) -> Option<usize> {
+    n_cols
+        .checked_mul(row_count)
+        .filter(|&cells| cells <= MAX_DENSE_CELLS)
+}
+
 /// One sheet's column-major scalar grid.
 pub(crate) struct SheetData {
     pub(crate) n_cols: usize,
@@ -324,25 +414,42 @@ pub(crate) struct SheetData {
 
 impl SheetData {
     pub(crate) fn new(n_cols: usize, row_count: usize) -> Self {
-        let len = n_cols.checked_mul(row_count).unwrap_or(0);
-        let (n_cols, row_count) = if len == 0 && n_cols != 0 && row_count != 0 {
-            (0, 0)
-        } else {
-            (n_cols, row_count)
-        };
+        Self::try_new(n_cols, row_count).expect("trusted dense sheet dimensions")
+    }
 
-        SheetData {
+    pub(crate) fn try_new(n_cols: usize, row_count: usize) -> Result<Self, String> {
+        let len = checked_dense_cell_count(n_cols, row_count).ok_or_else(|| {
+            format!(
+                "dense sheet resource limit exceeded: {n_cols} columns by {row_count} rows exceeds {MAX_DENSE_CELLS} cells"
+            )
+        })?;
+        let mut kind = Vec::new();
+        kind.try_reserve_exact(len)
+            .map_err(|_| "dense sheet allocation failed for cell kinds".to_string())?;
+        kind.resize(len, KIND_EMPTY);
+        let mut payload = Vec::new();
+        payload
+            .try_reserve_exact(len)
+            .map_err(|_| "dense sheet allocation failed for cell payloads".to_string())?;
+        payload.resize(len, 0);
+        let mut style = Vec::new();
+        style
+            .try_reserve_exact(len)
+            .map_err(|_| "dense sheet allocation failed for cell styles".to_string())?;
+        style.resize(len, 0);
+
+        Ok(SheetData {
             n_cols,
             row_count,
-            kind: vec![KIND_EMPTY; len],
-            payload: vec![0; len],
-            style: vec![0; len],
+            kind,
+            payload,
+            style,
             paged: None,
             formulas: HashMap::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
             cond_rules: Vec::new(),
-        }
+        })
     }
 
     pub(crate) fn new_paged(
@@ -424,6 +531,24 @@ impl SheetData {
             let (kind, payload, style, _, was_dirty) = paged.read(row, col);
             paged.write(row, col, kind, payload, style, dirty || was_dirty);
         }
+    }
+
+    pub(crate) fn hydrate_cell(
+        &mut self,
+        row: usize,
+        col: usize,
+        kind: u8,
+        payload: u64,
+        style: u32,
+    ) -> bool {
+        if let Some(paged) = &mut self.paged {
+            return paged.hydrate(row, col, kind, payload, style);
+        }
+        let index = self.idx(row, col);
+        self.kind[index] = kind;
+        self.payload[index] = payload;
+        self.style[index] = style;
+        true
     }
 
     pub(crate) fn is_loaded(&self, row: usize, col: usize) -> bool {
@@ -968,4 +1093,50 @@ impl SheetData {
 
 pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<FormulaError> {
     sheet.formulas.get(&key).and_then(|entry| entry.error)
+}
+
+#[cfg(test)]
+mod paged_storage_tests {
+    use super::{PagedStorage, KIND_EMPTY};
+
+    #[test]
+    fn eviction_index_tracks_access_dirty_and_pin_transitions() {
+        let mut storage = PagedStorage::new(4, 2 * PagedStorage::new(4, 0).chunk_bytes());
+        storage.write(0, 0, KIND_EMPTY, 0, 0, false);
+        storage.write(4, 0, KIND_EMPTY, 0, 0, false);
+        storage.read(0, 0);
+        storage.write(8, 0, KIND_EMPTY, 0, 0, false);
+        assert!(storage.chunks.contains_key(&(0, 0)));
+        assert!(!storage.chunks.contains_key(&(0, 1)));
+
+        storage.pin_range(0, 3, &[0]);
+        storage.write(12, 0, KIND_EMPTY, 0, 7, true);
+        storage.write(16, 0, KIND_EMPTY, 0, 0, false);
+        assert_eq!(storage.chunks.len(), 3);
+        assert!(storage.chunks.contains_key(&(0, 0)));
+        assert!(storage.chunks.contains_key(&(0, 3)));
+
+        storage.mark_clean(12, 0);
+        storage.pin_range(16, 19, &[0]);
+        storage.write(20, 0, KIND_EMPTY, 0, 0, false);
+        assert_eq!(storage.chunks.len(), 2);
+        assert!(storage.chunks.contains_key(&(0, 4)));
+        assert!(storage.chunks.contains_key(&(0, 5)));
+    }
+
+    #[test]
+    fn cache_churn_examines_one_index_entry_per_eviction() {
+        const RETAINED: usize = 8;
+        const CHUNKS: usize = 10_000;
+        let chunk_bytes = PagedStorage::new(4, 0).chunk_bytes();
+        let mut storage = PagedStorage::new(4, RETAINED * chunk_bytes);
+
+        for chunk in 0..CHUNKS {
+            storage.write(chunk * 4, 0, KIND_EMPTY, 0, 0, false);
+        }
+
+        assert_eq!(storage.chunks.len(), RETAINED);
+        assert_eq!(storage.evictions, (CHUNKS - RETAINED) as u64);
+        assert_eq!(storage.eviction_candidate_checks, storage.evictions);
+    }
 }

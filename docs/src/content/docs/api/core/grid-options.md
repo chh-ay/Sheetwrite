@@ -9,10 +9,10 @@ Workbook, data, rendering, policy, and built-in UI options used to create a Grid
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L253</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L254</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>14</span>
+## Members <span class="api-count" data-pagefind-ignore>15</span>
 
 <div class="api-member-list">
 
@@ -117,6 +117,15 @@ mutationPolicy?: MutationPolicyMode;
 
 </details>
 
+<details class="api-member" id="grid-options-transaction-resource-limits" data-pagefind-weight="1">
+<summary><code>transactionResourceLimits</code> <span class="api-member-summary">Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation.</span></summary>
+
+```ts generated
+transactionResourceLimits?: Partial<TransactionResourceLimits>;
+```
+
+</details>
+
 <details class="api-member" id="grid-options-renderers" data-pagefind-weight="1">
 <summary><code>renderers</code> <span class="api-member-summary">Custom cell renderers registered up front; also see Grid.defineCellRenderer.</span></summary>
 
@@ -171,6 +180,7 @@ export interface GridOptions {
   readOnly?: boolean;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
+  transactionResourceLimits?: Partial<TransactionResourceLimits>;
   renderers?: Record<string, CellRenderer>;
   overscan?: number;
   minColumns?: number;

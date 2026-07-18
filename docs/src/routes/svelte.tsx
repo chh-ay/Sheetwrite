@@ -2,13 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { pageMeta } from "../lib/seo.js";
 import { SvelteShowcaseIsland } from "../showcases/AdapterIslands.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
+import svelteWorkbenchStylesheet from "../styles/svelte-workbench.css?url";
 
 const description =
-  "Edit 500 live formulas, move between model and summary sheets, and inspect committed transactions through a bound Grid handle.";
+  "Queue edits offline in a durable IndexedDB outbox, reconnect to drain them through host persistence, and recover a real base-version conflict — with live presence — inside one Svelte component.";
 
 export const Route = createFileRoute("/svelte")({
   head: () => ({
-    meta: pageMeta("Svelte formula workbook — Sheetwrite", description),
+    meta: pageMeta("Svelte offline workbench — Sheetwrite", description),
+    links: [{ rel: "stylesheet", href: svelteWorkbenchStylesheet }],
   }),
   component: SvelteShowcaseRoute,
 });
@@ -18,30 +20,30 @@ function SvelteShowcaseRoute() {
     <ShowcasePage
       active="svelte"
       description={description}
-      eyebrow="SVELTE / FORMULA MODEL"
+      eyebrow="SVELTE / OFFLINE & COLLABORATION"
       guide="/docs/frameworks/svelte/"
       packageName="@sheetwrite/svelte"
       proof={[
         {
-          title: "Formula graph",
-          detail: "Dependencies recalculate inside the workbook engine.",
+          title: "Durable offline queue",
+          detail: "Edits persist to an IndexedDB outbox before any network send.",
         },
         {
-          title: "Workbook operations",
-          detail: "Selection, edits, merges, and sheets use the Grid API.",
+          title: "Reconnect drain & conflicts",
+          detail: "Queued work drains in order; stale bases surface as explicit conflicts.",
         },
         {
-          title: "Svelte events",
-          detail: "Committed transactions arrive through adapter callbacks.",
+          title: "Presence & remote commits",
+          detail: "Collaborator selections and server-sequenced edits land on the live grid.",
         },
         {
-          title: "Canvas surface",
-          detail: "The hot path stays off the component and DOM trees.",
+          title: "Remount persistence",
+          detail: "Destroying and remounting the island restores pending work from disk.",
         },
       ]}
-      prompt="Select F1, change a quarter value, then open Summary and watch the cross-sheet total recalculate."
+      prompt="Go offline, log two field updates, let HQ commit concurrent work, then reconnect and merge — or remount the island mid-queue."
       sourcePath="docs/src/showcases/SvelteShowcase.svelte"
-      title="A live formula model, composed the Svelte way."
+      title="Offline-first collaboration, held in Svelte state."
     >
       <SvelteShowcaseIsland />
     </ShowcasePage>

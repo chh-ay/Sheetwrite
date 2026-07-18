@@ -9,10 +9,10 @@ Document, version, durability, and online options for synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L49</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L184</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>6</span>
+## Members <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-member-list">
 
@@ -71,6 +71,15 @@ recoverVersionGap?: ( request: SyncVersionGapRequest, ) => Promise<readonly Vers
 <p class="api-member-doc">Optional host recovery hook. Return the missing ordered operations, or a
 snapshot for the host to remount before calling `resumeAfterReload`.</p>
 </details>
+
+<details class="api-member" id="sync-coordinator-options-limits" data-pagefind-weight="1">
+<summary><code>limits</code> <span class="api-member-summary">Overrides remote collaboration and durable local pending-queue ceilings.</span></summary>
+
+```ts generated
+limits?: Partial<SyncCoordinatorLimits>;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -88,6 +97,7 @@ export interface SyncCoordinatorOptions {
   recoverVersionGap?: (
     request: SyncVersionGapRequest,
   ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>;
+  limits?: Partial<SyncCoordinatorLimits>;
 }
 ```
 

@@ -1,0 +1,361 @@
+/* Route-scoped styles for the /vue business workbench. Every selector is
+   prefixed .sw-vuewb- to stay collision-free with the shared showcase chrome;
+   base surfaces, controlbar, and grid framing come from showcase.css. */
+
+.sw-vuewb-role {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.sw-vuewb-role select {
+  min-height: 2rem;
+  padding-inline: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg-soft);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
+  cursor: pointer;
+}
+
+.sw-vuewb-role select:focus-visible {
+  border-color: var(--sw-demo-accent);
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-demo-accent) 42%, transparent);
+}
+
+.sw-vuewb-workbook__state {
+  margin: 0;
+  color: var(--sw-demo-muted);
+  font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+}
+
+.sw-vuewb-persist__ack {
+  margin: 0;
+  overflow: hidden;
+  color: var(--sw-demo-dim);
+  font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-vuewb-workspace {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) 19rem;
+}
+
+.sw-vuewb-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--sw-demo-border);
+  background: var(--sw-demo-panel);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.sw-vuewb-section {
+  display: grid;
+  gap: var(--sw-demo-space-2);
+  padding: var(--sw-demo-space-3);
+  border-bottom: 1px solid var(--sw-demo-border);
+}
+
+.sw-vuewb-section:last-child {
+  border-bottom: 0;
+}
+
+.sw-vuewb-section__head {
+  display: flex;
+  gap: var(--sw-demo-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sw-vuewb-section__head h3 {
+  margin: 0;
+  color: var(--sw-demo-dim);
+  font: 650 var(--sw-type-xs) / 1.2 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sw-vuewb-section__head a {
+  color: var(--sw-demo-accent-strong);
+  font: 500 var(--sw-type-xs) / 1.2 var(--sw-font-body);
+  text-decoration: none;
+}
+
+.sw-vuewb-section__head a:hover {
+  text-decoration: underline;
+}
+
+/* ── Cell inspector ─────────────────────────────────────────────────────── */
+
+.sw-vuewb-inspector {
+  display: grid;
+  gap: var(--sw-demo-space-1);
+  margin: 0;
+}
+
+.sw-vuewb-inspector > div {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: var(--sw-demo-space-2);
+  align-items: baseline;
+}
+
+.sw-vuewb-inspector dt {
+  color: var(--sw-demo-dim);
+  font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+}
+
+.sw-vuewb-inspector dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--sw-demo-fg-soft);
+  font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-vuewb-inspector dd[data-tone="allow"] {
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-vuewb-inspector dd[data-tone="deny"] {
+  color: var(--sw-demo-warn);
+}
+
+.sw-vuewb-note {
+  display: grid;
+  gap: var(--sw-demo-space-2);
+}
+
+.sw-vuewb-note textarea {
+  min-height: 3.25rem;
+  padding: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg);
+  font: 500 var(--sw-type-xs) / 1.45 var(--sw-font-body);
+  resize: vertical;
+}
+
+.sw-vuewb-note textarea:focus-visible {
+  border-color: var(--sw-demo-accent);
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-demo-accent) 42%, transparent);
+}
+
+.sw-vuewb-note__actions {
+  display: flex;
+  gap: var(--sw-demo-space-1);
+}
+
+/* ── Shared panel controls ──────────────────────────────────────────────── */
+
+.sw-vuewb-panel button,
+.sw-vuewb-panel input[type="text"] {
+  min-height: 1.9rem;
+  padding-inline: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg-soft);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
+}
+
+.sw-vuewb-panel button {
+  cursor: pointer;
+  transition:
+    color var(--sw-demo-transition),
+    border-color var(--sw-demo-transition),
+    background var(--sw-demo-transition);
+}
+
+.sw-vuewb-panel button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 54%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-accent) 10%, var(--sw-demo-surface));
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-vuewb-panel button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sw-vuewb-panel button[data-variant="primary"] {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 60%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-accent) 16%, var(--sw-demo-surface));
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-vuewb-panel input[type="text"]:focus-visible {
+  border-color: var(--sw-demo-accent);
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-demo-accent) 42%, transparent);
+}
+
+/* ── Workbook operations ────────────────────────────────────────────────── */
+
+.sw-vuewb-workbook {
+  display: grid;
+  gap: var(--sw-demo-space-2);
+}
+
+.sw-vuewb-workbook__rename {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sw-demo-space-1);
+}
+
+.sw-vuewb-workbook__rename input {
+  min-width: 0;
+}
+
+.sw-vuewb-workbook__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-demo-space-1);
+}
+
+/* ── Host persistence ───────────────────────────────────────────────────── */
+
+.sw-vuewb-persist {
+  display: grid;
+  gap: var(--sw-demo-space-2);
+}
+
+.sw-vuewb-persist output {
+  display: block;
+  padding: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-deep);
+  color: var(--sw-demo-fg-soft);
+  font: 500 var(--sw-type-xs) / 1.45 var(--sw-font-mono);
+}
+
+.sw-vuewb-persist output[data-state="pending"] {
+  border-color: color-mix(in srgb, var(--sw-demo-warn) 45%, var(--sw-demo-border));
+  color: var(--sw-demo-warn);
+}
+
+.sw-vuewb-persist output[data-state="synced"] {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 45%, var(--sw-demo-border));
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-vuewb-persist__meters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sw-demo-space-1);
+  margin: 0;
+}
+
+.sw-vuewb-persist__meters > div {
+  display: grid;
+  gap: 0.125rem;
+  padding: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+}
+
+.sw-vuewb-persist__meters dt {
+  color: var(--sw-demo-dim);
+  font: 500 0.62rem / 1.2 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sw-vuewb-persist__meters dd {
+  margin: 0;
+  color: var(--sw-demo-fg-strong);
+  font: 650 var(--sw-type-sm) / 1.2 var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Event feed ─────────────────────────────────────────────────────────── */
+
+.sw-vuewb-feed {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-vuewb-feed li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-demo-space-2);
+  color: var(--sw-demo-muted);
+  font: 500 var(--sw-type-xs) / 1.45 var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.sw-vuewb-feed li > code {
+  color: var(--sw-demo-accent-strong);
+  font: 600 var(--sw-type-xs) / 1.45 var(--sw-font-mono);
+}
+
+.sw-vuewb-feed li[data-kind="rejected"] > code {
+  color: var(--sw-demo-danger);
+}
+
+.sw-vuewb-feed li[data-kind="lifecycle"] > code {
+  color: var(--sw-demo-warn);
+}
+
+/* ── Live prop bindings ─────────────────────────────────────────────────── */
+
+.sw-vuewb-props {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.sw-vuewb-props > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sw-demo-space-2);
+}
+
+.sw-vuewb-props dt {
+  color: var(--sw-demo-dim);
+  font: 500 var(--sw-type-xs) / 1.5 var(--sw-font-mono);
+}
+
+.sw-vuewb-props dd {
+  margin: 0;
+  color: var(--sw-demo-fg-soft);
+  font: 600 var(--sw-type-xs) / 1.5 var(--sw-font-mono);
+}
+
+/* ── Responsive: keep every panel operable on mobile ────────────────────── */
+
+@media (max-width: 64rem) {
+  .sw-vuewb-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(24rem, 1fr) auto;
+  }
+
+  .sw-vuewb-panel {
+    max-height: 24rem;
+    border-top: 1px solid var(--sw-demo-border);
+    border-left: 0;
+  }
+
+  .sw-vuewb-persist__meters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -1,17 +1,8 @@
 import type { CellScalar, ColumnarData, XlsxTableImportBackend } from "@sheetwrite/core";
-import { dateToSerial } from "@sheetwrite/core";
-import { readSheet } from "read-excel-file/universal";
+import { readWorkbook } from "./reader.js";
+import { assertResource, createCodecContext } from "./resources.js";
 
-function scalarOfCell(value: unknown): CellScalar {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Date) return dateToSerial(value);
-  if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
-    return value;
-  }
-  return String(value);
-}
-
-function headerKeys(header: readonly unknown[]): string[] {
+function headerKeys(header: readonly CellScalar[]): string[] {
   const keys = new Array<string>(header.length);
   const seen = new Set<string>();
   for (let column = 0; column < header.length; column++) {
@@ -25,37 +16,39 @@ function headerKeys(header: readonly unknown[]): string[] {
   return keys;
 }
 
-function toArrayBuffer(data: ArrayBuffer | Uint8Array): ArrayBuffer {
-  if (!(data instanceof Uint8Array)) return data;
-  const out = new ArrayBuffer(data.byteLength);
-  new Uint8Array(out).set(data);
-  return out;
-}
-
-async function fromXlsxTableBytes(data: ArrayBuffer | Uint8Array): Promise<ColumnarData> {
-  const rows = await readSheet(toArrayBuffer(data), { trim: false });
-  const columns: Record<string, CellScalar[]> = Object.create(null);
-  if (rows.length === 0) return { rowCount: 0, columns };
-
-  const header = rows[0] ?? [];
-  const keys = headerKeys(header);
-  const columnCount = keys.length;
-  const body = rows.slice(1);
-  const rowCount = body.length;
-  for (const key of keys) columns[key] = new Array<CellScalar>(rowCount);
-
-  for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-    const row = body[rowIndex] ?? [];
-    for (let column = 0; column < columnCount; column++) {
-      columns[keys[column]!]![rowIndex] = scalarOfCell(row[column]);
+/** Default bounded first-sheet table import backend. */
+export const sheetwriteTableImportBackend: XlsxTableImportBackend = {
+  name: "sheetwrite-ooxml-table",
+  async fromXlsxTable(data, options): Promise<ColumnarData> {
+    const context = createCodecContext("import", options);
+    const snapshot = readWorkbook(data, context);
+    const sheet = snapshot.sheets[0];
+    const columns: Record<string, CellScalar[]> = Object.create(null);
+    if (!sheet) return { rowCount: 0, columns };
+    const values = new Map<number, CellScalar>();
+    for (const block of sheet.cells) {
+      for (const cell of block.cells) {
+        const row = block.startRow + cell.rowOffset;
+        const col = block.startCol + cell.colOffset;
+        const value =
+          cell.value.kind === "literal"
+            ? cell.value.value
+            : cell.value.kind === "formula"
+              ? cell.value.src
+              : null;
+        values.set(row * sheet.columns.length + col, value);
+      }
     }
-  }
-
-  return { rowCount, columns };
-}
-
-/** Default first-sheet table import backend. */
-export const readExcelFileTableImportBackend: XlsxTableImportBackend = {
-  name: "read-excel-file",
-  fromXlsxTable: fromXlsxTableBytes,
+    const header = sheet.columns.map((_column, col) => values.get(col) ?? null);
+    const keys = headerKeys(header);
+    const rowCount = Math.max(0, sheet.rowCount - 1);
+    assertResource(context, "maxCells", rowCount * keys.length);
+    for (const key of keys) columns[key] = new Array<CellScalar>(rowCount).fill(null);
+    for (let row = 0; row < rowCount; row++) {
+      for (let col = 0; col < keys.length; col++) {
+        columns[keys[col]!]![row] = values.get((row + 1) * sheet.columns.length + col) ?? null;
+      }
+    }
+    return { rowCount, columns };
+  },
 };

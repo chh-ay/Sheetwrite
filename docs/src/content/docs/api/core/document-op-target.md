@@ -9,7 +9,7 @@ Exhaustive stable target identity used by persistence/logging layers.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L1273</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L1879</code></dd></div>
 </dl>
 
 ## Declaration

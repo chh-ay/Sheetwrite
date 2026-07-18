@@ -128,6 +128,15 @@ export interface Store {
     cols: readonly number[],
   ): VisibleWindowView;
   /**
+   * Optional packed canonical data-row window used by file export. Unlike
+   * `getVisibleWindow`, sort/filter state never remaps `rows`.
+   */
+  getDataWindow?(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+  ): VisibleWindowView;
+  /**
    * Optional packed clipboard read. Custom stores may omit it; the controller
    * preserves the per-cell Store fallback contract.
    */

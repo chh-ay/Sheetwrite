@@ -1,9 +1,18 @@
 import {
+  assertWorkbookAllocationLimits,
+  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  resolveTransactionResourceLimits,
+  SnapshotResourceError,
+  type SnapshotResourceLimits,
+  SnapshotValidationError,
+  validateTransactionResources,
+} from "./document-protocol.js";
+import {
   type CompactRangeHistory,
   IncompleteDataError,
   type RangeMutationAllocationStats,
-  type SheetwriteStoreOptions,
   StoreDataEngine,
+  type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
@@ -36,12 +45,35 @@ import type {
   ChangeEvent,
   Transaction,
   TransactionApplicationOptions,
+  TransactionResourceLimits,
 } from "./types/transaction.js";
 
-export type { CompactRangeHistory, RangeMutationAllocationStats, SheetwriteStoreOptions };
+export type { CompactRangeHistory, RangeMutationAllocationStats };
 export { IncompleteDataError };
 
+/** Storage layout plus snapshot and transaction resource ceilings for one store. */
+export interface SheetwriteStoreOptions extends StoreDataEngineOptions {
+  /** Overrides canonical snapshot/workbook allocation ceilings before construction. */
+  snapshotResourceLimits?: Partial<SnapshotResourceLimits>;
+  /** Overrides inclusive operation-count and encoded-byte ceilings for every transaction. */
+  transactionResourceLimits?: Partial<TransactionResourceLimits>;
+}
+
 type ChangeListener = (event: ChangeEvent) => void;
+
+function isSnapshotAllocationFailure(error: unknown): boolean {
+  if (error instanceof SnapshotResourceError || error instanceof RangeError) return true;
+  if (typeof error === "string") {
+    return /allocation|capacity|memory|resource limit|out of bounds memory access/i.test(error);
+  }
+  if (typeof WebAssembly !== "undefined" && error instanceof WebAssembly.RuntimeError) {
+    return true;
+  }
+  return (
+    error instanceof Error &&
+    /allocation|capacity|memory|resource limit|out of bounds memory access/i.test(error.message)
+  );
+}
 
 /** Stable public facade and the sole transaction, epoch, policy, and event barrier. */
 export class SheetwriteStore implements Store {
@@ -51,21 +83,50 @@ export class SheetwriteStore implements Store {
   private protectionResolver: ProtectionResolver | undefined;
   private mutationPolicy: MutationPolicyMode;
   private readonly policy: StoreMutationPolicy;
+  private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private documentId?: string;
   private documentVersion?: number;
 
   constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
-    this.engine = new StoreDataEngine(workbook, data, options);
+    this.transactionResourceLimits = resolveTransactionResourceLimits(
+      options.transactionResourceLimits,
+    );
+    const storage = options.storage ?? "dense";
+    assertWorkbookAllocationLimits(workbook, {
+      storage,
+      resourceLimits: options.snapshotResourceLimits,
+    });
+    try {
+      this.engine = new StoreDataEngine(workbook, data, options);
+    } catch (error) {
+      if (!isSnapshotAllocationFailure(error)) throw error;
+      const resource = storage === "dense" ? "maxDenseCells" : "maxLogicalCellsPerSheet";
+      let actual = 0;
+      for (const sheet of workbook.sheets) {
+        const cells = sheet.rowCount * sheet.columns.length;
+        actual = storage === "dense" ? actual + cells : Math.max(actual, cells);
+      }
+      throw new SnapshotResourceError(
+        resource,
+        options.snapshotResourceLimits?.[resource] ?? DEFAULT_SNAPSHOT_RESOURCE_LIMITS[resource],
+        actual,
+        { cause: error },
+      );
+    }
     this.policy = new StoreMutationPolicy(workbook);
     this.protectionResolver = options.protectionResolver;
     this.mutationPolicy = options.mutationPolicy ?? "atomic";
   }
 
-  static fromSnapshot(input: unknown): SheetwriteStore {
-    const { snapshot, workbook } = decodeWorkbookSnapshot(input);
+  static fromSnapshot(input: unknown, options: SheetwriteStoreOptions = {}): SheetwriteStore {
+    resolveTransactionResourceLimits(options.transactionResourceLimits);
+    const { snapshot, workbook } = decodeWorkbookSnapshot(input, {
+      storage: options.storage ?? "dense",
+      resourceLimits: options.snapshotResourceLimits,
+    });
     let store: SheetwriteStore | undefined;
     try {
-      store = new SheetwriteStore(workbook);
+      store = new SheetwriteStore(workbook, undefined, options);
       store.documentId = snapshot.documentId;
       store.documentVersion = snapshot.version;
       store.epoch = snapshot.version ?? 0;
@@ -73,6 +134,15 @@ export class SheetwriteStore implements Store {
       return store;
     } catch (error) {
       store?.dispose();
+      if (isSnapshotAllocationFailure(error)) {
+        throw new SnapshotValidationError([
+          {
+            path: "$",
+            code: "resource-limit",
+            message: error instanceof Error ? error.message : "Snapshot allocation failed",
+          },
+        ]);
+      }
       throw error;
     }
   }
@@ -164,6 +234,14 @@ export class SheetwriteStore implements Store {
     cols: readonly number[],
   ): VisibleWindowView {
     return this.engine.getVisibleWindow(sheet, rows, cols);
+  }
+
+  getDataWindow(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+  ): VisibleWindowView {
+    return this.engine.getDataWindow(sheet, rows, cols);
   }
 
   getClipboardWindow(
@@ -343,6 +421,13 @@ export class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
+    const resourceValidation = validateTransactionResources(
+      tx.patches,
+      this.transactionResourceLimits,
+    );
+    if (!resourceValidation.ok) {
+      return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
+    }
     const options =
       typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
     const commitReason = options.commitReason ?? "api";

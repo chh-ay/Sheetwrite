@@ -9,7 +9,7 @@ Column definition accepted by the adapters’ simple row-object API.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L90</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L91</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>8</span>

@@ -9,7 +9,7 @@ Stable category for an IndexedDB pending-storage failure.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/browser</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L10</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L11</code></dd></div>
 </dl>
 
 ## Declaration
@@ -23,7 +23,9 @@ export type IndexedDbPendingCommitStorageErrorCode =
   | "aborted"
   | "quota"
   | "unsupported-schema"
-  | "transaction";
+  | "transaction"
+  | "conflict"
+  | "limit";
 ```
 
 </div>

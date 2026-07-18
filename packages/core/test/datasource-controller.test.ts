@@ -75,6 +75,87 @@ describe("DatasourceController revision retention", () => {
     store.dispose();
   });
 
+  it("schedules every maximal missing band and keeps ownership isolated across retry and reset", async () => {
+    const store = new SheetwriteStore(makeWorkbook(8));
+    const pending: Array<{
+      request: { start: number; end: number; signal: AbortSignal };
+      result: PromiseWithResolvers<DataSourcePage>;
+    }> = [];
+    const errors: unknown[] = [];
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          const result = Promise.withResolvers<DataSourcePage>();
+          pending.push({ request, result });
+          return result.promise;
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 8,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: (_request, error) => errors.push(error),
+      },
+      8,
+    );
+
+    controller.ensureLoaded(2, 4);
+    controller.ensureLoaded(0, 7);
+    expect(pending.map(({ request }) => [request.start, request.end])).toEqual([
+      [2, 4],
+      [0, 2],
+      [4, 7],
+    ]);
+    for (let left = 0; left < pending.length; left++) {
+      for (let right = left + 1; right < pending.length; right++) {
+        const a = pending[left]!.request;
+        const b = pending[right]!.request;
+        expect(Math.max(a.start, b.start)).toBeGreaterThanOrEqual(Math.min(a.end, b.end));
+      }
+    }
+
+    pending[2]!.result.resolve({
+      start: 4,
+      rows: [{ name: "four" }, { name: "five" }, { name: "six" }],
+    });
+    pending[0]!.result.reject(new Error("retry"));
+    await flushRequest();
+    controller.ensureLoaded(0, 7);
+    expect(pending.at(-1)!.request).toMatchObject({ start: 2, end: 4 });
+
+    const staleBeforeReset = [pending[1]!, pending.at(-1)!];
+    controller.reset(8);
+    expect(staleBeforeReset.every(({ request }) => request.signal.aborted)).toBe(true);
+    controller.ensureLoaded(0, 7);
+    const replacement = pending.at(-1)!;
+    expect(replacement.request).toMatchObject({ start: 0, end: 7 });
+
+    staleBeforeReset[0]!.result.resolve({
+      start: 0,
+      rows: [{ name: "stale zero" }, { name: "stale one" }],
+    });
+    staleBeforeReset.at(-1)!.result.resolve({
+      start: 2,
+      rows: [{ name: "stale two" }, { name: "stale three" }],
+    });
+    await flushRequest();
+    controller.ensureLoaded(0, 7);
+    expect(pending.at(-1)).toBe(replacement);
+
+    replacement.result.resolve({
+      start: 0,
+      rows: Array.from({ length: 7 }, (_, row) => ({ name: `fresh ${row}` })),
+    });
+    await flushRequest();
+    expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("fresh 2");
+    expect(errors).toHaveLength(1);
+
+    controller.destroy();
+    store.dispose();
+  });
+
   it("treats edits before a request as part of its revision and still protects later dense clears", async () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     const revisions = new MutationRevisionIndex();

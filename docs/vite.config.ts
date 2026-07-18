@@ -94,6 +94,13 @@ export default defineConfig({
       pages: [
         { path: "/" },
         { path: "/docs/" },
+        // The capability hub and its proofs are build gates: prerendering them
+        // must not depend on crawl reachability from the landing page.
+        { path: "/showcases/" },
+        { path: "/showcases/database/" },
+        { path: "/showcases/interoperability/" },
+        { path: "/showcases/performance/" },
+        { path: "/showcases/collaboration/" },
         { path: "/docs/proof/", sitemap: { exclude: true } },
         // Test fixtures stay reachable for Playwright but out of search surfaces.
         { path: "/test/xlsx/", sitemap: { exclude: true } },

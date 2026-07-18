@@ -1,4 +1,9 @@
-import { SnapshotValidationError, validateWorkbookSnapshot } from "./document-protocol.js";
+import {
+  SnapshotResourceError,
+  type SnapshotResourceLimits,
+  SnapshotValidationError,
+  validateWorkbookSnapshot,
+} from "./document-protocol.js";
 import { GridImpl } from "./grid.js";
 import { SheetwriteStore } from "./store.js";
 import type { WorkbookSnapshot } from "./types/document.js";
@@ -11,10 +16,18 @@ import type {
 } from "./types/transaction.js";
 
 /** Grid creation options accepted when hydrating a validated snapshot. */
-export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data">;
+export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data"> & {
+  /** Overrides canonical validation/allocation ceilings for this snapshot load. */
+  snapshotResourceLimits?: Partial<SnapshotResourceLimits>;
+};
 
 /** Stable category for a persistence failure. */
-export type PersistenceErrorCode = "aborted" | "invalid-snapshot" | "not-found" | "commit-rejected";
+export type PersistenceErrorCode =
+  | "aborted"
+  | "invalid-snapshot"
+  | "resource-limit"
+  | "not-found"
+  | "commit-rejected";
 
 /** Typed failure raised by persistence and synchronization flows. */
 export class PersistenceError extends Error {
@@ -37,20 +50,35 @@ export function createGridFromSnapshot(
   snapshot: unknown,
   options: SnapshotGridOptions = {},
 ): Grid {
+  const { snapshotResourceLimits, ...gridOptions } = options;
   let store: SheetwriteStore;
   try {
-    store = SheetwriteStore.fromSnapshot(snapshot);
+    store = SheetwriteStore.fromSnapshot(snapshot, {
+      storage: gridOptions.datasourceStorage?.mode ?? "dense",
+      chunkRows: gridOptions.datasourceStorage?.chunkRows,
+      cacheBytes: gridOptions.datasourceStorage?.cacheBytes,
+      protectionResolver: gridOptions.protectionResolver,
+      mutationPolicy: gridOptions.mutationPolicy,
+      snapshotResourceLimits,
+      transactionResourceLimits: gridOptions.transactionResourceLimits,
+    });
   } catch (error) {
     if (error instanceof SnapshotValidationError) {
-      throw new PersistenceError("invalid-snapshot", error.message, { cause: error });
+      const code = error.errors.some((issue) => issue.code === "resource-limit")
+        ? "resource-limit"
+        : "invalid-snapshot";
+      throw new PersistenceError(code, error.message, { cause: error });
     }
     throw error;
   }
 
   try {
-    return new GridImpl(host, { ...options, workbook: store.getWorkbook() }, store, true);
+    return new GridImpl(host, { ...gridOptions, workbook: store.getWorkbook() }, store, true);
   } catch (error) {
     store.dispose();
+    if (error instanceof SnapshotResourceError || error instanceof RangeError) {
+      throw new PersistenceError("resource-limit", error.message, { cause: error });
+    }
     throw error;
   }
 }

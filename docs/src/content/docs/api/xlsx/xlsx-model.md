@@ -1,35 +1,53 @@
 ---
 title: "XlsxModel | @sheetwrite/xlsx"
-description: "Tabular workbook model exchanged with the optional XLSX table backend."
+description: "Implementation-neutral first-sheet table export model."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|XlsxModel -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Tabular workbook model exchanged with the optional XLSX table backend.
+Implementation-neutral first-sheet table export model.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L74</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L23</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="xlsx-model-data" data-pagefind-weight="1">
-<summary><code>data</code></summary>
+<details class="api-member" id="xlsx-model-sheet-name" data-pagefind-weight="1">
+<summary><code>sheetName</code></summary>
 
 ```ts generated
-data: SheetData;
+sheetName: string;
 ```
 
 </details>
 
-<details class="api-member" id="xlsx-model-options" data-pagefind-weight="1">
-<summary><code>options</code></summary>
+<details class="api-member" id="xlsx-model-column-widths" data-pagefind-weight="1">
+<summary><code>columnWidths</code></summary>
 
 ```ts generated
-options: SheetOptions<Blob>;
+columnWidths: number[];
+```
+
+</details>
+
+<details class="api-member" id="xlsx-model-row-heights" data-pagefind-weight="1">
+<summary><code>rowHeights</code></summary>
+
+```ts generated
+rowHeights: (number | undefined)[];
+```
+
+</details>
+
+<details class="api-member" id="xlsx-model-rows" data-pagefind-weight="1">
+<summary><code>rows</code></summary>
+
+```ts generated
+rows: (XlsxModelCell | null)[][];
 ```
 
 </details>
@@ -42,8 +60,10 @@ options: SheetOptions<Blob>;
 
 ```ts generated
 export interface XlsxModel {
-  data: SheetData;
-  options: SheetOptions<Blob>;
+  sheetName: string;
+  columnWidths: number[];
+  rowHeights: (number | undefined)[];
+  rows: (XlsxModelCell | null)[][];
 }
 ```
 
