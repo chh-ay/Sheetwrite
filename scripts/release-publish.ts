@@ -1,3 +1,4 @@
+import { appendFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   type ReleaseArtifactManifest,
@@ -5,10 +6,18 @@ import {
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
 
-export interface PublishedPackage {
+export interface PackageIdentity {
   readonly name: string;
   readonly version: string;
+}
+
+export interface PublishedPackage extends PackageIdentity {
   readonly integrity: string;
+}
+
+export interface PublicationResult {
+  readonly verifiedPackages: readonly PublishedPackage[];
+  readonly newlyPublishedPackages: readonly PublishedPackage[];
 }
 
 export interface RegistryPackage {
@@ -24,7 +33,7 @@ type PublishArtifact = (
 
 type RegistryQuery = (artifact: ReleasePackageArtifact) => Promise<RegistryPackage>;
 type LatestQuery = (name: string) => Promise<string>;
-type ExistingQuery = (artifact: ReleasePackageArtifact) => Promise<RegistryPackage | undefined>;
+type ExistingQuery = (identity: PackageIdentity) => Promise<RegistryPackage | undefined>;
 
 function processEnvironment(): Record<string, string> {
   return Object.fromEntries(
@@ -94,12 +103,12 @@ export async function publishArtifact(
   return { ...published, integrity: artifact.integrity };
 }
 
-async function queryRegistry(artifact: ReleasePackageArtifact): Promise<RegistryPackage> {
+async function queryRegistry(identity: PackageIdentity): Promise<RegistryPackage> {
   return JSON.parse(
     await command([
       "npm",
       "view",
-      `${artifact.name}@${artifact.version}`,
+      `${identity.name}@${identity.version}`,
       "name",
       "version",
       "dist.integrity",
@@ -109,10 +118,10 @@ async function queryRegistry(artifact: ReleasePackageArtifact): Promise<Registry
 }
 
 async function queryExistingRegistry(
-  artifact: ReleasePackageArtifact,
+  identity: PackageIdentity,
 ): Promise<RegistryPackage | undefined> {
   try {
-    return await queryRegistry(artifact);
+    return await queryRegistry(identity);
   } catch (error) {
     if (String(error).includes("E404")) return undefined;
     throw error;
@@ -127,15 +136,19 @@ async function queryLatest(name: string): Promise<string> {
   return value;
 }
 
+function assertRegistryIdentity(identity: PackageIdentity, registry: RegistryPackage): void {
+  if (registry.name !== identity.name || registry.version !== identity.version) {
+    throw new Error(
+      `Registry returned ${String(registry.name)}@${String(registry.version)}, expected ${identity.name}@${identity.version}`,
+    );
+  }
+}
+
 export function assertRegistryArtifact(
   artifact: ReleasePackageArtifact,
   registry: RegistryPackage,
 ): void {
-  if (registry.name !== artifact.name || registry.version !== artifact.version) {
-    throw new Error(
-      `Registry returned ${String(registry.name)}@${String(registry.version)}, expected ${artifact.name}@${artifact.version}`,
-    );
-  }
+  assertRegistryIdentity(artifact, registry);
   if (registry.dist?.integrity !== artifact.integrity) {
     throw new Error(
       `${artifact.name}@${artifact.version} registry integrity does not match the canonical tarball`,
@@ -148,22 +161,45 @@ export async function publishArtifactsIdempotently(
   artifacts: readonly ReleasePackageArtifact[],
   existing: ExistingQuery = queryExistingRegistry,
   publish: PublishArtifact = publishArtifact,
-): Promise<readonly PublishedPackage[]> {
-  const published: PublishedPackage[] = [];
+): Promise<PublicationResult> {
+  const packagedNames = new Set<string>();
+  for (const artifact of artifacts) packagedNames.add(artifact.name);
+  const verifiedIndependentDependencies = new Set<string>();
+  for (const artifact of artifacts) {
+    for (const [name, version] of Object.entries(artifact.internalDependencies)) {
+      if (packagedNames.has(name)) continue;
+      const dependencyKey = `${name}@${version}`;
+      if (verifiedIndependentDependencies.has(dependencyKey)) continue;
+      const identity = { name, version };
+      const registry = await existing(identity);
+      if (registry === undefined) {
+        throw new Error(
+          `${artifact.name}@${artifact.version} requires unpublished internal dependency ${dependencyKey}`,
+        );
+      }
+      assertRegistryIdentity(identity, registry);
+      verifiedIndependentDependencies.add(dependencyKey);
+    }
+  }
+
+  const verifiedPackages: PublishedPackage[] = [];
+  const newlyPublishedPackages: PublishedPackage[] = [];
   for (const artifact of artifacts) {
     const registry = await existing(artifact);
     if (registry !== undefined) {
       assertRegistryArtifact(artifact, registry);
-      published.push({
+      verifiedPackages.push({
         name: artifact.name,
         version: artifact.version,
         integrity: artifact.integrity,
       });
       continue;
     }
-    published.push(await publish(artifactRoot, artifact));
+    const published = await publish(artifactRoot, artifact);
+    verifiedPackages.push(published);
+    newlyPublishedPackages.push(published);
   }
-  return published;
+  return { verifiedPackages, newlyPublishedPackages };
 }
 
 export function assertRegistryPackage(
@@ -203,7 +239,6 @@ export async function verifyPublishedArtifacts(
 
 export function assertCanonicalReleaseIdentity(
   manifest: Pick<ReleaseArtifactManifest, "sourceCommit" | "packages">,
-  expectedVersion: string,
   expectedCommit: string,
 ): void {
   if (manifest.sourceCommit !== expectedCommit) {
@@ -211,35 +246,40 @@ export function assertCanonicalReleaseIdentity(
       `Canonical artifacts came from ${manifest.sourceCommit}, expected ${expectedCommit}`,
     );
   }
-  for (const artifact of manifest.packages) {
-    if (artifact.version !== expectedVersion) {
-      throw new Error(`${artifact.name} is ${artifact.version}, expected ${expectedVersion}`);
-    }
-  }
 }
 
 export async function publishCanonicalArtifacts(
   artifactRoot: string,
-  expectedVersion: string,
   expectedCommit: string,
-): Promise<readonly PublishedPackage[]> {
+): Promise<PublicationResult> {
   const manifest = await verifyReleaseArtifacts(artifactRoot);
-  assertCanonicalReleaseIdentity(manifest, expectedVersion, expectedCommit);
-  const published = await publishArtifactsIdempotently(artifactRoot, manifest.packages);
+  assertCanonicalReleaseIdentity(manifest, expectedCommit);
+  const result = await publishArtifactsIdempotently(artifactRoot, manifest.packages);
   await verifyPublishedArtifacts(manifest.packages);
-  return published;
+  return result;
 }
 
 if (import.meta.main) {
   const artifactRoot = resolve(process.argv[2] ?? "test-results/release-artifacts");
-  const expectedVersion = process.env.RELEASE_VERSION;
   const expectedCommit = process.env.EXPECTED_SHA;
-  if (!expectedVersion) throw new Error("RELEASE_VERSION is required");
   if (!expectedCommit || !/^[0-9a-f]{40}$/.test(expectedCommit)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
-  const published = await publishCanonicalArtifacts(artifactRoot, expectedVersion, expectedCommit);
+  const result = await publishCanonicalArtifacts(artifactRoot, expectedCommit);
+  const outputPath = process.env.GITHUB_OUTPUT;
+  if (outputPath) {
+    const verified = result.verifiedPackages.map(({ name, version }) => ({ name, version }));
+    const published = result.newlyPublishedPackages.map(({ name, version }) => ({
+      name,
+      version,
+    }));
+    await appendFile(
+      outputPath,
+      `verified=${JSON.stringify(verified)}\n` + `published=${JSON.stringify(published)}\n`,
+      "utf8",
+    );
+  }
   console.log(
-    `Published and verified ${published.length} canonical packages at ${expectedVersion}`,
+    `Published ${result.newlyPublishedPackages.length} and verified ${result.verifiedPackages.length} canonical packages`,
   );
 }

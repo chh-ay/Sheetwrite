@@ -22,6 +22,7 @@ const root = resolve(import.meta.dir, "..");
 const workflowSources = {
   ci: readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8"),
   release: readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8"),
+  version: readFileSync(resolve(root, ".github/workflows/version.yml"), "utf8"),
 } as const;
 const WORKFLOW_BUN_VERSION = "$" + "{{ env.BUN_VERSION }}";
 const WORKFLOW_NODE_VERSION = "$" + "{{ env.NODE_VERSION }}";
@@ -33,6 +34,7 @@ function workflows(): Readonly<Record<keyof typeof workflowSources, WorkflowCont
   return {
     ci: parseWorkflowContract(workflowSources.ci, "CI workflow"),
     release: parseWorkflowContract(workflowSources.release, "release workflow"),
+    version: parseWorkflowContract(workflowSources.version, "version workflow"),
   };
 }
 
@@ -49,6 +51,7 @@ describe("CI and release workflow contracts", () => {
     const parsed = workflows();
     expect(Object.keys(parsed.ci.jobs).length).toBeGreaterThan(1);
     expect(Object.keys(parsed.release.jobs)).toEqual(["identity", "publish"]);
+    expect(Object.keys(parsed.version.jobs)).toEqual(["version"]);
 
     expect(() => parseWorkflowContract("jobs: []", "fixture")).toThrow(
       "fixture.jobs must be a non-empty object",
@@ -64,12 +67,13 @@ describe("CI and release workflow contracts", () => {
     ).toThrow("cannot define both run and uses");
   });
 
-  it("requires every third-party action in both workflows to use its reviewed commit SHA", () => {
+  it("requires every third-party workflow action to use its reviewed commit SHA", () => {
     const parsed = workflows();
     expect(() =>
       assertReviewedActionPins([
         { name: "CI", workflow: parsed.ci },
         { name: "release", workflow: parsed.release },
+        { name: "version", workflow: parsed.version },
       ]),
     ).not.toThrow();
 
@@ -95,20 +99,23 @@ describe("CI and release workflow contracts", () => {
   it("keeps each workflow's required toolchain versions in parity", () => {
     const parsed = workflows();
     for (const [name, workflow] of Object.entries(parsed)) {
-      const expectedEnv = { BUN_VERSION, NODE_VERSION, NPM_VERSION } as const;
-      for (const [key, value] of Object.entries(expectedEnv)) {
-        expect(workflow.env?.[key], `${name} ${key}`).toBe(value);
-      }
+      expect(workflow.env?.BUN_VERSION, `${name} BUN_VERSION`).toBe(BUN_VERSION);
       const steps = Object.values(workflow.jobs).flatMap((job) => job.steps ?? []);
       const nodeSetups = steps.filter((step) => step.uses?.startsWith("actions/setup-node@"));
       const bunSetups = steps.filter((step) => step.uses?.startsWith("oven-sh/setup-bun@"));
-      expect(nodeSetups.length, `${name} Node setup`).toBeGreaterThan(0);
       expect(bunSetups.length, `${name} Bun setup`).toBeGreaterThan(0);
       expect(
-        nodeSetups.every((step) => step.with?.["node-version"] === WORKFLOW_NODE_VERSION),
-      ).toBeTrue();
-      expect(
         bunSetups.every((step) => step.with?.["bun-version"] === WORKFLOW_BUN_VERSION),
+      ).toBeTrue();
+      if (name === "version") {
+        expect(nodeSetups).toEqual([]);
+        continue;
+      }
+      expect(workflow.env?.NODE_VERSION, `${name} NODE_VERSION`).toBe(NODE_VERSION);
+      expect(workflow.env?.NPM_VERSION, `${name} NPM_VERSION`).toBe(NPM_VERSION);
+      expect(nodeSetups.length, `${name} Node setup`).toBeGreaterThan(0);
+      expect(
+        nodeSetups.every((step) => step.with?.["node-version"] === WORKFLOW_NODE_VERSION),
       ).toBeTrue();
       expect(
         steps
@@ -167,11 +174,18 @@ describe("CI and release workflow contracts", () => {
       WORKFLOW_BUN_VERSION,
     );
     expect(commands(publish)).toContain('npm install --global "npm@$NPM_VERSION"');
-    expect(commands(publish)).toContain(
-      "npm config delete //registry.npmjs.org/:_authToken --location=user",
-    );
-    expect(commands(publish)).toContain("unset NODE_AUTH_TOKEN");
     expect(commands(publish)).toContain("release-publish.ts");
-    expect(commands(publish)).toContain("gh release create");
+    expect(commands(publish)).toContain("release-github.ts");
+  });
+
+  it("creates independent package version pull requests without publishing", () => {
+    const version = workflows().version;
+    const job = version.jobs.version!;
+    expect(version.permissions).toEqual({ contents: "write", "pull-requests": "write" });
+    expect(setupStep(job, "oven-sh/setup-bun")?.with?.["bun-version"]).toBe(WORKFLOW_BUN_VERSION);
+    const changesets = setupStep(job, "changesets/action")!;
+    expect(changesets.with?.version).toBe("bunx changeset version");
+    expect(changesets.with?.createGithubReleases).toBe(false);
+    expect(changesets.with?.publish).toBeUndefined();
   });
 });

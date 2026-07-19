@@ -143,13 +143,14 @@ presence, comments, and revisions.
 
 ## Releases
 
-Changesets generate the package-level changelogs linked from the root
-[changelog](CHANGELOG.md). After the coordinated version commit is merged and
-green on `develop`, pushing an exact stable tag such as `v0.2.1` requires that
-successful push CI run, downloads and rehashes its six canonical tarballs,
-publishes them to npm with provenance, verifies their registry integrity and
-`latest` tags, then creates the matching GitHub Release. A tag whose version or
-artifact commit does not match fails before publication.
+Changesets maintain independent package versions and package-level changelogs
+linked from the root [changelog](CHANGELOG.md). Merging changes with pending
+changesets updates one version pull request. After its version commit passes CI
+on `develop`, publication downloads and rehashes that exact run's canonical
+tarballs, verifies and skips package versions already on npm, and publishes only
+unpublished versions in dependency order with provenance. Registry verification
+finishes before package-specific tags and GitHub Releases such as
+`@sheetwrite/xlsx@0.2.1` are created.
 
 ## Development
 

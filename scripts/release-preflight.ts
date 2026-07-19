@@ -1,6 +1,5 @@
-import { appendFile, readFile } from "node:fs/promises";
+import { appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 
@@ -22,81 +21,29 @@ async function run(command: readonly string[]): Promise<string> {
   return stdout.trim();
 }
 
-async function packageVersion(name: string): Promise<string> {
-  const directory = name.slice("@sheetwrite/".length);
-  const manifest = JSON.parse(
-    await readFile(resolve(repositoryRoot, "packages", directory, "package.json"), "utf8"),
-  ) as { version?: unknown };
-  if (typeof manifest.version !== "string") throw new Error(`${name} has no version`);
-  return manifest.version;
-}
-
-export function releaseVersionFromTag(tag: string): string {
-  const match = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(tag);
-  if (!match) throw new Error(`Release tag ${tag} must be an exact stable semantic version`);
-  return tag.slice(1);
-}
-
-function isSuccessfulCiRun(value: unknown, expectedSha: string): value is { id: number } {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    "id" in value &&
-    typeof value.id === "number" &&
-    Number.isSafeInteger(value.id) &&
-    "head_sha" in value &&
-    value.head_sha === expectedSha &&
-    "event" in value &&
-    value.event === "push" &&
-    "status" in value &&
-    value.status === "completed" &&
-    "conclusion" in value &&
-    value.conclusion === "success"
-  );
-}
-
-export function successfulCiRunId(payload: unknown, expectedSha: string): number {
-  if (
-    payload === null ||
-    typeof payload !== "object" ||
-    !("workflow_runs" in payload) ||
-    !Array.isArray(payload.workflow_runs)
-  ) {
-    throw new Error("CI workflow response has no workflow_runs array");
+export function parseCiRunId(value: string | undefined): number {
+  if (value === undefined || !/^[1-9]\d*$/.test(value)) {
+    throw new Error("CI_RUN_ID must be a positive integer");
   }
-  const match = payload.workflow_runs.find((run) => isSuccessfulCiRun(run, expectedSha));
-  if (match === undefined) {
-    throw new Error(`${expectedSha} has no successful completed push CI run`);
-  }
-  return match.id;
+  const runId = Number(value);
+  if (!Number.isSafeInteger(runId)) throw new Error("CI_RUN_ID must be a safe integer");
+  return runId;
 }
 
 async function main(): Promise<void> {
   const expectedSha = process.env.EXPECTED_SHA;
-  const releaseTag = process.env.RELEASE_TAG;
   if (!expectedSha || !/^[0-9a-f]{40}$/.test(expectedSha)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
-  if (!releaseTag) throw new Error("RELEASE_TAG is required");
-  const expectedVersion = releaseVersionFromTag(releaseTag);
+  const ciRunId = parseCiRunId(process.env.CI_RUN_ID);
 
   const actualSha = await run(["git", "rev-parse", "HEAD"]);
-  if (actualSha !== expectedSha)
+  if (actualSha !== expectedSha) {
     throw new Error(`Checked out ${actualSha}, expected ${expectedSha}`);
-  const taggedSha = await run(["git", "rev-parse", `${releaseTag}^{commit}`]);
-  if (taggedSha !== expectedSha) {
-    throw new Error(`${releaseTag} targets ${taggedSha}, expected ${expectedSha}`);
   }
   await run(["git", "merge-base", "--is-ancestor", expectedSha, "origin/develop"]);
   if ((await run(["git", "status", "--porcelain", "--untracked-files=all"])) !== "") {
     throw new Error("Release checkout is not clean");
-  }
-
-  for (const name of PUBLISHABLE_PACKAGE_ORDER) {
-    const version = await packageVersion(name);
-    if (version !== expectedVersion) {
-      throw new Error(`${name} is ${version}, expected ${expectedVersion}`);
-    }
   }
 
   const repository = process.env.GITHUB_REPOSITORY;
@@ -106,26 +53,17 @@ async function main(): Promise<void> {
     );
   }
   const visibility = await run(["gh", "api", `repos/${repository}`, "--jq", ".visibility"]);
-  if (visibility !== "public")
+  if (visibility !== "public") {
     throw new Error(`Repository visibility is ${visibility}, expected public`);
-
-  const ciRuns = JSON.parse(
-    await run([
-      "gh",
-      "api",
-      `repos/${repository}/actions/workflows/ci.yml/runs?head_sha=${expectedSha}&event=push&status=success&per_page=10`,
-    ]),
-  ) as unknown;
-  const ciRunId = successfulCiRunId(ciRuns, expectedSha);
-  const outputPath = process.env.GITHUB_OUTPUT;
-  if (!outputPath) throw new Error("GITHUB_OUTPUT is required");
-  await appendFile(outputPath, `ci_run_id=${ciRunId}\n`, "utf8");
+  }
 
   await run(["npm", "ping", "--registry", "https://registry.npmjs.org"]);
 
-  console.log(
-    `Release preflight passed for ${expectedSha} at version ${expectedVersion} using CI run ${ciRunId}`,
-  );
+  const outputPath = process.env.GITHUB_OUTPUT;
+  if (!outputPath) throw new Error("GITHUB_OUTPUT is required");
+  await appendFile(outputPath, `commit=${expectedSha}\nci_run_id=${ciRunId}\n`, "utf8");
+
+  console.log(`Release preflight passed for ${expectedSha} using CI run ${ciRunId}`);
 }
 
 if (import.meta.main) await main();

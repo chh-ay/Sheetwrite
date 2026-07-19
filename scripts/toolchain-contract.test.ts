@@ -20,7 +20,9 @@ const packageManifest = JSON.parse(readFileSync(resolve(root, "package.json"), "
 };
 const rustToolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+const versionWorkflow = readFileSync(resolve(root, ".github/workflows/version.yml"), "utf8");
 const parsedWorkflow = parseWorkflowContract(workflow, "CI workflow");
+const parsedVersionWorkflow = parseWorkflowContract(versionWorkflow, "version workflow");
 const nodeVersion = readFileSync(resolve(root, ".node-version"), "utf8").trim();
 const WORKFLOW_BUN_VERSION = "$" + "{{ env.BUN_VERSION }}";
 const WORKFLOW_NODE_VERSION = "$" + "{{ env.NODE_VERSION }}";
@@ -81,7 +83,10 @@ describe("contributor and CI toolchain contract", () => {
 
   it("pins every third-party action to its reviewed immutable commit", () => {
     expect(() =>
-      assertReviewedActionPins([{ name: "CI", workflow: parsedWorkflow }]),
+      assertReviewedActionPins([
+        { name: "CI", workflow: parsedWorkflow },
+        { name: "version", workflow: parsedVersionWorkflow },
+      ]),
     ).not.toThrow();
     expect(workflow).not.toMatch(
       /(?:bun-version|NODE_VERSION|NPM_VERSION|RUST_VERSION|WASM_PACK_VERSION):\s*(?:latest|stable)\b/,
