@@ -49,10 +49,11 @@ describe("CI and release workflow contracts", () => {
     const parsed = workflows();
     expect(Object.keys(parsed.ci.jobs).length).toBeGreaterThan(1);
     expect(Object.keys(parsed.release.jobs)).toEqual([
+      "identity",
       "preflight",
       "prepare",
       "package-gates",
-      "stage",
+      "publish",
     ]);
 
     expect(() => parseWorkflowContract("jobs: []", "fixture")).toThrow(
@@ -154,15 +155,18 @@ describe("CI and release workflow contracts", () => {
     expect(String(projectByName.webkit?.grep)).toBe("/@portability/");
   });
 
-  it("applies the canonical JavaScript toolchain to the protected OIDC staging job", () => {
-    const stage = workflows().release.jobs.stage!;
-    expect(stage.environment).toBe("npm-release");
-    expect(stage.permissions?.["id-token"]).toBe("write");
-    expect(setupStep(stage, "actions/setup-node")?.with?.["node-version"]).toBe(
+  it("applies the canonical JavaScript toolchain to the trusted publishing job", () => {
+    const publish = workflows().release.jobs.publish!;
+    expect(publish.environment).toBe("npm-release");
+    expect(publish.permissions).toEqual({ contents: "write", "id-token": "write" });
+    expect(setupStep(publish, "actions/setup-node")?.with?.["node-version"]).toBe(
       WORKFLOW_NODE_VERSION,
     );
-    expect(setupStep(stage, "oven-sh/setup-bun")?.with?.["bun-version"]).toBe(WORKFLOW_BUN_VERSION);
-    expect(commands(stage)).toContain('npm install --global "npm@$NPM_VERSION"');
-    expect(commands(stage)).toContain("release-stage.ts");
+    expect(setupStep(publish, "oven-sh/setup-bun")?.with?.["bun-version"]).toBe(
+      WORKFLOW_BUN_VERSION,
+    );
+    expect(commands(publish)).toContain('npm install --global "npm@$NPM_VERSION"');
+    expect(commands(publish)).toContain("release-publish.ts");
+    expect(commands(publish)).toContain("gh release create");
   });
 });

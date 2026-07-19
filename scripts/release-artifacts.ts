@@ -16,7 +16,6 @@ import {
 
 export const RELEASE_ARTIFACT_SCHEMA_VERSION = 2;
 export const RELEASE_ARTIFACT_MANIFEST = "release-artifacts.json";
-export const INITIAL_RELEASE_VERSION = "0.1.0";
 export const RELEASE_BUILD_COMMAND = "bun run build:packages";
 
 interface PackageManifest {
@@ -178,14 +177,20 @@ function collectInternalDependencies(
   return Object.fromEntries([...internal].sort(([left], [right]) => left.localeCompare(right)));
 }
 
+function assertStableReleaseVersion(version: string, label: string): void {
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+    throw new Error(`${label} must be an exact stable semantic version`);
+  }
+}
+
 function expectedTarballName(name: string, version: string): string {
   return `${name.replace(/^@/, "").replaceAll("/", "-")}-${version}.tgz`;
 }
 
-export function expectedArtifactFiles(): readonly string[] {
+export function expectedArtifactFiles(version: string): readonly string[] {
   return [
     RELEASE_ARTIFACT_MANIFEST,
-    ...PUBLISHABLE_PACKAGE_ORDER.map((name) => expectedTarballName(name, INITIAL_RELEASE_VERSION)),
+    ...PUBLISHABLE_PACKAGE_ORDER.map((name) => expectedTarballName(name, version)),
   ].sort();
 }
 
@@ -263,6 +268,9 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
       `Release manifest must contain exactly ${PUBLISHABLE_PACKAGE_ORDER.length} packages`,
     );
   }
+  const releaseVersion = manifest.packages[0]?.version;
+  assertString(releaseVersion, "Release version");
+  assertStableReleaseVersion(releaseVersion, "Release version");
   const seen = new Set<string>();
   for (const [index, artifact] of manifest.packages.entries()) {
     if (typeof artifact !== "object" || artifact === null) {
@@ -291,8 +299,8 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
     }
     if (seen.has(artifact.name)) throw new Error(`Duplicate release package ${artifact.name}`);
     seen.add(artifact.name);
-    if (artifact.version !== INITIAL_RELEASE_VERSION) {
-      throw new Error(`${artifact.name} must remain version ${INITIAL_RELEASE_VERSION}`);
+    if (artifact.version !== releaseVersion) {
+      throw new Error(`${artifact.name} must use coordinated version ${releaseVersion}`);
     }
     const expectedPath = expectedTarballName(artifact.name, artifact.version);
     if (artifact.path !== expectedPath || basename(artifact.path) !== artifact.path) {
@@ -328,13 +336,8 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
       throw new Error(`${artifact.name} internalDependencies must be an object`);
     }
     for (const [name, version] of Object.entries(artifact.internalDependencies)) {
-      if (
-        !PUBLISHABLE_PACKAGE_ORDER.includes(name as never) ||
-        version !== INITIAL_RELEASE_VERSION
-      ) {
-        throw new Error(
-          `${artifact.name} internal dependency ${name} must be ${INITIAL_RELEASE_VERSION}`,
-        );
+      if (!PUBLISHABLE_PACKAGE_ORDER.includes(name as never) || version !== releaseVersion) {
+        throw new Error(`${artifact.name} internal dependency ${name} must be ${releaseVersion}`);
       }
     }
   }
@@ -484,8 +487,8 @@ async function assertToolchain(): Promise<ReleaseToolchain> {
     buildCommand: RELEASE_BUILD_COMMAND,
     packages: PUBLISHABLE_PACKAGE_ORDER.map((name) => ({
       name,
-      version: INITIAL_RELEASE_VERSION,
-      path: expectedTarballName(name, INITIAL_RELEASE_VERSION),
+      version: "0.0.0",
+      path: expectedTarballName(name, "0.0.0"),
       bytes: 0,
       unpackedBytes: 0,
       fileCount: 0,
@@ -544,14 +547,19 @@ async function loadSourcePackages(): Promise<
       byName.set(manifest.name, { directory, manifest });
     }
   }
-  return PUBLISHABLE_PACKAGE_ORDER.map((name) => {
+  const sources = PUBLISHABLE_PACKAGE_ORDER.map((name) => {
     const source = byName.get(name);
     if (source === undefined) throw new Error(`Missing publishable workspace package ${name}`);
-    if (source.manifest.version !== INITIAL_RELEASE_VERSION) {
-      throw new Error(`${name} must remain version ${INITIAL_RELEASE_VERSION}`);
-    }
     return source;
   });
+  const releaseVersion = sources[0]!.manifest.version;
+  assertStableReleaseVersion(releaseVersion, "Publishable package version");
+  for (const source of sources) {
+    if (source.manifest.version !== releaseVersion) {
+      throw new Error(`${source.manifest.name} must use coordinated version ${releaseVersion}`);
+    }
+  }
+  return sources;
 }
 
 interface StagedPackage {
@@ -595,7 +603,7 @@ export async function verifyReleaseArtifacts(
   const manifest = await readJson<ReleaseArtifactManifest>(manifestPath);
   validateReleaseManifest(manifest);
   const entries = (await readdir(root)).sort();
-  const expectedEntries = [...expectedArtifactFiles()];
+  const expectedEntries = [...expectedArtifactFiles(manifest.packages[0]!.version)];
   if (
     entries.length !== expectedEntries.length ||
     entries.some((entry, index) => entry !== expectedEntries[index])
@@ -705,8 +713,10 @@ export async function buildReleaseArtifacts(
         ),
         source.manifest.name,
       );
-      if (result.version !== INITIAL_RELEASE_VERSION) {
-        throw new Error(`${result.name} npm pack version changed to ${result.version}`);
+      if (result.version !== source.manifest.version) {
+        throw new Error(
+          `${result.name} npm pack version changed to ${result.version}, expected ${source.manifest.version}`,
+        );
       }
       const expectedFilename = expectedTarballName(result.name, result.version);
       if (result.filename !== expectedFilename) {

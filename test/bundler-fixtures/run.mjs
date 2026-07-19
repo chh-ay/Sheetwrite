@@ -133,8 +133,12 @@ await rm(stagingRoot, { recursive: true, force: true });
 for (const fixture of ["vite", "webpack", "next"]) {
   const cwd = join(fixturesRoot, fixture);
   const lockPath = join(cwd, "package-lock.json");
-  const originalLock = await readFile(lockPath, "utf8");
-  const manifest = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"));
+  const manifestPath = join(cwd, "package.json");
+  const [originalLock, originalManifest] = await Promise.all([
+    readFile(lockPath, "utf8"),
+    readFile(manifestPath, "utf8"),
+  ]);
+  const manifest = JSON.parse(originalManifest);
   const fixtureTarballs = new Map();
   for (const packageName of Object.keys({
     ...manifest.dependencies,
@@ -151,7 +155,10 @@ for (const fixture of ["vite", "webpack", "next"]) {
     await bindCanonicalTarballIntegrities(lockPath, fixtureTarballs);
     await run("npm", ["run", "build"], cwd);
   } finally {
-    await writeFile(lockPath, originalLock);
+    await Promise.all([
+      writeFile(lockPath, originalLock),
+      writeFile(manifestPath, originalManifest),
+    ]);
   }
 }
 

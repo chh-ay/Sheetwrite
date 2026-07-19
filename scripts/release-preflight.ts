@@ -31,17 +31,28 @@ async function packageVersion(name: string): Promise<string> {
   return manifest.version;
 }
 
+export function releaseVersionFromTag(tag: string): string {
+  const match = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(tag);
+  if (!match) throw new Error(`Release tag ${tag} must be an exact stable semantic version`);
+  return tag.slice(1);
+}
+
 async function main(): Promise<void> {
   const expectedSha = process.env.EXPECTED_SHA;
-  const expectedVersion = process.env.RELEASE_VERSION;
+  const releaseTag = process.env.RELEASE_TAG;
   if (!expectedSha || !/^[0-9a-f]{40}$/.test(expectedSha)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
-  if (!expectedVersion) throw new Error("RELEASE_VERSION is required");
+  if (!releaseTag) throw new Error("RELEASE_TAG is required");
+  const expectedVersion = releaseVersionFromTag(releaseTag);
 
   const actualSha = await run(["git", "rev-parse", "HEAD"]);
   if (actualSha !== expectedSha)
     throw new Error(`Checked out ${actualSha}, expected ${expectedSha}`);
+  const taggedSha = await run(["git", "rev-parse", `${releaseTag}^{commit}`]);
+  if (taggedSha !== expectedSha) {
+    throw new Error(`${releaseTag} targets ${taggedSha}, expected ${expectedSha}`);
+  }
   await run(["git", "merge-base", "--is-ancestor", expectedSha, "origin/develop"]);
   if ((await run(["git", "status", "--porcelain", "--untracked-files=all"])) !== "") {
     throw new Error("Release checkout is not clean");
@@ -64,27 +75,9 @@ async function main(): Promise<void> {
   if (visibility !== "public")
     throw new Error(`Repository visibility is ${visibility}, expected public`);
 
-  for (const name of PUBLISHABLE_PACKAGE_ORDER) {
-    const child = Bun.spawn(["npm", "view", `${name}@${expectedVersion}`, "version", "--json"], {
-      cwd: repositoryRoot,
-      env: process.env,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
-    if (exitCode === 0 && stdout.trim() !== "") {
-      throw new Error(`${name}@${expectedVersion} already exists in the public registry`);
-    }
-    if (exitCode !== 0 && !stderr.includes("E404")) {
-      throw new Error(`Could not verify ${name}@${expectedVersion} registry state: ${stderr}`);
-    }
-  }
+  await run(["npm", "ping", "--registry", "https://registry.npmjs.org"]);
 
   console.log(`Release preflight passed for ${expectedSha} at version ${expectedVersion}`);
 }
 
-await main();
+if (import.meta.main) await main();

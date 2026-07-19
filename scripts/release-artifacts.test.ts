@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   assertOutputDirectoryEmpty,
-  INITIAL_RELEASE_VERSION,
   RELEASE_ARTIFACT_MANIFEST,
   RELEASE_ARTIFACT_SCHEMA_VERSION,
   RELEASE_BUILD_COMMAND,
@@ -28,6 +27,8 @@ import {
   WASM_TARGET,
 } from "./workspace-tooling.js";
 
+const TEST_RELEASE_VERSION = "0.2.0";
+
 const temporaryRoots: string[] = [];
 
 afterEach(async () => {
@@ -37,7 +38,7 @@ afterEach(async () => {
 });
 
 function tarballName(name: string): string {
-  return `${name.replace(/^@/, "").replaceAll("/", "-")}-${INITIAL_RELEASE_VERSION}.tgz`;
+  return `${name.replace(/^@/, "").replaceAll("/", "-")}-${TEST_RELEASE_VERSION}.tgz`;
 }
 
 function manifest(): ReleaseArtifactManifest {
@@ -58,7 +59,7 @@ function manifest(): ReleaseArtifactManifest {
     buildCommand: RELEASE_BUILD_COMMAND,
     packages: PUBLISHABLE_PACKAGE_ORDER.map((name) => ({
       name,
-      version: INITIAL_RELEASE_VERSION,
+      version: TEST_RELEASE_VERSION,
       path: tarballName(name),
       bytes: 1,
       unpackedBytes: 1,
@@ -126,7 +127,7 @@ async function writeTarball(
   await mkdir(packageRoot, { recursive: true });
   const packedManifestValue = {
     name: packedName,
-    version: INITIAL_RELEASE_VERSION,
+    version: TEST_RELEASE_VERSION,
     ...manifestOverrides,
   };
   const packedManifest = `${JSON.stringify(packedManifestValue)}\n`;
@@ -156,7 +157,7 @@ async function writeTarball(
   const bytes = new Uint8Array(await readFile(join(root, path)));
   return {
     name: artifactName,
-    version: INITIAL_RELEASE_VERSION,
+    version: TEST_RELEASE_VERSION,
     path,
     bytes: bytes.byteLength,
     unpackedBytes:
@@ -224,10 +225,12 @@ describe("canonical release artifacts", () => {
     const wrongVersion: ReleaseArtifactManifest = {
       ...base,
       packages: base.packages.map((artifact, index) =>
-        index === 0 ? { ...artifact, version: "0.1.1" } : artifact,
+        index === 1 ? { ...artifact, version: "0.1.1" } : artifact,
       ),
     };
-    expect(() => validateReleaseManifest(wrongVersion)).toThrow("must remain version 0.1.0");
+    expect(() => validateReleaseManifest(wrongVersion)).toThrow(
+      "must use coordinated version 0.2.0",
+    );
 
     const duplicate: ReleaseArtifactManifest = {
       ...base,

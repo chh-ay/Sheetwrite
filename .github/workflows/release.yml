@@ -1,16 +1,9 @@
-name: Stage npm release
+name: Publish npm release
 
 on:
-  workflow_dispatch:
-    inputs:
-      expected_sha:
-        description: Full commit SHA reachable from origin/develop
-        required: true
-        type: string
-      version:
-        description: Exact version shared by all six packages
-        required: true
-        type: string
+  push:
+    tags:
+      - "v*"
 
 concurrency:
   group: npm-release
@@ -30,14 +23,38 @@ env:
   CARGO_LLVM_COV_VERSION: "0.8.7"
 
 jobs:
+  identity:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Checkout pushed tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+      - name: Resolve immutable release identity
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Release tag must be an exact stable semantic version: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          echo "commit=$(git rev-parse "${RELEASE_TAG}^{commit}")" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+
   preflight:
+    needs: identity
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Checkout requested commit
+      - name: Checkout release commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.expected_sha }}
+          ref: ${{ needs.identity.outputs.commit }}
           fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -51,14 +68,12 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Validate release identity and registry state
+      - name: Validate tag identity and registry state
         env:
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
-          RELEASE_VERSION: ${{ inputs.version }}
+          EXPECTED_SHA: ${{ needs.identity.outputs.commit }}
+          RELEASE_TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         run: bun scripts/release-preflight.ts
-      - name: Changeset status
-        run: bun run changeset:status -- --since=origin/develop
       - name: Install verification toolchain
         run: |
           bun scripts/install-wasm-pack.ts
@@ -90,16 +105,16 @@ jobs:
         run: test -z "$(git status --porcelain --untracked-files=all)"
 
   prepare:
-    needs: preflight
+    needs: [identity, preflight]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
       artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
     steps:
-      - name: Checkout requested commit
+      - name: Checkout release commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.expected_sha }}
+          ref: ${{ needs.identity.outputs.commit }}
           fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -132,14 +147,14 @@ jobs:
           retention-days: 7
 
   package-gates:
-    needs: prepare
+    needs: [identity, prepare]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout requested commit
+      - name: Checkout release commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.expected_sha }}
+          ref: ${{ needs.identity.outputs.commit }}
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -166,23 +181,24 @@ jobs:
       - name: Run every package consumer against downloaded bytes
         run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
 
-  stage:
-    needs: [prepare, package-gates]
+  publish:
+    needs: [identity, prepare, package-gates]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: npm-release
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
-      - name: Checkout requested commit
+      - name: Checkout release commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.expected_sha }}
-      - name: Setup Node
+          ref: ${{ needs.identity.outputs.commit }}
+      - name: Setup Node and npm registry
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
       - name: Install pinned npm
         run: npm install --global "npm@$NPM_VERSION"
       - name: Setup Bun
@@ -194,13 +210,23 @@ jobs:
         with:
           name: canonical-release-artifacts
           path: test-results/release-artifacts
-      - name: Rehash exact tarballs before staging
+      - name: Rehash exact tarballs before publication
         run: bun run release:verify-artifacts -- --input test-results/release-artifacts
-      - name: Stage exact tarballs sequentially
-        run: bun scripts/release-stage.ts test-results/release-artifacts test-results/release-stage
-      - name: Upload maintainer review summary
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: npm-stage-review-summary
-          path: test-results/release-stage/staging-summary.json
-          if-no-files-found: error
+      - name: Publish exact tarballs and verify the public registry
+        env:
+          RELEASE_VERSION: ${{ needs.identity.outputs.version }}
+        run: bun scripts/release-publish.ts test-results/release-artifacts
+      - name: Create verified GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.identity.outputs.version }}
+          EXPECTED_SHA: ${{ needs.identity.outputs.commit }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(gh release view "$RELEASE_TAG" --json tagName --jq .tagName)" = "$RELEASE_TAG"
+            test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = "false"
+            test "$(gh release view "$RELEASE_TAG" --json isPrerelease --jq .isPrerelease)" = "false"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --target "$EXPECTED_SHA" --title "Sheetwrite $RELEASE_VERSION" --generate-notes
+          fi

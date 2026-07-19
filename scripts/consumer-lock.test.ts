@@ -103,22 +103,38 @@ describe("immutable release consumer locks", () => {
     }
   });
 
-  it("rebinds only copied canonical tarball integrities", async () => {
+  it("rebinds copied canonical tarballs without changing registry entries", async () => {
     const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-lock-"));
     const lockPath = join(root, "package-lock.json");
-    const tarballPath = join(root, "sheetwrite-core-0.1.0.tgz");
+    const tarballPath = join(root, "sheetwrite-core-0.2.0.tgz");
     await writeFile(tarballPath, "canonical bytes");
+    await writeFile(
+      join(root, "package.json"),
+      `${JSON.stringify({
+        dependencies: {
+          "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.1.0.tgz",
+          react: "19.1.0",
+        },
+      })}\n`,
+    );
     await writeFile(
       lockPath,
       `${JSON.stringify({
         lockfileVersion: 3,
         packages: {
-          "": {},
+          "": {
+            dependencies: {
+              "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.1.0.tgz",
+              react: "19.1.0",
+            },
+          },
           "node_modules/@sheetwrite/core": {
+            version: "0.1.0",
             resolved: "file:artifacts/sheetwrite-core-0.1.0.tgz",
             integrity: "sha512-stale",
           },
           "node_modules/react": {
+            version: "19.1.0",
             resolved: "https://registry.npmjs.org/react/-/react-19.1.0.tgz",
             integrity: "sha512-registry",
           },
@@ -128,6 +144,19 @@ describe("immutable release consumer locks", () => {
 
     await bindCanonicalTarballIntegrities(lockPath, new Map([["@sheetwrite/core", tarballPath]]));
     const rebound = JSON.parse(await readFile(lockPath, "utf8")) as FixtureLock;
+    const reboundManifest = JSON.parse(
+      await readFile(join(root, "package.json"), "utf8"),
+    ) as FixtureManifest;
+    expect(reboundManifest.dependencies?.["@sheetwrite/core"]).toEndWith(
+      "sheetwrite-core-0.2.0.tgz",
+    );
+    expect(rebound.packages?.[""]?.dependencies?.["@sheetwrite/core"]).toEndWith(
+      "sheetwrite-core-0.2.0.tgz",
+    );
+    expect(rebound.packages?.["node_modules/@sheetwrite/core"]?.version).toBe("0.2.0");
+    expect(rebound.packages?.["node_modules/@sheetwrite/core"]?.resolved).toEndWith(
+      "sheetwrite-core-0.2.0.tgz",
+    );
     expect(rebound.packages?.["node_modules/@sheetwrite/core"]?.integrity).toMatch(/^sha512-/);
     expect(rebound.packages?.["node_modules/@sheetwrite/core"]?.integrity).not.toBe("sha512-stale");
     expect(rebound.packages?.["node_modules/react"]?.integrity).toBe("sha512-registry");
