@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
@@ -35,6 +35,40 @@ export function releaseVersionFromTag(tag: string): string {
   const match = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(tag);
   if (!match) throw new Error(`Release tag ${tag} must be an exact stable semantic version`);
   return tag.slice(1);
+}
+
+function isSuccessfulCiRun(value: unknown, expectedSha: string): value is { id: number } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof value.id === "number" &&
+    Number.isSafeInteger(value.id) &&
+    "head_sha" in value &&
+    value.head_sha === expectedSha &&
+    "event" in value &&
+    value.event === "push" &&
+    "status" in value &&
+    value.status === "completed" &&
+    "conclusion" in value &&
+    value.conclusion === "success"
+  );
+}
+
+export function successfulCiRunId(payload: unknown, expectedSha: string): number {
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    !("workflow_runs" in payload) ||
+    !Array.isArray(payload.workflow_runs)
+  ) {
+    throw new Error("CI workflow response has no workflow_runs array");
+  }
+  const match = payload.workflow_runs.find((run) => isSuccessfulCiRun(run, expectedSha));
+  if (match === undefined) {
+    throw new Error(`${expectedSha} has no successful completed push CI run`);
+  }
+  return match.id;
 }
 
 async function main(): Promise<void> {
@@ -75,9 +109,23 @@ async function main(): Promise<void> {
   if (visibility !== "public")
     throw new Error(`Repository visibility is ${visibility}, expected public`);
 
+  const ciRuns = JSON.parse(
+    await run([
+      "gh",
+      "api",
+      `repos/${repository}/actions/workflows/ci.yml/runs?head_sha=${expectedSha}&event=push&status=success&per_page=10`,
+    ]),
+  ) as unknown;
+  const ciRunId = successfulCiRunId(ciRuns, expectedSha);
+  const outputPath = process.env.GITHUB_OUTPUT;
+  if (!outputPath) throw new Error("GITHUB_OUTPUT is required");
+  await appendFile(outputPath, `ci_run_id=${ciRunId}\n`, "utf8");
+
   await run(["npm", "ping", "--registry", "https://registry.npmjs.org"]);
 
-  console.log(`Release preflight passed for ${expectedSha} at version ${expectedVersion}`);
+  console.log(
+    `Release preflight passed for ${expectedSha} at version ${expectedVersion} using CI run ${ciRunId}`,
+  );
 }
 
 if (import.meta.main) await main();

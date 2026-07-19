@@ -145,11 +145,11 @@ presence, comments, and revisions.
 
 Changesets generate the package-level changelogs linked from the root
 [changelog](CHANGELOG.md). After the coordinated version commit is merged and
-green on `develop`, pushing an exact stable tag such as `v0.2.1` runs the full
-release gates, publishes the six canonical tarballs to npm with provenance,
-verifies their registry integrity and `latest` tags, then creates the matching
-GitHub Release. A tag whose version does not match every publishable package
-manifest fails before publication.
+green on `develop`, pushing an exact stable tag such as `v0.2.1` requires that
+successful push CI run, downloads and rehashes its six canonical tarballs,
+publishes them to npm with provenance, verifies their registry integrity and
+`latest` tags, then creates the matching GitHub Release. A tag whose version or
+artifact commit does not match fails before publication.
 
 ## Development
 
