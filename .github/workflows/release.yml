@@ -69,11 +69,10 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ needs.identity.outputs.commit }}
-      - name: Setup Node and npm registry
+      - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          registry-url: https://registry.npmjs.org
       - name: Install pinned npm
         run: npm install --global "npm@$NPM_VERSION"
       - name: Setup Bun
