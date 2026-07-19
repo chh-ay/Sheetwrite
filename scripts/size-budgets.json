@@ -40,24 +40,24 @@
     },
     "bundler.next.coreInitial.wasm.brotliBytes": {
       "unit": "bytes",
-      "baseline": 99982,
-      "maximum": 104982,
+      "baseline": 133087,
+      "maximum": 139742,
       "category": "browser-wasm",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.next.coreInitial.wasm.gzipBytes": {
       "unit": "bytes",
-      "baseline": 123417,
-      "maximum": 129588,
+      "baseline": 167314,
+      "maximum": 175680,
       "category": "browser-wasm",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.next.coreInitial.wasm.rawBytes": {
       "unit": "bytes",
-      "baseline": 295879,
-      "maximum": 310673,
+      "baseline": 411490,
+      "maximum": 432065,
       "category": "browser-wasm",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."

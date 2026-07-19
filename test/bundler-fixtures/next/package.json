@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "bundle": "next build",
+    "bundle": "rm -rf .next out && next build",
     "build": "npm ci --ignore-scripts --no-audit --no-fund && npm run bundle && node check.mjs"
   },
   "dependencies": {
