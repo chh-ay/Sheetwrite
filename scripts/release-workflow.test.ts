@@ -183,7 +183,9 @@ describe("tag-triggered release workflow", () => {
     expect(commands).not.toMatch(
       /verify:ci|verify:release-quality|test:coverage|test:browser|release:prepare|release-verify\.ts|install-wasm-pack|browser:install/,
     );
-    expect(source).not.toMatch(/NODE_AUTH_TOKEN|NPM_TOKEN|changeset publish|release-stage/);
+    expect(source).not.toMatch(
+      /secrets\.(?:NODE_AUTH_TOKEN|NPM_TOKEN)|changeset publish|release-stage/,
+    );
   });
 
   it("publishes canonical packages sequentially", async () => {

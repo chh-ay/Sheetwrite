@@ -160,11 +160,17 @@ describe("CI and release workflow contracts", () => {
     expect(setupStep(publish, "actions/setup-node")?.with?.["node-version"]).toBe(
       WORKFLOW_NODE_VERSION,
     );
-    expect(setupStep(publish, "actions/setup-node")?.with?.["registry-url"]).toBeUndefined();
+    expect(setupStep(publish, "actions/setup-node")?.with?.["registry-url"]).toBe(
+      "https://registry.npmjs.org",
+    );
     expect(setupStep(publish, "oven-sh/setup-bun")?.with?.["bun-version"]).toBe(
       WORKFLOW_BUN_VERSION,
     );
     expect(commands(publish)).toContain('npm install --global "npm@$NPM_VERSION"');
+    expect(commands(publish)).toContain(
+      "npm config delete //registry.npmjs.org/:_authToken --location=user",
+    );
+    expect(commands(publish)).toContain("unset NODE_AUTH_TOKEN");
     expect(commands(publish)).toContain("release-publish.ts");
     expect(commands(publish)).toContain("gh release create");
   });
