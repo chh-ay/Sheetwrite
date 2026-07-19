@@ -1,5 +1,10 @@
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
-export { cellScalarToText, parseCellInput, parseCurrencyInput } from "./cell-input.js";
+export {
+  cellScalarToText,
+  parseCellInput,
+  parseCellLiteralInput,
+  parseCurrencyInput,
+} from "./cell-input.js";
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 export {
   type CommentAdapter,
@@ -32,14 +37,32 @@ export {
 } from "./collaboration.js";
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
+  DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
+  type DelimitedTextOperation,
+  type DelimitedTextOptions,
+  DelimitedTextOptionsError,
+  DelimitedTextResourceError,
+  type DelimitedTextResourceLimits,
+} from "./delimited-text.js";
+export {
+  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   type DocumentValidationError,
   type DocumentValidationResult,
   documentOpTarget,
+  resolveTransactionResourceLimits,
+  SnapshotResourceError,
+  type SnapshotResourceLimits,
+  type SnapshotStorageMode,
   SnapshotValidationError,
+  type SnapshotValidationOptions,
+  type TransactionResourceValidationResult,
+  validateTransactionResources,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "./document-protocol.js";
 export {
+  DEFAULT_XLSX_RESOURCE_LIMITS,
   downloadBytes,
   fromCsv,
   fromXlsxTable,
@@ -52,6 +75,8 @@ export {
   toTsv,
   toXlsxTable,
   toXlsxWorkbook,
+  XlsxResourceError,
+  type XlsxResourceLimits,
   type XlsxTableExportBackend,
   type XlsxTableImportBackend,
   type XlsxWorkbookBackend,
@@ -80,14 +105,22 @@ export {
   rebaseDocumentOperations,
 } from "./rebase.js";
 export { REF_CYCLE } from "./reference.js";
-export { IncompleteDataError, SheetwriteStore } from "./store.js";
+export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 export {
+  DEFAULT_SYNC_COORDINATOR_LIMITS,
+  type PendingCommitLoadOptions,
   type PendingCommitStorage,
   type SyncActivityState,
   type SyncConnectionState,
   SyncCoordinator,
   type SyncCoordinatorEvent,
+  type SyncCoordinatorLimits,
   type SyncCoordinatorOptions,
+  SyncPendingCapacityError,
+  type SyncPendingCapacityState,
+  type SyncPendingQueueLimits,
+  SyncProtocolError,
+  type SyncProtocolErrorCode,
   type SyncStateSnapshot,
   type SyncVersionGapRequest,
 } from "./sync.js";
@@ -124,6 +157,7 @@ export type {
   DataSourcePage,
   DataSourceRequest,
   DataSourceStorageOptions,
+  DataValidationComparison,
   DataValidationCondition,
   DataValidationRule,
   DocumentOp,
@@ -164,6 +198,7 @@ export type {
   Sheet,
   SheetId,
   SheetSnapshot,
+  SheetVisibility,
   SnapshotCell,
   SortKey,
   Store,
@@ -175,6 +210,7 @@ export type {
   ToolbarItem,
   Transaction,
   TransactionApplicationOptions,
+  TransactionResourceLimits,
   ValidationPolicy,
   VersionedOperation,
   VisibleWindowView,

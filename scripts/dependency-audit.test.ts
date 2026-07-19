@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AUDIT_ALLOWANCE_MAX_DAYS,
   type AuditAllowance,
   type AuditCommandResult,
   evaluateAuditPolicy,
+  parseAuditPolicyFile,
 } from "./dependency-audit.js";
 
 const TODAY = "2026-07-14";
@@ -31,8 +33,18 @@ const REVIEWED_ALLOWANCE: AuditAllowance = {
   advisory: "GHSA-AAAA-BBBB-CCCC",
   package: "vulnerable",
   owner: "security@example.invalid",
-  reason: "Fixture has no reachable affected call path while the upstream fix is prepared.",
+  rationale: "Fixture has no reachable affected call path while the upstream fix is prepared.",
   expires: "2026-08-01",
+};
+
+const POLICY_FILE = {
+  policy: {
+    scope: "Frozen Bun lockfile",
+    failSeverities: ["low", "moderate", "high", "critical"],
+    allowanceRequirements: ["advisory", "package", "owner", "rationale", "expires"],
+    maximumAllowanceDays: AUDIT_ALLOWANCE_MAX_DAYS,
+  },
+  allowlist: [],
 };
 
 describe("JavaScript dependency audit policy", () => {
@@ -41,18 +53,48 @@ describe("JavaScript dependency audit policy", () => {
     expect(result.findings).toEqual([]);
   });
 
-  it("reports reviewed low and moderate findings without blocking", () => {
-    const result = evaluateAuditPolicy(auditResult("moderate"), [], TODAY);
-    expect(result.nonBlockingFindings).toHaveLength(1);
-    expect(result.allowedBlockingFindings).toEqual([]);
+  it("fails closed when the declared policy drifts from enforcement", () => {
+    expect(parseAuditPolicyFile(POLICY_FILE)).toEqual([]);
+    expect(() =>
+      parseAuditPolicyFile({
+        ...POLICY_FILE,
+        policy: { ...POLICY_FILE.policy, failSeverities: ["high", "critical"] },
+      }),
+    ).toThrow("Audit policy failSeverities");
+    expect(() =>
+      parseAuditPolicyFile({
+        ...POLICY_FILE,
+        policy: { ...POLICY_FILE.policy, allowanceRequirements: ["advisory", "package"] },
+      }),
+    ).toThrow("Audit policy allowanceRequirements");
+    expect(() =>
+      parseAuditPolicyFile({
+        ...POLICY_FILE,
+        policy: { ...POLICY_FILE.policy, maximumAllowanceDays: 365 },
+      }),
+    ).toThrow(`maximumAllowanceDays must be ${AUDIT_ALLOWANCE_MAX_DAYS}`);
+    expect(() => parseAuditPolicyFile({ ...POLICY_FILE, legacyXlsxAllowance: true })).toThrow(
+      "unknown field: legacyXlsxAllowance",
+    );
+  });
+
+  it("requires reviewed ownership for low and moderate findings", () => {
+    for (const severity of ["low", "moderate"] as const) {
+      expect(() => evaluateAuditPolicy(auditResult(severity), [], TODAY)).toThrow(
+        `vulnerable/GHSA-AAAA-BBBB-CCCC (${severity})`,
+      );
+      const result = evaluateAuditPolicy(auditResult(severity), [REVIEWED_ALLOWANCE], TODAY);
+      expect(result.nonBlockingFindings).toHaveLength(1);
+      expect(result.allowedBlockingFindings).toEqual([]);
+    }
   });
 
   it("rejects an unowned high or critical finding", () => {
     expect(() => evaluateAuditPolicy(auditResult("high"), [], TODAY)).toThrow(
-      "Unallowlisted high/critical",
+      "Unallowlisted dependency findings",
     );
     expect(() => evaluateAuditPolicy(auditResult("critical"), [], TODAY)).toThrow(
-      "Unallowlisted high/critical",
+      "Unallowlisted dependency findings",
     );
   });
 
@@ -69,6 +111,45 @@ describe("JavaScript dependency audit policy", () => {
         TODAY,
       ),
     ).toThrow("expired on 2026-07-13");
+  });
+
+  it("requires complete, exact, near-term allowance metadata", () => {
+    for (const field of ["advisory", "package", "owner", "rationale", "expires"] as const) {
+      expect(() =>
+        evaluateAuditPolicy(
+          auditResult("moderate"),
+          [{ ...REVIEWED_ALLOWANCE, [field]: "" }],
+          TODAY,
+        ),
+      ).toThrow(`empty ${field}`);
+    }
+    expect(() =>
+      evaluateAuditPolicy(
+        auditResult("moderate"),
+        [{ ...REVIEWED_ALLOWANCE, expires: "2026-02-31" }],
+        TODAY,
+      ),
+    ).toThrow("is not a calendar date");
+    expect(() =>
+      evaluateAuditPolicy(
+        auditResult("moderate"),
+        [{ ...REVIEWED_ALLOWANCE, expires: "2026-10-13" }],
+        TODAY,
+      ),
+    ).toThrow(`more than ${AUDIT_ALLOWANCE_MAX_DAYS} days`);
+    expect(() =>
+      evaluateAuditPolicy(
+        auditResult("moderate"),
+        [{ ...REVIEWED_ALLOWANCE, reason: REVIEWED_ALLOWANCE.rationale }],
+        TODAY,
+      ),
+    ).toThrow("unknown field: reason");
+  });
+
+  it("rejects stale allowances as soon as the dependency or advisory disappears", () => {
+    expect(() =>
+      evaluateAuditPolicy({ exitCode: 0, stdout: "{}", stderr: "" }, [REVIEWED_ALLOWANCE], TODAY),
+    ).toThrow("Stale dependency audit allowances: vulnerable:GHSA-AAAA-BBBB-CCCC");
   });
 
   it("fails closed on malformed audit output", () => {

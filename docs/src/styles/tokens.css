@@ -6,9 +6,10 @@
 
 :root {
   color-scheme: light;
-  --sw-accent: #059669;
-  --sw-accent-strong: #047857;
+  --sw-accent: #047857;
+  --sw-accent-strong: #065f46;
   --sw-accent-soft: #d1fae5;
+  --sw-accent-ink: #ffffff;
   --sw-surface-0: #f7f8fa;
   --sw-surface-1: #ffffff;
   --sw-surface-2: #f0f2f5;
@@ -79,6 +80,7 @@
   --sw-accent: #34d399;
   --sw-accent-strong: #6ee7b7;
   --sw-accent-soft: #0b3b2f;
+  --sw-accent-ink: #06100c;
   --sw-surface-0: #080b12;
   --sw-surface-1: #0d121d;
   --sw-surface-2: #121a28;

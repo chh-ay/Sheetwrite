@@ -1,10 +1,21 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { validateWorkbookSnapshot } from "../src/document-protocol.js";
+import { CellStore } from "@sheetwrite/wasm";
+import {
+  DEFAULT_TRANSACTION_RESOURCE_LIMITS,
+  resolveTransactionResourceLimits,
+  validateTransactionResources,
+  validateWorkbookSnapshot,
+} from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
+import { validValidationRules } from "../src/store/ranges.js";
 import { SheetwriteStore } from "../src/store.js";
 import type {
   ChangeEvent,
+  DataValidationComparison,
+  DataValidationCondition,
+  DataValidationRule,
   DocumentOp,
+  RowData,
   Transaction,
   Workbook,
   WorkbookSnapshot,
@@ -1502,6 +1513,135 @@ describe("range-native mutations", () => {
 });
 
 describe("paged datasource storage", () => {
+  it("hydrates pages without overwriting dirty or revision-protected rich cells", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1_000_000,
+    });
+    store.loadRows("s1", 0, [
+      { name: "source zero", amount: 1, city: "A" },
+      { name: "source target", amount: 2, city: "B" },
+    ]);
+    const literal: DocumentOp = {
+      op: "set",
+      addr: addr(0, 0),
+      value: { kind: "literal", value: "local literal" },
+      style: { bold: true },
+    };
+    const formula: DocumentOp = {
+      op: "set",
+      addr: addr(0, 1),
+      value: { kind: "formula", src: "=40+2" },
+      style: { italic: true },
+    };
+    const reference: DocumentOp = {
+      op: "set",
+      addr: addr(0, 2),
+      value: { kind: "ref", target: addr(1, 0) },
+      style: { underline: true },
+    };
+    store.applyTransaction({ patches: [literal, formula, reference] });
+    store.acknowledgeOperations([literal]);
+
+    const revisionAddresses = new Set<object>();
+    store.loadRows(
+      "s1",
+      0,
+      [
+        { name: "stale literal", amount: 3, city: "stale ref" },
+        { name: "server target", amount: 4, city: "server" },
+      ],
+      (address) => {
+        revisionAddresses.add(address);
+        return address.row === 0 && address.col === 0;
+      },
+    );
+
+    expect(revisionAddresses.size).toBe(1);
+    expect(store.getCell(addr(0, 0))).toMatchObject({
+      resolved: "local literal",
+      style: { bold: true },
+    });
+    expect(store.getFormula(addr(0, 1))).toBe("=40+2");
+    expect(store.getCell(addr(0, 1))).toMatchObject({
+      resolved: 42,
+      style: { italic: true },
+    });
+    expect(store.getRefTarget(addr(0, 2))).toEqual(addr(1, 0));
+    expect(store.getCell(addr(0, 2))).toMatchObject({
+      resolved: "server target",
+      style: { underline: true },
+    });
+    store.dispose();
+  });
+
+  it("crosses the WASM boundary once per wide-page column plus rich exceptions", () => {
+    const columnCount = 96;
+    const rowCount = 256;
+    const workbook = makeWorkbook(rowCount);
+    workbook.sheets[0]!.columns = Array.from({ length: columnCount }, (_, col) => ({
+      key: `c${col}`,
+      header: `Column ${col}`,
+      width: 100,
+      type: "number" as const,
+    }));
+    const page: RowData[] = Array.from({ length: rowCount }, (_, row) =>
+      Object.fromEntries(Array.from({ length: columnCount }, (_, col) => [`c${col}`, row + col])),
+    );
+    page[0]!.c0 = { kind: "formula", src: "=1+1" };
+    page[1]!.c1 = { value: { kind: "literal", value: 7 }, style: { bold: true } };
+
+    const originalNumbers = CellStore.prototype.hydratePageNumbers;
+    const originalCellState = CellStore.prototype.cellState;
+    const originalSetFormula = CellStore.prototype.setFormula;
+    const originalSetNumber = CellStore.prototype.setNumber;
+    let columnCrossings = 0;
+    let exceptionCrossings = 0;
+    CellStore.prototype.hydratePageNumbers = function (...args) {
+      columnCrossings += 1;
+      return originalNumbers.apply(this, args);
+    };
+    CellStore.prototype.cellState = function (...args) {
+      exceptionCrossings += 1;
+      return originalCellState.apply(this, args);
+    };
+    CellStore.prototype.setFormula = function (...args) {
+      exceptionCrossings += 1;
+      return originalSetFormula.apply(this, args);
+    };
+    CellStore.prototype.setNumber = function (...args) {
+      exceptionCrossings += 1;
+      return originalSetNumber.apply(this, args);
+    };
+    const store = new SheetwriteStore(workbook, undefined, {
+      storage: "paged",
+      chunkRows: 512,
+      cacheBytes: 32 * 1024 * 1024,
+    });
+    const revisionAddresses = new Set<object>();
+    try {
+      store.loadRows("s1", 0, page, (address) => {
+        revisionAddresses.add(address);
+        return false;
+      });
+      expect(columnCrossings).toBe(columnCount);
+      expect(exceptionCrossings).toBe(4);
+      expect(revisionAddresses.size).toBe(1);
+      expect(store.getFormula(addr(0, 0))).toBe("=1+1");
+      expect(store.getCell(addr(1, 1))).toMatchObject({
+        resolved: 7,
+        style: { bold: true },
+      });
+    } finally {
+      CellStore.prototype.hydratePageNumbers = originalNumbers;
+      CellStore.prototype.cellState = originalCellState;
+      CellStore.prototype.setFormula = originalSetFormula;
+      CellStore.prototype.setNumber = originalSetNumber;
+      store.dispose();
+    }
+  });
+
   it("rejects style remapping across loading cells before crossing the WASM boundary", () => {
     const store = new SheetwriteStore(makeWorkbook(4), undefined, {
       storage: "paged",
@@ -1800,6 +1940,143 @@ describe("validation, protection, and notes metadata", () => {
     partial.dispose();
   });
 
+  it("enforces every typed comparison atomically for numbers, dates, and text lengths", () => {
+    const comparisons: {
+      comparison: DataValidationComparison;
+      accepted: number;
+      rejected: number;
+      message: string;
+    }[] = [
+      {
+        comparison: { operator: "between", min: 2, max: 4 },
+        accepted: 3,
+        rejected: 5,
+        message: "must be between 2 and 4, inclusive",
+      },
+      {
+        comparison: { operator: "notBetween", min: 2, max: 4 },
+        accepted: 1,
+        rejected: 2,
+        message: "must be less than 2 or greater than 4",
+      },
+      {
+        comparison: { operator: "equal", value: 2 },
+        accepted: 2,
+        rejected: 3,
+        message: "must equal 2",
+      },
+      {
+        comparison: { operator: "notEqual", value: 2 },
+        accepted: 3,
+        rejected: 2,
+        message: "must not equal 2",
+      },
+      {
+        comparison: { operator: "greaterThan", value: 2 },
+        accepted: 3,
+        rejected: 2,
+        message: "must be greater than 2",
+      },
+      {
+        comparison: { operator: "lessThan", value: 2 },
+        accepted: 1,
+        rejected: 2,
+        message: "must be less than 2",
+      },
+      {
+        comparison: { operator: "greaterThanOrEqual", value: 2 },
+        accepted: 2,
+        rejected: 1,
+        message: "must be greater than or equal to 2",
+      },
+      {
+        comparison: { operator: "lessThanOrEqual", value: 2 },
+        accepted: 2,
+        rejected: 3,
+        message: "must be less than or equal to 2",
+      },
+    ];
+    const kinds = [
+      { kind: "number", subject: "Value" },
+      { kind: "date", subject: "Date" },
+      { kind: "textLength", subject: "Text length" },
+    ] as const;
+    const workbook = makeWorkbook(comparisons.length * kinds.length);
+    const rules: DataValidationRule[] = [];
+    const acceptedValues: (number | string)[] = [];
+    const rejectedValues: (number | string)[] = [];
+    const expectedMessages: string[] = [];
+    for (const validationKind of kinds) {
+      for (const entry of comparisons) {
+        const row = rules.length;
+        const condition: DataValidationCondition =
+          validationKind.kind === "number"
+            ? { kind: "number", comparison: entry.comparison }
+            : validationKind.kind === "date"
+              ? { kind: "date", comparison: entry.comparison }
+              : { kind: "textLength", comparison: entry.comparison };
+        rules.push({
+          id: `${validationKind.kind}-${entry.comparison.operator}`,
+          range: { sheet: "s1", start: { row, col: 1 }, end: { row, col: 1 } },
+          condition,
+          policy: "reject",
+          allowBlank: false,
+        });
+        acceptedValues.push(
+          validationKind.kind === "textLength" ? "x".repeat(entry.accepted) : entry.accepted,
+        );
+        rejectedValues.push(
+          validationKind.kind === "textLength" ? "x".repeat(entry.rejected) : entry.rejected,
+        );
+        expectedMessages.push(`${validationKind.subject} ${entry.message}`);
+      }
+    }
+    workbook.sheets[0]!.validationRules = rules;
+    expect(validValidationRules(workbook.sheets[0]!, rules)).toBe(true);
+    expect(
+      validValidationRules(workbook.sheets[0]!, [
+        {
+          ...rules[0]!,
+          condition: {
+            kind: "number",
+            min: 0,
+            comparison: { operator: "greaterThan", value: 1 },
+          },
+        },
+      ]),
+    ).toBe(false);
+
+    const store = new SheetwriteStore(workbook);
+    const rejectedPatches: DocumentOp[] = rejectedValues.map((value, row) => ({
+      op: "set",
+      addr: addr(row, 1),
+      value: { kind: "literal", value },
+    }));
+    rejectedPatches.push({
+      op: "set",
+      addr: addr(0, 0),
+      value: { kind: "literal", value: "must remain atomic" },
+    });
+    const rejected = store.applyTransaction({ patches: rejectedPatches });
+    expect(rejected.status).toBe("rejected");
+    expect(
+      rejected.status === "rejected" ? rejected.issues.map((issue) => issue.message) : [],
+    ).toEqual(expectedMessages);
+    expect(store.getCell(addr(0, 0)).resolved).toBeNull();
+
+    const acceptedPatches: DocumentOp[] = acceptedValues.map((value, row) => ({
+      op: "set",
+      addr: addr(row, 1),
+      value: { kind: "literal", value },
+    }));
+    const accepted = store.applyTransaction({ patches: acceptedPatches });
+    expect(accepted.status).toBe("applied");
+    expect(acceptedValues.map((_value, row) => store.getCell(addr(row, 1)).resolved)).toEqual(
+      acceptedValues,
+    );
+    store.dispose();
+  });
+
   it("denies protected local mutations by default and delegates permission to the host", () => {
     const workbook = makeWorkbook(3);
     workbook.sheets[0]!.protectedRanges = [
@@ -1886,6 +2163,203 @@ describe("validation, protection, and notes metadata", () => {
     expect(restored.getWorkbook().sheets[0]!.protectedRanges).toEqual(sheet.protectedRanges);
     expect(restored.getWorkbook().sheets[0]!.notes).toEqual(sheet.notes);
     restored.dispose();
+    store.dispose();
+  });
+});
+
+describe("transaction resource ingress", () => {
+  const literalSet = (row: number, text: string): DocumentOp => ({
+    op: "set",
+    addr: addr(row, 0),
+    value: { kind: "literal", value: text },
+  });
+  const encodedBytes = (patches: readonly DocumentOp[]): number =>
+    new TextEncoder().encode(JSON.stringify(patches)).byteLength;
+
+  it("validates custom limits at construction", () => {
+    for (const transactionResourceLimits of [
+      { maxOperations: -1 },
+      { maxOperations: 1.5 },
+      { maxEncodedBytes: Number.NaN },
+      { maxEncodedBytes: Number.POSITIVE_INFINITY },
+    ]) {
+      expect(
+        () =>
+          new SheetwriteStore(makeWorkbook(2), undefined, {
+            transactionResourceLimits,
+          }),
+      ).toThrow(RangeError);
+    }
+  });
+
+  it("rejects local and remote count overflow before policy, state, epoch, or events", () => {
+    const workbook = makeWorkbook(4);
+    workbook.sheets[0]!.protectedRanges = [
+      {
+        id: "all",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 2 } },
+      },
+    ];
+    let policyCalls = 0;
+    const limits = resolveTransactionResourceLimits({ maxOperations: 1 });
+    const store = new SheetwriteStore(workbook, undefined, {
+      transactionResourceLimits: limits,
+      protectionResolver: () => {
+        policyCalls += 1;
+        return "allow";
+      },
+    });
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    const accepted = store.applyTransaction({ patches: [literalSet(0, "accepted")] });
+    expect(accepted.status).toBe("applied");
+    if (accepted.status !== "applied") throw new Error("count-limit transaction rejected");
+    expect(validateTransactionResources(accepted.transaction.patches, limits).ok).toBe(true);
+    expect(policyCalls).toBe(1);
+    policyCalls = 0;
+
+    const oversizedPatches = [literalSet(1, "blocked"), literalSet(2, "also blocked")];
+    const local = store.applyTransaction({ patches: oversizedPatches });
+    expect(local).toEqual({
+      status: "rejected",
+      epoch: 1,
+      issues: [
+        {
+          kind: "resource-limit",
+          severity: "error",
+          resource: "operations",
+          actual: 2,
+          max: 1,
+          message: "Transaction operation count 2 exceeds maximum 1",
+        },
+      ],
+    });
+    expect(policyCalls).toBe(0);
+    expect(events).toHaveLength(1);
+    expect(store.getCell(addr(1, 0)).resolved).toBeNull();
+    expect(store.getCell(addr(2, 0)).resolved).toBeNull();
+
+    const remote = store.applyTransaction({ patches: oversizedPatches }, { source: "remote" });
+    expect(remote).toMatchObject({ status: "rejected", epoch: 1 });
+    expect(events).toHaveLength(1);
+    expect(store.getCell(addr(1, 0)).resolved).toBeNull();
+
+    const acceptedRemote = store.applyTransaction(
+      { patches: [literalSet(1, "remote")] },
+      { source: "remote" },
+    );
+    expect(acceptedRemote.status).toBe("applied");
+    expect(events).toHaveLength(2);
+    expect(events[1]).toMatchObject({ epoch: 2, source: "remote" });
+    expect(store.getCell(addr(1, 0)).resolved).toBe("remote");
+    store.dispose();
+  });
+
+  it("accepts and rejects long strings at the exact encoded-byte boundary", () => {
+    const acceptedPatches = [literalSet(0, "x".repeat(4_096))];
+    const maxEncodedBytes = encodedBytes(acceptedPatches);
+    const limits = resolveTransactionResourceLimits({ maxEncodedBytes });
+    const store = new SheetwriteStore(makeWorkbook(2), undefined, {
+      transactionResourceLimits: limits,
+    });
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    const accepted = store.applyTransaction({ patches: acceptedPatches });
+    expect(accepted.status).toBe("applied");
+    if (accepted.status !== "applied") throw new Error("exact byte limit rejected");
+    expect(validateTransactionResources(accepted.transaction.patches, limits)).toEqual({
+      ok: true,
+      operationCount: 1,
+      encodedBytes: maxEncodedBytes,
+    });
+
+    const rejected = store.applyTransaction({
+      patches: [literalSet(0, `${"x".repeat(4_096)}y`)],
+    });
+    expect(rejected.status).toBe("rejected");
+    if (rejected.status !== "rejected") throw new Error("long-string overflow applied");
+    expect(rejected).toMatchObject({
+      epoch: 1,
+      issues: [
+        {
+          kind: "resource-limit",
+          resource: "encoded-bytes",
+          actual: maxEncodedBytes + 1,
+          max: maxEncodedBytes,
+        },
+      ],
+    });
+    expect(store.getCell(addr(0, 0)).resolved).toBe("x".repeat(4_096));
+    expect(events).toHaveLength(1);
+    store.dispose();
+  });
+
+  it("applies a packed block at its byte limit and atomically rejects one extra byte", () => {
+    const packed = (text: string): DocumentOp => ({
+      op: "setBlock",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      block: { rowCount: 1, colCount: 1, values: [text] },
+    });
+    const acceptedPatches = [packed("p".repeat(2_048))];
+    const maxEncodedBytes = encodedBytes(acceptedPatches);
+    const store = new SheetwriteStore(makeWorkbook(2), undefined, {
+      transactionResourceLimits: { maxEncodedBytes },
+    });
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    expect(store.applyTransaction({ patches: acceptedPatches }).status).toBe("applied");
+    const rejected = store.applyTransaction(
+      { patches: [packed(`${"p".repeat(2_048)}q`)] },
+      { source: "remote" },
+    );
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      epoch: 1,
+      issues: [
+        {
+          kind: "resource-limit",
+          resource: "encoded-bytes",
+          actual: maxEncodedBytes + 1,
+          max: maxEncodedBytes,
+        },
+      ],
+    });
+    expect(store.getCell(addr(0, 0)).resolved).toBe("p".repeat(2_048));
+    expect(events).toHaveLength(1);
+    store.dispose();
+  });
+
+  it("accepts compact million-row range payloads by serialized size, not logical area", () => {
+    const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
+      storage: "paged",
+      chunkRows: 4_096,
+      cacheBytes: 1024 * 1024,
+    });
+    const fullRange = {
+      sheet: "s1",
+      start: { row: 0, col: 0 },
+      end: { row: 999_999, col: 2 },
+    };
+    const patches: DocumentOp[] = [
+      { op: "clearRange", range: fullRange },
+      { op: "setRangeStyle", range: fullRange, style: null },
+    ];
+    const resources = validateTransactionResources(patches);
+    expect(resources.ok).toBe(true);
+    if (!resources.ok) throw new Error("compact million-row operations rejected");
+    expect(resources.encodedBytes).toBeLessThan(1_000);
+    expect(resources.encodedBytes).toBeLessThan(
+      DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes,
+    );
+
+    const applied = store.applyTransaction({ patches }, { source: "remote" });
+    expect(applied.status).toBe("applied");
+    if (applied.status !== "applied")
+      throw new Error("compact million-row transaction not applied");
+    expect(validateTransactionResources(applied.transaction.patches).ok).toBe(true);
     store.dispose();
   });
 });

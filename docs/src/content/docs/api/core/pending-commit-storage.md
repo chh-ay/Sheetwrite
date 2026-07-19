@@ -9,10 +9,10 @@ Host-owned durable queue. Browser storage lives in the optional `./browser` entr
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L13</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L33</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -20,7 +20,7 @@ Host-owned durable queue. Browser storage lives in the optional `./browser` entr
 <summary><code>load</code></summary>
 
 ```ts generated
-load(documentId: string, signal?: AbortSignal): Promise<readonly PendingCommit[]>;
+load(documentId: string, options: PendingCommitLoadOptions): Promise<readonly PendingCommit[]>;
 ```
 
 </details>
@@ -42,6 +42,15 @@ remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Prom
 ```
 
 </details>
+
+<details class="api-member" id="pending-commit-storage-replace" data-pagefind-weight="1">
+<summary><code>replace</code> <span class="api-member-summary">Atomically replaces one document queue only if its ordered IDs still match the caller's expected view.</span></summary>
+
+```ts generated
+replace( documentId: string, expectedClientMutationIds: readonly string[], commits: readonly PendingCommit[], signal?: AbortSignal, ): Promise<void>;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -53,12 +62,18 @@ remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Prom
 export interface PendingCommitStorage {
   load(
     documentId: string,
-    signal?: AbortSignal,
+    options: PendingCommitLoadOptions,
   ): Promise<readonly PendingCommit[]>;
   put(commit: PendingCommit, signal?: AbortSignal): Promise<void>;
   remove(
     documentId: string,
     clientMutationId: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  replace(
+    documentId: string,
+    expectedClientMutationIds: readonly string[],
+    commits: readonly PendingCommit[],
     signal?: AbortSignal,
   ): Promise<void>;
 }

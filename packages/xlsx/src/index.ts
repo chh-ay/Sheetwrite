@@ -1,9 +1,9 @@
 export { registerXlsxBackends } from "./registration.js";
 export {
   buildXlsxModel,
-  writeExcelFileTableExportBackend,
+  sheetwriteTableExportBackend,
   type XlsxModel,
-  xlsxStyleOf,
+  type XlsxModelCell,
 } from "./table-export.js";
-export { readExcelFileTableImportBackend } from "./table-import.js";
-export { excelJsWorkbookBackend } from "./workbook.js";
+export { sheetwriteTableImportBackend } from "./table-import.js";
+export { sheetwriteWorkbookBackend } from "./workbook.js";

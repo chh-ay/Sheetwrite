@@ -9,7 +9,7 @@ Path-qualified validation failure for a document operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L8</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L165</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -29,7 +29,7 @@ path: string;
 <summary><code>code</code></summary>
 
 ```ts generated
-code: | "unsupported-schema" | "invalid-value" | "duplicate-id" | "missing-reference" | "out-of-bounds" | "overlapping-merge" | "non-serializable";
+code: | "unsupported-schema" | "invalid-value" | "duplicate-id" | "missing-reference" | "out-of-bounds" | "overlapping-merge" | "non-serializable" | "resource-limit";
 ```
 
 </details>
@@ -59,7 +59,8 @@ export interface DocumentValidationError {
     | "missing-reference"
     | "out-of-bounds"
     | "overlapping-merge"
-    | "non-serializable";
+    | "non-serializable"
+    | "resource-limit";
   message: string;
 }
 ```

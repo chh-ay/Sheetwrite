@@ -9,7 +9,7 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L23</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L35</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>4</span>

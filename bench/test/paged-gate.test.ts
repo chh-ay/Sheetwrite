@@ -24,6 +24,8 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
     startup: timing(),
     "first-page": timing(),
     "distant-page": timing(),
+    "wide-page": timing(),
+    "cache-churn": timing(),
   };
   if (options.omitTiming) delete timingsByKey[options.omitTiming];
   const timings = timingsByKey as PagedBenchmarkResult["timings"];
@@ -77,6 +79,10 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
     pageRows: 120,
     cacheBudgetBytes: 32 * 1024 * 1024,
     denseLogicalBytes: PAGED_SMOKE_ROWS * 5 * (1 + 8 + 4),
+    widePageColumns: 256,
+    cacheChurnPages: 2048,
+    cacheChurnBudgetBytes: 34_816,
+    cacheChurnRetainedChunks: 512,
     timings,
     peakAllocatedBytes: 542_720,
     peakChunks: 10,
@@ -109,10 +115,16 @@ function fullFixture(): PagedBenchmarkResult {
     pageRows: 120,
     cacheBudgetBytes: 32 * 1024 * 1024,
     denseLogicalBytes: PAGED_FULL_ROWS * 5 * (1 + 8 + 4),
+    widePageColumns: 256,
+    cacheChurnPages: 2048,
+    cacheChurnBudgetBytes: 34_816,
+    cacheChurnRetainedChunks: 512,
     timings: {
       startup: timing(),
       "first-page": timing(),
       "distant-page": timing(),
+      "wide-page": timing(),
+      "cache-churn": timing(),
     },
     peakAllocatedBytes: 542_720,
     peakChunks: 10,
@@ -145,6 +157,22 @@ describe("paged benchmark exact matrix", () => {
     expect(() => validatePagedBenchmark(corrupted, "full")).toThrow(
       "rows=1000000;probe=scroll-100 does not match the cache-bounded full traversal",
     );
+  });
+
+  test("requires the declared wide-page and indexed cache-churn contracts", () => {
+    const source = smokeFixture();
+    expect(() =>
+      validatePagedBenchmark({ ...source, widePageColumns: source.widePageColumns - 1 }, "smoke"),
+    ).toThrow("configuration does not match");
+    expect(() =>
+      validatePagedBenchmark(
+        {
+          ...source,
+          cacheChurnRetainedChunks: source.cacheChurnRetainedChunks - 1,
+        },
+        "smoke",
+      ),
+    ).toThrow("configuration does not match");
   });
 
   test("rejects missing, duplicate, unexpected, and non-finite cells by key", () => {

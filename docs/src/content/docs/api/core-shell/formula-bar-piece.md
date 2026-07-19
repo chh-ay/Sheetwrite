@@ -12,7 +12,7 @@ A formula bar piece; `setReadOnly` blocks commits without unmounting.
 <div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L124</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>1</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -24,6 +24,24 @@ setReadOnly(readOnly: boolean): void;
 ```
 
 </details>
+
+<details class="api-member" id="formula-bar-piece-element" data-pagefind-weight="1">
+<summary><code>element</code></summary>
+
+```ts generated
+readonly element: HTMLElement;
+```
+
+</details>
+
+<details class="api-member" id="formula-bar-piece-destroy" data-pagefind-weight="1">
+<summary><code>destroy</code></summary>
+
+```ts generated
+destroy(): void;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -32,8 +50,10 @@ setReadOnly(readOnly: boolean): void;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface FormulaBarPiece extends ShellPiece {
+export interface FormulaBarPiece {
   setReadOnly(readOnly: boolean): void;
+  readonly element: HTMLElement;
+  destroy(): void;
 }
 ```
 

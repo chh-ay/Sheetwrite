@@ -1,23 +1,23 @@
 ---
 title: "XlsxWorkbookOptions | @sheetwrite/core"
-description: "Workbook XLSX conversion options passed to the registered backend."
+description: "Shared options passed to every registered table and workbook XLSX backend."
 ---
 <!-- api-export:@sheetwrite/core|.|XlsxWorkbookOptions -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Workbook XLSX conversion options passed to the registered backend.
+Shared options passed to every registered table and workbook XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L302</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L357</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
 <details class="api-member" id="xlsx-workbook-options-signal" data-pagefind-weight="1">
-<summary><code>signal</code> <span class="api-member-summary">Abort before or between workbook model operations.</span></summary>
+<summary><code>signal</code> <span class="api-member-summary">Abort before or between bounded codec operations.</span></summary>
 
 ```ts generated
 signal?: AbortSignal;
@@ -26,15 +26,22 @@ signal?: AbortSignal;
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-max-cells" data-pagefind-weight="1">
-<summary><code>maxCells</code> <span class="api-member-summary">Maximum populated cells accepted by the in-memory ExcelJS document model.</span></summary>
+<summary><code>maxCells</code> <span class="api-member-summary">Maximum logical cells processed.</span></summary>
 
 ```ts generated
 maxCells?: number;
 ```
 
-<p class="api-member-doc">Maximum populated cells accepted by the in-memory ExcelJS document model.
-Defaults to 1,000,000. Use a lower host-specific bound for constrained
-browsers; table APIs remain available for larger streaming interchange.</p>
+<p class="api-member-doc">Maximum logical cells processed. Defaults to 1,000,000.</p>
+</details>
+
+<details class="api-member" id="xlsx-workbook-options-resource-limits" data-pagefind-weight="1">
+<summary><code>resourceLimits</code> <span class="api-member-summary">Overrides for all other XLSX resource dimensions.</span></summary>
+
+```ts generated
+resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
+```
+
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-on-warning" data-pagefind-weight="1">
@@ -56,6 +63,7 @@ onWarning?: (warning: XlsxWorkbookWarning) => void;
 export interface XlsxWorkbookOptions {
   signal?: AbortSignal;
   maxCells?: number;
+  resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
   onWarning?: (warning: XlsxWorkbookWarning) => void;
 }
 ```

@@ -40,6 +40,31 @@ describe("clipboard TSV", () => {
     expect(parseTsv('"b\tc"\t"d\ne"')).toEqual([["b\tc", "d\ne"]]);
     expect(parseTsv('"q""x"')).toEqual([['q"x']]);
   });
+
+  it("hardens every dangerous string prefix in external TSV while leaving numbers intact", () => {
+    const dangerous = ["=cmd", "+1", "-1", "@x", "\tx", "\rx"];
+    expect(parseTsv(toTsv([dangerous, [-1, 1, 0, null, true, false]]))).toEqual([
+      dangerous.map((value) => `'${value}`),
+      ["-1", "1", "0", "", "TRUE", "FALSE"],
+    ]);
+  });
+
+  it("strips exactly one leading TSV BOM and preserves quoted and trailing blank records", () => {
+    expect(parseTsv("\ufeffα\tβ")).toEqual([["α", "β"]]);
+    expect(parseTsv("\ufeff\ufeffα")).toEqual([["\ufeffα"]]);
+    expect(parseTsv('""')).toEqual([[""]]);
+    expect(toTsv([[null], [null], [null]])).toBe('""\r\n""\r\n""');
+    expect(parseTsv(toTsv([[null], [null], [null]]))).toEqual([[""], [""], [""]]);
+  });
+
+  it("handles bare CR, CRLF, Unicode, delimiters, doubled quotes, and trailing fields", () => {
+    expect(parseTsv(toTsv([["🎉"]]))).toEqual([["🎉"]]);
+    expect(parseTsv('α\t"b\tc"\r"d\nx"\t"q""x"\r\nlast\t')).toEqual([
+      ["α", "b\tc"],
+      ["d\nx", 'q"x'],
+      ["last", ""],
+    ]);
+  });
 });
 
 // ── Rich clipboard (copy/cut/paste/pasteValues) ──────────────────────────────
@@ -577,6 +602,67 @@ describe("ClipboardController", () => {
       bold: true,
       backgroundColor: "#abcdef",
     });
+  });
+
+  it("hardens every dangerous prefix in plain and preferred HTML while trusted private cells stay exact", async () => {
+    Object.defineProperty(globalThis, "ClipboardItem", {
+      configurable: true,
+      value: FakeClipboardItem,
+    });
+    let written: FakeClipboardItem | null = null;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: (items: FakeClipboardItem[]) => {
+          written = items[0] ?? null;
+          return Promise.resolve();
+        },
+        read: () => Promise.resolve(written ? [written] : []),
+        writeText: () => Promise.reject(new Error("text fallback should not run")),
+        readText: () => Promise.reject(new Error("text fallback should not run")),
+      },
+    });
+    const originals = [
+      ["=cmd", "+1", "-1"],
+      ["@x", "\tx", "\rx"],
+    ];
+    for (let row = 0; row < originals.length; row++) {
+      for (let column = 0; column < originals[row]!.length; column++) {
+        const value = originals[row]![column]!;
+        h.store.seed(row, column, { kind: "literal", value }, value);
+      }
+    }
+    h.select(0, 0);
+    h.selection.extendTo(1, 2);
+
+    await expect(h.controller.copy()).resolves.toBe("done");
+    const captured = written as unknown as FakeClipboardItem;
+    const expected = originals.map((row) => row.map((value) => `'${value}`));
+    const plain = await (await captured.getType("text/plain")).text();
+    expect(parseTsv(plain)).toEqual(expected);
+
+    const html = await (await captured.getType("text/html")).text();
+    const document = new DOMParser().parseFromString(html, "text/html");
+    expect(Array.from(document.querySelectorAll("td"), (cell) => cell.textContent)).toEqual(
+      expected.flat(),
+    );
+    expect(document.querySelector("[data-sheetwrite-formula]")).toBeNull();
+
+    const privateType = `web ${SHEETWRITE_CLIPBOARD_MIME}`;
+    const envelope = JSON.parse(await (await captured.getType(privateType)).text()) as {
+      cells: Array<Array<{ value: { kind: string; value?: CellScalar } }>>;
+    };
+    expect(envelope.cells.map((row) => row.map((cell) => cell.value.value))).toEqual(originals);
+
+    h.select(10, 0);
+    await expect(h.controller.paste()).resolves.toBe("done");
+    for (let row = 0; row < originals.length; row++) {
+      for (let column = 0; column < originals[row]!.length; column++) {
+        expect(h.store.getCell({ sheet: "s1", row: row + 10, col: column }).resolved).toBe(
+          originals[row]![column]!,
+        );
+      }
+    }
   });
 
   it("falls back from an unavailable web custom format to safe HTML plus text", async () => {

@@ -89,6 +89,23 @@ export type RecomputingCellStore = CellStore & {
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
   beginPageLoad(): void;
   endPageLoad(): void;
+  hydratePageNumbers(
+    sheet: number,
+    col: number,
+    startRow: number,
+    values: Float64Array,
+    style: number,
+    protectedOffsets: Uint32Array,
+  ): void;
+  hydratePageStringsPacked(
+    sheet: number,
+    col: number,
+    startRow: number,
+    buf: string,
+    utf16Lens: Uint32Array,
+    style: number,
+    protectedOffsets: Uint32Array,
+  ): void;
   markRangeClean(
     sheet: number,
     startRow: number,

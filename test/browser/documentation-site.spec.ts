@@ -47,11 +47,43 @@ test("documentation root serves the overview", async ({ page }) => {
   await expect(page.locator('.sw-sidebar__nav a[href="/docs/"]')).toBeVisible();
 });
 
+test("sidebar lists performance inside the start section", async ({ page }) => {
+  await page.goto(docsUrl());
+  const navigation = page.getByRole("navigation", { name: "Documentation" });
+  const start = navigation.getByRole("heading", { name: "Start" }).locator("..");
+
+  await expect(start.getByRole("link")).toHaveText([
+    "Overview",
+    "Installation",
+    "First grid",
+    "Performance",
+  ]);
+  await expect(navigation.getByRole("heading", { name: "Benchmark" })).toHaveCount(0);
+});
+
+test("sidebar marks only the nearest documentation route as current", async ({ page }) => {
+  for (const [path, label] of [
+    ["start/first-grid/", "First grid"],
+    ["api/core/", "@sheetwrite/core"],
+    ["api/core/grid/", "@sheetwrite/core"],
+  ] as const) {
+    await page.goto(docsUrl(path));
+    const navigation = page.getByRole("navigation", { name: "Documentation" });
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
+    await expect(navigation.getByRole("link", { name: label, exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  }
+});
+
 test("site root serves the product landing", async ({ page }) => {
   const errors = collectErrors(page);
   const response = await page.goto(siteUrl("/"));
   expect(response?.ok()).toBe(true);
-  await expect(page.locator("main h1")).toHaveText("Build web spreadsheets you still own.");
+  // Semantic contract: exactly one H1, and no live grid runtime on the landing.
+  await expect(page.locator("main h1")).toHaveCount(1);
+  await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
   await expect(page).toHaveTitle("Sheetwrite — TypeScript spreadsheet and data grid");
   await expect(page.locator('meta[name="description"]')).toHaveAttribute(
     "content",
@@ -83,10 +115,16 @@ test("site root serves the product landing", async ({ page }) => {
   const benchStats = page.locator("#benchmarks .sw-bench-stats li");
   await expect(benchStats.first()).toBeVisible();
   await expect(page.locator("#benchmarks")).toContainText("Read the full protocol.");
-  await page.getByRole("link", { name: "Get started" }).click();
-  await expect(page).toHaveURL(docsUrl("start/installation/"));
+  // Capability navigation: four owned proofs and four adapter workbenches link out.
+  await expect(page.locator("main a[data-proof]")).toHaveCount(4);
+  await expect(page.locator("main a[data-framework]")).toHaveCount(4);
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
+  await page.getByRole("link", { name: /Performance & scale/ }).click();
+  await expect(page).toHaveURL(siteUrl("/showcases/performance/"));
+  await page.goBack();
+  await page.getByRole("link", { name: "Get started" }).click();
+  await expect(page).toHaveURL(docsUrl("start/installation/"));
 });
 
 test.describe("documentation site", () => {
@@ -508,17 +546,21 @@ test.describe("documentation site", () => {
     test(`documentation landing remains aligned at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 855 });
       await page.goto(siteUrl());
-      await expect(page.locator("main h1")).toHaveText("Build web spreadsheets you still own.");
+      await expect(page.locator("main h1")).toHaveCount(1);
       await expect(
         page.getByRole("button", { name: /npm install @sheetwrite\/core Copy install command/ }),
       ).toBeVisible();
       const layout = await page.evaluate(() => {
         const main = document.querySelector<HTMLElement>("main");
-        const cards = [...document.querySelectorAll<HTMLElement>(".sw-landing-grid > a")];
-        if (!main || cards.length === 0) return null;
+        const targets = [
+          ...document.querySelectorAll<HTMLElement>(
+            "main a[data-proof], main a[data-framework], [data-hero-panel]",
+          ),
+        ];
+        if (!main || targets.length === 0) return null;
         return {
           documentFits: document.documentElement.scrollWidth <= window.innerWidth,
-          cardsFit: cards.every((card) => {
+          cardsFit: targets.every((card) => {
             const bounds = card.getBoundingClientRect();
             return bounds.left >= 0 && bounds.right <= window.innerWidth + 1;
           }),
@@ -538,11 +580,28 @@ test.describe("documentation site", () => {
   test("framework tabs synchronize and persist across guides", async ({ page }) => {
     await page.goto(docsUrl("start/installation/"));
     await waitForHydration(page);
+    const expectStyledPanel = async (language: string) => {
+      const panel = page.getByRole("tabpanel");
+      await expect(panel.locator(".frame.is-terminal .sr-only")).toHaveCSS("position", "absolute");
+      const colors = await panel
+        .locator(`pre[data-language="${language}"] .code`)
+        .first()
+        .evaluate((code) => ({
+          code: getComputedStyle(code).color,
+          tokens: Array.from(
+            code.querySelectorAll<HTMLElement>("span[style]"),
+            (token) => getComputedStyle(token).color,
+          ),
+        }));
+      expect(colors.tokens.length).toBeGreaterThan(0);
+      expect(colors.tokens.some((color) => color !== colors.code)).toBe(true);
+    };
     const reactTab = page.getByRole("tab", { name: "React", exact: true });
     await expect(reactTab).toBeVisible();
     await reactTab.click();
     await expect(reactTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tabpanel")).toContainText("@sheetwrite/react");
+    await expectStyledPanel("tsx");
     expect(await page.evaluate(() => localStorage.getItem("sheetwrite-framework"))).toBe("React");
 
     await page.goto(docsUrl("frameworks/lifecycle/"));
@@ -559,6 +618,9 @@ test.describe("documentation site", () => {
       "aria-selected",
       "true",
     );
+    await expectStyledPanel("vue");
+    await page.getByRole("tab", { name: "Svelte", exact: true }).click();
+    await expectStyledPanel("svelte");
   });
 
   for (const framework of ["react", "vue", "svelte"] as const) {

@@ -9,6 +9,7 @@
 export interface SheetTabRecord {
   id: string;
   name: string;
+  visibility?: "visible" | "hidden" | "veryHidden";
 }
 
 export interface SheetTabsOptions {
@@ -35,6 +36,7 @@ export class SheetTabs {
   private readonly onMove?: (id: string, toIndex: number) => void;
   private buttons: HTMLButtonElement[] = [];
   private ids: string[] = [];
+  private moveIndexes: number[] = [];
 
   constructor(host: HTMLElement, options: SheetTabsOptions) {
     this.host = host;
@@ -52,14 +54,18 @@ export class SheetTabs {
     this.host.replaceChildren();
     this.buttons = [];
     this.ids = [];
+    this.moveIndexes = [];
 
+    const visible = sheets
+      .map((sheet, index) => ({ sheet, index }))
+      .filter(({ sheet }) => sheet.visibility !== "hidden" && sheet.visibility !== "veryHidden");
     const focusIndex = Math.max(
       0,
-      sheets.findIndex((sheet) => sheet.id === activeId),
+      visible.findIndex(({ sheet }) => sheet.id === activeId),
     );
 
-    for (let i = 0; i < sheets.length; i++) {
-      const sheet = sheets[i]!;
+    for (let i = 0; i < visible.length; i++) {
+      const { sheet, index: workbookIndex } = visible[i]!;
       const active = sheet.id === activeId;
 
       const tab = document.createElement("button");
@@ -77,6 +83,7 @@ export class SheetTabs {
       tab.setAttribute("aria-label", `${sheet.name} sheet`);
       this.buttons.push(tab);
       this.ids.push(id);
+      this.moveIndexes.push(workbookIndex);
 
       if (this.onRemove && sheets.length > 1) {
         const close = document.createElement("button");
@@ -104,6 +111,7 @@ export class SheetTabs {
     this.host.replaceChildren();
     this.buttons = [];
     this.ids = [];
+    this.moveIndexes = [];
   }
 
   /** Roving focus: Left/Right step, Home/End jump; Enter/Space use the button default. */
@@ -127,13 +135,15 @@ export class SheetTabs {
       return;
     }
     if (event.shiftKey && event.ctrlKey && this.onMove) {
-      const to =
+      const targetVisibleIndex =
         event.key === "ArrowLeft"
           ? Math.max(0, current - 1)
           : event.key === "ArrowRight"
             ? Math.min(this.buttons.length - 1, current + 1)
             : null;
-      if (to !== null && to !== current) {
+      const to =
+        targetVisibleIndex === null ? null : (this.moveIndexes[targetVisibleIndex] ?? null);
+      if (to !== null && to !== this.moveIndexes[current]) {
         event.preventDefault();
         this.onMove(id, to);
         return;

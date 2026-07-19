@@ -27,6 +27,7 @@ const GRID_OPTION_POLICY: {
   readonly renderers: "reset";
   readonly protectionResolver: "reset";
   readonly mutationPolicy: "reset";
+  readonly transactionResourceLimits: "reset";
   readonly theme: "live";
   readonly readOnly: "live";
   readonly config: "live";

@@ -6,6 +6,18 @@ import type { CellAddress } from "./coordinates.js";
 import type { CommitReason, DocumentOp, MutationIssue, WorkbookSnapshot } from "./document.js";
 
 /**
+ * Public ceilings shared by transaction producers, persistence, transport,
+ * and replay. Limits measure the submitted operation array itself, not the
+ * logical cell area covered by compact operations.
+ */
+export interface TransactionResourceLimits {
+  /** Maximum number of DocumentOp objects in one atomic transaction. */
+  maxOperations: number;
+  /** Maximum UTF-8 bytes in the JSON-encoded DocumentOp array. */
+  maxEncodedBytes: number;
+}
+
+/**
  * Low-level Store transaction. `epoch` provides optional optimistic
  * concurrency at the storage boundary.
  *
@@ -89,14 +101,12 @@ export interface PersistenceCommitRequest extends PendingCommit {
   signal?: AbortSignal;
 }
 
-/** Applied, duplicate, or conflict acknowledgement from persistence. */
+/**
+ * Applied, duplicate, or conflict acknowledgement from persistence. `applied`
+ * confirms the submitted operations unchanged; normalization must conflict.
+ */
 export type PersistenceCommitResponse =
-  | {
-      status: "applied";
-      version: number;
-      clientMutationId: string;
-      canonicalOperations?: readonly DocumentOp[];
-    }
+  | { status: "applied"; version: number; clientMutationId: string }
   | { status: "duplicate"; version: number; clientMutationId: string }
   | {
       status: "conflict";
@@ -111,10 +121,13 @@ export interface PersistenceAdapter {
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
 }
 
-/** Host subscription contract for ordered versioned operations. */
+/**
+ * Host subscription contract for ordered versioned operations. Sources that
+ * can pause intake should await the listener promise to preserve backpressure.
+ */
 export interface RemoteOperationSource {
   subscribe(
-    listener: (operation: VersionedOperation) => void,
+    listener: (operation: VersionedOperation) => void | Promise<void>,
     signal?: AbortSignal,
   ): undefined | (() => void);
 }

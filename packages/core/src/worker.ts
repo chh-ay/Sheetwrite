@@ -278,7 +278,7 @@ export function createWorkerMessageHandler(
     switch (msg.type) {
       case "init":
         state.canvas = msg.canvas;
-        state.ctx = state.canvas.getContext("2d", { alpha: false, desynchronized: true });
+        state.ctx = state.canvas.getContext("2d", { alpha: false });
         state.theme = msg.theme;
         state.lastViewport = null;
         break;

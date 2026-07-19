@@ -1,8 +1,10 @@
 import { CellStore, isLoaded, type RangeSnapshot } from "@sheetwrite/wasm";
+import { parseCellLiteralInput } from "../cell-input.js";
 import { dateToSerial } from "../date-serial.js";
 import { cellKey, type LiteralLookup, parseCellKey, ReferenceGraph } from "../reference.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import type {
+  CellFormat,
   CellScalar,
   CellStyle,
   CellValue,
@@ -70,6 +72,7 @@ const KIND_FORMULA = 4;
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
 const DEFAULT_PAGED_CACHE_BYTES = 32 * 1024 * 1024;
+const EMPTY_U32 = new Uint32Array(0);
 
 /** Store-local compact history resource. Never serialize `resource`. */
 export interface CompactRangeHistory {
@@ -542,6 +545,14 @@ export class StoreDataEngine {
     cols: readonly number[],
   ): VisibleWindowView {
     return this.windowReader.read(sheet, rows, cols, this.view.order(sheet), true);
+  }
+
+  getDataWindow(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+  ): VisibleWindowView {
+    return this.windowReader.read(sheet, rows, cols, undefined, false);
   }
 
   getClipboardWindow(
@@ -1597,6 +1608,7 @@ export class StoreDataEngine {
     const candidate: Sheet = {
       id: snapshot.id,
       name: snapshot.name,
+      visibility: snapshot.visibility,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns,
       frozenRows: snapshot.frozenRows,
@@ -1659,6 +1671,7 @@ export class StoreDataEngine {
     const sheet: Sheet = {
       id: snapshot.id,
       name: snapshot.name,
+      visibility: snapshot.visibility,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns.map((column) => ({ ...column })),
       frozenRows: snapshot.frozenRows,
@@ -2022,52 +2035,39 @@ export class StoreDataEngine {
     try {
       const handle = this.handleOf(sheet);
       const columns = this.sheetMeta(sheet).columns;
-      const exceptions: DocumentOp[] = [];
-      const protectedCells: DocumentOp[] = [];
-
-      for (let c = 0; c < columns.length; c++) {
-        const column = columns[c]!;
-        for (let offset = 0; offset < rows.length; offset++) {
-          const addr = { sheet, row: start + offset, col: c };
-          if (this.wasm.cellState(handle, addr.row, addr.col) === 3 || protect?.(addr)) {
-            const formula = this.getFormula(addr);
-            const target = this.getRefTarget(addr);
-            const cell = this.getCell(addr);
-            const value: CellValue = formula
-              ? { kind: "formula", src: formula }
-              : target
-                ? { kind: "ref", target }
-                : { kind: "literal", value: cell.resolved };
-            protectedCells.push({ op: "set", addr, value, style: cell.style });
-            continue;
+      const protectedByColumn: Uint32Array[] = Array.from(
+        { length: columns.length },
+        () => EMPTY_U32,
+      );
+      if (protect) {
+        const address: CellAddress = { sheet, row: start, col: 0 };
+        for (let col = 0; col < columns.length; col++) {
+          const offsets: number[] = [];
+          address.col = col;
+          for (let offset = 0; offset < rows.length; offset++) {
+            address.row = start + offset;
+            if (protect(address)) offsets.push(offset);
           }
-          const dataCell = rows[offset]![column.key];
-          const wrapped =
-            dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
-              ? dataCell
-              : undefined;
-          const value: CellScalar | CellValue | undefined = wrapped
-            ? wrapped.value
-            : (dataCell as CellScalar | CellValue | undefined);
-          if (
-            wrapped?.style !== undefined ||
-            (value &&
-              typeof value === "object" &&
-              (value.kind === "formula" || value.kind === "ref"))
-          ) {
-            exceptions.push({
-              op: "set",
-              addr,
-              value: value as CellValue,
-              style: wrapped?.style,
-            });
-          }
+          if (offsets.length > 0) protectedByColumn[col] = Uint32Array.from(offsets);
         }
-        this.loadColumnBlock(handle, column, c, start, rows);
+      }
+
+      this.clearHydratedMetadata(handle, sheet, start, rows.length, protectedByColumn);
+      const exceptions: DocumentOp[] = [];
+      for (let col = 0; col < columns.length; col++) {
+        this.hydratePageColumn(
+          handle,
+          sheet,
+          columns[col]!,
+          col,
+          start,
+          rows,
+          protectedByColumn[col]!,
+          exceptions,
+        );
       }
 
       for (const patch of exceptions) this.applyPatch(patch, null);
-      for (const patch of protectedCells) this.applyPatch(patch, null);
       this.wasm.recompute(handle);
       if (this.refs.hasRefs()) {
         this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
@@ -2160,22 +2160,116 @@ export class StoreDataEngine {
     this.wasm.free();
   }
 
-  private loadColumnBlock(
+  private clearHydratedMetadata(
     handle: number,
+    sheet: SheetId,
+    start: number,
+    rowCount: number,
+    protectedByColumn: readonly Uint32Array[],
+  ): void {
+    const end = start + rowCount;
+    for (const key of this.formulaSrc.keys()) {
+      const address = parseCellKey(key);
+      if (
+        address.sheet !== sheet ||
+        address.row < start ||
+        address.row >= end ||
+        address.col >= protectedByColumn.length
+      ) {
+        continue;
+      }
+      const offset = address.row - start;
+      if (
+        hasSortedOffset(protectedByColumn[address.col]!, offset) ||
+        this.wasm.cellState(handle, address.row, address.col) === 3
+      ) {
+        continue;
+      }
+      this.formulaSrc.delete(key);
+    }
+    for (const [address] of this.refs.entries()) {
+      if (
+        address.sheet !== sheet ||
+        address.row < start ||
+        address.row >= end ||
+        address.col >= protectedByColumn.length
+      ) {
+        continue;
+      }
+      const offset = address.row - start;
+      if (
+        hasSortedOffset(protectedByColumn[address.col]!, offset) ||
+        this.wasm.cellState(handle, address.row, address.col) === 3
+      ) {
+        continue;
+      }
+      this.refs.removeRef(cellKey(address));
+    }
+  }
+
+  private hydratePageColumn(
+    handle: number,
+    sheet: SheetId,
     column: Column,
     col: number,
     start: number,
     rows: readonly RowData[],
+    protectedOffsets: Uint32Array,
+    exceptions: DocumentOp[],
   ): void {
     const key = column.key;
-    if (column.type === "number" || column.type === "currency") {
-      const nums = new Float64Array(rows.length);
-      for (let r = 0; r < rows.length; r++) nums[r] = toNumber(rows[r]![key]);
-      this.wasm.setColumnNumbers(handle, col, start, nums, 0);
+    const numeric = column.type === "number" || column.type === "currency";
+    const numbers = numeric ? new Float64Array(rows.length) : undefined;
+    const texts = numeric ? undefined : new Array<string>(rows.length);
+    const utf16Lens = numeric ? undefined : new Uint32Array(rows.length);
+
+    for (let offset = 0; offset < rows.length; offset++) {
+      const dataCell = rows[offset]![key];
+      if (numbers) {
+        numbers[offset] = toNumber(dataCell);
+      } else {
+        const text = toText(dataCell);
+        texts![offset] = text;
+        utf16Lens![offset] = text.length;
+      }
+
+      const wrapped =
+        dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
+          ? dataCell
+          : undefined;
+      const value = dataCellValue(dataCell);
+      const exceptional =
+        wrapped?.style !== undefined ||
+        (value && typeof value === "object" && (value.kind === "formula" || value.kind === "ref"));
+      if (
+        !exceptional ||
+        hasSortedOffset(protectedOffsets, offset) ||
+        this.wasm.cellState(handle, start + offset, col) === 3
+      ) {
+        continue;
+      }
+      const cellValue: CellValue =
+        value && typeof value === "object" ? value : { kind: "literal", value: value ?? null };
+      exceptions.push({
+        op: "set",
+        addr: { sheet, row: start + offset, col },
+        value: cellValue,
+        style: wrapped?.style,
+      });
+    }
+
+    if (numbers) {
+      this.wasm.hydratePageNumbers(handle, col, start, numbers, 0, protectedOffsets);
     } else {
-      const strs: string[] = new Array(rows.length);
-      for (let r = 0; r < rows.length; r++) strs[r] = toText(rows[r]![key]);
-      this.wasm.setColumnStrings(handle, col, start, strs, 0);
+      this.wasm.hydratePageStringsPacked(
+        handle,
+        col,
+        start,
+        texts!.join(""),
+        utf16Lens!,
+        0,
+        protectedOffsets,
+      );
     }
   }
 
@@ -2187,38 +2281,50 @@ export class StoreDataEngine {
       const column = columns[c]!;
       const source = data.columns[column.key];
       if (!source) continue;
-      if (column.type === "number" || column.type === "currency") {
+      const numericColumn =
+        column.type === "number" || column.type === "currency" || column.type === "date";
+      if (numericColumn) {
         if (source instanceof Float64Array) {
           this.wasm.setColumnNumbers(handle, c, 0, source.subarray(0, data.rowCount), 0);
           continue;
         }
 
         const nums = new Float64Array(data.rowCount);
-        for (let r = 0; r < data.rowCount; r++) nums[r] = toNumber(source[r]);
+        for (let r = 0; r < data.rowCount; r++) {
+          const value = columnarScalar(source[r], column.type);
+          nums[r] = typeof value === "number" ? value : Number.NaN;
+        }
         this.wasm.setColumnNumbers(handle, c, 0, nums, 0);
       } else {
         const stringSource = stringArrayForRows(source, data.rowCount);
         if (stringSource) {
           this.loadPackedStrings(handle, c, stringSource);
-          continue;
+        } else {
+          const strs: string[] = new Array(data.rowCount);
+          for (let r = 0; r < data.rowCount; r++) strs[r] = toText(source[r]);
+          this.loadPackedStrings(handle, c, strs);
         }
-
-        const strs: string[] = new Array(data.rowCount);
-        for (let r = 0; r < data.rowCount; r++) strs[r] = toText(source[r]);
-        this.loadPackedStrings(handle, c, strs);
       }
 
-      // Formula CellValues ride the bulk scalar pass as placeholders, then
-      // land individually so the calc engine parses and tracks them —
-      // honoring the ColumnarData contract for `{ kind: "formula" }` entries.
-      if (Array.isArray(source)) {
-        for (let r = 0; r < data.rowCount; r++) {
-          const value = source[r];
-          if (value && typeof value === "object" && value.kind === "formula") {
+      // Bulk columns carry homogeneous numeric/text values. Restore mixed
+      // booleans and inert text in numeric/date columns, clear canonical blanks,
+      // and land formulas individually so the engine tracks their sources.
+      for (let r = 0; r < data.rowCount; r++) {
+        const value = columnarScalar(source[r], column.type);
+        if (value && typeof value === "object") {
+          if (value.kind === "formula") {
             this.formulaSrc.set(cellKey({ sheet, row: r, col: c }), value.src);
             this.wasm.setFormula(handle, r, c, value.src, 0);
             loadedFormulas = true;
           }
+          continue;
+        }
+        if (typeof value === "boolean") {
+          this.wasm.setBool(handle, r, c, value, 0);
+        } else if (numericColumn && typeof value === "string") {
+          this.wasm.setString(handle, r, c, value, 0);
+        } else if (value === null || value === undefined) {
+          this.wasm.clearCell(handle, r, c, 0);
         }
       }
     }
@@ -2250,11 +2356,34 @@ function stringArrayForRows(
   return source.length === rowCount ? source : source.slice(0, rowCount);
 }
 
+function hasSortedOffset(offsets: Uint32Array, target: number): boolean {
+  let lo = 0;
+  let hi = offsets.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    const value = offsets[mid]!;
+    if (value < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return offsets[lo] === target;
+}
+
 function dataCellValue(value: DataCell | undefined): CellScalar | CellValue | undefined {
   if (value && typeof value === "object" && !("kind" in value) && "value" in value) {
     return value.value;
   }
   return value;
+}
+
+function columnarScalar(
+  value: CellScalar | CellValue | undefined,
+  type: CellFormat,
+): CellScalar | CellValue | undefined {
+  const unwrapped = dataCellValue(value);
+  if (unwrapped && typeof unwrapped === "object" && unwrapped.kind === "literal") {
+    return columnarScalar(unwrapped.value, type);
+  }
+  return typeof unwrapped === "string" ? parseCellLiteralInput(unwrapped, type) : unwrapped;
 }
 
 function toNumber(value: DataCell | undefined): number {

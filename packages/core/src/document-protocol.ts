@@ -1,8 +1,165 @@
+import { boundedJsonByteLength, JsonByteLengthError } from "./json-byte-length.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
-import type { DocumentOp, SheetSnapshot, WorkbookSnapshot } from "./types/document.js";
+import type {
+  DocumentOp,
+  MutationIssue,
+  SheetSnapshot,
+  Workbook,
+  WorkbookSnapshot,
+} from "./types/document.js";
+import type { TransactionResourceLimits } from "./types/transaction.js";
 
 /** Current workbook snapshot schema version accepted by Sheetwrite. */
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
+
+/**
+ * Inclusive defaults for every atomic document transaction accepted by a
+ * Store or Grid. Encoded bytes are the UTF-8 JSON size of the DocumentOp array.
+ */
+export const DEFAULT_TRANSACTION_RESOURCE_LIMITS: Readonly<TransactionResourceLimits> =
+  Object.freeze({
+    maxOperations: 10_000,
+    maxEncodedBytes: 8 * 1024 * 1024,
+  });
+
+/** Successful byte/count inspection or one structured transaction rejection. */
+export type TransactionResourceValidationResult =
+  | {
+      ok: true;
+      operationCount: number;
+      encodedBytes: number;
+    }
+  | {
+      ok: false;
+      issue: Extract<MutationIssue, { kind: "resource-limit" }>;
+    };
+
+const TRANSACTION_RESOURCE_KEYS = [
+  "maxOperations",
+  "maxEncodedBytes",
+] as const satisfies readonly (keyof TransactionResourceLimits)[];
+
+/**
+ * Validate and merge transaction ceiling overrides without retaining the
+ * caller-owned object. Every ceiling is an inclusive non-negative safe integer.
+ */
+export function resolveTransactionResourceLimits(
+  overrides: Partial<TransactionResourceLimits> = {},
+): Readonly<TransactionResourceLimits> {
+  const limits: TransactionResourceLimits = { ...DEFAULT_TRANSACTION_RESOURCE_LIMITS };
+  for (const resource of TRANSACTION_RESOURCE_KEYS) {
+    const value = overrides[resource];
+    if (value === undefined) continue;
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new RangeError(
+        `Transaction resource limit ${resource} must be a non-negative safe integer`,
+      );
+    }
+    limits[resource] = value;
+  }
+  return Object.freeze(limits);
+}
+
+/**
+ * Incrementally validate the operation count and exact encoded payload size
+ * without constructing a JSON string. Compact operation ranges are measured by
+ * their serialized fields; their logical cell area is deliberately irrelevant.
+ */
+export function validateTransactionResources(
+  operations: readonly DocumentOp[],
+  limits: Readonly<TransactionResourceLimits> = DEFAULT_TRANSACTION_RESOURCE_LIMITS,
+): TransactionResourceValidationResult {
+  if (!Array.isArray(operations)) {
+    throw new TypeError("Transaction patches must be an array of DocumentOps");
+  }
+  if (operations.length > limits.maxOperations) {
+    return {
+      ok: false,
+      issue: {
+        kind: "resource-limit",
+        severity: "error",
+        resource: "operations",
+        actual: operations.length,
+        max: limits.maxOperations,
+        message: `Transaction operation count ${operations.length} exceeds maximum ${limits.maxOperations}`,
+      },
+    };
+  }
+  try {
+    return {
+      ok: true,
+      operationCount: operations.length,
+      encodedBytes: boundedJsonByteLength(operations, limits.maxEncodedBytes, {
+        omitUndefinedProperties: true,
+      }),
+    };
+  } catch (error) {
+    if (!(error instanceof JsonByteLengthError) || error.code !== "limit") throw error;
+    const actual = error.actual ?? limits.maxEncodedBytes + 1;
+    return {
+      ok: false,
+      issue: {
+        kind: "resource-limit",
+        severity: "error",
+        resource: "encoded-bytes",
+        actual,
+        max: limits.maxEncodedBytes,
+        message: `Transaction encoded operation payload exceeds maximum ${limits.maxEncodedBytes} bytes (${actual} bytes observed)`,
+      },
+    };
+  }
+}
+
+/** Allocation mode used when enforcing snapshot construction capacity. */
+export type SnapshotStorageMode = "dense" | "paged";
+
+/** Resource ceilings applied before snapshot normalization or store allocation. */
+export interface SnapshotResourceLimits {
+  maxSheets: number;
+  maxRowsPerSheet: number;
+  maxColumnsPerSheet: number;
+  maxMetadataEntries: number;
+  maxSerializedBytes: number;
+  maxLogicalCellsPerSheet: number;
+  maxDenseCells: number;
+}
+
+/** Conservative defaults that retain the million-row paged-sheet contract. */
+export const DEFAULT_SNAPSHOT_RESOURCE_LIMITS: Readonly<SnapshotResourceLimits> = Object.freeze({
+  maxSheets: 256,
+  maxRowsPerSheet: 1_000_000,
+  maxColumnsPerSheet: 16_384,
+  maxMetadataEntries: 1_000_000,
+  maxSerializedBytes: 64 * 1024 * 1024,
+  maxLogicalCellsPerSheet: 0xffff_ffff,
+  maxDenseCells: 5_000_000,
+});
+
+/** Validation and allocation policy for an untrusted workbook snapshot. */
+export interface SnapshotValidationOptions {
+  storage?: SnapshotStorageMode;
+  resourceLimits?: Partial<SnapshotResourceLimits>;
+}
+
+/** Stable resource failure raised by direct workbook construction paths. */
+export class SnapshotResourceError extends RangeError {
+  readonly code = "resource-limit";
+
+  constructor(
+    readonly resource: keyof SnapshotResourceLimits,
+    readonly limit: number,
+    readonly actual: number,
+    options?: ErrorOptions,
+  ) {
+    super(
+      actual > limit
+        ? `Snapshot ${resource} limit ${limit} exceeded by ${actual}`
+        : `Snapshot allocation failed for ${actual} within ${resource} limit ${limit}`,
+      options,
+    );
+    this.name = "SnapshotResourceError";
+  }
+}
 
 /** Path-qualified validation failure for a document operation. */
 export interface DocumentValidationError {
@@ -14,7 +171,8 @@ export interface DocumentValidationError {
     | "missing-reference"
     | "out-of-bounds"
     | "overlapping-merge"
-    | "non-serializable";
+    | "non-serializable"
+    | "resource-limit";
   message: string;
 }
 
@@ -37,13 +195,45 @@ type PlainRecord = Record<string, unknown>;
 
 interface JsonSafetyIssue {
   path: string;
+  code: "non-serializable" | "resource-limit";
   message: string;
 }
 
+interface JsonInspectionState {
+  readonly maxBytes: number;
+  bytes: number;
+}
+
+interface ResolvedSnapshotValidationOptions {
+  readonly storage: SnapshotStorageMode;
+  readonly limits: SnapshotResourceLimits;
+}
+
+const SNAPSHOT_RESOURCE_KEYS = [
+  "maxSheets",
+  "maxRowsPerSheet",
+  "maxColumnsPerSheet",
+  "maxMetadataEntries",
+  "maxSerializedBytes",
+  "maxLogicalCellsPerSheet",
+  "maxDenseCells",
+] as const satisfies readonly (keyof SnapshotResourceLimits)[];
+
+const SHEET_METADATA_ARRAY_KEYS = [
+  "rowMeta",
+  "merges",
+  "conditionalFormats",
+  "validationRules",
+  "protectedRanges",
+  "notes",
+  "sortKeys",
+  "filters",
+  "rowGroups",
+  "cells",
+] as const;
+
 function nonNegativeInteger(value: unknown): value is number {
-  return (
-    typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 0
-  );
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function finiteNumber(value: unknown): value is number {
@@ -61,7 +251,7 @@ function isPlainRecord(value: unknown): value is PlainRecord {
 
 function ownValue(record: PlainRecord, key: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(record, key);
-  return descriptor && "value" in descriptor ? descriptor.value : undefined;
+  return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
 }
 
 function childPath(path: string, key: string): string {
@@ -73,96 +263,406 @@ function childPath(path: string, key: string): string {
     : `${path}[${JSON.stringify(key)}]`;
 }
 
+function consumeBytes(state: JsonInspectionState, count: number): boolean {
+  if (count > state.maxBytes - state.bytes) return false;
+  state.bytes += count;
+  return true;
+}
+
+function consumeJsonString(state: JsonInspectionState, value: string): boolean {
+  if (!consumeBytes(state, 2)) return false;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    let bytes: number;
+    if (code === 0x22 || code === 0x5c || code === 0x08 || code === 0x09 || code === 0x0a) {
+      bytes = 2;
+    } else if (code === 0x0c || code === 0x0d) {
+      bytes = 2;
+    } else if (code < 0x20) {
+      bytes = 6;
+    } else if (code < 0x80) {
+      bytes = 1;
+    } else if (code < 0x800) {
+      bytes = 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes = 4;
+        index += 1;
+      } else {
+        bytes = 6;
+      }
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      bytes = 6;
+    } else {
+      bytes = 3;
+    }
+    if (!consumeBytes(state, bytes)) return false;
+  }
+  return true;
+}
+
+function serializedLimitIssue(path: string, maxBytes: number): JsonSafetyIssue {
+  return {
+    path,
+    code: "resource-limit",
+    message: `Snapshot maxSerializedBytes limit ${maxBytes} exceeded`,
+  };
+}
+
 function findJsonSafetyIssue(
   value: unknown,
   path: string,
   ancestors: Set<object>,
+  state: JsonInspectionState,
 ): JsonSafetyIssue | undefined {
   if (value === undefined) {
-    return { path, message: "undefined is not JSON-safe" };
+    return { path, code: "non-serializable", message: "undefined is not JSON-safe" };
   }
   if (typeof value === "number") {
-    return Number.isFinite(value) ? undefined : { path, message: "Numbers must be finite" };
+    if (!Number.isFinite(value)) {
+      return { path, code: "non-serializable", message: "Numbers must be finite" };
+    }
+    const serialized = Object.is(value, -0) ? "0" : String(value);
+    return consumeBytes(state, serialized.length)
+      ? undefined
+      : serializedLimitIssue(path, state.maxBytes);
   }
   if (typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
-    return { path, message: `${typeof value} values are not JSON-safe` };
+    return {
+      path,
+      code: "non-serializable",
+      message: `${typeof value} values are not JSON-safe`,
+    };
   }
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return undefined;
+  if (value === null) {
+    return consumeBytes(state, 4) ? undefined : serializedLimitIssue(path, state.maxBytes);
+  }
+  if (typeof value === "boolean") {
+    return consumeBytes(state, value ? 4 : 5)
+      ? undefined
+      : serializedLimitIssue(path, state.maxBytes);
+  }
+  if (typeof value === "string") {
+    return consumeJsonString(state, value) ? undefined : serializedLimitIssue(path, state.maxBytes);
   }
   if (typeof value !== "object") {
-    return { path, message: "Value is not JSON-safe" };
+    return { path, code: "non-serializable", message: "Value is not JSON-safe" };
   }
   if (ancestors.has(value)) {
-    return { path, message: "Cyclic values are not JSON-safe" };
+    return { path, code: "non-serializable", message: "Cyclic values are not JSON-safe" };
   }
 
   if (Array.isArray(value)) {
     if (Object.getPrototypeOf(value) !== Array.prototype) {
-      return { path, message: "Arrays with custom prototypes are not JSON-safe" };
+      return {
+        path,
+        code: "non-serializable",
+        message: "Arrays with custom prototypes are not JSON-safe",
+      };
     }
-    const indexKeys: string[] = [];
-    for (const key of Reflect.ownKeys(value)) {
-      if (key === "length") continue;
-      if (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length) {
-        return {
-          path: typeof key === "string" ? childPath(path, key) : path,
-          message: "Arrays may contain only indexed data properties",
-        };
-      }
-      indexKeys.push(key);
-    }
-    if (indexKeys.length !== value.length) {
-      let missingIndex = 0;
-      while (missingIndex < indexKeys.length && indexKeys[missingIndex] === String(missingIndex)) {
-        missingIndex++;
-      }
-      return { path: `${path}[${missingIndex}]`, message: "Sparse arrays are not JSON-safe" };
+    if (!consumeBytes(state, 2 + Math.max(0, value.length - 1))) {
+      return serializedLimitIssue(path, state.maxBytes);
     }
     ancestors.add(value);
-    for (const key of indexKeys) {
-      const itemPath = `${path}[${key}]`;
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    for (let index = 0; index < value.length; index++) {
+      const itemPath = `${path}[${index}]`;
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
       if (!descriptor?.enumerable || !("value" in descriptor)) {
         ancestors.delete(value);
-        return { path: itemPath, message: "Array entries must be enumerable data properties" };
+        return {
+          path: itemPath,
+          code: "non-serializable",
+          message: "Array entries must be enumerable data properties",
+        };
       }
-      const issue = findJsonSafetyIssue(descriptor.value, itemPath, ancestors);
+      const issue = findJsonSafetyIssue(descriptor.value, itemPath, ancestors, state);
       if (issue) {
         ancestors.delete(value);
         return issue;
       }
+    }
+    for (const key in value) {
+      if (!Object.hasOwn(value, key)) continue;
+      if (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length) {
+        ancestors.delete(value);
+        return {
+          path: childPath(path, key),
+          code: "non-serializable",
+          message: "Arrays may contain only indexed data properties",
+        };
+      }
+    }
+    if (Object.getOwnPropertySymbols(value).length > 0) {
+      ancestors.delete(value);
+      return {
+        path,
+        code: "non-serializable",
+        message: "Symbol-keyed properties are not JSON-safe",
+      };
     }
     ancestors.delete(value);
     return undefined;
   }
 
   if (!isPlainRecord(value)) {
-    return { path, message: "Only plain objects are JSON-safe" };
+    return { path, code: "non-serializable", message: "Only plain objects are JSON-safe" };
   }
+  if (!consumeBytes(state, 2)) return serializedLimitIssue(path, state.maxBytes);
   ancestors.add(value);
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key !== "string") {
-      ancestors.delete(value);
-      return { path, message: "Symbol-keyed properties are not JSON-safe" };
-    }
+  let propertyCount = 0;
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
     const propertyPath = childPath(path, key);
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor?.enumerable || !("value" in descriptor)) {
       ancestors.delete(value);
       return {
         path: propertyPath,
+        code: "non-serializable",
         message: "Object properties must be enumerable data properties",
       };
     }
-    const issue = findJsonSafetyIssue(descriptor.value, propertyPath, ancestors);
+    if (
+      (propertyCount > 0 && !consumeBytes(state, 1)) ||
+      !consumeJsonString(state, key) ||
+      !consumeBytes(state, 1)
+    ) {
+      ancestors.delete(value);
+      return serializedLimitIssue(propertyPath, state.maxBytes);
+    }
+    propertyCount += 1;
+    const issue = findJsonSafetyIssue(descriptor.value, propertyPath, ancestors, state);
     if (issue) {
       ancestors.delete(value);
       return issue;
     }
   }
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    ancestors.delete(value);
+    return {
+      path,
+      code: "non-serializable",
+      message: "Symbol-keyed properties are not JSON-safe",
+    };
+  }
   ancestors.delete(value);
   return undefined;
+}
+
+function resourceValidationError(
+  resource: keyof SnapshotResourceLimits,
+  limit: number,
+  actual: number,
+  path: string,
+): DocumentValidationError {
+  return {
+    path,
+    code: "resource-limit",
+    message: `Snapshot ${resource} limit ${limit} exceeded by ${actual}`,
+  };
+}
+
+function resolveSnapshotValidationOptions(
+  options: SnapshotValidationOptions,
+): ResolvedSnapshotValidationOptions | DocumentValidationError {
+  const storage = options.storage ?? "dense";
+  if (storage !== "dense" && storage !== "paged") {
+    return {
+      path: "options.storage",
+      code: "invalid-value",
+      message: "Snapshot storage must be dense or paged",
+    };
+  }
+  const limits: SnapshotResourceLimits = { ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
+  for (const resource of SNAPSHOT_RESOURCE_KEYS) {
+    const override = options.resourceLimits?.[resource];
+    if (override === undefined) continue;
+    if (!nonNegativeInteger(override)) {
+      return {
+        path: `options.resourceLimits.${resource}`,
+        code: "invalid-value",
+        message: `${resource} must be a non-negative safe integer`,
+      };
+    }
+    limits[resource] = override;
+  }
+  return { storage, limits };
+}
+
+function arrayDataValue(array: unknown[], index: number): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(array, String(index));
+  return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
+}
+
+function productExceeds(left: number, right: number, limit: number): boolean {
+  return left !== 0 && right > Math.floor(limit / left);
+}
+
+function preflightSnapshotResources(
+  input: unknown,
+  options: ResolvedSnapshotValidationOptions,
+): DocumentValidationError | undefined {
+  if (!isPlainRecord(input)) return undefined;
+  const sheets = ownValue(input, "sheets");
+  if (!Array.isArray(sheets)) return undefined;
+  const { limits } = options;
+  if (sheets.length > limits.maxSheets) {
+    return resourceValidationError("maxSheets", limits.maxSheets, sheets.length, "sheets");
+  }
+
+  let metadataEntries = 0;
+  const workbook = ownValue(input, "workbook");
+  if (isPlainRecord(workbook)) {
+    const namedRanges = ownValue(workbook, "namedRanges");
+    if (Array.isArray(namedRanges)) {
+      metadataEntries = namedRanges.length;
+      if (metadataEntries > limits.maxMetadataEntries) {
+        return resourceValidationError(
+          "maxMetadataEntries",
+          limits.maxMetadataEntries,
+          metadataEntries,
+          "workbook.namedRanges",
+        );
+      }
+    }
+  }
+
+  let denseCells = 0;
+  for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
+    const sheet = arrayDataValue(sheets, sheetIndex);
+    if (!isPlainRecord(sheet)) continue;
+    const path = `sheets[${sheetIndex}]`;
+    const rowCount = ownValue(sheet, "rowCount");
+    const columns = ownValue(sheet, "columns");
+    if (nonNegativeInteger(rowCount) && rowCount > limits.maxRowsPerSheet) {
+      return resourceValidationError(
+        "maxRowsPerSheet",
+        limits.maxRowsPerSheet,
+        rowCount,
+        `${path}.rowCount`,
+      );
+    }
+    if (Array.isArray(columns) && columns.length > limits.maxColumnsPerSheet) {
+      return resourceValidationError(
+        "maxColumnsPerSheet",
+        limits.maxColumnsPerSheet,
+        columns.length,
+        `${path}.columns`,
+      );
+    }
+    if (nonNegativeInteger(rowCount) && Array.isArray(columns)) {
+      if (productExceeds(rowCount, columns.length, limits.maxLogicalCellsPerSheet)) {
+        return resourceValidationError(
+          "maxLogicalCellsPerSheet",
+          limits.maxLogicalCellsPerSheet,
+          rowCount * columns.length,
+          path,
+        );
+      }
+      if (options.storage === "dense") {
+        const remaining = limits.maxDenseCells - denseCells;
+        if (remaining < 0 || productExceeds(rowCount, columns.length, remaining)) {
+          return resourceValidationError(
+            "maxDenseCells",
+            limits.maxDenseCells,
+            denseCells + rowCount * columns.length,
+            path,
+          );
+        }
+        denseCells += rowCount * columns.length;
+      }
+    }
+
+    for (const key of SHEET_METADATA_ARRAY_KEYS) {
+      const entries = ownValue(sheet, key);
+      if (!Array.isArray(entries)) continue;
+      if (entries.length > limits.maxMetadataEntries - metadataEntries) {
+        return resourceValidationError(
+          "maxMetadataEntries",
+          limits.maxMetadataEntries,
+          metadataEntries + entries.length,
+          `${path}.${key}`,
+        );
+      }
+      metadataEntries += entries.length;
+    }
+  }
+  return undefined;
+}
+
+/** Reject workbook dimensions before a direct store or grid allocates JS/WASM buffers. */
+export function assertWorkbookAllocationLimits(
+  workbook: Workbook,
+  options: SnapshotValidationOptions = {},
+): void {
+  const resolved = resolveSnapshotValidationOptions(options);
+  if ("code" in resolved) {
+    throw new TypeError(resolved.message);
+  }
+  const { limits } = resolved;
+  if (workbook.sheets.length > limits.maxSheets) {
+    throw new SnapshotResourceError("maxSheets", limits.maxSheets, workbook.sheets.length);
+  }
+
+  let denseCells = 0;
+  let metadataEntries = workbook.namedRanges?.length ?? 0;
+  if (metadataEntries > limits.maxMetadataEntries) {
+    throw new SnapshotResourceError(
+      "maxMetadataEntries",
+      limits.maxMetadataEntries,
+      metadataEntries,
+    );
+  }
+  for (const sheet of workbook.sheets) {
+    if (!nonNegativeInteger(sheet.rowCount) || sheet.rowCount > limits.maxRowsPerSheet) {
+      throw new SnapshotResourceError("maxRowsPerSheet", limits.maxRowsPerSheet, sheet.rowCount);
+    }
+    if (sheet.columns.length > limits.maxColumnsPerSheet) {
+      throw new SnapshotResourceError(
+        "maxColumnsPerSheet",
+        limits.maxColumnsPerSheet,
+        sheet.columns.length,
+      );
+    }
+    if (productExceeds(sheet.rowCount, sheet.columns.length, limits.maxLogicalCellsPerSheet)) {
+      throw new SnapshotResourceError(
+        "maxLogicalCellsPerSheet",
+        limits.maxLogicalCellsPerSheet,
+        sheet.rowCount * sheet.columns.length,
+      );
+    }
+    if (resolved.storage === "dense") {
+      const remaining = limits.maxDenseCells - denseCells;
+      if (remaining < 0 || productExceeds(sheet.rowCount, sheet.columns.length, remaining)) {
+        throw new SnapshotResourceError(
+          "maxDenseCells",
+          limits.maxDenseCells,
+          denseCells + sheet.rowCount * sheet.columns.length,
+        );
+      }
+      denseCells += sheet.rowCount * sheet.columns.length;
+    }
+
+    metadataEntries +=
+      (sheet.rowHeights?.size ?? 0) +
+      (sheet.hiddenRows?.size ?? 0) +
+      (sheet.merges?.length ?? 0) +
+      (sheet.conditionalFormats?.length ?? 0) +
+      (sheet.validationRules?.length ?? 0) +
+      (sheet.protectedRanges?.length ?? 0) +
+      (sheet.notes?.length ?? 0) +
+      (sheet.sortKeys?.length ?? 0) +
+      (sheet.filters?.length ?? 0) +
+      (sheet.rowGroups?.length ?? 0);
+    if (metadataEntries > limits.maxMetadataEntries) {
+      throw new SnapshotResourceError(
+        "maxMetadataEntries",
+        limits.maxMetadataEntries,
+        metadataEntries,
+      );
+    }
+  }
 }
 
 function invalid(
@@ -403,6 +903,64 @@ function validateConditionalPredicate(
   }
 }
 
+function validateValidationComparison(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+  textLength: boolean,
+): void {
+  const comparison = recordAt(value, path, errors);
+  if (!comparison) return;
+  const operator = ownValue(comparison, "operator");
+  const interval = operator === "between" || operator === "notBetween";
+  const single = [
+    "equal",
+    "notEqual",
+    "greaterThan",
+    "lessThan",
+    "greaterThanOrEqual",
+    "lessThanOrEqual",
+  ].includes(String(operator));
+  if (!interval && !single) {
+    invalid(errors, `${path}.operator`, "Validation comparison operator is invalid");
+    return;
+  }
+
+  const validateOperand = (key: "min" | "max" | "value"): number | undefined => {
+    const operand = ownValue(comparison, key);
+    if (textLength) {
+      if (nonNegativeInteger(operand)) return operand;
+    } else if (finiteNumber(operand)) {
+      return operand;
+    }
+    invalid(
+      errors,
+      `${path}.${key}`,
+      textLength
+        ? "Text length comparison operands must be non-negative integers"
+        : "Validation comparison operands must be finite",
+    );
+    return undefined;
+  };
+
+  if (interval) {
+    const min = validateOperand("min");
+    const max = validateOperand("max");
+    if (ownValue(comparison, "value") !== undefined) {
+      invalid(errors, path, "Interval validation comparisons may not define value");
+    }
+    if (min !== undefined && max !== undefined && min > max) {
+      invalid(errors, path, "Validation comparison minimum may not exceed maximum");
+    }
+    return;
+  }
+
+  validateOperand("value");
+  if (ownValue(comparison, "min") !== undefined || ownValue(comparison, "max") !== undefined) {
+    invalid(errors, path, "Single-value validation comparisons may not define min or max");
+  }
+}
+
 function validateValidationCondition(
   value: unknown,
   path: string,
@@ -427,6 +985,13 @@ function validateValidationCondition(
   if (kind === "number" || kind === "date") {
     const min = ownValue(condition, "min");
     const max = ownValue(condition, "max");
+    const comparison = ownValue(condition, "comparison");
+    if (comparison !== undefined && (min !== undefined || max !== undefined)) {
+      invalid(errors, path, "Validation comparison may not be combined with legacy min or max");
+    }
+    if (comparison !== undefined) {
+      validateValidationComparison(comparison, `${path}.comparison`, errors, false);
+    }
     if (min !== undefined && !finiteNumber(min)) {
       invalid(errors, `${path}.min`, "Validation minimum must be finite");
     }
@@ -436,11 +1001,19 @@ function validateValidationCondition(
     if (finiteNumber(min) && finiteNumber(max) && min > max) {
       invalid(errors, path, "Validation minimum may not exceed maximum");
     }
+    if (kind === "number") optionalBoolean(condition, "integer", path, errors);
     return;
   }
   if (kind === "textLength") {
     const min = ownValue(condition, "min");
     const max = ownValue(condition, "max");
+    const comparison = ownValue(condition, "comparison");
+    if (comparison !== undefined && (min !== undefined || max !== undefined)) {
+      invalid(errors, path, "Text length comparison may not be combined with legacy min or max");
+    }
+    if (comparison !== undefined) {
+      validateValidationComparison(comparison, `${path}.comparison`, errors, true);
+    }
     if (min !== undefined && !nonNegativeInteger(min)) {
       invalid(errors, `${path}.min`, "Text length minimum must be a non-negative integer");
     }
@@ -501,6 +1074,15 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
   requireString(sheet, "name", path, errors);
   requireNonNegativeInteger(sheet, "order", path, errors);
   requireNonNegativeInteger(sheet, "rowCount", path, errors);
+  const visibility = ownValue(sheet, "visibility");
+  if (
+    visibility !== undefined &&
+    visibility !== "visible" &&
+    visibility !== "hidden" &&
+    visibility !== "veryHidden"
+  ) {
+    invalid(errors, `${path}.visibility`, "Sheet visibility is invalid");
+  }
 
   const columns = arrayAt(ownValue(sheet, "columns"), `${path}.columns`, errors);
   if (columns && columns.length === 0) {
@@ -968,10 +1550,12 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     for (let blockIndex = 0; blockIndex < sheet.cells.length; blockIndex++) {
       const block = sheet.cells[blockIndex]!;
       const blockPath = `${path}.cells[${blockIndex}]`;
-      if (
-        block.startRow + block.rowCount > sheet.rowCount ||
-        block.startCol + block.colCount > sheet.columns.length
-      ) {
+      const blockInBounds =
+        block.startRow <= sheet.rowCount &&
+        block.rowCount <= sheet.rowCount - block.startRow &&
+        block.startCol <= sheet.columns.length &&
+        block.colCount <= sheet.columns.length - block.startCol;
+      if (!blockInBounds) {
         invalid(errors, blockPath, "Cell block lies outside the sheet", "out-of-bounds");
       }
       for (let cellIndex = 0; cellIndex < block.cells.length; cellIndex++) {
@@ -981,6 +1565,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           invalid(errors, cellPath, "Cell offset lies outside its block", "out-of-bounds");
           continue;
         }
+        if (!blockInBounds) continue;
         const key = `${block.startRow + cell.rowOffset}:${block.startCol + cell.colOffset}`;
         if (occupied.has(key)) {
           invalid(errors, cellPath, "A snapshot cell may appear only once", "duplicate-id");
@@ -988,7 +1573,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         occupied.add(key);
       }
     }
-
+    const metadataRows = new Set<number>();
     for (let index = 0; index < (sheet.rowMeta?.length ?? 0); index++) {
       const row = sheet.rowMeta![index]![0];
       if (row >= sheet.rowCount) {
@@ -998,7 +1583,15 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "Row metadata lies outside the sheet",
           "out-of-bounds",
         );
+      } else if (metadataRows.has(row)) {
+        invalid(
+          errors,
+          `${path}.rowMeta[${index}][0]`,
+          "Row metadata indices must be unique",
+          "duplicate-id",
+        );
       }
+      metadataRows.add(row);
     }
     for (const [field, value, limit] of [
       ["frozenRows", sheet.frozenRows, sheet.rowCount],
@@ -1245,24 +1838,37 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
 }
 
 /** Validate and canonically order a schema-1 snapshot without hydrating runtime state. */
-export function validateWorkbookSnapshot(input: unknown): DocumentValidationResult {
+export function validateWorkbookSnapshot(
+  input: unknown,
+  options: SnapshotValidationOptions = {},
+): DocumentValidationResult {
   try {
-    const issue = findJsonSafetyIssue(input, "$", new Set<object>());
+    const resolved = resolveSnapshotValidationOptions(options);
+    if ("code" in resolved) return { ok: false, errors: [resolved] };
+    const resourceIssue = preflightSnapshotResources(input, resolved);
+    if (resourceIssue) return { ok: false, errors: [resourceIssue] };
+    const issue = findJsonSafetyIssue(input, "$", new Set<object>(), {
+      bytes: 0,
+      maxBytes: resolved.limits.maxSerializedBytes,
+    });
     if (issue) {
       return {
         ok: false,
-        errors: [{ path: issue.path, code: "non-serializable", message: issue.message }],
+        errors: [{ path: issue.path, code: issue.code, message: issue.message }],
       };
     }
     return validateJsonSafeSnapshot(input);
-  } catch {
+  } catch (error) {
+    const resourceFailure = error instanceof RangeError;
     return {
       ok: false,
       errors: [
         {
           path: "$",
-          code: "invalid-value",
-          message: "Snapshot could not be inspected safely",
+          code: resourceFailure ? "resource-limit" : "invalid-value",
+          message: resourceFailure
+            ? "Snapshot inspection exceeded a safe resource limit"
+            : "Snapshot could not be inspected safely",
         },
       ],
     };

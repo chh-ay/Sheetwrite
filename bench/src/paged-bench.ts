@@ -26,6 +26,14 @@ const CHUNK_BYTES =
   CHUNK_ROWS * (1 + Float64Array.BYTES_PER_ELEMENT + Uint32Array.BYTES_PER_ELEMENT) +
   Math.ceil(CHUNK_ROWS / 64) * BigUint64Array.BYTES_PER_ELEMENT * 2;
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
+const WIDE_PAGE_COLUMNS = 256;
+const CACHE_CHURN_CHUNK_ROWS = 4;
+const CACHE_CHURN_PAGES = 2048;
+const CACHE_CHURN_RETAINED_CHUNKS = 512;
+const CACHE_CHURN_CHUNK_BYTES =
+  CACHE_CHURN_CHUNK_ROWS * (1 + Float64Array.BYTES_PER_ELEMENT + Uint32Array.BYTES_PER_ELEMENT) +
+  Math.ceil(CACHE_CHURN_CHUNK_ROWS / 64) * BigUint64Array.BYTES_PER_ELEMENT * 2;
+const CACHE_CHURN_BUDGET_BYTES = CACHE_CHURN_RETAINED_CHUNKS * CACHE_CHURN_CHUNK_BYTES;
 export const PAGED_SCENARIOS = [
   "empty",
   "padding",
@@ -36,7 +44,13 @@ export const PAGED_SCENARIOS = [
   "dirty",
 ] as const;
 export const PAGED_SMOKE_SCENARIOS = ["empty", "viewport", "dirty"] as const;
-export const PAGED_WORKLOADS = ["startup", "first-page", "distant-page"] as const;
+export const PAGED_WORKLOADS = [
+  "startup",
+  "first-page",
+  "distant-page",
+  "wide-page",
+  "cache-churn",
+] as const;
 export type PagedScenario = (typeof PAGED_SCENARIOS)[number];
 export type PagedWorkload = (typeof PAGED_WORKLOADS)[number];
 
@@ -62,6 +76,10 @@ export interface PagedBenchmarkResult extends GateIdentity {
   readonly pageRows: number;
   readonly cacheBudgetBytes: number;
   readonly denseLogicalBytes: number;
+  readonly widePageColumns: number;
+  readonly cacheChurnPages: number;
+  readonly cacheChurnBudgetBytes: number;
+  readonly cacheChurnRetainedChunks: number;
   readonly timings: Readonly<Record<PagedWorkload, PagedTimingResult>>;
   readonly peakAllocatedBytes: number;
   readonly peakChunks: number;
@@ -98,7 +116,11 @@ export function validatePagedBenchmark(
     result.runs !== expectedRuns ||
     result.pageRows !== PAGE_ROWS ||
     result.cacheBudgetBytes !== CACHE_BYTES ||
-    result.denseLogicalBytes !== expectedRows * COLUMNS * (1 + 8 + 4)
+    result.denseLogicalBytes !== expectedRows * COLUMNS * (1 + 8 + 4) ||
+    result.widePageColumns !== WIDE_PAGE_COLUMNS ||
+    result.cacheChurnPages !== CACHE_CHURN_PAGES ||
+    result.cacheChurnBudgetBytes !== CACHE_CHURN_BUDGET_BYTES ||
+    result.cacheChurnRetainedChunks !== CACHE_CHURN_RETAINED_CHUNKS
   ) {
     throw new Error(`paged ${expectedMode} configuration does not match its declared protocol`);
   }
@@ -210,7 +232,7 @@ export function validatePagedBenchmark(
   }
 }
 
-function workbook(rowCount: number): Workbook {
+function workbook(rowCount: number, columnCount = COLUMNS): Workbook {
   return {
     activeSheet: "s1",
     sheets: [
@@ -218,7 +240,7 @@ function workbook(rowCount: number): Workbook {
         id: "s1",
         name: `${rowCount.toLocaleString("en-US")} rows`,
         rowCount,
-        columns: Array.from({ length: COLUMNS }, (_, col) => ({
+        columns: Array.from({ length: columnCount }, (_, col) => ({
           key: `c${col}`,
           header: `Column ${col + 1}`,
           width: 120,
@@ -233,6 +255,14 @@ function rows(start: number, count = PAGE_ROWS): RowData[] {
   return Array.from({ length: count }, (_, offset) => {
     const row = start + offset;
     return { c0: row, c1: row + 1, c2: row + 2, c3: row + 3, c4: row + 4 };
+  });
+}
+
+function wideRows(start: number, count: number): RowData[] {
+  return Array.from({ length: count }, (_, offset) => {
+    const row: RowData = {};
+    for (let col = 0; col < WIDE_PAGE_COLUMNS; col++) row[`c${col}`] = start + offset + col;
+    return row;
   });
 }
 
@@ -354,6 +384,14 @@ async function runBenchmark(mode: BenchmarkMode): Promise<void> {
   const startup: number[] = [];
   const firstPage: number[] = [];
   const distantPage: number[] = [];
+  const widePage: readonly RowData[] = wideRows(0, PAGE_ROWS);
+  const churnPages: ReadonlyArray<readonly RowData[]> = Array.from(
+    { length: CACHE_CHURN_PAGES },
+    (_, page) => rows(page * CACHE_CHURN_CHUNK_ROWS, CACHE_CHURN_CHUNK_ROWS),
+  );
+  const widePageMs: number[] = [];
+  const cacheChurnMs: number[] = [];
+  let cacheChurnRetainedChunks = 0;
   let peakAllocatedBytes = 0;
   let peakChunks = 0;
   for (let run = 0; run < runs; run++) {
@@ -378,6 +416,32 @@ async function runBenchmark(mode: BenchmarkMode): Promise<void> {
     peakAllocatedBytes = Math.max(peakAllocatedBytes, stats.allocatedBytes);
     peakChunks = Math.max(peakChunks, stats.chunks);
     store.dispose();
+
+    const wideStore = new SheetwriteStore(workbook(rowCount, WIDE_PAGE_COLUMNS), undefined, {
+      storage: "paged",
+      chunkRows: CHUNK_ROWS,
+      cacheBytes: CACHE_BYTES,
+    });
+    started = performance.now();
+    wideStore.loadRows("s1", 0, widePage);
+    widePageMs.push(performance.now() - started);
+    wideStore.dispose();
+
+    const churnStore = new SheetwriteStore(workbook(rowCount), undefined, {
+      storage: "paged",
+      chunkRows: CACHE_CHURN_CHUNK_ROWS,
+      cacheBytes: CACHE_CHURN_BUDGET_BYTES,
+    });
+    started = performance.now();
+    for (let page = 0; page < churnPages.length; page++) {
+      churnStore.loadRows("s1", page * CACHE_CHURN_CHUNK_ROWS, churnPages[page]!);
+    }
+    cacheChurnMs.push(performance.now() - started);
+    cacheChurnRetainedChunks = Math.max(
+      cacheChurnRetainedChunks,
+      churnStore.getPagedStats("s1").chunks,
+    );
+    churnStore.dispose();
   }
 
   const probes = scenarios.map((scenario) => isolatedProbe(scenario, rowCount));
@@ -391,10 +455,16 @@ async function runBenchmark(mode: BenchmarkMode): Promise<void> {
     pageRows: PAGE_ROWS,
     cacheBudgetBytes: CACHE_BYTES,
     denseLogicalBytes: rowCount * COLUMNS * (1 + 8 + 4),
+    widePageColumns: WIDE_PAGE_COLUMNS,
+    cacheChurnPages: CACHE_CHURN_PAGES,
+    cacheChurnBudgetBytes: CACHE_CHURN_BUDGET_BYTES,
+    cacheChurnRetainedChunks,
     timings: {
       startup: { samplesMs: startup, stat: summarize(startup) },
       "first-page": { samplesMs: firstPage, stat: summarize(firstPage) },
       "distant-page": { samplesMs: distantPage, stat: summarize(distantPage) },
+      "wide-page": { samplesMs: widePageMs, stat: summarize(widePageMs) },
+      "cache-churn": { samplesMs: cacheChurnMs, stat: summarize(cacheChurnMs) },
     },
     peakAllocatedBytes,
     peakChunks,
@@ -408,6 +478,8 @@ async function runBenchmark(mode: BenchmarkMode): Promise<void> {
     [`${rowCount.toLocaleString("en-US")}-row paged startup`, result.timings.startup],
     ["first 120-row page", result.timings["first-page"]],
     ["distant 120-row page", result.timings["distant-page"]],
+    [`wide ${WIDE_PAGE_COLUMNS}-column page`, result.timings["wide-page"]],
+    [`${CACHE_CHURN_PAGES}-page cache churn`, result.timings["cache-churn"]],
   ] as const) {
     console.log(`| ${name} | ${timing.stat.median.toFixed(3)} | ${timing.stat.p95.toFixed(3)} |`);
   }

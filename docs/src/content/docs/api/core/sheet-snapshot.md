@@ -9,10 +9,10 @@ Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L228</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L277</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -39,6 +39,15 @@ name: string;
 
 ```ts generated
 order: number;
+```
+
+</details>
+
+<details class="api-member" id="sheet-snapshot-visibility" data-pagefind-weight="1">
+<summary><code>visibility</code> <span class="api-member-summary">Hidden worksheets remain in the workbook and retain formulas/references.</span></summary>
+
+```ts generated
+visibility?: SheetVisibility;
 ```
 
 </details>
@@ -180,6 +189,7 @@ export interface SheetSnapshot {
   id: SheetId;
   name: string;
   order: number;
+  visibility?: SheetVisibility;
   rowCount: number;
   columns: Column[];
   frozenRows?: number;

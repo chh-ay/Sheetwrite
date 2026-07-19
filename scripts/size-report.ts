@@ -148,10 +148,8 @@ const repositoryRoot = resolve(import.meta.dir, "..");
 const evidenceRoot = join(repositoryRoot, "test-results/delivery-size");
 const reportPath = join(evidenceRoot, "size-report.json");
 const budgetPath = join(repositoryRoot, "scripts/size-budgets.json");
-const excelPackages: Record<string, true> = {
-  exceljs: true,
-  "read-excel-file": true,
-  "write-excel-file": true,
+const xlsxCodecPackages: Record<string, true> = {
+  fflate: true,
 };
 const packageDirectories = [
   "packages/wasm",
@@ -664,10 +662,10 @@ async function measureClosure(
   if (name !== "core-xlsx") {
     const leaked = packageNames.filter((identity) => {
       const packageName = identity.split("@").slice(0, -1).join("@");
-      return excelPackages[packageName] === true;
+      return xlsxCodecPackages[packageName] === true;
     });
     if (leaked.length > 0)
-      throw new Error(`${name} runtime closure contains Excel packages: ${leaked.join(", ")}`);
+      throw new Error(`${name} runtime closure contains XLSX codec packages: ${leaked.join(", ")}`);
   }
   return { name, packageCount: packageNames.length, logicalBytes, packages: packageNames };
 }
@@ -827,15 +825,15 @@ async function buildSizeReport(
         "install-closure",
         closure.name,
       );
-      const excelCount = closure.packages.filter((identity) => {
+      const codecPackageCount = closure.packages.filter((identity) => {
         const packageName = identity.split("@").slice(0, -1).join("@");
-        return excelPackages[packageName] === true;
+        return xlsxCodecPackages[packageName] === true;
       }).length;
       if (closure.name !== "core-xlsx") {
         addMetric(
           metrics,
-          `${prefix}.excelPackageCount`,
-          excelCount,
+          `${prefix}.xlsxCodecPackageCount`,
+          codecPackageCount,
           "count",
           "optional-dependency-isolation",
           closure.name,

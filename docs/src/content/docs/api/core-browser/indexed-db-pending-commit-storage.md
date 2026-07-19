@@ -10,10 +10,10 @@ the package's root entrypoint never evaluates IndexedDB globals.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/browser</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L58</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/indexeddb.ts#L61</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -39,7 +39,7 @@ close: () => void;
 <summary><code>load</code></summary>
 
 ```ts generated
-load: (documentId: string, signal?: AbortSignal) => Promise<readonly PendingCommit[]>;
+load: (documentId: string, options: PendingCommitLoadOptions) => Promise<readonly PendingCommit[]>;
 ```
 
 </details>
@@ -57,7 +57,16 @@ put: (commit: PendingCommit, signal?: AbortSignal) => Promise<void>;
 <summary><code>remove</code></summary>
 
 ```ts generated
-remove: (documentId: string, clientMutationId: string, signal?: AbortSignal) => Promise<void>
+remove: (documentId: string, clientMutationId: string, signal?: AbortSignal) => Promise<void>;
+```
+
+</details>
+
+<details class="api-member" id="indexed-db-pending-commit-storage-replace" data-pagefind-weight="1">
+<summary><code>replace</code> <span class="api-member-summary">Atomically replaces one document queue only if its ordered IDs still match the caller's expected view.</span></summary>
+
+```ts generated
+replace: (documentId: string, expectedClientMutationIds: readonly string[], commits: readonly PendingCommit[], signal?: AbortSignal) => Promise<void>
 ```
 
 </details>
@@ -74,12 +83,18 @@ class IndexedDbPendingCommitStorage implements PendingCommitStorage {
   close: () => void;
   load: (
     documentId: string,
-    signal?: AbortSignal,
+    options: PendingCommitLoadOptions,
   ) => Promise<readonly PendingCommit[]>;
   put: (commit: PendingCommit, signal?: AbortSignal) => Promise<void>;
   remove: (
     documentId: string,
     clientMutationId: string,
+    signal?: AbortSignal,
+  ) => Promise<void>;
+  replace: (
+    documentId: string,
+    expectedClientMutationIds: readonly string[],
+    commits: readonly PendingCommit[],
     signal?: AbortSignal,
   ) => Promise<void>;
 }

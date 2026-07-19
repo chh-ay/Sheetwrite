@@ -33,6 +33,8 @@ export interface SheetwriteGridProps
   protectionResolver?: GridOptions["protectionResolver"];
   /** Atomic or partial denial policy. */
   mutationPolicy?: GridOptions["mutationPolicy"];
+  /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
+  transactionResourceLimits?: GridOptions["transactionResourceLimits"];
   /** Named custom cell renderers. */
   renderers?: GridOptions["renderers"];
   /** Extra rows painted around the viewport. */

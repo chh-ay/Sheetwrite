@@ -1,16 +1,21 @@
 import { Link } from "@tanstack/react-router";
-import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
+import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 
 import { ThemeToggle } from "./ThemeToggle.js";
 
 interface SiteTopbarProps {
-  /** Highlighted showcase entry, when rendered on a showcase route. */
-  active?: "vanilla" | "react" | "vue" | "svelte";
+  /**
+   * Current showcase context: an owner id on a showcase-family route, or
+   * "showcases" on the hub itself. The Showcases link is `page`-current on the
+   * hub and ancestor-current everywhere in the family.
+   */
+  active?: CapabilityOwnerId | "showcases";
 }
 
 /**
- * The one product topbar: brand, Docs, showcase routes, GitHub, theme.
+ * The one product topbar: brand, Docs, showcases, GitHub, theme.
  * Shared by the landing and every showcase so the site has a single chrome.
+ * Framework deep links and benchmark navigation live in their dedicated surfaces.
  */
 export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
   return (
@@ -24,14 +29,19 @@ export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
       </Link>
       <nav aria-label="Site">
         <Link to="/docs/">Docs</Link>
-        {SHOWCASE_NAVIGATION.map((item) => {
-          const id = item.href.replaceAll("/", "");
-          return (
-            <Link aria-current={id === active ? "page" : undefined} key={item.href} to={item.href}>
-              {item.label}
-            </Link>
-          );
-        })}
+        <Link
+          activeOptions={{ exact: true }}
+          aria-current={
+            active === "showcases"
+              ? "page"
+              : active && active !== "performance"
+                ? "true"
+                : undefined
+          }
+          to="/showcases/"
+        >
+          Showcases
+        </Link>
       </nav>
       <div className="sw-showcase-nav__actions">
         <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>

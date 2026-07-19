@@ -9,10 +9,10 @@ Result of module initialization: the instantiated exports plus the shared linear
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L297</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L307</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>95</span>
+## Members <span class="api-count" data-pagefind-ignore>97</span>
 
 <div class="api-member-list">
 
@@ -282,6 +282,24 @@ readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: nu
 
 ```ts generated
 readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-hydrate-page-numbers" data-pagefind-weight="1">
+<summary><code>cellstore_hydratePageNumbers</code></summary>
+
+```ts generated
+readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-hydrate-page-strings-packed" data-pagefind-weight="1">
+<summary><code>cellstore_hydratePageStringsPacked</code></summary>
+
+```ts generated
+readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
 ```
 
 </details>
@@ -1022,6 +1040,30 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => number;
+  readonly cellstore_hydratePageNumbers: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+  ) => void;
+  readonly cellstore_hydratePageStringsPacked: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
+  ) => void;
   readonly cellstore_insertCols: (
     a: number,
     b: number,

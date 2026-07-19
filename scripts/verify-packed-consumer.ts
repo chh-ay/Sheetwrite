@@ -29,7 +29,7 @@ interface PackageSpec {
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const fixtureRoot = join(repositoryRoot, "test/consumer");
-const excelPackages = ["exceljs", "read-excel-file", "write-excel-file"] as const;
+const xlsxCodecPackages = ["fflate"] as const;
 const mitCompatibleLicenses: Record<string, true> = {
   "0BSD": true,
   "Apache-2.0": true,
@@ -285,7 +285,7 @@ async function assertTarball(
   ) {
     throw new Error("@sheetwrite/core tarball still contains the removed XLSX backend");
   }
-  for (const dependency of excelPackages) {
+  for (const dependency of xlsxCodecPackages) {
     const ownsDependency = manifest.dependencies?.[dependency] !== undefined;
     if (manifest.name === "@sheetwrite/xlsx" && !ownsDependency) {
       throw new Error(`${manifest.name} must declare ${dependency}`);
@@ -341,7 +341,7 @@ async function verifyNoExcelClosure(
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
-  for (const dependency of excelPackages) {
+  for (const dependency of xlsxCodecPackages) {
     if (lock.includes(`node_modules/${dependency}`)) {
       throw new Error(`${packageName} package-lock unexpectedly contains ${dependency}`);
     }

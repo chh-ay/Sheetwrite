@@ -73,6 +73,7 @@ export const GRID_OPTION_CONFORMANCE = {
   readOnly: { policy: "live", reason: null },
   protectionResolver: { policy: "reset", reason: "input-reset" },
   mutationPolicy: { policy: "reset", reason: "input-reset" },
+  transactionResourceLimits: { policy: "reset", reason: "input-reset" },
   renderers: { policy: "reset", reason: "renderer-reset" },
   overscan: { policy: "live", reason: null },
   minColumns: { policy: "live", reason: null },

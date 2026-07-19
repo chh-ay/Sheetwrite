@@ -5,11 +5,12 @@ description: "Host subscription contract for ordered versioned operations."
 <!-- api-export:@sheetwrite/core|.|RemoteOperationSource -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Host subscription contract for ordered versioned operations.
+Host subscription contract for ordered versioned operations. Sources that
+can pause intake should await the listener promise to preserve backpressure.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L115</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L128</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>
@@ -20,7 +21,7 @@ Host subscription contract for ordered versioned operations.
 <summary><code>subscribe</code></summary>
 
 ```ts generated
-subscribe( listener: (operation: VersionedOperation) => void, signal?: AbortSignal, ): undefined | (() => void);
+subscribe( listener: (operation: VersionedOperation) => void | Promise<void>, signal?: AbortSignal, ): undefined | (() => void);
 ```
 
 </details>
@@ -34,7 +35,7 @@ subscribe( listener: (operation: VersionedOperation) => void, signal?: AbortSign
 ```ts generated
 export interface RemoteOperationSource {
   subscribe(
-    listener: (operation: VersionedOperation) => void,
+    listener: (operation: VersionedOperation) => void | Promise<void>,
     signal?: AbortSignal,
   ): undefined | (() => void);
 }

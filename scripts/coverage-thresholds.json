@@ -145,6 +145,17 @@
       "rationale": "Runtime helper or public integration surface"
     },
     {
+      "path": "packages/core/src/delimited-text.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
       "path": "packages/core/src/document-controller.ts",
       "language": "typescript",
       "tier": "B",
@@ -308,6 +319,17 @@
       },
       "owner": "core-runtime",
       "rationale": "State orchestration, rendering, geometry, or input boundary"
+    },
+    {
+      "path": "packages/core/src/json-byte-length.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
     },
     {
       "path": "packages/core/src/mutation-revision-index.ts",
@@ -595,6 +617,17 @@
       "rationale": "Runtime helper or public integration surface"
     },
     {
+      "path": "packages/core/src/transaction-admission.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "core-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
       "path": "packages/core/src/types.ts",
       "language": "typescript",
       "tier": "C",
@@ -801,12 +834,45 @@
       }
     },
     {
+      "path": "packages/xlsx/src/formula.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 95,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "External-formula neutralization is a file-format trust boundary"
+    },
+    {
       "path": "packages/xlsx/src/index.ts",
       "language": "typescript",
       "tier": "A",
       "metrics": {
         "lines": 100,
         "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/opc.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 97,
+        "functions": 95
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/reader.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 93,
+        "functions": 97
       },
       "owner": "xlsx-runtime",
       "rationale": "Trust, state, worker, adapter, or file-format boundary"
@@ -830,6 +896,28 @@
       "metrics": {
         "lines": 100,
         "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/resources.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 98,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/styles.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 94
       },
       "owner": "xlsx-runtime",
       "rationale": "Trust, state, worker, adapter, or file-format boundary"
@@ -862,6 +950,39 @@
       "tier": "A",
       "metrics": {
         "lines": 90,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/writer.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 93,
+        "functions": 97
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/xml.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
+        "functions": 100
+      },
+      "owner": "xlsx-runtime",
+      "rationale": "Trust, state, worker, adapter, or file-format boundary"
+    },
+    {
+      "path": "packages/xlsx/src/zip.ts",
+      "language": "typescript",
+      "tier": "A",
+      "metrics": {
+        "lines": 100,
         "functions": 100
       },
       "owner": "xlsx-runtime",
@@ -931,11 +1052,11 @@
       "tier": "A",
       "metrics": {
         "lines": 90,
-        "functions": 97,
+        "functions": 96,
         "regions": 86
       },
       "owner": "wasm-runtime",
-      "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+      "rationale": "Storage and structural mutation contracts; allocation-failure closures are not deterministically executable"
     },
     {
       "path": "packages/wasm/src/store.rs",

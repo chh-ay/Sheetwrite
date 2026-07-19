@@ -9,7 +9,7 @@ Host-controlled online state reported by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L20</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L50</code></dd></div>
 </dl>
 
 ## Declaration

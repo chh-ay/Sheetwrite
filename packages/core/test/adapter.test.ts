@@ -53,6 +53,7 @@ describe("shared adapter option policy", () => {
       readOnly: true,
       protectionResolver: () => "allow",
       mutationPolicy: "partial",
+      transactionResourceLimits: { maxOperations: 25 },
       renderers: {},
       overscan: 2,
       minColumns: 4,

@@ -468,6 +468,34 @@ export function filterRuntimeRecords(
   return records.filter((record) => runtimePaths.has(record.path));
 }
 
+const MANIFEST_KEYS: Readonly<Record<string, true>> = { schemaVersion: true, entries: true };
+const ENTRY_KEYS: Readonly<Record<string, true>> = {
+  path: true,
+  members: true,
+  language: true,
+  tier: true,
+  metrics: true,
+  owner: true,
+  rationale: true,
+  exclusion: true,
+};
+const METRIC_KEYS: Readonly<Record<string, true>> = {
+  lines: true,
+  functions: true,
+  regions: true,
+};
+const EXCLUSION_KEYS: Readonly<Record<string, true>> = { reason: true, command: true };
+
+function validateKeys(
+  value: Record<string, unknown>,
+  allowed: Readonly<Record<string, true>>,
+  label: string,
+): void {
+  for (const key of Object.keys(value)) {
+    if (allowed[key] !== true) throw new Error(`${label} has an unknown field: ${key}`);
+  }
+}
+
 function validateText(value: unknown, label: string): asserts value is string {
   if (typeof value !== "string" || value.trim() === "")
     throw new Error(`${label} must be non-empty`);
@@ -486,6 +514,7 @@ function entrySourcePaths(entry: CoverageThresholdEntry): readonly string[] {
 
 export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
   assertRecord(raw, "Coverage threshold manifest");
+  validateKeys(raw, MANIFEST_KEYS, "Coverage threshold manifest");
   if (raw.schemaVersion !== COVERAGE_SCHEMA_VERSION) {
     throw new Error(`Unsupported coverage threshold schema version: ${String(raw.schemaVersion)}`);
   }
@@ -495,6 +524,7 @@ export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
   const classifiedPaths = new Set<string>();
   const entries = raw.entries.map((value, index): CoverageThresholdEntry => {
     assertRecord(value, `Coverage threshold entry ${index}`);
+    validateKeys(value, ENTRY_KEYS, `Coverage threshold entry ${index}`);
     validateRepositoryPath(value.path, `Coverage threshold entry ${index} path`);
     if (entryIds.has(value.path))
       throw new Error(`Duplicate coverage threshold entry: ${value.path}`);
@@ -527,6 +557,7 @@ export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
     validateText(value.owner, `Coverage threshold entry ${value.path} owner`);
     validateText(value.rationale, `Coverage threshold entry ${value.path} rationale`);
     assertRecord(value.metrics, `Coverage threshold entry ${value.path} metrics`);
+    validateKeys(value.metrics, METRIC_KEYS, `Coverage threshold entry ${value.path} metrics`);
     const metrics: Record<string, number> = {};
     for (const metric of ["lines", "functions", "regions"] as const) {
       const floor = value.metrics[metric];
@@ -539,6 +570,11 @@ export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
     let exclusion: CoverageExclusion | undefined;
     if (value.exclusion !== undefined) {
       assertRecord(value.exclusion, `Coverage threshold entry ${value.path} exclusion`);
+      validateKeys(
+        value.exclusion,
+        EXCLUSION_KEYS,
+        `Coverage threshold entry ${value.path} exclusion`,
+      );
       validateText(
         value.exclusion.reason,
         `Coverage threshold entry ${value.path} exclusion reason`,
@@ -664,26 +700,53 @@ export function evaluateCoveragePolicy(options: {
     recordByPath.set(record.path, record);
   }
 
+  const enforceMetric = (
+    path: string,
+    metric: CoverageMetricName,
+    counts: CoverageCounts | undefined,
+    floor: number,
+    policy: string,
+  ): void => {
+    if (!counts) throw new Error(`Coverage report is missing ${metric} data for ${path}`);
+    if (!meetsFloor(counts, floor)) {
+      const actual = counts.total === 0 ? 100 : (counts.covered * 100) / counts.total;
+      throw new Error(
+        `${path} ${metric} coverage ${actual.toFixed(2)}% (${counts.covered}/${counts.total}) is below ${policy}`,
+      );
+    }
+  };
+
   for (const entry of entries) {
     if (entry.exclusion) continue;
     const record = aggregateCoverageRecords(entry, recordByPath);
+    if (entry.members && entry.tier !== "C") {
+      for (const member of entry.members) {
+        const memberRecord = recordByPath.get(member);
+        if (!memberRecord) throw new Error(`Coverage report is missing scored source: ${member}`);
+        for (const metric of ["lines", "functions", "regions"] as const) {
+          if (entry.metrics[metric] === undefined) continue;
+          const minimum = TIER_MINIMUMS[entry.tier][metric];
+          enforceMetric(
+            member,
+            metric,
+            metricCounts(memberRecord, metric),
+            minimum,
+            `inherited Tier ${entry.tier} minimum ${minimum}%`,
+          );
+        }
+      }
+    }
     for (const metric of ["lines", "functions", "regions"] as const) {
       const floor = entry.metrics[metric];
       if (floor === undefined) continue;
       const counts = metricCounts(record, metric);
-      if (!counts) throw new Error(`Coverage report is missing ${metric} data for ${entry.path}`);
       const minimum = TIER_MINIMUMS[entry.tier][metric];
       if (floor < minimum) {
         throw new Error(
           `${entry.path} ${metric} floor ${floor}% is below Tier ${entry.tier} minimum ${minimum}%`,
         );
       }
-      if (!meetsFloor(counts, floor)) {
-        const actual = counts.total === 0 ? 100 : (counts.covered * 100) / counts.total;
-        throw new Error(
-          `${entry.path} ${metric} coverage ${actual.toFixed(2)}% (${counts.covered}/${counts.total}) is below ${floor}%`,
-        );
-      }
+      enforceMetric(entry.path, metric, counts, floor, `${floor}%`);
     }
   }
 

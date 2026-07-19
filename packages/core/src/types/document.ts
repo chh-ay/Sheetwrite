@@ -4,12 +4,17 @@
 import type { CellScalar, CellStyle, CellValue, Column, ConditionalFormatRule } from "./cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 
+/** Native worksheet visibility preserved across workbook snapshots and tab rendering. */
+export type SheetVisibility = "visible" | "hidden" | "veryHidden";
+
 /** Workbook sheet schema used when creating a live grid. */
 export interface Sheet {
   /** Stable identifier, unique within the workbook and used by every cell address. */
   id: SheetId;
   /** User-facing sheet name shown in tabs and workbook exports. */
   name: string;
+  /** Hidden worksheets remain addressable but are omitted from the tab strip. */
+  visibility?: SheetVisibility;
   /** Ordered schema; array positions are the zero-based column coordinates. */
   columns: Column[];
   /** Row count for both in-memory and datasource-backed sheets. */
@@ -93,12 +98,40 @@ export interface NamedRangeSnapshot {
 /** Reject-or-warn policy attached to a data-validation rule. */
 export type ValidationPolicy = "reject" | "warn" | "allow";
 
-/** Serializable condition enforced by a data-validation rule. */
+/**
+ * Native comparison semantics for numeric, date-serial, and text-length validation.
+ * Interval operands are inclusive; `notBetween` accepts values outside that interval.
+ */
+export type DataValidationComparison =
+  | { operator: "between" | "notBetween"; min: number; max: number }
+  | {
+      operator:
+        | "equal"
+        | "notEqual"
+        | "greaterThan"
+        | "lessThan"
+        | "greaterThanOrEqual"
+        | "lessThanOrEqual";
+      value: number;
+    };
+
+/**
+ * Serializable condition enforced by a data-validation rule.
+ *
+ * `min` and `max` remain inclusive legacy bounds. Use `comparison` when the
+ * operator itself is significant; comparison and legacy bounds are mutually exclusive.
+ */
 export type DataValidationCondition =
   | { kind: "list"; values: readonly CellScalar[]; allowCustom?: boolean }
-  | { kind: "number"; min?: number; max?: number }
-  | { kind: "date"; min?: number; max?: number }
-  | { kind: "textLength"; min?: number; max?: number }
+  | {
+      kind: "number";
+      min?: number;
+      max?: number;
+      integer?: boolean;
+      comparison?: DataValidationComparison;
+    }
+  | { kind: "date"; min?: number; max?: number; comparison?: DataValidationComparison }
+  | { kind: "textLength"; min?: number; max?: number; comparison?: DataValidationComparison }
   | {
       kind: "checkbox";
       checkedValue?: CellScalar;
@@ -185,6 +218,22 @@ export type MutationIssue =
       range: Range;
       operationIndex: number;
       message: string;
+    }
+  | {
+      kind: "resource-limit";
+      severity: "error";
+      /** Resource dimension exceeded by the transaction or durable pending queue. */
+      resource:
+        | "operations"
+        | "encoded-bytes"
+        | "pending-commits"
+        | "pending-operations"
+        | "pending-encoded-bytes";
+      /** Count or incrementally observed encoded bytes at rejection. */
+      actual: number;
+      /** Configured inclusive ceiling for the resource. */
+      max: number;
+      message: string;
     };
 
 /** Persistent display and grouping metadata for one document row. */
@@ -229,6 +278,8 @@ export interface SheetSnapshot {
   id: SheetId;
   name: string;
   order: number;
+  /** Hidden worksheets remain in the workbook and retain formulas/references. */
+  visibility?: SheetVisibility;
   rowCount: number;
   /** Keys are stable, unique document column identities as well as datasource keys. */
   columns: Column[];

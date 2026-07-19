@@ -1,15 +1,15 @@
 ---
 title: "buildXlsxModel | @sheetwrite/xlsx"
-description: "Build the default writer's complete active-sheet model without serializing it."
+description: "Build the active-sheet table model used by the bounded OOXML writer."
 ---
 <!-- api-export:@sheetwrite/xlsx|.|buildXlsxModel -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/xlsx/">@sheetwrite/xlsx</a><span class="api-status" data-kind="function">function</span></div>
 
-Build the default writer's complete active-sheet model without serializing it.
+Build the active-sheet table model used by the bounded OOXML writer.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L80</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L31</code></dd></div>
 </dl>
 
 ## Declaration
@@ -20,6 +20,7 @@ Build the default writer's complete active-sheet model without serializing it.
 function buildXlsxModel(
   workbook: Workbook,
   store: Store,
+  options?: XlsxWorkbookOptions,
 ): XlsxModel | null
 ```
 

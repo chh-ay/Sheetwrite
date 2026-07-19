@@ -14,6 +14,11 @@ import { ClipboardController } from "./clipboard-controller.js";
 import { ContextMenu } from "./context-menu.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
+import {
+  assertWorkbookAllocationLimits,
+  resolveTransactionResourceLimits,
+  validateTransactionResources,
+} from "./document-protocol.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
@@ -28,6 +33,7 @@ import { SheetTabs } from "./sheet-tabs.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
+import { beginGridTransactionAdmission } from "./transaction-admission.js";
 import type {
   CellScalar,
   CellStyle,
@@ -76,6 +82,7 @@ import type {
   ApplyTransactionResult,
   GridTransaction,
   RemoteOperationOptions,
+  TransactionResourceLimits,
 } from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
 import { WorkerRenderer } from "./worker-renderer.js";
@@ -258,6 +265,7 @@ export class GridImpl implements Grid {
   private readonly overlayPainter: OverlayPainter;
   private readonly renderCoordinator: RenderCoordinator;
   private overscan: number;
+  private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private readOnly: boolean;
   private maxElementHeight = MAX_ELEMENT_HEIGHT_FALLBACK;
   private lastDevicePixelRatio = 1;
@@ -338,8 +346,16 @@ export class GridImpl implements Grid {
     store?: Store,
     ownsStore = store === undefined,
   ) {
+    this.transactionResourceLimits = resolveTransactionResourceLimits(
+      opts.transactionResourceLimits,
+    );
     this.host = host;
     const workbook = opts.workbook;
+    if (!(store instanceof SheetwriteStore)) {
+      assertWorkbookAllocationLimits(workbook, {
+        storage: opts.datasourceStorage?.mode ?? "dense",
+      });
+    }
     this.store =
       store ??
       new SheetwriteStore(workbook, opts.data, {
@@ -348,6 +364,7 @@ export class GridImpl implements Grid {
         cacheBytes: opts.datasourceStorage?.cacheBytes,
         protectionResolver: opts.protectionResolver,
         mutationPolicy: opts.mutationPolicy,
+        transactionResourceLimits: this.transactionResourceLimits,
       });
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
@@ -380,6 +397,8 @@ export class GridImpl implements Grid {
         this.emitSelection();
         this.render();
       },
+      transactionResourceLimits: this.transactionResourceLimits,
+      admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
     });
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
@@ -1818,6 +1837,17 @@ export class GridImpl implements Grid {
   }
 
   applyTransaction(transaction: GridTransaction): ApplyTransactionResult {
+    const resourceValidation = validateTransactionResources(
+      transaction.patches,
+      this.transactionResourceLimits,
+    );
+    if (!resourceValidation.ok) {
+      return {
+        status: "rejected",
+        epoch: this.storeEpoch,
+        issues: [resourceValidation.issue],
+      };
+    }
     return this.document.commit(transaction.patches.slice(), "api");
   }
 

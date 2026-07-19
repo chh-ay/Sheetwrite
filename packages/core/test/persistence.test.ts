@@ -220,6 +220,53 @@ describe("snapshot persistence boundary", () => {
     expect(gridError.cause).toBeInstanceOf(SnapshotValidationError);
     expect(host.childElementCount).toBe(0);
   });
+  it("hydrates a million-row snapshot only through paged allocation", () => {
+    const snapshot: WorkbookSnapshot = {
+      schemaVersion: 1,
+      workbook: { activeSheet: "large" },
+      sheets: [
+        {
+          id: "large",
+          name: "Large",
+          order: 0,
+          rowCount: 1_000_000,
+          columns: Array.from({ length: 6 }, (_, index) => ({
+            key: `c${index}`,
+            header: `C${index}`,
+            width: 80,
+            type: "text",
+          })),
+          cells: [],
+        },
+      ],
+    };
+
+    expect(() => SheetwriteStore.fromSnapshot(snapshot)).toThrow(SnapshotValidationError);
+    const pagedStore = SheetwriteStore.fromSnapshot(snapshot, { storage: "paged" });
+    expect(pagedStore.isPaged("large")).toBe(true);
+    expect(pagedStore.getPagedStats("large").allocatedBytes).toBe(0);
+    pagedStore.dispose();
+
+    const host = document.createElement("div");
+    const grid = createGridFromSnapshot(host, snapshot, {
+      datasourceStorage: { mode: "paged" },
+    });
+    expect(grid.store.getWorkbook().sheets[0]?.rowCount).toBe(1_000_000);
+    grid.destroy();
+
+    let error: unknown;
+    try {
+      createGridFromSnapshot(document.createElement("div"), snapshot);
+    } catch (cause) {
+      error = cause;
+    }
+    expect(error).toBeInstanceOf(PersistenceError);
+    if (!(error instanceof PersistenceError)) {
+      throw new Error("dense snapshot resource failure was not typed");
+    }
+    expect(error.code).toBe("resource-limit");
+    expect(error.cause).toBeInstanceOf(SnapshotValidationError);
+  });
 
   it("applies remote operations observably without local history", async () => {
     const host = document.createElement("div");

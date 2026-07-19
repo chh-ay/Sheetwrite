@@ -3,13 +3,13 @@ import {
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
 } from "@sheetwrite/core";
-import { writeExcelFileTableExportBackend } from "./table-export.js";
-import { readExcelFileTableImportBackend } from "./table-import.js";
-import { excelJsWorkbookBackend } from "./workbook.js";
+import { sheetwriteTableExportBackend } from "./table-export.js";
+import { sheetwriteTableImportBackend } from "./table-import.js";
+import { sheetwriteWorkbookBackend } from "./workbook.js";
 
 /** Register all concrete XLSX backends with the backend-neutral core contracts. */
 export function registerXlsxBackends(): void {
-  setXlsxTableExportBackend(writeExcelFileTableExportBackend);
-  setXlsxTableImportBackend(readExcelFileTableImportBackend);
-  setXlsxWorkbookBackend(excelJsWorkbookBackend);
+  setXlsxTableExportBackend(sheetwriteTableExportBackend);
+  setXlsxTableImportBackend(sheetwriteTableImportBackend);
+  setXlsxWorkbookBackend(sheetwriteWorkbookBackend);
 }

@@ -1,18 +1,19 @@
 ---
 title: "parseCsv | @sheetwrite/core"
-description: "Parse RFC-4180-style CSV into a grid of raw strings: comma-delimited, with \"-quoted fields that may embed commas, newlines, and doubled quotes, plus CR / LF / CRLF row breaks."
+description: "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes, bare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional leading UTF-8 BOM."
 ---
 <!-- api-export:@sheetwrite/core|.|parseCsv -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
-Parse RFC-4180-style CSV into a grid of raw strings: comma-delimited, with
-`"`-quoted fields that may embed commas, newlines, and doubled quotes, plus
-CR / LF / CRLF row breaks. A leading UTF-8 BOM is stripped. This mirrors
-`parseTsv` from clipboard.ts exactly, but splits on commas instead of tabs.
+Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,
+bare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional
+leading UTF-8 BOM. The synchronous API consumes an existing in-memory string
+and returns an in-memory grid; it does not claim streaming. Scanning enforces
+resource ceilings before materializing the next oversized field or record.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L93</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L140</code></dd></div>
 </dl>
 
 ## Declaration
@@ -20,7 +21,10 @@ CR / LF / CRLF row breaks. A leading UTF-8 BOM is stripped. This mirrors
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-function parseCsv(text: string): string[][]
+function parseCsv(
+  text: string,
+  options?: DelimitedTextOptions,
+): string[][]
 ```
 
 </div>

@@ -77,9 +77,8 @@ Zero-argument initialization is canonical and re-entrant. Explicit WASM sources 
 
 ## Optional XLSX backend
 
-Core and every framework adapter install without ExcelJS,
-`read-excel-file`, or `write-excel-file`. Add the concrete backend only when
-the application chooses XLSX support:
+Core and every framework adapter install without a concrete XLSX codec. Add the
+optional backend only when the application chooses XLSX support:
 
 ```sh
 bun add @sheetwrite/xlsx

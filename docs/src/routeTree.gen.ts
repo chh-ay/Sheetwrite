@@ -14,9 +14,14 @@ import { Route as VanillaRouteImport } from './routes/vanilla'
 import { Route as SvelteRouteImport } from './routes/svelte'
 import { Route as ReactRouteImport } from './routes/react'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
+import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
+import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
+import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
+import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
 import { Route as DocsProofRouteImport } from './routes/docs.proof'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as TestFrameworkLifecycleFrameworkRouteImport } from './routes/test.framework-lifecycle.$framework'
@@ -46,6 +51,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
+  id: '/showcases/',
+  path: '/showcases/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/docs/',
   path: '/docs/',
@@ -59,6 +69,27 @@ const TestXlsxRoute = TestXlsxRouteImport.update({
 const TestCollaborationRoute = TestCollaborationRouteImport.update({
   id: '/test/collaboration',
   path: '/test/collaboration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesPerformanceRoute = ShowcasesPerformanceRouteImport.update({
+  id: '/showcases/performance',
+  path: '/showcases/performance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesInteroperabilityRoute =
+  ShowcasesInteroperabilityRouteImport.update({
+    id: '/showcases/interoperability',
+    path: '/showcases/interoperability',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
+  id: '/showcases/database',
+  path: '/showcases/database',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesCollaborationRoute = ShowcasesCollaborationRouteImport.update({
+  id: '/showcases/collaboration',
+  path: '/showcases/collaboration',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsProofRoute = DocsProofRouteImport.update({
@@ -86,9 +117,14 @@ export interface FileRoutesByFullPath {
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/proof': typeof DocsProofRoute
+  '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
+  '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
+  '/showcases/': typeof ShowcasesIndexRoute
   '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRoutesByTo {
@@ -99,9 +135,14 @@ export interface FileRoutesByTo {
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/proof': typeof DocsProofRoute
+  '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
+  '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs': typeof DocsIndexRoute
+  '/showcases': typeof ShowcasesIndexRoute
   '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRoutesById {
@@ -113,9 +154,14 @@ export interface FileRoutesById {
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/proof': typeof DocsProofRoute
+  '/showcases/collaboration': typeof ShowcasesCollaborationRoute
+  '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
+  '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
+  '/showcases/': typeof ShowcasesIndexRoute
   '/test/framework-lifecycle/$framework': typeof TestFrameworkLifecycleFrameworkRoute
 }
 export interface FileRouteTypes {
@@ -128,9 +174,14 @@ export interface FileRouteTypes {
     | '/vue'
     | '/docs/$'
     | '/docs/proof'
+    | '/showcases/collaboration'
+    | '/showcases/database'
+    | '/showcases/interoperability'
+    | '/showcases/performance'
     | '/test/collaboration'
     | '/test/xlsx'
     | '/docs/'
+    | '/showcases/'
     | '/test/framework-lifecycle/$framework'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -141,9 +192,14 @@ export interface FileRouteTypes {
     | '/vue'
     | '/docs/$'
     | '/docs/proof'
+    | '/showcases/collaboration'
+    | '/showcases/database'
+    | '/showcases/interoperability'
+    | '/showcases/performance'
     | '/test/collaboration'
     | '/test/xlsx'
     | '/docs'
+    | '/showcases'
     | '/test/framework-lifecycle/$framework'
   id:
     | '__root__'
@@ -154,9 +210,14 @@ export interface FileRouteTypes {
     | '/vue'
     | '/docs/$'
     | '/docs/proof'
+    | '/showcases/collaboration'
+    | '/showcases/database'
+    | '/showcases/interoperability'
+    | '/showcases/performance'
     | '/test/collaboration'
     | '/test/xlsx'
     | '/docs/'
+    | '/showcases/'
     | '/test/framework-lifecycle/$framework'
   fileRoutesById: FileRoutesById
 }
@@ -168,9 +229,14 @@ export interface RootRouteChildren {
   VueRoute: typeof VueRoute
   DocsSplatRoute: typeof DocsSplatRoute
   DocsProofRoute: typeof DocsProofRoute
+  ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
+  ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
+  ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
+  ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
   TestXlsxRoute: typeof TestXlsxRoute
   DocsIndexRoute: typeof DocsIndexRoute
+  ShowcasesIndexRoute: typeof ShowcasesIndexRoute
   TestFrameworkLifecycleFrameworkRoute: typeof TestFrameworkLifecycleFrameworkRoute
 }
 
@@ -211,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/': {
+      id: '/showcases/'
+      path: '/showcases'
+      fullPath: '/showcases/'
+      preLoaderRoute: typeof ShowcasesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs/': {
       id: '/docs/'
       path: '/docs'
@@ -230,6 +303,34 @@ declare module '@tanstack/react-router' {
       path: '/test/collaboration'
       fullPath: '/test/collaboration'
       preLoaderRoute: typeof TestCollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/performance': {
+      id: '/showcases/performance'
+      path: '/showcases/performance'
+      fullPath: '/showcases/performance'
+      preLoaderRoute: typeof ShowcasesPerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/interoperability': {
+      id: '/showcases/interoperability'
+      path: '/showcases/interoperability'
+      fullPath: '/showcases/interoperability'
+      preLoaderRoute: typeof ShowcasesInteroperabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/database': {
+      id: '/showcases/database'
+      path: '/showcases/database'
+      fullPath: '/showcases/database'
+      preLoaderRoute: typeof ShowcasesDatabaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/collaboration': {
+      id: '/showcases/collaboration'
+      path: '/showcases/collaboration'
+      fullPath: '/showcases/collaboration'
+      preLoaderRoute: typeof ShowcasesCollaborationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/proof': {
@@ -264,9 +365,14 @@ const rootRouteChildren: RootRouteChildren = {
   VueRoute: VueRoute,
   DocsSplatRoute: DocsSplatRoute,
   DocsProofRoute: DocsProofRoute,
+  ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
+  ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
+  ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
+  ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   TestCollaborationRoute: TestCollaborationRoute,
   TestXlsxRoute: TestXlsxRoute,
   DocsIndexRoute: DocsIndexRoute,
+  ShowcasesIndexRoute: ShowcasesIndexRoute,
   TestFrameworkLifecycleFrameworkRoute: TestFrameworkLifecycleFrameworkRoute,
 }
 export const routeTree = rootRouteImport

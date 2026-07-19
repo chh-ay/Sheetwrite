@@ -9,7 +9,7 @@ Cell and viewport coordinates resolved for one bundled context-menu opening.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L172</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L173</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

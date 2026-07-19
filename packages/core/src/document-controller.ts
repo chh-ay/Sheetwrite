@@ -1,10 +1,15 @@
 import {
+  DEFAULT_TRANSACTION_RESOURCE_LIMITS,
+  validateTransactionResources,
+} from "./document-protocol.js";
+import {
   type HistoryAction,
   type HistoryPart,
   materializeHistoryAction,
   UndoManager,
 } from "./history.js";
 import type { SheetwriteStore } from "./store.js";
+import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
 import type { CellValue, Column } from "./types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./types/coordinates.js";
 import type {
@@ -20,6 +25,7 @@ import type {
   ApplyTransactionResult,
   GridTransaction,
   RemoteOperationOptions,
+  TransactionResourceLimits,
 } from "./types/transaction.js";
 
 export interface DocumentControllerOptions {
@@ -30,6 +36,8 @@ export interface DocumentControllerOptions {
   materializeVirtualColumns: (patches: DocumentOp[]) => DocumentOp[];
   onMutationRejected: (issues: MutationIssue[]) => void;
   onHistoryApplied: () => void;
+  transactionResourceLimits?: Readonly<TransactionResourceLimits>;
+  admitTransaction?: (operations: readonly DocumentOp[]) => GridTransactionAdmissionDecision;
 }
 
 /**
@@ -40,8 +48,12 @@ export interface DocumentControllerOptions {
 export class DocumentController {
   private readonly history = new UndoManager();
   private applyingHistory = false;
+  private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
 
-  constructor(private readonly options: DocumentControllerOptions) {}
+  constructor(private readonly options: DocumentControllerOptions) {
+    this.transactionResourceLimits =
+      options.transactionResourceLimits ?? DEFAULT_TRANSACTION_RESOURCE_LIMITS;
+  }
 
   applyTransaction(transaction: GridTransaction): ApplyTransactionResult {
     return this.commit(transaction.patches, "api");
@@ -51,6 +63,17 @@ export class DocumentController {
     operations: readonly DocumentOp[],
     options: RemoteOperationOptions = {},
   ): ApplyTransactionResult {
+    const resourceValidation = validateTransactionResources(
+      operations,
+      this.transactionResourceLimits,
+    );
+    if (!resourceValidation.ok) {
+      return {
+        status: "rejected",
+        epoch: this.options.epoch(),
+        issues: [resourceValidation.issue],
+      };
+    }
     return this.options.store.applyTransaction(
       { patches: operations.slice() },
       {
@@ -61,6 +84,14 @@ export class DocumentController {
   }
 
   commit(input: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
+    const inputResources = validateTransactionResources(input, this.transactionResourceLimits);
+    if (!inputResources.ok) {
+      return {
+        status: "rejected",
+        epoch: this.options.epoch(),
+        issues: [inputResources.issue],
+      };
+    }
     if (this.options.readOnly()) {
       return { status: "noop", epoch: this.options.epoch(), reason: "read-only" };
     }
@@ -68,16 +99,62 @@ export class DocumentController {
       return { status: "noop", epoch: this.options.epoch(), reason: "empty" };
     }
     const patches = this.options.materializeVirtualColumns(input);
+    if (patches !== input) {
+      const materializedResources = validateTransactionResources(
+        patches,
+        this.transactionResourceLimits,
+      );
+      if (!materializedResources.ok) {
+        return {
+          status: "rejected",
+          epoch: this.options.epoch(),
+          issues: [materializedResources.issue],
+        };
+      }
+    }
     if (patches.some((patch) => this.options.loadable?.canApplyLocally(patch) === false)) {
       return { status: "noop", epoch: this.options.epoch(), reason: "incomplete-data" };
     }
 
-    if (this.applyingHistory) return this.storeApply(patches, reason);
+    const admission = this.options.admitTransaction?.(patches);
+    if (admission && !admission.ok) {
+      this.options.onMutationRejected([admission.issue]);
+      return {
+        status: "rejected",
+        epoch: this.options.epoch(),
+        issues: [admission.issue],
+      };
+    }
+    const reservation = admission?.reservation;
+
+    if (this.applyingHistory) {
+      let outcome: ApplyTransactionResult;
+      try {
+        outcome = this.storeApply(patches, reason);
+      } catch (error) {
+        reservation?.cancel();
+        throw error;
+      }
+      reservation?.finish(outcome);
+      if (outcome.status === "rejected") this.options.onMutationRejected(outcome.issues);
+      return outcome;
+    }
 
     const inverseByPatch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
-    for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
-
-    const outcome = this.storeApply(patches, reason);
+    let outcome: ApplyTransactionResult;
+    try {
+      for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
+      outcome = this.storeApply(patches, reason);
+    } catch (error) {
+      reservation?.cancel();
+      for (const inverse of inverseByPatch.values()) {
+        for (const item of inverse) {
+          if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
+        }
+      }
+      throw error;
+    }
+    reservation?.finish(outcome);
     if (outcome.status !== "applied") {
       for (const inverse of inverseByPatch.values()) {
         for (const item of inverse) {
@@ -110,12 +187,24 @@ export class DocumentController {
 
   undo(): void {
     const action = this.history.undo();
-    if (action) this.applyHistoryPatches(action, "undo");
+    if (!action) return;
+    try {
+      if (!this.applyHistoryPatches(action, "undo")) this.history.restoreUndo();
+    } catch (error) {
+      this.history.restoreUndo();
+      throw error;
+    }
   }
 
   redo(): void {
     const action = this.history.redo();
-    if (action) this.applyHistoryPatches(action, "redo");
+    if (!action) return;
+    try {
+      if (!this.applyHistoryPatches(action, "redo")) this.history.restoreRedo();
+    } catch (error) {
+      this.history.restoreRedo();
+      throw error;
+    }
   }
 
   destroy(): void {
@@ -543,6 +632,7 @@ export class DocumentController {
     return {
       id: sheet.id,
       name: sheet.name,
+      visibility: sheet.visibility,
       order: this.options.store.getWorkbook().sheets.findIndex((candidate) => candidate.id === id),
       rowCount: sheet.rowCount,
       columns: sheet.columns.map((column) => ({ ...column })),
@@ -605,18 +695,21 @@ export class DocumentController {
     }
   }
 
-  private applyHistoryPatches(action: HistoryAction, reason: "undo" | "redo"): void {
+  private applyHistoryPatches(action: HistoryAction, reason: "undo" | "redo"): boolean {
     const patches = materializeHistoryAction(action);
-    if (patches.length === 0) return;
+    if (patches.length === 0) return false;
 
     this.applyingHistory = true;
+    let outcome: ApplyTransactionResult;
     try {
-      this.storeApply(patches, reason);
+      outcome = this.commit(patches, reason);
     } finally {
       this.applyingHistory = false;
     }
-    for (const patch of patches) this.rebaseHistoryFor(patch);
+    if (outcome.status !== "applied") return false;
+    for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
     this.options.onHistoryApplied();
+    return true;
   }
 
   private sheetById(id: SheetId): Sheet | null {

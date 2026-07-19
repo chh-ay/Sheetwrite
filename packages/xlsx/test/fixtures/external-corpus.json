@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "license": {
+    "name": "Apache-2.0",
+    "url": "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/LICENSE"
+  },
+  "notice": {
+    "url": "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/NOTICE",
+    "text": "Apache POI\nCopyright 2003-2026 The Apache Software Foundation\n\nThis product includes software developed at\nThe Apache Software Foundation (https://www.apache.org/)."
+  },
+  "repository": "https://github.com/apache/poi",
+  "commit": "913c78891bd0cd20945b050c63abfb8c66c88009",
+  "fixtures": [
+    {
+      "file": "FormulaSheetRange.xlsx",
+      "path": "test-data/spreadsheet/FormulaSheetRange.xlsx",
+      "sha256": "1943a81a9d439e3bb843b66fd2f9bcdcf37e31232c850ea31d47681b5d5efa12",
+      "producer": "Microsoft Excel",
+      "appVersion": "12.0000",
+      "expected": ["shared strings", "multi-sheet formulas", "bold styles", "no warnings"]
+    },
+    {
+      "file": "DateFormatTests.xlsx",
+      "path": "test-data/spreadsheet/DateFormatTests.xlsx",
+      "sha256": "16445dc0deba00671ee4315015a970d415ce9886da59c974532d946e99276c66",
+      "producer": "Microsoft Macintosh Excel",
+      "appVersion": "16.0300",
+      "expected": [
+        "date and number formats",
+        "formulas",
+        "italic and wrapped styles",
+        "no warnings"
+      ]
+    },
+    {
+      "file": "DataValidations-49244.xlsx",
+      "path": "test-data/spreadsheet/DataValidations-49244.xlsx",
+      "sha256": "8066b12c878d74aa35b55b22dc9daba9a56e91332a35cf96c4fc0f6af6bd3bd1",
+      "producer": "Microsoft Excel",
+      "appVersion": "12.0000",
+      "expected": [
+        "merged cells",
+        "supported validations",
+        "styles",
+        "exact unsupported validation drop warnings"
+      ]
+    },
+    {
+      "file": "55814.xlsx",
+      "path": "test-data/spreadsheet/55814.xlsx",
+      "sha256": "95ecf8b64c84e749f29689e8bb72a2c8faf192932cd8e7bed294e2242d5fd217",
+      "producer": "Microsoft Excel",
+      "appVersion": "14.0300",
+      "expected": ["legacy note", "active worksheet", "no warnings"]
+    },
+    {
+      "file": "ExcelTables.xlsx",
+      "path": "test-data/spreadsheet/ExcelTables.xlsx",
+      "sha256": "1e43011440eb39000d1751abaf9ded42d37b26f91b4f586a94bf91ce8ecbe9e5",
+      "producer": "Microsoft Excel",
+      "appVersion": "12.0000",
+      "expected": ["defined name", "exact unsupported table and defined-name warnings"]
+    }
+  ],
+  "googleFixtures": [
+    {
+      "file": "google-sheets-public.xlsx",
+      "sourcePage": "https://www.highviewapps.com/blog/how-to-create-a-csv-or-excel-direct-download-link-in-google-sheets/",
+      "downloadUrl": "https://docs.google.com/spreadsheets/d/1Gztm9o8JEPibPWEDwH54qBG5kwj51ILDOk_dxK6uTSY/export?format=xlsx",
+      "contentSha256": "472a6fb930acd78cebaaf8a4890c21144bd7a775586f3a75f4eb6195cb866936",
+      "producer": "Google Sheets",
+      "redistributed": false,
+      "expected": [
+        "shared strings",
+        "ten worksheets",
+        "230 formulas",
+        "cell styles",
+        "frozen rows",
+        "exact drawing and reserved-fill warnings"
+      ]
+    }
+  ],
+  "unverified": {
+    "Microsoft Excel": ["hidden worksheet", "Sheetwrite metadata resave"],
+    "Google Sheets": [
+      "dates",
+      "merges",
+      "validations",
+      "notes",
+      "hidden active sheet",
+      "defined names",
+      "Sheetwrite metadata resave"
+    ]
+  }
+}

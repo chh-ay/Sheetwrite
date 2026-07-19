@@ -11,7 +11,7 @@ or `retry` to perform network work.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L102</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L239</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>18</span>
@@ -31,7 +31,7 @@ constructor(grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOpt
 <summary><code>applyVersionedOperation</code></summary>
 
 ```ts generated
-applyVersionedOperation: (operation: VersionedOperation) => void;
+applyVersionedOperation: (operation: VersionedOperation) => Promise<void>;
 ```
 
 </details>
@@ -103,7 +103,7 @@ ready: () => Promise<void>;
 <summary><code>resumeAfterReload</code> <span class="api-member-summary">Resume only after the host remounted/reloaded document state and reapplied retained local operations.</span></summary>
 
 ```ts generated
-resumeAfterReload: (snapshot: WorkbookSnapshot) => void;
+resumeAfterReload: (snapshot: WorkbookSnapshot) => Promise<void>;
 ```
 
 <p class="api-member-doc">Resume only after the host remounted/reloaded document state and reapplied
@@ -195,7 +195,7 @@ class SyncCoordinator {
     adapter: PersistenceAdapter,
     options: SyncCoordinatorOptions,
   );
-  applyVersionedOperation: (operation: VersionedOperation) => void;
+  applyVersionedOperation: (operation: VersionedOperation) => Promise<void>;
   destroy: () => void;
   flush: () => Promise<readonly PersistenceCommitResponse[]>;
   handleResponse: (
@@ -206,7 +206,7 @@ class SyncCoordinator {
   pendingCommits: () => readonly SyncMutationRecord[];
   pendingCount: number;
   ready: () => Promise<void>;
-  resumeAfterReload: (snapshot: WorkbookSnapshot) => void;
+  resumeAfterReload: (snapshot: WorkbookSnapshot) => Promise<void>;
   retry: (
     clientMutationId: string,
   ) => Promise<PersistenceCommitResponse | null>;

@@ -12,7 +12,7 @@ The workbook-wide store: every sheet, one string pool.
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>60</span>
+## Members <span class="api-count" data-pagefind-ignore>62</span>
 
 <div class="api-member-list">
 
@@ -218,6 +218,28 @@ getWindowRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => WindowVi
 
 <p class="api-member-doc">Bulk read of an explicit row list (sorted/filtered views) — same output
 shape as `get_window`, rows taken from `rows` rather than a range.</p>
+</details>
+
+<details class="api-member" id="cell-store-hydrate-page-numbers" data-pagefind-weight="1">
+<summary><code>hydratePageNumbers</code> <span class="api-member-summary">Hydrate one datasource page column while retaining local dirty cells and request-revision exceptions.</span></summary>
+
+```ts generated
+hydratePageNumbers: (sheet: number, col: number, start_row: number, values: Float64Array, style: number, protected_offsets: Uint32Array) => void;
+```
+
+<p class="api-member-doc">Hydrate one datasource page column while retaining local dirty cells and
+request-revision exceptions. `protected_offsets` is sorted and relative
+to `start_row`.</p>
+</details>
+
+<details class="api-member" id="cell-store-hydrate-page-strings-packed" data-pagefind-weight="1">
+<summary><code>hydratePageStringsPacked</code> <span class="api-member-summary">Packed-string counterpart to [CellStore::hydratepagenumbers].</span></summary>
+
+```ts generated
+hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: string, utf16_lens: Uint32Array, style: number, protected_offsets: Uint32Array) => void;
+```
+
+<p class="api-member-doc">Packed-string counterpart to [`CellStore::hydrate_page_numbers`].</p>
 </details>
 
 <details class="api-member" id="cell-store-insert-cols" data-pagefind-weight="1">
@@ -696,6 +718,23 @@ class CellStore {
     rows: Uint32Array,
     cols: Uint32Array,
   ) => WindowView;
+  hydratePageNumbers: (
+    sheet: number,
+    col: number,
+    start_row: number,
+    values: Float64Array,
+    style: number,
+    protected_offsets: Uint32Array,
+  ) => void;
+  hydratePageStringsPacked: (
+    sheet: number,
+    col: number,
+    start_row: number,
+    buf: string,
+    utf16_lens: Uint32Array,
+    style: number,
+    protected_offsets: Uint32Array,
+  ) => void;
   insertCols: (sheet: number, at: number, count: number) => void;
   isFullyLoaded: (sheet: number) => boolean;
   isPaged: (sheet: number) => boolean;

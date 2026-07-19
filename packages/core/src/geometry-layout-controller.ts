@@ -1,4 +1,5 @@
 import { ColumnIndex } from "./column-index.js";
+import { DEFAULT_SNAPSHOT_RESOURCE_LIMITS, SnapshotResourceError } from "./document-protocol.js";
 import { OffsetIndex, ScaledScroll } from "./fenwick.js";
 import type { SheetwriteStore } from "./store.js";
 import type { Range, SheetId } from "./types/coordinates.js";
@@ -24,6 +25,40 @@ export interface GeometryPaintWindow {
   frozenWidth: number;
 }
 
+function assertGeometryDimensions(rowCount: number, columnCount: number): void {
+  if (
+    !Number.isSafeInteger(rowCount) ||
+    rowCount < 0 ||
+    rowCount > DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet
+  ) {
+    throw new SnapshotResourceError(
+      "maxRowsPerSheet",
+      DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
+      rowCount,
+    );
+  }
+  if (columnCount > DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxColumnsPerSheet) {
+    throw new SnapshotResourceError(
+      "maxColumnsPerSheet",
+      DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxColumnsPerSheet,
+      columnCount,
+    );
+  }
+}
+
+function createRowIndex(rowCount: number, defaultHeight: number): OffsetIndex {
+  try {
+    return new OffsetIndex(rowCount, defaultHeight);
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    throw new SnapshotResourceError(
+      "maxRowsPerSheet",
+      DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
+      rowCount,
+      { cause: error },
+    );
+  }
+}
 /** Owns row/column indexes, scaled scrolling, viewport windows, and frozen-pane mapping. */
 export class GeometryLayoutController {
   private rowIndex: OffsetIndex;
@@ -41,9 +76,10 @@ export class GeometryLayoutController {
     viewportHeight: number,
   ) {
     const sheet = options.sheet();
+    assertGeometryDimensions(sheet.rowCount, sheet.columns.length);
     this.visibleColumnIndices = visibleColumns(sheet);
     this.columnIndex = buildColumnIndex(sheet, this.visibleColumnIndices, options.zoom());
-    this.rowIndex = new OffsetIndex(sheet.rowCount, options.theme().rowHeight);
+    this.rowIndex = createRowIndex(sheet.rowCount, options.theme().rowHeight);
     this.applyRowHeights(sheet);
     this.scrollScale = new ScaledScroll(
       this.rowIndex.totalHeight + options.theme().headerHeight,
@@ -277,8 +313,21 @@ export class GeometryLayoutController {
     rowHeights: Float64Array;
   } | null {
     if (count <= 0 || !this.options.sheet().rowHeights?.size) return null;
-    const rowTops = new Float64Array(count);
-    const rowHeights = new Float64Array(count);
+    assertGeometryDimensions(count, 0);
+    let rowTops: Float64Array;
+    let rowHeights: Float64Array;
+    try {
+      rowTops = new Float64Array(count);
+      rowHeights = new Float64Array(count);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      throw new SnapshotResourceError(
+        "maxRowsPerSheet",
+        DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
+        count,
+        { cause: error },
+      );
+    }
     let top = 0;
     for (let index = 0; index < count; index++) {
       const height = this.rowIndex.heightOf(index);
@@ -291,12 +340,14 @@ export class GeometryLayoutController {
 
   rebuildRows(rowCount = this.options.sheet().rowCount): void {
     const sheet = this.options.sheet();
-    this.rowIndex = new OffsetIndex(rowCount, this.options.theme().rowHeight);
+    assertGeometryDimensions(rowCount, sheet.columns.length);
+    this.rowIndex = createRowIndex(rowCount, this.options.theme().rowHeight);
     this.applyRowHeights(sheet);
   }
 
   rebuildColumns(): void {
     const sheet = this.options.sheet();
+    assertGeometryDimensions(sheet.rowCount, sheet.columns.length);
     this.visibleColumnIndices = visibleColumns(sheet);
     this.columnIndex = buildColumnIndex(sheet, this.visibleColumnIndices, this.options.zoom());
   }

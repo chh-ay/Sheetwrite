@@ -1,75 +1,25 @@
 import {
   createGridFromSnapshot,
   initSheetwrite,
-  MemoryPersistenceAdapter,
   type PendingCommit,
-  type PersistenceAdapter,
-  type PersistenceCommitRequest,
-  type PersistenceCommitResponse,
   PresenceCoordinator,
-  type PresenceMessage,
-  type PresenceTransport,
-  type RemoteOperationSource,
   SyncCoordinator,
-  type VersionedOperation,
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 import "@sheetwrite/core/styles.css";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import {
+  ShowcaseCollaborationServer,
+  ShowcasePresenceBus,
+} from "../showcases/collaboration-protocol.js";
+import { deleteShowcaseDatabase } from "../showcases/showcase-database.js";
 
 export const Route = createFileRoute("/test/collaboration")({
   head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
   component: CollaborationFixture,
 });
-
-class CollaborationServer implements PersistenceAdapter, RemoteOperationSource {
-  private readonly adapter: MemoryPersistenceAdapter;
-  private readonly listeners = new Set<(operation: VersionedOperation) => void>();
-
-  constructor(snapshot: WorkbookSnapshot) {
-    this.adapter = new MemoryPersistenceAdapter(snapshot);
-  }
-
-  load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
-    return this.adapter.load(documentId, signal);
-  }
-
-  async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
-    const response = await this.adapter.commit(request);
-    if (response.status === "applied") {
-      const operation: VersionedOperation = {
-        version: response.version,
-        clientMutationId: request.clientMutationId,
-        operations: request.operations,
-      };
-      for (const listener of this.listeners) listener(structuredClone(operation));
-    }
-    return response;
-  }
-
-  subscribe(listener: (operation: VersionedOperation) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-}
-
-class PresenceBus {
-  private readonly listeners = new Set<(message: PresenceMessage) => void>();
-
-  endpoint(): PresenceTransport {
-    return {
-      publish: (message) => {
-        for (const listener of this.listeners) listener(structuredClone(message));
-      },
-      subscribe: (listener) => {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
-      },
-    };
-  }
-}
 
 const snapshot: WorkbookSnapshot = {
   schemaVersion: 1,
@@ -91,18 +41,9 @@ const snapshot: WorkbookSnapshot = {
   ],
 };
 
-async function deleteDatabase(databaseName: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(databaseName);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error("IndexedDB cleanup was blocked"));
-  });
-}
-
 async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElement) {
   await initSheetwrite();
-  const server = new CollaborationServer(snapshot);
+  const server = new ShowcaseCollaborationServer(snapshot);
   const gridA = createGridFromSnapshot(hostA, snapshot);
   const gridB = createGridFromSnapshot(hostB, snapshot);
   let nextMutation = 1;
@@ -115,7 +56,7 @@ async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElemen
     documentId: "browser-collaboration",
     serverVersion: 0,
   });
-  const presenceBus = new PresenceBus();
+  const presenceBus = new ShowcasePresenceBus();
   const presenceA = new PresenceCoordinator(gridA, presenceBus.endpoint(), {
     actor: { id: "actor-a", displayName: "Actor A", color: "#dc2626" },
     heartbeatMs: 0,
@@ -165,7 +106,7 @@ async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElemen
     if (presenceRects.length === 0) throw new Error("Remote presence overlay was not painted");
 
     const databaseName = "sheetwrite-browser-collaboration-test";
-    await deleteDatabase(databaseName);
+    await deleteShowcaseDatabase(databaseName);
     const durable = new IndexedDbPendingCommitStorage({ databaseName });
     const pending: PendingCommit = {
       documentId: "browser-collaboration",
@@ -184,12 +125,13 @@ async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElemen
     await Promise.resolve();
     const reopened = new IndexedDbPendingCommitStorage({ databaseName });
     try {
-      const restored = await reopened.load("browser-collaboration");
+      const loadBounds = { maxRecords: 16, maxOperations: 256, maxBytes: 1024 * 1024 };
+      const restored = await reopened.load("browser-collaboration", loadBounds);
       if (restored.length !== 1 || restored[0]?.clientMutationId !== "durable-browser-m1") {
         throw new Error("IndexedDB pending commit did not survive reopen");
       }
       await reopened.remove("browser-collaboration", "durable-browser-m1");
-      if ((await reopened.load("browser-collaboration")).length !== 0) {
+      if ((await reopened.load("browser-collaboration", loadBounds)).length !== 0) {
         throw new Error("Acknowledged IndexedDB commit was not removed");
       }
       return {

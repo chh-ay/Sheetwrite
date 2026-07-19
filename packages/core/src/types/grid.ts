@@ -45,6 +45,7 @@ import type {
   ChangeEvent,
   GridTransaction,
   RemoteOperationOptions,
+  TransactionResourceLimits,
 } from "./transaction.js";
 
 /**
@@ -284,6 +285,8 @@ export interface GridOptions {
   protectionResolver?: ProtectionResolver;
   /** Atomic rejects the transaction; partial skips denied operation objects. */
   mutationPolicy?: MutationPolicyMode;
+  /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
+  transactionResourceLimits?: Partial<TransactionResourceLimits>;
   /** Custom cell renderers registered up front; also see `Grid.defineCellRenderer`. */
   renderers?: Record<string, CellRenderer>;
   /** Rows rendered above/below the viewport to absorb fast scrolls. */

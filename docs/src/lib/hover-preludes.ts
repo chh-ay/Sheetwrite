@@ -27,7 +27,7 @@ const FRAMEWORK_PRELUDE = [
   'import type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";',
   "declare const columns: readonly SimpleColumn<Record<string, CellScalar>>[];",
   "declare const rows: readonly Record<string, CellScalar>[];",
-  "declare const dataSource: DataSource;",
+  "declare const datasource: DataSource;",
   "declare const gridRef: Grid | null;",
   "declare const persist: (transaction: Transaction) => void;",
   "declare const observe: (grid: Grid, generation: number, reason: string) => void;",

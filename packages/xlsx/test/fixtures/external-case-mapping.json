@@ -1,0 +1,320 @@
+{
+  "schemaVersion": 1,
+  "description": "Implementation-neutral Sheetwrite coverage mapping for the pinned 45-case XLSX behavioral manifest. No upstream workbook bytes are included or generated from upstream libraries.",
+  "pins": {
+    "exceljs": {
+      "version": "4.4.0",
+      "commit": "ac96f9a61e9799c7776bd940f05c4a51d7200209",
+      "repository": "https://github.com/exceljs/exceljs",
+      "license": "MIT",
+      "licenseUrl": "https://github.com/exceljs/exceljs/blob/ac96f9a61e9799c7776bd940f05c4a51d7200209/LICENSE",
+      "notice": "The MIT License (MIT)\nCopyright (c) 2014-2019 Guyon Roche\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\nAdapted behavioral vectors and retyped XML only."
+    },
+    "openpyxl": {
+      "version": "3.1.5",
+      "commit": "9a816c7f1efabd2d31689e29037f1a2d6756cc00",
+      "repository": "https://foss.heptapod.net/openpyxl/openpyxl",
+      "license": "MIT",
+      "licenseUrl": "https://foss.heptapod.net/openpyxl/openpyxl/-/blob/9a816c7f1efabd2d31689e29037f1a2d6756cc00/LICENCE.rst",
+      "notice": "The MIT License\nCopyright (c) 2010 openpyxl\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\nAdapted behavioral vectors and retyped XML only."
+    },
+    "apache-poi": {
+      "commit": "913c78891bd0cd20945b050c63abfb8c66c88009",
+      "repository": "https://github.com/apache/poi",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/LICENSE",
+      "noticeUrl": "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/NOTICE",
+      "notice": "Apache POI; Copyright 2003-2026 The Apache Software Foundation; includes software developed at The Apache Software Foundation (https://www.apache.org/)."
+    }
+  },
+  "fixturePolicy": {
+    "generator": "packages/xlsx/test/raw-opc.ts",
+    "independent": true,
+    "usesSheetwriteReaderOrWriterToGenerateImportedInputs": false,
+    "upstreamWorkbookBytesShipped": false
+  },
+  "impossibleCases": [],
+  "cases": [
+    {
+      "id": 1,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/cell-xform.spec.js#Error",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 2,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/cell-xform.spec.js#String with Invalid Number",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 3,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/cell-xform.spec.js#Styled Null",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 4,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/cell-xform.spec.js#Inline String with plain text",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 5,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/cell-xform.spec.js#Inline String with RichText",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 6,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/strings/shared-string-xform.spec.js#rich text",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 7,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/strings/shared-string-xform.spec.js#phonetic text",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 8,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/strings/shared-string-xform.spec.js#Japanese phonetic",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 9,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/strings/shared-string-xform.spec.js#text with newline",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 1-9: preserves typed, inline, shared, rich, phonetic, and whitespace values"
+    },
+    {
+      "id": 10,
+      "status": "covered-existing",
+      "source": "exceljs:spec/integration/workbook-xlsx-reader.spec.js#escaped underscore",
+      "testName": "raw spec-authored OOXML fidelity > escapes SpreadsheetML control tokens without confusing literal escape text"
+    },
+    {
+      "id": 11,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/utils/tests/test_datetime.py#Excel 1900 leap-day vectors",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 11 and 13: preserves the 1900 boundary and converts ISO offsets and fractions"
+    },
+    {
+      "id": 12,
+      "status": "covered-existing",
+      "source": "exceljs:spec/integration/issues/issue-219-1904-dates.spec.js",
+      "testName": "raw spec-authored OOXML fidelity > converts date1904 serials, preserves serial 60, and parses t=d as UTC wall time"
+    },
+    {
+      "id": 13,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/utils/tests/test_datetime.py#from_ISO8601/to_excel",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 11 and 13: preserves the 1900 boundary and converts ISO offsets and fractions"
+    },
+    {
+      "id": 14,
+      "status": "ported",
+      "source": "exceljs:spec/unit/utils/shared-formula.spec.js#nine slideFormula vectors",
+      "testName": "pinned external XLSX behavioral vectors > ports case 14: translates all nine relative and absolute shared-formula vectors"
+    },
+    {
+      "id": 15,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/cell-xform.spec.js#Array Formula",
+      "testName": "pinned external XLSX behavioral vectors > ports case 15: neutralizes array and data-table formulas with exact warnings"
+    },
+    {
+      "id": 16,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/styles/tests/test_fonts.py#disabled/empty style flags",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 16-17: maps false font flags and warns on double-underline precision loss"
+    },
+    {
+      "id": 17,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/style/underline-xform.spec.js",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 16-17: maps false font flags and warns on double-underline precision loss"
+    },
+    {
+      "id": 18,
+      "status": "covered-existing",
+      "source": "exceljs:spec/unit/xlsx/xform/style/color-xform.spec.js",
+      "testName": "raw spec-authored OOXML fidelity > resolves theme tint and indexed colors for font, solid fill, and border zero"
+    },
+    {
+      "id": 19,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/style/border-xform.spec.js#Red Box/Cross",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 19-20: maps four borders and warns for diagonal, patterned, and gradient loss"
+    },
+    {
+      "id": 20,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/style/fill-xform.spec.js#Gray 125/Red Dark Vertical/gradient",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 19-20: maps four borders and warns for diagonal, patterned, and gradient loss"
+    },
+    {
+      "id": 21,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/style/numfmt-xform.spec.js",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 21-22: preserves custom formats and classifies quoted and elapsed-time vectors"
+    },
+    {
+      "id": 22,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/styles/tests/test_number_style.py#is_date_format/is_timedelta_format",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 21-22: preserves custom formats and classifies quoted and elapsed-time vectors"
+    },
+    {
+      "id": 23,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/col-xform.spec.js#Width/Outline",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 23-25 and 45: preserves dimensions, outlines, and row-over-column style precedence"
+    },
+    {
+      "id": 24,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/row-xform.spec.js#outline/hidden",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 23-25 and 45: preserves dimensions, outlines, and row-over-column style precedence"
+    },
+    {
+      "id": 25,
+      "status": "ported",
+      "source": "exceljs:spec/integration/workbook/styles.spec.js#row/column style inheritance",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 23-25 and 45: preserves dimensions, outlines, and row-over-column style precedence"
+    },
+    {
+      "id": 26,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/sheet-view-xform.spec.js",
+      "testName": "pinned external XLSX behavioral vectors > ports case 26: retains frozen axes and warns for split, RTL, and zoom presentation"
+    },
+    {
+      "id": 27,
+      "status": "ported",
+      "source": "exceljs:spec/integration/pr/test-pr-728.spec.js#hidden sheet states",
+      "testName": "pinned external XLSX behavioral vectors > ports case 27: imports visible, hidden, and veryHidden worksheet states exactly"
+    },
+    {
+      "id": 28,
+      "status": "ported",
+      "source": "exceljs:spec/integration/worksheet-xlsx-writer.spec.js#Merge Cells",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 28-29: rejects overlapping merges and unsafe case-folded or overlength names"
+    },
+    {
+      "id": 29,
+      "status": "ported",
+      "source": "exceljs:spec/integration/worksheet.spec.js#case-insensitive duplicate worksheet name",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 28-29: rejects overlapping merges and unsafe case-folded or overlength names"
+    },
+    {
+      "id": 30,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/reader/tests/test_workbook.py#test_assign_names",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 30-31: imports scoped rectangles and drops reserved, constant, dynamic, and union names"
+    },
+    {
+      "id": 31,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/book/defined-name-xform.spec.js#range/OFFSET",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 30-31: imports scoped rectangles and drops reserved, constant, dynamic, and union names"
+    },
+    {
+      "id": 32,
+      "status": "ported",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/data-validations-xform.spec.js#List type",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 32 and 34: maps inline and multi-range lists and warns on validation-policy loss"
+    },
+    {
+      "id": 33,
+      "status": "covered-existing",
+      "source": "exceljs:spec/unit/xlsx/xform/sheet/data-validations-xform.spec.js#Whole type",
+      "testName": "raw spec-authored OOXML fidelity > maps validation defaults, policies, whole semantics, and multiple ranges without broadening"
+    },
+    {
+      "id": 34,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/worksheet/tests/test_datavalidation.py",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 32 and 34: maps inline and multi-range lists and warns on validation-policy loss"
+    },
+    {
+      "id": 35,
+      "status": "covered-existing",
+      "source": "apache-poi:test-data/spreadsheet/DataValidations-49244.xlsx",
+      "testName": "scheduled independent Microsoft Excel corpus > imports checksum-locked DataValidations-49244.xlsx",
+      "nonShippedChecksumDownloadOnly": true
+    },
+    {
+      "id": 36,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/comments/tests/test_comment_reader.py#test_read_comments",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 36-37: imports multi-author rich comments and exact note whitespace/newlines"
+    },
+    {
+      "id": 37,
+      "status": "ported",
+      "source": "exceljs:spec/integration/pr/test-pr-896.spec.js#whitespace/newlines",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 36-37: imports multi-author rich comments and exact note whitespace/newlines"
+    },
+    {
+      "id": 38,
+      "status": "ported",
+      "source": "apache-poi:poi-ooxml/src/test/java/org/apache/poi/xssf/eventusermodel/TestXSSFReader.java#testStrictOoxmlAllowed",
+      "testName": "pinned external XLSX behavioral vectors > ports case 38: dispatches a full Strict workbook, styles, strings, sheet, and comments graph"
+    },
+    {
+      "id": 39,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/packaging/tests/test_relationship.py",
+      "testName": "pinned external XLSX behavioral vectors > ports case 39: never fetches external targets and resolves internal parent targets within OPC root"
+    },
+    {
+      "id": 40,
+      "status": "ported",
+      "source": "exceljs:spec/integration/workbook-xlsx-reader.spec.js#invalid-xml/missing-bits",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 40-41: rejects malformed or missing XML and ignores declared unknown extensions"
+    },
+    {
+      "id": 41,
+      "status": "ported",
+      "source": "exceljs:spec/integration/issues/issue-176-unexpected-xml-node.spec.js",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 40-41: rejects malformed or missing XML and ignores declared unknown extensions"
+    },
+    {
+      "id": 42,
+      "status": "ported",
+      "source": "apache-poi:poi-ooxml/src/test/java/org/apache/poi/openxml4j/util/TestZipSecureFile.java",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 42-44: enforces per-entry, entry-count, row, and column resource boundaries"
+    },
+    {
+      "id": 43,
+      "status": "ported",
+      "source": "apache-poi:poi-ooxml/src/test/java/org/apache/poi/openxml4j/opc/TestOPCPackageFileLimit.java#testWithReducedFileLimit",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 42-44: enforces per-entry, entry-count, row, and column resource boundaries"
+    },
+    {
+      "id": 44,
+      "status": "ported",
+      "source": "exceljs:spec/integration/workbook-xlsx-reader.spec.js#row and column limits",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 42-44: enforces per-entry, entry-count, row, and column resource boundaries"
+    },
+    {
+      "id": 45,
+      "status": "ported",
+      "source": "openpyxl:openpyxl/worksheet/tests/test_dimensions.py",
+      "testName": "pinned external XLSX behavioral vectors > ports cases 23-25 and 45: preserves dimensions, outlines, and row-over-column style precedence"
+    }
+  ],
+  "localOnlyTests": [
+    "local deterministic and adversarial XLSX gates > is insertion-order invariant with canonical ZIP entries, relationships, styles, and timestamps",
+    "local deterministic and adversarial XLSX gates > matches independently authored exact workbook, sheet, style, comment, name, and view XML",
+    "local deterministic and adversarial XLSX gates > propagates exact abort reasons during central-directory, shared-string, and export-part stages",
+    "local deterministic and adversarial XLSX gates > rejects ZIP local/central disagreements and duplicate raw or normalized logical entries",
+    "local deterministic and adversarial XLSX gates > rejects wrong roots or namespaces while tolerating extensions only under valid roots",
+    "local deterministic and adversarial XLSX gates > drops threaded comments with one exact unsupported-feature warning",
+    "local deterministic and adversarial XLSX gates > makes native external edits win over stale value, style, name, note, and view sidecar data",
+    "local deterministic and adversarial XLSX gates > accounts UTF-8 bytes incrementally for CJK, emoji, and escaped output"
+  ]
+}

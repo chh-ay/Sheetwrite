@@ -17,6 +17,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Overview", href: "/docs/" },
       { label: "Installation", href: "/docs/start/installation/" },
       { label: "First grid", href: "/docs/start/first-grid/" },
+      { label: "Performance", href: "/docs/guides/performance-resources/" },
     ],
   },
   {
@@ -48,7 +49,6 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Worker rendering", href: "/docs/guides/worker-rendering/" },
       { label: "XLSX export", href: "/docs/guides/xlsx-export/" },
       { label: "Accessibility", href: "/docs/guides/accessibility/" },
-      { label: "Performance", href: "/docs/guides/performance-resources/" },
     ],
   },
   {
@@ -68,6 +68,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
 ];
 
+/**
+ * Framework workbench deep links. The global topbar links to /showcases/
+ * instead; these power in-page cross-links (ShowcasePage next/prev) and the
+ * landing/hub link graphs. Every href here is a preserved public URL.
+ */
 export const SHOWCASE_NAVIGATION: readonly NavigationItem[] = [
   { label: "Vanilla", href: "/vanilla/" },
   { label: "React", href: "/react/" },

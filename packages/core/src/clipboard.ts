@@ -1,4 +1,9 @@
 import { cellScalarToText } from "./cell-input.js";
+import {
+  type DelimitedTextOptions,
+  encodeDelimitedText,
+  parseDelimitedText,
+} from "./delimited-text.js";
 import type { CellScalar, CellStyle, CellValue } from "./types/cell.js";
 
 // Values beginning with any of these are neutralized on paste so a pasted
@@ -9,80 +14,34 @@ export function neutralizeInjection(value: string): string {
   return INJECTION.test(value) ? `'${value}` : value;
 }
 
-function encodeField(value: CellScalar): string {
-  if (value === null) return "";
-  const s = cellScalarToText(value);
-  if (/[\t\n\r"]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
+/**
+ * Serialize a rectangular block to external Excel/Sheets-compatible TSV.
+ * Formula-sensitive string prefixes are neutralized; numbers (including
+ * negatives) remain numeric text. The result is one synchronous in-memory
+ * string and has no BOM because it is a clipboard flavor.
+ */
+export function toTsv(
+  rows: readonly (readonly CellScalar[])[],
+  options: DelimitedTextOptions = {},
+): string {
+  function* externalRows(): Generator<readonly string[]> {
+    for (const row of rows) {
+      yield row.map((value) =>
+        typeof value === "string" ? neutralizeInjection(value) : cellScalarToText(value),
+      );
+    }
   }
-  return s;
-}
-
-/** Serialize a rectangular block (row-major) to Excel/Sheets-compatible TSV. */
-export function toTsv(rows: readonly (readonly CellScalar[])[]): string {
-  return rows.map((row) => row.map(encodeField).join("\t")).join("\r\n");
+  return encodeDelimitedText(externalRows(), "\t", options);
 }
 
 /**
- * Parse clipboard TSV into a grid of raw strings. Handles quoted fields that
- * embed tabs/newlines and doubled quotes, matching how spreadsheets emit them.
+ * Parse external clipboard TSV with the shared bounded delimited parser. Quoted
+ * tabs/newlines, doubled quotes, bare CR, LF, CRLF, Unicode, trailing empty
+ * fields, syntactically present empty records, and one leading BOM are handled.
+ * The synchronous input and returned grid are both fully in memory.
  */
-export function parseTsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let quoted = false;
-  let i = 0;
-
-  const endField = () => {
-    row.push(field);
-    field = "";
-  };
-  const endRow = () => {
-    endField();
-    rows.push(row);
-    row = [];
-  };
-
-  while (i < text.length) {
-    const ch = text[i]!;
-    if (quoted) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        quoted = false;
-        i++;
-        continue;
-      }
-      field += ch;
-      i++;
-      continue;
-    }
-    if (ch === '"' && field === "") {
-      quoted = true;
-      i++;
-    } else if (ch === "\t") {
-      endField();
-      i++;
-    } else if (ch === "\r") {
-      // swallow CRLF as one row break
-      if (text[i + 1] === "\n") i++;
-      endRow();
-      i++;
-    } else if (ch === "\n") {
-      endRow();
-      i++;
-    } else {
-      field += ch;
-      i++;
-    }
-  }
-  // trailing field/row unless the text ended exactly on a row break
-  if (field !== "" || row.length > 0) endRow();
-  return rows;
+export function parseTsv(text: string, options: DelimitedTextOptions = {}): string[][] {
+  return parseDelimitedText(text, "\t", options);
 }
 
 // ── Internal snapshot ────────────────────────────────────────────────────────

@@ -1,49 +1,80 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { pageMeta } from "../lib/seo.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
-import VanillaShowcase from "../showcases/VanillaShowcase.js";
+import VanillaWorkbench from "../showcases/VanillaWorkbench.js";
+import vanillaStylesheet from "../styles/vanilla-workbench.css?url";
 
 const description =
-  "Mount the framework-neutral core, then compose toolbar, formula bar, policy controls, and exports around one live Grid handle.";
+  "Framework-free host code owns create, reset, and destroy: renderer selection, Worker fallback, a host-served page source, and workbook operations, all through the public core API.";
+
+/** Construction-bound options are deep-linkable; defaults stay out of the URL. */
+interface VanillaSearch {
+  renderer?: "worker";
+  data?: "paged";
+}
 
 export const Route = createFileRoute("/vanilla")({
-  head: () => ({
-    meta: pageMeta("Vanilla imperative workbook — Sheetwrite", description),
+  validateSearch: (search: Record<string, unknown>): VanillaSearch => ({
+    ...(search.renderer === "worker" ? { renderer: "worker" as const } : {}),
+    ...(search.data === "paged" ? { data: "paged" as const } : {}),
   }),
-  component: VanillaShowcaseRoute,
+  head: () => ({
+    meta: pageMeta("Vanilla engine workbench — Sheetwrite", description),
+    links: [{ rel: "stylesheet", href: vanillaStylesheet }],
+  }),
+  component: VanillaWorkbenchRoute,
 });
 
-function VanillaShowcaseRoute() {
+function VanillaWorkbenchRoute() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+
   return (
     <ShowcasePage
       active="vanilla"
       description={description}
-      eyebrow="VANILLA / IMPERATIVE WORKBOOK"
+      eyebrow="VANILLA / ENGINE WORKBENCH"
       guide="/docs/frameworks/vanilla/"
       packageName="@sheetwrite/core"
       proof={[
         {
-          title: "One mount call",
-          detail: "createSpreadsheetShell owns one Grid and all disposable chrome.",
+          title: "Explicit lifecycle",
+          detail:
+            "createWorkbench and destroy() bound every generation — no listeners, chrome, or canvas survive teardown.",
         },
         {
-          title: "Real commands",
-          detail: "Search, sorting, export, and editing policy call the live Grid handle.",
+          title: "Construction-bound truth",
+          detail:
+            "Renderer and data path rebuild the grid and live in the URL; read-only flips on the running instance.",
         },
         {
-          title: "Headless ownership",
-          detail: "The host owns lifecycle, events, theme, and document state.",
+          title: "Host-owned paging",
+          detail:
+            "The page source, its latency, and its abort path are host code; allocation stats read back from the store.",
         },
         {
-          title: "No imitation menus",
-          detail: "Every visible control has a wired product behavior.",
+          title: "Honest Worker fallback",
+          detail:
+            "A failed Worker boot emits renderer-fallback and keeps painting on the main thread — requested vs. active is always visible.",
         },
       ]}
-      prompt="Jump to B2 in the name box, enter a value in the formula bar, then undo the change."
-      sourcePath="docs/src/showcases/VanillaShowcase.tsx"
-      title="Own the workbook shell your product needs."
+      prompt="Switch the renderer to Web Worker and the data path to Paged source — then destroy and re-create the grid. The URL follows the construction options."
+      sourcePath="docs/src/showcases/vanilla-workbench.ts"
+      title="Drive the engine without an adapter."
     >
-      <VanillaShowcase />
+      <VanillaWorkbench
+        renderer={search.renderer ?? "canvas"}
+        data={search.data ?? "columnar"}
+        onSpecChange={(spec) =>
+          void navigate({
+            search: {
+              ...(spec.renderer === "worker" ? { renderer: "worker" as const } : {}),
+              ...(spec.data === "paged" ? { data: "paged" as const } : {}),
+            },
+            replace: true,
+          })
+        }
+      />
     </ShowcasePage>
   );
 }

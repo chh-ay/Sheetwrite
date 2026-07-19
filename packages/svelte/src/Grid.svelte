@@ -21,6 +21,7 @@ let {
   readOnly,
   protectionResolver,
   mutationPolicy,
+  transactionResourceLimits,
   renderers,
   overscan,
   minColumns,
@@ -100,6 +101,7 @@ $effect(() => {
     workerUrl,
     protectionResolver,
     mutationPolicy,
+    transactionResourceLimits,
     renderers,
     wasmSource,
   };
@@ -113,6 +115,7 @@ $effect(() => {
       workerUrl: resetInputs.workerUrl,
       protectionResolver: resetInputs.protectionResolver,
       mutationPolicy: resetInputs.mutationPolicy,
+      transactionResourceLimits: resetInputs.transactionResourceLimits,
       renderers: resetInputs.renderers,
       theme,
       readOnly,

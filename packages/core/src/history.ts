@@ -56,12 +56,24 @@ export class UndoManager {
     return entry.undo;
   }
 
+  /** Restore the most recently moved undo entry after its transaction was rejected. */
+  restoreUndo(): void {
+    const entry = this.redoStack.pop();
+    if (entry) this.undoStack.push(entry);
+  }
+
   redo(): HistoryAction | null {
     const entry = this.redoStack.pop();
     if (!entry) return null;
 
     this.undoStack.push(entry);
     return [{ kind: "patches", patches: entry.redo }];
+  }
+
+  /** Restore the most recently moved redo entry after its transaction was rejected. */
+  restoreRedo(): void {
+    const entry = this.undoStack.pop();
+    if (entry) this.redoStack.push(entry);
   }
 
   clear(): void {

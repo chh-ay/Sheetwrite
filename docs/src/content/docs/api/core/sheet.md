@@ -9,10 +9,10 @@ Workbook sheet schema used when creating a live grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L8</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L11</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>16</span>
+## Members <span class="api-count" data-pagefind-ignore>17</span>
 
 <div class="api-member-list">
 
@@ -30,6 +30,15 @@ id: SheetId;
 
 ```ts generated
 name: string;
+```
+
+</details>
+
+<details class="api-member" id="sheet-visibility" data-pagefind-weight="1">
+<summary><code>visibility</code> <span class="api-member-summary">Hidden worksheets remain addressable but are omitted from the tab strip.</span></summary>
+
+```ts generated
+visibility?: SheetVisibility;
 ```
 
 </details>
@@ -170,6 +179,7 @@ frozenCols?: number;
 export interface Sheet {
   id: SheetId;
   name: string;
+  visibility?: SheetVisibility;
   columns: Column[];
   rowCount: number;
   rowHeights?: Map<number, number>;

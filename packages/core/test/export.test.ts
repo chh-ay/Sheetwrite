@@ -1,4 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { parseDateInput } from "../src/date-serial.js";
+import {
+  DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
+  DelimitedTextOptionsError,
+  DelimitedTextResourceError,
+} from "../src/delimited-text.js";
 import type {
   XlsxTableExportBackend,
   XlsxTableImportBackend,
@@ -18,9 +24,10 @@ import {
   toTsv,
   toXlsxTable,
   toXlsxWorkbook,
+  XlsxResourceError,
 } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
-import { SheetwriteStore } from "../src/store.js";
+import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
 
 beforeAll(async () => {
@@ -45,13 +52,13 @@ function workbook(): Workbook {
 }
 
 describe("export", () => {
-  it("imports core without resolving any concrete Excel package", async () => {
+  it("imports core without resolving the optional XLSX codec", async () => {
     const script = `
       Bun.plugin({
-        name: "forbid-excel-packages",
+        name: "forbid-xlsx-codec",
         setup(build) {
           build.onResolve(
-            { filter: /^(exceljs|read-excel-file|write-excel-file)/ },
+            { filter: /^fflate$/ },
             (args) => { throw new Error(\`core resolved forbidden package \${args.path}\`); },
           );
         },
@@ -132,6 +139,18 @@ describe("export", () => {
     store.dispose();
   });
 
+  it("reports typed XLSX resource-limit details", () => {
+    const error = new XlsxResourceError("maxInputBytes", 32, 33, "import");
+    expect(error).toBeInstanceOf(RangeError);
+    expect(error.name).toBe("XlsxResourceError");
+    expect(error.code).toBe("XLSX_RESOURCE_LIMIT");
+    expect(error.resource).toBe("maxInputBytes");
+    expect(error.limit).toBe(32);
+    expect(error.actual).toBe(33);
+    expect(error.operation).toBe("import");
+    expect(error.message).toBe("Sheetwrite: XLSX import maxInputBytes limit is 32; observed 33");
+  });
+
   it("forwards table and workbook calls through independently injected backends", async () => {
     const store = new SheetwriteStore(workbook());
     const input = new Uint8Array([9, 8, 7]);
@@ -141,22 +160,26 @@ describe("export", () => {
       sheets: [],
     };
     const options: XlsxWorkbookOptions = { maxCells: 17 };
+    let tableExportOptions: XlsxWorkbookOptions | undefined;
+    let tableImportOptions: XlsxWorkbookOptions | undefined;
     let exportedSnapshot: WorkbookSnapshot | undefined;
     let exportedOptions: XlsxWorkbookOptions | undefined;
     let importedOptions: XlsxWorkbookOptions | undefined;
 
     const tableExportBackend: XlsxTableExportBackend = {
       name: "fake-table-export",
-      toXlsxTable: async (actualWorkbook, actualStore) => {
+      toXlsxTable: async (actualWorkbook, actualStore, actualOptions) => {
         expect(actualWorkbook).toBe(store.getWorkbook());
         expect(actualStore).toBe(store);
+        tableExportOptions = actualOptions;
         return new Uint8Array([1, 2, 3]);
       },
     };
     const tableImportBackend: XlsxTableImportBackend = {
       name: "fake-table-import",
-      fromXlsxTable: async (actualInput) => {
+      fromXlsxTable: async (actualInput, actualOptions) => {
         expect(actualInput).toBe(input);
+        tableImportOptions = actualOptions;
         return { rowCount: 1, columns: { Imported: ["yes"] } };
       },
     };
@@ -178,10 +201,10 @@ describe("export", () => {
     setXlsxTableImportBackend(tableImportBackend);
     setXlsxWorkbookBackend(workbookBackend);
     try {
-      await expect(toXlsxTable(store.getWorkbook(), store)).resolves.toEqual(
+      await expect(toXlsxTable(store.getWorkbook(), store, options)).resolves.toEqual(
         new Uint8Array([1, 2, 3]),
       );
-      await expect(fromXlsxTable(input)).resolves.toEqual({
+      await expect(fromXlsxTable(input, options)).resolves.toEqual({
         rowCount: 1,
         columns: { Imported: ["yes"] },
       });
@@ -189,6 +212,8 @@ describe("export", () => {
         new Uint8Array([4, 5, 6]),
       );
       await expect(fromXlsxWorkbook(input, options)).resolves.toBe(snapshot);
+      expect(tableExportOptions).toBe(options);
+      expect(tableImportOptions).toBe(options);
       expect(exportedSnapshot).toBe(snapshot);
       expect(exportedOptions).toBe(options);
       expect(importedOptions).toBe(options);
@@ -277,8 +302,8 @@ describe("export", () => {
     expect(toCsv(store.getWorkbook().sheets[0]!, store).slice(1).split("\r\n")).toEqual([
       "A",
       "visible",
-      "",
-      "",
+      '""',
+      '""',
     ]);
   });
 
@@ -387,6 +412,265 @@ describe("export", () => {
     expect(imported.getCell({ sheet: "reserved", row: 0, col: 1 }).resolved).toBe("beta");
     imported.dispose();
   });
+
+  it("csv exports only the sorted, filtered, non-hidden view and never pads filtered rows", () => {
+    const wb: Workbook = {
+      activeSheet: "view",
+      sheets: [
+        {
+          id: "view",
+          name: "View",
+          rowCount: 4,
+          columns: [
+            { key: "a", header: "A", width: 80, type: "text" },
+            { key: "b", header: "B", width: 80, type: "number", visible: false },
+          ],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(wb, {
+      rowCount: 4,
+      columns: { a: ["keep-a", "drop", "keep-b", "keep-c"], b: [2, 9, 3, 1] },
+    });
+    store.setColumnFilter("view", 0, { kind: "contains", text: "keep" });
+    store.hideRows("view", [2]);
+    store.sortBy("view", 1, true);
+
+    expect(toCsv(store.getWorkbook().sheets[0]!, store)).toBe("\ufeffA\r\nkeep-c\r\nkeep-a");
+
+    store.setColumnFilter("view", 0, { kind: "values", values: ["missing"] });
+    expect(toCsv(store.getWorkbook().sheets[0]!, store)).toBe("\ufeffA");
+    store.dispose();
+  });
+
+  it("tsv reads normalized canonical data coordinates despite the active view", () => {
+    const store = new SheetwriteStore(workbook(), {
+      rowCount: 3,
+      columns: { a: ["zero", "one", "two"], b: [0, 1, 2] },
+    });
+    store.setColumnFilter("s", 0, { kind: "values", values: ["two"] });
+    store.sortBy("s", 1, false);
+
+    expect(toTsv({ sheet: "s", start: { row: 2, col: 1 }, end: { row: 0, col: 0 } }, store)).toBe(
+      "zero\t0\r\none\t1\r\ntwo\t2",
+    );
+    store.dispose();
+  });
+
+  it("direct CSV and TSV exports reject incomplete paged data before reading sentinels", () => {
+    const store = new SheetwriteStore(workbook(), undefined, { storage: "paged" });
+    expect(store.queryCapability("s").status).toBe("incomplete");
+    expect(() => toCsv(store.getWorkbook().sheets[0]!, store)).toThrow(IncompleteDataError);
+    expect(() =>
+      toTsv({ sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } }, store),
+    ).toThrow(IncompleteDataError);
+    store.dispose();
+  });
+
+  it("parses both fixed-dialect record breaks, Unicode, quotes, and trailing empties", () => {
+    expect(parseCsv('α,"b,c","q""x"\rbare,cr,\r\nlast,,')).toEqual([
+      ["α", "b,c", 'q"x'],
+      ["bare", "cr", ""],
+      ["last", "", ""],
+    ]);
+    expect(parseCsv('""')).toEqual([[""]]);
+    expect(parseCsv("\ufeffa")).toEqual([["a"]]);
+    expect(parseCsv("\ufeff\ufeffa")).toEqual([["\ufeffa"]]);
+  });
+
+  it("preserves one-column trailing blank records across CSV export and import", () => {
+    const wb: Workbook = {
+      activeSheet: "blank",
+      sheets: [
+        {
+          id: "blank",
+          name: "Blank",
+          rowCount: 3,
+          columns: [{ key: "only", header: "Only", width: 80, type: "text" }],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(wb);
+    const csv = toCsv(store.getWorkbook().sheets[0]!, store);
+    expect(csv).toBe('\ufeffOnly\r\n""\r\n""\r\n""');
+    expect(parseCsv(csv)).toEqual([["Only"], [""], [""], [""]]);
+    expect(fromCsv(csv, wb.sheets[0]!.columns)).toEqual({
+      rowCount: 3,
+      columns: { only: [null, null, null] },
+    });
+    store.dispose();
+  });
+
+  it("projects visible CSV fields around hidden declared columns on reimport", () => {
+    const columns: Column[] = [
+      { key: "a", header: "A", width: 80, type: "text" },
+      { key: "hidden", header: "Hidden", width: 80, type: "number", visible: false },
+      { key: "c", header: "C", width: 80, type: "text" },
+    ];
+    const data = fromCsv("A,C\r\nleft,right", columns);
+    expect(data.columns).toEqual({ a: ["left"], hidden: [null], c: ["right"] });
+
+    const store = new SheetwriteStore(
+      {
+        activeSheet: "projection",
+        sheets: [{ id: "projection", name: "Projection", rowCount: 1, columns }],
+      },
+      data,
+    );
+    expect(store.getCell({ sheet: "projection", row: 0, col: 0 }).resolved).toBe("left");
+    expect(store.getCell({ sheet: "projection", row: 0, col: 1 }).resolved).toBeNull();
+    expect(store.getCell({ sheet: "projection", row: 0, col: 2 }).resolved).toBe("right");
+    store.dispose();
+  });
+
+  it("coerces declared types canonically and loads booleans and dates without type loss", () => {
+    const columns: Column[] = [
+      { key: "bool", header: "Bool", width: 80, type: "text" },
+      { key: "num", header: "Num", width: 80, type: "number" },
+      { key: "serial", header: "Serial", width: 80, type: "date" },
+      { key: "date", header: "Date", width: 80, type: "date" },
+      { key: "money", header: "Money", width: 80, type: "currency" },
+      { key: "blank", header: "Blank", width: 80, type: "text" },
+      { key: "formula", header: "Formula", width: 80, type: "number" },
+    ];
+    const data = fromCsv(
+      'Bool,Num,Serial,Date,Money,Blank,Formula\r\n TRUE , 42 ,45678.5,2026-07-18,"$1,234.50",   ,=1+1\r\n false ,-2,45679,07/18/2026,"(€2,000.25)",\t,+1+1',
+      columns,
+    );
+    expect(data.columns.bool).toEqual([true, false]);
+    expect(data.columns.num).toEqual([42, -2]);
+    expect(data.columns.serial).toEqual([45678.5, 45679]);
+    expect(data.columns.date).toEqual([parseDateInput("2026-07-18"), parseDateInput("07/18/2026")]);
+    expect(data.columns.money).toEqual([1234.5, -2000.25]);
+    expect(data.columns.blank).toEqual([null, null]);
+    expect(data.columns.formula).toEqual(["=1+1", "+1+1"]);
+
+    const store = new SheetwriteStore(
+      {
+        activeSheet: "types",
+        sheets: [{ id: "types", name: "Types", rowCount: 2, columns }],
+      },
+      data,
+    );
+    expect(store.getCell({ sheet: "types", row: 0, col: 0 }).resolved).toBe(true);
+    expect(store.getCell({ sheet: "types", row: 1, col: 0 }).resolved).toBe(false);
+    expect(store.getCell({ sheet: "types", row: 0, col: 2 }).resolved).toBe(45678.5);
+    expect(store.getCell({ sheet: "types", row: 0, col: 3 }).resolved).toBe(
+      parseDateInput("2026-07-18"),
+    );
+    expect(store.getCell({ sheet: "types", row: 0, col: 4 }).resolved).toBe(1234.5);
+    expect(store.getCell({ sheet: "types", row: 0, col: 5 }).resolved).toBeNull();
+    expect(store.getCell({ sheet: "types", row: 0, col: 6 }).resolved).toBe("=1+1");
+    expect(store.getFormula({ sheet: "types", row: 0, col: 6 })).toBeNull();
+    store.dispose();
+  });
+
+  it("enforces exact defaults and limit+1 before oversized delimited allocations", () => {
+    expect(DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS).toEqual({
+      maxInputBytes: 32 * 1024 * 1024,
+      maxOutputBytes: 64 * 1024 * 1024,
+      maxRows: 1_000_000,
+      maxColumns: 16_384,
+      maxCells: 1_000_000,
+      maxFieldBytes: 1 * 1024 * 1024,
+      maxWriterWindowRows: 4_096,
+    });
+    expect(parseCsv("éé", { resourceLimits: { maxInputBytes: 4, maxFieldBytes: 4 } })).toEqual([
+      ["éé"],
+    ]);
+
+    let inputFailure: unknown;
+    try {
+      parseCsv("ééx", { resourceLimits: { maxInputBytes: 4 } });
+    } catch (error) {
+      inputFailure = error;
+    }
+    expect(inputFailure).toBeInstanceOf(DelimitedTextResourceError);
+    expect(inputFailure).toMatchObject({
+      resource: "maxInputBytes",
+      limit: 4,
+      actual: 5,
+      operation: "parse",
+    });
+    expect(() => parseCsv("ééx", { resourceLimits: { maxFieldBytes: 4 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    expect(() => parseCsv("a\nb", { resourceLimits: { maxRows: 1 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    expect(() => parseCsv("a,b", { resourceLimits: { maxColumns: 1 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    expect(() => parseCsv("a,b\nc", { resourceLimits: { maxCells: 2 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    expect(() => parseCsv("a", { resourceLimits: { maxRows: 0 } })).toThrow(
+      DelimitedTextOptionsError,
+    );
+
+    const store = new SheetwriteStore(
+      {
+        activeSheet: "limit",
+        sheets: [
+          {
+            id: "limit",
+            name: "Limit",
+            rowCount: 1,
+            columns: [{ key: "a", header: "A", width: 80, type: "text" }],
+          },
+        ],
+      },
+      { rowCount: 1, columns: { a: ["a"] } },
+    );
+    const range = { sheet: "limit", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+    expect(toTsv(range, store, { resourceLimits: { maxOutputBytes: 1 } })).toBe("a");
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "limit", row: 0, col: 0 },
+          value: { kind: "literal", value: "ab" },
+        },
+      ],
+    });
+    expect(() => toTsv(range, store, { resourceLimits: { maxOutputBytes: 1 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    store.dispose();
+  });
+
+  it("bounds CSV and TSV store reads by maxWriterWindowRows", () => {
+    const store = new SheetwriteStore(workbook(), {
+      rowCount: 3,
+      columns: { a: ["a", "b", "c"], b: [1, 2, 3] },
+    });
+    const windows: number[] = [];
+    const readWindow = store.getVisibleWindow.bind(store);
+    store.getVisibleWindow = ((sheet, rows, columns) => {
+      windows.push(rows.end - rows.start);
+      return readWindow(sheet, rows, columns);
+    }) as typeof store.getVisibleWindow;
+    const dataWindows: number[] = [];
+    const readDataWindow = store.getDataWindow.bind(store);
+    store.getDataWindow = ((sheet, rows, columns) => {
+      dataWindows.push(rows.end - rows.start);
+      return readDataWindow(sheet, rows, columns);
+    }) as typeof store.getDataWindow;
+
+    expect(
+      toCsv(store.getWorkbook().sheets[0]!, store, {
+        resourceLimits: { maxWriterWindowRows: 1 },
+      }),
+    ).toContain("a,1\r\nb,2\r\nc,3");
+    expect(windows).toEqual([1, 1, 1]);
+    expect(
+      toTsv({ sheet: "s", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } }, store, {
+        resourceLimits: { maxWriterWindowRows: 1 },
+      }),
+    ).toBe("a\t1\r\nb\t2\r\nc\t3");
+    expect(dataWindows).toEqual([1, 1, 1]);
+    store.dispose();
+  });
 });
 
 describe("downloadBytes", () => {
@@ -438,6 +722,46 @@ describe("downloadBytes", () => {
       expect(revoked).toEqual([]);
       for (const fn of deferred) fn();
       expect(revoked).toEqual(["blob:sheetwrite-test"]);
+    } finally {
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+      HTMLAnchorElement.prototype.click = originalClick;
+      document.body.appendChild = originalAppend as typeof document.body.appendChild;
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+
+  it("cleans up the anchor and object URL when click throws", () => {
+    const revoked: string[] = [];
+    const deferred: Array<() => void> = [];
+    let anchor: HTMLAnchorElement | null = null;
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const originalClick = HTMLAnchorElement.prototype.click;
+    const originalAppend = document.body.appendChild.bind(document.body);
+    const originalSetTimeout = globalThis.setTimeout;
+
+    URL.createObjectURL = (() => "blob:sheetwrite-failure") as typeof URL.createObjectURL;
+    URL.revokeObjectURL = ((url: string) => revoked.push(url)) as typeof URL.revokeObjectURL;
+    HTMLAnchorElement.prototype.click = () => {
+      throw new Error("click failed");
+    };
+    document.body.appendChild = ((node: Node) => {
+      if (node instanceof HTMLAnchorElement) anchor = node;
+      return originalAppend(node);
+    }) as typeof document.body.appendChild;
+    globalThis.setTimeout = ((fn: () => void) => {
+      deferred.push(fn);
+      return 0;
+    }) as unknown as typeof globalThis.setTimeout;
+
+    try {
+      expect(() => downloadBytes("x", "failure.txt", "text/plain")).toThrow("click failed");
+      expect(anchor).not.toBeNull();
+      expect(anchor!.isConnected).toBe(false);
+      expect(revoked).toEqual([]);
+      for (const callback of deferred) callback();
+      expect(revoked).toEqual(["blob:sheetwrite-failure"]);
     } finally {
       URL.createObjectURL = originalCreate;
       URL.revokeObjectURL = originalRevoke;

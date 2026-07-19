@@ -4,28 +4,15 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { ReleasePackageArtifact } from "./release-artifacts.js";
 import { type StageSummaryEntry, stageArtifactsInOrder, stageIdFrom } from "./release-stage.js";
+import { parseWorkflowContract } from "./workflow-contract.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const workflowPath = resolve(repositoryRoot, ".github/workflows/release.yml");
 
-type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> };
-type Job = {
-  needs?: string | string[];
-  environment?: string;
-  permissions?: Record<string, string>;
-  steps?: Step[];
-};
-type Workflow = {
-  on?: { workflow_dispatch?: { inputs?: Record<string, { required?: boolean }> } };
-  concurrency?: { group?: string; "cancel-in-progress"?: boolean };
-  permissions?: Record<string, string>;
-  jobs?: Record<string, Job>;
-};
-
-async function workflow(): Promise<{ parsed: Workflow; source: string }> {
+async function workflow() {
   const source = await readFile(workflowPath, "utf8");
-  return { parsed: Bun.YAML.parse(source) as Workflow, source };
+  return { parsed: parseWorkflowContract(source, "release workflow"), source };
 }
 
 function artifact(name: string): ReleasePackageArtifact {

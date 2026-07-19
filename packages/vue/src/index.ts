@@ -24,9 +24,12 @@ import {
   getGridResetReason,
   gridSizeStyle,
   type SheetwriteInitializationProps,
+  type SimpleColumn,
   type SimpleGridInput,
 } from "@sheetwrite/core/adapter";
 import {
+  type AllowedComponentProps,
+  type ComponentPublicInstance,
   defineComponent,
   h,
   nextTick,
@@ -35,6 +38,7 @@ import {
   type PropType,
   ref,
   shallowRef,
+  type VNodeProps,
   watch,
 } from "vue";
 
@@ -43,6 +47,94 @@ export interface SheetwriteGridExpose {
   /** Live Grid after readiness, or `null` before initialization and during teardown. */
   grid: Grid | null;
 }
+/** Advanced Vue adapter props for workbook data or datasource ownership. */
+export interface SheetwriteGridProps {
+  /** Live workbook schema adopted by the Grid. */
+  workbook: Workbook;
+  /** Eager column-major values for the active sheet. */
+  data?: ColumnarData;
+  /** Lazy row provider requested for visible windows. */
+  datasource?: DataSource;
+  /** Allocation and cache policy for datasource storage. */
+  datasourceStorage?: DataSourceStorageOptions;
+  /** Paint backend; defaults to main-thread canvas. */
+  renderer?: GridOptions["renderer"];
+  /** Browser-fetchable worker module URL. */
+  workerUrl?: GridOptions["workerUrl"];
+  /** Live overrides merged into the resolved Grid theme. */
+  theme?: Partial<Theme>;
+  /** Disables mutation while preserving navigation and selection. */
+  readOnly?: boolean;
+  /** Host-owned client permission check for protected ranges. */
+  protectionResolver?: GridOptions["protectionResolver"];
+  /** Atomic or partial handling for denied local operations. */
+  mutationPolicy?: GridOptions["mutationPolicy"];
+  /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
+  transactionResourceLimits?: GridOptions["transactionResourceLimits"];
+  /** Named custom renderers registered when the Grid is created. */
+  renderers?: Record<string, CellRenderer>;
+  /** Extra rows painted above and below the viewport. */
+  overscan?: number;
+  /** Minimum rendered column count, including empty padding columns. */
+  minColumns?: number;
+  /** Built-in toolbar, menu, keyboard, find, and tab controls. */
+  config?: GridOptions["config"];
+  /** Explicit source passed to process-wide WASM initialization. */
+  wasmSource?: SheetwriteInitializationProps["wasmSource"];
+  /** Host height in CSS pixels for numbers or any CSS length string. */
+  height?: number | string;
+  /** Fills the parent's available width and height. */
+  fill?: boolean;
+}
+
+/** Simple Vue adapter props for columns and default row objects. */
+export interface SheetwriteProps
+  extends Omit<SheetwriteGridProps, "workbook" | "data" | "datasource"> {
+  /** Ordered schema used to derive the component-owned sheet. */
+  columns: readonly SimpleColumn<Record<string, CellScalar>>[];
+  /** Rows converted to initial columnar data; missing keys become `null`. */
+  defaultRows: readonly Record<string, CellScalar>[];
+  /** Generated sheet name; defaults to `Sheet 1`. */
+  sheetName?: string;
+}
+
+/** Event payloads emitted by the Vue components, keyed by template event name. */
+export interface SheetwriteGridEmits {
+  /** Committed Grid change, including its applied transaction. */
+  "grid-change": ChangeEvent;
+  /** Current selection, or `null` after it is cleared. */
+  "selection-change": Selection | null;
+  /** Visible row bounds and vertical scroll offset after scrolling. */
+  "viewport-change": GridEvents["scroll"];
+  /** Cell editing began. */
+  "edit-begin": GridEvents["edit-begin"];
+  /** An edit committed its parsed cell value. */
+  "edit-commit": GridEvents["edit-commit"];
+  /** Refreshed search matches and active-match index. */
+  search: GridEvents["search"];
+  /** The visible sheet changed. */
+  "active-sheet-change": GridEvents["active-sheet"];
+  /** The adapter published a ready Grid generation. */
+  ready: GridReadyEvent;
+  /** WASM initialization failed while the component stayed mounted. */
+  "initialization-error": unknown;
+}
+
+/**
+ * Vue constructor type for Sheetwrite components: Sheetwrite-owned props,
+ * emitted events exposed as `on*` listener props, and the exposed instance
+ * surface reachable through a template ref.
+ */
+export type SheetwriteComponentConstructor<Props, Emits, Expose = object> = new () => Expose &
+  ComponentPublicInstance & {
+    $props: AllowedComponentProps &
+      Props &
+      VNodeProps & {
+        [EventName in keyof Emits & string as `on${Capitalize<EventName>}`]?: (
+          payload: Emits[EventName],
+        ) => void;
+      };
+  };
 
 const gridProps = {
   /** Live workbook schema adopted by the Grid. */
@@ -75,6 +167,11 @@ const gridProps = {
   /** Atomic or partial handling for denied local operations. */
   mutationPolicy: {
     type: String as PropType<GridOptions["mutationPolicy"]>,
+    default: undefined,
+  },
+  /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
+  transactionResourceLimits: {
+    type: Object as PropType<GridOptions["transactionResourceLimits"]>,
     default: undefined,
   },
   /** Named custom renderers registered when the Grid is created. */
@@ -144,6 +241,7 @@ const SheetwriteGridComponent = defineComponent({
         readOnly: props.readOnly,
         protectionResolver: props.protectionResolver,
         mutationPolicy: props.mutationPolicy,
+        transactionResourceLimits: props.transactionResourceLimits,
         renderers: props.renderers,
         overscan: props.overscan,
         minColumns: props.minColumns,
@@ -216,6 +314,7 @@ const SheetwriteGridComponent = defineComponent({
         props.workerUrl,
         props.protectionResolver,
         props.mutationPolicy,
+        props.transactionResourceLimits,
         props.renderers,
       ],
       () => {
@@ -260,12 +359,13 @@ const SheetwriteGridComponent = defineComponent({
 });
 
 /** Advanced framework component for workbook data or datasource input. */
-export const SheetwriteGrid = SheetwriteGridComponent as typeof SheetwriteGridComponent & {
-  new (): InstanceType<typeof SheetwriteGridComponent> & SheetwriteGridExpose;
-};
+export const SheetwriteGrid = SheetwriteGridComponent as unknown as SheetwriteComponentConstructor<
+  SheetwriteGridProps,
+  SheetwriteGridEmits,
+  SheetwriteGridExpose
+>;
 
-/** Convenience component for local object rows with live option updates. */
-export const Sheetwrite = defineComponent({
+const SheetwriteSimpleComponent = defineComponent({
   name: "SheetwriteComponent",
   inheritAttrs: false,
   props: {
@@ -312,6 +412,12 @@ export const Sheetwrite = defineComponent({
     };
   },
 });
+
+/** Convenience component for local object rows with live option updates. */
+export const Sheetwrite = SheetwriteSimpleComponent as unknown as SheetwriteComponentConstructor<
+  SheetwriteProps,
+  SheetwriteGridEmits
+>;
 
 export type { CellScalar, Grid } from "@sheetwrite/core";
 export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";

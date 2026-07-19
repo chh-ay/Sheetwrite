@@ -302,20 +302,20 @@ describe("risk floors", () => {
 });
 
 describe("aggregate risk floors", () => {
-  it("classifies split modules once and enforces the prior combined floor", () => {
+  it("enforces aggregate floors and inherited per-file Tier A/B minimums", () => {
     const members = [
       "packages/core/src/store/facade.ts",
       "packages/core/src/store/engine.ts",
     ] as const;
     const group: CoverageThresholdEntry = {
-      ...scored("packages/core/src/store/**", { lines: 90, functions: 85 }),
+      ...scored("packages/core/src/store/**", { lines: 95, functions: 85 }),
       members,
     };
     const manifest = manifestFor("typescript", [group]);
     const paths = runtimePaths(manifest.entries);
     const records = [
-      record(members[0], { covered: 98, total: 100 }),
-      record(members[1], { covered: 82, total: 100 }),
+      record(members[0], { covered: 100, total: 100 }),
+      record(members[1], { covered: 90, total: 100 }),
     ];
     expect(
       evaluateCoveragePolicy({
@@ -325,14 +325,48 @@ describe("aggregate risk floors", () => {
         runtimePaths: paths,
       }).records,
     ).toHaveLength(2);
+
     expect(() =>
       evaluateCoveragePolicy({
         manifest,
         language: "typescript",
-        records: [records[0]!, record(members[1], { covered: 81, total: 100 })],
+        records: [records[0]!, record(members[1], { covered: 89, total: 100 })],
         runtimePaths: paths,
       }),
-    ).toThrow("below 90%");
+    ).toThrow(`${members[1]} lines coverage 89.00% (89/100) is below inherited Tier A minimum 90%`);
+
+    expect(() =>
+      evaluateCoveragePolicy({
+        manifest,
+        language: "typescript",
+        records: [
+          record(members[0], { covered: 99, total: 100 }),
+          record(members[1], { covered: 90, total: 100 }),
+        ],
+        runtimePaths: paths,
+      }),
+    ).toThrow("packages/core/src/store/** lines coverage 94.50% (189/200) is below 95%");
+  });
+
+  it("keeps Tier C aggregate groups exempt from per-file inheritance", () => {
+    const members = ["packages/core/src/types/a.ts", "packages/core/src/types/b.ts"] as const;
+    const group: CoverageThresholdEntry = {
+      ...scored("packages/core/src/types/**", { lines: 75, functions: 70 }),
+      tier: "C",
+      members,
+    };
+    const manifest = manifestFor("typescript", [group]);
+    expect(() =>
+      evaluateCoveragePolicy({
+        manifest,
+        language: "typescript",
+        records: [
+          record(members[0], { covered: 100, total: 100 }),
+          record(members[1], { covered: 50, total: 100 }),
+        ],
+        runtimePaths: runtimePaths(manifest.entries),
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -354,6 +388,25 @@ describe("manifest schema", () => {
     expect(() => parseCoverageManifest({ schemaVersion: 1, entries: [] })).toThrow(
       "Unsupported coverage threshold schema version",
     );
+  });
+
+  it("fails closed on unknown manifest, entry, metrics, and exclusion fields", () => {
+    const base = exclusion("packages/core/src/types.ts");
+    const cases = [
+      { schemaVersion: COVERAGE_SCHEMA_VERSION, entries: [], typo: true },
+      { schemaVersion: COVERAGE_SCHEMA_VERSION, entries: [{ ...base, typo: true }] },
+      {
+        schemaVersion: COVERAGE_SCHEMA_VERSION,
+        entries: [{ ...scored(), metrics: { lines: 90, functions: 85, statements: 90 } }],
+      },
+      {
+        schemaVersion: COVERAGE_SCHEMA_VERSION,
+        entries: [{ ...base, exclusion: { ...base.exclusion, ticket: "SEC-1" } }],
+      },
+    ];
+    for (const value of cases) {
+      expect(() => parseCoverageManifest(value)).toThrow("unknown field");
+    }
   });
 });
 

@@ -9,7 +9,7 @@ Pluggable first-row-header, first-sheet table export backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L232</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L271</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -29,7 +29,7 @@ name: string;
 <summary><code>toXlsxTable</code></summary>
 
 ```ts generated
-toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
+toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
 ```
 
 </details>
@@ -43,7 +43,11 @@ toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
 ```ts generated
 export interface XlsxTableExportBackend {
   name: string;
-  toXlsxTable(workbook: Workbook, store: Store): Promise<Uint8Array>;
+  toXlsxTable(
+    workbook: Workbook,
+    store: Store,
+    options?: XlsxWorkbookOptions,
+  ): Promise<Uint8Array>;
 }
 ```
 
