@@ -115,7 +115,7 @@ async function queryRegistry(identity: PackageIdentity): Promise<RegistryPackage
       `${identity.name}@${identity.version}`,
       "name",
       "version",
-      "dist.integrity",
+      "dist",
       "--json",
     ]),
   ) as RegistryPackage;
