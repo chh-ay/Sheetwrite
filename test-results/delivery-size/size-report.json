@@ -6,9 +6,9 @@
     "version": "1.0.0"
   },
   "meta": {
-    "commit": "a8dea92529c9fc0240ba5e222bb8aab604e55b3d",
-    "dirty": true,
-    "timestamp": "2026-07-19T08:13:37.940Z"
+    "commit": "499ac68a998f050fec7ebb94d6f80e356bb5c7a9",
+    "dirty": false,
+    "timestamp": "2026-07-19T09:27:53.353Z"
   },
   "toolchain": {
     "bun": "1.3.14",
@@ -416,7 +416,7 @@
       "owner": "webpack:worker-async"
     },
     "closure.core-xlsx.logicalBytes": {
-      "actual": 3679041,
+      "actual": 3679158,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core-xlsx"
@@ -428,7 +428,7 @@
       "owner": "core-xlsx"
     },
     "closure.core.logicalBytes": {
-      "actual": 2507434,
+      "actual": 2507512,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core"
@@ -446,7 +446,7 @@
       "owner": "core"
     },
     "closure.react.logicalBytes": {
-      "actual": 2701568,
+      "actual": 2701685,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "react"
@@ -464,7 +464,7 @@
       "owner": "react"
     },
     "closure.svelte.logicalBytes": {
-      "actual": 7557180,
+      "actual": 7557297,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "svelte"
@@ -482,7 +482,7 @@
       "owner": "svelte"
     },
     "closure.vue.logicalBytes": {
-      "actual": 19394674,
+      "actual": 19394791,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "vue"
@@ -560,7 +560,7 @@
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.metadataBytes": {
-      "actual": 5096,
+      "actual": 5135,
       "unit": "bytes",
       "category": "package-metadata",
       "owner": "@sheetwrite/core"
@@ -578,13 +578,13 @@
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.tarballBytes": {
-      "actual": 381363,
+      "actual": 381382,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.unpackedBytes": {
-      "actual": 2005268,
+      "actual": 2005307,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/core"
@@ -620,7 +620,7 @@
       "owner": "@sheetwrite/react"
     },
     "package.@sheetwrite/react.metadataBytes": {
-      "actual": 4986,
+      "actual": 5025,
       "unit": "bytes",
       "category": "package-metadata",
       "owner": "@sheetwrite/react"
@@ -638,13 +638,13 @@
       "owner": "@sheetwrite/react"
     },
     "package.@sheetwrite/react.tarballBytes": {
-      "actual": 7165,
+      "actual": 7181,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/react"
     },
     "package.@sheetwrite/react.unpackedBytes": {
-      "actual": 22530,
+      "actual": 22569,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/react"
@@ -680,7 +680,7 @@
       "owner": "@sheetwrite/svelte"
     },
     "package.@sheetwrite/svelte.metadataBytes": {
-      "actual": 4150,
+      "actual": 4189,
       "unit": "bytes",
       "category": "package-metadata",
       "owner": "@sheetwrite/svelte"
@@ -698,13 +698,13 @@
       "owner": "@sheetwrite/svelte"
     },
     "package.@sheetwrite/svelte.tarballBytes": {
-      "actual": 5352,
+      "actual": 5364,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/svelte"
     },
     "package.@sheetwrite/svelte.unpackedBytes": {
-      "actual": 14884,
+      "actual": 14923,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/svelte"
@@ -740,7 +740,7 @@
       "owner": "@sheetwrite/vue"
     },
     "package.@sheetwrite/vue.metadataBytes": {
-      "actual": 4534,
+      "actual": 4573,
       "unit": "bytes",
       "category": "package-metadata",
       "owner": "@sheetwrite/vue"
@@ -758,13 +758,13 @@
       "owner": "@sheetwrite/vue"
     },
     "package.@sheetwrite/vue.tarballBytes": {
-      "actual": 8798,
+      "actual": 8816,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/vue"
     },
     "package.@sheetwrite/vue.unpackedBytes": {
-      "actual": 29186,
+      "actual": 29225,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/vue"
@@ -800,7 +800,7 @@
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.metadataBytes": {
-      "actual": 3274,
+      "actual": 3313,
       "unit": "bytes",
       "category": "package-metadata",
       "owner": "@sheetwrite/wasm"
@@ -818,13 +818,13 @@
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.tarballBytes": {
-      "actual": 184825,
+      "actual": 184834,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.unpackedBytes": {
-      "actual": 502166,
+      "actual": 502205,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/wasm"
@@ -860,7 +860,7 @@
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.metadataBytes": {
-      "actual": 4701,
+      "actual": 4740,
       "unit": "bytes",
       "category": "package-metadata",
       "owner": "@sheetwrite/xlsx"
@@ -878,13 +878,13 @@
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.tarballBytes": {
-      "actual": 76803,
+      "actual": 76823,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/xlsx"
     },
     "package.@sheetwrite/xlsx.unpackedBytes": {
-      "actual": 374865,
+      "actual": 374904,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/xlsx"
@@ -899,14 +899,14 @@
   "packages": [
     {
       "name": "@sheetwrite/core",
-      "tarballBytes": 381363,
-      "unpackedBytes": 2005268,
+      "tarballBytes": 381382,
+      "unpackedBytes": 2005307,
       "fileCount": 293,
       "categories": {
         "css": 13446,
         "declarations": 241968,
         "maps": 973220,
-        "metadata": 5096,
+        "metadata": 5135,
         "runtime-js": 771538,
         "runtime-source": 0,
         "wasm": 0
@@ -914,14 +914,14 @@
     },
     {
       "name": "@sheetwrite/react",
-      "tarballBytes": 7165,
-      "unpackedBytes": 22530,
+      "tarballBytes": 7181,
+      "unpackedBytes": 22569,
       "fileCount": 8,
       "categories": {
         "css": 39,
         "declarations": 2684,
         "maps": 7749,
-        "metadata": 4986,
+        "metadata": 5025,
         "runtime-js": 7072,
         "runtime-source": 0,
         "wasm": 0
@@ -929,14 +929,14 @@
     },
     {
       "name": "@sheetwrite/svelte",
-      "tarballBytes": 5352,
-      "unpackedBytes": 14884,
+      "tarballBytes": 5364,
+      "unpackedBytes": 14923,
       "fileCount": 10,
       "categories": {
         "css": 39,
         "declarations": 823,
         "maps": 0,
-        "metadata": 4150,
+        "metadata": 4189,
         "runtime-js": 0,
         "runtime-source": 9872,
         "wasm": 0
@@ -944,14 +944,14 @@
     },
     {
       "name": "@sheetwrite/vue",
-      "tarballBytes": 8798,
-      "unpackedBytes": 29186,
+      "tarballBytes": 8816,
+      "unpackedBytes": 29225,
       "fileCount": 8,
       "categories": {
         "css": 39,
         "declarations": 5283,
         "maps": 10950,
-        "metadata": 4534,
+        "metadata": 4573,
         "runtime-js": 8380,
         "runtime-source": 0,
         "wasm": 0
@@ -959,14 +959,14 @@
     },
     {
       "name": "@sheetwrite/wasm",
-      "tarballBytes": 184825,
-      "unpackedBytes": 502166,
+      "tarballBytes": 184834,
+      "unpackedBytes": 502205,
       "fileCount": 12,
       "categories": {
         "css": 0,
         "declarations": 33620,
         "maps": 0,
-        "metadata": 3274,
+        "metadata": 3313,
         "runtime-js": 53782,
         "runtime-source": 0,
         "wasm": 411490
@@ -974,14 +974,14 @@
     },
     {
       "name": "@sheetwrite/xlsx",
-      "tarballBytes": 76803,
-      "unpackedBytes": 374865,
+      "tarballBytes": 76823,
+      "unpackedBytes": 374904,
       "fileCount": 59,
       "categories": {
         "css": 0,
         "declarations": 9577,
         "maps": 184895,
-        "metadata": 4701,
+        "metadata": 4740,
         "runtime-js": 175692,
         "runtime-source": 0,
         "wasm": 0
@@ -992,13 +992,13 @@
     {
       "name": "core",
       "packageCount": 2,
-      "logicalBytes": 2507434,
+      "logicalBytes": 2507512,
       "packages": ["@sheetwrite/core@0.1.0", "@sheetwrite/wasm@0.1.0"]
     },
     {
       "name": "core-xlsx",
       "packageCount": 4,
-      "logicalBytes": 3679041,
+      "logicalBytes": 3679158,
       "packages": [
         "@sheetwrite/core@0.1.0",
         "@sheetwrite/wasm@0.1.0",
@@ -1009,7 +1009,7 @@
     {
       "name": "react",
       "packageCount": 4,
-      "logicalBytes": 2701568,
+      "logicalBytes": 2701685,
       "packages": [
         "@sheetwrite/core@0.1.0",
         "@sheetwrite/react@0.1.0",
@@ -1020,7 +1020,7 @@
     {
       "name": "svelte",
       "packageCount": 23,
-      "logicalBytes": 7557180,
+      "logicalBytes": 7557297,
       "packages": [
         "@jridgewell/gen-mapping@0.3.13",
         "@jridgewell/remapping@2.3.5",
@@ -1050,7 +1050,7 @@
     {
       "name": "vue",
       "packageCount": 26,
-      "logicalBytes": 19394674,
+      "logicalBytes": 19394791,
       "packages": [
         "@babel/helper-string-parser@7.29.7",
         "@babel/helper-validator-identifier@7.29.7",
@@ -1227,7 +1227,7 @@
           "sha256": "87c0df90ad290f67e22e3e26394e8846c2294ebf40d93433ad5b62eb7b817e4f"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/oJLP9iepkhHBsdXpotd08/_buildManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/SNhV9uPDtVYdnZ6I0B1PB/_buildManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
@@ -1237,7 +1237,7 @@
           "sha256": "549fc1f6f226df947f859689a5217eeedc49d3ff876d9f364976a47ef4aad63d"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/oJLP9iepkhHBsdXpotd08/_ssgManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/SNhV9uPDtVYdnZ6I0B1PB/_ssgManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],

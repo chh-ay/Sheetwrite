@@ -932,10 +932,27 @@ bun run --filter @sheetwrite/bench bench:formula
 
 ## Delivery size
 
-## Pending local evidence
+<div class="evidence-available"><strong>Validated evidence.</strong> Package tarball and bundler-output sizes, gated by absolute budgets in CI.</div>
 
-These protocols have no validated artifact in this environment yet, so no numbers are published for them.
+<dl class="bench-meta" data-pagefind-ignore>
+<div><dt>Captured</dt><dd>2026-07-19 09:27 UTC</dd></div>
+<div><dt>Commit</dt><dd><code>499ac68a998f</code> clean worktree</dd></div>
+<div><dt>Raw artifact</dt><dd><code>test-results/delivery-size/size-report.json</code></dd></div>
+</dl>
 
-| Artifact | Status | Reproduce with |
-| --- | --- | --- |
-| `test-results/delivery-size/size-report.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run size:report` |
+| Package | Tarball | Unpacked |
+| --- | ---: | ---: |
+| `@sheetwrite/core` | 372.4 KiB | 1958.3 KiB |
+| `@sheetwrite/react` | 7.0 KiB | 22.0 KiB |
+| `@sheetwrite/svelte` | 5.2 KiB | 14.6 KiB |
+| `@sheetwrite/vue` | 8.6 KiB | 28.5 KiB |
+| `@sheetwrite/wasm` | 180.5 KiB | 490.4 KiB |
+| `@sheetwrite/xlsx` | 75.0 KiB | 366.1 KiB |
+
+A minimal Vite app that renders a grid ships 85.6 KiB of gzipped JavaScript.
+
+Reproduce with:
+
+```sh verify title="Delivery size evidence"
+bun run size:report
+```
