@@ -415,3 +415,17 @@ test("the workbench stays operable on a mobile viewport", async ({ page }) => {
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
+
+test("selected controls follow the site theme contrast", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("sheetwrite-theme", "light"));
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+  const selected = page.getByRole("radio", { name: "Main thread" });
+  const light = await selected.evaluate((element) => getComputedStyle(element).color);
+
+  await page.getByRole("button", { name: "Use dark theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect
+    .poll(() => selected.evaluate((element) => getComputedStyle(element).color))
+    .not.toBe(light);
+});

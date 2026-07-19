@@ -10,6 +10,8 @@
   --sw-demo-dim: var(--sw-fg-dim);
   --sw-demo-border: var(--sw-border);
   --sw-demo-border-strong: var(--sw-border-strong);
+  --sw-demo-accent: var(--sw-accent);
+  --sw-demo-accent-strong: var(--sw-accent-strong);
   --sw-demo-shadow: var(--sw-shadow);
   --sw-demo-popup-shadow: var(--sw-shadow);
 }
@@ -145,6 +147,10 @@
   padding-inline: var(--sw-demo-space-3);
 }
 
+.sw-vw .sw-demo-radio-item[data-checked] {
+  color: var(--sw-accent-ink);
+}
+
 /* DemoButton has no global skin; give it this route's instrument look. */
 .sw-vw .sw-demo-button {
   min-height: 2.15rem;
@@ -174,12 +180,12 @@
 .sw-vw .sw-demo-button[data-variant="primary"] {
   border-color: var(--sw-demo-accent);
   background: var(--sw-demo-accent);
-  color: var(--sw-demo-ink);
+  color: var(--sw-accent-ink);
 }
 
 .sw-vw .sw-demo-button[data-variant="primary"]:hover:not(:disabled) {
   background: var(--sw-demo-accent-strong);
-  color: var(--sw-demo-ink);
+  color: var(--sw-accent-ink);
 }
 
 .sw-vw .sw-demo-button[data-variant="quiet"] {

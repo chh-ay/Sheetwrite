@@ -252,7 +252,7 @@
   .sw-si-btn--primary {
     border-color: var(--sw-accent);
     background: var(--sw-accent);
-    color: var(--sw-surface-1);
+    color: var(--sw-accent-ink);
     font-weight: 700;
   }
 

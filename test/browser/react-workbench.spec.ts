@@ -202,6 +202,9 @@ test.describe("react workbench — controlled analytics", () => {
     // Copy the first account over the second with grid keyboard clipboard.
     await page.locator(GRID).click({ position: { x: ACCOUNT_X, y: ROW0_Y } });
     await page.keyboard.press("ControlOrMeta+c");
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 15_000 })
+      .toContain("Account 000001");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ControlOrMeta+v");
     await expect

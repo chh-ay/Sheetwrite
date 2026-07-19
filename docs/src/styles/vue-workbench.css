@@ -60,7 +60,7 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) 19rem;
+  grid-template-columns: minmax(0, 1fr) 24rem;
 }
 
 .sw-vuewb-panel {

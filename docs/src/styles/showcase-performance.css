@@ -425,13 +425,13 @@
   .sw-sp-actions button[data-variant="primary"] {
     border-color: var(--sw-accent);
     background: var(--sw-accent);
-    color: var(--sw-demo-ink);
+    color: var(--sw-accent-ink);
   }
 
   .sw-sp-actions button[data-variant="primary"]:hover:not(:disabled) {
     border-color: var(--sw-accent-strong);
     background: var(--sw-accent-strong);
-    color: var(--sw-demo-ink);
+    color: var(--sw-accent-ink);
   }
 
   .sw-sp-actions button[data-variant="quiet"] {
@@ -453,7 +453,7 @@
     border: 1px solid var(--sw-accent);
     border-radius: 0 var(--sw-demo-radius-2) var(--sw-demo-radius-2) 0;
     background: var(--sw-accent);
-    color: var(--sw-demo-ink);
+    color: var(--sw-accent-ink);
     font: 550 var(--sw-type-sm) var(--sw-font-body);
     cursor: pointer;
     transition:

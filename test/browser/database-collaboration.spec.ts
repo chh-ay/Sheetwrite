@@ -335,3 +335,50 @@ test.describe("collaboration proof", () => {
     expect(errors.page).toEqual([]);
   });
 });
+
+test("proof stages, workbooks, and primary actions follow the site theme", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("sheetwrite-theme", "light"));
+  const cases = [
+    {
+      url: DATABASE_URL,
+      ready: databaseReady,
+      grid: ".sw-dbx__grid",
+      primary: '.sw-dbx__button[data-variant="primary"]',
+    },
+    {
+      url: COLLABORATION_URL,
+      ready: collaborationReady,
+      grid: ".sw-clb__grid",
+      primary: '.sw-clb__button[data-variant="primary"]',
+    },
+  ] as const;
+
+  for (const current of cases) {
+    await page.goto(current.url);
+    await current.ready(page);
+    const palette = () =>
+      page.evaluate(
+        ({ grid, primary }) => {
+          const stageStyle = getComputedStyle(
+            document.querySelector<HTMLElement>(".sw-proofs-page__stage")!,
+          );
+          const gridStyle = getComputedStyle(document.querySelector<HTMLElement>(grid)!);
+          const buttonStyle = getComputedStyle(document.querySelector<HTMLButtonElement>(primary)!);
+          return {
+            stage: stageStyle.backgroundColor,
+            sheet: gridStyle.getPropertyValue("--sheetwrite-bg").trim(),
+            buttonText: buttonStyle.color,
+          };
+        },
+        { grid: current.grid, primary: current.primary },
+      );
+    const light = await palette();
+    await page.getByRole("button", { name: "Use dark theme" }).click();
+    await expect.poll(async () => (await palette()).buttonText).not.toBe(light.buttonText);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    const dark = await palette();
+    expect(dark.stage).not.toBe(light.stage);
+    expect(dark.sheet).not.toBe(light.sheet);
+    expect(dark.buttonText).not.toBe(light.buttonText);
+  }
+});

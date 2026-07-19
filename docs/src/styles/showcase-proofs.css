@@ -81,11 +81,11 @@
 }
 
 .sw-proofs-page__stage {
-  border: 1px solid var(--sw-demo-border);
+  border: 1px solid var(--sw-border);
   border-radius: var(--sw-demo-radius-3);
   overflow: hidden;
-  background: var(--sw-demo-surface);
-  box-shadow: var(--sw-demo-shadow);
+  background: var(--sw-surface-1);
+  box-shadow: var(--sw-shadow);
 }
 
 .sw-proofs-page__viewport {
@@ -98,14 +98,14 @@
   gap: 0.35rem 1rem;
   align-items: baseline;
   padding: 0.85rem clamp(0.9rem, 2vw, 1.4rem);
-  border-top: 1px solid var(--sw-demo-border);
-  background: var(--sw-demo-deep);
-  color: var(--sw-demo-muted);
+  border-top: 1px solid var(--sw-border);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg-muted);
   font-size: var(--sw-type-sm);
 }
 
 .sw-proofs-page__prompt strong {
-  color: var(--sw-demo-accent);
+  color: var(--sw-accent);
   font-family: var(--sw-font-mono);
   font-size: var(--sw-type-xs);
   letter-spacing: 0.12em;
@@ -482,7 +482,7 @@
 .sw-clb__button[data-variant="primary"] {
   border-color: var(--sw-demo-accent);
   background: var(--sw-demo-accent);
-  color: var(--sw-demo-ink);
+  color: var(--sw-accent-ink);
   font-weight: 600;
 }
 

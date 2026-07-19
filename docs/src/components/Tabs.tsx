@@ -61,8 +61,7 @@ export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
     window.dispatchEvent(new CustomEvent(TAB_EVENT, { detail: { key: syncKey, label } }));
   };
 
-  const active = tabs[selected] ?? tabs[0];
-  if (active === undefined) return null;
+  if (tabs.length === 0) return null;
 
   return (
     <div className="sw-tabs">
@@ -81,14 +80,18 @@ export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
           </button>
         ))}
       </div>
-      <div
-        aria-labelledby={`${id}-tab-${selected}`}
-        className="sw-tabs__panel"
-        id={`${id}-panel-${selected}`}
-        role="tabpanel"
-      >
-        {active.props.children}
-      </div>
+      {tabs.map((tab, index) => (
+        <div
+          aria-labelledby={`${id}-tab-${index}`}
+          className="sw-tabs__panel"
+          hidden={index !== selected}
+          id={`${id}-panel-${index}`}
+          key={tab.props.label}
+          role="tabpanel"
+        >
+          {tab.props.children}
+        </div>
+      ))}
     </div>
   );
 }

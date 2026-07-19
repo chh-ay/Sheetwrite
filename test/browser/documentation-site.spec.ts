@@ -580,11 +580,28 @@ test.describe("documentation site", () => {
   test("framework tabs synchronize and persist across guides", async ({ page }) => {
     await page.goto(docsUrl("start/installation/"));
     await waitForHydration(page);
+    const expectStyledPanel = async (language: string) => {
+      const panel = page.getByRole("tabpanel");
+      await expect(panel.locator(".frame.is-terminal .sr-only")).toHaveCSS("position", "absolute");
+      const colors = await panel
+        .locator(`pre[data-language="${language}"] .code`)
+        .first()
+        .evaluate((code) => ({
+          code: getComputedStyle(code).color,
+          tokens: Array.from(
+            code.querySelectorAll<HTMLElement>("span[style]"),
+            (token) => getComputedStyle(token).color,
+          ),
+        }));
+      expect(colors.tokens.length).toBeGreaterThan(0);
+      expect(colors.tokens.some((color) => color !== colors.code)).toBe(true);
+    };
     const reactTab = page.getByRole("tab", { name: "React", exact: true });
     await expect(reactTab).toBeVisible();
     await reactTab.click();
     await expect(reactTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tabpanel")).toContainText("@sheetwrite/react");
+    await expectStyledPanel("tsx");
     expect(await page.evaluate(() => localStorage.getItem("sheetwrite-framework"))).toBe("React");
 
     await page.goto(docsUrl("frameworks/lifecycle/"));
@@ -601,6 +618,9 @@ test.describe("documentation site", () => {
       "aria-selected",
       "true",
     );
+    await expectStyledPanel("vue");
+    await page.getByRole("tab", { name: "Svelte", exact: true }).click();
+    await expectStyledPanel("svelte");
   });
 
   for (const framework of ["react", "vue", "svelte"] as const) {
