@@ -160,6 +160,7 @@ describe("CI and release workflow contracts", () => {
     expect(setupStep(publish, "actions/setup-node")?.with?.["node-version"]).toBe(
       WORKFLOW_NODE_VERSION,
     );
+    expect(setupStep(publish, "actions/setup-node")?.with?.["registry-url"]).toBeUndefined();
     expect(setupStep(publish, "oven-sh/setup-bun")?.with?.["bun-version"]).toBe(
       WORKFLOW_BUN_VERSION,
     );
