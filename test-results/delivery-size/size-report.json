@@ -6,9 +6,9 @@
     "version": "1.0.0"
   },
   "meta": {
-    "commit": "499ac68a998f050fec7ebb94d6f80e356bb5c7a9",
+    "commit": "848e46a0f350d027982cfa86c67ea802d0ad544c",
     "dirty": false,
-    "timestamp": "2026-07-19T09:27:53.353Z"
+    "timestamp": "2026-07-19T10:35:25.088Z"
   },
   "toolchain": {
     "bun": "1.3.14",
@@ -993,16 +993,16 @@
       "name": "core",
       "packageCount": 2,
       "logicalBytes": 2507512,
-      "packages": ["@sheetwrite/core@0.1.0", "@sheetwrite/wasm@0.1.0"]
+      "packages": ["@sheetwrite/core@0.2.0", "@sheetwrite/wasm@0.2.0"]
     },
     {
       "name": "core-xlsx",
       "packageCount": 4,
       "logicalBytes": 3679158,
       "packages": [
-        "@sheetwrite/core@0.1.0",
-        "@sheetwrite/wasm@0.1.0",
-        "@sheetwrite/xlsx@0.1.0",
+        "@sheetwrite/core@0.2.0",
+        "@sheetwrite/wasm@0.2.0",
+        "@sheetwrite/xlsx@0.2.0",
         "fflate@0.8.3"
       ]
     },
@@ -1011,9 +1011,9 @@
       "packageCount": 4,
       "logicalBytes": 2701685,
       "packages": [
-        "@sheetwrite/core@0.1.0",
-        "@sheetwrite/react@0.1.0",
-        "@sheetwrite/wasm@0.1.0",
+        "@sheetwrite/core@0.2.0",
+        "@sheetwrite/react@0.2.0",
+        "@sheetwrite/wasm@0.2.0",
         "react@19.2.7"
       ]
     },
@@ -1027,9 +1027,9 @@
         "@jridgewell/resolve-uri@3.1.2",
         "@jridgewell/sourcemap-codec@1.5.5",
         "@jridgewell/trace-mapping@0.3.31",
-        "@sheetwrite/core@0.1.0",
-        "@sheetwrite/svelte@0.1.0",
-        "@sheetwrite/wasm@0.1.0",
+        "@sheetwrite/core@0.2.0",
+        "@sheetwrite/svelte@0.2.0",
+        "@sheetwrite/wasm@0.2.0",
         "@sveltejs/acorn-typescript@1.0.11",
         "@types/estree@1.0.9",
         "@types/trusted-types@2.0.7",
@@ -1057,9 +1057,9 @@
         "@babel/parser@7.29.7",
         "@babel/types@7.29.7",
         "@jridgewell/sourcemap-codec@1.5.5",
-        "@sheetwrite/core@0.1.0",
-        "@sheetwrite/vue@0.1.0",
-        "@sheetwrite/wasm@0.1.0",
+        "@sheetwrite/core@0.2.0",
+        "@sheetwrite/vue@0.2.0",
+        "@sheetwrite/wasm@0.2.0",
         "@vue/compiler-core@3.5.39",
         "@vue/compiler-dom@3.5.39",
         "@vue/compiler-sfc@3.5.39",
@@ -1227,7 +1227,7 @@
           "sha256": "87c0df90ad290f67e22e3e26394e8846c2294ebf40d93433ad5b62eb7b817e4f"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/SNhV9uPDtVYdnZ6I0B1PB/_buildManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/OeuQ2z-sDBG_-8Jyk46M5/_buildManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
@@ -1237,7 +1237,7 @@
           "sha256": "549fc1f6f226df947f859689a5217eeedc49d3ff876d9f364976a47ef4aad63d"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/SNhV9uPDtVYdnZ6I0B1PB/_ssgManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/OeuQ2z-sDBG_-8Jyk46M5/_ssgManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
