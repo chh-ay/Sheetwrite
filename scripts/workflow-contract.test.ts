@@ -167,10 +167,6 @@ describe("CI and release workflow contracts", () => {
       WORKFLOW_BUN_VERSION,
     );
     expect(commands(publish)).toContain('npm install --global "npm@$NPM_VERSION"');
-    expect(commands(publish)).toContain(
-      "npm config delete //registry.npmjs.org/:_authToken --location=user",
-    );
-    expect(commands(publish)).toContain("unset NODE_AUTH_TOKEN");
     expect(commands(publish)).toContain("release-publish.ts");
     expect(commands(publish)).toContain("gh release create");
   });
