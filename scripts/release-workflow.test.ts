@@ -351,6 +351,27 @@ describe("CI-completion package release workflow", () => {
       name: "@sheetwrite/core",
       version: "0.2.0",
     });
+    expect(
+      publishedPackageFrom({
+        "@sheetwrite/core": {
+          id: "@sheetwrite/core@0.2.0",
+          name: "@sheetwrite/core",
+          version: "0.2.0",
+          size: 381363,
+          unpackedSize: 2005268,
+          shasum: "557be78d365d7f77f48485907835685cb953d737",
+          integrity:
+            "sha512-QAJ3U891g0fM2LE7d+gxGJlUHaZwRhFqqHuOhPpXJUHzsnYP5JpSwXFUfxwrij5v2SCdcHeZwT06szZ13R0BNg==",
+          filename: "sheetwrite-core-0.2.0.tgz",
+          files: [{ path: "package.json", size: 1769, mode: 420 }],
+          entryCount: 293,
+          bundled: [],
+        },
+      }),
+    ).toEqual({
+      name: "@sheetwrite/core",
+      version: "0.2.0",
+    });
     expect(() => publishedPackageFrom({ id: "@sheetwrite/core@0.2.0" })).toThrow(
       "explicit package name and version",
     );
