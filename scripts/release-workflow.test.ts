@@ -417,6 +417,14 @@ describe("CI-completion package release workflow", () => {
         core.version,
       ),
     ).toThrow("integrity does not match");
+    const flatNpmViewResponse = {
+      name: core.name,
+      version: core.version,
+      "dist.integrity": core.integrity,
+    };
+    expect(() => assertRegistryPackage(core, flatNpmViewResponse, core.version)).toThrow(
+      "integrity does not match",
+    );
     expect(() =>
       assertRegistryPackage(
         core,
