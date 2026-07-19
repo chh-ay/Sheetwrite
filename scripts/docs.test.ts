@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { GRID_OPTION_POLICY } from "../packages/core/src/adapter.js";
 import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
@@ -342,6 +341,14 @@ describe("adapter documentation contract", () => {
       {
         name: "@sheetwrite/core",
         entryPoints: [
+          entry(".", [
+            apiExport(
+              "GridOptions",
+              "interface",
+              propsSignature(ADAPTER_DOC_CONTRACT.inputs.filter((name) => name !== "wasmSource")),
+              ADAPTER_DOC_CONTRACT.inputs.filter((name) => name !== "wasmSource"),
+            ),
+          ]),
           entry("./adapter", [
             apiExport(
               "GridReadyReason",
@@ -398,10 +405,7 @@ describe("adapter documentation contract", () => {
     ],
   });
 
-  it("mirrors the canonical adapter option policy and event casing", () => {
-    expect(new Set<string>(ADAPTER_DOC_CONTRACT.inputs)).toEqual(
-      new Set<string>([...Object.keys(GRID_OPTION_POLICY), "wasmSource"]),
-    );
+  it("mirrors canonical event casing", () => {
     const kebabOf = (handler: string) =>
       handler
         .replace(/^on/, "")
@@ -414,6 +418,18 @@ describe("adapter documentation contract", () => {
 
   it("accepts a manifest documenting every canonical input, event, and reason", () => {
     expect(adapterContractIssues(conformingManifest())).toEqual([]);
+  });
+
+  it("fails when GridOptions and the adapter input contract drift", () => {
+    const manifest = conformingManifest();
+    const options = manifest.packages[0]?.entryPoints
+      .find((entry) => entry.subpath === ".")
+      ?.exports.find((item) => item.name === "GridOptions");
+    if (options === undefined) throw new Error("fixture shape changed");
+    options.memberDocs.push({ name: "uncoveredInput", documentation: "Uncovered input." });
+    expect(adapterContractIssues(manifest)).toContain(
+      "GridOptions member uncoveredInput is not covered by the adapter documentation contract",
+    );
   });
 
   it("fails when an adapter input or readiness event disappears", () => {
@@ -451,7 +467,9 @@ describe("adapter documentation contract", () => {
 
   it("fails when documented readiness reasons drift from the implementation", () => {
     const manifest = conformingManifest();
-    const reason = manifest.packages[0]?.entryPoints[0]?.exports[0];
+    const reason = manifest.packages[0]?.entryPoints
+      .find((entry) => entry.subpath === "./adapter")
+      ?.exports.find((item) => item.name === "GridReadyReason");
     if (reason === undefined) throw new Error("fixture shape changed");
     reason.signature = 'export type GridReadyReason = "initial" | "reset";';
     const issues = adapterContractIssues(manifest);

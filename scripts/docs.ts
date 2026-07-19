@@ -146,6 +146,28 @@ export function adapterContractIssues(manifest: PublicApiManifest): string[] {
       ?.entryPoints.find((entry) => entry.subpath === ".")
       ?.exports.find((item) => item.name === name);
 
+  const gridOptions = exportOf("@sheetwrite/core", "GridOptions");
+  const expectedInputs = ADAPTER_DOC_CONTRACT.inputs.filter((name) => name !== "wasmSource");
+  if (gridOptions === undefined) {
+    failures.push("@sheetwrite/core does not export GridOptions");
+  } else {
+    const implementedInputs = new Set(gridOptions.memberDocs.map((member) => member.name));
+    for (const input of expectedInputs) {
+      if (!implementedInputs.has(input)) {
+        failures.push(
+          `GridOptions member ${input} is missing from the adapter documentation contract`,
+        );
+      }
+    }
+    for (const input of implementedInputs) {
+      if (!(expectedInputs as readonly string[]).includes(input)) {
+        failures.push(
+          `GridOptions member ${input} is not covered by the adapter documentation contract`,
+        );
+      }
+    }
+  }
+
   const requireMembers = (
     packageName: string,
     exportName: string,
