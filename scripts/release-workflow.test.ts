@@ -3,8 +3,9 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { ReleasePackageArtifact } from "./release-artifacts.js";
-import { releaseVersionFromTag } from "./release-preflight.js";
+import { releaseVersionFromTag, successfulCiRunId } from "./release-preflight.js";
 import {
+  assertCanonicalReleaseIdentity,
   assertRegistryPackage,
   publishArtifactsIdempotently,
   publishedPackageFrom,
@@ -53,26 +54,85 @@ describe("tag-triggered release workflow", () => {
     expect(() => releaseVersionFromTag("v0.2.0-beta.1")).toThrow("exact stable semantic version");
   });
 
-  it("derives one immutable tag identity before every release gate", async () => {
+  it("accepts only a successful completed push CI run for the exact commit", () => {
+    const sha = "a".repeat(40);
+    expect(
+      successfulCiRunId(
+        {
+          workflow_runs: [
+            {
+              id: 42,
+              head_sha: sha,
+              event: "push",
+              status: "completed",
+              conclusion: "success",
+            },
+          ],
+        },
+        sha,
+      ),
+    ).toBe(42);
+    for (const override of [
+      { head_sha: "b".repeat(40) },
+      { event: "pull_request" },
+      { status: "in_progress" },
+      { conclusion: "failure" },
+    ]) {
+      expect(() =>
+        successfulCiRunId(
+          {
+            workflow_runs: [
+              {
+                id: 42,
+                head_sha: sha,
+                event: "push",
+                status: "completed",
+                conclusion: "success",
+                ...override,
+              },
+            ],
+          },
+          sha,
+        ),
+      ).toThrow("no successful completed push CI run");
+    }
+  });
+
+  it("binds canonical artifact bytes to the tagged version and commit", () => {
+    const sha = "a".repeat(40);
+    const artifacts = PUBLISHABLE_PACKAGE_ORDER.map(artifact);
+    expect(() =>
+      assertCanonicalReleaseIdentity({ sourceCommit: sha, packages: artifacts }, "0.2.0", sha),
+    ).not.toThrow();
+    expect(() =>
+      assertCanonicalReleaseIdentity(
+        { sourceCommit: "b".repeat(40), packages: artifacts },
+        "0.2.0",
+        sha,
+      ),
+    ).toThrow("Canonical artifacts came from");
+    expect(() =>
+      assertCanonicalReleaseIdentity(
+        { sourceCommit: sha, packages: [{ ...artifacts[0]!, version: "0.1.0" }] },
+        "0.2.0",
+        sha,
+      ),
+    ).toThrow("expected 0.2.0");
+  });
+
+  it("derives one immutable tag identity and reuses its successful CI artifacts", async () => {
     const { parsed, source } = await workflow();
-    expect(Object.keys(parsed.jobs ?? {})).toEqual([
-      "identity",
-      "preflight",
-      "prepare",
-      "package-gates",
-      "publish",
-    ]);
+    expect(Object.keys(parsed.jobs ?? {})).toEqual(["identity", "publish"]);
     expect(source).toMatch(/git rev-parse "\$\{RELEASE_TAG\}\^\{commit\}"/);
     expect(source).toMatch(/version=\$\{RELEASE_TAG#v\}/);
     expect(source).not.toContain("workflow_dispatch");
-    for (const name of ["preflight", "prepare", "package-gates", "publish"]) {
-      expect(JSON.stringify(parsed.jobs?.[name])).toContain("needs.identity.outputs.commit");
-    }
+    expect(JSON.stringify(parsed.jobs?.publish)).toContain("needs.identity.outputs.commit");
+    expect(JSON.stringify(parsed.jobs?.publish)).toContain("needs.identity.outputs.ci_run_id");
   });
 
   it("isolates OIDC and repository write access to the publishing job", async () => {
     const { parsed } = await workflow();
-    expect(parsed.permissions).toEqual({ contents: "read" });
+    expect(parsed.permissions).toEqual({ actions: "read", contents: "read" });
     const jobs = parsed.jobs ?? {};
     const privileged = Object.entries(jobs).filter(
       ([, job]) => job.permissions?.["id-token"] === "write",
@@ -81,7 +141,11 @@ describe("tag-triggered release workflow", () => {
     const [publishName, publishJob] = privileged[0]!;
     expect(publishName).toBe("publish");
     expect(publishJob.environment).toBe("npm-release");
-    expect(publishJob.permissions).toEqual({ contents: "write", "id-token": "write" });
+    expect(publishJob.permissions).toEqual({
+      actions: "read",
+      contents: "write",
+      "id-token": "write",
+    });
 
     const pending = [
       ...(Array.isArray(publishJob.needs)
@@ -104,20 +168,21 @@ describe("tag-triggered release workflow", () => {
     }
   });
 
-  it("rehashes immutable artifacts before trusted publication and registry verification", async () => {
+  it("publishes only artifacts from successful CI without repeating its gates", async () => {
     const { parsed, source } = await workflow();
-    const jobs = parsed.jobs ?? {};
-    for (const name of ["package-gates", "publish"]) {
-      const steps = jobs[name]?.steps ?? [];
-      expect(steps.some((step) => step.uses?.startsWith("actions/download-artifact@"))).toBe(true);
-      expect(steps.some((step) => step.run?.includes("release:verify-artifacts"))).toBe(true);
-    }
-    expect(jobs.prepare?.steps?.some((step) => step.with?.["if-no-files-found"] === "error")).toBe(
-      true,
+    const commands = Object.values(parsed.jobs ?? {})
+      .flatMap((job) => job.steps ?? [])
+      .flatMap((step) => (step.run ? [step.run] : []))
+      .join("\n");
+    expect(source).toContain("scripts/release-preflight.ts");
+    expect(commands).toContain("gh run download");
+    expect(commands).toContain("canonical-release-artifacts");
+    expect(commands).toContain("scripts/release-publish.ts");
+    expect(commands).toContain("gh release create");
+    expect(commands).toContain("--generate-notes");
+    expect(commands).not.toMatch(
+      /verify:ci|verify:release-quality|test:coverage|test:browser|release:prepare|release-verify\.ts|install-wasm-pack|browser:install/,
     );
-    expect(source).toContain("scripts/release-publish.ts");
-    expect(source).toContain("gh release create");
-    expect(source).toContain("--generate-notes");
     expect(source).not.toMatch(/NODE_AUTH_TOKEN|NPM_TOKEN|changeset publish|release-stage/);
   });
 

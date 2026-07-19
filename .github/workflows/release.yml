@@ -10,17 +10,13 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
 
 env:
   BUN_VERSION: "1.3.14"
   NODE_VERSION: "24.3.0"
   NPM_VERSION: "11.18.0"
-  RUST_VERSION: "1.96.0"
-  WASM_TARGET: "wasm32-unknown-unknown"
-  WASM_PACK_VERSION: "0.15.0"
-  CARGO_AUDIT_VERSION: "0.22.2"
-  CARGO_LLVM_COV_VERSION: "0.8.7"
 
 jobs:
   identity:
@@ -28,6 +24,7 @@ jobs:
     outputs:
       commit: ${{ steps.release.outputs.commit }}
       version: ${{ steps.release.outputs.version }}
+      ci_run_id: ${{ steps.preflight.outputs.ci_run_id }}
     steps:
       - name: Checkout pushed tag
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -45,148 +42,26 @@ jobs:
           fi
           echo "commit=$(git rev-parse "${RELEASE_TAG}^{commit}")" >> "$GITHUB_OUTPUT"
           echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
-
-  preflight:
-    needs: identity
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - name: Checkout release commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ needs.identity.outputs.commit }}
-          fetch-depth: 0
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Install pinned npm
-        run: npm install --global "npm@$NPM_VERSION"
       - name: Setup Bun
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Validate tag identity and registry state
+      - name: Require successful CI for the tagged commit
+        id: preflight
         env:
-          EXPECTED_SHA: ${{ needs.identity.outputs.commit }}
+          EXPECTED_SHA: ${{ steps.release.outputs.commit }}
           RELEASE_TAG: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: bun scripts/release-preflight.ts
-      - name: Install verification toolchain
-        run: |
-          bun scripts/install-wasm-pack.ts
-          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
-          cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
-          bun run browser:install
-      - name: Print exact toolchain
-        run: |
-          test "$(bun --version)" = "$BUN_VERSION"
-          test "$(node --version)" = "v$NODE_VERSION"
-          test "$(npm --version)" = "$NPM_VERSION"
-          test "$(rustc --version | cut -d' ' -f2)" = "$RUST_VERSION"
-          test "$(wasm-pack --version | cut -d' ' -f2)" = "$WASM_PACK_VERSION"
-          cargo audit --version
-          cargo llvm-cov --version
-      - name: Run canonical source verification
-        run: bun run verify:ci
-      - name: Build verification-mode canonical artifacts
-        run: bun run release:artifacts
-      - name: Run release quality gates
-        run: bun run verify:release-quality
-      - name: Verify every canonical artifact consumer
-        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
-      - name: Enforce source coverage
-        run: bun run test:coverage
-      - name: Browser smoke tests
-        run: bun run test:browser
-      - name: Assert source remains clean
-        run: test -z "$(git status --porcelain --untracked-files=all)"
-
-  prepare:
-    needs: [identity, preflight]
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    outputs:
-      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
-    steps:
-      - name: Checkout release commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ needs.identity.outputs.commit }}
-          fetch-depth: 0
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Install pinned npm
-        run: npm install --global "npm@$NPM_VERSION"
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Install release artifact toolchain
-        run: |
-          bun scripts/install-wasm-pack.ts
-          cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
-          cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
-      - name: Build and pack one canonical artifact set
-        run: bun run release:prepare -- --mode release --output test-results/release-artifacts
-      - name: Verify canonical artifact manifest
-        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
-      - name: Upload immutable canonical artifact bundle
-        id: upload
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: canonical-release-artifacts
-          path: test-results/release-artifacts/
-          if-no-files-found: error
-          retention-days: 7
-
-  package-gates:
-    needs: [identity, prepare]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout release commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ needs.identity.outputs.commit }}
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Install pinned npm
-        run: npm install --global "npm@$NPM_VERSION"
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Download immutable canonical artifact bundle
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
-        with:
-          name: canonical-release-artifacts
-          path: test-results/release-artifacts
-      - name: Assert workflow artifact digest exists
-        env:
-          ARTIFACT_DIGEST: ${{ needs.prepare.outputs.artifact_digest }}
-        run: test -n "$ARTIFACT_DIGEST"
-      - name: Rehash and verify exact tarballs
-        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
-      - name: Run every package consumer against downloaded bytes
-        run: bun scripts/release-verify.ts --artifacts test-results/release-artifacts
 
   publish:
-    needs: [identity, prepare, package-gates]
+    needs: identity
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: npm-release
     permissions:
+      actions: read
       contents: write
       id-token: write
     steps:
@@ -205,15 +80,14 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - name: Download immutable canonical artifact bundle
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
-        with:
-          name: canonical-release-artifacts
-          path: test-results/release-artifacts
-      - name: Rehash exact tarballs before publication
-        run: bun run release:verify-artifacts -- --input test-results/release-artifacts
-      - name: Publish exact tarballs and verify the public registry
+      - name: Download canonical artifacts from successful CI
         env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ needs.identity.outputs.ci_run_id }}
+        run: gh run download "$CI_RUN_ID" --name canonical-release-artifacts --dir test-results/release-artifacts
+      - name: Rehash and publish exact tarballs
+        env:
+          EXPECTED_SHA: ${{ needs.identity.outputs.commit }}
           RELEASE_VERSION: ${{ needs.identity.outputs.version }}
         run: bun scripts/release-publish.ts test-results/release-artifacts
       - name: Create verified GitHub release

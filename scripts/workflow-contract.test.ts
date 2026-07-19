@@ -48,13 +48,7 @@ describe("CI and release workflow contracts", () => {
   it("parses jobs and steps through one fail-closed workflow seam", () => {
     const parsed = workflows();
     expect(Object.keys(parsed.ci.jobs).length).toBeGreaterThan(1);
-    expect(Object.keys(parsed.release.jobs)).toEqual([
-      "identity",
-      "preflight",
-      "prepare",
-      "package-gates",
-      "publish",
-    ]);
+    expect(Object.keys(parsed.release.jobs)).toEqual(["identity", "publish"]);
 
     expect(() => parseWorkflowContract("jobs: []", "fixture")).toThrow(
       "fixture.jobs must be a non-empty object",
@@ -98,16 +92,10 @@ describe("CI and release workflow contracts", () => {
     ).toThrow("action is not reviewed");
   });
 
-  it("keeps canonical Node, Bun, npm, Rust, target, and wasm-pack versions in parity", () => {
-    const expectedEnv = {
-      BUN_VERSION,
-      NODE_VERSION,
-      NPM_VERSION,
-      RUST_VERSION,
-      WASM_TARGET,
-      WASM_PACK_VERSION,
-    } as const;
-    for (const [name, workflow] of Object.entries(workflows())) {
+  it("keeps each workflow's required toolchain versions in parity", () => {
+    const parsed = workflows();
+    for (const [name, workflow] of Object.entries(parsed)) {
+      const expectedEnv = { BUN_VERSION, NODE_VERSION, NPM_VERSION } as const;
       for (const [key, value] of Object.entries(expectedEnv)) {
         expect(workflow.env?.[key], `${name} ${key}`).toBe(value);
       }
@@ -122,18 +110,24 @@ describe("CI and release workflow contracts", () => {
       expect(
         bunSetups.every((step) => step.with?.["bun-version"] === WORKFLOW_BUN_VERSION),
       ).toBeTrue();
-
-      const npmInstallCommands = steps
-        .flatMap((step) => (step.run ? [step.run] : []))
-        .filter((command) => command.includes("npm install --global"));
-      expect(npmInstallCommands.length, `${name} npm setup`).toBeGreaterThan(0);
       expect(
-        npmInstallCommands.every((command) =>
-          command.includes('npm install --global "npm@$NPM_VERSION"'),
-        ),
+        steps
+          .flatMap((step) => (step.run ? [step.run] : []))
+          .filter((command) => command.includes("npm install --global"))
+          .every((command) => command.includes('npm install --global "npm@$NPM_VERSION"')),
       ).toBeTrue();
-      expect(steps.some((step) => step.run?.includes("scripts/install-wasm-pack.ts"))).toBeTrue();
     }
+
+    for (const [key, value] of Object.entries({
+      RUST_VERSION,
+      WASM_TARGET,
+      WASM_PACK_VERSION,
+    })) {
+      expect(parsed.ci.env?.[key], `CI ${key}`).toBe(value);
+      expect(parsed.release.env?.[key], `release ${key}`).toBeUndefined();
+    }
+    expect(commands(parsed.release.jobs.identity!)).not.toContain("install-wasm-pack");
+    expect(commands(parsed.release.jobs.publish!)).not.toContain("install-wasm-pack");
   });
 
   it("installs and runs all browser projects on supported Ubuntu while limiting portable engines", () => {
@@ -158,7 +152,11 @@ describe("CI and release workflow contracts", () => {
   it("applies the canonical JavaScript toolchain to the trusted publishing job", () => {
     const publish = workflows().release.jobs.publish!;
     expect(publish.environment).toBe("npm-release");
-    expect(publish.permissions).toEqual({ contents: "write", "id-token": "write" });
+    expect(publish.permissions).toEqual({
+      actions: "read",
+      contents: "write",
+      "id-token": "write",
+    });
     expect(setupStep(publish, "actions/setup-node")?.with?.["node-version"]).toBe(
       WORKFLOW_NODE_VERSION,
     );

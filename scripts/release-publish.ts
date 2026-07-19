@@ -1,5 +1,9 @@
 import { join, resolve } from "node:path";
-import { type ReleasePackageArtifact, verifyReleaseArtifacts } from "./release-artifacts.js";
+import {
+  type ReleaseArtifactManifest,
+  type ReleasePackageArtifact,
+  verifyReleaseArtifacts,
+} from "./release-artifacts.js";
 
 export interface PublishedPackage {
   readonly name: string;
@@ -197,16 +201,30 @@ export async function verifyPublishedArtifacts(
   });
 }
 
-export async function publishCanonicalArtifacts(
-  artifactRoot: string,
+export function assertCanonicalReleaseIdentity(
+  manifest: Pick<ReleaseArtifactManifest, "sourceCommit" | "packages">,
   expectedVersion: string,
-): Promise<readonly PublishedPackage[]> {
-  const manifest = await verifyReleaseArtifacts(artifactRoot);
+  expectedCommit: string,
+): void {
+  if (manifest.sourceCommit !== expectedCommit) {
+    throw new Error(
+      `Canonical artifacts came from ${manifest.sourceCommit}, expected ${expectedCommit}`,
+    );
+  }
   for (const artifact of manifest.packages) {
     if (artifact.version !== expectedVersion) {
       throw new Error(`${artifact.name} is ${artifact.version}, expected ${expectedVersion}`);
     }
   }
+}
+
+export async function publishCanonicalArtifacts(
+  artifactRoot: string,
+  expectedVersion: string,
+  expectedCommit: string,
+): Promise<readonly PublishedPackage[]> {
+  const manifest = await verifyReleaseArtifacts(artifactRoot);
+  assertCanonicalReleaseIdentity(manifest, expectedVersion, expectedCommit);
   const published = await publishArtifactsIdempotently(artifactRoot, manifest.packages);
   await verifyPublishedArtifacts(manifest.packages);
   return published;
@@ -215,8 +233,12 @@ export async function publishCanonicalArtifacts(
 if (import.meta.main) {
   const artifactRoot = resolve(process.argv[2] ?? "test-results/release-artifacts");
   const expectedVersion = process.env.RELEASE_VERSION;
+  const expectedCommit = process.env.EXPECTED_SHA;
   if (!expectedVersion) throw new Error("RELEASE_VERSION is required");
-  const published = await publishCanonicalArtifacts(artifactRoot, expectedVersion);
+  if (!expectedCommit || !/^[0-9a-f]{40}$/.test(expectedCommit)) {
+    throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
+  }
+  const published = await publishCanonicalArtifacts(artifactRoot, expectedVersion, expectedCommit);
   console.log(
     `Published and verified ${published.length} canonical packages at ${expectedVersion}`,
   );
