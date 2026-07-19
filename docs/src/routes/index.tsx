@@ -3,7 +3,6 @@ import { InstallCommand } from "../components/InstallCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
-import { HeroWorkbookIsland } from "../showcases/HeroIsland.js";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -152,21 +151,53 @@ function Landing() {
               <InstallCommand packageName="@sheetwrite/core" />
             </div>
           </div>
-          <div className="sw-hero-demo">
-            <div className="sw-hero-stage">
-              <header className="sw-hero-stage__bar">
+          <div className="sw-hero-proof">
+            <div className="sw-hero-panel" data-hero-panel>
+              <header className="sw-hero-panel__bar">
                 <div>
-                  <strong>fy26-plan.sheet</strong>
-                  <span>@sheetwrite/react</span>
+                  <strong>sheetwrite</strong>
+                  <span>runtime contract</span>
                 </div>
-                <span>every FY total is =SUM</span>
+                <span>MIT</span>
               </header>
-              <HeroWorkbookIsland />
+              <dl className="sw-hero-manifest">
+                <div>
+                  <dt>document</dt>
+                  <dd>
+                    owned by your application — lifecycle, persistence, and product UI stay in your
+                    codebase
+                  </dd>
+                </div>
+                <div>
+                  <dt>engine</dt>
+                  <dd>Rust/WASM columnar core — formulas, query scans, packed render windows</dd>
+                </div>
+                <div>
+                  <dt>rows</dt>
+                  <dd>
+                    <strong>1,000,000</strong> paged through a Worker host, with measured evidence
+                  </dd>
+                </div>
+                <div>
+                  <dt>sync</dt>
+                  <dd>durable IndexedDB commits and one shared collaboration protocol</dd>
+                </div>
+                <div>
+                  <dt>xlsx</dt>
+                  <dd>
+                    optional — <code>@sheetwrite/xlsx</code> workbook and table backends
+                  </dd>
+                </div>
+                <div>
+                  <dt>adapters</dt>
+                  <dd>first-party Vanilla, React, Vue, and Svelte</dd>
+                </div>
+              </dl>
+              <footer className="sw-hero-panel__foot">
+                <span>TypeScript · Rust</span>
+                <span>every line has a live showcase below</span>
+              </footer>
             </div>
-            <p className="sw-hero-demo__hint">
-              The real adapter, not a video — click a quarter, type a number, and the FY totals
-              recalculate in the Rust engine.
-            </p>
           </div>
         </section>
 
@@ -259,35 +290,47 @@ function Landing() {
           )}
         </section>
 
-        <section aria-labelledby="showcases-title" className="sw-landing-showcases">
+        <section aria-labelledby="proofs-title" className="sw-landing-proofs">
           <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Capability proof</p>
-            <h2 id="showcases-title">Evaluate by capability, not by demo.</h2>
+            <p className="sw-section-eyebrow">Capability showcases</p>
+            <h2 id="proofs-title">Evaluate by capability, not by demo.</h2>
             <p className="sw-section-lede">
-              Every public capability has one owning live proof, a required interaction, and an
+              Every public capability has one owning live showcase, a required interaction, and an
               executable browser contract.{" "}
               <Link to="/showcases/">Browse the full capability index →</Link>
             </p>
           </header>
-          <div className="sw-landing-grid sw-landing-grid--frameworks">
-            {CAPABILITY_PROOFS.map((proof) => (
-              <Link data-proof={proof.id} key={proof.id} to={proof.href}>
-                <span className="sw-showcase-card__meta">{proof.label}</span>
-                <strong>{proof.headline}</strong>
-                <span className="sw-showcase-card__cta">Open the live proof →</span>
-              </Link>
+          <ol className="sw-proof-ledger">
+            {CAPABILITY_PROOFS.map((proof, index) => (
+              <li key={proof.id}>
+                <Link data-proof={proof.id} to={proof.href}>
+                  <span className="sw-proof-ledger__index">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="sw-proof-ledger__label">{proof.label}</span>
+                  <strong>{proof.headline}</strong>
+                  <span className="sw-proof-ledger__cta">Open the live scenario →</span>
+                </Link>
+              </li>
             ))}
-          </div>
-          <p className="sw-section-lede">
-            Prefer to start from your framework? The same engine mounts four ways — every workbench
-            is a bounded, directly editable product story.
-          </p>
-          <div className="sw-landing-grid sw-landing-grid--frameworks">
+          </ol>
+        </section>
+
+        <section aria-labelledby="adapters-title" className="sw-landing-adapters">
+          <header className="sw-section-head">
+            <p className="sw-section-eyebrow">Framework adapters</p>
+            <h2 id="adapters-title">One engine, four first-party mounts</h2>
+            <p className="sw-section-lede">
+              The same engine mounts four ways — every workbench is a bounded, directly editable
+              product story.
+            </p>
+          </header>
+          <div className="sw-adapter-strip">
             {WORKBENCHES.map((workbench) => (
               <Link data-framework={workbench.id} key={workbench.id} to={workbench.href}>
-                <span className="sw-showcase-card__meta">{workbench.label}</span>
-                <strong>{workbench.headline}</strong>
-                <span className="sw-showcase-card__cta">Open the workbench →</span>
+                <strong>{workbench.label}</strong>
+                <span>{workbench.headline}</span>
+                <span className="sw-adapter-strip__cta">Open the workbench →</span>
               </Link>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../../docs/src/showcases/capabilities.js";
+import { CAPABILITY_OWNERS } from "../../docs/src/showcases/capabilities.js";
 import { SITE_BASE, siteUrl } from "./playwright.config.js";
 
 interface BootErrors {
@@ -18,31 +18,32 @@ function collectErrors(page: Page): BootErrors {
   return errors;
 }
 
-test("hub lists every capability with an owning proof link and no errors", async ({ page }) => {
+test("hub launches every owning showcase without errors", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(siteUrl("/showcases/"));
 
-  await expect(page.locator("main h1")).toHaveText("Every capability, proven live.");
+  await expect(page.locator("main h1")).toHaveText("Every capability, live and verified.");
   // The Showcases link is page-current on the hub itself.
   await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
 
-  // Every inventory entry renders with its stable id and its owner link.
-  await expect(page.locator(".sw-hub-cap")).toHaveCount(CAPABILITY_INVENTORY.length);
-  for (const owner of CAPABILITY_OWNERS) {
-    const links = page.locator(`main a[href="${SITE_BASE}${owner.href}"]`);
-    expect(await links.count()).toBeGreaterThan(0);
-  }
+  // The visual launcher leads with the four capability scenes — Performance
+  // first — and keeps the four framework adapters as a secondary rail.
+  await expect(page.locator(".sw-hub-scenes .sw-hub-launch")).toHaveCount(4);
+  await expect(page.locator(".sw-hub-scenes .sw-hub-launch").first()).toHaveAttribute(
+    "data-owner",
+    "performance",
+  );
+  await expect(page.locator(".sw-hub-rail .sw-hub-rail__item")).toHaveCount(4);
 
   // Landmarks and headings: one h1, labelled sections, real list semantics.
   await expect(page.locator("main h1")).toHaveCount(1);
-  await expect(page.getByRole("heading", { name: "The capability index" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Site" })).toBeVisible();
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
 
-test("every owner route URL in the inventory stays resolvable", async ({ request }) => {
+test("every owning showcase URL stays resolvable", async ({ request }) => {
   for (const owner of CAPABILITY_OWNERS) {
     const response = await request.get(siteUrl(owner.href));
     expect(response.ok(), `${owner.href} must resolve`).toBe(true);
@@ -60,8 +61,8 @@ test("hub stays accessible and usable on a mobile viewport", async ({ page }) =>
   }));
   expect(layout.fits).toBe(true);
 
-  // The capability index remains reachable and readable, and keyboard focus
-  // lands on real links with accessible names.
+  // The visual launchers remain reachable, and keyboard focus lands on real
+  // links with accessible names.
   const hubLink = page.getByRole("link", { name: "Showcases" });
   await expect(hubLink).toBeVisible();
   await hubLink.focus();

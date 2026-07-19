@@ -299,3 +299,11 @@ test("performance page stays operable on a phone viewport", async ({ page }) => 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
+
+test("topbar leaves benchmark navigation to the documentation sidebar", async ({ page }) => {
+  await page.goto(ROUTE);
+  const navigation = page.getByRole("navigation", { name: "Site" });
+
+  await expect(navigation.getByRole("link")).toHaveText(["Docs", "Showcases"]);
+  await expect(navigation.getByRole("link", { name: "Benchmarks" })).toHaveCount(0);
+});

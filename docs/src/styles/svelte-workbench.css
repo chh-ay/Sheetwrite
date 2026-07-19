@@ -2,11 +2,29 @@
    Composes the shared sw-demo-* system; every selector is prefixed .sw-svw. */
 
 .sw-svw {
+  --sw-demo-surface: var(--sw-surface-1);
+  --sw-demo-raised: var(--sw-surface-2);
+  --sw-demo-deep: var(--sw-surface-0);
+  --sw-demo-panel: var(--sw-surface-1);
+  --sw-demo-fg: var(--sw-fg);
+  --sw-demo-fg-soft: var(--sw-fg-muted);
+  --sw-demo-fg-strong: var(--sw-fg-strong);
+  --sw-demo-muted: var(--sw-fg-muted);
+  --sw-demo-dim: var(--sw-fg-dim);
+  --sw-demo-border: var(--sw-border);
+  --sw-demo-border-strong: var(--sw-border-strong);
   --sw-demo-accent: var(--sw-demo-svelte-accent);
-  --sw-demo-accent-strong: var(--sw-demo-svelte-accent-strong);
-  --demo-accent: var(--sw-demo-svelte-accent);
-  /* Per-collaborator chip color; each presence <li> overrides it inline. */
+  --sw-demo-accent-strong: color-mix(
+    in srgb,
+    var(--sw-demo-svelte-accent) 62%,
+    var(--sw-fg-strong)
+  );
+  --sw-demo-shadow: var(--sw-shadow);
+  --sw-demo-popup-shadow: var(--sw-shadow);
+  --demo-accent: var(--sw-demo-accent);
   --sw-svw-peer: var(--sw-demo-accent);
+  --sw-scrollbar-thumb: color-mix(in srgb, var(--sw-fg-dim) 60%, transparent);
+  --sw-scrollbar-track: transparent;
 }
 
 /* ---- Control bar -------------------------------------------------------- */
@@ -30,7 +48,7 @@
   padding-inline: var(--sw-demo-space-2);
   border: 1px solid color-mix(in srgb, var(--sw-demo-accent) 34%, var(--sw-demo-border));
   border-radius: 999px;
-  background: var(--sw-demo-surface);
+  background: color-mix(in srgb, var(--sw-demo-accent) 10%, var(--sw-demo-surface));
   color: var(--sw-demo-accent-strong);
   font: 600 var(--sw-type-xs) var(--sw-font-mono);
   letter-spacing: 0.04em;
@@ -49,6 +67,10 @@
 
 .sw-svw-toggle:hover:not(:disabled) {
   border-color: var(--sw-demo-accent);
+}
+
+.sw-svw-toggle[aria-checked="false"]:hover:not(:disabled) {
+  border-color: var(--sw-demo-warn);
 }
 
 .sw-svw-toggle:disabled {
@@ -90,21 +112,22 @@
   gap: var(--sw-demo-space-1);
   align-items: center;
   padding-inline: var(--sw-demo-space-2);
-  border: 1px solid var(--sw-demo-border);
+  border: 1px solid color-mix(in srgb, var(--sw-svw-peer) 30%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-svw-peer) 8%, var(--sw-demo-surface));
   border-radius: 999px;
   color: var(--sw-demo-fg-soft);
   font: 550 var(--sw-type-xs) var(--sw-font-mono);
   white-space: nowrap;
 }
 
-.sw-svw-presence__dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--sw-svw-peer);
-}
-
 /* ---- Sync rail ---------------------------------------------------------- */
+
+/* Fixed workbench stage: with a definite height, the workspace row is truly
+   bounded, so outbox/activity growth scrolls inside the rail instead of
+   stretching the workbook or pushing the metrics footer. */
+.sw-svw .sw-demo-main {
+  height: 44rem;
+}
 
 /* The shared aside is 14rem; this workbench narrates sync state, so widen it. */
 .sw-svw .sw-demo-workspace {
@@ -117,8 +140,10 @@
   scrollbar-width: thin;
 }
 
+/* Fixed blocks never squash; the rail is the single vertical scroll owner. */
 .sw-svw-rail > div {
   display: grid;
+  flex: none;
   gap: var(--sw-demo-space-1);
 }
 
@@ -143,6 +168,9 @@
   gap: var(--sw-demo-space-1);
 }
 
+/* Action hierarchy: one accent-filled primary (the demo's main verb), quiet
+   surface secondaries, a ghost tertiary, and a warn-tinted resolver inside
+   the conflict panel — same control geometry as the Vue workbench. */
 .sw-svw-actions button,
 .sw-svw-conflict button {
   display: inline-flex;
@@ -154,8 +182,8 @@
   border: 1px solid var(--sw-demo-border);
   border-radius: var(--sw-demo-radius-1);
   background: var(--sw-demo-surface);
-  color: var(--sw-demo-fg);
-  font: 550 var(--sw-type-xs) var(--sw-font-mono);
+  color: var(--sw-demo-fg-soft);
+  font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
   cursor: pointer;
   transition:
     border-color var(--sw-demo-transition),
@@ -163,11 +191,44 @@
     color var(--sw-demo-transition);
 }
 
-.sw-svw-actions button:hover:not(:disabled),
-.sw-svw-conflict button:hover:not(:disabled) {
+.sw-svw-actions button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--sw-demo-accent) 54%, var(--sw-demo-border));
   background: color-mix(in srgb, var(--sw-demo-accent) 10%, var(--sw-demo-surface));
   color: var(--sw-demo-accent-strong);
+}
+
+.sw-svw-actions button[data-variant="primary"] {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 60%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-accent) 16%, var(--sw-demo-surface));
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-svw-actions button[data-variant="primary"]:hover:not(:disabled) {
+  border-color: var(--sw-demo-accent);
+  background: color-mix(in srgb, var(--sw-demo-accent) 24%, var(--sw-demo-surface));
+}
+
+.sw-svw-actions button[data-variant="quiet"] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--sw-demo-muted);
+}
+
+.sw-svw-actions button[data-variant="quiet"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--sw-demo-accent) 8%, var(--sw-demo-surface));
+  color: var(--sw-demo-fg);
+}
+
+.sw-svw-conflict button {
+  border-color: color-mix(in srgb, var(--sw-demo-warn) 55%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-warn) 14%, var(--sw-demo-surface));
+  color: var(--sw-demo-warn);
+}
+
+.sw-svw-conflict button:hover:not(:disabled) {
+  border-color: var(--sw-demo-warn);
+  background: color-mix(in srgb, var(--sw-demo-warn) 22%, var(--sw-demo-surface));
 }
 
 .sw-svw-actions button:disabled,
@@ -246,13 +307,17 @@
   color: var(--sw-demo-dim);
 }
 
-.sw-svw-feed {
-  min-height: 0;
-  flex: 1;
+.sw-svw-outbox ol,
+.sw-svw-feed ol {
+  max-height: 8rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.sw-svw-feed ol {
-  align-content: start;
+.sw-svw-rail > .sw-svw-feed {
+  min-height: 0;
+  flex: none;
+  grid-template-rows: auto auto;
 }
 
 .sw-svw-feed li[data-tone="warn"] {
@@ -275,13 +340,38 @@
   content: "✓ ";
 }
 
+/* Compact guidance: a disclosure keeps the rail action-first. */
+.sw-svw-try {
+  padding: var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-demo-raised);
+}
+
+.sw-svw-try summary {
+  color: var(--sw-demo-accent-strong);
+  font: 600 var(--sw-type-xs) var(--sw-font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sw-svw-try p {
+  margin: var(--sw-demo-space-1) 0 0;
+  color: var(--sw-demo-muted);
+  font: var(--sw-type-xs) / 1.5 var(--sw-font-body);
+  letter-spacing: normal;
+}
+
 /* ---- Small screens ------------------------------------------------------ */
 
 @media (max-width: 48rem) {
   /* The shared system hides the demo aside on small screens; this rail IS the
-     workbench story, so stack it under the grid instead. */
+     workbench story, so stack it under the grid inside the fixed stage: the
+     grid keeps the larger share and the rail scrolls its own overflow. */
   .sw-svw .sw-demo-workspace {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(16rem, 1fr) minmax(0, 19rem);
   }
 
   .sw-svw .sw-svw-rail {
@@ -290,11 +380,15 @@
   }
 
   .sw-svw .sw-demo-grid {
-    min-height: 18rem;
+    min-height: 0;
   }
 
   .sw-svw-actions {
     grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  }
+
+  .sw-svw-actions button[data-variant="primary"] {
+    grid-column: 1 / -1;
   }
 
   .sw-svw-shellbar {
@@ -307,9 +401,9 @@
     text-overflow: ellipsis;
   }
 
+  .sw-svw-outbox ol,
   .sw-svw-feed ol {
-    max-height: 9.5rem;
-    overflow-y: auto;
+    max-height: 8rem;
   }
 }
 

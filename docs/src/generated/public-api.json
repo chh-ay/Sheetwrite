@@ -1068,7 +1068,7 @@
               "owners": [
                 "src/number-format.ts"
               ],
-              "source": "src/number-format.ts#L455",
+              "source": "src/number-format.ts#L460",
               "jsDocTags": [],
               "documentation": "Deterministic Excel-style number/date formatter. Supports explicit locale\nseparators, percent/scientific notation, UTC date/time tokens, four-section\npositive/negative/zero/text codes, quoted literals, and backslash escapes.",
               "memberDocs": []

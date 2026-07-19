@@ -25,6 +25,7 @@ import {
   ANALYTICS_ROWS,
   ANALYTICS_SHEET_ID,
   ANALYTICS_SUMMARY_SHEET_ID,
+  ANALYTICS_THEME,
   analyticsSummarySeedOps,
   buildAnalyticsData,
   createAnalyticsWorkbook,
@@ -458,6 +459,15 @@ export function useAnalyticsWorkbench() {
   const chooseRenderer = useCallback((mode: "canvas" | "worker"): void => {
     setRenderer(mode);
     setRendererFallback(null);
+  }, []);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => gridRef.current?.replaceTheme(ANALYTICS_THEME));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
   }, []);
 
   return {

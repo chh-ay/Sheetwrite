@@ -1,3 +1,19 @@
+.sw-vw {
+  --sw-demo-surface: var(--sw-surface-1);
+  --sw-demo-raised: var(--sw-surface-2);
+  --sw-demo-deep: var(--sw-surface-0);
+  --sw-demo-panel: var(--sw-surface-1);
+  --sw-demo-fg: var(--sw-fg);
+  --sw-demo-fg-soft: var(--sw-fg-muted);
+  --sw-demo-fg-strong: var(--sw-fg-strong);
+  --sw-demo-muted: var(--sw-fg-muted);
+  --sw-demo-dim: var(--sw-fg-dim);
+  --sw-demo-border: var(--sw-border);
+  --sw-demo-border-strong: var(--sw-border-strong);
+  --sw-demo-shadow: var(--sw-shadow);
+  --sw-demo-popup-shadow: var(--sw-shadow);
+}
+
 /* Vanilla workbench — route-scoped styles for /vanilla/ only.
    Composes the shared demo tokens (--sw-demo-*, --demo-*) and the
    .sw-vanilla-app shell theming from showcase.css; every selector here is
@@ -86,6 +102,16 @@
   text-transform: uppercase;
 }
 
+/* The read-only switch joins the labelled-instrument family without
+   inheriting the 12rem floor meant for the segmented fields. */
+.sw-vw-field--toggle {
+  min-width: 0;
+}
+
+.sw-vw-field--toggle .sw-vw-toggle {
+  justify-self: start;
+}
+
 .sw-vw-toggle {
   display: flex;
   min-height: 2.15rem;
@@ -94,7 +120,7 @@
   padding: 0 var(--sw-demo-space-3);
   border: 1px solid var(--sw-demo-border);
   border-radius: var(--sw-demo-radius-2);
-  background: var(--sw-demo-deep);
+  background: var(--sw-demo-surface);
   color: var(--sw-demo-fg-soft);
   font: 500 var(--sw-type-sm) var(--sw-font-body);
   cursor: pointer;
@@ -107,6 +133,16 @@
 
 .sw-vw-toggle input {
   accent-color: var(--sw-demo-accent);
+}
+
+/* Segmented controls: no column may ever shrink below its label, and the
+   active pill keeps balanced side padding at the shared instrument height. */
+.sw-vw .sw-demo-radio-group {
+  grid-template-columns: repeat(2, minmax(max-content, 1fr));
+}
+
+.sw-vw .sw-demo-radio-item {
+  padding-inline: var(--sw-demo-space-3);
 }
 
 /* DemoButton has no global skin; give it this route's instrument look. */
@@ -200,6 +236,25 @@
   margin: 0;
   font: 400 var(--sw-type-sm) var(--sw-font-body);
   line-height: 1.55;
+}
+
+/* Teardown facts render as compact chips instead of a paragraph. */
+.sw-vw-teardown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-demo-space-1);
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-vw-teardown li {
+  padding: 0.15rem var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  color: var(--sw-demo-fg-soft);
+  font: 500 var(--sw-type-xs) var(--sw-font-mono);
 }
 
 /* ── Status bar ──────────────────────────────────────────────────────── */

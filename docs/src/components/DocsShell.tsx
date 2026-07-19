@@ -24,7 +24,23 @@ function Brand() {
   );
 }
 
+function nearestNavigationHref(activeHref: string | undefined): string | undefined {
+  if (activeHref === undefined) return undefined;
+  let nearest: string | undefined;
+  for (const section of DOCS_NAVIGATION) {
+    for (const item of section.items) {
+      const matches =
+        activeHref === item.href || (item.href !== "/docs/" && activeHref.startsWith(item.href));
+      if (matches && (nearest === undefined || item.href.length > nearest.length)) {
+        nearest = item.href;
+      }
+    }
+  }
+  return nearest;
+}
+
 function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
+  const currentHref = nearestNavigationHref(activeHref);
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
       {DOCS_NAVIGATION.map((section) => (
@@ -32,7 +48,8 @@ function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
           <h2>{section.label}</h2>
           {section.items.map((item) => (
             <Link
-              aria-current={activeHref === item.href ? "page" : undefined}
+              activeOptions={{ exact: true }}
+              aria-current={currentHref === item.href ? "page" : undefined}
               key={item.href}
               to={item.href}
             >
@@ -43,7 +60,9 @@ function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
       ))}
       <section>
         <h2>Live showcases</h2>
-        <Link to="/showcases/">All capabilities</Link>
+        <Link activeOptions={{ exact: true }} to="/showcases/">
+          All capabilities
+        </Link>
       </section>
     </nav>
   );
@@ -67,10 +86,6 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
         </nav>
       </header>
       <aside className="sw-sidebar">
-        <div className="sw-sidebar__intro">
-          <span>Documentation</span>
-          <p>Build and own a production spreadsheet runtime.</p>
-        </div>
         <Sidebar activeHref={activeHref} />
       </aside>
       <main

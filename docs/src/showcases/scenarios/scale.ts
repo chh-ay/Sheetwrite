@@ -35,7 +35,12 @@ export const WIDE_SHEET: SheetId = "wide";
 export const FEED_ROWS = 1_000_000;
 export const WIDE_ROWS = 250_000;
 export const WIDE_METRIC_COLUMNS = 120;
-export const SCALE_THEME: Partial<Theme> = SHOWCASE_THEME;
+export const SCALE_THEME: Partial<Theme> = {
+  font: SHOWCASE_THEME.font,
+  rowHeight: SHOWCASE_THEME.rowHeight,
+  headerHeight: SHOWCASE_THEME.headerHeight,
+  rowHeaderWidth: SHOWCASE_THEME.rowHeaderWidth,
+};
 
 /** Clean-chunk budget kept deliberately small so cache churn is observable. */
 export const SCALE_STORAGE: Required<DataSourceStorageOptions> = {

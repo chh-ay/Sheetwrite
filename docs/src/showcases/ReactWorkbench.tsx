@@ -63,44 +63,50 @@ export default function ReactWorkbench() {
             </div>
           </div>
           <div className="sw-demo-controlbar__controls" role="toolbar" aria-label="Query controls">
-            <DemoSelect
-              label="Market"
-              value={bench.market}
-              options={MARKET_OPTIONS}
-              onValueChange={bench.chooseMarket}
-            />
-            <DemoSelect
-              label="Segment"
-              value={bench.segment}
-              options={SEGMENT_OPTIONS}
-              onValueChange={bench.chooseSegment}
-            />
-            <label className="sw-demo-controlbar__search">
-              <span className="sw-visually-hidden">Search accounts</span>
-              <input
-                aria-label="Search accounts"
-                type="search"
-                value={bench.query}
-                placeholder="Account 004812"
-                onChange={(event) => bench.setQuery(event.target.value)}
-                onKeyDown={onSearchKeyDown}
+            <fieldset className="sw-rwb-cluster" aria-label="Filters">
+              <DemoSelect
+                label="Market"
+                value={bench.market}
+                options={MARKET_OPTIONS}
+                onValueChange={bench.chooseMarket}
               />
-            </label>
-            <DemoButton type="button" onClick={() => bench.runSearch(bench.query)}>
-              Find
-            </DemoButton>
-            <DemoButton type="button" onClick={bench.findPrev} disabled={!hasMatches}>
-              Previous
-            </DemoButton>
-            <DemoButton type="button" onClick={bench.findNext} disabled={!hasMatches}>
-              Next
-            </DemoButton>
-            <DemoButton type="button" onClick={bench.rankByArr}>
-              Rank ARR
-            </DemoButton>
-            <DemoButton type="button" onClick={bench.resetView}>
-              Reset view
-            </DemoButton>
+              <DemoSelect
+                label="Segment"
+                value={bench.segment}
+                options={SEGMENT_OPTIONS}
+                onValueChange={bench.chooseSegment}
+              />
+            </fieldset>
+            <fieldset className="sw-rwb-cluster" aria-label="Account search">
+              <label className="sw-demo-controlbar__search">
+                <span className="sw-visually-hidden">Search accounts</span>
+                <input
+                  aria-label="Search accounts"
+                  type="search"
+                  value={bench.query}
+                  placeholder="Account 004812"
+                  onChange={(event) => bench.setQuery(event.target.value)}
+                  onKeyDown={onSearchKeyDown}
+                />
+              </label>
+              <DemoButton type="button" onClick={() => bench.runSearch(bench.query)}>
+                Find
+              </DemoButton>
+              <DemoButton type="button" onClick={bench.findPrev} disabled={!hasMatches}>
+                Previous
+              </DemoButton>
+              <DemoButton type="button" onClick={bench.findNext} disabled={!hasMatches}>
+                Next
+              </DemoButton>
+            </fieldset>
+            <fieldset className="sw-rwb-cluster" aria-label="View">
+              <DemoButton type="button" onClick={bench.rankByArr}>
+                Rank ARR
+              </DemoButton>
+              <DemoButton type="button" onClick={bench.resetView}>
+                Reset view
+              </DemoButton>
+            </fieldset>
           </div>
           <span className="sw-demo-controlbar__state" role="status">
             <Monitor aria-hidden="true" size={14} />
@@ -109,63 +115,69 @@ export default function ReactWorkbench() {
         </header>
 
         <div className="sw-rwb-editrow" role="toolbar" aria-label="Editing controls">
-          <span className="sw-rwb-editrow__address" data-testid="selection-address">
-            {bench.formulaAddress
-              ? `R${bench.formulaAddress.row + 1} C${bench.formulaAddress.col + 1}`
-              : "No cell"}
-          </span>
-          <label className="sw-rwb-editrow__field sw-rwb-editrow__field--formula">
-            <span className="sw-visually-hidden">Formula or value</span>
-            <input
-              aria-label="Formula or value"
-              data-testid="formula-input"
-              type="text"
-              value={bench.formulaDraft}
-              placeholder="=SUM(ANNUAL_ARR)"
+          <fieldset className="sw-rwb-cluster sw-rwb-cluster--formula" aria-label="Formula">
+            <span className="sw-rwb-editrow__address" data-testid="selection-address">
+              {bench.formulaAddress
+                ? `R${bench.formulaAddress.row + 1} C${bench.formulaAddress.col + 1}`
+                : "No cell"}
+            </span>
+            <label className="sw-rwb-editrow__field sw-rwb-editrow__field--formula">
+              <span className="sw-visually-hidden">Formula or value</span>
+              <input
+                aria-label="Formula or value"
+                data-testid="formula-input"
+                type="text"
+                value={bench.formulaDraft}
+                placeholder="=SUM(ANNUAL_ARR)"
+                disabled={bench.readOnly || bench.formulaAddress === null}
+                onChange={(event) => bench.editFormulaDraft(event.target.value)}
+                onKeyDown={onFormulaKeyDown}
+              />
+            </label>
+            <DemoButton
+              type="button"
+              onClick={bench.commitFormulaDraft}
               disabled={bench.readOnly || bench.formulaAddress === null}
-              onChange={(event) => bench.editFormulaDraft(event.target.value)}
-              onKeyDown={onFormulaKeyDown}
-            />
-          </label>
-          <DemoButton
-            type="button"
-            onClick={bench.commitFormulaDraft}
-            disabled={bench.readOnly || bench.formulaAddress === null}
-          >
-            Apply
-          </DemoButton>
-          <label className="sw-rwb-editrow__field">
-            <span className="sw-visually-hidden">Replacement text</span>
-            <input
-              aria-label="Replacement text"
-              data-testid="replace-input"
-              type="text"
-              value={bench.replacement}
-              placeholder="Replace with…"
-              disabled={bench.readOnly}
-              onChange={(event) => bench.setReplacement(event.target.value)}
-            />
-          </label>
-          <DemoButton
-            type="button"
-            onClick={bench.replaceCurrent}
-            disabled={bench.readOnly || !hasMatches}
-          >
-            Replace
-          </DemoButton>
-          <DemoButton
-            type="button"
-            onClick={bench.replaceAll}
-            disabled={bench.readOnly || !hasMatches}
-          >
-            Replace all
-          </DemoButton>
-          <DemoButton type="button" onClick={bench.undo}>
-            Undo
-          </DemoButton>
-          <DemoButton type="button" onClick={bench.redo}>
-            Redo
-          </DemoButton>
+            >
+              Apply
+            </DemoButton>
+          </fieldset>
+          <fieldset className="sw-rwb-cluster" aria-label="Replace">
+            <label className="sw-rwb-editrow__field">
+              <span className="sw-visually-hidden">Replacement text</span>
+              <input
+                aria-label="Replacement text"
+                data-testid="replace-input"
+                type="text"
+                value={bench.replacement}
+                placeholder="Replace with…"
+                disabled={bench.readOnly}
+                onChange={(event) => bench.setReplacement(event.target.value)}
+              />
+            </label>
+            <DemoButton
+              type="button"
+              onClick={bench.replaceCurrent}
+              disabled={bench.readOnly || !hasMatches}
+            >
+              Replace
+            </DemoButton>
+            <DemoButton
+              type="button"
+              onClick={bench.replaceAll}
+              disabled={bench.readOnly || !hasMatches}
+            >
+              Replace all
+            </DemoButton>
+          </fieldset>
+          <fieldset className="sw-rwb-cluster" aria-label="History">
+            <DemoButton type="button" onClick={bench.undo}>
+              Undo
+            </DemoButton>
+            <DemoButton type="button" onClick={bench.redo}>
+              Redo
+            </DemoButton>
+          </fieldset>
         </div>
 
         <div className="sw-demo-grid">
@@ -213,41 +225,49 @@ export default function ReactWorkbench() {
             </div>
           </dl>
           <div className="sw-rwb-workflow" role="toolbar" aria-label="Data workflow">
-            <DemoButton type="button" onClick={bench.exportCsv}>
-              Export CSV
-            </DemoButton>
-            <DemoButton type="button" onClick={() => void bench.exportXlsx()}>
-              Export XLSX
-            </DemoButton>
-            <label className="sw-rwb-workflow__import">
-              Import CSV
-              <input
-                aria-label="Import CSV file"
-                data-testid="import-csv"
-                type="file"
-                accept=".csv,text/csv"
-                disabled={bench.readOnly}
-                onChange={onImportChange}
+            <fieldset className="sw-rwb-cluster" aria-label="Data exchange">
+              <DemoButton type="button" onClick={bench.exportCsv}>
+                Export CSV
+              </DemoButton>
+              <DemoButton type="button" onClick={() => void bench.exportXlsx()}>
+                Export XLSX
+              </DemoButton>
+              <label className="sw-rwb-workflow__import">
+                Import CSV
+                <input
+                  aria-label="Import CSV file"
+                  data-testid="import-csv"
+                  type="file"
+                  accept=".csv,text/csv"
+                  disabled={bench.readOnly}
+                  onChange={onImportChange}
+                />
+              </label>
+              <a
+                className="sw-rwb-workflow__link"
+                data-testid="interop-link"
+                href="/showcases/interoperability/"
+              >
+                Fidelity proofs
+              </a>
+            </fieldset>
+            <fieldset className="sw-rwb-cluster" aria-label="Grid lifecycle">
+              <DemoButton type="button" onClick={bench.reloadDataset}>
+                Reload dataset
+              </DemoButton>
+              <DemoButton
+                type="button"
+                aria-pressed={bench.readOnly}
+                onClick={bench.toggleReadOnly}
+              >
+                Read-only
+              </DemoButton>
+              <DemoRenderingMode
+                label="Rendering thread"
+                mode={bench.renderer}
+                onModeChange={bench.chooseRenderer}
               />
-            </label>
-            <a
-              className="sw-rwb-workflow__link"
-              data-testid="interop-link"
-              href="/showcases/interoperability/"
-            >
-              Fidelity proofs
-            </a>
-            <DemoButton type="button" onClick={bench.reloadDataset}>
-              Reload dataset
-            </DemoButton>
-            <DemoButton type="button" aria-pressed={bench.readOnly} onClick={bench.toggleReadOnly}>
-              Read-only
-            </DemoButton>
-            <DemoRenderingMode
-              label="Rendering thread"
-              mode={bench.renderer}
-              onModeChange={bench.chooseRenderer}
-            />
+            </fieldset>
             <span className="sw-rwb-lifecycle" data-testid="lifecycle">
               Gen <span data-testid="generation">{bench.generation}</span> ·{" "}
               <span data-testid="ready-reason">{bench.readyReason}</span>

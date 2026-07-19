@@ -50,6 +50,7 @@ function CollaborationProofRoute() {
             "Who a collaborator is, what they may edit, and where the service runs are host decisions — presence identity is advisory UI state, never access control.",
         },
       ]}
+      boundaryContract="PersistenceAdapter + RemoteOperationSource"
       boundaryLede="Everything moving on this page is the real collaboration protocol running in your browser tab. The server is deliberately illustrative — the responsibilities below never move into Sheetwrite."
       description={description}
       eyebrow="CAPABILITY / COLLABORATION PROTOCOL"
@@ -61,7 +62,11 @@ function CollaborationProofRoute() {
       ]}
       guideHref="/docs/guides/collaboration/"
       guideLabel="Read the collaboration guide"
-      proof={[
+      prompt="Take Bram offline, queue a few edits, and reconnect. Then hold a broadcast on Ana, commit from the server, and watch her conflict recover."
+      slug="collaboration"
+      sourcePath="docs/src/showcases/collaboration-protocol.ts"
+      title="Two clients, one protocol, no lost updates."
+      verification={[
         {
           title: "Convergence under ordering",
           detail:
@@ -83,10 +88,6 @@ function CollaborationProofRoute() {
             "Out-of-order broadcasts buffer until the gap closes; stale base versions surface as conflicts that recover through the documented rebase loop.",
         },
       ]}
-      prompt="Take Bram offline, queue a few edits, and reconnect. Then hold a broadcast on Ana, commit from the server, and watch her conflict recover."
-      slug="collaboration"
-      sourcePath="docs/src/showcases/collaboration-protocol.ts"
-      title="Two clients, one protocol, no lost updates."
     >
       <CollaborationShowcase />
     </ProofPage>

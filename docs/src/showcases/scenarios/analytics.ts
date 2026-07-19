@@ -38,7 +38,12 @@ export const ANALYTICS_COLUMNS = {
   arr: 5,
 } as const;
 
-export const ANALYTICS_THEME: Partial<Theme> = REACT_SHOWCASE_THEME;
+export const ANALYTICS_THEME: Partial<Theme> = {
+  font: REACT_SHOWCASE_THEME.font,
+  rowHeight: REACT_SHOWCASE_THEME.rowHeight,
+  headerHeight: REACT_SHOWCASE_THEME.headerHeight,
+  rowHeaderWidth: REACT_SHOWCASE_THEME.rowHeaderWidth,
+};
 
 /**
  * Deterministic integer ARR per row. Integer dollars keep aggregate

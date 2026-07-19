@@ -265,4 +265,51 @@ describe("DatasourceController revision retention", () => {
     expect(errors).toHaveLength(2);
     store.dispose();
   });
+
+  it("reloads rows after the paged cache evicts their clean chunks", async () => {
+    const store = new SheetwriteStore(makeWorkbook(100), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 300,
+    });
+    const starts: number[] = [];
+    const controller = new DatasourceController(
+      {
+        datasource: async (request) => {
+          starts.push(request.start);
+          return {
+            start: request.start,
+            rows: Array.from({ length: request.end - request.start }, (_, offset) => ({
+              name: `row-${request.start + offset}`,
+              amount: request.start + offset,
+              city: "A",
+            })),
+          };
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 100,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      100,
+    );
+
+    for (const row of [0, 4, 8, 12]) {
+      controller.ensureLoaded(row, row + 1);
+      await flushRequest();
+    }
+    expect(store.getCellLoadState({ sheet: "s1", row: 0, col: 0 })).toBe("unloaded");
+
+    controller.ensureLoaded(0, 1);
+    await flushRequest();
+    expect(starts).toEqual([0, 4, 8, 12, 0]);
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("row-0");
+
+    controller.destroy();
+    store.dispose();
+  });
 });

@@ -22,6 +22,12 @@ describe("formatNumber", () => {
     expect(formatNumber(1234.5, "$#,##0.00")).toBe("$1,234.50");
   });
 
+  it("ignores locale ids while preserving locale currency symbols", () => {
+    expect(formatNumber(1234.5, "[$-409]\\$#,##0.00")).toBe("$1,234.50");
+    expect(formatNumber(1234.5, "[$$-409]#,##0.00")).toBe("$1,234.50");
+    expect(formatNumber(1234.5, "[$€-407]#,##0.00")).toBe("€1,234.50");
+  });
+
   it("resolves the locale currency placeholder", () => {
     resetNumberFormatResourcesForTest();
     expect(formatNumber(1234.5, "¤#,##0.00")).toBe("$1,234.50");

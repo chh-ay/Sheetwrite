@@ -54,7 +54,12 @@ export const OFFLINE_COLUMNS = {
   hours: 6,
 } as const;
 
-export const OFFLINE_THEME: Partial<Theme> = SVELTE_SHOWCASE_THEME;
+export const OFFLINE_THEME: Partial<Theme> = {
+  font: SVELTE_SHOWCASE_THEME.font,
+  rowHeight: SVELTE_SHOWCASE_THEME.rowHeight,
+  headerHeight: SVELTE_SHOWCASE_THEME.headerHeight,
+  rowHeaderWidth: SVELTE_SHOWCASE_THEME.rowHeaderWidth,
+};
 
 /** Local device identity shown in presence overlays. */
 export const OFFLINE_LOCAL_ACTOR: PresenceActor = {

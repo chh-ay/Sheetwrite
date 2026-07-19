@@ -1,6 +1,7 @@
 import type { PagedStoreStats, Selection, WorkbookSnapshot } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ENGINE_THEME } from "./scenarios/engine.js";
 import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRadioGroup, DemoRadioItem } from "./ui/DemoRadioGroup.js";
 import { DemoRenderingMode } from "./ui/DemoRenderingMode.js";
@@ -163,6 +164,17 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     // reset is destroy + create of a fresh generation, not a state patch.
   }, [alive, hydrated, spec.renderer, spec.data, imported, resetCount, record]);
 
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      workbenchRef.current?.grid.replaceTheme(ENGINE_THEME),
+    );
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   function changeRenderer(next: WorkbenchRenderer): void {
     if (next === spec.renderer) return;
     record(
@@ -286,14 +298,19 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               <DemoRadioItem value="paged">Paged source</DemoRadioItem>
             </DemoRadioGroup>
           </div>
-          <label className="sw-vw-toggle">
-            <input
-              type="checkbox"
-              checked={readOnly}
-              onChange={(event) => toggleReadOnly(event.target.checked)}
-            />
-            Read-only
-          </label>
+          <div className="sw-vw-field sw-vw-field--toggle">
+            <span className="sw-vw-field__label" aria-hidden="true">
+              Access
+            </span>
+            <label className="sw-vw-toggle">
+              <input
+                type="checkbox"
+                checked={readOnly}
+                onChange={(event) => toggleReadOnly(event.target.checked)}
+              />
+              Read-only
+            </label>
+          </div>
         </div>
 
         <div className="sw-vw-actions" role="toolbar" aria-label="Workbook operations">
@@ -365,10 +382,13 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
         {!alive ? (
           <div className="sw-vw-veil sw-vw-veil--destroyed" role="status" data-testid="destroyed">
             <strong>Grid destroyed.</strong>
-            <p>
-              `destroy()` removed the canvas, chrome, timers, and subscriptions. The host decides
-              when — and whether — a new generation exists.
-            </p>
+            <ul className="sw-vw-teardown" aria-label="Removed by destroy()">
+              <li>canvas</li>
+              <li>chrome</li>
+              <li>timers</li>
+              <li>subscriptions</li>
+            </ul>
+            <p>Create grid starts the next generation.</p>
           </div>
         ) : null}
       </div>

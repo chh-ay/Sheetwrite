@@ -150,7 +150,9 @@ function decodeLiteral(source: string): string {
     }
     if (char === "[" && !quoted) {
       const close = source.indexOf("]", index + 1);
+      const currency = /^\$([^-]*)-[0-9A-F]+$/i.exec(source.slice(index + 1, close));
       if (close >= 0) {
+        if (currency?.[1]) output += currency[1];
         index = close;
         continue;
       }
@@ -167,7 +169,10 @@ function placeholderBounds(section: string): [number, number] | null {
   for (let index = 0; index < section.length; index++) {
     const char = section[index]!;
     if (char === '"') quoted = !quoted;
-    else if (char === "\\") index++;
+    else if (char === "[" && !quoted) {
+      const close = section.indexOf("]", index + 1);
+      if (close >= 0) index = close;
+    } else if (char === "\\") index++;
     else if (!quoted && /[0#?]/.test(char)) {
       if (first < 0) first = index;
       last = index;

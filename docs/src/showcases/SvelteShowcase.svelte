@@ -128,6 +128,17 @@ $effect(() => {
   };
 });
 
+$effect(() => {
+  const activeGrid = grid;
+  if (!activeGrid) return;
+  const observer = new MutationObserver(() => activeGrid.replaceTheme(OFFLINE_THEME));
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+  return () => observer.disconnect();
+});
+
 // Shell chrome (name box, formula bar, selection status) binds to the same
 // Grid handle the adapter publishes — chrome composition without a wrapper.
 $effect(() => {
@@ -202,12 +213,10 @@ async function mergeConflict(): Promise<void> {
 
       <ul class="sw-svw-presence" data-testid="presence-list" aria-label="Collaborators on this document">
         <li style:--sw-svw-peer={OFFLINE_LOCAL_ACTOR.color}>
-          <span class="sw-svw-presence__dot" aria-hidden="true"></span>
           {OFFLINE_LOCAL_ACTOR.displayName}
         </li>
         {#each peers as peer (peer.actor.id)}
           <li style:--sw-svw-peer={peer.actor.color}>
-            <span class="sw-svw-presence__dot" aria-hidden="true"></span>
             {peer.actor.displayName ?? peer.actor.id}
           </li>
         {/each}
@@ -238,13 +247,13 @@ async function mergeConflict(): Promise<void> {
         </div>
 
         <div class="sw-svw-actions" role="group" aria-label="Workbench actions">
-          <button type="button" data-testid="log-button" disabled={!ready} onclick={() => session?.logNextEntry()}>
+          <button type="button" data-variant="primary" data-testid="log-button" disabled={!ready} onclick={() => session?.logNextEntry()}>
             Log field update
           </button>
           <button type="button" data-testid="colleague-button" disabled={!session} onclick={() => void session?.colleagueCommit()}>
             <Users size={14} aria-hidden="true" /> HQ commits work
           </button>
-          <button type="button" data-testid="remount-button" disabled={!ready} onclick={() => session?.remountIsland()}>
+          <button type="button" data-variant="quiet" data-testid="remount-button" disabled={!ready} onclick={() => session?.remountIsland()}>
             <RefreshCw size={14} aria-hidden="true" /> Remount island
           </button>
         </div>
@@ -297,13 +306,6 @@ async function mergeConflict(): Promise<void> {
               <li data-tone={entry.tone}>{entry.text}</li>
             {/each}
           </ol>
-          <div class="sw-demo-activity__help">
-            <span>TRY THIS</span>
-            <p>
-              Go offline, log two field updates, let HQ commit concurrent work, then reconnect
-              and merge — or remount the island and watch the outbox restore from IndexedDB.
-            </p>
-          </div>
         </div>
       </aside>
     </div>

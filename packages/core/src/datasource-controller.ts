@@ -46,6 +46,8 @@ export class DatasourceController {
     const loadable = this.options.loadable;
     if (!datasource || !loadable || this.destroyed) return;
 
+    this.refreshPagedResidency(loadable, start, end);
+
     const requestLimit = Math.min(this.loaded.length, Math.max(0, Math.ceil(end)));
     let row = Math.min(requestLimit, Math.max(0, Math.floor(start)));
     while (row < requestLimit) {
@@ -56,6 +58,23 @@ export class DatasourceController {
       while (row < requestLimit && this.loaded[row] === 0 && this.owners[row] === 0) row += 1;
       this.requestBand(datasource, loadable, requestStart, row);
     }
+  }
+
+  private refreshPagedResidency(loadable: SheetwriteStore, start: number, end: number): void {
+    const sheet = this.options.activeSheet();
+    if (!loadable.isPaged(sheet)) return;
+    const schema = loadable.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
+    const columnCount = schema?.columns.length ?? 0;
+    const rangeStart = Math.min(this.loaded.length, Math.max(0, Math.floor(start)));
+    const rangeEnd = Math.min(this.loaded.length, Math.max(rangeStart, Math.ceil(end)));
+    if (columnCount === 0 || rangeStart === rangeEnd) return;
+
+    const resident = loadable.isRangeFullyLoaded({
+      sheet,
+      start: { row: rangeStart, col: 0 },
+      end: { row: rangeEnd - 1, col: columnCount - 1 },
+    });
+    this.loaded.fill(resident ? 1 : 0, rangeStart, rangeEnd);
   }
 
   resize(rowCount: number): void {

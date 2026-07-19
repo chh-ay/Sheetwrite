@@ -1,3 +1,19 @@
+.sw-rwb {
+  --sw-demo-surface: var(--sw-surface-1);
+  --sw-demo-raised: var(--sw-surface-2);
+  --sw-demo-deep: var(--sw-surface-0);
+  --sw-demo-panel: var(--sw-surface-1);
+  --sw-demo-fg: var(--sw-fg);
+  --sw-demo-fg-soft: var(--sw-fg-muted);
+  --sw-demo-fg-strong: var(--sw-fg-strong);
+  --sw-demo-muted: var(--sw-fg-muted);
+  --sw-demo-dim: var(--sw-fg-dim);
+  --sw-demo-border: var(--sw-border);
+  --sw-demo-border-strong: var(--sw-border-strong);
+  --sw-demo-shadow: var(--sw-shadow);
+  --sw-demo-popup-shadow: var(--sw-shadow);
+}
+
 /* React analytics workbench — route-scoped chrome for /react/.
    Everything is prefixed .sw-rwb and rides the shared showcase tokens. */
 
@@ -92,6 +108,31 @@
   border-color: var(--sw-demo-accent);
   background: color-mix(in srgb, var(--sw-demo-accent) 18%, var(--sw-demo-surface));
   color: var(--sw-demo-accent-strong);
+}
+
+/* ── Toolbar clusters ───────────────────────────────────────────────────── */
+
+/* Related instruments read as one group; hairline dividers separate the
+   clusters instead of an undifferentiated button stream. */
+.sw-rwb-cluster {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: var(--sw-demo-space-1);
+  align-items: center;
+}
+
+.sw-rwb-cluster--formula {
+  flex: 1 1 auto;
+}
+
+.sw-rwb-cluster + .sw-rwb-cluster {
+  margin-inline-start: var(--sw-demo-space-1);
+  padding-inline-start: var(--sw-demo-space-2);
+  border-inline-start: 1px solid var(--sw-demo-border);
 }
 
 /* ── Deck: derived summaries + data workflow ────────────────────────────── */
@@ -204,6 +245,26 @@
   background: color-mix(in srgb, var(--sw-demo-accent) 10%, transparent);
 }
 
+/* Rendering mode rides inline in the workflow toolbar at the shared 2rem
+   instrument height instead of the stacked label layout. */
+.sw-rwb-workflow .sw-demo-render-mode {
+  display: flex;
+  min-width: 0;
+  gap: var(--sw-demo-space-1);
+  align-items: center;
+}
+
+/* Segmented options never shrink below their labels. */
+.sw-rwb .sw-demo-radio-group {
+  width: auto;
+  min-height: 2rem;
+  grid-template-columns: repeat(2, minmax(max-content, 1fr));
+}
+
+.sw-rwb .sw-demo-radio-item {
+  padding-inline: var(--sw-demo-space-2);
+}
+
 .sw-rwb-lifecycle {
   margin-inline-start: auto;
   display: inline-flex;
@@ -221,8 +282,33 @@
 /* ── Small screens ──────────────────────────────────────────────────────── */
 
 @media (max-width: 48rem) {
+  /* Toolbars wrap into readable rows instead of hiding groups behind a
+     horizontal scroll; DOM order keeps reading and tab order intact. */
+  .sw-rwb .sw-demo-controlbar {
+    flex-wrap: wrap;
+  }
+
+  .sw-rwb .sw-demo-controlbar__controls {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
   .sw-rwb-editrow {
+    flex-wrap: wrap;
+    padding-block: var(--sw-demo-space-2);
     padding-inline: var(--sw-demo-space-2);
+    overflow: visible;
+  }
+
+  .sw-rwb-cluster {
+    flex-wrap: wrap;
+  }
+
+  .sw-rwb-cluster + .sw-rwb-cluster {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: 0;
   }
 
   .sw-rwb-editrow__field--formula {

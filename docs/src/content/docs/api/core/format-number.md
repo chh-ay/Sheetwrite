@@ -11,7 +11,7 @@ positive/negative/zero/text codes, quoted literals, and backslash escapes.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/number-format.ts#L455</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/number-format.ts#L460</code></dd></div>
 </dl>
 
 ## Declaration

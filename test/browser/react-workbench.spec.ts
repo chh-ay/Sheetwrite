@@ -356,9 +356,9 @@ test.describe("react workbench — controlled analytics", () => {
     await expect(page.getByTestId("rows-visible")).toHaveText(en(TOKYO_ROWS));
     await expect(page.getByTestId("kpi-market")).toHaveAttribute("data-raw", String(TOKYO_ARR));
 
-    // Derived summaries and the workflow group stay visible on small screens.
+    // Derived summaries and workflow controls stay visible on small screens.
     await expect(page.getByTestId("kpi-total")).toBeVisible();
-    await expect(page.getByRole("group", { name: "Data workflow" })).toBeVisible();
+    await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
 
     await expectNoErrors(page, errors);
   });
@@ -371,7 +371,25 @@ test.describe("react workbench — controlled analytics", () => {
 
     await expect(page.getByRole("toolbar", { name: "Query controls" })).toBeVisible();
     await expect(page.getByRole("toolbar", { name: "Editing controls" })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Data workflow" })).toBeVisible();
+    await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
+
+    // Related controls cluster into named groups inside each toolbar.
+    await expect(
+      page
+        .getByRole("toolbar", { name: "Query controls" })
+        .getByRole("group", { name: "Account search" }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("toolbar", { name: "Editing controls" })
+        .getByRole("group", { name: "Replace" }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("toolbar", { name: "Data workflow" })
+        .getByRole("group", { name: "Data exchange" }),
+    ).toBeVisible();
+
     await expect(page.getByRole("radiogroup", { name: "Rendering thread" })).toBeVisible();
     await expect(page.getByLabel("Search accounts")).toBeVisible();
     await expect(page.getByLabel("Formula or value")).toBeVisible();

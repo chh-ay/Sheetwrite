@@ -52,7 +52,12 @@ export const BUSINESS_COLUMNS = {
 } as const;
 
 export const BUSINESS_MAX_QTY = 5_000;
-export const BUSINESS_THEME: Partial<Theme> = VUE_SHOWCASE_THEME;
+export const BUSINESS_THEME: Partial<Theme> = {
+  font: VUE_SHOWCASE_THEME.font,
+  rowHeight: VUE_SHOWCASE_THEME.rowHeight,
+  headerHeight: VUE_SHOWCASE_THEME.headerHeight,
+  rowHeaderWidth: VUE_SHOWCASE_THEME.rowHeaderWidth,
+};
 
 /** Deterministic integer quantity per row (1..480). */
 export function businessQty(row: number): number {

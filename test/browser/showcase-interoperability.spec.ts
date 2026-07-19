@@ -76,10 +76,10 @@ test("interoperability page boots, verifies fixture checksums in-browser, and pr
   // Sheets and Microsoft Excel are suite-verified from genuine producer bytes
   // (not run here), and the residual unverified aspects stay spelled out.
   const matrix = page.locator('[data-testid="interop-producer-matrix"]');
-  const excelRow = matrix.locator("tr", { hasText: "Microsoft Excel" });
+  const excelRow = matrix.locator('[data-producer="Microsoft Excel"]');
   await expect(excelRow).toHaveAttribute("data-state", "verified-suite");
   await expect(excelRow).toContainText("Apache POI");
-  const sheetsRow = matrix.locator("tr", { hasText: "Google Sheets" });
+  const sheetsRow = matrix.locator('[data-producer="Google Sheets"]');
   await expect(sheetsRow).toHaveAttribute("data-state", "verified-suite");
   await expect(sheetsRow).toContainText("genuine Google Sheets-exported workbook");
   await expect(sheetsRow).toContainText("Not yet verified from Google Sheets bytes");
@@ -275,6 +275,9 @@ test("interoperability page stays operable and labeled on a phone viewport", asy
   // Section anchors resolve and the section nav is an accessible landmark.
   const sectionNav = page.getByRole("navigation", { name: "Page sections" });
   await expect(sectionNav).toBeVisible();
+  // The rail always marks exactly one current section, so users know where
+  // they are on the long page.
+  await expect(sectionNav.locator('a[aria-current="true"]')).toHaveCount(1);
   for (const anchor of ["xlsx", "fixtures", "warnings", "delimited", "limits", "isolation"]) {
     await expect(page.locator(`#${anchor}`)).toHaveCount(1);
   }

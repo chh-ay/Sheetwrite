@@ -50,7 +50,8 @@ function DatabaseProofRoute() {
             "HTTP, WebSocket, queues, regions, backups: the adapter interface is transport-neutral by design and ships no network code.",
         },
       ]}
-      boundaryLede="This proof runs the full persistence protocol against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours."
+      boundaryContract="PersistenceAdapter"
+      boundaryLede="This showcase runs the full persistence protocol against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours."
       description={description}
       eyebrow="CAPABILITY / DATABASE & DOCUMENT LIFECYCLE"
       facts={[
@@ -61,7 +62,11 @@ function DatabaseProofRoute() {
       ]}
       guideHref="/docs/guides/persistence/"
       guideLabel="Read the persistence guide"
-      proof={[
+      prompt="Turn autosave off, make a few edits, then reload the page — the pending queue survives. Or force an external commit and watch conflict recovery rebase your work."
+      slug="database"
+      sourcePath="docs/src/showcases/showcase-database.ts"
+      title="A real database lifecycle, observable end to end."
+      verification={[
         {
           title: "Atomic sequencing",
           detail:
@@ -83,10 +88,6 @@ function DatabaseProofRoute() {
             "Close and reopen the session (or reload this page): committed state and the durable pending queue come back from IndexedDB exactly once.",
         },
       ]}
-      prompt="Turn autosave off, make a few edits, then reload the page — the pending queue survives. Or force an external commit and watch conflict recovery rebase your work."
-      slug="database"
-      sourcePath="docs/src/showcases/showcase-database.ts"
-      title="A real database lifecycle, observable end to end."
     >
       <DatabaseShowcase />
     </ProofPage>

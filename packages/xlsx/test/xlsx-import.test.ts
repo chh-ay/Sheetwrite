@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import type { Workbook, WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import {
   dateToSerial,
+  formatNumber,
   fromXlsxTable,
   fromXlsxWorkbook,
   initSheetwrite,
@@ -322,11 +323,19 @@ describe("independent XLSX corpus", () => {
     const inputs = imported.sheets[0]!;
     expect([inputs.frozenRows, inputs.frozenCols]).toEqual([1, 1]);
     expect(inputs.merges).toContainEqual({ r0: 1, c0: 3, r1: 1, c1: 4 });
+    const currencyFormat = inputs.columns[1]!.numberFormat;
     expect(inputs.columns[1]).toMatchObject({
       type: "currency",
       numberFormat: expect.stringContaining("$#,##0.00"),
     });
     expect(inputs.columns[4]!.visible).toBe(false);
+    expect({
+      format: currencyFormat,
+      rendered: formatNumber(2, currencyFormat),
+    }).toEqual({
+      format: expect.stringContaining("$#,##0.00"),
+      rendered: "$2.00",
+    });
     expect(inputs.validationRules?.[0]).toMatchObject({
       range: {
         sheet: "inputs",

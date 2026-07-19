@@ -296,6 +296,53 @@ test("shell edits land in the outbox and survive the drain", async ({ page }) =>
   expect(errors.console).toEqual([]);
 });
 
+test("logging past the activity capacity never grows the workbench or grid", async ({ page }) => {
+  const errors = collectErrors(page);
+  await bootWorkbench(page);
+
+  const workbench = page.locator(".sw-svw");
+  const grid = page.locator(".sw-svw .sw-demo-grid");
+  const initialWorkbench = (await workbench.boundingBox())?.height ?? 0;
+  const initialGrid = (await grid.boundingBox())?.height ?? 0;
+  expect(initialWorkbench).toBeGreaterThan(0);
+  expect(initialGrid).toBeGreaterThan(0);
+
+  // Queue offline so every logged update stays in the durable outbox and the
+  // activity feed fills well past its visible window.
+  await page.getByTestId("connection-toggle").click();
+  for (let update = 0; update < 10; update += 1) {
+    await page.getByTestId("log-button").click();
+  }
+  await expect(page.getByTestId("queue-count")).toHaveText("10");
+
+  // The workbench is a fixed stage: overflow lives inside the rail, never in
+  // the outer layout, so the workbook and grid keep their boot-time heights.
+  const grownWorkbench = (await workbench.boundingBox())?.height ?? 0;
+  const grownGrid = (await grid.boundingBox())?.height ?? 0;
+  expect(Math.abs(grownWorkbench - initialWorkbench)).toBeLessThanOrEqual(1);
+  expect(Math.abs(grownGrid - initialGrid)).toBeLessThanOrEqual(1);
+  expect(
+    await page
+      .getByTestId("pending-queue")
+      .evaluate((list) => list.scrollHeight > list.clientHeight + 1),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+
+  // Bounding the viewport must not break the drain: reconnect and settle.
+  await page.getByTestId("connection-toggle").click();
+  await expect(page.getByTestId("sync-status")).toContainText("All changes synced · server v10", {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("queue-count")).toHaveText("0");
+  const drainedWorkbench = (await workbench.boundingBox())?.height ?? 0;
+  expect(Math.abs(drainedWorkbench - initialWorkbench)).toBeLessThanOrEqual(1);
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test.describe("mobile viewport", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 

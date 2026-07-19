@@ -2081,7 +2081,8 @@
   }
 
   .sw-demo-main {
-    min-height: 44rem;
+    height: 44rem;
+    min-height: 0;
     padding: 0;
     grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 0;

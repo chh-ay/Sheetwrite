@@ -294,6 +294,17 @@ export default function CollaborationShowcase() {
     };
   }, []);
 
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      for (const key of CLIENT_KEYS) clientsRef.current[key]?.grid.replaceTheme({});
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   const sampleEdit = (key: ClientKey) => {
     const runtime = clientsRef.current[key];
     if (!runtime) return;
@@ -468,10 +479,9 @@ export default function CollaborationShowcase() {
   };
 
   return (
-    <section aria-label="Collaboration protocol proof" className="sw-clb">
+    <section aria-label="Collaboration protocol showcase" className="sw-clb">
       <header className="sw-clb__statusbar">
         <p className="sw-clb__status" data-status={status} data-testid="clb-status">
-          <span aria-hidden="true" className="sw-clb__status-dot" />
           {status === "ready" ? "Ready" : status === "error" ? "Error" : "Loading"}
           <span className="sw-clb__status-detail">{statusDetail}</span>
         </p>
@@ -509,6 +519,12 @@ export default function CollaborationShowcase() {
         })}
       </div>
 
+      <div aria-hidden="true" className="sw-clb__flow">
+        <span className="sw-clb__flow-stem" />
+        <span className="sw-clb__flow-label">commits in · sequenced broadcasts out</span>
+        <span className="sw-clb__flow-stem" data-flip="true" />
+      </div>
+
       <section aria-labelledby="clb-server-title" className="sw-clb__server">
         <header>
           <h3 id="clb-server-title">In-page sequencing server</h3>
@@ -533,9 +549,12 @@ export default function CollaborationShowcase() {
           )}
         </ol>
         <p className="sw-clb__server-note">
-          Demo-only: this server lives in the page so the protocol is observable. It implements the
-          same <code>PersistenceAdapter</code> + <code>RemoteOperationSource</code> pair your
-          backend implements over its own transport and database.
+          <span className="sw-clb__server-note-tag">Demo-only</span>
+          <span>
+            This server lives in the page so the protocol is observable. It implements the same{" "}
+            <code>PersistenceAdapter</code> + <code>RemoteOperationSource</code> pair your backend
+            implements over its own transport and database.
+          </span>
         </p>
       </section>
     </section>
@@ -568,21 +587,18 @@ function ClientPanel({
   view,
 }: Readonly<ClientPanelProps>) {
   const connection = view.online ? "online" : "offline";
+  const held = view.linkState?.heldBroadcasts ?? 0;
+  const pending = view.syncState?.pendingCount ?? 0;
   return (
     <article
       aria-label={`Client ${actor.displayName}`}
       className="sw-clb__client"
       data-client={slug}
+      data-connection={connection}
+      style={{ "--clb-actor": actor.color } as React.CSSProperties}
     >
       <header className="sw-clb__client-head">
-        <span className="sw-clb__actor">
-          <span
-            aria-hidden="true"
-            className="sw-clb__actor-dot"
-            style={{ background: actor.color }}
-          />
-          {actor.displayName}
-        </span>
+        <span className="sw-clb__actor">{actor.displayName}</span>
         <span
           className="sw-clb__connection"
           data-connection={connection}
@@ -615,20 +631,18 @@ function ClientPanel({
         >
           Edit {actor.displayName === "Ana" ? "“Import pipeline”" : "“Offline drain QA”"}
         </button>
-        <button className="sw-clb__button" onClick={onLoseAck} type="button">
+        <button className="sw-clb__button" data-variant="quiet" onClick={onLoseAck} type="button">
           Lose next ack
         </button>
-        <button className="sw-clb__button" onClick={onRetry} type="button">
+        <button className="sw-clb__button" data-variant="quiet" onClick={onRetry} type="button">
           Retry pending
         </button>
-        <button className="sw-clb__button" onClick={onHold} type="button">
+        <button className="sw-clb__button" data-variant="quiet" onClick={onHold} type="button">
           Hold next broadcast
         </button>
-        <button className="sw-clb__button" onClick={onRelease} type="button">
+        <button className="sw-clb__button" data-variant="quiet" onClick={onRelease} type="button">
           Release held
-          {view.linkState && view.linkState.heldBroadcasts > 0
-            ? ` (${view.linkState.heldBroadcasts})`
-            : ""}
+          {held > 0 ? <span className="sw-clb__held-count">{held}</span> : null}
         </button>
       </div>
 
@@ -639,7 +653,9 @@ function ClientPanel({
         </div>
         <div>
           <dt>Pending</dt>
-          <dd data-testid={`clb-${slug}-pending`}>{view.syncState?.pendingCount ?? 0}</dd>
+          <dd data-state={pending > 0 ? "queued" : undefined} data-testid={`clb-${slug}-pending`}>
+            {pending}
+          </dd>
         </div>
         <div>
           <dt>Committed total</dt>
@@ -657,14 +673,7 @@ function ClientPanel({
             <li className="sw-clb__presence-empty">no one yet</li>
           ) : (
             view.roster.map((message) => (
-              <li key={message.actor.id}>
-                <span
-                  aria-hidden="true"
-                  className="sw-clb__actor-dot"
-                  style={{ background: message.actor.color ?? "#94a3b8" }}
-                />
-                {message.actor.displayName ?? message.actor.id}
-              </li>
+              <li key={message.actor.id}>{message.actor.displayName ?? message.actor.id}</li>
             ))
           )}
         </ul>

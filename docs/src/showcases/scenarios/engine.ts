@@ -28,7 +28,12 @@ export const ENGINE_MARKETS = REVENUE_CITIES;
 export const ENGINE_OWNERS = REVENUE_REPS;
 export const ENGINE_MARKET_COLUMN = REVENUE_CITY_COLUMN;
 export const ENGINE_AMOUNT_COLUMN = REVENUE_AMOUNT_COLUMN;
-export const ENGINE_THEME: Partial<Theme> = SHOWCASE_THEME;
+export const ENGINE_THEME: Partial<Theme> = {
+  font: SHOWCASE_THEME.font,
+  rowHeight: SHOWCASE_THEME.rowHeight,
+  headerHeight: SHOWCASE_THEME.headerHeight,
+  rowHeaderWidth: SHOWCASE_THEME.rowHeaderWidth,
+};
 
 /**
  * Canonical dense columnar dataset (module-level singleton — the grid copies

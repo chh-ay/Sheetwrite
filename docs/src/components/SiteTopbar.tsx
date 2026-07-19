@@ -13,9 +13,9 @@ interface SiteTopbarProps {
 }
 
 /**
- * The one product topbar: brand, Docs, the capability hub, GitHub, theme.
- * Shared by the landing, the hub, and every showcase so the site has a single
- * chrome. Framework deep links live on the hub and landing, not up here.
+ * The one product topbar: brand, Docs, showcases, GitHub, theme.
+ * Shared by the landing and every showcase so the site has a single chrome.
+ * Framework deep links and benchmark navigation live in their dedicated surfaces.
  */
 export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
   return (
@@ -30,7 +30,14 @@ export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
       <nav aria-label="Site">
         <Link to="/docs/">Docs</Link>
         <Link
-          aria-current={active === "showcases" ? "page" : active ? "true" : undefined}
+          activeOptions={{ exact: true }}
+          aria-current={
+            active === "showcases"
+              ? "page"
+              : active && active !== "performance"
+                ? "true"
+                : undefined
+          }
           to="/showcases/"
         >
           Showcases

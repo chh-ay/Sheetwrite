@@ -5,8 +5,6 @@ import { pageMeta } from "../lib/seo.js";
 import {
   CAPABILITY_INVENTORY,
   CAPABILITY_OWNERS,
-  type Capability,
-  type CapabilityArea,
   type CapabilityOwnerId,
 } from "../showcases/capabilities.js";
 import { assertCapabilityInventory } from "../showcases/capability-validation.js";
@@ -20,41 +18,40 @@ export const Route = createFileRoute("/showcases/")({
   head: () => ({
     meta: pageMeta(
       "Showcases — evaluate Sheetwrite by capability",
-      "Every public Sheetwrite capability with its owning live proof: editing, formulas, validation, million-row scale, XLSX/CSV exchange, IndexedDB persistence, offline sync, and collaboration.",
+      "Every public Sheetwrite capability with its owning live showcase: editing, formulas, validation, million-row scale, XLSX/CSV exchange, IndexedDB persistence, offline sync, and collaboration.",
     ),
     links: [{ rel: "stylesheet", href: hubStylesheet }],
   }),
   component: ShowcaseHub,
 });
 
-const AREA_ORDER: readonly { area: CapabilityArea; label: string; job: string }[] = [
-  { area: "editing", label: "Edit & interact", job: "Enter, move, and correct data" },
-  { area: "modeling", label: "Model & analyze", job: "Formulas, aggregates, and queries" },
-  {
-    area: "workflow",
-    label: "Govern & annotate",
-    job: "Validation, protection, notes, formatting",
-  },
-  { area: "scale", label: "Scale & render", job: "Million rows, Workers, measured speed" },
-  { area: "interop", label: "Exchange spreadsheets", job: "XLSX, Excel, CSV/TSV in and out" },
-  {
-    area: "persistence",
-    label: "Persist & recover",
-    job: "Snapshots, commits, compaction, reload",
-  },
-  {
-    area: "collaboration",
-    label: "Sync & collaborate",
-    job: "Offline queues, presence, convergence",
-  },
-  {
-    area: "lifecycle",
-    label: "Mount in your framework",
-    job: "Create, reset, live options, destroy",
-  },
-];
-
 const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]));
+
+/** Launch order for the four capability scenes: measured scale leads. */
+const SCENE_ORDER = [
+  "performance",
+  "database",
+  "interoperability",
+  "collaboration",
+] as const satisfies readonly CapabilityOwnerId[];
+
+type SceneOwnerId = (typeof SCENE_ORDER)[number];
+
+/** One concise line per scene, distilled from the owner's responsibility. */
+const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
+  performance: "A million paged rows, Worker and main-thread rendering, measured medians.",
+  database: "Snapshot load, append-only IndexedDB commits, compaction, reload recovery.",
+  interoperability: "XLSX/Excel and CSV/TSV against independent fixtures, with explicit warnings.",
+  collaboration: "Two clients, one sequencer: presence, offline reconnect, conflicts, recovery.",
+};
+
+/** Accurate mount and runtime cues per first-party adapter. */
+const FRAMEWORK_MOUNTS: Readonly<Record<string, { mount: string; pkg: string }>> = {
+  vanilla: { mount: "createGrid(host, …)", pkg: "@sheetwrite/core" },
+  react: { mount: "<SheetwriteGrid />", pkg: "@sheetwrite/react" },
+  vue: { mount: "<SheetwriteGrid />", pkg: "@sheetwrite/vue" },
+  svelte: { mount: "<SheetwriteGrid bind:grid />", pkg: "@sheetwrite/svelte" },
+};
 
 interface HubBenchData {
   available: boolean;
@@ -65,56 +62,147 @@ interface HubBenchData {
   };
 }
 
-function OwnerLink({ id }: Readonly<{ id: CapabilityOwnerId }>) {
-  const owner = OWNER_BY_ID.get(id);
-  if (!owner) return null;
+const TELEMETRY_BAR_IDS = Array.from({ length: 16 }, (_, index) => `telemetry-${index + 1}`);
+const EXCHANGE_CELL_IDS = Array.from({ length: 9 }, (_, index) => `exchange-${index + 1}`);
+
+/** Million-row telemetry: paged-row counter, median readout, frame bars. */
+function PerformanceScene({ medianMs }: Readonly<{ medianMs?: number }>) {
   return (
-    <Link className="sw-hub-owner-link" data-owner={id} to={owner.href}>
-      {owner.label}
-    </Link>
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--performance">
+      <span className="sw-hub-tele">
+        <span className="sw-hub-tele__stat">
+          <strong>1,000,000</strong>
+          <small>rows paged</small>
+        </span>
+        <span className="sw-hub-tele__stat">
+          {medianMs === undefined ? (
+            <>
+              <strong>Worker</strong>
+              <small>renderer host</small>
+            </>
+          ) : (
+            <>
+              <strong>{medianMs} ms</strong>
+              <small>median interaction</small>
+            </>
+          )}
+        </span>
+      </span>
+      <span className="sw-hub-tele__bars">
+        {TELEMETRY_BAR_IDS.map((id) => (
+          <i key={id} />
+        ))}
+      </span>
+      <span className="sw-hub-scene__caption">scroll · jump · edit · cache churn</span>
+    </span>
   );
 }
 
-function CapabilityRow({ capability }: Readonly<{ capability: Capability }>) {
+/** Durable commit timeline: snapshot, append-only commits, compact, reload. */
+function DatabaseScene() {
   return (
-    <li className="sw-hub-cap">
-      <div className="sw-hub-cap__head">
-        <h4>{capability.title}</h4>
-        <code>{capability.id}</code>
-      </div>
-      <p className="sw-hub-cap__interaction">{capability.interaction}</p>
-      <dl className="sw-hub-cap__facts">
-        <div>
-          <dt>Proof</dt>
-          <dd>
-            <OwnerLink id={capability.primary} />
-            {(capability.secondary ?? []).map((secondary) => (
-              <span className="sw-hub-cap__secondary" key={secondary.owner}>
-                also <OwnerLink id={secondary.owner} />
-              </span>
-            ))}
-          </dd>
-        </div>
-        <div>
-          <dt>Contract</dt>
-          <dd>
-            <code>{capability.testPath}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Boundary</dt>
-          <dd>{capability.boundary}</dd>
-        </div>
-      </dl>
-    </li>
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--database">
+      <span className="sw-hub-commits">
+        <span className="sw-hub-commits__node" data-kind="snapshot">
+          <i />
+          <code>snapshot</code>
+        </span>
+        <span className="sw-hub-commits__node" data-kind="commit">
+          <i />
+          <code>c41</code>
+        </span>
+        <span className="sw-hub-commits__node" data-kind="commit">
+          <i />
+          <code>c42</code>
+        </span>
+        <span className="sw-hub-commits__node" data-kind="commit">
+          <i />
+          <code>c43</code>
+        </span>
+        <span className="sw-hub-commits__node" data-kind="compact">
+          <i />
+          <code>compact</code>
+        </span>
+        <span className="sw-hub-commits__node" data-kind="reload">
+          <i />
+          <code>reload</code>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">IndexedDB · append-only log · recovery</span>
+    </span>
   );
+}
+
+/** Workbook exchange: files in, grid in the middle, files back out. */
+function InteroperabilityScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--interoperability">
+      <span className="sw-hub-exchange">
+        <span className="sw-hub-exchange__files">
+          <span className="sw-hub-file">.xlsx</span>
+          <span className="sw-hub-file">.csv</span>
+        </span>
+        <i className="sw-hub-exchange__arrow" />
+        <span className="sw-hub-exchange__grid">
+          {EXCHANGE_CELL_IDS.map((id) => (
+            <i key={id} />
+          ))}
+        </span>
+        <i className="sw-hub-exchange__arrow" />
+        <span className="sw-hub-exchange__files">
+          <span className="sw-hub-file">.xlsx</span>
+          <span className="sw-hub-file">.tsv</span>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">import · fidelity warnings · export</span>
+    </span>
+  );
+}
+
+/** Two-client sequencing: per-client op lanes converging on one shared log. */
+function CollaborationScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--collaboration">
+      <span className="sw-hub-sync">
+        <span className="sw-hub-sync__lane" data-client="a">
+          <span className="sw-hub-sync__peer">A</span>
+          <code>edit B2</code>
+          <code>edit C4</code>
+        </span>
+        <span className="sw-hub-sync__seq">
+          <span data-client="a">41</span>
+          <span data-client="b">42</span>
+          <span data-client="a">43</span>
+          <span data-client="b">44</span>
+        </span>
+        <span className="sw-hub-sync__lane" data-client="b">
+          <span className="sw-hub-sync__peer">B</span>
+          <code>edit D1</code>
+          <code>ack 42</code>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">two clients · one sequencer · convergence</span>
+    </span>
+  );
+}
+
+function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs?: number }>) {
+  switch (id) {
+    case "performance":
+      return <PerformanceScene medianMs={medianMs} />;
+    case "database":
+      return <DatabaseScene />;
+    case "interoperability":
+      return <InteroperabilityScene />;
+    case "collaboration":
+      return <CollaborationScene />;
+  }
 }
 
 function ShowcaseHub() {
   const bench = landingBench as HubBenchData;
   const heroStats = bench.available ? bench.heroStats : undefined;
   const frameworks = CAPABILITY_OWNERS.filter((owner) => owner.kind === "framework");
-  const proofs = CAPABILITY_OWNERS.filter((owner) => owner.kind === "capability");
 
   return (
     <div className="sw-hub-frame">
@@ -122,12 +210,11 @@ function ShowcaseHub() {
       <main className="sw-hub" id="main-content">
         <header className="sw-hub__hero">
           <p className="sw-hub__eyebrow">Capability evaluation</p>
-          <h1>Every capability, proven live.</h1>
+          <h1>Every capability, live and verified.</h1>
           <p className="sw-hub__lede">
             {CAPABILITY_INVENTORY.length} public capabilities, each with exactly one owning
-            showcase, a required interaction, an executable browser contract, and an explicit
-            host-owned boundary. Open the proof that matches your job — every grid below is real and
-            editable.
+            showcase, a required interaction, and an executable browser contract. Open the live
+            scenario that matches your job.
           </p>
           {heroStats ? (
             <p className="sw-hub__bench">
@@ -145,71 +232,62 @@ function ShowcaseHub() {
           )}
         </header>
 
-        <section aria-labelledby="hub-proofs" className="sw-hub__owners">
-          <h2 id="hub-proofs">Deep capability proofs</h2>
-          <p>Framework-neutral routes that prove one subsystem end to end.</p>
-          <ul className="sw-hub__owner-grid">
-            {proofs.map((owner) => (
-              <li key={owner.id}>
-                <Link data-owner={owner.id} to={owner.href}>
-                  <strong>{owner.label}</strong>
-                  <span>{owner.responsibility}</span>
-                  <span className="sw-hub__owner-count">
-                    {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} owned
-                    capabilities →
-                  </span>
-                </Link>
-              </li>
-            ))}
+        <section aria-labelledby="hub-scenes" className="sw-hub__scenes">
+          <h2 id="hub-scenes">Capability showcases</h2>
+          <p>Four framework-neutral live scenarios — one subsystem each, real and editable.</p>
+          <ul className="sw-hub-scenes">
+            {SCENE_ORDER.map((id) => {
+              const owner = OWNER_BY_ID.get(id);
+              if (!owner) return null;
+              return (
+                <li key={owner.id}>
+                  <Link className="sw-hub-launch" data-owner={owner.id} to={owner.href}>
+                    <CapabilityScene id={id} medianMs={heroStats?.millionRowMedianMs} />
+                    <span className="sw-hub-launch__body">
+                      <strong>{owner.label}</strong>
+                      <span className="sw-hub-launch__summary">{SCENE_SUMMARY[id]}</span>
+                      <span className="sw-hub__owner-count">
+                        {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} owned
+                        capabilities →
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </section>
 
-        <section aria-labelledby="hub-frameworks" className="sw-hub__owners">
+        <section aria-labelledby="hub-frameworks" className="sw-hub__frameworks">
           <h2 id="hub-frameworks">Framework workbenches</h2>
-          <p>
-            One engine, four first-party adapters. Each workbench mounts the same core with a
-            bounded product story — and stays directly editable.
-          </p>
-          <ul className="sw-hub__owner-grid">
-            {frameworks.map((owner) => (
-              <li key={owner.id}>
-                <Link data-owner={owner.id} to={owner.href}>
-                  <strong>{owner.label}</strong>
-                  <span>{owner.responsibility}</span>
-                  <span className="sw-hub__owner-count">
-                    {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} owned
-                    capabilities →
-                  </span>
-                </Link>
-              </li>
-            ))}
+          <p>One engine, four first-party adapters — every workbench stays directly editable.</p>
+          <ul className="sw-hub-rail">
+            {frameworks.map((owner) => {
+              const cue = FRAMEWORK_MOUNTS[owner.id];
+              return (
+                <li key={owner.id}>
+                  <Link
+                    className="sw-hub-rail__item"
+                    data-framework={owner.id}
+                    data-owner={owner.id}
+                    to={owner.href}
+                  >
+                    <strong>{owner.label}</strong>
+                    {cue ? (
+                      <span className="sw-hub-rail__mount">
+                        <code>{cue.mount}</code>
+                        <code className="sw-hub-rail__pkg">{cue.pkg}</code>
+                      </span>
+                    ) : null}
+                    <span className="sw-hub__owner-count">
+                      {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} owned
+                      capabilities →
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
-        </section>
-
-        <section aria-labelledby="hub-index" className="sw-hub__index">
-          <h2 id="hub-index">The capability index</h2>
-          <p>
-            The same checked-in inventory that gates the docs build — if a capability loses its
-            owner, route, interaction contract, or shared protocol binding, this site fails to ship.
-          </p>
-          {AREA_ORDER.map(({ area, label, job }) => {
-            const capabilities = CAPABILITY_INVENTORY.filter((c) => c.area === area);
-            if (capabilities.length === 0) return null;
-            const headingId = `hub-area-${area}`;
-            return (
-              <section aria-labelledby={headingId} className="sw-hub__area" key={area}>
-                <header>
-                  <h3 id={headingId}>{label}</h3>
-                  <p>{job}</p>
-                </header>
-                <ul className="sw-hub__caps">
-                  {capabilities.map((capability) => (
-                    <CapabilityRow capability={capability} key={capability.id} />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
         </section>
       </main>
     </div>

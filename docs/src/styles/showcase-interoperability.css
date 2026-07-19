@@ -1,5 +1,9 @@
 /* Route-scoped styles for /showcases/interoperability/. Every selector is
-   prefixed .sw-si- so this sheet can never collide with sibling showcases. */
+   prefixed .sw-si- so this sheet can never collide with sibling showcases.
+   Palette contract: everything — page chrome AND the workbench instrument —
+   reads theme-aware --sw-* tokens, so the whole route follows the site
+   light/dark theme. --sw-demo-* is only used for theme-agnostic status
+   colors (warn/danger) and structural tokens (space/radius/transition). */
 
 @layer components {
   .sw-si-frame {
@@ -13,12 +17,14 @@
   .sw-si-page {
     width: min(74rem, 100% - 2.5rem);
     margin: 0 auto;
-    padding: 2.5rem 0 5rem;
+    padding: 2.25rem 0 5rem;
   }
+
+  /* ── Hero ── */
 
   .sw-si-hero {
     max-width: 52rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .sw-si-eyebrow {
@@ -29,14 +35,14 @@
   }
 
   .sw-si-hero h1 {
-    margin: 0 0 1rem;
+    margin: 0 0 0.75rem;
     color: var(--sw-fg-strong);
     font: 640 clamp(1.7rem, 3.4vw, 2.5rem) / 1.12 var(--font-display);
     text-wrap: balance;
   }
 
   .sw-si-lede {
-    margin: 0 0 1.25rem;
+    margin: 0;
     color: var(--sw-fg-muted);
     font-size: 1.02rem;
     line-height: 1.65;
@@ -47,44 +53,111 @@
     font-size: 0.92em;
   }
 
+  .sw-si-lede a {
+    color: var(--sw-accent-strong);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .sw-si-lede a:hover,
+  .sw-si-lede a:focus-visible {
+    text-decoration: underline;
+  }
+
+  /* ── Persistent section rail ──
+     One nav landmark for every viewport: a sticky strip of numbered text
+     tabs under the site header, with a mono progress readout. Scroll-spy
+     underlines the current section via aria-current; on narrow viewports
+     the strip scrolls horizontally inside itself so the page never
+     overflows. */
+
   .sw-si-sectionnav {
+    position: sticky;
+    top: var(--sw-header-height);
+    z-index: 30;
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    align-items: stretch;
+    gap: 1rem;
+    margin: 0 0 1.5rem;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--sw-border);
+    background: var(--sw-surface-0);
+    scrollbar-width: none;
+  }
+
+  .sw-si-sectionnav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sw-si-sectionnav__progress {
+    flex: none;
+    align-self: center;
+    margin-right: 0.25rem;
+    color: var(--sw-fg-dim);
+    font: 650 var(--sw-type-xs) var(--font-mono);
+    letter-spacing: 0.08em;
   }
 
   .sw-si-sectionnav a {
-    padding: 0.35rem 0.7rem;
-    border: 1px solid var(--sw-border);
-    border-radius: 999px;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0.1rem 0.55rem;
+    border-bottom: 2px solid transparent;
     color: var(--sw-fg-muted);
     font: 550 var(--sw-type-sm) var(--font-sans);
     text-decoration: none;
+    white-space: nowrap;
     transition:
       border-color var(--sw-demo-transition),
       color var(--sw-demo-transition);
   }
 
-  .sw-si-sectionnav a:hover,
-  .sw-si-sectionnav a:focus-visible {
-    border-color: var(--sw-accent);
+  .sw-si-sectionnav a span {
+    color: var(--sw-fg-dim);
+    font: 650 var(--sw-type-xs) var(--font-mono);
+  }
+
+  .sw-si-sectionnav a:hover {
     color: var(--sw-fg-strong);
   }
+
+  .sw-si-sectionnav a:focus-visible {
+    border-radius: var(--sw-demo-radius-1);
+    outline: 2px solid var(--sw-accent);
+    outline-offset: -2px;
+  }
+
+  .sw-si-sectionnav a[aria-current="true"] {
+    border-bottom-color: var(--sw-accent);
+    color: var(--sw-fg-strong);
+  }
+
+  .sw-si-sectionnav a[aria-current="true"] span {
+    color: var(--sw-accent-strong);
+  }
+
+  /* ── Live status readout ── */
 
   .sw-si-status {
     max-width: 52rem;
     margin: 0 0 2rem;
     padding: 0.6rem 0.9rem;
     border-left: 3px solid var(--sw-accent);
-    background: var(--sw-surface-1);
     border-radius: 0 var(--sw-demo-radius-2) var(--sw-demo-radius-2) 0;
+    background: var(--sw-surface-1);
     color: var(--sw-fg);
     font: 500 var(--sw-type-sm) / 1.5 var(--font-sans);
   }
 
+  /* ── Sections ── */
+
   .sw-si-section {
     margin: 0 0 3.25rem;
-    scroll-margin-top: calc(var(--sw-header-height) + 1rem);
+    /* Clear both the sticky site header and the sticky section rail. */
+    scroll-margin-top: calc(var(--sw-header-height) + 3.4rem);
   }
 
   .sw-si-section h2 {
@@ -106,61 +179,136 @@
     line-height: 1.65;
   }
 
+  .sw-si-section > p a {
+    color: var(--sw-accent-strong);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .sw-si-section > p a:hover,
+  .sw-si-section > p a:focus-visible {
+    text-decoration: underline;
+  }
+
   /* Long repository paths in inline code must wrap on narrow viewports. */
   .sw-si-section code {
     overflow-wrap: anywhere;
   }
 
-  /* ── Workbench ── */
-
-  .sw-si-workbench {
-    /* Engine chrome adopts the shared demo palette: grid surface, shell
-       widgets (name box, formula bar, status), menus, and editors. */
-    --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
-    --sheetwrite-bg: var(--sw-demo-surface);
-    --sheetwrite-fg: var(--sw-demo-fg);
-    --sheetwrite-grid-line: var(--sw-demo-border);
-    --sheetwrite-header-bg: var(--sw-demo-raised);
-    --sheetwrite-header-fg: var(--sw-demo-accent-strong);
-    --sheetwrite-selection: color-mix(in srgb, var(--sw-demo-accent) 14%, transparent);
-    --sheetwrite-selection-border: var(--sw-demo-accent);
-    --sheetwrite-search-match: color-mix(in srgb, var(--sw-demo-warn) 25%, transparent);
-    --sheetwrite-search-active: var(--sw-demo-warn);
-    --sheetwrite-highlight: color-mix(in srgb, var(--sw-demo-accent) 20%, transparent);
-    --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
-    --sheetwrite-widget-bg: var(--sw-demo-raised);
-    --sheetwrite-widget-fg: var(--sw-demo-fg);
-    --sheetwrite-widget-muted: var(--sw-demo-muted);
-    --sheetwrite-widget-border: var(--sw-demo-border);
-    --sheetwrite-widget-accent: var(--sw-demo-accent-strong);
-    --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-demo-accent) 14%, transparent);
-    --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-demo-accent) 12%, var(--sw-demo-raised));
-    --sheetwrite-menu-shadow: var(--sw-demo-popup-shadow);
-    --sheetwrite-find-shadow: var(--sw-demo-popup-shadow);
-
-    overflow: hidden;
-    border: 1px solid var(--sw-demo-border);
-    border-radius: var(--sw-demo-radius-3);
-    background: var(--sw-demo-surface);
-    box-shadow: var(--sw-demo-shadow);
-    color: var(--sw-demo-fg);
+  /* Compact fact chips replace explanatory paragraphs: document features,
+     enforced ceilings — scannable state, not prose. */
+  .sw-si-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
   }
 
-  .sw-si-workbench__label {
-    margin: 0;
-    padding: 0.7rem 1rem;
-    border-bottom: 1px solid var(--sw-demo-border);
-    background: var(--sw-demo-raised);
-    color: var(--sw-demo-muted);
-    font: 600 var(--sw-type-sm) var(--font-sans);
+  .sw-si-facts li {
+    padding: 0.26rem 0.65rem;
+    border: 1px solid var(--sw-border);
+    border-radius: 999px;
+    background: var(--sw-surface-1);
+    color: var(--sw-fg-muted);
+    font: 550 var(--sw-type-xs) var(--font-sans);
   }
 
-  /* shell.css owns the .sheetwrite-shell flex column and sizes it at 100% of
-     its parent (unlayered, so it wins over layered overrides). The stage is
-     the owned parent that turns that 100% into a definite height. */
-  .sw-si-stage {
-    height: min(30rem, 58vh);
-    min-height: 20rem;
+  /* ── Buttons: one language, four ranks ──
+     Primary = the section's verifying action; secondary = supporting
+     import/export; quiet = reset/undo; danger = security scenarios. */
+
+  .sw-si-btn {
+    display: inline-flex;
+    min-height: 2.15rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.42rem 0.85rem;
+    border: 1px solid var(--sw-border-strong);
+    border-radius: var(--sw-demo-radius-1);
+    background: var(--sw-surface-1);
+    color: var(--sw-fg-strong);
+    font: 570 var(--sw-type-sm) var(--font-sans);
+    cursor: pointer;
+    transition:
+      border-color var(--sw-demo-transition),
+      background var(--sw-demo-transition),
+      color var(--sw-demo-transition);
+  }
+
+  .sw-si-btn:focus-visible {
+    outline: 2px solid var(--sw-accent);
+    outline-offset: 2px;
+  }
+
+  .sw-si-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .sw-si-btn--primary {
+    border-color: var(--sw-accent);
+    background: var(--sw-accent);
+    color: var(--sw-surface-1);
+    font-weight: 700;
+  }
+
+  .sw-si-btn--primary:hover:not(:disabled),
+  .sw-si-btn--primary:focus-visible {
+    border-color: var(--sw-accent-strong);
+    background: var(--sw-accent-strong);
+  }
+
+  .sw-si-btn--secondary:hover:not(:disabled),
+  .sw-si-btn--secondary:focus-visible,
+  .sw-si-file:focus-within {
+    border-color: var(--sw-accent);
+  }
+
+  .sw-si-btn--quiet {
+    border-color: transparent;
+    background: transparent;
+    color: var(--sw-fg-muted);
+  }
+
+  .sw-si-btn--quiet:hover:not(:disabled),
+  .sw-si-btn--quiet:focus-visible {
+    background: var(--sw-surface-2);
+    color: var(--sw-fg-strong);
+  }
+
+  .sw-si-btn--danger {
+    border-color: color-mix(in srgb, var(--sw-demo-danger) 55%, var(--sw-border-strong));
+    background: color-mix(in srgb, var(--sw-demo-danger) 12%, var(--sw-surface-1));
+    color: color-mix(in srgb, var(--sw-demo-danger) 62%, var(--sw-fg-strong));
+    font-weight: 650;
+  }
+
+  .sw-si-btn--danger:hover:not(:disabled),
+  .sw-si-btn--danger:focus-visible {
+    border-color: var(--sw-demo-danger);
+    background: color-mix(in srgb, var(--sw-demo-danger) 20%, var(--sw-surface-1));
+  }
+
+  .sw-si-btn--danger:focus-visible {
+    outline-color: var(--sw-demo-danger);
+  }
+
+  /* The file control is a real <input type=file> behind a button-shaped
+     label: keyboard reachable, no light-mode native chrome poking through. */
+  .sw-si-file {
+    position: relative;
+  }
+
+  .sw-si-file input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .sw-si-actions {
@@ -171,56 +319,97 @@
     margin: 1rem 0;
   }
 
+  .sw-si-actions__spacer {
+    flex: 1;
+  }
+
+  /* ── Workbench: one dark instrument ── */
+
+  .sw-si-workbench {
+    /* Engine chrome adopts the site theme: the canvas reads these seeds via
+       resolveThemeFromCss at mount (and again on replaceTheme when the theme
+       flips); shell widgets, tabs, menus, and editors read them from CSS. */
+    --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
+    --sheetwrite-bg: var(--sw-surface-1);
+    --sheetwrite-fg: var(--sw-fg);
+    --sheetwrite-grid-line: var(--sw-border);
+    --sheetwrite-header-bg: var(--sw-surface-2);
+    --sheetwrite-header-fg: var(--sw-accent-strong);
+    --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+    --sheetwrite-selection-border: var(--sw-accent);
+    --sheetwrite-search-match: color-mix(in srgb, var(--sw-demo-warn) 25%, transparent);
+    --sheetwrite-search-active: var(--sw-demo-warn);
+    --sheetwrite-highlight: color-mix(in srgb, var(--sw-accent) 20%, transparent);
+    --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
+    --sheetwrite-widget-bg: var(--sw-surface-2);
+    --sheetwrite-widget-fg: var(--sw-fg);
+    --sheetwrite-widget-muted: var(--sw-fg-muted);
+    --sheetwrite-widget-border: var(--sw-border);
+    --sheetwrite-widget-accent: var(--sw-accent-strong);
+    --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+    --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
+    --sheetwrite-menu-shadow: var(--sw-shadow);
+    --sheetwrite-find-shadow: var(--sw-shadow);
+    --sheetwrite-tab-font: 600 12px / 1 var(--sw-font-body);
+    --sheetwrite-tab-bg: var(--sw-surface-2);
+    --sheetwrite-tab-fg: var(--sw-fg-muted);
+    --sheetwrite-tab-border: var(--sw-border);
+    --sheetwrite-tab-hover-bg: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-2));
+    --sheetwrite-tab-active-bg: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-1));
+    --sheetwrite-tab-active-fg: var(--sw-accent-strong);
+
+    overflow: hidden;
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-demo-radius-3);
+    background: var(--sw-surface-1);
+    box-shadow: var(--sw-shadow);
+    color: var(--sw-fg);
+  }
+
+  .sw-si-workbench__label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--sw-border);
+    background: var(--sw-surface-2);
+    color: var(--sw-fg-muted);
+    font: 600 var(--sw-type-sm) var(--font-sans);
+    overflow-wrap: anywhere;
+  }
+
+  /* shell.css owns the .sheetwrite-shell flex column and sizes it at 100% of
+     its parent (unlayered, so it wins over layered overrides). The stage is
+     the owned parent that turns that 100% into a definite height — the grid
+     never grows because logs or reports gain content. */
+  .sw-si-stage {
+    height: min(30rem, 58vh);
+    min-height: 20rem;
+    transition: opacity var(--sw-demo-transition);
+  }
+
+  .sw-si-workbench:not([data-ready]) .sw-si-stage {
+    opacity: 0.55;
+  }
+
+  /* Engine chrome overrides (.sheetwrite-*) live at the END of this file,
+     OUTSIDE @layer components: core's styles.css and shell.css are unlayered,
+     and unlayered author styles always beat layered ones. */
+
+  /* Action toolbar inside the instrument: the page's adaptive button
+     language on the panel's raised strip. */
   .sw-si-workbench .sw-si-actions {
     margin: 0;
     padding: 0.8rem 1rem;
-    border-top: 1px solid var(--sw-demo-border);
-    background: var(--sw-demo-raised);
+    border-top: 1px solid var(--sw-border);
+    background: var(--sw-surface-2);
   }
 
-  .sw-si-actions button,
-  .sw-si-file {
-    display: inline-flex;
-    min-height: 2.15rem;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.42rem 0.8rem;
-    border: 1px solid var(--sw-border-strong);
-    border-radius: var(--sw-demo-radius-1);
-    background: var(--sw-surface-1);
-    color: var(--sw-fg-strong);
-    font: 570 var(--sw-type-sm) var(--font-sans);
-    cursor: pointer;
-    transition: border-color var(--sw-demo-transition);
-  }
-
-  .sw-si-workbench .sw-si-actions button,
-  .sw-si-workbench .sw-si-file {
-    border-color: var(--sw-demo-border-strong);
-    background: var(--sw-demo-panel);
-    color: var(--sw-demo-fg);
-  }
-
-  .sw-si-actions button:hover,
-  .sw-si-actions button:focus-visible,
-  .sw-si-file:hover,
-  .sw-si-file:focus-within {
-    border-color: var(--sw-accent);
-  }
-
-  .sw-si-actions button:focus-visible {
-    outline: 2px solid var(--sw-accent);
-    outline-offset: 2px;
-  }
-
-  .sw-si-actions button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-
-  .sw-si-file input {
-    max-width: 13rem;
-    font: inherit;
+  /* The quiet reset needs one surface step beyond the strip it sits on. */
+  .sw-si-workbench .sw-si-btn--quiet:hover:not(:disabled),
+  .sw-si-workbench .sw-si-btn--quiet:focus-visible {
+    background: var(--sw-surface-3);
   }
 
   /* ── Reports ── */
@@ -262,130 +451,240 @@
     overflow-wrap: anywhere;
   }
 
-  /* ── Fixtures ── */
+  /* ── Fixtures: producer artifacts ── */
+
+  .sw-si-provenance {
+    margin: 0 0 1rem;
+    color: var(--sw-fg-dim);
+    font: 550 var(--sw-type-xs) var(--font-mono);
+  }
 
   .sw-si-fixtures {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
-    gap: 0.9rem;
-    margin: 1.25rem 0;
+    margin: 0 0 1.5rem;
     padding: 0;
+    border-top: 1px solid var(--sw-border);
     list-style: none;
   }
 
   .sw-si-fixture {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    padding: 1rem;
-    border: 1px solid var(--sw-border);
-    border-radius: var(--sw-demo-radius-3);
-    background: var(--sw-surface-1);
+    display: grid;
+    grid-template:
+      "head features action" auto
+      "file features action" auto
+      "warning warning warning" auto
+      "result result result" auto /
+      minmax(15rem, 0.75fr) minmax(20rem, 1.5fr) auto;
+    gap: 0.35rem 1.25rem;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--sw-border);
   }
 
   .sw-si-fixture__head {
+    grid-area: head;
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .sw-si-fixture__head strong {
-    color: var(--sw-fg-strong);
-    font: 640 var(--sw-type-sm) var(--font-mono);
-    overflow-wrap: anywhere;
-  }
-
-  .sw-si-digest {
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    font: 650 var(--sw-type-xs) var(--font-mono);
-  }
-
-  .sw-si-digest[data-state="pending"] {
-    background: var(--sw-surface-2);
-    color: var(--sw-fg-dim);
-  }
-
-  .sw-si-digest[data-state="verified"] {
-    background: var(--sw-accent-soft);
-    color: var(--sw-accent-strong);
-  }
-
-  .sw-si-digest[data-state="mismatch"] {
-    background: color-mix(in srgb, var(--sw-demo-danger) 18%, transparent);
-    color: var(--sw-demo-danger);
+    gap: 0.35rem 0.75rem;
   }
 
   .sw-si-fixture__producer {
-    margin: 0;
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-type-sm);
+    color: var(--sw-fg-strong);
+    font: 640 var(--sw-type-base) var(--font-display);
   }
 
-  .sw-si-fixture__sha {
+  .sw-si-fixture__file {
+    grid-area: file;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
     margin: 0;
+  }
+
+  .sw-si-fixture__file strong {
+    color: var(--sw-fg);
+    font: 600 var(--sw-type-xs) var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  .sw-si-fixture__file code {
     color: var(--sw-fg-dim);
     font: 500 var(--sw-type-xs) var(--font-mono);
   }
 
+  .sw-si-digest {
+    color: var(--sw-fg-dim);
+    font: 600 var(--sw-type-xs) var(--font-mono);
+  }
+
+  .sw-si-digest::before {
+    margin-right: 0.35rem;
+    content: "○";
+  }
+
+  .sw-si-digest[data-state="verified"] {
+    color: var(--sw-accent-strong);
+  }
+
+  .sw-si-digest[data-state="verified"]::before {
+    content: "✓";
+  }
+
+  .sw-si-digest[data-state="mismatch"] {
+    color: var(--sw-demo-danger);
+  }
+
+  .sw-si-digest[data-state="mismatch"]::before {
+    content: "×";
+  }
+
   .sw-si-fixture__warn {
-    margin: 0;
+    grid-area: warning;
+    margin: 0.35rem 0 0;
     color: var(--sw-type-number);
-    font-size: var(--sw-type-sm);
+    font-size: var(--sw-type-xs);
+    line-height: 1.5;
   }
 
-  .sw-si-fixture button {
-    align-self: flex-start;
-    margin-top: 0.35rem;
-    padding: 0.4rem 0.8rem;
-    border: 1px solid var(--sw-border-strong);
-    border-radius: var(--sw-demo-radius-1);
-    background: var(--sw-surface-2);
-    color: var(--sw-fg-strong);
-    font: 570 var(--sw-type-sm) var(--font-sans);
-    cursor: pointer;
+  .sw-si-fixture__warn::before {
+    margin-right: 0.35rem;
+    content: "Warning:";
+    font-weight: 650;
   }
 
-  .sw-si-fixture button:hover:not(:disabled),
-  .sw-si-fixture button:focus-visible {
-    border-color: var(--sw-accent);
+  .sw-si-fixture .sw-si-btn {
+    grid-area: action;
+    white-space: nowrap;
   }
 
-  .sw-si-fixture button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
+  .sw-si-fixture__load {
+    grid-area: result;
+    margin: 0;
+    color: var(--sw-fg-dim);
+    font: 550 var(--sw-type-xs) / 1.5 var(--font-sans);
+  }
+
+  .sw-si-fixture__load[data-state="loaded"] {
+    color: var(--sw-accent-strong);
+  }
+
+  .sw-si-fixture__load[data-state="failed"] {
+    color: var(--sw-demo-danger);
   }
 
   .sw-si-chips {
+    grid-area: features;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
+    gap: 0.2rem 0;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .sw-si-chips li {
-    padding: 0.14rem 0.5rem;
-    border: 1px solid var(--sw-border);
-    border-radius: 999px;
     color: var(--sw-fg-muted);
-    font: 550 var(--sw-type-xs) var(--font-sans);
+    font: 550 var(--sw-type-xs) / 1.45 var(--font-sans);
   }
 
-  /* ── Tables ── */
+  .sw-si-chips li:not(:last-child)::after {
+    margin: 0 0.45rem;
+    color: var(--sw-border-strong);
+    content: "·";
+  }
+
+  .sw-si-producers {
+    margin: 0.75rem 0 0;
+    padding: 0;
+    border-top: 1px solid var(--sw-border);
+    list-style: none;
+  }
+
+  .sw-si-producers > li {
+    display: grid;
+    grid-template-columns: minmax(12rem, 0.7fr) minmax(18rem, 1.5fr) minmax(12rem, 0.8fr);
+    gap: 1.25rem;
+    align-items: baseline;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--sw-border);
+  }
+
+  .sw-si-producers__identity {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.65rem;
+    align-items: baseline;
+  }
+
+  .sw-si-producers__identity strong {
+    color: var(--sw-fg-strong);
+  }
+
+  .sw-si-producers__status {
+    color: var(--sw-accent-strong);
+    font: 620 var(--sw-type-xs) var(--font-mono);
+  }
+
+  .sw-si-producers__status::before {
+    margin-right: 0.3rem;
+    content: "✓";
+  }
+
+  .sw-si-producers__status[data-state="verified-suite"] {
+    color: var(--sw-type-name);
+  }
+
+  .sw-si-producers__status[data-state="unverified"] {
+    color: var(--sw-type-number);
+  }
+
+  .sw-si-producers__status[data-state="unverified"]::before {
+    content: "!";
+  }
+
+  .sw-si-producers details {
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-sm);
+  }
+
+  .sw-si-producers summary {
+    width: fit-content;
+    cursor: pointer;
+    color: var(--sw-fg);
+    font-weight: 600;
+  }
+
+  .sw-si-producers details p {
+    margin: 0.5rem 0 0;
+    line-height: 1.55;
+  }
+
+  .sw-si-producers > li > code {
+    color: var(--sw-fg-dim);
+    font-size: var(--sw-type-xs);
+    overflow-wrap: anywhere;
+  }
+
+  /* ── Tables: one rounded frame that clips cleanly ──
+     The wrapper owns border, radius, and horizontal scrolling; the table
+     itself stays borderless so no cell ever pokes past a rounded corner. */
+
+  .sw-si-tablewrap {
+    margin: 0.75rem 0 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-demo-radius-2);
+    background: var(--sw-surface-1);
+  }
 
   .sw-si-matrix {
     width: 100%;
-    margin: 0.75rem 0 0;
-    border: 1px solid var(--sw-border);
-    border-radius: var(--sw-demo-radius-2);
+    min-width: 34rem;
+    margin: 0;
     border-collapse: separate;
     border-spacing: 0;
-    overflow: hidden;
-    background: var(--sw-surface-1);
     font-size: var(--sw-type-sm);
   }
 
@@ -406,7 +705,6 @@
   }
 
   .sw-si-matrix thead th {
-    border-top: 0;
     color: var(--sw-fg-dim);
     font: 640 var(--sw-type-xs) var(--font-sans);
     letter-spacing: 0.05em;
@@ -459,30 +757,101 @@
     overflow-wrap: anywhere;
   }
 
-  /* ── Warnings, previews, misc ── */
+  /* ── Panels: controls and their outputs live together ── */
 
-  .sw-si-warnings {
+  .sw-si-panel {
     max-width: 52rem;
-    padding: 0.9rem 1rem;
+    margin: 0 0 1rem;
+    padding: 1rem 1.1rem;
     border: 1px solid var(--sw-border);
-    border-radius: var(--sw-demo-radius-2);
+    border-radius: var(--sw-demo-radius-3);
     background: var(--sw-surface-1);
   }
 
-  .sw-si-warnings p {
-    margin: 0 0 0.4rem;
-    color: var(--sw-fg);
+  .sw-si-section .sw-si-panel h3 {
+    margin: 0 0 0.35rem;
   }
 
-  .sw-si-warnings ul {
-    margin: 0;
-    padding-left: 1.2rem;
+  .sw-si-panel__head p {
+    margin: 0 0 0.4rem;
     color: var(--sw-fg-muted);
+    font-size: var(--sw-type-sm);
     line-height: 1.6;
   }
 
+  .sw-si-panel .sw-si-actions {
+    margin: 0.75rem 0;
+  }
+
+  .sw-si-panel .sw-si-actions:last-child,
+  .sw-si-panel .sw-si-report {
+    margin-bottom: 0;
+  }
+
+  /* Panels holding tables span the full content width. */
+  .sw-si-panel:has(.sw-si-tablewrap) {
+    max-width: none;
+  }
+
+  .sw-si-note {
+    margin: 0.9rem 0 0;
+    padding-top: 0.7rem;
+    border-top: 1px dashed var(--sw-border);
+    color: var(--sw-fg-dim);
+    font-size: var(--sw-type-xs);
+    line-height: 1.6;
+  }
+
+  /* ── Warnings panel ── */
+
+  .sw-si-warnings__op {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.6rem;
+    color: var(--sw-fg);
+    font: 600 var(--sw-type-sm) var(--font-sans);
+    overflow-wrap: anywhere;
+  }
+
+  .sw-si-count {
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sw-demo-warn) 16%, transparent);
+    color: var(--sw-type-number);
+    font: 650 var(--sw-type-xs) var(--font-mono);
+  }
+
+  .sw-si-warnings ul {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sw-si-warnings li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-demo-radius-1);
+    background: var(--sw-surface-2);
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-sm);
+    line-height: 1.5;
+  }
+
+  .sw-si-warnings li span {
+    flex: 1;
+    min-width: 12rem;
+  }
+
   .sw-si-warncode {
-    margin-right: 0.35rem;
+    flex: none;
     padding: 0.1rem 0.4rem;
     border-radius: var(--sw-demo-radius-1);
     background: color-mix(in srgb, var(--sw-demo-warn) 16%, transparent);
@@ -495,9 +864,10 @@
     color: var(--sw-fg-dim);
   }
 
+  /* ── Previews, injection, errors ── */
+
   .sw-si-preview {
     display: grid;
-    max-width: 52rem;
     gap: 0.35rem;
     margin: 0.75rem 0;
     color: var(--sw-fg-muted);
@@ -508,7 +878,7 @@
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--sw-border-strong);
     border-radius: var(--sw-demo-radius-2);
-    background: var(--sw-surface-1);
+    background: var(--sw-surface-0);
     color: var(--sw-fg);
     font: 500 var(--sw-type-xs) / 1.5 var(--font-mono);
     resize: vertical;
@@ -521,8 +891,7 @@
   }
 
   .sw-si-injection {
-    max-width: 52rem;
-    margin: 0.5rem 0;
+    margin: 0.75rem 0;
     padding: 0.55rem 0.8rem;
     border: 1px solid color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
     border-radius: var(--sw-demo-radius-2);
@@ -533,24 +902,41 @@
   }
 
   .sw-si-error {
-    max-width: 52rem;
     margin: 0.5rem 0 0;
     color: var(--sw-demo-danger);
     font: 570 var(--sw-type-sm) var(--font-sans);
   }
 
+  /* ── Package boundary ── */
+
   .sw-si-isolation {
-    max-width: 52rem;
-    padding: 0.9rem 1rem;
-    border: 1px dashed var(--sw-border-strong);
-    border-radius: var(--sw-demo-radius-2);
-    background: var(--sw-surface-1);
+    border: 0;
+    background: color-mix(in srgb, var(--sw-accent) 5%, var(--sw-surface-1));
+  }
+
+  .sw-si-isolation .sw-si-verdict {
+    margin-bottom: 0.5rem;
   }
 
   .sw-si-isolation p {
     margin: 0;
     color: var(--sw-fg);
     line-height: 1.6;
+  }
+
+  /* ── Narrow viewports ── */
+
+  /* The topbar wraps to a second row below 54rem and grows taller than
+     --sw-header-height, so the section rail stays in flow there instead of
+     sticking under (and overlapping) it — same fallback as the hub rail. */
+  @media (max-width: 54rem) {
+    .sw-si-sectionnav {
+      position: static;
+    }
+
+    .sw-si-section {
+      scroll-margin-top: calc(var(--sw-header-height) + 1rem);
+    }
   }
 
   @media (max-width: 720px) {
@@ -564,14 +950,193 @@
       min-height: 16rem;
     }
 
-    .sw-si-matrix {
-      display: block;
-      overflow-x: auto;
+    .sw-si-sectionnav {
+      gap: 0.7rem;
+    }
+
+    .sw-si-sectionnav a {
+      padding-block: 0.5rem 0.45rem;
+      font-size: var(--sw-type-xs);
     }
 
     .sw-si-workbench .sw-si-actions {
       flex-direction: column;
       align-items: stretch;
     }
+
+    .sw-si-workbench .sw-si-btn {
+      justify-content: center;
+    }
+
+    .sw-si-actions__spacer {
+      display: none;
+    }
+    .sw-si-fixture,
+    .sw-si-producers > li {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sw-si-fixture {
+      grid-template:
+        "head"
+        "file"
+        "features"
+        "warning"
+        "action"
+        "result";
+    }
+
+    .sw-si-fixture .sw-si-btn {
+      width: fit-content;
+    }
   }
+}
+
+/* ── Engine chrome: one adaptive instrument ──
+   Unlayered on purpose: core's styles.css and shell.css are unlayered, and
+   unlayered author styles beat anything declared inside @layer components.
+   The --sheetwrite-* tokens these rules read are seeded on .sw-si-workbench
+   above from adaptive --sw-* tokens, so the whole instrument follows the
+   site light/dark theme. */
+
+/* Formula row: a visible, intentional edit strip on the panel surface. */
+.sw-si-workbench .sheetwrite-shell-formula-row {
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.sw-si-workbench .sheetwrite-shell-namebox,
+.sw-si-workbench .sheetwrite-shell-formula {
+  border-color: var(--sw-border-strong);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg);
+  transition:
+    border-color var(--sw-demo-transition),
+    box-shadow var(--sw-demo-transition);
+}
+
+.sw-si-workbench .sheetwrite-shell-namebox {
+  font: 600 12px / 1 var(--sw-font-mono);
+  color: var(--sw-accent-strong);
+}
+
+.sw-si-workbench :is(.sheetwrite-shell-namebox, .sheetwrite-shell-formula):focus-visible {
+  border-color: var(--sw-accent);
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 42%, transparent);
+}
+
+.sw-si-workbench .sheetwrite-shell-namebox[aria-invalid="true"] {
+  border-color: var(--sw-demo-danger);
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--sw-demo-danger);
+}
+
+/* Selection status strip under the grid. */
+.sw-si-workbench .sheetwrite-shell-bottom-row {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border-top: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.sw-si-workbench .sheetwrite-shell-status {
+  padding-left: 0;
+  color: var(--sw-fg-muted);
+  font: 500 12px / 1 var(--sw-font-mono);
+  opacity: 1;
+}
+
+/* Sheet tabs: compact treatment on the adaptive tab tokens (grid.ts syncs
+   the inline --sheetwrite-tab-* values from the resolved theme) — tabs
+   never shrink below their labels. */
+.sw-si-workbench :is(.sheetwrite-tabbar, .sheetwrite-shell-tabs) {
+  background: var(--sheetwrite-tab-bg);
+  border-color: var(--sheetwrite-tab-border);
+}
+
+.sw-si-workbench .sheetwrite-tab {
+  flex: none;
+  padding-inline: var(--sw-demo-space-3);
+  border-radius: var(--sw-demo-radius-1);
+  color: var(--sheetwrite-tab-fg);
+  white-space: nowrap;
+  transition:
+    color var(--sw-demo-transition),
+    background var(--sw-demo-transition);
+}
+
+.sw-si-workbench .sheetwrite-tab:has(+ .sheetwrite-tab-close) {
+  padding-inline-end: calc(var(--sw-demo-space-4) * 2);
+}
+
+.sw-si-workbench .sheetwrite-tab:hover:not(.sheetwrite-tab-active) {
+  background: var(--sheetwrite-tab-hover-bg);
+  color: var(--sw-fg-strong);
+}
+
+.sw-si-workbench .sheetwrite-tab:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: -2px;
+}
+
+.sw-si-workbench .sheetwrite-tab-active {
+  background: var(--sheetwrite-tab-active-bg);
+  color: var(--sheetwrite-tab-active-fg);
+  box-shadow: none;
+}
+
+.sw-si-workbench .sheetwrite-tab-active:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 48%, transparent);
+}
+
+/* Sheet add/remove: plain glyph controls, not filled bubbles. Hover tints
+   the glyph and washes the hit target; a ring appears only for keyboard
+   focus. Hit targets stay 1.5rem square / tab-height. */
+.sw-si-workbench .sheetwrite-tab-close {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  align-self: center;
+  place-items: center;
+  margin-inline: calc(var(--sw-demo-space-4) * -2) var(--sw-demo-space-1);
+  padding: 0;
+  border-radius: var(--sw-demo-radius-1);
+  background: transparent;
+  color: var(--sw-fg-dim);
+  line-height: 1;
+  transition:
+    color var(--sw-demo-transition),
+    background var(--sw-demo-transition);
+}
+
+.sw-si-workbench .sheetwrite-tab-active + .sheetwrite-tab-close {
+  color: var(--sw-fg-muted);
+}
+
+.sw-si-workbench .sheetwrite-tab-close:hover {
+  background: color-mix(in srgb, var(--sw-demo-danger) 14%, transparent);
+  color: var(--sw-demo-danger);
+}
+
+.sw-si-workbench .sheetwrite-tab-close:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: -2px;
+}
+
+/* The add-sheet "+" is a .sheetwrite-tab in core's markup: keep it a quiet
+   glyph beside the tabs rather than a labelled-tab lookalike (its hover
+   wash and focus ring come from the shared .sheetwrite-tab rules). */
+.sw-si-workbench .sheetwrite-tab-add {
+  padding-inline: var(--sw-demo-space-2);
+  color: var(--sw-fg-dim);
+}
+
+.sw-si-workbench .sheetwrite-tab-add:hover {
+  color: var(--sw-fg-strong);
 }

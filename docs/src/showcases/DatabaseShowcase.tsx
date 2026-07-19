@@ -265,6 +265,15 @@ export default function DatabaseShowcase() {
     };
   }, [boot]);
 
+  useEffect(() => {
+    const observer = new MutationObserver(() => sessionRef.current?.grid.replaceTheme({}));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   /** Runs one control action at a time so overlapping clicks cannot interleave. */
   const run = (action: () => Promise<void>) => {
     if (busyRef.current) return;
@@ -443,7 +452,9 @@ export default function DatabaseShowcase() {
       await boot("Demo databases deleted; reseeded from the canonical ledger at v0");
     });
 
-  const counters: ReadonlyArray<{ id: string; label: string; value: string }> = [
+  const activity = syncState?.activity ?? "hydrating";
+  const pendingCount = syncState?.pendingCount ?? 0;
+  const counters: ReadonlyArray<{ id: string; label: string; value: string; queued?: boolean }> = [
     { id: "dbx-version", label: "Head version", value: String(stats?.currentVersion ?? 0) },
     {
       id: "dbx-snapshot-version",
@@ -451,29 +462,38 @@ export default function DatabaseShowcase() {
       value: String(stats?.snapshotVersion ?? 0),
     },
     { id: "dbx-tail", label: "Tail records", value: String(stats?.tailLength ?? 0) },
-    { id: "dbx-pending", label: "Pending commits", value: String(syncState?.pendingCount ?? 0) },
+    {
+      id: "dbx-pending",
+      label: "Pending commits",
+      value: String(pendingCount),
+      queued: pendingCount > 0,
+    },
     { id: "dbx-reads", label: "IDB reads", value: String(stats?.reads ?? 0) },
     { id: "dbx-writes", label: "IDB writes", value: String(stats?.writes ?? 0) },
     { id: "dbx-bytes", label: "Stored", value: stats ? formatBytes(stats.storedBytes) : "0 B" },
   ];
 
   return (
-    <section aria-label="IndexedDB persistence proof" className="sw-dbx">
+    <section aria-label="IndexedDB persistence showcase" className="sw-dbx">
       <div className="sw-dbx__stage">
         <header className="sw-dbx__statusbar">
           <p
             className="sw-dbx__status"
-            data-activity={syncState?.activity ?? "hydrating"}
+            data-activity={activity}
             data-status={status}
             data-testid="dbx-status"
           >
-            <span aria-hidden="true" className="sw-dbx__status-dot" />
             {status === "ready" ? "Ready" : status === "error" ? "Error" : "Loading"}
             <span className="sw-dbx__status-detail">{statusDetail}</span>
           </p>
-          <p className="sw-dbx__probe">
-            Ledger total <output data-testid="dbx-total">{total}</output>
-          </p>
+          <div className="sw-dbx__readouts">
+            <span className="sw-dbx__chip" data-activity={activity}>
+              {activity}
+            </span>
+            <p className="sw-dbx__probe">
+              Ledger total <output data-testid="dbx-total">{total}</output>
+            </p>
+          </div>
         </header>
         <div
           aria-label="Expedition ledger workbook"
@@ -482,51 +502,78 @@ export default function DatabaseShowcase() {
           role="application"
         />
         <div aria-label="Database controls" className="sw-dbx__controls" role="toolbar">
-          <button
-            className="sw-dbx__button"
-            data-variant="primary"
-            onClick={commitSampleEdit}
-            type="button"
-          >
-            Commit sample edit
-          </button>
-          <button className="sw-dbx__button" onClick={saveNow} type="button">
-            Save pending now
-          </button>
-          <label className="sw-dbx__switch">
-            <input
-              checked={autosave}
-              onChange={(event) => {
-                autosaveRef.current = event.currentTarget.checked;
-                setAutosave(event.currentTarget.checked);
-                if (event.currentTarget.checked) saveNow();
-              }}
-              type="checkbox"
-            />
-            Autosave
-          </label>
-          <span aria-hidden="true" className="sw-dbx__divider" />
-          <button className="sw-dbx__button" onClick={loseNextAck} type="button">
-            Lose next acknowledgement
-          </button>
-          <button className="sw-dbx__button" onClick={retryPending} type="button">
-            Retry pending commit
-          </button>
-          <span aria-hidden="true" className="sw-dbx__divider" />
-          <button className="sw-dbx__button" onClick={externalCommit} type="button">
-            External writer commit
-          </button>
-          <button className="sw-dbx__button" onClick={simulateReload} type="button">
-            Close and reopen session
-          </button>
-          <button
-            className="sw-dbx__button"
-            data-variant="danger"
-            onClick={resetDemo}
-            type="button"
-          >
-            Reset demo data
-          </button>
+          <fieldset aria-label="Commit controls" className="sw-dbx__control-group">
+            <span className="sw-dbx__group-label">Commit</span>
+            <button
+              className="sw-dbx__button"
+              data-variant="primary"
+              onClick={commitSampleEdit}
+              type="button"
+            >
+              Commit sample edit
+            </button>
+            <button className="sw-dbx__button" onClick={saveNow} type="button">
+              Save pending now
+            </button>
+            <label className="sw-dbx__switch">
+              <input
+                checked={autosave}
+                onChange={(event) => {
+                  autosaveRef.current = event.currentTarget.checked;
+                  setAutosave(event.currentTarget.checked);
+                  if (event.currentTarget.checked) saveNow();
+                }}
+                type="checkbox"
+              />
+              Autosave
+            </label>
+          </fieldset>
+          <fieldset aria-label="Failure injection" className="sw-dbx__control-group">
+            <span className="sw-dbx__group-label">Faults</span>
+            <button
+              className="sw-dbx__button"
+              data-variant="quiet"
+              onClick={loseNextAck}
+              type="button"
+            >
+              Lose next acknowledgement
+            </button>
+            <button
+              className="sw-dbx__button"
+              data-variant="quiet"
+              onClick={retryPending}
+              type="button"
+            >
+              Retry pending commit
+            </button>
+          </fieldset>
+          <fieldset aria-label="Session lifecycle" className="sw-dbx__control-group">
+            <span className="sw-dbx__group-label">Session</span>
+            <button
+              className="sw-dbx__button"
+              data-variant="quiet"
+              onClick={externalCommit}
+              type="button"
+            >
+              External writer commit
+            </button>
+            <button
+              className="sw-dbx__button"
+              data-variant="quiet"
+              onClick={simulateReload}
+              type="button"
+            >
+              Close and reopen session
+            </button>
+            <button
+              className="sw-dbx__button"
+              data-variant="danger"
+              onClick={resetDemo}
+              type="button"
+            >
+              Reset demo data
+            </button>
+          </fieldset>
         </div>
       </div>
 
@@ -537,7 +584,9 @@ export default function DatabaseShowcase() {
             {counters.map((counter) => (
               <div key={counter.id}>
                 <dt>{counter.label}</dt>
-                <dd data-testid={counter.id}>{counter.value}</dd>
+                <dd data-state={counter.queued ? "queued" : undefined} data-testid={counter.id}>
+                  {counter.value}
+                </dd>
               </div>
             ))}
           </dl>

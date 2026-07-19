@@ -1,3 +1,19 @@
+.sw-vuewb-app {
+  --sw-demo-surface: var(--sw-surface-1);
+  --sw-demo-raised: var(--sw-surface-2);
+  --sw-demo-deep: var(--sw-surface-0);
+  --sw-demo-panel: var(--sw-surface-1);
+  --sw-demo-fg: var(--sw-fg);
+  --sw-demo-fg-soft: var(--sw-fg-muted);
+  --sw-demo-fg-strong: var(--sw-fg-strong);
+  --sw-demo-muted: var(--sw-fg-muted);
+  --sw-demo-dim: var(--sw-fg-dim);
+  --sw-demo-border: var(--sw-border);
+  --sw-demo-border-strong: var(--sw-border-strong);
+  --sw-demo-shadow: var(--sw-shadow);
+  --sw-demo-popup-shadow: var(--sw-shadow);
+}
+
 /* Route-scoped styles for the /vue business workbench. Every selector is
    prefixed .sw-vuewb- to stay collision-free with the shared showcase chrome;
    base surfaces, controlbar, and grid framing come from showcase.css. */

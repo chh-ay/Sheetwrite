@@ -315,7 +315,9 @@ test("the paged data path serves host pages and reports allocation honestly", as
 
   // Back to the dense path: stats disappear, aggregates complete.
   await page.getByRole("radio", { name: "Dense columnar" }).click();
-  await waitForLive(page);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
+    timeout: 20_000,
+  });
   await expect(page).not.toHaveURL(/data=paged/);
   await expect(page.getByTestId("paged-stats")).toHaveCount(0);
   await actionButton(page, "Total ARR").click();

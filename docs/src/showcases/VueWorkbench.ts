@@ -13,7 +13,7 @@ import { cellA1, MemoryPersistenceAdapter, SyncCoordinator } from "@sheetwrite/c
 import type { GridReadyEvent } from "@sheetwrite/vue";
 import { SheetwriteGrid } from "@sheetwrite/vue";
 import { FileSpreadsheet, ShieldCheck } from "lucide-vue-next";
-import { computed, defineComponent, h, onBeforeUnmount, ref, shallowRef } from "vue";
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import {
   BUSINESS_DOCUMENT_ID,
   BUSINESS_ROWS,
@@ -350,7 +350,19 @@ const App = defineComponent({
       );
     }
 
+    let themeObserver: MutationObserver | null = null;
+    onMounted(() => {
+      themeObserver = new MutationObserver(() =>
+        window.__sheetwriteVueWorkbench?.grid.replaceTheme(BUSINESS_THEME),
+      );
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
+    });
+
     onBeforeUnmount(() => {
+      themeObserver?.disconnect();
       offSync?.();
       offRejected?.();
       sync?.destroy();
