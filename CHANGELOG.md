@@ -16,4 +16,4 @@ Published releases and user-visible changes to Sheetwrite are recorded here. Pac
 - Improved wide-page loading, cache eviction, large-dataset performance, and browser rendering behavior.
 - Added complete framework, database lifecycle, collaboration, interoperability, and million-row performance showcases.
 - Added deterministic performance, delivery-size, cross-browser, package-consumer, and release verification gates.
-- Stable version tags reuse the successful commit CI artifacts for trusted npm publication and registry verification without rerunning source, coverage, browser, or consumer gates.
+- Successful `develop` CI runs publish only unpublished package versions from canonical artifacts, then create verified package-specific tags and GitHub Releases.

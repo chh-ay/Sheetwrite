@@ -1,0 +1,41 @@
+name: Version npm packages
+
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: package-versioning
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  BUN_VERSION: "1.3.14"
+
+jobs:
+  version:
+    if: github.repository == 'chh-ay/sheetwrite'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Create or update package version pull request
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        with:
+          version: bunx changeset version
+          title: Version npm packages
+          commit: "chore(release): version packages"
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

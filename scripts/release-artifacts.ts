@@ -81,6 +81,9 @@ export interface ReleaseArtifactManifest {
 }
 
 const repositoryRoot = resolve(import.meta.dir, "..");
+const PUBLISHABLE_PACKAGE_INDEXES: Readonly<Record<string, number>> = Object.fromEntries(
+  PUBLISHABLE_PACKAGE_ORDER.map((name, index) => [name, index]),
+);
 
 function processEnvironment(): Record<string, string> {
   return Object.fromEntries(
@@ -166,9 +169,9 @@ function collectInternalDependencies(
   const internal = new Map<string, string>();
   for (const field of DEPENDENCY_FIELDS) {
     for (const [name, version] of Object.entries(manifest[field] ?? {})) {
-      if (!versions.has(name)) continue;
+      if (PUBLISHABLE_PACKAGE_INDEXES[name] === undefined) continue;
       const expected = versions.get(name);
-      if (version !== expected) {
+      if (expected !== undefined && version !== expected) {
         throw new Error(`${manifest.name} internal dependency ${name} must be ${expected}`);
       }
       internal.set(name, version);
@@ -187,10 +190,12 @@ function expectedTarballName(name: string, version: string): string {
   return `${name.replace(/^@/, "").replaceAll("/", "-")}-${version}.tgz`;
 }
 
-export function expectedArtifactFiles(version: string): readonly string[] {
+export function expectedArtifactFiles(
+  packages: readonly Pick<ReleasePackageArtifact, "name" | "version">[],
+): readonly string[] {
   return [
     RELEASE_ARTIFACT_MANIFEST,
-    ...PUBLISHABLE_PACKAGE_ORDER.map((name) => expectedTarballName(name, version)),
+    ...packages.map(({ name, version }) => expectedTarballName(name, version)),
   ].sort();
 }
 
@@ -262,16 +267,12 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
       throw new Error(`Release toolchain ${name} must be ${expected}`);
     }
   }
-  if (!Array.isArray(manifest.packages)) throw new Error("Release packages must be an array");
-  if (manifest.packages.length !== PUBLISHABLE_PACKAGE_ORDER.length) {
-    throw new Error(
-      `Release manifest must contain exactly ${PUBLISHABLE_PACKAGE_ORDER.length} packages`,
-    );
+  if (!Array.isArray(manifest.packages) || manifest.packages.length === 0) {
+    throw new Error("Release packages must be a non-empty array");
   }
-  const releaseVersion = manifest.packages[0]?.version;
-  assertString(releaseVersion, "Release version");
-  assertStableReleaseVersion(releaseVersion, "Release version");
   const seen = new Set<string>();
+  const packageVersions = new Map<string, string>();
+  let previousPackageIndex = -1;
   for (const [index, artifact] of manifest.packages.entries()) {
     if (typeof artifact !== "object" || artifact === null) {
       throw new Error(`Release package ${index} must be an object`);
@@ -293,15 +294,18 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
       ],
       `Release package ${index}`,
     );
-    const expectedName = PUBLISHABLE_PACKAGE_ORDER[index];
-    if (artifact.name !== expectedName) {
-      throw new Error(`Release package ${index} must be ${expectedName ?? "missing"}`);
-    }
+    assertString(artifact.name, `Release package ${index} name`);
     if (seen.has(artifact.name)) throw new Error(`Duplicate release package ${artifact.name}`);
-    seen.add(artifact.name);
-    if (artifact.version !== releaseVersion) {
-      throw new Error(`${artifact.name} must use coordinated version ${releaseVersion}`);
+    const packageIndex = PUBLISHABLE_PACKAGE_INDEXES[artifact.name];
+    if (packageIndex === undefined) throw new Error(`Unknown release package ${artifact.name}`);
+    if (packageIndex <= previousPackageIndex) {
+      throw new Error("Release packages must follow dependency order");
     }
+    previousPackageIndex = packageIndex;
+    seen.add(artifact.name);
+    assertString(artifact.version, `${artifact.name} version`);
+    assertStableReleaseVersion(artifact.version, `${artifact.name} version`);
+    packageVersions.set(artifact.name, artifact.version);
     const expectedPath = expectedTarballName(artifact.name, artifact.version);
     if (artifact.path !== expectedPath || basename(artifact.path) !== artifact.path) {
       throw new Error(`${artifact.name} must use canonical tarball path ${expectedPath}`);
@@ -335,9 +339,17 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
     ) {
       throw new Error(`${artifact.name} internalDependencies must be an object`);
     }
+  }
+  for (const artifact of manifest.packages) {
     for (const [name, version] of Object.entries(artifact.internalDependencies)) {
-      if (!PUBLISHABLE_PACKAGE_ORDER.includes(name as never) || version !== releaseVersion) {
-        throw new Error(`${artifact.name} internal dependency ${name} must be ${releaseVersion}`);
+      if (PUBLISHABLE_PACKAGE_INDEXES[name] === undefined) {
+        throw new Error(`${artifact.name} has unknown internal dependency ${name}`);
+      }
+      assertString(version, `${artifact.name} internal dependency ${name}`);
+      assertStableReleaseVersion(version, `${artifact.name} internal dependency ${name}`);
+      const packagedVersion = packageVersions.get(name);
+      if (packagedVersion !== undefined && version !== packagedVersion) {
+        throw new Error(`${artifact.name} internal dependency ${name} must be ${packagedVersion}`);
       }
     }
   }
@@ -543,22 +555,19 @@ async function loadSourcePackages(): Promise<
     const manifestPath = join(directory, "package.json");
     if (!(await pathExists(manifestPath))) continue;
     const manifest = await readJson<PackageManifest>(manifestPath);
-    if (PUBLISHABLE_PACKAGE_ORDER.includes(manifest.name as never)) {
-      byName.set(manifest.name, { directory, manifest });
+    if (PUBLISHABLE_PACKAGE_INDEXES[manifest.name] === undefined) continue;
+    if (byName.has(manifest.name)) {
+      throw new Error(`Duplicate publishable workspace package ${manifest.name}`);
     }
+    assertStableReleaseVersion(manifest.version, `${manifest.name} version`);
+    byName.set(manifest.name, { directory, manifest });
   }
-  const sources = PUBLISHABLE_PACKAGE_ORDER.map((name) => {
-    const source = byName.get(name);
-    if (source === undefined) throw new Error(`Missing publishable workspace package ${name}`);
-    return source;
-  });
-  const releaseVersion = sources[0]!.manifest.version;
-  assertStableReleaseVersion(releaseVersion, "Publishable package version");
-  for (const source of sources) {
-    if (source.manifest.version !== releaseVersion) {
-      throw new Error(`${source.manifest.name} must use coordinated version ${releaseVersion}`);
-    }
-  }
+  const sources = [...byName.values()].sort(
+    (left, right) =>
+      PUBLISHABLE_PACKAGE_INDEXES[left.manifest.name]! -
+      PUBLISHABLE_PACKAGE_INDEXES[right.manifest.name]!,
+  );
+  if (sources.length === 0) throw new Error("No publishable workspace packages found");
   return sources;
 }
 
@@ -603,7 +612,7 @@ export async function verifyReleaseArtifacts(
   const manifest = await readJson<ReleaseArtifactManifest>(manifestPath);
   validateReleaseManifest(manifest);
   const entries = (await readdir(root)).sort();
-  const expectedEntries = [...expectedArtifactFiles(manifest.packages[0]!.version)];
+  const expectedEntries = [...expectedArtifactFiles(manifest.packages)];
   if (
     entries.length !== expectedEntries.length ||
     entries.some((entry, index) => entry !== expectedEntries[index])
@@ -616,11 +625,14 @@ export async function verifyReleaseArtifacts(
   const sourceVersions = new Map(
     sourcePackages.map(({ manifest: source }) => [source.name, source.version] as const),
   );
-  const versions = new Map(
-    manifest.packages.map((artifact) => [artifact.name, artifact.version] as const),
-  );
-  for (const [name, version] of sourceVersions) {
-    if (versions.get(name) !== version) throw new Error(`${name} source version changed`);
+  for (const artifact of manifest.packages) {
+    const sourceVersion = sourceVersions.get(artifact.name);
+    if (sourceVersion === undefined) {
+      throw new Error(`Missing publishable workspace package ${artifact.name}`);
+    }
+    if (sourceVersion !== artifact.version) {
+      throw new Error(`${artifact.name} source version changed`);
+    }
   }
   for (const artifact of manifest.packages) {
     const tarballPath = join(root, artifact.path);
@@ -668,7 +680,7 @@ export async function verifyReleaseArtifacts(
     }
     const packedManifestText = await run(["tar", "-xOzf", tarballPath, "package/package.json"]);
     const packedManifest = JSON.parse(packedManifestText) as PackageManifest;
-    validatePackedManifest(artifact, packedManifest, versions);
+    validatePackedManifest(artifact, packedManifest, sourceVersions);
   }
   return manifest;
 }

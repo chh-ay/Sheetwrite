@@ -52,6 +52,7 @@ export const REVIEWED_ACTION_PINS: Readonly<Record<string, string>> = {
   "actions/checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
   "actions/setup-node": "249970729cb0ef3589644e2896645e5dc5ba9c38",
   "oven-sh/setup-bun": "735343b667d3e6f658f44d0eca948eb6282f2b76",
+  "changesets/action": "a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d",
   "actions/upload-artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02",
   "actions/download-artifact": "634f93cb2916e3fdff6788551b99b062d0335ce0",
   "actions/cache": "0057852bfaa89a56745cba8c7296529d2fc39830",

@@ -22,12 +22,16 @@ published packages: `@sheetwrite/core`, `@sheetwrite/wasm`, `@sheetwrite/xlsx`,
 
 ## How releases consume them
 
-CI/release tooling reads the accumulated changesets to bump versions and
-assemble changelogs:
+The base branch is `develop`. The versioning workflow accumulates pending
+changesets into one pull request, applying only the requested package bumps and
+updating their changelogs. After that pull request merges and passes CI, release
+automation publishes only exact package versions that are not already present
+on npm.
+
+For a local preview of the version changes:
 
 ```sh
-bunx changeset version   # apply bumps + update CHANGELOG files
-bunx changeset publish   # publish the bumped packages
+bunx changeset version
 ```
 
-The base branch is `develop`. Config lives in `.changeset/config.json`.
+Configuration lives in `.changeset/config.json`.
