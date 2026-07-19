@@ -141,6 +141,16 @@ presence, comments, and revisions.
 | `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/wasm` | Internal Rust/WASM engine; normally transitive |
 
+## Releases
+
+Changesets generate the package-level changelogs linked from the root
+[changelog](CHANGELOG.md). After the coordinated version commit is merged and
+green on `develop`, pushing an exact stable tag such as `v0.2.1` runs the full
+release gates, publishes the six canonical tarballs to npm with provenance,
+verifies their registry integrity and `latest` tags, then creates the matching
+GitHub Release. A tag whose version does not match every publishable package
+manifest fails before publication.
+
 ## Development
 
 Contributor and CI tooling is pinned to Bun 1.3.14, Rust 1.96.0 with the
@@ -194,4 +204,4 @@ packed declarations and source maps separately from browser raw, gzip, and
 Brotli transfer bytes. Never resolve a breach by removing required tests,
 types, licenses, provenance, or debugging artifacts.
 
-The documentation site is available at [sheetwrite.vercel.app](https://sheetwrite.vercel.app/). See [support](SUPPORT.md), [security](SECURITY.md), and [contributing](CONTRIBUTING.md) policies in this repository.
+The documentation site is available at [sheetwrite.vercel.app](https://sheetwrite.vercel.app/). See the [changelog](CHANGELOG.md), [support](SUPPORT.md), [security](SECURITY.md), and [contributing](CONTRIBUTING.md) policies in this repository.

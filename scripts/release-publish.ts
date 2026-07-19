@@ -1,0 +1,223 @@
+import { join, resolve } from "node:path";
+import { type ReleasePackageArtifact, verifyReleaseArtifacts } from "./release-artifacts.js";
+
+export interface PublishedPackage {
+  readonly name: string;
+  readonly version: string;
+  readonly integrity: string;
+}
+
+export interface RegistryPackage {
+  readonly name?: unknown;
+  readonly version?: unknown;
+  readonly dist?: { readonly integrity?: unknown };
+}
+
+type PublishArtifact = (
+  artifactRoot: string,
+  artifact: ReleasePackageArtifact,
+) => Promise<PublishedPackage>;
+
+type RegistryQuery = (artifact: ReleasePackageArtifact) => Promise<RegistryPackage>;
+type LatestQuery = (name: string) => Promise<string>;
+type ExistingQuery = (artifact: ReleasePackageArtifact) => Promise<RegistryPackage | undefined>;
+
+function processEnvironment(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined,
+    ),
+  );
+}
+
+async function command(command: readonly [string, ...string[]]): Promise<string> {
+  const child = Bun.spawn([...command], {
+    env: processEnvironment(),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  if (exitCode !== 0) {
+    throw new Error(`${command.join(" ")} failed (${exitCode}): ${stderr || stdout}`);
+  }
+  return stdout.trim();
+}
+
+export function publishedPackageFrom(value: unknown): Omit<PublishedPackage, "integrity"> {
+  const candidates = Array.isArray(value) ? value : [value];
+  for (const candidate of candidates) {
+    if (candidate === null || typeof candidate !== "object") continue;
+    const record = candidate as Record<string, unknown>;
+    if (typeof record.name === "string" && typeof record.version === "string") {
+      return { name: record.name, version: record.version };
+    }
+  }
+  throw new Error("npm publish did not return an explicit package name and version");
+}
+
+export async function publishArtifact(
+  artifactRoot: string,
+  artifact: ReleasePackageArtifact,
+): Promise<PublishedPackage> {
+  const stdout = await command([
+    "npm",
+    "publish",
+    join(artifactRoot, artifact.path),
+    "--access",
+    "public",
+    "--tag",
+    "latest",
+    "--provenance",
+    "--ignore-scripts",
+    "--json",
+  ]);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new Error(`npm publish did not return JSON: ${stdout}`);
+  }
+  const published = publishedPackageFrom(parsed);
+  if (published.name !== artifact.name || published.version !== artifact.version) {
+    throw new Error(
+      `npm published ${published.name}@${published.version}, expected ${artifact.name}@${artifact.version}`,
+    );
+  }
+  return { ...published, integrity: artifact.integrity };
+}
+
+async function queryRegistry(artifact: ReleasePackageArtifact): Promise<RegistryPackage> {
+  return JSON.parse(
+    await command([
+      "npm",
+      "view",
+      `${artifact.name}@${artifact.version}`,
+      "name",
+      "version",
+      "dist.integrity",
+      "--json",
+    ]),
+  ) as RegistryPackage;
+}
+
+async function queryExistingRegistry(
+  artifact: ReleasePackageArtifact,
+): Promise<RegistryPackage | undefined> {
+  try {
+    return await queryRegistry(artifact);
+  } catch (error) {
+    if (String(error).includes("E404")) return undefined;
+    throw error;
+  }
+}
+
+async function queryLatest(name: string): Promise<string> {
+  const value = JSON.parse(
+    await command(["npm", "view", name, "dist-tags.latest", "--json"]),
+  ) as unknown;
+  if (typeof value !== "string") throw new Error(`${name} has no string latest dist-tag`);
+  return value;
+}
+
+export function assertRegistryArtifact(
+  artifact: ReleasePackageArtifact,
+  registry: RegistryPackage,
+): void {
+  if (registry.name !== artifact.name || registry.version !== artifact.version) {
+    throw new Error(
+      `Registry returned ${String(registry.name)}@${String(registry.version)}, expected ${artifact.name}@${artifact.version}`,
+    );
+  }
+  if (registry.dist?.integrity !== artifact.integrity) {
+    throw new Error(
+      `${artifact.name}@${artifact.version} registry integrity does not match the canonical tarball`,
+    );
+  }
+}
+
+export async function publishArtifactsIdempotently(
+  artifactRoot: string,
+  artifacts: readonly ReleasePackageArtifact[],
+  existing: ExistingQuery = queryExistingRegistry,
+  publish: PublishArtifact = publishArtifact,
+): Promise<readonly PublishedPackage[]> {
+  const published: PublishedPackage[] = [];
+  for (const artifact of artifacts) {
+    const registry = await existing(artifact);
+    if (registry !== undefined) {
+      assertRegistryArtifact(artifact, registry);
+      published.push({
+        name: artifact.name,
+        version: artifact.version,
+        integrity: artifact.integrity,
+      });
+      continue;
+    }
+    published.push(await publish(artifactRoot, artifact));
+  }
+  return published;
+}
+
+export function assertRegistryPackage(
+  artifact: ReleasePackageArtifact,
+  registry: RegistryPackage,
+  latest: string,
+): void {
+  assertRegistryArtifact(artifact, registry);
+  if (latest !== artifact.version) {
+    throw new Error(`${artifact.name} latest is ${latest}, expected ${artifact.version}`);
+  }
+}
+
+export async function verifyPublishedArtifacts(
+  artifacts: readonly ReleasePackageArtifact[],
+  query: RegistryQuery = queryRegistry,
+  latest: LatestQuery = queryLatest,
+  attempts = 12,
+  pause: (milliseconds: number) => Promise<unknown> = Bun.sleep,
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      for (const artifact of artifacts) {
+        assertRegistryPackage(artifact, await query(artifact), await latest(artifact.name));
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await pause(5_000);
+    }
+  }
+  throw new Error(`Published package registry verification failed after ${attempts} attempts`, {
+    cause: lastError,
+  });
+}
+
+export async function publishCanonicalArtifacts(
+  artifactRoot: string,
+  expectedVersion: string,
+): Promise<readonly PublishedPackage[]> {
+  const manifest = await verifyReleaseArtifacts(artifactRoot);
+  for (const artifact of manifest.packages) {
+    if (artifact.version !== expectedVersion) {
+      throw new Error(`${artifact.name} is ${artifact.version}, expected ${expectedVersion}`);
+    }
+  }
+  const published = await publishArtifactsIdempotently(artifactRoot, manifest.packages);
+  await verifyPublishedArtifacts(manifest.packages);
+  return published;
+}
+
+if (import.meta.main) {
+  const artifactRoot = resolve(process.argv[2] ?? "test-results/release-artifacts");
+  const expectedVersion = process.env.RELEASE_VERSION;
+  if (!expectedVersion) throw new Error("RELEASE_VERSION is required");
+  const published = await publishCanonicalArtifacts(artifactRoot, expectedVersion);
+  console.log(
+    `Published and verified ${published.length} canonical packages at ${expectedVersion}`,
+  );
+}

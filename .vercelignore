@@ -5,6 +5,9 @@ node_modules
 **/.tanstack
 **/target
 packages/wasm/pkg
-test-results
+test-results/*
+!test-results/delivery-size/
+test-results/delivery-size/*
+!test-results/delivery-size/size-report.json
 bench/results/candidates
 playwright-report

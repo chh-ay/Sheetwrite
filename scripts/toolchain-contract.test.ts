@@ -153,7 +153,7 @@ describe("contributor and CI toolchain contract", () => {
     expect(preflight?.outputs?.docs_required).toBe("$" + "{{ steps.paths.outputs.docs_required }}");
     expect(classifier?.run).toContain("ci-paths.ts");
     expect(new Set(jobs["docs-build"]?.needs as string[])).toEqual(
-      new Set(["preflight", "artifact-build"]),
+      new Set(["preflight", "artifact-build", "delivery-size"]),
     );
     expect(jobs["docs-build"]?.if).toBe("needs.preflight.outputs.docs_required == 'true'");
 
@@ -163,6 +163,8 @@ describe("contributor and CI toolchain contract", () => {
     expect(docsCommand).toContain("docs:generate");
     expect(docsCommand).not.toContain("docs:check");
     expect(docsCommand).toContain("@sheetwrite/docs-start' build");
+    expect(JSON.stringify(jobs["delivery-size"])).toContain("delivery-size-evidence");
+    expect(JSON.stringify(jobs["docs-build"])).toContain("delivery-size-evidence");
 
     const requiredCommand = jobs.required?.steps?.find((step) =>
       step.run?.includes('test "$PREFLIGHT" = success'),

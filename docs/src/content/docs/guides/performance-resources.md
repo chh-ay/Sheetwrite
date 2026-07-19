@@ -935,8 +935,8 @@ bun run --filter @sheetwrite/bench bench:formula
 <div class="evidence-available"><strong>Validated evidence.</strong> Package tarball and bundler-output sizes, gated by absolute budgets in CI.</div>
 
 <dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Captured</dt><dd>2026-07-19 09:27 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>499ac68a998f</code> clean worktree</dd></div>
+<div><dt>Captured</dt><dd>2026-07-19 10:35 UTC</dd></div>
+<div><dt>Commit</dt><dd><code>848e46a0f350</code> clean worktree</dd></div>
 <div><dt>Raw artifact</dt><dd><code>test-results/delivery-size/size-report.json</code></dd></div>
 </dl>
 

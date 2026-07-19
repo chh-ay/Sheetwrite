@@ -306,10 +306,17 @@ jobs:
           bun run release:verify-artifacts -- --input test-results/release-artifacts
       - name: Enforce delivery budgets
         run: bun scripts/size-report.ts check --artifacts test-results/release-artifacts
+      - name: Upload validated delivery evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: delivery-size-evidence
+          path: test-results/delivery-size/size-report.json
+          if-no-files-found: error
+          retention-days: 7
 
   docs-build:
     name: Production Docs
-    needs: [preflight, artifact-build]
+    needs: [preflight, artifact-build, delivery-size]
     if: needs.preflight.outputs.docs_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -331,6 +338,11 @@ jobs:
         with:
           name: canonical-release-artifacts
           path: test-results/release-artifacts
+      - name: Download validated delivery evidence
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: delivery-size-evidence
+          path: test-results/delivery-size
       - name: Verify and hydrate canonical package outputs
         env:
           ARTIFACT_DIGEST: ${{ needs.artifact-build.outputs.artifact_digest }}
