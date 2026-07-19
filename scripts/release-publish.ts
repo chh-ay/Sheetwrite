@@ -61,7 +61,11 @@ async function command(command: readonly [string, ...string[]]): Promise<string>
 }
 
 export function publishedPackageFrom(value: unknown): Omit<PublishedPackage, "integrity"> {
-  const candidates = Array.isArray(value) ? value : [value];
+  const candidates = Array.isArray(value)
+    ? value
+    : value !== null && typeof value === "object"
+      ? [value, ...Object.values(value)]
+      : [value];
   for (const candidate of candidates) {
     if (candidate === null || typeof candidate !== "object") continue;
     const record = candidate as Record<string, unknown>;
