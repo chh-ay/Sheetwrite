@@ -69,12 +69,15 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ needs.identity.outputs.commit }}
-      - name: Setup Node
+      - name: Setup Node and npm registry
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
       - name: Install pinned npm
         run: npm install --global "npm@$NPM_VERSION"
+      - name: Remove token fallback before OIDC publication
+        run: npm config delete //registry.npmjs.org/:_authToken --location=user
       - name: Setup Bun
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
@@ -88,7 +91,9 @@ jobs:
         env:
           EXPECTED_SHA: ${{ needs.identity.outputs.commit }}
           RELEASE_VERSION: ${{ needs.identity.outputs.version }}
-        run: bun scripts/release-publish.ts test-results/release-artifacts
+        run: |
+          unset NODE_AUTH_TOKEN
+          bun scripts/release-publish.ts test-results/release-artifacts
       - name: Create verified GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
