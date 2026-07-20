@@ -16,27 +16,27 @@
   "budgets": {
     "bundler.next.coreInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 124798,
-      "maximum": 131038,
+      "baseline": 193670,
+      "maximum": 203354,
       "category": "browser-javascript",
       "owner": "next:core-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted Next lifecycle proof includes the required client React runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.next.coreInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 145910,
-      "maximum": 153206,
+      "baseline": 228520,
+      "maximum": 239946,
       "category": "browser-javascript",
       "owner": "next:core-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted Next lifecycle proof includes the required client React runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.next.coreInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 475234,
-      "maximum": 498996,
+      "baseline": 770513,
+      "maximum": 809039,
       "category": "browser-javascript",
       "owner": "next:core-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted Next lifecycle proof includes the required client React runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.next.coreInitial.wasm.brotliBytes": {
       "unit": "bytes",
@@ -184,27 +184,27 @@
     },
     "bundler.vite.reactInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 79633,
-      "maximum": 83615,
+      "baseline": 128076,
+      "maximum": 134480,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted React lifecycle proof includes the required ReactDOM runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.vite.reactInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 92454,
-      "maximum": 97077,
+      "baseline": 148907,
+      "maximum": 156353,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted React lifecycle proof includes the required ReactDOM runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.vite.reactInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 320211,
-      "maximum": 336222,
+      "baseline": 500399,
+      "maximum": 525419,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted React lifecycle proof includes the required ReactDOM runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.vite.reactInitial.wasm.brotliBytes": {
       "unit": "bytes",
@@ -328,27 +328,27 @@
     },
     "bundler.vite.vueInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 84909,
-      "maximum": 89155,
+      "baseline": 99967,
+      "maximum": 104966,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted Vue lifecycle proof includes the required Vue mount runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.vite.vueInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 98068,
-      "maximum": 102972,
+      "baseline": 114897,
+      "maximum": 120642,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted Vue lifecycle proof includes the required Vue mount runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.vite.vueInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 334137,
-      "maximum": 350844,
+      "baseline": 376905,
+      "maximum": 395751,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Mounted Vue lifecycle proof includes the required Vue mount runtime; reviewed baseline plus five percent or 1 KiB guard."
     },
     "bundler.vite.vueInitial.wasm.brotliBytes": {
       "unit": "bytes",
@@ -792,11 +792,11 @@
     },
     "package.@sheetwrite/react.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 2684,
-      "maximum": 3708,
+      "baseline": 3993,
+      "maximum": 5017,
       "category": "package-declarations",
       "owner": "@sheetwrite/react",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Reviewed typed operational event surface size; baseline plus five percent or 1 KiB guard."
     },
     "package.@sheetwrite/react.fileCount": {
       "unit": "count",
@@ -808,11 +808,11 @@
     },
     "package.@sheetwrite/react.mapsBytes": {
       "unit": "bytes",
-      "baseline": 7749,
-      "maximum": 8773,
+      "baseline": 8917,
+      "maximum": 9941,
       "category": "package-maps",
       "owner": "@sheetwrite/react",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Reviewed typed operational event surface size; baseline plus five percent or 1 KiB guard."
     },
     "package.@sheetwrite/react.metadataBytes": {
       "unit": "bytes",
@@ -848,11 +848,11 @@
     },
     "package.@sheetwrite/react.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 22530,
-      "maximum": 23657,
+      "baseline": 25652,
+      "maximum": 26935,
       "category": "package",
       "owner": "@sheetwrite/react",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Reviewed typed operational event surface size; baseline plus five percent or 1 KiB guard."
     },
     "package.@sheetwrite/react.wasmBytes": {
       "unit": "bytes",
@@ -1008,11 +1008,11 @@
     },
     "package.@sheetwrite/vue.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 29186,
-      "maximum": 30646,
+      "baseline": 30907,
+      "maximum": 32453,
       "category": "package",
       "owner": "@sheetwrite/vue",
-      "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
+      "rationale": "Reviewed mounted adapter lifecycle fixture package size; baseline plus five percent or 1 KiB guard."
     },
     "package.@sheetwrite/vue.wasmBytes": {
       "unit": "bytes",
@@ -1181,6 +1181,30 @@
       "category": "package-wasm",
       "owner": "@sheetwrite/xlsx",
       "rationale": "Zero-growth isolation invariant; any presence requires design review."
+    },
+    "bundler.next.coreInitial.css.brotliBytes": {
+      "unit": "bytes",
+      "baseline": 1442,
+      "maximum": 2466,
+      "category": "browser-css",
+      "owner": "next:core-initial",
+      "rationale": "Mounted Next lifecycle proof includes the required client React runtime; reviewed baseline plus five percent or 1 KiB guard."
+    },
+    "bundler.next.coreInitial.css.gzipBytes": {
+      "unit": "bytes",
+      "baseline": 1684,
+      "maximum": 2708,
+      "category": "browser-css",
+      "owner": "next:core-initial",
+      "rationale": "Mounted Next lifecycle proof includes the required client React runtime; reviewed baseline plus five percent or 1 KiB guard."
+    },
+    "bundler.next.coreInitial.css.rawBytes": {
+      "unit": "bytes",
+      "baseline": 7394,
+      "maximum": 8418,
+      "category": "browser-css",
+      "owner": "next:core-initial",
+      "rationale": "Mounted Next lifecycle proof includes the required client React runtime; reviewed baseline plus five percent or 1 KiB guard."
     }
   }
 }
