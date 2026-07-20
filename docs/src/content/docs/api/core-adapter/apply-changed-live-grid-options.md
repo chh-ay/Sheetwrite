@@ -9,7 +9,7 @@ Applies live-updatable adapter option changes to an existing Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L145</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L153</code></dd></div>
 </dl>
 
 ## Declaration

@@ -1,7 +1,9 @@
+import { createServer } from "node:http";
+import { chromium } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { basename, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bindCanonicalTarballIntegrities } from "../../scripts/release-lock-integrity.mjs";
 
@@ -92,6 +94,85 @@ async function stageAndPack(packageDirectory, filename) {
   );
 }
 
+async function withStaticServer(root, runWithOrigin) {
+  const server = createServer(async (request, response) => {
+    try {
+      const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+      const pathname = decodeURIComponent(requestUrl.pathname);
+      const relativePath = pathname.endsWith("/") ? `${pathname}index.html` : pathname;
+      const file = resolve(root, `.${relativePath}`);
+      if (file !== root && !file.startsWith(`${root}${sep}`)) {
+        response.writeHead(403).end();
+        return;
+      }
+      const bytes = await readFile(file);
+      const contentType =
+        extname(file) === ".html"
+          ? "text/html; charset=utf-8"
+          : extname(file) === ".js"
+            ? "text/javascript; charset=utf-8"
+            : extname(file) === ".css"
+              ? "text/css; charset=utf-8"
+              : extname(file) === ".wasm"
+                ? "application/wasm"
+                : "application/octet-stream";
+      response.writeHead(200, { "content-type": contentType }).end(bytes);
+    } catch {
+      response.writeHead(404).end();
+    }
+  });
+  const listening = Promise.withResolvers();
+  server.once("error", listening.reject);
+  server.listen(0, "127.0.0.1", listening.resolve);
+  await listening.promise;
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("Fixture static server did not publish a TCP port");
+  }
+  try {
+    await runWithOrigin(`http://127.0.0.1:${address.port}`);
+  } finally {
+    const closed = Promise.withResolvers();
+    server.close(closed.resolve);
+    await closed.promise;
+  }
+}
+
+async function assertLifecyclePages(browser, root, pages) {
+  await withStaticServer(root, async (origin) => {
+    for (const [path, expected] of pages) {
+      const page = await browser.newPage();
+      const errors = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      await page.goto(`${origin}${path}`, { waitUntil: "domcontentloaded" });
+      try {
+        await page.waitForFunction(
+          () => document.documentElement.dataset.sheetwriteLifecycle === "passed",
+          undefined,
+          { timeout: 20_000 },
+        );
+      } catch (error) {
+        throw new Error(
+          `${path} did not complete mounted lifecycle\n${errors.join("\n")}\nbody: ${await page.locator("body").innerText()}`,
+          { cause: error },
+        );
+      }
+      const body = await page.locator("body").innerText();
+      if (!body.includes(expected)) {
+        throw new Error(`${path} did not publish expected lifecycle marker ${expected}`);
+      }
+      if (errors.length > 0) {
+        throw new Error(`${path} emitted browser errors:\n${errors.join("\n")}`);
+      }
+      await page.close();
+    }
+  });
+}
+
 await rm(stagingRoot, { recursive: true, force: true });
 await rm(tarballRoot, { recursive: true, force: true });
 await rm(join(repositoryRoot, "test-results/delivery-size/bundlers"), {
@@ -160,6 +241,20 @@ for (const fixture of ["vite", "webpack", "next"]) {
       writeFile(manifestPath, originalManifest),
     ]);
   }
+}
+
+const browser = await chromium.launch({ headless: true });
+try {
+  await assertLifecyclePages(browser, join(fixturesRoot, "vite/dist"), [
+    ["/react.html", "react ready/edit/reset/unmount passed"],
+    ["/vue.html", "vue ready/edit/reset/unmount passed"],
+    ["/svelte.html", "svelte ready/edit/reset/unmount passed"],
+  ]);
+  await assertLifecyclePages(browser, join(fixturesRoot, "next/out"), [
+    ["/", "next ready/edit/reset/unmount passed"],
+  ]);
+} finally {
+  await browser.close();
 }
 
 if (artifactManifestDigest !== undefined) {

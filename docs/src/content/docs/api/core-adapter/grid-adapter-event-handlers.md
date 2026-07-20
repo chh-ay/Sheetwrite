@@ -12,7 +12,7 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 <div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L57</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>9</span>
+## Members <span class="api-count" data-pagefind-ignore>13</span>
 
 <div class="api-member-list">
 <h3 id="ongridchange" class="api-search-anchor">onGridChange</h3>
@@ -79,6 +79,42 @@ onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
 
 </details>
 
+<details class="api-member" id="grid-adapter-event-handlers-on-mutation-rejected" data-pagefind-weight="1">
+<summary><code>onMutationRejected</code> <span class="api-member-summary">Receives structured issues when a Grid mutation is rejected.</span></summary>
+
+```ts generated
+onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-renderer-fallback" data-pagefind-weight="1">
+<summary><code>onRendererFallback</code> <span class="api-member-summary">Fires when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-datasource-error" data-pagefind-weight="1">
+<summary><code>onDatasourceError</code> <span class="api-member-summary">Receives failed datasource requests and their errors.</span></summary>
+
+```ts generated
+onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-export-error" data-pagefind-weight="1">
+<summary><code>onExportError</code> <span class="api-member-summary">Receives failures from built-in XLSX export actions.</span></summary>
+
+```ts generated
+onExportError?: (event: GridEvents["export-error"]) => void;
+```
+
+</details>
+
 <details class="api-member" id="grid-adapter-event-handlers-on-ready" data-pagefind-weight="1">
 <summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
 
@@ -112,6 +148,10 @@ export interface GridAdapterEventHandlers {
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+  onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+  onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+  onExportError?: (event: GridEvents["export-error"]) => void;
   onReady?: (event: GridReadyEvent) => void;
   onInitializationError?: (error: unknown) => void;
 }

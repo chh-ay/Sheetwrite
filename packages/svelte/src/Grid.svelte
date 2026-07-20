@@ -37,6 +37,10 @@ let {
   onEditCommit,
   onSearch,
   onActiveSheetChange,
+  onMutationRejected,
+  onRendererFallback,
+  onDatasourceError,
+  onExportError,
   onReady,
   onInitializationError,
   grid = $bindable(),
@@ -59,6 +63,14 @@ const handlers = {
   onSearch: (event: Parameters<NonNullable<typeof onSearch>>[0]) => onSearch?.(event),
   onActiveSheetChange: (event: Parameters<NonNullable<typeof onActiveSheetChange>>[0]) =>
     onActiveSheetChange?.(event),
+  onMutationRejected: (event: Parameters<NonNullable<typeof onMutationRejected>>[0]) =>
+    onMutationRejected?.(event),
+  onRendererFallback: (event: Parameters<NonNullable<typeof onRendererFallback>>[0]) =>
+    onRendererFallback?.(event),
+  onDatasourceError: (event: Parameters<NonNullable<typeof onDatasourceError>>[0]) =>
+    onDatasourceError?.(event),
+  onExportError: (event: Parameters<NonNullable<typeof onExportError>>[0]) =>
+    onExportError?.(event),
 };
 
 const UNSET_WASM_SOURCE = Symbol("unset-wasm-source");

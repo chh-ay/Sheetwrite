@@ -9,12 +9,57 @@ Advanced framework adapter props for workbook data or datasource ownership.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L40</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L64</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>30</span>
+## Members <span class="api-count" data-pagefind-ignore>34</span>
 
 <div class="api-member-list">
+
+<details class="api-member" id="sheetwrite-grid-props-on-mutation-rejected" data-pagefind-weight="1">
+<summary><code>onMutationRejected</code> <span class="api-member-summary">Receives structured issues when a Grid mutation is rejected.</span></summary>
+
+```ts generated
+onMutationRejected?: GridAdapterEventHandlers["onMutationRejected"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-renderer-fallback" data-pagefind-weight="1">
+<summary><code>onRendererFallback</code> <span class="api-member-summary">Fires when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+onRendererFallback?: GridAdapterEventHandlers["onRendererFallback"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-datasource-error" data-pagefind-weight="1">
+<summary><code>onDatasourceError</code> <span class="api-member-summary">Receives failed datasource requests and their errors.</span></summary>
+
+```ts generated
+onDatasourceError?: GridAdapterEventHandlers["onDatasourceError"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-export-error" data-pagefind-weight="1">
+<summary><code>onExportError</code> <span class="api-member-summary">Receives failures from built-in XLSX export actions.</span></summary>
+
+```ts generated
+onExportError?: GridAdapterEventHandlers["onExportError"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-ready" data-pagefind-weight="1">
+<summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
+
+```ts generated
+onReady?: GridAdapterEventHandlers["onReady"];
+```
+
+</details>
 
 <details class="api-member" id="sheetwrite-grid-props-class-name" data-pagefind-weight="1">
 <summary><code>className</code> <span class="api-member-summary">Additional class appended to the required sheetwrite host class.</span></summary>
@@ -270,15 +315,6 @@ onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
 
 </details>
 
-<details class="api-member" id="sheetwrite-grid-props-on-ready" data-pagefind-weight="1">
-<summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
-
-```ts generated
-onReady?: (event: GridReadyEvent) => void;
-```
-
-</details>
-
 <details class="api-member" id="sheetwrite-grid-props-on-initialization-error" data-pagefind-weight="1">
 <summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 
@@ -304,10 +340,12 @@ wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SheetwriteGridProps extends Omit<
-  HTMLAttributes<HTMLDivElement>,
-  keyof GridAdapterEventHandlers | "children"
-> {
+export interface SheetwriteGridProps {
+  onMutationRejected?: GridAdapterEventHandlers["onMutationRejected"];
+  onRendererFallback?: GridAdapterEventHandlers["onRendererFallback"];
+  onDatasourceError?: GridAdapterEventHandlers["onDatasourceError"];
+  onExportError?: GridAdapterEventHandlers["onExportError"];
+  onReady?: GridAdapterEventHandlers["onReady"];
   className?: string;
   style?: CSSProperties;
   fallback?: ReactNode;
@@ -335,7 +373,6 @@ export interface SheetwriteGridProps extends Omit<
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
-  onReady?: (event: GridReadyEvent) => void;
   onInitializationError?: (error: unknown) => void;
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 }

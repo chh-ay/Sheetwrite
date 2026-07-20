@@ -12,7 +12,7 @@ Advanced framework adapter props for workbook data or datasource ownership.
 <div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L12</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>29</span>
+## Members <span class="api-count" data-pagefind-ignore>33</span>
 
 <div class="api-member-list">
 
@@ -250,6 +250,42 @@ onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-on-mutation-rejected" data-pagefind-weight="1">
+<summary><code>onMutationRejected</code> <span class="api-member-summary">Receives structured issues when a Grid mutation is rejected.</span></summary>
+
+```ts generated
+onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-renderer-fallback" data-pagefind-weight="1">
+<summary><code>onRendererFallback</code> <span class="api-member-summary">Fires when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-datasource-error" data-pagefind-weight="1">
+<summary><code>onDatasourceError</code> <span class="api-member-summary">Receives failed datasource requests and their errors.</span></summary>
+
+```ts generated
+onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-export-error" data-pagefind-weight="1">
+<summary><code>onExportError</code> <span class="api-member-summary">Receives failures from built-in XLSX export actions.</span></summary>
+
+```ts generated
+onExportError?: (event: GridEvents["export-error"]) => void;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-on-ready" data-pagefind-weight="1">
 <summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
 
@@ -314,6 +350,10 @@ export interface SheetwriteGridProps extends Omit<
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+  onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+  onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+  onExportError?: (event: GridEvents["export-error"]) => void;
   onReady?: (event: GridReadyEvent) => void;
   onInitializationError?: (error: unknown) => void;
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;

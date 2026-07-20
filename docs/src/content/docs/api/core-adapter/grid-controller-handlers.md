@@ -18,7 +18,7 @@ Every field is optional; a missing callback simply drops that event.
 <div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L16</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>11</span>
 
 <div class="api-member-list">
 
@@ -84,6 +84,42 @@ onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
 ```
 
 </details>
+
+<details class="api-member" id="grid-controller-handlers-on-mutation-rejected" data-pagefind-weight="1">
+<summary><code>onMutationRejected</code> <span class="api-member-summary">Forwarded when a Grid mutation is rejected.</span></summary>
+
+```ts generated
+onMutationRejected?(event: GridEvents["mutation-rejected"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-renderer-fallback" data-pagefind-weight="1">
+<summary><code>onRendererFallback</code> <span class="api-member-summary">Forwarded when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+onRendererFallback?(event: GridEvents["renderer-fallback"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-datasource-error" data-pagefind-weight="1">
+<summary><code>onDatasourceError</code> <span class="api-member-summary">Forwarded when a datasource request fails.</span></summary>
+
+```ts generated
+onDatasourceError?(event: GridEvents["datasource-error"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-export-error" data-pagefind-weight="1">
+<summary><code>onExportError</code> <span class="api-member-summary">Forwarded when a built-in XLSX export action fails.</span></summary>
+
+```ts generated
+onExportError?(event: GridEvents["export-error"]): void;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -100,6 +136,10 @@ export interface GridControllerHandlers {
   onEditCommit?(event: GridEvents["edit-commit"]): void;
   onSearch?(result: GridEvents["search"]): void;
   onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
+  onMutationRejected?(event: GridEvents["mutation-rejected"]): void;
+  onRendererFallback?(event: GridEvents["renderer-fallback"]): void;
+  onDatasourceError?(event: GridEvents["datasource-error"]): void;
+  onExportError?(event: GridEvents["export-error"]): void;
 }
 ```
 

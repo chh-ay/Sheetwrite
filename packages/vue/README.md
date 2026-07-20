@@ -44,7 +44,7 @@ WASM initializes on client mount. Supply a `#fallback` slot while loading, obser
 
 The exposed `grid` handle is published before `@ready="({ grid, generation, reason }) => …"` and clears during replacement/unmount. Reset-bound inputs are `workbook`, `data`, `datasource`, `datasourceStorage`, `renderer`, `workerUrl`, and `renderers`; `theme`, `readOnly`, `config`, `overscan`, and `minColumns` update live.
 
-Events are `grid-change`, `viewport-change`, `selection-change`, `edit-begin`, `edit-commit`, `search`, `active-sheet-change`, `ready`, and `initialization-error`. Native DOM change/scroll listeners remain available on the host.
+Events are `grid-change`, `viewport-change`, `selection-change`, `edit-begin`, `edit-commit`, `search`, `active-sheet-change`, `mutation-rejected`, `renderer-fallback`, `datasource-error`, `export-error`, `ready`, and `initialization-error`. Native DOM change/scroll listeners remain available on the host.
 
 For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Vue integration](https://sheetwrite.vercel.app/docs/frameworks/vue/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
 

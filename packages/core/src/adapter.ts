@@ -69,6 +69,14 @@ export interface GridAdapterEventHandlers {
   onSearch?: (result: GridEvents["search"]) => void;
   /** Fires after the visible sheet changes. */
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  /** Receives structured issues when a Grid mutation is rejected. */
+  onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+  /** Fires when worker rendering falls back to the main-thread canvas renderer. */
+  onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+  /** Receives failed datasource requests and their errors. */
+  onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+  /** Receives failures from built-in XLSX export actions. */
+  onExportError?: (event: GridEvents["export-error"]) => void;
   /** Fires after the adapter publishes a ready Grid generation. */
   onReady?: (event: GridReadyEvent) => void;
   /** Receives a WASM initialization failure while the adapter remains mounted. */

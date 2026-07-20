@@ -114,6 +114,14 @@ export interface SheetwriteGridEmits {
   search: GridEvents["search"];
   /** The visible sheet changed. */
   "active-sheet-change": GridEvents["active-sheet"];
+  /** A Grid mutation was rejected. */
+  "mutation-rejected": GridEvents["mutation-rejected"];
+  /** Worker rendering fell back to the main-thread canvas renderer. */
+  "renderer-fallback": GridEvents["renderer-fallback"];
+  /** A datasource request failed. */
+  "datasource-error": GridEvents["datasource-error"];
+  /** A built-in XLSX export action failed. */
+  "export-error": GridEvents["export-error"];
   /** The adapter published a ready Grid generation. */
   ready: GridReadyEvent;
   /** WASM initialization failed while the component stayed mounted. */
@@ -201,6 +209,10 @@ const gridEmits = {
   "edit-commit": (_event: GridEvents["edit-commit"]) => true,
   search: (_result: GridEvents["search"]) => true,
   "active-sheet-change": (_event: GridEvents["active-sheet"]) => true,
+  "mutation-rejected": (_event: GridEvents["mutation-rejected"]) => true,
+  "renderer-fallback": (_event: GridEvents["renderer-fallback"]) => true,
+  "datasource-error": (_event: GridEvents["datasource-error"]) => true,
+  "export-error": (_event: GridEvents["export-error"]) => true,
   ready: (_event: GridReadyEvent) => true,
   "initialization-error": (_error: unknown) => true,
 };
@@ -227,6 +239,10 @@ const SheetwriteGridComponent = defineComponent({
       onEditCommit: (event) => emit("edit-commit", event),
       onSearch: (result) => emit("search", result),
       onActiveSheetChange: (event) => emit("active-sheet-change", event),
+      onMutationRejected: (event) => emit("mutation-rejected", event),
+      onRendererFallback: (event) => emit("renderer-fallback", event),
+      onDatasourceError: (event) => emit("datasource-error", event),
+      onExportError: (event) => emit("export-error", event),
     };
 
     function currentOptions(): GridOptions {

@@ -33,6 +33,18 @@ export interface GridControllerHandlers {
 
   /** Forwarded after the visible sheet changes. */
   onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
+
+  /** Forwarded when a Grid mutation is rejected. */
+  onMutationRejected?(event: GridEvents["mutation-rejected"]): void;
+
+  /** Forwarded when worker rendering falls back to the main-thread canvas renderer. */
+  onRendererFallback?(event: GridEvents["renderer-fallback"]): void;
+
+  /** Forwarded when a datasource request fails. */
+  onDatasourceError?(event: GridEvents["datasource-error"]): void;
+
+  /** Forwarded when a built-in XLSX export action fails. */
+  onExportError?(event: GridEvents["export-error"]): void;
 }
 
 /**
@@ -106,6 +118,10 @@ export function createGridController(
     grid.on("edit-commit", (event) => handlers.onEditCommit?.(event)),
     grid.on("search", (result) => handlers.onSearch?.(result)),
     grid.on("active-sheet", (event) => handlers.onActiveSheetChange?.(event)),
+    grid.on("mutation-rejected", (event) => handlers.onMutationRejected?.(event)),
+    grid.on("renderer-fallback", (event) => handlers.onRendererFallback?.(event)),
+    grid.on("datasource-error", (event) => handlers.onDatasourceError?.(event)),
+    grid.on("export-error", (event) => handlers.onExportError?.(event)),
   ];
 
   let destroyed = false;

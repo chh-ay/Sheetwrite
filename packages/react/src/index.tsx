@@ -36,12 +36,46 @@ function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
   else if (ref) ref.current = grid;
 }
 
+type GridAdapterEventHandlerName =
+  | "onGridChange"
+  | "onSelectionChange"
+  | "onViewportChange"
+  | "onEditBegin"
+  | "onEditCommit"
+  | "onSearch"
+  | "onActiveSheetChange"
+  | "onMutationRejected"
+  | "onRendererFallback"
+  | "onDatasourceError"
+  | "onExportError"
+  | "onReady"
+  | "onInitializationError";
+type AssertNever<Value extends never> = Value;
+type GridAdapterEventHandlerParity = AssertNever<
+  | Exclude<keyof GridAdapterEventHandlers, GridAdapterEventHandlerName>
+  | Exclude<GridAdapterEventHandlerName, keyof GridAdapterEventHandlers>
+>;
+type SheetwriteGridHostAttributes = Omit<
+  HTMLAttributes<HTMLDivElement>,
+  GridAdapterEventHandlerName | GridAdapterEventHandlerParity | "children"
+>;
+
 /** Advanced framework adapter props for workbook data or datasource ownership. */
 export interface SheetwriteGridProps
   extends GridOptions,
     GridAdapterEventHandlers,
     SheetwriteInitializationProps,
-    Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | "children"> {
+    SheetwriteGridHostAttributes {
+  /** Receives structured issues when a Grid mutation is rejected. */
+  onMutationRejected?: GridAdapterEventHandlers["onMutationRejected"];
+  /** Fires when worker rendering falls back to the main-thread canvas renderer. */
+  onRendererFallback?: GridAdapterEventHandlers["onRendererFallback"];
+  /** Receives failed datasource requests and their errors. */
+  onDatasourceError?: GridAdapterEventHandlers["onDatasourceError"];
+  /** Receives failures from built-in XLSX export actions. */
+  onExportError?: GridAdapterEventHandlers["onExportError"];
+  /** Fires after the adapter publishes a ready Grid generation. */
+  onReady?: GridAdapterEventHandlers["onReady"];
   /** Additional class appended to the required `sheetwrite` host class. */
   className?: string;
   /** Host styles merged before adapter sizing styles. */
@@ -70,6 +104,10 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       onEditCommit,
       onSearch,
       onActiveSheetChange,
+      onMutationRejected,
+      onRendererFallback,
+      onDatasourceError,
+      onExportError,
       onReady,
       workbook,
       data,
@@ -119,6 +157,10 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       onEditCommit,
       onSearch,
       onActiveSheetChange,
+      onMutationRejected,
+      onRendererFallback,
+      onDatasourceError,
+      onExportError,
       onReady,
       onInitializationError,
     });
@@ -198,6 +240,10 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         onEditCommit: (event) => handlers.current.onEditCommit?.(event),
         onSearch: (result) => handlers.current.onSearch?.(result),
         onActiveSheetChange: (event) => handlers.current.onActiveSheetChange?.(event),
+        onMutationRejected: (event) => handlers.current.onMutationRejected?.(event),
+        onRendererFallback: (event) => handlers.current.onRendererFallback?.(event),
+        onDatasourceError: (event) => handlers.current.onDatasourceError?.(event),
+        onExportError: (event) => handlers.current.onExportError?.(event),
       });
       controllerRef.current = controller;
       generationRef.current += 1;

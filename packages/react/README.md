@@ -50,7 +50,7 @@ Reset-bound inputs are `workbook`, `data`, `datasource`, `datasourceStorage`, `r
 
 `ref` receives the current `Grid` before `onReady({ grid, generation, reason })` runs and clears on replacement or unmount. Reasons are `initial`, `input-reset`, and `renderer-reset`.
 
-Grid events use collision-free names: `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, and `onActiveSheetChange`. Native host `onChange` and `onScroll` remain ordinary DOM handlers.
+Grid events use collision-free names: `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`. Native host `onChange` and `onScroll` remain ordinary DOM handlers.
 
 For vanilla/preload control, import `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [React integration](https://sheetwrite.vercel.app/docs/frameworks/react/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
 

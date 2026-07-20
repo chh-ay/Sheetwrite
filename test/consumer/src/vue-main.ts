@@ -5,21 +5,22 @@ import "@sheetwrite/vue/styles.css";
 import wasmUrl from "@sheetwrite/wasm/wasm?url";
 import { createApp, defineComponent, h, ref, type VNodeRef } from "vue";
 import {
+  assertReadyAndEdit,
   assertUnmounted,
-  editReadyGrid,
   initialData,
-  passed,
+  markPassed,
   replacementData,
   workbook,
 } from "./lifecycle.js";
 
 const target = document.getElementById("app");
-if (!target) throw new Error("Vue Vite fixture is missing #app");
+if (!target) throw new Error("Packed Vue consumer is missing #app");
 const host = target;
-let grid: Grid | null = null;
+
+let publishedGrid: Grid | null = null;
 let readyCount = 0;
 const publishGrid: VNodeRef = (instance) => {
-  grid =
+  publishedGrid =
     instance !== null && !(instance instanceof Element)
       ? ((instance as unknown as SheetwriteGridExpose).grid ?? null)
       : null;
@@ -34,18 +35,20 @@ const App = defineComponent({
         data: data.value,
         wasmSource: wasmUrl,
         height: 240,
-        onReady(event: GridReadyEvent) {
+        onReady: (event: GridReadyEvent) => {
           readyCount += 1;
-          if (readyCount !== 1 && readyCount !== 2) throw new Error("Unexpected Vue generation");
-          editReadyGrid(event, readyCount);
+          if (readyCount !== 1 && readyCount !== 2) {
+            throw new Error(`Packed Vue consumer published ${readyCount} generations`);
+          }
+          assertReadyAndEdit(event, readyCount);
           if (readyCount === 1) {
             data.value = replacementData;
             return;
           }
           queueMicrotask(() => {
             app.unmount();
-            assertUnmounted(host, grid);
-            passed("vue");
+            assertUnmounted(host, publishedGrid);
+            markPassed("vue");
           });
         },
       });

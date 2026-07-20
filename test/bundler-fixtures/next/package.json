@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "@sheetwrite/core": "file:../.packed/sheetwrite-core-0.1.0.tgz",
+    "@sheetwrite/react": "file:../.packed/sheetwrite-react-0.1.0.tgz",
     "@sheetwrite/wasm": "file:../.packed/sheetwrite-wasm-0.1.0.tgz",
     "next": "15.5.9",
     "react": "19.1.0",

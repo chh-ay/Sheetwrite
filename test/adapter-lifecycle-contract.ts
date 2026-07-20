@@ -7,7 +7,9 @@ import type {
 import type {
   ColumnarData,
   DataSource,
+  DataSourcePage,
   Grid,
+  GridEvents,
   GridOptions,
   Workbook,
 } from "../packages/core/src/index.js";
@@ -23,7 +25,9 @@ export interface AdapterLifecycleCase {
     | "live-options"
     | "construction-reset"
     | "exact-cleanup"
-    | "publication-agreement";
+    | "publication-agreement"
+    | "operational-events"
+    | "generation-safe-events";
   observable: string;
 }
 
@@ -55,6 +59,14 @@ export const ADAPTER_LIFECYCLE_CONTRACT = [
   {
     id: "publication-agreement",
     observable: "published grid and readiness generation refer to the same live grid",
+  },
+  {
+    id: "operational-events",
+    observable: "all operational Grid events retain typed declarative payloads",
+  },
+  {
+    id: "generation-safe-events",
+    observable: "replaced and unmounted grids cannot deliver stale adapter events",
   },
 ] as const satisfies readonly AdapterLifecycleCase[];
 
@@ -107,6 +119,48 @@ export function makeConformanceDatasource(label: string): DataSource {
       })),
     }),
   };
+}
+
+function makeProtectedWorkbook(label = "Protected"): Workbook {
+  const workbook = makeConformanceWorkbook(label);
+  workbook.sheets[0]!.protectedRanges = [
+    {
+      id: "locked",
+      range: {
+        sheet: "lifecycle",
+        start: { row: 0, col: 0 },
+        end: { row: 0, col: 0 },
+      },
+    },
+  ];
+  return workbook;
+}
+
+function rejectProtectedEdit(grid: Grid): void {
+  const result = grid.applyTransaction({
+    patches: [
+      {
+        op: "set",
+        addr: { sheet: "lifecycle", row: 0, col: 0 },
+        value: { kind: "literal", value: "rejected" },
+      },
+    ],
+  });
+  expect(result.status).toBe("rejected");
+}
+
+async function nextTask(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, 0);
+  await promise;
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (predicate()) return;
+    await nextTask();
+  }
+  throw new Error("Timed out waiting for adapter event");
 }
 
 export interface AdapterConformanceProps extends GridOptions, GridAdapterEventHandlers {
@@ -260,6 +314,128 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
 
       await mounted.unmount();
       expect(recorder.destroyCalls.get(first)).toBe(1);
+    });
+
+    it("forwards every operational event with typed payloads and current callbacks", async () => {
+      const recorder = createLifecycleRecorder();
+      const mutationEvents: Array<GridEvents["mutation-rejected"]> = [];
+      const fallbackEvents: Array<GridEvents["renderer-fallback"]> = [];
+      const datasourceEvents: Array<GridEvents["datasource-error"]> = [];
+      const exportEvents: Array<GridEvents["export-error"]> = [];
+      const datasourceFailure = new Error("adapter datasource failure");
+      const datasource: DataSource = {
+        async getRows() {
+          throw datasourceFailure;
+        },
+      };
+      const props: AdapterConformanceProps = {
+        ...initialProps(recorder),
+        workbook: makeProtectedWorkbook(),
+        data: undefined,
+        datasource,
+        renderer: "worker",
+        onMutationRejected: (event) => mutationEvents.push(event),
+        onRendererFallback: (event) => fallbackEvents.push(event),
+        onDatasourceError: (event) => datasourceEvents.push(event),
+        onExportError: (event) => exportEvents.push(event),
+      };
+      const mounted = await mount(props);
+      const grid = mounted.getPublishedGrid()!;
+
+      rejectProtectedEdit(grid);
+      grid.actions.exportXlsx();
+      await waitFor(
+        () =>
+          fallbackEvents.length === 1 && datasourceEvents.length === 1 && exportEvents.length === 1,
+      );
+
+      expect(mutationEvents).toHaveLength(1);
+      expect(mutationEvents[0]!.issues.map((issue) => issue.kind)).toEqual(["protection"]);
+      expect(fallbackEvents[0]!.requested).toBe("worker");
+      expect(fallbackEvents[0]!.error).toBeDefined();
+      expect(datasourceEvents[0]).toMatchObject({
+        request: { sheet: "lifecycle", start: 0 },
+        error: datasourceFailure,
+      });
+      expect("signal" in datasourceEvents[0]!.request).toBe(false);
+      expect(exportEvents[0]!.format).toBe("xlsx");
+      expect(exportEvents[0]!.error).toBeInstanceOf(Error);
+
+      const swapped: Array<GridEvents["mutation-rejected"]> = [];
+      await mounted.render({ ...props, onMutationRejected: (event) => swapped.push(event) });
+      expect(mounted.getPublishedGrid()).toBe(grid);
+      rejectProtectedEdit(grid);
+      expect(mutationEvents).toHaveLength(1);
+      expect(swapped).toHaveLength(1);
+
+      await mounted.unmount();
+    });
+
+    it("drops stale datasource delivery after replacement and unmount", async () => {
+      const recorder = createLifecycleRecorder();
+      const staleEvents: Array<GridEvents["datasource-error"]> = [];
+      const currentEvents: Array<GridEvents["datasource-error"]> = [];
+      const staleRequest = Promise.withResolvers<DataSourcePage>();
+      const currentRequest = Promise.withResolvers<DataSourcePage>();
+      let staleRequests = 0;
+      let currentRequests = 0;
+      const staleDatasource: DataSource = {
+        getRows() {
+          staleRequests += 1;
+          return staleRequest.promise;
+        },
+      };
+      const currentDatasource: DataSource = {
+        getRows() {
+          currentRequests += 1;
+          return currentRequest.promise;
+        },
+      };
+      const props: AdapterConformanceProps = {
+        ...initialProps(recorder),
+        data: undefined,
+        datasource: staleDatasource,
+        onDatasourceError: (event) => staleEvents.push(event),
+      };
+      const mounted = await mount(props);
+      await waitFor(() => staleRequests > 0);
+      const staleGrid = mounted.getPublishedGrid()!;
+
+      await mounted.render({
+        ...props,
+        datasource: currentDatasource,
+        onDatasourceError: (event) => currentEvents.push(event),
+      });
+      await waitFor(() => currentRequests > 0);
+      expect(mounted.getPublishedGrid()).not.toBe(staleGrid);
+
+      staleRequest.reject(new Error("stale generation"));
+      await nextTask();
+      expect(staleEvents).toHaveLength(0);
+      expect(currentEvents).toHaveLength(0);
+
+      const currentFailure = new Error("current generation");
+      currentRequest.reject(currentFailure);
+      await waitFor(() => currentEvents.length === 1);
+      expect(currentEvents[0]!.error).toBe(currentFailure);
+
+      const unmountedRequest = Promise.withResolvers<DataSourcePage>();
+      let unmountedRequests = 0;
+      await mounted.render({
+        ...props,
+        datasource: {
+          getRows() {
+            unmountedRequests += 1;
+            return unmountedRequest.promise;
+          },
+        },
+        onDatasourceError: (event) => currentEvents.push(event),
+      });
+      await waitFor(() => unmountedRequests > 0);
+      await mounted.unmount();
+      unmountedRequest.reject(new Error("unmounted generation"));
+      await nextTask();
+      expect(currentEvents).toHaveLength(1);
     });
 
     for (const resetCase of ["workbook", "data", "datasource", "renderer"] as const) {

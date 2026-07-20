@@ -3691,7 +3691,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L145",
+              "source": "src/adapter.ts#L153",
               "jsDocTags": [],
               "documentation": "Applies live-updatable adapter option changes to an existing Grid.",
               "memberDocs": []
@@ -3703,7 +3703,7 @@
               "owners": [
                 "src/grid-controller.ts"
               ],
-              "source": "src/grid-controller.ts#L92",
+              "source": "src/grid-controller.ts#L104",
               "jsDocTags": [
                 "param"
               ],
@@ -3717,7 +3717,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L194",
+              "source": "src/adapter.ts#L202",
               "jsDocTags": [],
               "documentation": "Converts simple columns and row objects into canonical workbook and columnar input.",
               "memberDocs": []
@@ -3729,7 +3729,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L158",
+              "source": "src/adapter.ts#L166",
               "jsDocTags": [],
               "documentation": "Default pixel width assigned to simple adapter columns.",
               "memberDocs": []
@@ -3741,7 +3741,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L122",
+              "source": "src/adapter.ts#L130",
               "jsDocTags": [],
               "documentation": "Extracts advanced GridOptions from framework adapter props.",
               "memberDocs": []
@@ -3753,7 +3753,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L131",
+              "source": "src/adapter.ts#L139",
               "jsDocTags": [],
               "documentation": "Returns the first reset-sensitive adapter input that changed, if any.",
               "memberDocs": []
@@ -3773,7 +3773,7 @@
             {
               "name": "GridAdapterEventHandlers",
               "kind": "interface",
-              "signature": "export interface GridAdapterEventHandlers { onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; }",
+              "signature": "export interface GridAdapterEventHandlers { onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; }",
               "owners": [
                 "src/adapter.ts"
               ],
@@ -3786,12 +3786,20 @@
                   "documentation": "Fires after the visible sheet changes."
                 },
                 {
+                  "name": "onDatasourceError",
+                  "documentation": "Receives failed datasource requests and their errors."
+                },
+                {
                   "name": "onEditBegin",
                   "documentation": "Fires when cell editing begins."
                 },
                 {
                   "name": "onEditCommit",
                   "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onExportError",
+                  "documentation": "Receives failures from built-in XLSX export actions."
                 },
                 {
                   "name": "onGridChange",
@@ -3802,8 +3810,16 @@
                   "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
                 },
                 {
+                  "name": "onMutationRejected",
+                  "documentation": "Receives structured issues when a Grid mutation is rejected."
+                },
+                {
                   "name": "onReady",
                   "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onRendererFallback",
+                  "documentation": "Fires when worker rendering falls back to the main-thread canvas renderer."
                 },
                 {
                   "name": "onSearch",
@@ -3826,7 +3842,7 @@
               "owners": [
                 "src/grid-controller.ts"
               ],
-              "source": "src/grid-controller.ts#L43",
+              "source": "src/grid-controller.ts#L55",
               "jsDocTags": [],
               "documentation": "The lifecycle handle returned by {@link createGridController}: the live grid,\na theme passthrough, and a single teardown that detaches every subscription\nand destroys the grid.",
               "memberDocs": [
@@ -3863,7 +3879,7 @@
             {
               "name": "GridControllerHandlers",
               "kind": "interface",
-              "signature": "export interface GridControllerHandlers { onGridChange?(event: ChangeEvent): void; onSelectionChange?(selection: Selection | null): void; onViewportChange?(event: GridEvents[\"scroll\"]): void; onEditBegin?(event: GridEvents[\"edit-begin\"]): void; onEditCommit?(event: GridEvents[\"edit-commit\"]): void; onSearch?(result: GridEvents[\"search\"]): void; onActiveSheetChange?(event: GridEvents[\"active-sheet\"]): void; }",
+              "signature": "export interface GridControllerHandlers { onGridChange?(event: ChangeEvent): void; onSelectionChange?(selection: Selection | null): void; onViewportChange?(event: GridEvents[\"scroll\"]): void; onEditBegin?(event: GridEvents[\"edit-begin\"]): void; onEditCommit?(event: GridEvents[\"edit-commit\"]): void; onSearch?(result: GridEvents[\"search\"]): void; onActiveSheetChange?(event: GridEvents[\"active-sheet\"]): void; onMutationRejected?(event: GridEvents[\"mutation-rejected\"]): void; onRendererFallback?(event: GridEvents[\"renderer-fallback\"]): void; onDatasourceError?(event: GridEvents[\"datasource-error\"]): void; onExportError?(event: GridEvents[\"export-error\"]): void; }",
               "owners": [
                 "src/grid-controller.ts"
               ],
@@ -3876,6 +3892,10 @@
                   "documentation": "Forwarded after the visible sheet changes."
                 },
                 {
+                  "name": "onDatasourceError",
+                  "documentation": "Forwarded when a datasource request fails."
+                },
+                {
                   "name": "onEditBegin",
                   "documentation": "Forwarded when a cell editor opens."
                 },
@@ -3884,8 +3904,20 @@
                   "documentation": "Forwarded after a cell editor commits."
                 },
                 {
+                  "name": "onExportError",
+                  "documentation": "Forwarded when a built-in XLSX export action fails."
+                },
+                {
                   "name": "onGridChange",
                   "documentation": "Forwarded from the grid's `change` event (a committed transaction)."
+                },
+                {
+                  "name": "onMutationRejected",
+                  "documentation": "Forwarded when a Grid mutation is rejected."
+                },
+                {
+                  "name": "onRendererFallback",
+                  "documentation": "Forwarded when worker rendering falls back to the main-thread canvas renderer."
                 },
                 {
                   "name": "onSearch",
@@ -3957,7 +3989,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L87",
+              "source": "src/adapter.ts#L95",
               "jsDocTags": [],
               "documentation": "Explicit width and height accepted by framework adapters.",
               "memberDocs": []
@@ -3969,7 +4001,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L108",
+              "source": "src/adapter.ts#L116",
               "jsDocTags": [],
               "documentation": "Converts adapter size props into a host element style object.",
               "memberDocs": []
@@ -3981,7 +4013,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L102",
+              "source": "src/adapter.ts#L110",
               "jsDocTags": [],
               "documentation": "Optional width and height accepted by advanced framework adapters.",
               "memberDocs": []
@@ -3993,7 +4025,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L79",
+              "source": "src/adapter.ts#L87",
               "jsDocTags": [],
               "documentation": "Optional explicit WASM source and initialization error callback for adapters.",
               "memberDocs": [
@@ -4014,7 +4046,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L161",
+              "source": "src/adapter.ts#L169",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -4059,7 +4091,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L188",
+              "source": "src/adapter.ts#L196",
               "jsDocTags": [],
               "documentation": "Normalized workbook and columnar data produced from simple adapter props.",
               "memberDocs": []
@@ -4071,7 +4103,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L181",
+              "source": "src/adapter.ts#L189",
               "jsDocTags": [],
               "documentation": "Framework-neutral simple columns, rows, sizing, and grid options.",
               "memberDocs": []
@@ -4757,7 +4789,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L278",
+              "source": "src/index.tsx#L324",
               "jsDocTags": [],
               "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`\nthrough prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;\nuse `SheetwriteGrid` when the host already owns a workbook or datasource.",
               "memberDocs": []
@@ -4769,7 +4801,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L58",
+              "source": "src/index.tsx#L92",
               "jsDocTags": [],
               "documentation": "Advanced framework component for workbook data or datasource input.",
               "memberDocs": []
@@ -4777,11 +4809,11 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; workbook: Workbook; data?: ColumnarData; datasource?: DataSource; datasourceStorage?: DataSourceStorageOptions; renderer?: \"canvas\" | \"worker\"; workerUrl?: string | URL; theme?: Partial<Theme>; readOnly?: boolean; protectionResolver?: ProtectionResolver; mutationPolicy?: MutationPolicyMode; transactionResourceLimits?: Partial<TransactionResourceLimits>; renderers?: Record<string, CellRenderer>; overscan?: number; minColumns?: number; config?: GridConfig; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "signature": "export interface SheetwriteGridProps { onMutationRejected?: GridAdapterEventHandlers[\"onMutationRejected\"]; onRendererFallback?: GridAdapterEventHandlers[\"onRendererFallback\"]; onDatasourceError?: GridAdapterEventHandlers[\"onDatasourceError\"]; onExportError?: GridAdapterEventHandlers[\"onExportError\"]; onReady?: GridAdapterEventHandlers[\"onReady\"]; className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; workbook: Workbook; data?: ColumnarData; datasource?: DataSource; datasourceStorage?: DataSourceStorageOptions; renderer?: \"canvas\" | \"worker\"; workerUrl?: string | URL; theme?: Partial<Theme>; readOnly?: boolean; protectionResolver?: ProtectionResolver; mutationPolicy?: MutationPolicyMode; transactionResourceLimits?: Partial<TransactionResourceLimits>; renderers?: Record<string, CellRenderer>; overscan?: number; minColumns?: number; config?: GridConfig; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L40",
+              "source": "src/index.tsx#L64",
               "jsDocTags": [],
               "documentation": "Advanced framework adapter props for workbook data or datasource ownership.",
               "memberDocs": [
@@ -5046,12 +5078,20 @@
                   "documentation": "Fires after the visible sheet changes."
                 },
                 {
+                  "name": "onDatasourceError",
+                  "documentation": "Receives failed datasource requests and their errors."
+                },
+                {
                   "name": "onEditBegin",
                   "documentation": "Fires when cell editing begins."
                 },
                 {
                   "name": "onEditCommit",
                   "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onExportError",
+                  "documentation": "Receives failures from built-in XLSX export actions."
                 },
                 {
                   "name": "onGridChange",
@@ -5062,8 +5102,16 @@
                   "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
                 },
                 {
+                  "name": "onMutationRejected",
+                  "documentation": "Receives structured issues when a Grid mutation is rejected."
+                },
+                {
                   "name": "onReady",
                   "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onRendererFallback",
+                  "documentation": "Fires when worker rendering falls back to the main-thread canvas renderer."
                 },
                 {
                   "name": "onSearch",
@@ -5130,7 +5178,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L249",
+              "source": "src/index.tsx#L295",
               "jsDocTags": [],
               "documentation": "Simple framework adapter props for columns and default row objects.",
               "memberDocs": []
@@ -5142,7 +5190,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L91",
+              "source": "../core/dist/adapter.d.ts#L99",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -5498,7 +5546,7 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
               "owners": [
                 "src/props.ts"
               ],
@@ -5763,12 +5811,20 @@
                   "documentation": "Fires after the visible sheet changes."
                 },
                 {
+                  "name": "onDatasourceError",
+                  "documentation": "Receives failed datasource requests and their errors."
+                },
+                {
                   "name": "onEditBegin",
                   "documentation": "Fires when cell editing begins."
                 },
                 {
                   "name": "onEditCommit",
                   "documentation": "Fires after an edit commits its parsed cell value."
+                },
+                {
+                  "name": "onExportError",
+                  "documentation": "Receives failures from built-in XLSX export actions."
                 },
                 {
                   "name": "onGridChange",
@@ -5779,8 +5835,16 @@
                   "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
                 },
                 {
+                  "name": "onMutationRejected",
+                  "documentation": "Receives structured issues when a Grid mutation is rejected."
+                },
+                {
                   "name": "onReady",
                   "documentation": "Fires after the adapter publishes a ready Grid generation."
+                },
+                {
+                  "name": "onRendererFallback",
+                  "documentation": "Fires when worker rendering falls back to the main-thread canvas renderer."
                 },
                 {
                   "name": "onSearch",
@@ -5855,7 +5919,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L91",
+              "source": "../core/dist/adapter.d.ts#L99",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -6191,7 +6255,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L417",
+              "source": "src/index.ts#L433",
               "jsDocTags": [],
               "documentation": "Convenience component for local object rows with live option updates.",
               "memberDocs": []
@@ -6203,7 +6267,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L128",
+              "source": "src/index.ts#L136",
               "jsDocTags": [],
               "documentation": "Vue constructor type for Sheetwrite components: Sheetwrite-owned props,\nemitted events exposed as `on*` listener props, and the exposed instance\nsurface reachable through a template ref.",
               "memberDocs": []
@@ -6215,7 +6279,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L362",
+              "source": "src/index.ts#L378",
               "jsDocTags": [],
               "documentation": "Advanced framework component for workbook data or datasource input.",
               "memberDocs": []
@@ -6223,7 +6287,7 @@
             {
               "name": "SheetwriteGridEmits",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridEmits { \"grid-change\": ChangeEvent; \"selection-change\": Selection | null; \"viewport-change\": GridEvents[\"scroll\"]; \"edit-begin\": GridEvents[\"edit-begin\"]; \"edit-commit\": GridEvents[\"edit-commit\"]; search: GridEvents[\"search\"]; \"active-sheet-change\": GridEvents[\"active-sheet\"]; ready: GridReadyEvent; \"initialization-error\": unknown; }",
+              "signature": "export interface SheetwriteGridEmits { \"grid-change\": ChangeEvent; \"selection-change\": Selection | null; \"viewport-change\": GridEvents[\"scroll\"]; \"edit-begin\": GridEvents[\"edit-begin\"]; \"edit-commit\": GridEvents[\"edit-commit\"]; search: GridEvents[\"search\"]; \"active-sheet-change\": GridEvents[\"active-sheet\"]; \"mutation-rejected\": GridEvents[\"mutation-rejected\"]; \"renderer-fallback\": GridEvents[\"renderer-fallback\"]; \"datasource-error\": GridEvents[\"datasource-error\"]; \"export-error\": GridEvents[\"export-error\"]; ready: GridReadyEvent; \"initialization-error\": unknown; }",
               "owners": [
                 "src/index.ts"
               ],
@@ -6236,12 +6300,20 @@
                   "documentation": "The visible sheet changed."
                 },
                 {
+                  "name": "datasource-error",
+                  "documentation": "A datasource request failed."
+                },
+                {
                   "name": "edit-begin",
                   "documentation": "Cell editing began."
                 },
                 {
                   "name": "edit-commit",
                   "documentation": "An edit committed its parsed cell value."
+                },
+                {
+                  "name": "export-error",
+                  "documentation": "A built-in XLSX export action failed."
                 },
                 {
                   "name": "grid-change",
@@ -6252,8 +6324,16 @@
                   "documentation": "WASM initialization failed while the component stayed mounted."
                 },
                 {
+                  "name": "mutation-rejected",
+                  "documentation": "A Grid mutation was rejected."
+                },
+                {
                   "name": "ready",
                   "documentation": "The adapter published a ready Grid generation."
+                },
+                {
+                  "name": "renderer-fallback",
+                  "documentation": "Worker rendering fell back to the main-thread canvas renderer."
                 },
                 {
                   "name": "search",
@@ -6463,7 +6543,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L91",
+              "source": "../core/dist/adapter.d.ts#L99",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [

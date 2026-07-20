@@ -40,7 +40,7 @@ WASM initializes on client mount. Use `fallback` while loading, `onInitializatio
 
 The bindable `grid` is published before `onReady({ grid, generation, reason })` and clears during replacement or unmount. Reset-bound inputs replace the generation; presentation props update live.
 
-Grid events cover changes, viewport, selection, editing, search, and active-sheet changes.
+Grid callbacks are `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`.
 
 For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Svelte integration](https://sheetwrite.vercel.app/docs/frameworks/svelte/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
 
