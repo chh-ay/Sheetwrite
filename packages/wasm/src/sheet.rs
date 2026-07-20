@@ -96,6 +96,7 @@ struct CellChunk {
     loaded: Vec<u64>,
     dirty: Vec<u64>,
     last_access: Cell<u64>,
+    dirty_count: usize,
 }
 
 impl CellChunk {
@@ -108,6 +109,7 @@ impl CellChunk {
             loaded: vec![0; words],
             dirty: vec![0; words],
             last_access: Cell::new(last_access),
+            dirty_count: 0,
         }
     }
 
@@ -126,7 +128,20 @@ impl CellChunk {
     }
 
     fn has_dirty(&self) -> bool {
-        self.dirty.iter().any(|word| *word != 0)
+        self.dirty_count != 0
+    }
+
+    fn set_dirty(&mut self, offset: usize, value: bool) {
+        let was_dirty = Self::bit(&self.dirty, offset);
+        if was_dirty == value {
+            return;
+        }
+        Self::set_bit(&mut self.dirty, offset, value);
+        if value {
+            self.dirty_count += 1;
+        } else {
+            self.dirty_count -= 1;
+        }
     }
 
     fn byte_len(&self) -> usize {
@@ -256,7 +271,7 @@ impl PagedStorage {
             chunk.style[offset] = style;
             CellChunk::set_bit(&mut chunk.loaded, offset, true);
             if dirty {
-                CellChunk::set_bit(&mut chunk.dirty, offset, true);
+                chunk.set_dirty(offset, true);
             }
             (!was_dirty && chunk.has_dirty(), chunk.last_access.get())
         };
@@ -284,7 +299,7 @@ impl PagedStorage {
         let pinned = self.pinned.contains(&key);
         let became_clean = self.chunks.get_mut(&key).and_then(|chunk| {
             let was_dirty = chunk.has_dirty();
-            CellChunk::set_bit(&mut chunk.dirty, offset, false);
+            chunk.set_dirty(offset, false);
             (was_dirty && !chunk.has_dirty()).then_some(chunk.last_access.get())
         });
         if let Some(access) = became_clean {
@@ -368,16 +383,7 @@ impl PagedStorage {
     }
 
     fn dirty_cells(&self) -> usize {
-        self.chunks
-            .values()
-            .map(|chunk| {
-                chunk
-                    .dirty
-                    .iter()
-                    .map(|word| word.count_ones() as usize)
-                    .sum::<usize>()
-            })
-            .sum()
+        self.chunks.values().map(|chunk| chunk.dirty_count).sum()
     }
 }
 
@@ -1122,6 +1128,26 @@ mod paged_storage_tests {
         assert_eq!(storage.chunks.len(), 2);
         assert!(storage.chunks.contains_key(&(0, 4)));
         assert!(storage.chunks.contains_key(&(0, 5)));
+    }
+
+    #[test]
+    fn dirty_count_keeps_chunk_ineligible_until_its_last_dirty_cell_is_clean() {
+        let chunk_bytes = PagedStorage::new(4, 0).chunk_bytes();
+        let mut storage = PagedStorage::new(4, chunk_bytes);
+        storage.write(0, 0, KIND_EMPTY, 0, 0, true);
+        storage.write(1, 0, KIND_EMPTY, 0, 0, true);
+        assert_eq!(storage.dirty_cells(), 2);
+
+        storage.mark_clean(0, 0);
+        assert_eq!(storage.dirty_cells(), 1);
+        storage.write(4, 0, KIND_EMPTY, 0, 0, false);
+        assert!(storage.chunks.contains_key(&(0, 0)));
+
+        storage.mark_clean(1, 0);
+        assert_eq!(storage.dirty_cells(), 0);
+        storage.write(8, 0, KIND_EMPTY, 0, 0, false);
+        assert_eq!(storage.chunks.len(), 1);
+        assert!(!storage.chunks.contains_key(&(0, 0)));
     }
 
     #[test]
