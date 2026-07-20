@@ -5190,7 +5190,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L99",
+              "source": "../core/dist/adapter.d.ts#L91",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -5546,7 +5546,7 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
               "owners": [
                 "src/props.ts"
               ],
@@ -5811,20 +5811,12 @@
                   "documentation": "Fires after the visible sheet changes."
                 },
                 {
-                  "name": "onDatasourceError",
-                  "documentation": "Receives failed datasource requests and their errors."
-                },
-                {
                   "name": "onEditBegin",
                   "documentation": "Fires when cell editing begins."
                 },
                 {
                   "name": "onEditCommit",
                   "documentation": "Fires after an edit commits its parsed cell value."
-                },
-                {
-                  "name": "onExportError",
-                  "documentation": "Receives failures from built-in XLSX export actions."
                 },
                 {
                   "name": "onGridChange",
@@ -5835,16 +5827,8 @@
                   "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
                 },
                 {
-                  "name": "onMutationRejected",
-                  "documentation": "Receives structured issues when a Grid mutation is rejected."
-                },
-                {
                   "name": "onReady",
                   "documentation": "Fires after the adapter publishes a ready Grid generation."
-                },
-                {
-                  "name": "onRendererFallback",
-                  "documentation": "Fires when worker rendering falls back to the main-thread canvas renderer."
                 },
                 {
                   "name": "onSearch",
@@ -5919,7 +5903,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L99",
+              "source": "../core/dist/adapter.d.ts#L91",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -6543,7 +6527,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L99",
+              "source": "../core/dist/adapter.d.ts#L91",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [

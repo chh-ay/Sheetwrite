@@ -779,7 +779,7 @@ export function validateManifest(value: unknown): ApiIssue[] {
   return [];
 }
 export const PUBLIC_API_BASELINE_SHA256 =
-  "05204e1872bc69d7e6e312a7b890beed944fc61aa0f3b8bcab788f71d6c49d6d";
+  "667f9fefe005a7bef890b8316c15cd7fbc2dad210b27d74c1b8c976229437e89";
 
 export function publicApiDigest(manifest: PublicApiManifest): string {
   return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
