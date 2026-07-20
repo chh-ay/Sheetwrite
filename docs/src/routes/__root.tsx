@@ -13,7 +13,7 @@ const THEME_SCRIPT =
 
 const SITE_URL = "https://sheetwrite.vercel.app";
 const SITE_DESCRIPTION =
-  "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters.";
+  "A fast, editable web spreadsheet and data-grid library with a TypeScript API and Rust/WASM engine. React, Vue, Svelte, and vanilla adapters included.";
 const SOCIAL_IMAGE_ALT = "Sheetwrite spreadsheet grid showing typed web data";
 const STRUCTURED_DATA = JSON.stringify({
   "@context": "https://schema.org",
@@ -66,7 +66,10 @@ export const Route = createRootRoute({
         { property: "og:type", content: "website" },
         { property: "og:site_name", content: "Sheetwrite" },
         { property: "og:locale", content: "en_US" },
-        { property: "og:title", content: "Sheetwrite — TypeScript spreadsheet engine" },
+        {
+          property: "og:title",
+          content: "Sheetwrite — Web spreadsheet library powered by Rust/WASM",
+        },
         { property: "og:description", content: SITE_DESCRIPTION },
         { property: "og:url", content: canonical },
         { property: "og:image", content: `${SITE_URL}/og-sheetwrite.webp` },
@@ -74,7 +77,10 @@ export const Route = createRootRoute({
         { property: "og:image:height", content: "630" },
         { property: "og:image:alt", content: SOCIAL_IMAGE_ALT },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:title", content: "Sheetwrite — TypeScript spreadsheet engine" },
+        {
+          name: "twitter:title",
+          content: "Sheetwrite — Web spreadsheet library powered by Rust/WASM",
+        },
         { name: "twitter:description", content: SITE_DESCRIPTION },
         { name: "twitter:image", content: `${SITE_URL}/og-sheetwrite.webp` },
         { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT },

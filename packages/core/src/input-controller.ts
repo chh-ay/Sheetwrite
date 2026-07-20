@@ -175,6 +175,9 @@ export class InputController {
       this.attachDrag(e, move, up);
       return;
     }
+    // A selected cell must own subsequent keyboard input across browsers.
+    // Keep touch and active-editor gestures focused where they already are.
+    if (!isTouch && !editor.isEditing) this.deps.host.focus({ preventScroll: true });
 
     const viewportRect = this.deps.viewportEl.getBoundingClientRect();
     const fillHandle = this.fillHandleScreen(this.deps.contentTop(), this.deps.scroller.scrollLeft);
