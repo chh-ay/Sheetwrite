@@ -623,8 +623,20 @@ describe("bounded and corrupt XLSX inputs", () => {
       fromXlsxWorkbook(positive, { resourceLimits: { maxXmlDepth: 1.5 } }),
     ).rejects.toThrow("maxXmlDepth must be a positive integer");
     await expect(
+      fromXlsxWorkbook(positive, {
+        resourceLimits: { maxRowsPerSheet: Number.MAX_SAFE_INTEGER + 1 },
+      }),
+    ).rejects.toThrow("maxRowsPerSheet must be a positive integer");
+    await expect(
       fromXlsxWorkbook(positive, { resourceLimits: { maxXmlTextBytes: 4 } }),
     ).rejects.toThrow(XlsxResourceError);
+    await expect(
+      fromXlsxWorkbook(
+        manualWorkbook(
+          '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2:C3"/><sheetData/></worksheet>',
+        ),
+      ),
+    ).rejects.toThrow("range A1:B2:C3 is invalid");
     await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toThrow(
       XlsxResourceError,
     );

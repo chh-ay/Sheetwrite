@@ -128,19 +128,25 @@ function strictDateSerial(value: string, address: string): number {
 }
 
 function parseUnsigned(value: string | undefined, description: string): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) return readerFailure(`${description} is invalid`);
+  const text = value?.trim() ?? "";
+  if (!/^\d+$/.test(text)) return readerFailure(`${description} is invalid`);
+  const parsed = Number(text);
+  if (!Number.isSafeInteger(parsed)) return readerFailure(`${description} is invalid`);
   return parsed;
 }
 
 function parseCellAddress(value: string): { row: number; col: number } {
   const match = /^\$?([A-Z]{1,3})\$?([1-9]\d*)$/i.exec(value);
   if (!match) return readerFailure(`cell reference ${value} is invalid`);
-  return { row: Number(match[2]) - 1, col: labelToCol(match[1]!) };
+  const row = Number(match[2]) - 1;
+  if (!Number.isSafeInteger(row)) return readerFailure(`cell reference ${value} is invalid`);
+  return { row, col: labelToCol(match[1]!) };
 }
 
 function parseRange(value: string): MergeRange {
-  const [startRaw, endRaw = startRaw] = value.split(":");
+  const parts = value.split(":");
+  if (parts.length > 2) return readerFailure(`range ${value} is invalid`);
+  const [startRaw, endRaw = startRaw] = parts;
   if (!startRaw || !endRaw) return readerFailure(`range ${value} is invalid`);
   const start = parseCellAddress(startRaw);
   const end = parseCellAddress(endRaw);

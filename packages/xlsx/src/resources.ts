@@ -17,7 +17,11 @@ const RESOURCE_KEYS = Object.keys(DEFAULT_XLSX_RESOURCE_LIMITS) as (keyof XlsxRe
 
 function positiveLimit(name: keyof XlsxResourceLimits, value: number): number {
   const integerOnly = name !== "maxCompressionRatio";
-  if (!Number.isFinite(value) || value <= 0 || (integerOnly && !Number.isInteger(value))) {
+  if (
+    !Number.isFinite(value) ||
+    value <= 0 ||
+    (integerOnly ? !Number.isSafeInteger(value) : false)
+  ) {
     throw new RangeError(
       `Sheetwrite: XLSX ${name} must be ${integerOnly ? "a positive integer" : "positive"}`,
     );
