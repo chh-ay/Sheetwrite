@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "b
 import {
   type ApplyTransactionResult,
   type ChangeEvent,
+  type DocumentOp,
   createGridFromSnapshot,
   DEFAULT_SYNC_COORDINATOR_LIMITS,
   initSheetwrite,
@@ -560,6 +561,61 @@ describe("sync coordinator", () => {
     expect(coordinator.serverVersion).toBe(7);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
     expect(events.filter((event) => event.type === "reload-required")).toHaveLength(4);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("validates complete operation shapes before retaining future versions", async () => {
+    const { grid, coordinator, events } = harness();
+    const malformed = {
+      op: "set",
+      value: { kind: "literal", value: 2 },
+    } as unknown as DocumentOp;
+
+    await coordinator.applyVersionedOperation({ version: 9, operations: [malformed] });
+    await coordinator.applyVersionedOperation({ version: 8, operations: [] });
+    await coordinator.applyVersionedOperation({ version: 9, operations: [localSet(9)] });
+
+    expect(
+      events.some(
+        (event) =>
+          event.type === "error" &&
+          event.error instanceof SyncProtocolError &&
+          event.error.code === "invalid-operations",
+      ),
+    ).toBe(true);
+    expect(coordinator.serverVersion).toBe(9);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("clears retained gaps when aggregate intake limits are crossed", async () => {
+    const { grid, coordinator, events } = harness(["m1"], {
+      limits: { maxBufferedVersions: 1 },
+    });
+
+    await coordinator.applyVersionedOperation({ version: 9, operations: [] });
+    await coordinator.applyVersionedOperation({ version: 10, operations: [] });
+    await coordinator.applyVersionedOperation({ version: 8, operations: [] });
+
+    expect(coordinator.serverVersion).toBe(8);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "error" &&
+          event.error instanceof SyncProtocolError &&
+          event.error.code === "buffer-count-limit",
+      ),
+    ).toBe(true);
+    expect(
+      events
+        .filter((event) => event.type === "remote-applied")
+        .map((event) => event.operation.version),
+    ).toEqual([8]);
+
+    await coordinator.applyVersionedOperation({ version: 9, operations: [] });
+    expect(coordinator.serverVersion).toBe(9);
     coordinator.destroy();
     grid.destroy();
   });

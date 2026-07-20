@@ -386,6 +386,47 @@ describe("durable offline sync", () => {
     grid.destroy();
   });
 
+  it("orders following remote versions behind durable echo removal", async () => {
+    const storage = new FakePendingStorage();
+    storage.removeGate = deferred<void>();
+    const adapter = new ControlledAdapter(snapshot());
+    const grid = mountGrid();
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      createMutationId: () => "ordered-echo-m1",
+    });
+    await coordinator.ready();
+    grid.applyTransaction({ patches: [setValue(5)] });
+    await coordinator.ready();
+
+    const echo = coordinator.handleResponse({
+      status: "applied",
+      version: 5,
+      clientMutationId: "ordered-echo-m1",
+    });
+    while (storage.removals.length === 0) await Promise.resolve();
+    let followingApplied = false;
+    const following = coordinator
+      .applyVersionedOperation({ version: 6, operations: [setValue(6)] })
+      .then(() => {
+        followingApplied = true;
+      });
+    await Promise.resolve();
+
+    expect(followingApplied).toBe(false);
+    expect(coordinator.serverVersion).toBe(4);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(5);
+
+    storage.removeGate.resolve(undefined);
+    await Promise.all([echo, following]);
+    expect(coordinator.serverVersion).toBe(6);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(6);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
   it("finishes an acknowledged durable removal after destroy without publishing", async () => {
     const storage = new FakePendingStorage();
     storage.removeGate = deferred<void>();

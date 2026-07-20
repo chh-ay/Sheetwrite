@@ -1,5 +1,6 @@
 import {
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
+  validateDocumentOperationShape,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
 import { boundedJsonByteLength, JsonByteLengthError } from "./json-byte-length.js";
@@ -503,7 +504,18 @@ export class SyncCoordinator {
   }
 
   /** Public for transports that deliver responses independently of send promises. */
-  async handleResponse(
+  handleResponse(response: PersistenceCommitResponse, requestedMutationId?: string): Promise<void> {
+    if (this.destroyed) return Promise.resolve();
+    return this.enqueueInbound(async () => {
+      const previousVersion = this.version;
+      await this.processResponse(response, requestedMutationId);
+      if (response.status !== "conflict" && this.version > previousVersion) {
+        await this.drainGapBuffer();
+      }
+    });
+  }
+
+  private async processResponse(
     response: PersistenceCommitResponse,
     requestedMutationId?: string,
   ): Promise<void> {
@@ -614,9 +626,9 @@ export class SyncCoordinator {
 
   applyVersionedOperation(operation: VersionedOperation): Promise<void> {
     if (this.destroyed) return Promise.resolve();
-    let validated: BufferedVersionedOperation;
+    let inspected: InspectedVersionedOperation;
     try {
-      validated = validateVersionedOperation(operation, this.limits);
+      inspected = inspectVersionedOperation(operation, this.limits);
     } catch (error) {
       this.rejectInbound(
         asSyncProtocolError(error),
@@ -624,9 +636,46 @@ export class SyncCoordinator {
       );
       return Promise.resolve();
     }
-    const limitError = this.reserveInbound(validated);
-    if (limitError) {
-      this.rejectInbound(limitError, validated.operation.version);
+    if (
+      inspected.version > this.version &&
+      inspected.version - this.version > this.limits.maxFutureVersionDistance
+    ) {
+      this.clearGapBuffer();
+      this.rejectInbound(
+        new SyncProtocolError(
+          "future-distance-limit",
+          `Remote version ${inspected.version} exceeds the future-version distance limit`,
+        ),
+        inspected.version,
+      );
+      return Promise.resolve();
+    }
+    const preflightError = this.inboundLimitError(inspected.operations.length, inspected.bytes);
+    if (preflightError) {
+      this.clearGapBuffer();
+      this.rejectInbound(preflightError, inspected.version);
+      return Promise.resolve();
+    }
+    let validated: BufferedVersionedOperation;
+    try {
+      validated = {
+        operation: {
+          version: inspected.version,
+          operations: cloneJsonValue(inspected.operations),
+          ...(inspected.clientMutationId !== undefined
+            ? { clientMutationId: inspected.clientMutationId }
+            : {}),
+        },
+        bytes: inspected.bytes,
+      };
+    } catch (error) {
+      this.rejectInbound(asSyncProtocolError(error), inspected.version);
+      return Promise.resolve();
+    }
+    const reservationError = this.reserveInbound(validated);
+    if (reservationError) {
+      this.clearGapBuffer();
+      this.rejectInbound(reservationError, inspected.version);
       return Promise.resolve();
     }
     return this.enqueueInbound(() => this.processVersionedOperation(validated)).finally(() => {
@@ -1044,7 +1093,7 @@ export class SyncCoordinator {
     const mutationId = operation.clientMutationId;
     if (operation.version <= this.version) {
       if (mutationId && this.records.has(mutationId)) {
-        await this.handleResponse({
+        await this.processResponse({
           status: "applied",
           version: operation.version,
           clientMutationId: mutationId,
@@ -1078,6 +1127,7 @@ export class SyncCoordinator {
     if (operation.version !== expectedVersion) {
       const distance = operation.version - this.version;
       if (distance > this.limits.maxFutureVersionDistance) {
+        this.clearGapBuffer();
         this.rejectInbound(
           new SyncProtocolError(
             "future-distance-limit",
@@ -1104,7 +1154,7 @@ export class SyncCoordinator {
   private async applyContiguousOperation(operation: VersionedOperation): Promise<boolean> {
     const mutationId = operation.clientMutationId;
     if (mutationId && this.records.has(mutationId)) {
-      await this.handleResponse({
+      await this.processResponse({
         status: "applied",
         version: operation.version,
         clientMutationId: mutationId,
@@ -1136,22 +1186,25 @@ export class SyncCoordinator {
     return true;
   }
 
-  private reserveInbound(input: BufferedVersionedOperation): SyncProtocolError | undefined {
+  private inboundLimitError(operationCount: number, bytes: number): SyncProtocolError | undefined {
     if (this.bufferedVersions >= this.limits.maxBufferedVersions) {
       return new SyncProtocolError("buffer-count-limit", "Inbound version count limit exceeded");
     }
-    if (
-      this.bufferedOperations + input.operation.operations.length >
-      this.limits.maxBufferedOperations
-    ) {
+    if (this.bufferedOperations + operationCount > this.limits.maxBufferedOperations) {
       return new SyncProtocolError(
         "buffer-operation-limit",
         "Inbound operation count limit exceeded",
       );
     }
-    if (this.bufferedBytes + input.bytes > this.limits.maxBufferedBytes) {
+    if (this.bufferedBytes + bytes > this.limits.maxBufferedBytes) {
       return new SyncProtocolError("buffer-byte-limit", "Inbound byte limit exceeded");
     }
+    return undefined;
+  }
+
+  private reserveInbound(input: BufferedVersionedOperation): SyncProtocolError | undefined {
+    const error = this.inboundLimitError(input.operation.operations.length, input.bytes);
+    if (error) return error;
     this.bufferedVersions += 1;
     this.bufferedOperations += input.operation.operations.length;
     this.bufferedBytes += input.bytes;
@@ -1495,14 +1548,24 @@ function assertOperationResources(
       `operations exceeds the ${maxOperations} operation limit`,
     );
   }
-  for (const operation of value) {
+  const encodedBytes = jsonEncodedByteLength(value, maxEncodedBytes);
+  for (let index = 0; index < value.length; index++) {
+    const operation = value[index];
     const record = assertPlainRecord(operation, "Each document operation must be a plain object");
     const kind = ownDataValue(record, "op");
     if (typeof kind !== "string" || !Object.hasOwn(DOCUMENT_OPERATION_KINDS, kind)) {
       throw new SyncProtocolError("invalid-operations", "Document operation kind is invalid");
     }
+    const errors = validateDocumentOperationShape(operation, `operations[${index}]`);
+    if (errors.length > 0) {
+      const error = errors[0]!;
+      throw new SyncProtocolError(
+        "invalid-operations",
+        `Invalid document operation at ${error.path}: ${error.message}`,
+      );
+    }
   }
-  return jsonEncodedByteLength(value, maxEncodedBytes);
+  return encodedBytes;
 }
 
 function inspectVersionedOperation(
@@ -1521,23 +1584,6 @@ function inspectVersionedOperation(
     operations: operations as readonly DocumentOp[],
     ...(mutationId !== undefined ? { clientMutationId: mutationId } : {}),
     bytes,
-  };
-}
-
-function validateVersionedOperation(
-  value: unknown,
-  limits: Readonly<SyncCoordinatorLimits>,
-): BufferedVersionedOperation {
-  const inspected = inspectVersionedOperation(value, limits);
-  return {
-    operation: {
-      version: inspected.version,
-      operations: cloneJsonValue(inspected.operations),
-      ...(inspected.clientMutationId !== undefined
-        ? { clientMutationId: inspected.clientMutationId }
-        : {}),
-    },
-    bytes: inspected.bytes,
   };
 }
 

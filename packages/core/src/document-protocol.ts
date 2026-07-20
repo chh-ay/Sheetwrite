@@ -1237,6 +1237,438 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
   });
 }
 
+function validateOperationSheetId(
+  operation: PlainRecord,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  requireString(operation, "sheet", path, errors, true);
+}
+
+function validateOperationCell(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const cell = recordAt(entry, path, errors);
+  if (!cell) return;
+  requireNonNegativeInteger(cell, "rowOffset", path, errors);
+  requireNonNegativeInteger(cell, "colOffset", path, errors);
+  validateCellValueShape(ownValue(cell, "value"), `${path}.value`, errors);
+  const style = ownValue(cell, "style");
+  if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
+}
+
+function validateOperationMerge(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const merge = recordAt(entry, path, errors);
+  if (!merge) return;
+  for (const key of ["r0", "c0", "r1", "c1"]) {
+    requireNonNegativeInteger(merge, key, path, errors);
+  }
+}
+
+function validateOperationConditionalFormat(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const format = recordAt(entry, path, errors);
+  if (!format) return;
+  validateRangeShape(ownValue(format, "range"), `${path}.range`, errors);
+  validateConditionalPredicate(ownValue(format, "when"), `${path}.when`, errors);
+  validateCellStyle(ownValue(format, "style"), `${path}.style`, errors);
+}
+
+function validateOperationValidationRule(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const rule = recordAt(entry, path, errors);
+  if (!rule) return;
+  requireString(rule, "id", path, errors, true);
+  validateRangeShape(ownValue(rule, "range"), `${path}.range`, errors);
+  validateValidationCondition(ownValue(rule, "condition"), `${path}.condition`, errors);
+  const policy = ownValue(rule, "policy");
+  if (!["reject", "warn", "allow"].includes(String(policy))) {
+    invalid(errors, `${path}.policy`, "Validation policy is invalid");
+  }
+  optionalBoolean(rule, "allowBlank", path, errors);
+  optionalString(rule, "helpText", path, errors);
+}
+
+function validateOperationProtectedRange(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const protectedRange = recordAt(entry, path, errors);
+  if (!protectedRange) return;
+  requireString(protectedRange, "id", path, errors, true);
+  validateRangeShape(ownValue(protectedRange, "range"), `${path}.range`, errors);
+  optionalString(protectedRange, "label", path, errors);
+  optionalString(protectedRange, "permissionKey", path, errors);
+}
+
+function validateOperationNamedRange(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const namedRange = recordAt(entry, path, errors);
+  if (!namedRange) return;
+  const name = requireString(namedRange, "name", path, errors, true);
+  if (
+    name !== undefined &&
+    (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ||
+      /^[A-Za-z]+\d+$/.test(name) ||
+      /^(TRUE|FALSE)$/i.test(name))
+  ) {
+    invalid(errors, `${path}.name`, "Named range name must be formula-safe");
+  }
+  optionalString(namedRange, "scope", path, errors);
+  validateRangeShape(ownValue(namedRange, "range"), `${path}.range`, errors);
+}
+
+function validateOperationSortKey(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const sortKey = recordAt(entry, path, errors);
+  if (!sortKey) return;
+  requireNonNegativeInteger(sortKey, "col", path, errors);
+  if (typeof ownValue(sortKey, "ascending") !== "boolean") {
+    invalid(errors, `${path}.ascending`, "ascending must be a boolean");
+  }
+}
+
+function validateOperationFilterTuple(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  if (!Array.isArray(entry) || entry.length !== 2) {
+    invalid(errors, path, "Filters must be [column, filter] tuples");
+    return;
+  }
+  if (!nonNegativeInteger(entry[0])) {
+    invalid(errors, `${path}[0]`, "Filter column must be a non-negative integer");
+  }
+  validateFilterShape(entry[1], `${path}[1]`, errors);
+}
+
+function validateOperationRowGroup(
+  entry: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const group = recordAt(entry, path, errors);
+  if (!group) return;
+  requireNonNegativeInteger(group, "start", path, errors);
+  requireNonNegativeInteger(group, "end", path, errors);
+  if (typeof ownValue(group, "collapsed") !== "boolean") {
+    invalid(errors, `${path}.collapsed`, "collapsed must be a boolean");
+  }
+}
+
+/**
+ * Validate one untrusted operation before collaboration retains or applies it.
+ * Workbook-relative bounds remain the Store's responsibility.
+ */
+export function validateDocumentOperationShape(
+  value: unknown,
+  path = "operation",
+): readonly DocumentValidationError[] {
+  const errors: DocumentValidationError[] = [];
+  const operation = recordAt(value, path, errors);
+  if (!operation) return errors;
+  const kind = ownValue(operation, "op");
+  if (typeof kind !== "string") {
+    invalid(errors, `${path}.op`, "Document operation kind is invalid");
+    return errors;
+  }
+  const operationKind = kind as DocumentOp["op"];
+
+  switch (operationKind) {
+    case "set": {
+      validateAddress(ownValue(operation, "addr"), `${path}.addr`, errors);
+      validateCellValueShape(ownValue(operation, "value"), `${path}.value`, errors);
+      const style = ownValue(operation, "style");
+      if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
+      break;
+    }
+    case "setRange": {
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      const cells = arrayAt(ownValue(operation, "cells"), `${path}.cells`, errors);
+      cells?.forEach((cell, index) => validateOperationCell(cell, `${path}.cells[${index}]`, errors));
+      break;
+    }
+    case "setBlock": {
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      const blockPath = `${path}.block`;
+      const block = recordAt(ownValue(operation, "block"), blockPath, errors);
+      if (!block) break;
+      const rowCount = requireNonNegativeInteger(block, "rowCount", blockPath, errors, true);
+      const colCount = requireNonNegativeInteger(block, "colCount", blockPath, errors, true);
+      const values = arrayAt(ownValue(block, "values"), `${blockPath}.values`, errors);
+      values?.forEach((entry, index) => {
+        if (!scalar(entry)) {
+          invalid(errors, `${blockPath}.values[${index}]`, "Block values must be scalars");
+        }
+      });
+      const cellCount =
+        rowCount !== undefined &&
+        colCount !== undefined &&
+        !productExceeds(rowCount, colCount, Number.MAX_SAFE_INTEGER)
+          ? rowCount * colCount
+          : undefined;
+      if (cellCount === undefined && rowCount !== undefined && colCount !== undefined) {
+        invalid(errors, blockPath, "Block dimensions exceed safe integer capacity");
+      } else if (values && cellCount !== undefined && values.length !== cellCount) {
+        invalid(errors, `${blockPath}.values`, "Block values must match its dimensions");
+      }
+      const formulas = ownValue(block, "formulas");
+      if (formulas !== undefined) {
+        const entries = arrayAt(formulas, `${blockPath}.formulas`, errors);
+        entries?.forEach((entry, index) => {
+          const entryPath = `${blockPath}.formulas[${index}]`;
+          if (!Array.isArray(entry) || entry.length !== 2) {
+            invalid(errors, entryPath, "Block formulas must be [offset, source] tuples");
+            return;
+          }
+          if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
+            invalid(errors, `${entryPath}[0]`, "Formula offset is outside the block");
+          }
+          if (typeof entry[1] !== "string") {
+            invalid(errors, `${entryPath}[1]`, "Formula source must be a string");
+          }
+        });
+      }
+      const refs = ownValue(block, "refs");
+      if (refs !== undefined) {
+        const entries = arrayAt(refs, `${blockPath}.refs`, errors);
+        entries?.forEach((entry, index) => {
+          const entryPath = `${blockPath}.refs[${index}]`;
+          if (!Array.isArray(entry) || entry.length !== 2) {
+            invalid(errors, entryPath, "Block refs must be [offset, address] tuples");
+            return;
+          }
+          if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
+            invalid(errors, `${entryPath}[0]`, "Reference offset is outside the block");
+          }
+          validateAddress(entry[1], `${entryPath}[1]`, errors);
+        });
+      }
+      const styleTableValue = ownValue(block, "styleTable");
+      const styleTable =
+        styleTableValue === undefined
+          ? undefined
+          : arrayAt(styleTableValue, `${blockPath}.styleTable`, errors);
+      styleTable?.forEach((style, index) =>
+        validateCellStyle(style, `${blockPath}.styleTable[${index}]`, errors),
+      );
+      const styleIdsValue = ownValue(block, "styleIds");
+      if (styleIdsValue !== undefined) {
+        const styleIds = arrayAt(styleIdsValue, `${blockPath}.styleIds`, errors);
+        if (styleIds && cellCount !== undefined && styleIds.length !== cellCount) {
+          invalid(errors, `${blockPath}.styleIds`, "Block style IDs must match its dimensions");
+        }
+        styleIds?.forEach((styleId, index) => {
+          if (
+            !nonNegativeInteger(styleId) ||
+            (styleTable !== undefined && styleId >= styleTable.length)
+          ) {
+            invalid(errors, `${blockPath}.styleIds[${index}]`, "Block style ID is invalid");
+          }
+        });
+      }
+      break;
+    }
+    case "setRangeStyle": {
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      const style = ownValue(operation, "style");
+      if (style !== null) validateCellStyle(style, `${path}.style`, errors);
+      break;
+    }
+    case "clearRange":
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      optionalBoolean(operation, "contents", path, errors);
+      optionalBoolean(operation, "style", path, errors);
+      break;
+    case "addRows":
+    case "removeRows":
+      validateOperationSheetId(operation, path, errors);
+      requireNonNegativeInteger(operation, "at", path, errors);
+      requireNonNegativeInteger(operation, "count", path, errors, true);
+      break;
+    case "moveRows":
+    case "moveColumns":
+      validateOperationSheetId(operation, path, errors);
+      requireNonNegativeInteger(operation, "from", path, errors);
+      requireNonNegativeInteger(operation, "count", path, errors, true);
+      requireNonNegativeInteger(operation, "to", path, errors);
+      break;
+    case "addColumns": {
+      validateOperationSheetId(operation, path, errors);
+      requireNonNegativeInteger(operation, "at", path, errors);
+      const columns = arrayAt(ownValue(operation, "columns"), `${path}.columns`, errors);
+      columns?.forEach((column, index) =>
+        validateColumnShape(column, `${path}.columns[${index}]`, errors),
+      );
+      break;
+    }
+    case "removeColumns":
+      validateOperationSheetId(operation, path, errors);
+      requireNonNegativeInteger(operation, "at", path, errors);
+      requireNonNegativeInteger(operation, "count", path, errors, true);
+      break;
+    case "setColumn": {
+      validateOperationSheetId(operation, path, errors);
+      requireNonNegativeInteger(operation, "col", path, errors);
+      const patchPath = `${path}.patch`;
+      const patch = recordAt(ownValue(operation, "patch"), patchPath, errors);
+      if (!patch) break;
+      const key = ownValue(patch, "key");
+      if (key !== undefined && (typeof key !== "string" || key.length === 0)) {
+        invalid(errors, `${patchPath}.key`, "Column key must be a non-empty string");
+      }
+      optionalString(patch, "header", patchPath, errors);
+      const width = ownValue(patch, "width");
+      if (width !== undefined && (!finiteNumber(width) || width < 0)) {
+        invalid(errors, `${patchPath}.width`, "Column width must be finite and non-negative");
+      }
+      const type = ownValue(patch, "type");
+      if (type !== undefined && !["text", "number", "date", "currency"].includes(String(type))) {
+        invalid(errors, `${patchPath}.type`, "Column type is invalid");
+      }
+      for (const field of ["numberFormat", "numberLocale", "renderer"]) {
+        optionalString(patch, field, patchPath, errors);
+      }
+      optionalBoolean(patch, "visible", patchPath, errors);
+      for (const field of ["headerStyle", "cellStyle"]) {
+        const style = ownValue(patch, field);
+        if (style !== undefined) {
+          validateCellStyle(style, `${patchPath}.${field}`, errors);
+        }
+      }
+      break;
+    }
+    case "setRowMeta": {
+      validateOperationSheetId(operation, path, errors);
+      requireNonNegativeInteger(operation, "row", path, errors);
+      const metaValue = ownValue(operation, "meta");
+      if (metaValue === null) break;
+      const metaPath = `${path}.meta`;
+      const meta = recordAt(metaValue, metaPath, errors);
+      if (!meta) break;
+      const height = ownValue(meta, "height");
+      if (height !== undefined && (!finiteNumber(height) || height <= 0)) {
+        invalid(errors, `${metaPath}.height`, "Row height must be finite and positive");
+      }
+      optionalBoolean(meta, "hidden", metaPath, errors);
+      break;
+    }
+    case "addMerge":
+    case "removeMerge":
+      validateOperationSheetId(operation, path, errors);
+      validateOperationMerge(ownValue(operation, "merge"), `${path}.merge`, errors);
+      break;
+    case "addSheet":
+      validateSheetShape(ownValue(operation, "sheet"), `${path}.sheet`, errors);
+      break;
+    case "removeSheet":
+      validateOperationSheetId(operation, path, errors);
+      break;
+    case "renameSheet":
+      validateOperationSheetId(operation, path, errors);
+      requireString(operation, "name", path, errors, true);
+      break;
+    case "moveSheet":
+      validateOperationSheetId(operation, path, errors);
+      requireNonNegativeInteger(operation, "to", path, errors);
+      break;
+    case "setSheetMeta": {
+      validateOperationSheetId(operation, path, errors);
+      const patchPath = `${path}.patch`;
+      const patch = recordAt(ownValue(operation, "patch"), patchPath, errors);
+      if (!patch) break;
+      for (const field of ["frozenRows", "frozenCols"]) {
+        const count = ownValue(patch, field);
+        if (count !== undefined && !nonNegativeInteger(count)) {
+          invalid(errors, `${patchPath}.${field}`, `${field} must be a non-negative integer`);
+        }
+      }
+      const conditionalFormats = ownValue(patch, "conditionalFormats");
+      if (conditionalFormats !== undefined) {
+        const entries = arrayAt(conditionalFormats, `${patchPath}.conditionalFormats`, errors);
+        entries?.forEach((entry, index) =>
+          validateOperationConditionalFormat(entry, `${patchPath}.conditionalFormats[${index}]`, errors),
+        );
+      }
+      const rowGroups = ownValue(patch, "rowGroups");
+      if (rowGroups !== undefined) {
+        const entries = arrayAt(rowGroups, `${patchPath}.rowGroups`, errors);
+        entries?.forEach((entry, index) =>
+          validateOperationRowGroup(entry, `${patchPath}.rowGroups[${index}]`, errors),
+        );
+      }
+      const sortKeys = ownValue(patch, "sortKeys");
+      if (sortKeys !== undefined) {
+        const entries = arrayAt(sortKeys, `${patchPath}.sortKeys`, errors);
+        entries?.forEach((entry, index) =>
+          validateOperationSortKey(entry, `${patchPath}.sortKeys[${index}]`, errors),
+        );
+      }
+      const filters = ownValue(patch, "filters");
+      if (filters !== undefined) {
+        const entries = arrayAt(filters, `${patchPath}.filters`, errors);
+        entries?.forEach((entry, index) =>
+          validateOperationFilterTuple(entry, `${patchPath}.filters[${index}]`, errors),
+        );
+      }
+      break;
+    }
+    case "setValidationRule":
+      validateOperationSheetId(operation, path, errors);
+      validateOperationValidationRule(ownValue(operation, "rule"), `${path}.rule`, errors);
+      break;
+    case "removeValidationRule":
+    case "removeProtectedRange":
+      validateOperationSheetId(operation, path, errors);
+      requireString(operation, "id", path, errors, true);
+      break;
+    case "setProtectedRange":
+      validateOperationSheetId(operation, path, errors);
+      validateOperationProtectedRange(ownValue(operation, "protectedRange"), `${path}.protectedRange`, errors);
+      break;
+    case "setNote": {
+      validateAddress(ownValue(operation, "addr"), `${path}.addr`, errors);
+      const text = ownValue(operation, "text");
+      if (text !== null && typeof text !== "string") {
+        invalid(errors, `${path}.text`, "Note text must be a string or null");
+      }
+      break;
+    }
+    case "setNamedRange":
+      validateOperationNamedRange(ownValue(operation, "namedRange"), `${path}.namedRange`, errors);
+      break;
+    case "removeNamedRange":
+      requireString(operation, "name", path, errors, true);
+      optionalString(operation, "scope", path, errors);
+      break;
+    default: {
+      const unsupported: never = operationKind;
+      invalid(errors, `${path}.op`, `Document operation kind ${String(unsupported)} is invalid`);
+    }
+  }
+  return errors;
+}
+
 function normalizedMerge(merge: MergeRange): MergeRange {
   return {
     r0: Math.min(merge.r0, merge.r1),
