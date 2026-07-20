@@ -186,7 +186,9 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "1");
 });
 
-test("renderer selection is construction-bound and deep-linked", async ({ page }) => {
+test("renderer selection is construction-bound and deep-linked", {
+  tag: "@portability",
+}, async ({ page }) => {
   const errors = collectErrors(page);
   const workerUrls: string[] = [];
   page.on("worker", (worker) => workerUrls.push(worker.url()));
@@ -228,7 +230,9 @@ test("renderer selection is construction-bound and deep-linked", async ({ page }
   expect(errors.console).toEqual([]);
 });
 
-test("a failed Worker boot falls back honestly to the main thread", async ({ page }) => {
+test("a failed Worker boot falls back honestly to the main thread", {
+  tag: "@portability",
+}, async ({ page }) => {
   const errors = collectErrors(page);
   const failedWorkerUrls: string[] = [];
   // Two assets match `worker-*.js`: a tiny module that only exports the real
