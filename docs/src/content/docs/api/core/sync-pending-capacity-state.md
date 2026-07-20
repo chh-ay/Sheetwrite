@@ -9,7 +9,7 @@ Whether the durable local queue can currently admit another transaction.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L62</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L63</code></dd></div>
 </dl>
 
 ## Declaration

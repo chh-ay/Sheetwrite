@@ -129,17 +129,38 @@ server-sequenced reference—not as durable storage. Adapter methods accept
 `AbortSignal`; transport failures use `PersistenceError`, while version
 conflicts are typed commit responses that retain local work.
 
-A `CellRenderer` paints (or returns a DOM node for) a single cell:
+A `CellRenderer` paints or retains a DOM node for each cell in the rendered
+window. When `dom` is present, it owns the cell content (the canvas still paints
+the cell background, border, headers, and grid lines):
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 interface CellRenderer {
   canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
   dom?(c: CellPaintContext): HTMLElement;
+  update?(element: HTMLElement, c: CellPaintContext): void;
+  destroy?(element: HTMLElement): void;
 }
 ```
 
-Custom renderers are **not** available under `renderer: "worker"` (functions can
-not be transferred to the worker).
+`dom` creates an element when a cell enters the bounded rendered window.
+`update` receives that same element after values, styles, theme, zoom, size, or
+scroll geometry change. `destroy` runs immediately before the element leaves
+the window, is replaced by a newly registered renderer, or its grid is reset or
+destroyed. Implement `update` to preserve focus and element-local state. A
+legacy renderer with only `dom` is recreated when its value, style, theme, or
+size changes, but not for a pure scroll.
+
+DOM cells are clipped to the viewport and frozen pane that owns them. A merged
+range produces one node for its anchor, not one node per covered cell. Plain
+renderer output stays hidden from assistive technology because the compact ARIA
+mirror already exposes its cell value. To make a renderer explicitly
+interactive, return a native control (or add a non-negative `tabindex`), give it
+an accessible name, and set `element.style.pointerEvents = "auto"`. Keyboard
+events from that control stay with the control instead of moving the grid.
+
+With `renderer: "worker"`, `canvas` hooks cannot cross the Worker boundary.
+`dom`, `update`, and `destroy` still run on the main thread in the retained
+overlay.
 
 ## GridConfig (toolbar)
 

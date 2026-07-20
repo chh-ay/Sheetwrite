@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
+import { Route as TestRenderersRouteImport } from './routes/test.renderers'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
 import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
@@ -64,6 +65,11 @@ const DocsIndexRoute = DocsIndexRouteImport.update({
 const TestXlsxRoute = TestXlsxRouteImport.update({
   id: '/test/xlsx',
   path: '/test/xlsx',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestRenderersRoute = TestRenderersRouteImport.update({
+  id: '/test/renderers',
+  path: '/test/renderers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TestCollaborationRoute = TestCollaborationRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/renderers': typeof TestRenderersRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/renderers': typeof TestRenderersRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/renderers': typeof TestRenderersRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/renderers'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/renderers'
     | '/test/xlsx'
     | '/docs'
     | '/showcases'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/renderers'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -234,6 +246,7 @@ export interface RootRouteChildren {
   ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
+  TestRenderersRoute: typeof TestRenderersRoute
   TestXlsxRoute: typeof TestXlsxRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
@@ -296,6 +309,13 @@ declare module '@tanstack/react-router' {
       path: '/test/xlsx'
       fullPath: '/test/xlsx'
       preLoaderRoute: typeof TestXlsxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/renderers': {
+      id: '/test/renderers'
+      path: '/test/renderers'
+      fullPath: '/test/renderers'
+      preLoaderRoute: typeof TestRenderersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/test/collaboration': {
@@ -370,6 +390,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   TestCollaborationRoute: TestCollaborationRoute,
+  TestRenderersRoute: TestRenderersRoute,
   TestXlsxRoute: TestXlsxRoute,
   DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,

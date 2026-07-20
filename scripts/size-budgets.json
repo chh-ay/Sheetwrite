@@ -721,10 +721,10 @@
     "package.@sheetwrite/core.fileCount": {
       "unit": "count",
       "baseline": 293,
-      "maximum": 295,
+      "maximum": 297,
       "category": "package",
       "owner": "@sheetwrite/core",
-      "rationale": "Approved clean baseline with at most two additional files or packages."
+      "rationale": "Approved clean baseline plus two existing files and one dedicated runtime/declaration module pair for the retained DOM overlay."
     },
     "package.@sheetwrite/core.mapsBytes": {
       "unit": "bytes",

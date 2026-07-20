@@ -194,20 +194,33 @@
               ],
               "source": "src/types/render.ts#L40",
               "jsDocTags": [],
-              "documentation": "Read-only cell and canvas geometry supplied to a custom renderer.",
+              "documentation": "Read-only cell value and screen geometry supplied to a custom renderer.",
               "memberDocs": []
             },
             {
               "name": "CellRenderer",
               "kind": "interface",
-              "signature": "export interface CellRenderer { canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void; dom?(c: CellPaintContext): HTMLElement; }",
+              "signature": "export interface CellRenderer { canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void; dom?(c: CellPaintContext): HTMLElement; update?(element: HTMLElement, c: CellPaintContext): void; destroy?(element: HTMLElement): void; }",
               "owners": [
                 "src/types/render.ts"
               ],
               "source": "src/types/render.ts#L51",
               "jsDocTags": [],
-              "documentation": "Custom cell renderer hooks for the main-thread canvas or DOM overlay.",
-              "memberDocs": []
+              "documentation": "Custom cell renderer hooks for the main-thread canvas or retained DOM overlay.",
+              "memberDocs": [
+                {
+                  "name": "destroy",
+                  "documentation": "Runs immediately before a retained element is removed or replaced."
+                },
+                {
+                  "name": "dom",
+                  "documentation": "Creates one element when a rendered cell enters the retained DOM window."
+                },
+                {
+                  "name": "update",
+                  "documentation": "Updates a retained element after its value, style, theme, or geometry changes."
+                }
+              ]
             },
             {
               "name": "CellScalar",
@@ -685,7 +698,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L233",
+              "source": "src/grid.ts#L234",
               "jsDocTags": [],
               "documentation": "Creates and mounts an imperative Grid in the supplied host element.",
               "memberDocs": []
@@ -859,7 +872,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L128",
+              "source": "src/sync.ts#L129",
               "jsDocTags": [],
               "documentation": "Conservative synchronization limits suitable for untrusted collaboration input and offline work.",
               "memberDocs": []
@@ -871,7 +884,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L150",
+              "source": "src/grid.ts#L151",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1008,7 +1021,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L1879",
+              "source": "src/document-protocol.ts#L2311",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1598,7 +1611,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L181",
+              "source": "src/grid.ts#L182",
               "jsDocTags": [],
               "documentation": "Load the WASM data engine once. Must be awaited before `createGrid`.",
               "memberDocs": []
@@ -1610,7 +1623,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L188",
+              "source": "src/grid.ts#L189",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -1807,7 +1820,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L22",
+              "source": "src/sync.ts#L23",
               "jsDocTags": [],
               "documentation": "Mandatory bounds for one durable pending-commit restore.",
               "memberDocs": [
@@ -1832,7 +1845,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L33",
+              "source": "src/sync.ts#L34",
               "jsDocTags": [],
               "documentation": "Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.",
               "memberDocs": [
@@ -2182,7 +2195,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L193",
+              "source": "src/grid.ts#L194",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -2858,7 +2871,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L52",
+              "source": "src/sync.ts#L53",
               "jsDocTags": [],
               "documentation": "Current persistence activity reported by a sync coordinator.",
               "memberDocs": []
@@ -2870,7 +2883,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L50",
+              "source": "src/sync.ts#L51",
               "jsDocTags": [],
               "documentation": "Host-controlled online state reported by synchronization.",
               "memberDocs": []
@@ -2882,7 +2895,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L239",
+              "source": "src/sync.ts#L240",
               "jsDocTags": [],
               "documentation": "Deterministic, transport-neutral optimistic sync. Local rendering is never\nblocked: changes queue immediately, while hosts explicitly call `sendNext`\nor `retry` to perform network work.",
               "memberDocs": [
@@ -2915,7 +2928,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L202",
+              "source": "src/sync.ts#L203",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -2927,7 +2940,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L104",
+              "source": "src/sync.ts#L105",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied independently to remote collaboration input and local durability.",
               "memberDocs": [
@@ -2984,7 +2997,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L184",
+              "source": "src/sync.ts#L185",
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
@@ -3029,7 +3042,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L174",
+              "source": "src/sync.ts#L175",
               "jsDocTags": [],
               "documentation": "Typed local transaction rejection produced when the durable queue cannot reserve capacity.",
               "memberDocs": []
@@ -3041,7 +3054,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L62",
+              "source": "src/sync.ts#L63",
               "jsDocTags": [],
               "documentation": "Whether the durable local queue can currently admit another transaction.",
               "memberDocs": []
@@ -3053,7 +3066,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L94",
+              "source": "src/sync.ts#L95",
               "jsDocTags": [],
               "documentation": "Aggregate ceilings for local commits retained until durable acknowledgement.",
               "memberDocs": [
@@ -3078,7 +3091,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L162",
+              "source": "src/sync.ts#L163",
               "jsDocTags": [],
               "documentation": "Typed rejection of malformed or resource-exhausting synchronization input.",
               "memberDocs": []
@@ -3090,7 +3103,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L143",
+              "source": "src/sync.ts#L144",
               "jsDocTags": [],
               "documentation": "Stable category identifying which synchronization protocol bound was violated.",
               "memberDocs": []
@@ -3102,7 +3115,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L70",
+              "source": "src/sync.ts#L71",
               "jsDocTags": [],
               "documentation": "Immutable observable synchronization state.",
               "memberDocs": [
@@ -3135,7 +3148,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L86",
+              "source": "src/sync.ts#L87",
               "jsDocTags": [],
               "documentation": "Contiguous-version recovery request produced when remote input skips ahead.",
               "memberDocs": []
@@ -3410,7 +3423,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L1841",
+              "source": "src/document-protocol.ts#L2273",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []

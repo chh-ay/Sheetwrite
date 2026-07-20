@@ -1,5 +1,6 @@
 import type { AriaMirror } from "./aria-mirror.js";
 import type { DatasourceController } from "./datasource-controller.js";
+import type { DomOverlay } from "./dom-overlay.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
 import type { CellScalar } from "./types/cell.js";
@@ -9,6 +10,7 @@ import type { Store, VisibleWindowView } from "./types/store.js";
 
 export interface RenderCoordinatorOptions {
   renderer: () => Renderer;
+  domOverlay: DomOverlay;
   overlayPainter: OverlayPainter;
   ariaMirror: AriaMirror;
   geometry: GeometryLayoutController;
@@ -187,7 +189,10 @@ export class RenderCoordinator {
         );
       }
       view = this.lastPaintView!;
-      if (repaint) this.options.renderer().paint(view);
+      if (repaint) {
+        this.options.domOverlay.paint(view, viewport);
+        this.options.renderer().paint(view);
+      }
     }
     this.lastPaintView = view;
     this.lastDataSignature = dataSignature;
@@ -291,6 +296,7 @@ export class RenderCoordinator {
     });
     this.cachedPaneViews.length = panes.length;
     if (repaint) {
+      this.options.domOverlay.paintPanes(panes);
       this.options.renderer().paintPanes?.(panes, {
         x: frozenColumns > 0 ? xSplit - 0.5 : null,
         y: frozenRows > 0 ? ySplit - 0.5 : null,

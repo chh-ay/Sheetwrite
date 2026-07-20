@@ -9,7 +9,7 @@ Conservative synchronization limits suitable for untrusted collaboration input a
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L128</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L129</code></dd></div>
 </dl>
 
 ## Declaration

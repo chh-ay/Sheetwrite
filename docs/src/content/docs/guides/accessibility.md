@@ -67,9 +67,19 @@ Sketch of the emitted structure:
 
 As keyboard or pointer input changes the selection, `aria-selected` and the
 host's `aria-activedescendant` update. Scrolling rebuilds the visible mirror.
+Horizontal virtualization does not renumber the mirror: if the visible window
+starts at sheet column G, its header and cells use `aria-colindex="7"`. Frozen
+and scrolling columns likewise keep their absolute one-based sheet positions.
 A focused cell note is connected through `aria-describedby` to hidden plain text.
 Validation list and checkbox editors use real `listbox` / `option` and `checkbox`
 semantics, with the rule help text as their accessible label.
+
+Custom DOM renderer output uses the same mirror for its default cell value.
+Non-semantic renderer elements are hidden from assistive technology to avoid a
+duplicate announcement. A renderer can expose an explicitly interactive,
+labelled control; its keyboard events remain with that control, its element is
+retained across scroll and geometry updates, and focus returns to the grid if
+virtualization or renderer replacement removes it.
 
 ## Limitation: the mirror reflects the visible window
 

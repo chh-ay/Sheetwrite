@@ -419,6 +419,20 @@ describe("paintFrame column styles", () => {
     expect(ctx.fillTexts.find((t) => t.text === "A")?.fillStyle).toBe(theme.headerFg);
   });
 
+  it("leaves DOM-owned cell text to the retained overlay", () => {
+    const layout = {
+      ...makeLayout([{ key: "a", header: "A", width: 100, type: "text", renderer: "dom" }]),
+      domRendererColumns: Uint8Array.of(1),
+    };
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+    (view.values as string[])[0] = "DOM only";
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+
+    expect(ctx.fillTexts.some((call) => call.text === "DOM only")).toBe(false);
+    expect(ctx.fillTexts.some((call) => call.text === "A")).toBe(true);
+  });
+
   it("clips narrow headers and cell text to their own row and column", () => {
     const layout = makeLayout([
       { key: "a", header: "Long header", width: 18, type: "text" },

@@ -36,7 +36,7 @@ export interface Theme {
   highlight: string;
 }
 
-/** Read-only cell and canvas geometry supplied to a custom renderer. */
+/** Read-only cell value and screen geometry supplied to a custom renderer. */
 export interface CellPaintContext {
   value: CellScalar;
   x: number;
@@ -47,10 +47,15 @@ export interface CellPaintContext {
   style: CellStyle;
 }
 
-/** Custom cell renderer hooks for the main-thread canvas or DOM overlay. */
+/** Custom cell renderer hooks for the main-thread canvas or retained DOM overlay. */
 export interface CellRenderer {
   canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
+  /** Creates one element when a rendered cell enters the retained DOM window. */
   dom?(c: CellPaintContext): HTMLElement;
+  /** Updates a retained element after its value, style, theme, or geometry changes. */
+  update?(element: HTMLElement, c: CellPaintContext): void;
+  /** Runs immediately before a retained element is removed or replaced. */
+  destroy?(element: HTMLElement): void;
 }
 
 export interface RenderLayout {
@@ -62,6 +67,8 @@ export interface RenderLayout {
   totalRows: number;
   /** Merged cell regions in display-row space (empty under sort/filter). */
   merges?: ReadonlyArray<{ r0: number; c0: number; r1: number; c1: number }>;
+  /** Columns whose registered renderer owns cell content in the DOM overlay. */
+  domRendererColumns?: Uint8Array;
 }
 
 export interface Viewport {

@@ -100,6 +100,16 @@
   z-index: 1;
 }
 
+.sheetwrite-dom-overlay {
+  z-index: 2;
+}
+
+.sheetwrite-dom-cell-bounds > * {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
 /* ── Formula assist (autocomplete popup) ──────────────────────────────────── */
 /* Owned by FormulaAssist (packages/core/src/formula-assist.ts). Colors come from
    --sheetwrite-assist-* custom properties, seeded from the active theme at

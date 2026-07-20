@@ -19,6 +19,7 @@ import {
   resolveTransactionResourceLimits,
   validateTransactionResources,
 } from "./document-protocol.js";
+import { DomOverlay } from "./dom-overlay.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
@@ -263,6 +264,7 @@ export class GridImpl implements Grid {
   private readonly datasourceController: DatasourceController;
   private readonly geometry: GeometryLayoutController;
   private readonly overlayPainter: OverlayPainter;
+  private readonly domOverlay: DomOverlay;
   private readonly renderCoordinator: RenderCoordinator;
   private overscan: number;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
@@ -624,6 +626,13 @@ export class GridImpl implements Grid {
       scheduleRender: () => this.scheduleRender(),
     });
 
+    this.domOverlay = new DomOverlay(this.viewportEl, {
+      host,
+      geometry: this.geometry,
+    });
+    this.domOverlay.setRenderers(this.customRenderers);
+    this.domOverlay.setTheme(this.theme);
+
     this.ariaMirror = new AriaMirror({
       host,
       scroller: this.scroller,
@@ -640,6 +649,7 @@ export class GridImpl implements Grid {
 
     this.renderCoordinator = new RenderCoordinator({
       renderer: () => this.renderer,
+      domOverlay: this.domOverlay,
       overlayPainter: this.overlayPainter,
       ariaMirror: this.ariaMirror,
       geometry: this.geometry,
@@ -937,20 +947,31 @@ export class GridImpl implements Grid {
   private applyLayout(): void {
     this.renderCoordinator.invalidate();
     const sheet = this.sheet();
-    this.renderer.setLayout({
-      columns: sheet.columns.map((column, c) => ({
-        ...column,
-        header: column.visible === false ? "" : colToA1(c),
-        // Paint geometry is zoomed to match the column index; base widths stay
-        // untouched on the workbook.
-        width: column.visible === false ? 0 : column.width * this.zoom,
-      })),
+    const columns = sheet.columns.map((column, c) => ({
+      ...column,
+      header: column.visible === false ? "" : colToA1(c),
+      // Paint geometry is zoomed to match the column index; base widths stay
+      // untouched on the workbook.
+      width: column.visible === false ? 0 : column.width * this.zoom,
+    }));
+    const domRendererColumns = new Uint8Array(columns.length);
+    for (let col = 0; col < columns.length; col++) {
+      const rendererName = columns[col]?.renderer;
+      if (rendererName && this.customRenderers.get(rendererName)?.dom) {
+        domRendererColumns[col] = 1;
+      }
+    }
+    const layout = {
+      columns,
       rowHeight: this.theme.rowHeight,
       headerHeight: this.theme.headerHeight,
       totalRows: sheet.rowCount,
       zoom: this.zoom,
       merges: this.loadable?.hasView(this.activeSheet) ? [] : (sheet.merges ?? []),
-    });
+      domRendererColumns,
+    };
+    this.renderer.setLayout(layout);
+    this.domOverlay.setLayout(layout);
     this.selection.setBounds(sheet.rowCount, this.firstCol(), this.lastCol());
     this.syncSizer();
   }
@@ -981,6 +1002,7 @@ export class GridImpl implements Grid {
     if (adjusted !== this.theme) {
       this.theme = adjusted;
       this.renderer.setTheme(this.theme);
+      this.domOverlay.setTheme(this.theme);
     }
     this.syncSizer();
   }
@@ -1649,6 +1671,7 @@ export class GridImpl implements Grid {
     this.editor.cancel();
     this.validationEditor.cancel();
     this.cancelAutoFit();
+    this.domOverlay.reset();
     this.mutationRevisions.clear();
     this.activeSheet = id;
     this.activeSheetCache = null;
@@ -1898,6 +1921,7 @@ export class GridImpl implements Grid {
           };
     this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
     this.renderer.setTheme(this.theme);
+    this.domOverlay.setTheme(this.theme);
     this.syncTabBarTheme();
     this.rebuildIndex();
     this.rebuildColumnIndex();
@@ -1924,6 +1948,8 @@ export class GridImpl implements Grid {
   defineCellRenderer(name: string, renderer: CellRenderer): void {
     this.customRenderers.set(name, renderer);
     this.renderer.setRenderers(this.customRenderers);
+    this.domOverlay.setRenderers(this.customRenderers);
+    this.applyLayout();
     this.scheduleRender();
   }
 
@@ -2506,6 +2532,7 @@ export class GridImpl implements Grid {
     // store is owned by the caller and must stay usable after the grid is gone.
     if (this.ownsStore) this.loadable?.dispose();
     this.renderer.destroy();
+    this.domOverlay.destroy();
     this.scroller.remove();
     this.overlayPainter.destroy();
     this.sheetTabs?.destroy();

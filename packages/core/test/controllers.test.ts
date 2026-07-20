@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import type { AriaMirror } from "../src/aria-mirror.js";
 import { DatasourceController } from "../src/datasource-controller.js";
 import { DocumentController } from "../src/document-controller.js";
+import type { DomOverlay } from "../src/dom-overlay.js";
 import { GeometryLayoutController } from "../src/geometry-layout-controller.js";
 import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import type { OverlayPainter } from "../src/overlay-painter.js";
@@ -276,6 +277,10 @@ describe("RenderCoordinator", () => {
         overlayPaints += 1;
       },
     } as unknown as OverlayPainter;
+    const domOverlay = {
+      paint: () => {},
+      paintPanes: () => {},
+    } as unknown as DomOverlay;
     const aria = {
       bumpVersion: () => {},
       update: () => {
@@ -293,6 +298,7 @@ describe("RenderCoordinator", () => {
 
     const coordinator = new RenderCoordinator({
       renderer: () => renderer,
+      domOverlay,
       overlayPainter: overlay,
       ariaMirror: aria,
       geometry,

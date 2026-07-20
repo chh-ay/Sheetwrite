@@ -651,6 +651,7 @@ function paintCell(
   paintBorders(ctx, effective, x, y, w, h);
 
   const custom = column?.renderer ? renderers.get(column.renderer) : undefined;
+  if (custom?.dom || layout.domRendererColumns?.[col] === 1) return;
   if (custom?.canvas) {
     ctx.save();
     clipCell(ctx, x, y, w, h);

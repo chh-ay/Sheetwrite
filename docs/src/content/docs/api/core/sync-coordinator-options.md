@@ -9,7 +9,7 @@ Document, version, durability, and online options for synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L184</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L185</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
