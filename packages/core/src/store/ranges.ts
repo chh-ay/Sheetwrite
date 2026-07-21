@@ -6,6 +6,7 @@ import type {
   DocumentOp,
   ProtectedRange,
   Sheet,
+  SheetSnapshot,
   SortKey,
 } from "../types/document.js";
 
@@ -24,6 +25,135 @@ export function uniqueColumnKeys(columns: readonly Column[]): boolean {
     keys.add(column.key);
   }
   return true;
+}
+export interface SheetLifecycleState {
+  readonly sheets: Array<{ id: SheetId; name: string }>;
+}
+
+export function createSheetLifecycleState(
+  sheets: readonly { id: SheetId; name: string }[],
+): SheetLifecycleState {
+  return { sheets: sheets.map(({ id, name }) => ({ id, name })) };
+}
+export function canAddSheetSnapshot(
+  snapshot: SheetSnapshot,
+  existing: readonly { id: SheetId; name: string }[],
+): boolean {
+  if (
+    !snapshot.id ||
+    existing.some((sheet) => sheet.id === snapshot.id) ||
+    !integerAt(snapshot.order) ||
+    snapshot.order > existing.length ||
+    !integerAt(snapshot.rowCount) ||
+    snapshot.columns.length === 0 ||
+    !uniqueColumnKeys(snapshot.columns) ||
+    !snapshot.name.trim() ||
+    existing.some((sheet) => sheet.name === snapshot.name)
+  ) {
+    return false;
+  }
+  const merges = snapshot.merges?.map(normalizeMerge) ?? [];
+  const candidate: Sheet = {
+    id: snapshot.id,
+    name: snapshot.name,
+    visibility: snapshot.visibility,
+    rowCount: snapshot.rowCount,
+    columns: snapshot.columns,
+    frozenRows: snapshot.frozenRows,
+    frozenCols: snapshot.frozenCols,
+    validationRules: snapshot.validationRules,
+    protectedRanges: snapshot.protectedRanges,
+    notes: snapshot.notes,
+    sortKeys: snapshot.sortKeys,
+    filters: snapshot.filters,
+  };
+  return !(
+    (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
+    (snapshot.frozenCols !== undefined && snapshot.frozenCols > snapshot.columns.length) ||
+    merges.some((merge) => !validMerge(candidate, merge) || mergeCrossesFreeze(candidate, merge)) ||
+    merges.some((merge, index) =>
+      merges.slice(index + 1).some((other) => mergesOverlap(merge, other)),
+    ) ||
+    !validConditionalRules(candidate, snapshot.conditionalFormats ?? []) ||
+    !validValidationRules(candidate, snapshot.validationRules ?? []) ||
+    !validProtectedRanges(candidate, snapshot.protectedRanges ?? []) ||
+    !validNotes(candidate) ||
+    !validSortAndFilters(candidate, snapshot.sortKeys ?? [], snapshot.filters ?? []) ||
+    (snapshot.rowMeta ?? []).some(
+      ([row, meta]) =>
+        !integerAt(row) ||
+        row >= snapshot.rowCount ||
+        (meta.height !== undefined && (!Number.isFinite(meta.height) || meta.height <= 0)),
+    ) ||
+    (snapshot.rowGroups ?? []).some(
+      (group) =>
+        !integerAt(group.start) ||
+        !integerAt(group.end) ||
+        group.start > group.end ||
+        group.end >= snapshot.rowCount,
+    ) ||
+    snapshot.cells.some(
+      (block) =>
+        !integerAt(block.startRow) ||
+        !integerAt(block.startCol) ||
+        !positiveCount(block.rowCount) ||
+        !positiveCount(block.colCount) ||
+        block.startRow + block.rowCount > snapshot.rowCount ||
+        block.startCol + block.colCount > snapshot.columns.length ||
+        block.cells.some(
+          (cell) =>
+            !integerAt(cell.rowOffset) ||
+            !integerAt(cell.colOffset) ||
+            cell.rowOffset >= block.rowCount ||
+            cell.colOffset >= block.colCount,
+        ),
+    )
+  );
+}
+
+/** Simulates the sheet-array effects of one operation using the engine's exact success predicates. */
+export function applySheetLifecycleOperation(
+  state: SheetLifecycleState,
+  operation: DocumentOp,
+): boolean | null {
+  if (operation.op === "addSheet") {
+    if (!canAddSheetSnapshot(operation.sheet, state.sheets)) return false;
+    state.sheets.splice(operation.sheet.order, 0, {
+      id: operation.sheet.id,
+      name: operation.sheet.name,
+    });
+    return true;
+  }
+  if (operation.op === "removeSheet") {
+    const index = state.sheets.findIndex((sheet) => sheet.id === operation.sheet);
+    if (index < 0 || state.sheets.length <= 1) return false;
+    state.sheets.splice(index, 1);
+    return true;
+  }
+  if (operation.op === "renameSheet") {
+    const sheet = state.sheets.find((candidate) => candidate.id === operation.sheet);
+    if (
+      !sheet ||
+      !operation.name.trim() ||
+      state.sheets.some(
+        (candidate) => candidate.id !== operation.sheet && candidate.name === operation.name,
+      )
+    ) {
+      return false;
+    }
+    sheet.name = operation.name;
+    return true;
+  }
+  if (operation.op === "moveSheet") {
+    const from = state.sheets.findIndex((sheet) => sheet.id === operation.sheet);
+    if (from < 0 || !integerAt(operation.to) || operation.to >= state.sheets.length) {
+      return false;
+    }
+    const [sheet] = state.sheets.splice(from, 1);
+    state.sheets.splice(operation.to, 0, sheet!);
+    return true;
+  }
+  return null;
 }
 
 export function normalizedRange(range: Range): Range {

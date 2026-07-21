@@ -39,6 +39,9 @@ import type {
 } from "../types/store.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import {
+  applySheetLifecycleOperation,
+  canAddSheetSnapshot,
+  createSheetLifecycleState,
   integerAt,
   mergeCrossesFreeze,
   mergesOverlap,
@@ -346,6 +349,59 @@ export class StoreDataEngine {
     const limit = this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT;
     const wasmIndexLimit = 0xffff_ffff;
     const states = new Map<SheetId, PagedDirtyPreflightState>();
+    const sheetLifecycle = createSheetLifecycleState(this.workbook.sheets);
+    let virtualRefs = new Map(
+      this.refs.entries().map(([source, target]) => [cellKey(source), { ...target }] as const),
+    );
+    const setVirtualRef = (source: CellAddress, target: CellAddress | null): void => {
+      const key = cellKey(source);
+      virtualRefs.delete(key);
+      if (target) virtualRefs.set(key, { ...target });
+    };
+    const rebaseVirtualRefs = (
+      sheet: SheetId,
+      rowAt: (row: number) => number | null,
+      colAt: (col: number) => number | null,
+    ): void => {
+      const rebased = new Map<string, CellAddress>();
+      for (const [sourceKey, target] of virtualRefs) {
+        const source = parseCellKey(sourceKey);
+        const sourceRow = source.sheet === sheet ? rowAt(source.row) : source.row;
+        const sourceCol = source.sheet === sheet ? colAt(source.col) : source.col;
+        const targetRow = target.sheet === sheet ? rowAt(target.row) : target.row;
+        const targetCol = target.sheet === sheet ? colAt(target.col) : target.col;
+        if (sourceRow === null || sourceCol === null || targetRow === null || targetCol === null) {
+          continue;
+        }
+        const nextSource = { sheet: source.sheet, row: sourceRow, col: sourceCol };
+        rebased.set(cellKey(nextSource), {
+          sheet: target.sheet,
+          row: targetRow,
+          col: targetCol,
+        });
+      }
+      virtualRefs = rebased;
+    };
+    const clearVirtualRefs = (
+      sheet: SheetId,
+      startRow: number,
+      startCol: number,
+      rows: number,
+      cols: number,
+    ): void => {
+      for (const sourceKey of virtualRefs.keys()) {
+        const source = parseCellKey(sourceKey);
+        if (
+          source.sheet === sheet &&
+          source.row >= startRow &&
+          source.row < startRow + rows &&
+          source.col >= startCol &&
+          source.col < startCol + cols
+        ) {
+          virtualRefs.delete(sourceKey);
+        }
+      }
+    };
     const keyOf = (row: number, col: number) => `${row}:${col}`;
     const stateFor = (sheet: SheetId) => {
       const existing = states.get(sheet);
@@ -442,6 +498,30 @@ export class StoreDataEngine {
       if (!rejection) state.seen.add(key);
       return rejection;
     };
+    const cellApplies = (sheet: SheetId, row: number, col: number): boolean => {
+      const state = stateFor(sheet);
+      return Boolean(state && row >= 0 && col >= 0 && row < state.rows && col < state.cols);
+    };
+    const rectangleApplies = (
+      sheet: SheetId,
+      startRow: number,
+      startCol: number,
+      rows: number,
+      cols: number,
+    ): boolean => {
+      const state = stateFor(sheet);
+      return Boolean(
+        state &&
+          startRow >= 0 &&
+          startCol >= 0 &&
+          Number.isSafeInteger(rows) &&
+          Number.isSafeInteger(cols) &&
+          rows > 0 &&
+          cols > 0 &&
+          rows <= state.rows - startRow &&
+          cols <= state.cols - startCol,
+      );
+    };
     const addRectangle = (
       sheet: SheetId,
       startRow: number,
@@ -482,6 +562,7 @@ export class StoreDataEngine {
     for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
       const patch = patches[operationIndex]!;
       if (patch.op === "addSheet") {
+        if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
         const snapshot = patch.sheet;
         const state: PagedDirtyPreflightState = {
           handle: null,
@@ -502,12 +583,39 @@ export class StoreDataEngine {
               block.startCol + cell.colOffset,
             );
             if (rejection) return rejection;
+            if (cell.value.kind === "ref") {
+              setVirtualRef(
+                {
+                  sheet: snapshot.id,
+                  row: block.startRow + cell.rowOffset,
+                  col: block.startCol + cell.colOffset,
+                },
+                cell.value.target,
+              );
+            }
           }
         }
         continue;
       }
       if (patch.op === "removeSheet") {
+        if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
+        for (const [sourceKey, target] of virtualRefs) {
+          const source = parseCellKey(sourceKey);
+          if (source.sheet === patch.sheet || target.sheet !== patch.sheet) continue;
+          const rejection = addSparse(source.sheet, source.row, source.col);
+          if (rejection) return rejection;
+        }
+        virtualRefs = new Map(
+          [...virtualRefs].filter(([sourceKey, target]) => {
+            const source = parseCellKey(sourceKey);
+            return source.sheet !== patch.sheet && target.sheet !== patch.sheet;
+          }),
+        );
         states.delete(patch.sheet);
+        continue;
+      }
+      if (patch.op === "renameSheet" || patch.op === "moveSheet") {
+        applySheetLifecycleOperation(sheetLifecycle, patch);
         continue;
       }
       const sheet = patchSheetId(patch);
@@ -528,6 +636,7 @@ export class StoreDataEngine {
             return invalid(operationIndex, "addRows exceeds the current sheet bounds");
           }
           rebaseState(state, (row) => (row >= patch.at ? row + patch.count : row), keep);
+          rebaseVirtualRefs(sheet, (row) => (row >= patch.at ? row + patch.count : row), keep);
           state.rows += patch.count;
         } else if (patch.op === "removeRows") {
           if (patch.at > state.rows || patch.count > state.rows - patch.at) {
@@ -535,6 +644,12 @@ export class StoreDataEngine {
           }
           rebaseState(
             state,
+            (row) =>
+              row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
+            keep,
+          );
+          rebaseVirtualRefs(
+            sheet,
             (row) =>
               row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
             keep,
@@ -549,6 +664,11 @@ export class StoreDataEngine {
             return invalid(operationIndex, "moveRows exceeds the current sheet bounds");
           }
           rebaseState(state, (row) => moveIndex(row, patch.from, patch.count, patch.to), keep);
+          rebaseVirtualRefs(
+            sheet,
+            (row) => moveIndex(row, patch.from, patch.count, patch.to),
+            keep,
+          );
         } else if (patch.op === "addColumns") {
           const insertedKeys = patch.columns.map((column) => column.key);
           if (
@@ -561,6 +681,9 @@ export class StoreDataEngine {
             return invalid(operationIndex, "addColumns exceeds the current sheet bounds");
           }
           rebaseState(state, keep, (col) => (col >= patch.at ? col + patch.columns.length : col));
+          rebaseVirtualRefs(sheet, keep, (col) =>
+            col >= patch.at ? col + patch.columns.length : col,
+          );
           state.cols += patch.columns.length;
           state.columnKeys.splice(patch.at, 0, ...insertedKeys);
         } else if (patch.op === "removeColumns") {
@@ -574,6 +697,9 @@ export class StoreDataEngine {
           rebaseState(state, keep, (col) =>
             col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
           );
+          rebaseVirtualRefs(sheet, keep, (col) =>
+            col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
+          );
           state.cols -= patch.count;
           state.columnKeys.splice(patch.at, patch.count);
         } else {
@@ -585,6 +711,9 @@ export class StoreDataEngine {
             return invalid(operationIndex, "moveColumns exceeds the current sheet bounds");
           }
           rebaseState(state, keep, (col) => moveIndex(col, patch.from, patch.count, patch.to));
+          rebaseVirtualRefs(sheet, keep, (col) =>
+            moveIndex(col, patch.from, patch.count, patch.to),
+          );
           const movedKeys = state.columnKeys.splice(patch.from, patch.count);
           state.columnKeys.splice(patch.to, 0, ...movedKeys);
         }
@@ -592,9 +721,27 @@ export class StoreDataEngine {
       }
       let rejection: MutationIssue | null = null;
       if (patch.op === "set") {
+        if (!cellApplies(patch.addr.sheet, patch.addr.row, patch.addr.col)) continue;
         rejection = addSparse(patch.addr.sheet, patch.addr.row, patch.addr.col);
+        if (!rejection) {
+          setVirtualRef(patch.addr, patch.value.kind === "ref" ? patch.value.target : null);
+        }
       } else if (patch.op === "setRange") {
         const range = normalizedRange(patch.range);
+        const rows = range.end.row - range.start.row + 1;
+        const cols = range.end.col - range.start.col + 1;
+        if (
+          !rectangleApplies(range.sheet, range.start.row, range.start.col, rows, cols) ||
+          patch.cells.some(
+            (cell) =>
+              !integerAt(cell.rowOffset) ||
+              !integerAt(cell.colOffset) ||
+              cell.rowOffset >= rows ||
+              cell.colOffset >= cols,
+          )
+        ) {
+          continue;
+        }
         for (const cell of patch.cells) {
           rejection = addSparse(
             range.sheet,
@@ -602,6 +749,12 @@ export class StoreDataEngine {
             range.start.col + cell.colOffset,
           );
           if (rejection) break;
+          const source = {
+            sheet: range.sheet,
+            row: range.start.row + cell.rowOffset,
+            col: range.start.col + cell.colOffset,
+          };
+          setVirtualRef(source, cell.value.kind === "ref" ? cell.value.target : null);
         }
       } else if (patch.op === "setBlock") {
         const range = normalizedRange(patch.range);
@@ -612,6 +765,42 @@ export class StoreDataEngine {
           patch.block.rowCount,
           patch.block.colCount,
         );
+        if (
+          !rejection &&
+          patch.block.rowCount === range.end.row - range.start.row + 1 &&
+          patch.block.colCount === range.end.col - range.start.col + 1 &&
+          rectangleApplies(
+            range.sheet,
+            range.start.row,
+            range.start.col,
+            patch.block.rowCount,
+            patch.block.colCount,
+          )
+        ) {
+          for (let rowOffset = 0; rowOffset < patch.block.rowCount; rowOffset++) {
+            for (let colOffset = 0; colOffset < patch.block.colCount; colOffset++) {
+              const offset = rowOffset * patch.block.colCount + colOffset;
+              setVirtualRef(
+                {
+                  sheet: range.sheet,
+                  row: range.start.row + rowOffset,
+                  col: range.start.col + colOffset,
+                },
+                null,
+              );
+            }
+          }
+          for (const [offset, target] of patch.block.refs ?? []) {
+            setVirtualRef(
+              {
+                sheet: range.sheet,
+                row: range.start.row + Math.floor(offset / patch.block.colCount),
+                col: range.start.col + (offset % patch.block.colCount),
+              },
+              target,
+            );
+          }
+        }
       } else if (patch.op === "setRangeStyle" || patch.op === "clearRange") {
         const range = normalizedRange(patch.range);
         rejection = addRectangle(
@@ -621,6 +810,26 @@ export class StoreDataEngine {
           range.end.row - range.start.row + 1,
           range.end.col - range.start.col + 1,
         );
+        if (
+          !rejection &&
+          patch.op === "clearRange" &&
+          (patch.contents ?? true) &&
+          rectangleApplies(
+            range.sheet,
+            range.start.row,
+            range.start.col,
+            range.end.row - range.start.row + 1,
+            range.end.col - range.start.col + 1,
+          )
+        ) {
+          clearVirtualRefs(
+            range.sheet,
+            range.start.row,
+            range.start.col,
+            range.end.row - range.start.row + 1,
+            range.end.col - range.start.col + 1,
+          );
+        }
       }
       if (rejection) return rejection;
     }
@@ -1902,80 +2111,8 @@ export class StoreDataEngine {
     snapshot: SheetSnapshot,
     changes: ChangeEvent["changes"] | null,
   ): boolean {
-    if (
-      !snapshot.id ||
-      this.handles.has(snapshot.id) ||
-      !integerAt(snapshot.order) ||
-      snapshot.order > this.workbook.sheets.length ||
-      !integerAt(snapshot.rowCount) ||
-      snapshot.columns.length === 0 ||
-      !uniqueColumnKeys(snapshot.columns) ||
-      !snapshot.name.trim() ||
-      this.workbook.sheets.some((sheet) => sheet.name === snapshot.name)
-    ) {
-      return false;
-    }
+    if (!canAddSheetSnapshot(snapshot, this.workbook.sheets)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
-    const candidate: Sheet = {
-      id: snapshot.id,
-      name: snapshot.name,
-      visibility: snapshot.visibility,
-      rowCount: snapshot.rowCount,
-      columns: snapshot.columns,
-      frozenRows: snapshot.frozenRows,
-      frozenCols: snapshot.frozenCols,
-    };
-    candidate.validationRules = snapshot.validationRules;
-    candidate.protectedRanges = snapshot.protectedRanges;
-    candidate.notes = snapshot.notes;
-    candidate.sortKeys = snapshot.sortKeys;
-    candidate.filters = snapshot.filters;
-    if (
-      (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
-      (snapshot.frozenCols !== undefined && snapshot.frozenCols > snapshot.columns.length) ||
-      merges.some(
-        (merge) => !validMerge(candidate, merge) || mergeCrossesFreeze(candidate, merge),
-      ) ||
-      merges.some((merge, index) =>
-        merges.slice(index + 1).some((other) => mergesOverlap(merge, other)),
-      ) ||
-      !validConditionalRules(candidate, snapshot.conditionalFormats ?? []) ||
-      !validValidationRules(candidate, snapshot.validationRules ?? []) ||
-      !validProtectedRanges(candidate, snapshot.protectedRanges ?? []) ||
-      !validNotes(candidate) ||
-      !validSortAndFilters(candidate, snapshot.sortKeys ?? [], snapshot.filters ?? []) ||
-      (snapshot.rowMeta ?? []).some(
-        ([row, meta]) =>
-          !integerAt(row) ||
-          row >= snapshot.rowCount ||
-          (meta.height !== undefined && (!Number.isFinite(meta.height) || meta.height <= 0)),
-      ) ||
-      (snapshot.rowGroups ?? []).some(
-        (group) =>
-          !integerAt(group.start) ||
-          !integerAt(group.end) ||
-          group.start > group.end ||
-          group.end >= snapshot.rowCount,
-      ) ||
-      snapshot.cells.some(
-        (block) =>
-          !integerAt(block.startRow) ||
-          !integerAt(block.startCol) ||
-          !positiveCount(block.rowCount) ||
-          !positiveCount(block.colCount) ||
-          block.startRow + block.rowCount > snapshot.rowCount ||
-          block.startCol + block.colCount > snapshot.columns.length ||
-          block.cells.some(
-            (cell) =>
-              !integerAt(cell.rowOffset) ||
-              !integerAt(cell.colOffset) ||
-              cell.rowOffset >= block.rowCount ||
-              cell.colOffset >= block.colCount,
-          ),
-      )
-    ) {
-      return false;
-    }
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
     this.wasm.setSheetName(handle, snapshot.id, snapshot.name);
     this.handles.set(snapshot.id, handle);

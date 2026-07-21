@@ -2374,6 +2374,147 @@ it("preflights new-sheet snapshot cells and later writes against one dirty limit
   store.dispose();
 });
 
+it("preflights inbound clean ref rewrites before removing their target sheet", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  const remote = store.applyTransaction(
+    {
+      patches: [
+        {
+          op: "set",
+          addr: addr(0, 0),
+          value: { kind: "ref", target: { sheet: "s2", row: 0, col: 0 } },
+        },
+        {
+          op: "set",
+          addr: addr(1, 0),
+          value: { kind: "ref", target: { sheet: "s2", row: 0, col: 0 } },
+        },
+      ],
+    },
+    { source: "remote" },
+  );
+  expect(remote).toMatchObject({ status: "applied", epoch: 1 });
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+
+  const removed = store.applyTransaction({
+    patches: [{ op: "removeSheet", sheet: "s2" }],
+  });
+  expect(removed).toMatchObject({
+    status: "rejected",
+    epoch: 1,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 2, max: 1 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s2"]);
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.dispose();
+});
+
+it("rebases clean refs before counting a later target-sheet removal", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  expect(
+    store.applyTransaction(
+      {
+        patches: [
+          {
+            op: "set",
+            addr: addr(0, 0),
+            value: { kind: "ref", target: { sheet: "s2", row: 0, col: 0 } },
+          },
+        ],
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "moveRows", sheet: "s1", from: 0, count: 1, to: 2 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "local" } },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 1,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 2, max: 1 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s2"]);
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.dispose();
+});
+
+it("keeps virtual sheet membership aligned when addSheet snapshots are semantically invalid", () => {
+  const baseSheet = {
+    id: "s2",
+    name: "Second",
+    order: 1,
+    rowCount: 2,
+    columns: [{ key: "value", header: "Value", width: 100, type: "text" as const }],
+    cells: [],
+  };
+  const invalidSheets = [
+    {
+      ...baseSheet,
+      columns: [
+        ...baseSheet.columns,
+        { key: "value", header: "Duplicate", width: 100, type: "text" as const },
+      ],
+    },
+    { ...baseSheet, order: 2 },
+    { ...baseSheet, frozenRows: 3 },
+  ];
+  for (const sheet of invalidSheets) {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+    const outcome = store.applyTransaction({
+      patches: [
+        { op: "addSheet", sheet },
+        {
+          op: "setRange",
+          range: { sheet: "s2", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+          cells: [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "unsafe" } }],
+        },
+      ],
+    });
+    expect(outcome).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "invalid-operation", operationIndex: 1 }],
+    });
+    expect(store.getWorkbook().sheets.map((candidate) => candidate.id)).toEqual(["s1"]);
+    store.dispose();
+  }
+});
+
+it("retains last-sheet membership when removeSheet is a no-op", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "removeSheet", sheet: "s1" },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "kept" } },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  expect(store.getCell(addr(0, 0)).resolved).toBe("kept");
+  store.dispose();
+});
+
 describe("validation, protection, and notes metadata", () => {
   it("applies reject, warn, and partial validation policy at the transaction boundary", () => {
     const workbook = makeWorkbook(4);

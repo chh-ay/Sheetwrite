@@ -16,7 +16,11 @@ import {
   type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
-import { patchSheetId } from "./store/ranges.js";
+import {
+  applySheetLifecycleOperation,
+  createSheetLifecycleState,
+  patchSheetId,
+} from "./store/ranges.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -431,7 +435,7 @@ export class SheetwriteStore implements Store {
     if (!resourceValidation.ok) {
       return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
     }
-    const liveSheets = new Set(this.engine.getWorkbook().sheets.map((sheet) => sheet.id));
+    const sheetLifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
     for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
       const operationPath = `transaction.patches[${operationIndex}]`;
       const unsafeError = validateDocumentOperationShape(
@@ -455,36 +459,23 @@ export class SheetwriteStore implements Store {
       const operation = tx.patches[operationIndex]!;
       const requiredSheets: SheetId[] = [];
       if (operation.op === "addSheet") {
-        if (liveSheets.has(operation.sheet.id)) {
-          return {
-            status: "rejected",
-            epoch: this.epoch,
-            issues: [
-              {
-                kind: "invalid-operation",
-                severity: "error",
-                operationIndex,
-                message: `Sheet ${operation.sheet.id} already exists`,
-              },
-            ],
-          };
-        }
-        liveSheets.add(operation.sheet.id);
-        for (const block of operation.sheet.cells) {
-          for (const cell of block.cells) {
-            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+        if (applySheetLifecycleOperation(sheetLifecycle, operation)) {
+          for (const block of operation.sheet.cells) {
+            for (const cell of block.cells) {
+              if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+            }
           }
+          for (const rule of operation.sheet.conditionalFormats ?? []) {
+            requiredSheets.push(rule.range.sheet);
+          }
+          for (const rule of operation.sheet.validationRules ?? []) {
+            requiredSheets.push(rule.range.sheet);
+          }
+          for (const entry of operation.sheet.protectedRanges ?? []) {
+            requiredSheets.push(entry.range.sheet);
+          }
+          for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
         }
-        for (const rule of operation.sheet.conditionalFormats ?? []) {
-          requiredSheets.push(rule.range.sheet);
-        }
-        for (const rule of operation.sheet.validationRules ?? []) {
-          requiredSheets.push(rule.range.sheet);
-        }
-        for (const entry of operation.sheet.protectedRanges ?? []) {
-          requiredSheets.push(entry.range.sheet);
-        }
-        for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
       } else {
         const primarySheet = patchSheetId(operation);
         if (primarySheet !== null) requiredSheets.push(primarySheet);
@@ -513,7 +504,9 @@ export class SheetwriteStore implements Store {
           }
         }
       }
-      const missingSheet = requiredSheets.find((sheet) => !liveSheets.has(sheet));
+      const missingSheet = requiredSheets.find(
+        (sheet) => !sheetLifecycle.sheets.some((candidate) => candidate.id === sheet),
+      );
       if (missingSheet !== undefined) {
         return {
           status: "rejected",
@@ -528,7 +521,9 @@ export class SheetwriteStore implements Store {
           ],
         };
       }
-      if (operation.op === "removeSheet") liveSheets.delete(operation.sheet);
+      if (operation.op !== "addSheet") {
+        applySheetLifecycleOperation(sheetLifecycle, operation);
+      }
     }
     const options =
       typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
