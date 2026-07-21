@@ -1,5 +1,9 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { DatasourceController } from "../src/datasource-controller.js";
+import {
+  DATASOURCE_PREFETCH_MAX_BYTES,
+  DATASOURCE_PREFETCH_MAX_ROWS,
+  DatasourceController,
+} from "../src/datasource-controller.js";
 import { initSheetwrite } from "../src/grid.js";
 import { MutationRevisionIndex } from "../src/mutation-revision-index.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -320,6 +324,228 @@ describe("DatasourceController revision retention", () => {
     await flushRequest();
     expect(starts).toEqual([0, 4, 8, 12, 0]);
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("row-0");
+
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("starts visible demand before bounded aligned speculation and promotes overlap", async () => {
+    const store = new SheetwriteStore(makeWorkbook(100));
+    const pending: Array<{
+      request: { start: number; end: number; signal: AbortSignal };
+      result: PromiseWithResolvers<DataSourcePage>;
+    }> = [];
+    let now = 0;
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          const result = Promise.withResolvers<DataSourcePage>();
+          pending.push({ request, result });
+          return result.promise;
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 100,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => now,
+      },
+      100,
+    );
+
+    controller.updateViewport(0, 10);
+    expect(pending.map(({ request }) => [request.start, request.end])).toEqual([
+      [0, 10],
+      [10, 20],
+      [20, 30],
+    ]);
+    expect(controller.getTelemetry()).toMatchObject({
+      visibleRequests: 1,
+      speculativeRequests: 2,
+      visibleRequestedRows: 10,
+      speculativeRequestedRows: 20,
+    });
+
+    now = 16.7;
+    controller.updateViewport(5, 15);
+    expect(pending).toHaveLength(4);
+    expect(controller.getTelemetry().promotions).toBe(1);
+    for (let left = 0; left < pending.length; left++) {
+      for (let right = left + 1; right < pending.length; right++) {
+        const a = pending[left]!.request;
+        const b = pending[right]!.request;
+        expect(Math.max(a.start, b.start)).toBeGreaterThanOrEqual(Math.min(a.end, b.end));
+      }
+    }
+
+    for (const entry of pending) {
+      entry.result.resolve({
+        start: entry.request.start,
+        rows: Array.from({ length: entry.request.end - entry.request.start }, (_, offset) => ({
+          name: `row-${entry.request.start + offset}`,
+        })),
+      });
+    }
+    await flushRequest();
+    expect(controller.getTelemetry()).toMatchObject({
+      measuredFrames: 2,
+      residentFrames: 0,
+      visibleWaitSamples: 15,
+      p95VisibleWaitMs: 16.7,
+    });
+
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("aborts obsolete speculative requests on reversal and distant jumps", () => {
+    const store = new SheetwriteStore(makeWorkbook(200));
+    const requests: Array<{ start: number; end: number; signal: AbortSignal }> = [];
+    let now = 0;
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          requests.push(request);
+          return new Promise<DataSourcePage>(() => {});
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 200,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => now,
+      },
+      200,
+    );
+
+    controller.updateViewport(0, 10);
+    now = 16.7;
+    controller.updateViewport(5, 15);
+    now = 33.4;
+    controller.updateViewport(0, 10);
+    expect(requests.find(({ start }) => start === 20)?.signal.aborted).toBe(true);
+    expect(controller.getTelemetry().direction).toBe(-1);
+    expect(controller.getTelemetry().reversalAborts).toBeGreaterThan(0);
+
+    now = 50.1;
+    controller.updateViewport(20, 30);
+    const beforeJump = requests.filter(({ start }) => start >= 30 && start < 50);
+    expect(beforeJump.length).toBeGreaterThan(0);
+    now = 66.8;
+    controller.updateViewport(100, 110);
+    expect(beforeJump.every(({ signal }) => signal.aborted)).toBe(true);
+    expect(controller.getTelemetry().jumpAborts).toBeGreaterThan(0);
+
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("preserves resident rows while refreshing a paged overlap and stays within cache budget", async () => {
+    const cacheBytes = 87;
+    const workbook = makeWorkbook(20);
+    workbook.sheets[0]!.columns = workbook.sheets[0]!.columns.slice(0, 1);
+    const store = new SheetwriteStore(workbook, undefined, {
+      storage: "paged",
+      chunkRows: 1,
+      cacheBytes,
+    });
+    const requested: Array<[number, number]> = [];
+    const controller = new DatasourceController(
+      {
+        datasource: async (request) => {
+          requested.push([request.start, request.end]);
+          return {
+            start: request.start,
+            rows: Array.from({ length: request.end - request.start }, (_, offset) => ({
+              name: `row-${request.start + offset}`,
+              amount: request.start + offset,
+              city: "A",
+            })),
+          };
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 20,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      20,
+    );
+
+    controller.ensureLoaded(0, 2);
+    await flushRequest();
+    controller.ensureLoaded(2, 4);
+    await flushRequest();
+    expect(
+      store.isRangeFullyLoaded({
+        sheet: "s1",
+        start: { row: 1, col: 0 },
+        end: { row: 1, col: 0 },
+      }),
+    ).toBe(true);
+
+    controller.ensureLoaded(0, 2);
+    await flushRequest();
+    expect(requested.at(-1)).toEqual([0, 1]);
+    expect(store.getPagedStats("s1").allocatedBytes).toBeLessThanOrEqual(cacheBytes);
+
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("bounds combined ahead and behind ownership for wide large viewports and sheet edges", () => {
+    const workbook = makeWorkbook(2_000);
+    workbook.sheets[0]!.columns = Array.from({ length: 200 }, (_, column) => ({
+      key: `c${column}`,
+      header: `C${column}`,
+      width: 100,
+      type: "text" as const,
+    }));
+    const store = new SheetwriteStore(workbook);
+    let now = 0;
+    const controller = new DatasourceController(
+      {
+        datasource: () => Promise.withResolvers<DataSourcePage>().promise,
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 2_000,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => now,
+      },
+      2_000,
+    );
+    const assertBounded = () => {
+      const telemetry = controller.getTelemetry();
+      expect(telemetry.activeSpeculativeRows).toBeLessThanOrEqual(DATASOURCE_PREFETCH_MAX_ROWS);
+      expect(telemetry.activeSpeculativeRows * 200 * 16).toBeLessThanOrEqual(
+        DATASOURCE_PREFETCH_MAX_BYTES,
+      );
+    };
+
+    controller.updateViewport(0, 600);
+    assertBounded();
+    now = 16.7;
+    controller.updateViewport(600, 1_200);
+    assertBounded();
+    now = 33.4;
+    controller.updateViewport(1_900, 2_000);
+    assertBounded();
+    now = 50.1;
+    controller.updateViewport(1_200, 1_800);
+    assertBounded();
 
     controller.destroy();
     store.dispose();

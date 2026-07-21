@@ -133,11 +133,23 @@ export class RenderCoordinator {
     const frozenColumns = paintWindow.frozenColumns;
     const frozenHeight = paintWindow.frozenHeight;
     const frozenWidth = paintWindow.frozenWidth;
+    const rawVisibleRows = geometry.visibleRowWindow(
+      contentTop + frozenHeight,
+      Math.max(0, bodyHeight - frozenHeight) + theme.headerHeight,
+      0,
+    );
+    const visibleRows =
+      frozenRows > 0
+        ? {
+            start: Math.max(rawVisibleRows.start, frozenRows),
+            end: Math.max(rawVisibleRows.end, frozenRows),
+          }
+        : rawVisibleRows;
     const usePanes =
       (frozenRows > 0 || frozenColumns > 0) && this.options.renderer().paintPanes !== undefined;
     const rowGeometry = geometry.rowGeometry(rows);
     if (frozenRows > 0) this.options.datasource.ensureLoaded(0, frozenRows);
-    this.options.datasource.ensureLoaded(rows.start, rows.end);
+    this.options.datasource.updateViewport(visibleRows.start, visibleRows.end);
 
     if (columns.start !== this.columnWindowStart || columns.end !== this.columnWindowEnd) {
       this.columnWindowStart = columns.start;

@@ -240,7 +240,7 @@ describe("Grid editing (Layer 3)", () => {
       workbook,
       datasource: {
         getRows: async (request: DataSourceRequest) => {
-          captured = request;
+          captured ??= request;
           return {
             start: request.start,
             rows: [{ name: "Structured", amount: 7, city: "Paris" }],
@@ -263,6 +263,34 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
+  it("keeps render overscan independent from the bounded datasource horizon", () => {
+    const requests: DataSourceRequest[] = [];
+    let paintedLastRow = -1;
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(200),
+      overscan: 50,
+      datasource: {
+        getRows: (request) => {
+          requests.push(request);
+          return Promise.withResolvers<{ start: number; rows: RowData[] }>().promise;
+        },
+      },
+    });
+    grid.on("scroll", ({ lastRow }) => {
+      paintedLastRow = lastRow;
+    });
+    grid.refresh();
+
+    const visible = requests[0];
+    if (!visible) throw new Error("visible datasource request was not issued");
+    const requestedEnd = Math.max(...requests.map((request) => request.end));
+    expect(visible.start).toBe(0);
+    expect(requestedEnd).toBeLessThanOrEqual(visible.end * 3);
+    expect(paintedLastRow + 1).toBeGreaterThan(requestedEnd);
+
+    grid.destroy();
+  });
+
   it("retries datasource bands after a rejected load", async () => {
     const workbook = makeWorkbook(50);
     let requests = 0;
@@ -279,11 +307,12 @@ describe("Grid editing (Layer 3)", () => {
     });
     grid.on("datasource-error", () => failed.resolve());
 
-    expect(requests).toBe(1);
+    const initialRequests = requests;
+    expect(initialRequests).toBeGreaterThan(1);
     await failed.promise;
 
     grid.refresh();
-    expect(requests).toBe(2);
+    expect(requests).toBeGreaterThan(initialRequests);
 
     grid.destroy();
   });
@@ -307,7 +336,8 @@ describe("Grid editing (Layer 3)", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(starts.slice(0, 2)).toEqual([0, 1]);
+    expect(starts[0]).toBe(0);
+    expect(starts).toContain(1);
     grid.destroy();
   });
 
@@ -325,13 +355,15 @@ describe("Grid editing (Layer 3)", () => {
     });
     const errors: unknown[] = [];
     grid.on("datasource-error", (event) => errors.push(event.error));
+    const initialRequests = requests;
 
     await Promise.resolve();
     await Promise.resolve();
     grid.refresh();
 
-    expect(errors[0]).toBeInstanceOf(RangeError);
-    expect(requests).toBe(2);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.every((error) => error instanceof RangeError)).toBe(true);
+    expect(requests).toBeGreaterThan(initialRequests);
     grid.destroy();
   });
 
