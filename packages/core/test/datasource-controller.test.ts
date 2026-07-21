@@ -447,6 +447,7 @@ describe("DatasourceController revision retention", () => {
   });
 
   it("preserves resident rows while refreshing a paged overlap and stays within cache budget", async () => {
+
     const cacheBytes = 63;
     const workbook = makeWorkbook(20);
     workbook.sheets[0]!.columns = workbook.sheets[0]!.columns.slice(0, 1);
@@ -547,7 +548,26 @@ describe("DatasourceController revision retention", () => {
     controller.updateViewport(1_200, 1_800);
     assertBounded();
 
+    expect(
+      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.row-state"),
+    ).toMatchObject({
+      logicalBytes: 2_000 * (1 + 4 + 8),
+      allocatedBytes: 2_000 * (1 + 4 + 8),
+      entries: 6_000,
+    });
+    expect(
+      controller
+        .getResourceOwners()
+        .find((owner) => owner.owner === "js.datasource.pending-requests")!.entries,
+    ).toBeGreaterThan(0);
+
     controller.destroy();
+    expect(
+      controller
+        .getResourceOwners()
+        .every((owner) => owner.logicalBytes === 0 && owner.entries === 0),
+    ).toBe(true);
+    // Destroy above proves every datasource owner releases its retained state.
     store.dispose();
   });
   it("caps the full retained speculative union after partial-overlap viewport shifts", () => {

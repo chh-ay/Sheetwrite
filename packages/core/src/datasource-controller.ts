@@ -1,3 +1,4 @@
+import type { ResourceOwnerBytes } from "./resource-accounting.js";
 import type { SheetwriteStore } from "./store.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type { DataSourcePage, DataSourceRequest } from "./types/data.js";
@@ -633,6 +634,35 @@ export class DatasourceController {
     };
   }
 
+  /** On-demand, non-overlapping ownership for datasource state and pending work. */
+  getResourceOwners(): ResourceOwnerBytes[] {
+    const rowStateEntries =
+      this.loaded.bandCount + this.owners.bandCount + this.visibleWaitStarted.bandCount;
+    return [
+      {
+        owner: "js.datasource.row-state",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: rowStateEntries,
+        measurement: "entry-count-only",
+      },
+      {
+        owner: "js.datasource.pending-requests",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: this.requests.size + this.activeIds.size,
+        measurement: "entry-count-only",
+      },
+      {
+        owner: "js.datasource.wait-samples",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: this.visibleWaitDurations.length,
+        measurement: "entry-count-only",
+      },
+    ];
+  }
+
   resetTelemetry(): void {
     this.telemetry = emptyTelemetry();
     this.visibleWaitDurations.length = 0;
@@ -862,6 +892,7 @@ export class DatasourceController {
     this.loaded.clear();
     this.owners.clear();
     this.visibleWaitStarted.clear();
+    this.visibleWaitDurations.length = 0;
     this.lastViewport = null;
   }
 
