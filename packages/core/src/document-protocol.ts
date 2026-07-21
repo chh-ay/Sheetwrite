@@ -760,6 +760,7 @@ function requireNonNegativeInteger(
   path: string,
   errors: DocumentValidationError[],
   positive = false,
+  negativeIsOutOfBounds = false,
 ): number | undefined {
   const value = ownValue(record, key);
   if (nonNegativeInteger(value) && (!positive || value > 0)) return value;
@@ -767,6 +768,9 @@ function requireNonNegativeInteger(
     errors,
     `${path}.${key}`,
     `${key} must be a ${positive ? "positive" : "non-negative"} integer`,
+    negativeIsOutOfBounds && typeof value === "number" && Number.isInteger(value) && value < 0
+      ? "out-of-bounds"
+      : "invalid-value",
   );
   return undefined;
 }
@@ -824,8 +828,8 @@ function validateAddress(value: unknown, path: string, errors: DocumentValidatio
   const address = recordAt(value, path, errors);
   if (!address) return;
   requireString(address, "sheet", path, errors, true);
-  requireNonNegativeInteger(address, "row", path, errors);
-  requireNonNegativeInteger(address, "col", path, errors);
+  requireNonNegativeInteger(address, "row", path, errors, false, true);
+  requireNonNegativeInteger(address, "col", path, errors, false, true);
 }
 
 function validateRangeShape(value: unknown, path: string, errors: DocumentValidationError[]): void {
@@ -836,8 +840,8 @@ function validateRangeShape(value: unknown, path: string, errors: DocumentValida
     const coordinatePath = `${path}.${end}`;
     const coordinate = recordAt(ownValue(range, end), coordinatePath, errors);
     if (!coordinate) continue;
-    requireNonNegativeInteger(coordinate, "row", coordinatePath, errors);
-    requireNonNegativeInteger(coordinate, "col", coordinatePath, errors);
+    requireNonNegativeInteger(coordinate, "row", coordinatePath, errors, false, true);
+    requireNonNegativeInteger(coordinate, "col", coordinatePath, errors, false, true);
   }
 }
 

@@ -1939,7 +1939,7 @@ describe("paged datasource storage", () => {
   });
 });
 it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
-  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+  const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
     storage: "paged",
     dirtyCellLimit: 1,
   });
@@ -1951,12 +1951,47 @@ it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
       throw new Error("hostile getter");
     },
   });
+  const throwingAddr = Object.defineProperty(
+    { op: "set", value: { kind: "literal", value: 1 } },
+    "addr",
+    {
+      enumerable: true,
+      get: () => {
+        throw new Error("hostile addr getter");
+      },
+    },
+  );
+  const throwingRow = Object.defineProperty({ sheet: "s1", col: 0 }, "row", {
+    enumerable: true,
+    get: () => {
+      throw new Error("hostile row getter");
+    },
+  });
+  const throwingStartRow = Object.defineProperty({ col: 0 }, "row", {
+    enumerable: true,
+    get: () => {
+      throw new Error("hostile range row getter");
+    },
+  });
+  const throwingRangeRow = {
+    op: "setRangeStyle",
+    range: {
+      sheet: "s1",
+      start: throwingStartRow,
+      end: { row: 0, col: 0 },
+    },
+    style: { bold: true },
+  };
+
   for (const patch of [
     1,
     { op: "setRangeStyle", range: {}, style: { bold: true } },
     { op: "set", addr: addr(0, 0), value: { kind: "literal", value: Number.NaN } },
     cyclic,
     throwingAccessor,
+    throwingAddr,
+    { op: "set", addr: throwingRow, value: { kind: "literal", value: 1 } },
+    throwingRangeRow,
   ] as const) {
     expect(
       store.applyTransaction({
@@ -2089,6 +2124,120 @@ it("accounts for structural row and column ordering before admitting writes", ()
   expect(removedColumn.getWorkbook().sheets[0]!.columns[0]!.key).toBe("amount");
   expect(removedColumn.getCell(addr(0, 0)).resolved).toBe("replacement");
   removedColumn.dispose();
+  const outOfBoundsRow = makeLimited();
+  const rejectedOutOfBoundsRow = outOfBoundsRow.applyTransaction({
+    patches: [
+      { op: "removeRows", sheet: "s1", at: 4, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "must-not-apply" } },
+    ],
+  });
+  expect(rejectedOutOfBoundsRow).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+  expect(outOfBoundsRow.getCell(addr(0, 0)).resolved).toBe("A");
+  outOfBoundsRow.dispose();
+
+  const outOfBoundsColumn = makeLimited();
+  const rejectedOutOfBoundsColumn = outOfBoundsColumn.applyTransaction({
+    patches: [
+      { op: "removeColumns", sheet: "s1", at: 3, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "must-not-apply" } },
+    ],
+  });
+  expect(rejectedOutOfBoundsColumn).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+  expect(outOfBoundsColumn.getCell(addr(0, 0)).resolved).toBe("A");
+  outOfBoundsColumn.dispose();
+
+  const distantRebase = makeLimited();
+  distantRebase.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "dirty" } }],
+  });
+  const distantRow = 2_100_000;
+  const admittedDistantRebase = distantRebase.applyTransaction({
+    patches: [
+      { op: "addRows", sheet: "s1", at: 0, count: distantRow },
+      {
+        op: "set",
+        addr: addr(distantRow, 0),
+        value: { kind: "literal", value: "still-dirty" },
+      },
+    ],
+  });
+  expect(admittedDistantRebase).toMatchObject({ status: "applied", epoch: 2 });
+  expect(distantRebase.getCell(addr(distantRow, 0)).resolved).toBe("still-dirty");
+  expect(distantRebase.getPagedStats("s1").dirtyCells).toBe(1);
+  const distinctGap = distantRebase.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "overflow" } }],
+  });
+  expect(distinctGap).toMatchObject({ status: "rejected", epoch: 2 });
+  expect(distantRebase.getPagedStats("s1").dirtyCells).toBe(1);
+  distantRebase.dispose();
+  const negativeCount = makeLimited();
+  const rejectedNegativeCount = negativeCount.applyTransaction({
+    patches: [
+      { op: "addRows", sheet: "s1", at: 0, count: -1 } as DocumentOp,
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "must-not-apply" } },
+    ],
+  });
+  expect(rejectedNegativeCount).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+  expect(negativeCount.getCell(addr(0, 0)).resolved).toBe("A");
+  negativeCount.dispose();
+});
+
+it("counts rectangular rewrites and overlaps by distinct newly dirty cells", () => {
+  const makeLoaded = () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged" as const,
+      dirtyCellLimit: 2,
+    });
+    store.loadRows("s1", 0, [
+      { name: "A", amount: 1, city: "A" },
+      { name: "B", amount: 2, city: "B" },
+      { name: "C", amount: 3, city: "C" },
+      { name: "D", amount: 4, city: "D" },
+    ]);
+    return store;
+  };
+  const range = {
+    sheet: "s1",
+    start: { row: 0, col: 0 },
+    end: { row: 0, col: 1 },
+  };
+
+  const existing = makeLoaded();
+  existing.applyTransaction({
+    patches: [
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "first" } },
+      { op: "set", addr: addr(0, 1), value: { kind: "literal", value: "second" } },
+    ],
+  });
+  const rewritten = existing.applyTransaction({
+    patches: [{ op: "setRangeStyle", range, style: { bold: true } }],
+  });
+  expect(rewritten).toMatchObject({ status: "applied", epoch: 2 });
+  expect(existing.getPagedStats("s1").dirtyCells).toBe(2);
+  existing.dispose();
+
+  const overlapping = makeLoaded();
+  const admittedOverlap = overlapping.applyTransaction({
+    patches: [
+      { op: "setRangeStyle", range, style: { bold: true } },
+      { op: "clearRange", range, contents: true, style: false },
+    ],
+  });
+  expect(admittedOverlap).toMatchObject({ status: "applied", epoch: 1 });
+  expect(overlapping.getPagedStats("s1").dirtyCells).toBe(2);
+  overlapping.dispose();
 });
 
 it("rejects mixed clear/set growth atomically at the dirty limit", () => {

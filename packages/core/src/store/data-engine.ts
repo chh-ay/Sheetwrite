@@ -122,9 +122,10 @@ interface PagedDirtyPreflightState {
   handle: number;
   rows: number;
   cols: number;
+  columnKeys: string[];
   dirty: number;
   additional: number;
-  structural: boolean;
+  existing: Set<string> | null;
   seen: Set<string>;
 }
 
@@ -336,7 +337,9 @@ export class StoreDataEngine {
   pagedDirtyCapacityIssue(patches: readonly DocumentOp[]): MutationIssue | null {
     if (this.storageOptions.storage !== "paged") return null;
     const limit = this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT;
+    const wasmIndexLimit = 0xffff_ffff;
     const states = new Map<SheetId, PagedDirtyPreflightState>();
+    const keyOf = (row: number, col: number) => `${row}:${col}`;
     const stateFor = (sheet: SheetId) => {
       if (!this.handles.has(sheet)) return undefined;
       let state = states.get(sheet);
@@ -346,9 +349,10 @@ export class StoreDataEngine {
         handle: this.handleOf(sheet),
         rows: meta.rowCount,
         cols: meta.columns.length,
+        columnKeys: meta.columns.map((column) => column.key),
         dirty: this.getPagedStats(sheet).dirtyCells,
         additional: 0,
-        structural: false,
+        existing: null,
         seen: new Set<string>(),
       };
       states.set(sheet, state);
@@ -362,21 +366,69 @@ export class StoreDataEngine {
       max: limit,
       message: `Paged dirty cells exceed the ${limit} cell limit`,
     });
-    const consume = (state: PagedDirtyPreflightState, count: number): MutationIssue | null => {
-      if (!Number.isSafeInteger(count) || count < 0) return issue(Number.MAX_SAFE_INTEGER);
-      const actual = state.dirty + state.additional + count;
+    const invalid = (operationIndex: number, message: string): MutationIssue => ({
+      kind: "invalid-operation",
+      severity: "error",
+      operationIndex,
+      message,
+    });
+    const consume = (state: PagedDirtyPreflightState): MutationIssue | null => {
+      const actual = state.dirty + state.additional + 1;
       if (actual > limit) return issue(actual);
-      state.additional += count;
+      state.additional += 1;
       return null;
+    };
+    const materializeExisting = (state: PagedDirtyPreflightState) => {
+      if (state.existing) return;
+      const coordinates = this.wasm.pagedDirtyCoordinates(state.handle);
+      const existing = new Set<string>();
+      for (let index = 0; index + 1 < coordinates.length; index += 2) {
+        existing.add(keyOf(coordinates[index]!, coordinates[index + 1]!));
+      }
+      state.existing = existing;
+      state.dirty = existing.size;
+    };
+    const rebaseSet = (
+      source: ReadonlySet<string>,
+      rowAt: (row: number) => number | null,
+      colAt: (col: number) => number | null,
+    ) => {
+      const rebased = new Set<string>();
+      for (const encoded of source) {
+        const separator = encoded.indexOf(":");
+        const row = Number(encoded.slice(0, separator));
+        const col = Number(encoded.slice(separator + 1));
+        const nextRow = rowAt(row);
+        const nextCol = colAt(col);
+        if (nextRow !== null && nextCol !== null) rebased.add(keyOf(nextRow, nextCol));
+      }
+      return rebased;
+    };
+    const rebaseState = (
+      state: PagedDirtyPreflightState,
+      rowAt: (row: number) => number | null,
+      colAt: (col: number) => number | null,
+    ) => {
+      materializeExisting(state);
+      state.existing = rebaseSet(state.existing!, rowAt, colAt);
+      state.seen = rebaseSet(state.seen, rowAt, colAt);
+      state.dirty = state.existing.size;
+      state.additional = state.seen.size;
     };
     const addSparse = (sheet: SheetId, row: number, col: number): MutationIssue | null => {
       const state = stateFor(sheet);
       if (!state || row < 0 || col < 0 || row >= state.rows || col >= state.cols) return null;
-      const key = `${row}:${col}`;
+      const key = keyOf(row, col);
       if (state.seen.has(key)) return null;
-      state.seen.add(key);
-      if (!state.structural && this.wasm.cellState(state.handle, row, col) === 3) return null;
-      return consume(state, 1);
+      if (
+        state.existing?.has(key) ||
+        (state.existing === null && this.wasm.cellState(state.handle, row, col) === 3)
+      ) {
+        return null;
+      }
+      const rejection = consume(state);
+      if (!rejection) state.seen.add(key);
+      return rejection;
     };
     const addRectangle = (
       sheet: SheetId,
@@ -388,6 +440,7 @@ export class StoreDataEngine {
       if (rows === 1 && cols === 1) return addSparse(sheet, startRow, startCol);
       const state = stateFor(sheet);
       if (!state) return null;
+      if (startRow < 0 || startCol < 0) return null;
       if (
         !Number.isSafeInteger(rows) ||
         !Number.isSafeInteger(cols) ||
@@ -397,10 +450,25 @@ export class StoreDataEngine {
       ) {
         return issue(Number.MAX_SAFE_INTEGER);
       }
-      return consume(state, rows * cols);
+      if (rows > state.rows - startRow || cols > state.cols - startCol) {
+        const actual = state.dirty + state.additional + rows * cols;
+        return actual > limit ? issue(actual) : null;
+      }
+      materializeExisting(state);
+      for (let row = startRow; row < startRow + rows; row++) {
+        for (let col = startCol; col < startCol + cols; col++) {
+          const key = keyOf(row, col);
+          if (state.existing!.has(key) || state.seen.has(key)) continue;
+          const rejection = consume(state);
+          if (rejection) return rejection;
+          state.seen.add(key);
+        }
+      }
+      return null;
     };
 
-    for (const patch of patches) {
+    for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
+      const patch = patches[operationIndex]!;
       const sheet = patchSheetId(patch);
       if (
         sheet !== null &&
@@ -412,46 +480,72 @@ export class StoreDataEngine {
           patch.op === "moveColumns")
       ) {
         const state = stateFor(sheet);
-        if (state) {
-          if (patch.op === "addRows") {
-            if (patch.count > Number.MAX_SAFE_INTEGER - state.rows) {
-              return issue(Number.MAX_SAFE_INTEGER);
-            }
-            state.rows += patch.count;
-          } else if (patch.op === "removeRows") {
-            const start = Math.min(patch.at, state.rows);
-            const removed = Math.min(patch.count, state.rows - start);
-            if (!state.structural) {
-              state.dirty -= this.wasm.pagedDirtyCellsInRange(
-                state.handle,
-                start,
-                start + removed,
-                0,
-                state.cols,
-              );
-            }
-            state.rows -= removed;
-          } else if (patch.op === "addColumns") {
-            if (patch.columns.length > Number.MAX_SAFE_INTEGER - state.cols) {
-              return issue(Number.MAX_SAFE_INTEGER);
-            }
-            state.cols += patch.columns.length;
-          } else if (patch.op === "removeColumns") {
-            const start = Math.min(patch.at, state.cols);
-            const removed = Math.min(patch.count, state.cols - start);
-            if (!state.structural) {
-              state.dirty -= this.wasm.pagedDirtyCellsInRange(
-                state.handle,
-                0,
-                state.rows,
-                start,
-                start + removed,
-              );
-            }
-            state.cols -= removed;
+        if (!state) continue;
+        const keep = (index: number) => index;
+        if (patch.op === "addRows") {
+          if (patch.at > state.rows || patch.count > wasmIndexLimit - state.rows) {
+            return invalid(operationIndex, "addRows exceeds the current sheet bounds");
           }
-          state.structural = true;
-          state.seen.clear();
+          rebaseState(state, (row) => (row >= patch.at ? row + patch.count : row), keep);
+          state.rows += patch.count;
+        } else if (patch.op === "removeRows") {
+          if (patch.at > state.rows || patch.count > state.rows - patch.at) {
+            return invalid(operationIndex, "removeRows exceeds the current sheet bounds");
+          }
+          rebaseState(
+            state,
+            (row) =>
+              row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
+            keep,
+          );
+          state.rows -= patch.count;
+        } else if (patch.op === "moveRows") {
+          if (
+            patch.from > state.rows ||
+            patch.count > state.rows - patch.from ||
+            patch.to > state.rows - patch.count
+          ) {
+            return invalid(operationIndex, "moveRows exceeds the current sheet bounds");
+          }
+          rebaseState(state, (row) => moveIndex(row, patch.from, patch.count, patch.to), keep);
+        } else if (patch.op === "addColumns") {
+          const insertedKeys = patch.columns.map((column) => column.key);
+          if (
+            patch.at > state.cols ||
+            insertedKeys.length === 0 ||
+            insertedKeys.length > wasmIndexLimit - state.cols ||
+            new Set([...state.columnKeys, ...insertedKeys]).size !==
+              state.columnKeys.length + insertedKeys.length
+          ) {
+            return invalid(operationIndex, "addColumns exceeds the current sheet bounds");
+          }
+          rebaseState(state, keep, (col) => (col >= patch.at ? col + patch.columns.length : col));
+          state.cols += patch.columns.length;
+          state.columnKeys.splice(patch.at, 0, ...insertedKeys);
+        } else if (patch.op === "removeColumns") {
+          if (
+            patch.at > state.cols ||
+            patch.count > state.cols - patch.at ||
+            patch.count === state.cols
+          ) {
+            return invalid(operationIndex, "removeColumns exceeds the current sheet bounds");
+          }
+          rebaseState(state, keep, (col) =>
+            col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
+          );
+          state.cols -= patch.count;
+          state.columnKeys.splice(patch.at, patch.count);
+        } else {
+          if (
+            patch.from > state.cols ||
+            patch.count > state.cols - patch.from ||
+            patch.to > state.cols - patch.count
+          ) {
+            return invalid(operationIndex, "moveColumns exceeds the current sheet bounds");
+          }
+          rebaseState(state, keep, (col) => moveIndex(col, patch.from, patch.count, patch.to));
+          const movedKeys = state.columnKeys.splice(patch.from, patch.count);
+          state.columnKeys.splice(patch.to, 0, ...movedKeys);
         }
         continue;
       }

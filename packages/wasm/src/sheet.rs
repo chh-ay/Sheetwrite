@@ -536,19 +536,15 @@ impl PagedStorage {
         entries
     }
 
-    fn dirty_cells_in_range(
-        &self,
-        start_row: usize,
-        end_row: usize,
-        start_col: usize,
-        end_col: usize,
-    ) -> usize {
-        self.dirty
-            .keys()
-            .filter(|&&(row, col)| {
-                row >= start_row && row < end_row && col >= start_col && col < end_col
-            })
-            .count()
+    fn dirty_coordinates(&self) -> Vec<f64> {
+        let mut coordinates = Vec::with_capacity(self.dirty.len().saturating_mul(2));
+        let mut keys: Vec<_> = self.dirty.keys().copied().collect();
+        keys.sort_unstable();
+        for (row, col) in keys {
+            coordinates.push(row as f64);
+            coordinates.push(col as f64);
+        }
+        coordinates
     }
 
     fn byte_len(&self) -> usize {
@@ -835,16 +831,10 @@ impl SheetData {
             .and_then(|paged| paged.dirty_revision(row, col))
     }
 
-    pub(crate) fn dirty_cells_in_range(
-        &self,
-        start_row: usize,
-        end_row: usize,
-        start_col: usize,
-        end_col: usize,
-    ) -> usize {
-        self.paged.as_ref().map_or(0, |paged| {
-            paged.dirty_cells_in_range(start_row, end_row, start_col, end_col)
-        })
+    pub(crate) fn dirty_coordinates(&self) -> Vec<f64> {
+        self.paged
+            .as_ref()
+            .map_or_else(Vec::new, PagedStorage::dirty_coordinates)
     }
 
     pub(crate) fn mark_range_clean(

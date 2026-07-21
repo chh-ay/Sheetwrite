@@ -298,18 +298,11 @@ impl CellStore {
                 .is_some_and(|data| data.contains_cell(row, col) && data.can_dirty_cell(row, col))
     }
 
-    #[wasm_bindgen(js_name = pagedDirtyCellsInRange)]
-    pub fn paged_dirty_cells_in_range(
-        &self,
-        sheet: usize,
-        start_row: usize,
-        end_row: usize,
-        start_col: usize,
-        end_col: usize,
-    ) -> usize {
-        self.sheets.get(sheet).map_or(0, |data| {
-            data.dirty_cells_in_range(start_row, end_row, start_col, end_col)
-        })
+    #[wasm_bindgen(js_name = pagedDirtyCoordinates)]
+    pub fn paged_dirty_coordinates(&self, sheet: usize) -> Vec<f64> {
+        self.sheets
+            .get(sheet)
+            .map_or_else(Vec::new, SheetData::dirty_coordinates)
     }
 
     #[wasm_bindgen(js_name = dirtyRevision)]
