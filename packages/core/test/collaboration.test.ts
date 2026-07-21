@@ -161,9 +161,9 @@ describe("presence coordinator", () => {
         sentAt: 1_000,
       },
     ]);
-    const presenceRects = right.host.querySelectorAll('[data-sheetwrite-presence="left"]');
-    expect(presenceRects.length).toBeGreaterThan(0);
-    expect(presenceRects[0]?.getAttribute("title")).toBe("Left User");
+    const presenceLabels = right.host.querySelectorAll('[data-sheetwrite-presence-label="left"]');
+    expect(presenceLabels.length).toBeGreaterThan(0);
+    expect(presenceLabels[0]?.getAttribute("title")).toBe("Left User");
     expect(right.grid.exportSnapshot()).toEqual(before);
 
     now = 1_101;

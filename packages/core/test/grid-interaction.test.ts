@@ -264,25 +264,45 @@ describe("merge repaint invalidation", () => {
 describe("datasource repaint invalidation", () => {
   it("paints loaded values when an async page resolves without another interaction", async () => {
     const { promise, resolve } = Promise.withResolvers<DataSourcePage>();
+    let requested: { start: number; end: number } | undefined;
     const workbook = makeWorkbook(20);
     const host = mountHost();
     const grid = new GridImpl(host, {
       workbook,
-      datasource: { getRows: () => promise },
+      datasource: {
+        getRows: (request) => {
+          if (requested) {
+            return Promise.resolve({
+              start: request.start,
+              rows: Array.from({ length: request.end - request.start }, (_, row) => ({
+                name: `Loaded ${request.start + row}`,
+                amount: request.start + row,
+                city: "Tokyo",
+              })),
+            });
+          }
+          requested = request;
+          return promise;
+        },
+      },
     });
     const recorder = makePaintRecorder();
     Reflect.set(grid, "renderer", recorder);
 
+    if (!requested) throw new Error("datasource request was not issued");
+    const viewportRequest = requested;
     resolve({
-      start: 0,
-      rows: Array.from({ length: 20 }, (_, row) => ({
-        name: `Loaded ${row}`,
-        amount: row,
+      start: viewportRequest.start,
+      rows: Array.from({ length: viewportRequest.end - viewportRequest.start }, (_, row) => ({
+        name: `Loaded ${viewportRequest.start + row}`,
+        amount: viewportRequest.start + row,
         city: "Tokyo",
       })),
     });
     await promise;
-    await Promise.resolve();
+    await new Promise<void>((resolveFrame) => {
+      requestAnimationFrame(() => resolveFrame());
+    });
 
     expect(recorder.paints.some((paint) => paint.values.includes("Loaded 0"))).toBe(true);
     grid.destroy();
