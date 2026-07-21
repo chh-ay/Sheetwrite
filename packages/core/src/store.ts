@@ -8,6 +8,12 @@ import {
   validateTransactionResources,
   validateDocumentOperationShape,
 } from "./document-protocol.js";
+import type {
+  RuntimeMemoryObservation,
+  RuntimeResourceOperation,
+  RuntimeResourcePhase,
+  RuntimeResourceSnapshot,
+} from "./resource-accounting.js";
 import {
   type CompactRangeHistory,
   IncompleteDataError,
@@ -168,6 +174,22 @@ export class SheetwriteStore implements Store {
 
   resetRangeMutationAllocationStats(): void {
     this.engine.resetRangeMutationAllocationStats();
+  }
+
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot {
+    return this.engine.getRuntimeResourceSnapshot(operation, phase, runtime);
+  }
+
+  resetRuntimeResourceAccounting(): void {
+    this.engine.resetRuntimeResourceAccounting();
+  }
+
+  withResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
+    return this.engine.withResourceOperation(operation, run);
   }
 
   isPaged(sheet: SheetId): boolean {

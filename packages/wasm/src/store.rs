@@ -7,6 +7,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{parse, resolve_named_ranges, resolve_sheet_refs, shift_range, NamedRangeRef};
 use crate::eval::DepIndex;
+use crate::memory::{
+    StoreMemoryStats, DEPENDENCY_EDGES, DEPENDENCY_NODES, SHEET_INDEXES_METADATA, STRING_INDEX,
+    STRING_POOL_SPANS, STRING_POOL_UTF8,
+};
 use crate::sheet::{
     encode_num, encode_str_id, formula_error_at, payload_num, payload_str_id, CondPred, CondRule,
     SheetData, DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
@@ -269,6 +273,23 @@ impl CellStore {
             if data.is_fully_loaded() { 1.0 } else { 0.0 },
             dirty_bytes as f64,
         ]
+    }
+
+    #[wasm_bindgen(js_name = memoryStats)]
+    pub fn memory_stats(&self) -> Vec<f64> {
+        self.store_memory_stats().encode()
+    }
+
+    #[wasm_bindgen(js_name = wasmCommittedBytes)]
+    pub fn wasm_committed_bytes(&self) -> usize {
+        #[cfg(target_arch = "wasm32")]
+        {
+            core::arch::wasm32::memory_size::<0>().saturating_mul(65_536)
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            0
+        }
     }
 
     /// 0 unloaded, 1 loaded-empty, 2 loaded-value, 3 dirty local edit.
@@ -1617,6 +1638,62 @@ impl Default for CellStore {
 }
 
 impl CellStore {
+    fn store_memory_stats(&self) -> StoreMemoryStats {
+        let mut stats = StoreMemoryStats::default();
+        for sheet in &self.sheets {
+            sheet.add_memory_stats(&mut stats);
+        }
+
+        let (utf8, spans) = self.strings.memory_stats();
+        stats.owner_mut(STRING_POOL_UTF8).add(utf8);
+        stats.owner_mut(STRING_POOL_SPANS).add(spans);
+
+        let string_index = stats.owner_mut(STRING_INDEX);
+        string_index.add_hash_table::<u64, InternSlot>(
+            self.string_lookup.len(),
+            self.string_lookup.capacity(),
+        );
+        for slot in self.string_lookup.values() {
+            if let InternSlot::Many(ids) = slot {
+                string_index.add_payload(
+                    ids.len().saturating_mul(std::mem::size_of::<u32>()),
+                    ids.capacity().saturating_mul(std::mem::size_of::<u32>()),
+                );
+            }
+        }
+
+        if let Some(index) = &self.dep_index {
+            let (nodes, edges) = index.memory_stats();
+            stats.owner_mut(DEPENDENCY_NODES).add(nodes);
+            stats.owner_mut(DEPENDENCY_EDGES).add(edges);
+        }
+
+        let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
+        metadata.add_payload(std::mem::size_of::<CellStore>(), std::mem::size_of::<CellStore>());
+        metadata.add_vec::<SheetData>(self.sheets.len(), self.sheets.capacity());
+        metadata.add_vec::<String>(self.sheet_names.len(), self.sheet_names.capacity());
+        for name in &self.sheet_names {
+            metadata.add_payload(name.len(), name.capacity());
+        }
+        metadata.add_vec::<bool>(self.sheet_alive.len(), self.sheet_alive.capacity());
+        metadata.add_hash_table::<String, usize>(
+            self.sheet_lookup.len(),
+            self.sheet_lookup.capacity(),
+        );
+        for name in self.sheet_lookup.keys() {
+            metadata.add_payload(name.len(), name.capacity());
+        }
+        metadata.add_hash_table::<(Option<u32>, String), NamedRangeRef>(
+            self.named_ranges.len(),
+            self.named_ranges.capacity(),
+        );
+        for ((_, key), value) in &self.named_ranges {
+            metadata.add_payload(key.len(), key.capacity());
+            metadata.add_payload(value.name.len(), value.name.capacity());
+        }
+        stats
+    }
+
     pub(crate) fn try_add_sheet(
         &mut self,
         n_cols: usize,

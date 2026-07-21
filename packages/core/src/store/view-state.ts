@@ -1,3 +1,4 @@
+import type { ResourceOwnerBytes } from "../resource-accounting.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/document.js";
@@ -183,6 +184,49 @@ export class StoreViewState {
     this.stateBySheet.delete(sheet);
     this.orderBySheet.delete(sheet);
     this.rowIndexBySheet.delete(sheet);
+  }
+
+  resourceOwners(): ResourceOwnerBytes[] {
+    let orderBytes = 0;
+    let orderEntries = 0;
+    for (const order of this.orderBySheet.values()) {
+      orderBytes += order.byteLength;
+      orderEntries += order.length;
+    }
+    let inverseBytes = 0;
+    let inverseEntries = 0;
+    for (const index of this.rowIndexBySheet.values()) {
+      inverseBytes += index.rows.byteLength;
+      inverseEntries += index.rows.length;
+    }
+    let configEntries = 0;
+    for (const state of this.stateBySheet.values()) {
+      configEntries +=
+        state.sortKeys.length + state.filters.size + state.hiddenRows.size + state.groups.length;
+    }
+    return [
+      {
+        owner: "js.view.order",
+        logicalBytes: orderBytes,
+        allocatedBytes: orderBytes,
+        entries: orderEntries,
+        measurement: "typed-array-byte-length",
+      },
+      {
+        owner: "js.view.inverse-index",
+        logicalBytes: inverseBytes,
+        allocatedBytes: inverseBytes,
+        entries: inverseEntries,
+        measurement: "typed-array-byte-length",
+      },
+      {
+        owner: "js.view.configuration",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: configEntries,
+        measurement: "entry-count-only",
+      },
+    ];
   }
 
   dispose(): void {

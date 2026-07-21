@@ -1,3 +1,4 @@
+import type { ResourceOwnerBytes } from "./resource-accounting.js";
 import type { CellStyle } from "./types/cell.js";
 
 const EMPTY: CellStyle = {};
@@ -34,5 +35,31 @@ export class StyleDictionary {
 
   get table(): readonly CellStyle[] {
     return this.styles;
+  }
+
+  resourceOwners(): ResourceOwnerBytes[] {
+    let keyBytes = 0;
+    for (const key of this.lookup.keys()) keyBytes += key.length * 2;
+    return [
+      {
+        owner: "js.style-dictionary.values",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: this.styles.length,
+        measurement: "entry-count-only",
+      },
+      {
+        owner: "js.style-dictionary.keys",
+        logicalBytes: keyBytes,
+        allocatedBytes: keyBytes,
+        entries: this.lookup.size,
+        measurement: "utf16-upper-bound",
+      },
+    ];
+  }
+
+  clear(): void {
+    this.styles.length = 1;
+    this.lookup.clear();
   }
 }

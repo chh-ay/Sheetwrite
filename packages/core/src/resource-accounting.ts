@@ -175,16 +175,35 @@ export class BoundaryResourceAccounting {
     bytes: number,
     kind: BoundaryTransferKind,
     calls = 1,
+    largestTransferBytes = bytes,
   ): void {
     assertNonNegativeSafeInteger(bytes, "boundary bytes");
     assertNonNegativeSafeInteger(calls, "boundary calls");
+    assertNonNegativeSafeInteger(largestTransferBytes, "largest boundary transfer bytes");
     const counter = this.counters[OPERATION_INDEX[operation]]!;
-    counter.ffiCalls += calls;
-    if (direction === "js-to-wasm") counter.jsToWasmBytes += bytes;
-    else counter.wasmToJsBytes += bytes;
-    counter.largestTransferBytes = Math.max(counter.largestTransferBytes, bytes);
-    if (kind === "bulk") counter.bulkCalls += calls;
-    else counter.scalarCalls += calls;
+    const nextFfiCalls = safeCounterSum(counter.ffiCalls, calls, "boundary FFI calls");
+    const nextJsToWasm =
+      direction === "js-to-wasm"
+        ? safeCounterSum(counter.jsToWasmBytes, bytes, "JS-to-WASM bytes")
+        : counter.jsToWasmBytes;
+    const nextWasmToJs =
+      direction === "wasm-to-js"
+        ? safeCounterSum(counter.wasmToJsBytes, bytes, "WASM-to-JS bytes")
+        : counter.wasmToJsBytes;
+    const nextBulkCalls =
+      kind === "bulk"
+        ? safeCounterSum(counter.bulkCalls, calls, "bulk boundary calls")
+        : counter.bulkCalls;
+    const nextScalarCalls =
+      kind === "scalar"
+        ? safeCounterSum(counter.scalarCalls, calls, "scalar boundary calls")
+        : counter.scalarCalls;
+    counter.ffiCalls = nextFfiCalls;
+    counter.jsToWasmBytes = nextJsToWasm;
+    counter.wasmToJsBytes = nextWasmToJs;
+    counter.largestTransferBytes = Math.max(counter.largestTransferBytes, largestTransferBytes);
+    counter.bulkCalls = nextBulkCalls;
+    counter.scalarCalls = nextScalarCalls;
   }
 
   reset(): void {
@@ -240,7 +259,9 @@ export function decodeStoreMemoryStats(
       allocatedBytes,
       entries,
       measurement:
-        index === 8 || index === 11 || index >= 12 ? "hash-capacity-v1" : "exact-capacity",
+        index === 8 || index === 11 || index === 12 || index === 13 || index === 15
+          ? "hash-capacity-v1"
+          : "exact-capacity",
     });
   }
   const logicalLiveBytes = encoded[encoded.length - 2]!;
@@ -264,6 +285,14 @@ export function decodeStoreMemoryStats(
     allocatorMarginBytes: null,
     unaccountedBytes: 0,
   };
+}
+
+export function emptyStoreMemoryStats(wasmCommittedBytes: number | null): StoreMemoryBreakdown {
+  const encoded = new Float64Array(5 + WASM_MEMORY_OWNERS.length * 3);
+  encoded[0] = STORE_MEMORY_PROTOCOL_VERSION;
+  encoded[1] = WASM_MEMORY_OWNERS.length;
+  encoded[2] = STORE_MEMORY_HASH_ESTIMATE_VERSION;
+  return decodeStoreMemoryStats(encoded, wasmCommittedBytes);
 }
 
 export function createRuntimeResourceSnapshot(input: {
@@ -426,6 +455,12 @@ function assertNonNegativeSafeInteger(value: number, name: string): void {
 
 function finiteObservation(value: number | undefined): number | null {
   return value !== undefined && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+function safeCounterSum(current: number, increment: number, name: string): number {
+  const value = current + increment;
+  if (!Number.isSafeInteger(value)) throw new Error(`${name} exceeded Number.MAX_SAFE_INTEGER`);
+  return value;
 }
 
 function nullableDelta(before: number | null, after: number | null): number | null {

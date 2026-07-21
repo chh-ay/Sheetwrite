@@ -106,6 +106,7 @@ export {
   createRuntimeResourceSnapshot,
   decodeStoreMemoryStats,
   diffRuntimeResourcePhases,
+  emptyStoreMemoryStats,
   observeRuntimeMemory,
   type ResourceOwnerBytes,
   RUNTIME_RESOURCE_SCHEMA_VERSION,

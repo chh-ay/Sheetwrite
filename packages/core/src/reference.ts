@@ -28,6 +28,14 @@ export type LiteralLookup = (addr: CellAddress) => CellScalar;
  * cache so the render path reads cached scalars instead of walking the graph.
  * Resolution follows ref chains and returns `REF_CYCLE` on a cycle.
  */
+export interface ReferenceGraphResourceStats {
+  readonly references: number;
+  readonly targetKeys: number;
+  readonly reverseTargets: number;
+  readonly reverseEdges: number;
+  readonly cachedValues: number;
+}
+
 export class ReferenceGraph {
   private target = new Map<string, CellAddress>();
   private targetKey = new Map<string, string>();
@@ -68,6 +76,25 @@ export class ReferenceGraph {
   /** Snapshot all live references as `[source, target]` pairs. */
   entries(): Array<[CellAddress, CellAddress]> {
     return [...this.entryIterator()];
+  }
+
+  getResourceStats(): ReferenceGraphResourceStats {
+    let reverseEdges = 0;
+    for (const dependents of this.dependents.values()) reverseEdges += dependents.size;
+    return {
+      references: this.target.size,
+      targetKeys: this.targetKey.size,
+      reverseTargets: this.dependents.size,
+      reverseEdges,
+      cachedValues: this.cache.size,
+    };
+  }
+
+  clear(): void {
+    this.target.clear();
+    this.targetKey.clear();
+    this.dependents.clear();
+    this.cache.clear();
   }
 
   /** Re-resolve every live reference after an external formula barrier. */

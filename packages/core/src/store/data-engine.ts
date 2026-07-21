@@ -2,6 +2,17 @@ import { CellStore, isLoaded, type RangeSnapshot } from "@sheetwrite/wasm";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { dateToSerial } from "../date-serial.js";
 import { cellKey, type LiteralLookup, parseCellKey, ReferenceGraph } from "../reference.js";
+import {
+  BoundaryResourceAccounting,
+  createRuntimeResourceSnapshot,
+  decodeStoreMemoryStats,
+  emptyStoreMemoryStats,
+  type ResourceOwnerBytes,
+  type RuntimeMemoryObservation,
+  type RuntimeResourceOperation,
+  type RuntimeResourcePhase,
+  type RuntimeResourceSnapshot,
+} from "../resource-accounting.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import type {
   CellFormat,
@@ -166,6 +177,10 @@ export class StoreDataEngine {
   private readonly view: StoreViewState;
   private readonly windowReader: StoreWindowReader;
   private readonly snapshotCodec: StoreSnapshotCodec;
+  private readonly boundaryAccounting = new BoundaryResourceAccounting();
+  private resourceOperation: RuntimeResourceOperation | null = "startup";
+  private disposed = false;
+  private committedBytesAfterDispose: number | null = null;
   private readonly rangeMutationStats = {
     documentOperations: 0,
     jsPatchObjects: 0,
@@ -190,6 +205,7 @@ export class StoreDataEngine {
     this.workbook = workbook;
     this.storageOptions = options;
     this.wasm = new CellStore() as RecomputingCellStore;
+    this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, workbook, this.handles);
     this.windowReader = new StoreWindowReader(this.wasm, workbook, this.handles, this.styles);
     this.snapshotCodec = new StoreSnapshotCodec(
@@ -200,6 +216,12 @@ export class StoreDataEngine {
     );
     for (const sheet of workbook.sheets) {
       const handle = this.allocateSheet(sheet.columns.length, sheet.rowCount);
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "startup",
+        "js-to-wasm",
+        (sheet.id.length + sheet.name.length) * 2,
+        "scalar",
+      );
       this.wasm.setSheetName(handle, sheet.id, sheet.name);
       this.handles.set(sheet.id, handle);
     }
@@ -209,7 +231,10 @@ export class StoreDataEngine {
         throw new Error(`invalid named range: ${namedRange.name}`);
       }
     }
-    if (data) this.loadColumnar(workbook.activeSheet, data);
+    if (data) {
+      this.withResourceOperation("ingest", () => this.loadColumnar(workbook.activeSheet, data));
+    }
+    this.resourceOperation = null;
   }
 
   /** Internal allocation counters for deterministic range-mutation gates. */
@@ -228,11 +253,118 @@ export class StoreDataEngine {
     }
   }
 
-  private noteRangeMutationFfi(transferredArrayLength = 0): void {
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot {
+    let wasm;
+    if (this.disposed) {
+      wasm = emptyStoreMemoryStats(this.committedBytesAfterDispose);
+    } else {
+      const committed = this.wasm.wasmCommittedBytes();
+      wasm = decodeStoreMemoryStats(this.wasm.memoryStats(), committed > 0 ? committed : null);
+    }
+    return createRuntimeResourceSnapshot({
+      operation,
+      phase,
+      wasm,
+      jsOwners: this.disposed ? [] : this.resourceOwners(),
+      boundary: this.boundaryAccounting.snapshot(),
+      runtime,
+    });
+  }
+
+  resetRuntimeResourceAccounting(): void {
+    this.boundaryAccounting.reset();
+  }
+
+  withResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
+    const previous = this.resourceOperation;
+    this.resourceOperation = operation;
+    try {
+      return run();
+    } finally {
+      this.resourceOperation = previous;
+    }
+  }
+
+  private resourceOwners(): ResourceOwnerBytes[] {
+    let formulaSourceBytes = 0;
+    for (const [key, value] of this.formulaSrc) {
+      formulaSourceBytes += (key.length + value.length) * 2;
+    }
+    const refs = this.refs.getResourceStats();
+    return [
+      {
+        owner: "js.store.sheet-handles",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: this.handles.size,
+        measurement: "entry-count-only",
+      },
+      {
+        owner: "js.store.formula-sources",
+        logicalBytes: formulaSourceBytes,
+        allocatedBytes: formulaSourceBytes,
+        entries: this.formulaSrc.size,
+        measurement: "utf16-upper-bound",
+      },
+      {
+        owner: "js.store.reference-graph",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries:
+          refs.references +
+          refs.targetKeys +
+          refs.reverseTargets +
+          refs.reverseEdges +
+          refs.cachedValues,
+        measurement: "entry-count-only",
+      },
+      ...this.styles.resourceOwners(),
+      ...this.view.resourceOwners(),
+      ...this.windowReader.resourceOwners(),
+    ];
+  }
+
+  private recordWindowBoundary(
+    window: VisibleWindowView,
+    fallbackOperation: RuntimeResourceOperation,
+  ): void {
+    const operation = this.resourceOperation ?? fallbackOperation;
+    const calls = window.ffiBoundaryCalls ?? window.ffiCalls ?? 0;
+    const largest = window.ffiLargestTransferBytes ?? 0;
+    this.boundaryAccounting.record(
+      operation,
+      "js-to-wasm",
+      window.ffiInputBytes ?? 0,
+      "bulk",
+      calls,
+      largest,
+    );
+    this.boundaryAccounting.record(
+      operation,
+      "wasm-to-js",
+      window.ffiOutputBytes ?? 0,
+      "bulk",
+      0,
+      largest,
+    );
+  }
+
+  private noteRangeMutationFfi(transferredArrayLength = 0, transferredBytes?: number): void {
     this.rangeMutationStats.ffiCalls += 1;
     this.rangeMutationStats.maxTransferredArrayLength = Math.max(
       this.rangeMutationStats.maxTransferredArrayLength,
       transferredArrayLength,
+    );
+    const bytes = transferredBytes ?? transferredArrayLength * Uint32Array.BYTES_PER_ELEMENT;
+    this.boundaryAccounting.record(
+      this.resourceOperation ?? "edit",
+      "js-to-wasm",
+      bytes,
+      transferredArrayLength > 0 ? "bulk" : "scalar",
     );
   }
 
@@ -248,6 +380,12 @@ export class StoreDataEngine {
 
   private syncNamedRange(namedRange: NamedRangeSnapshot): boolean {
     const range = normalizedRange(namedRange.range);
+    this.boundaryAccounting.record(
+      this.resourceOperation ?? "edit",
+      "js-to-wasm",
+      namedRange.name.length * 2,
+      "scalar",
+    );
     return this.wasm.setNamedRange(
       namedRange.name,
       this.namedRangeScope(namedRange.scope),
@@ -268,15 +406,18 @@ export class StoreDataEngine {
   }
 
   private allocateSheet(columns: number, rows: number): number {
-    return this.storageOptions.storage === "paged"
-      ? this.wasm.addPagedSheet(
-          columns,
-          rows,
-          this.storageOptions.chunkRows ?? DEFAULT_PAGED_CHUNK_ROWS,
-          this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES,
-          this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
-        )
-      : this.wasm.addSheet(columns, rows);
+    const handle =
+      this.storageOptions.storage === "paged"
+        ? this.wasm.addPagedSheet(
+            columns,
+            rows,
+            this.storageOptions.chunkRows ?? DEFAULT_PAGED_CHUNK_ROWS,
+            this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES,
+            this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
+          )
+        : this.wasm.addSheet(columns, rows);
+    this.boundaryAccounting.record(this.resourceOperation ?? "edit", "js-to-wasm", 0, "scalar");
+    return handle;
   }
 
   isPaged(sheet: SheetId): boolean {
@@ -1092,7 +1233,9 @@ export class StoreDataEngine {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
-    return this.windowReader.read(sheet, rows, cols, this.view.order(sheet), true);
+    const window = this.windowReader.read(sheet, rows, cols, this.view.order(sheet), true);
+    this.recordWindowBoundary(window, "scroll");
+    return window;
   }
 
   getDataWindow(
@@ -1100,7 +1243,9 @@ export class StoreDataEngine {
     rows: { start: number; end: number },
     cols: readonly number[],
   ): VisibleWindowView {
-    return this.windowReader.read(sheet, rows, cols, undefined, false);
+    const window = this.windowReader.read(sheet, rows, cols, undefined, false);
+    this.recordWindowBoundary(window, "scroll");
+    return window;
   }
 
   getClipboardWindow(
@@ -1124,6 +1269,7 @@ export class StoreDataEngine {
       order,
       false,
     );
+    this.recordWindowBoundary(window, "export");
     const formulas: Array<{ offset: number; source: string }> = [];
     const refs: Array<{ offset: number; target: CellAddress }> = [];
     for (let rowIndex = 0; rowIndex < dataRows.length; rowIndex++) {
@@ -2547,6 +2693,9 @@ export class StoreDataEngine {
     protect?: (addr: CellAddress) => boolean,
   ): void {
     if (rows.length === 0) return;
+    const previousOperation = this.resourceOperation;
+    this.resourceOperation ??= "ingest";
+    this.boundaryAccounting.record("ingest", "js-to-wasm", 0, "scalar");
     this.wasm.beginPageLoad();
     try {
       const handle = this.handleOf(sheet);
@@ -2584,12 +2733,15 @@ export class StoreDataEngine {
       }
 
       for (const patch of exceptions) this.applyPatch(patch, null);
+      this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
       this.wasm.recompute(handle);
       if (this.refs.hasRefs()) {
         this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
       }
     } finally {
+      this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
       this.wasm.endPageLoad();
+      this.resourceOperation = previousOperation;
     }
   }
 
@@ -2678,8 +2830,18 @@ export class StoreDataEngine {
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
   dispose(): void {
+    if (this.disposed) return;
+    const committed = this.wasm.wasmCommittedBytes();
+    this.committedBytesAfterDispose = committed > 0 ? committed : null;
+    this.boundaryAccounting.record("teardown", "js-to-wasm", 0, "scalar");
     this.view.dispose();
+    this.windowReader.clear();
+    this.styles.clear();
+    this.refs.clear();
+    this.formulaSrc.clear();
+    this.handles.clear();
     this.wasm.free();
+    this.disposed = true;
   }
 
   private clearHydratedMetadata(
@@ -2690,6 +2852,7 @@ export class StoreDataEngine {
     protectedByColumn: readonly Uint32Array[],
   ): void {
     const end = start + rowCount;
+    let cellStateCalls = 0;
     for (const key of this.formulaSrc.keys()) {
       const address = parseCellKey(key);
       if (
@@ -2701,12 +2864,9 @@ export class StoreDataEngine {
         continue;
       }
       const offset = address.row - start;
-      if (
-        hasSortedOffset(protectedByColumn[address.col]!, offset) ||
-        this.wasm.cellState(handle, address.row, address.col) === 3
-      ) {
-        continue;
-      }
+      if (hasSortedOffset(protectedByColumn[address.col]!, offset)) continue;
+      cellStateCalls += 1;
+      if (this.wasm.cellState(handle, address.row, address.col) === 3) continue;
       this.formulaSrc.delete(key);
     }
     for (const [address] of this.refs.entries()) {
@@ -2719,13 +2879,19 @@ export class StoreDataEngine {
         continue;
       }
       const offset = address.row - start;
-      if (
-        hasSortedOffset(protectedByColumn[address.col]!, offset) ||
-        this.wasm.cellState(handle, address.row, address.col) === 3
-      ) {
-        continue;
-      }
+      if (hasSortedOffset(protectedByColumn[address.col]!, offset)) continue;
+      cellStateCalls += 1;
+      if (this.wasm.cellState(handle, address.row, address.col) === 3) continue;
       this.refs.removeRef(cellKey(address));
+    }
+    if (cellStateCalls > 0) {
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "ingest",
+        "js-to-wasm",
+        0,
+        "scalar",
+        cellStateCalls,
+      );
     }
   }
 
@@ -2744,6 +2910,8 @@ export class StoreDataEngine {
     const numbers = numeric ? new Float64Array(rows.length) : undefined;
     const texts = numeric ? undefined : new Array<string>(rows.length);
     const utf16Lens = numeric ? undefined : new Uint32Array(rows.length);
+    let textBytes = 0;
+    let cellStateCalls = 0;
 
     for (let offset = 0; offset < rows.length; offset++) {
       const dataCell = rows[offset]![key];
@@ -2753,6 +2921,7 @@ export class StoreDataEngine {
         const text = toText(dataCell);
         texts![offset] = text;
         utf16Lens![offset] = text.length;
+        textBytes += utf8ByteLength(text);
       }
 
       const wrapped =
@@ -2763,13 +2932,9 @@ export class StoreDataEngine {
       const exceptional =
         wrapped?.style !== undefined ||
         (value && typeof value === "object" && (value.kind === "formula" || value.kind === "ref"));
-      if (
-        !exceptional ||
-        hasSortedOffset(protectedOffsets, offset) ||
-        this.wasm.cellState(handle, start + offset, col) === 3
-      ) {
-        continue;
-      }
+      if (!exceptional || hasSortedOffset(protectedOffsets, offset)) continue;
+      cellStateCalls += 1;
+      if (this.wasm.cellState(handle, start + offset, col) === 3) continue;
       const cellValue: CellValue =
         value && typeof value === "object" ? value : { kind: "literal", value: value ?? null };
       exceptions.push({
@@ -2780,14 +2945,43 @@ export class StoreDataEngine {
       });
     }
 
+    if (cellStateCalls > 0) {
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "ingest",
+        "js-to-wasm",
+        0,
+        "scalar",
+        cellStateCalls,
+      );
+    }
+
     if (numbers) {
+      const bytes = numbers.byteLength + protectedOffsets.byteLength;
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "ingest",
+        "js-to-wasm",
+        bytes,
+        "bulk",
+        1,
+        Math.max(numbers.byteLength, protectedOffsets.byteLength),
+      );
       this.wasm.hydratePageNumbers(handle, col, start, numbers, 0, protectedOffsets);
     } else {
+      const packedTexts = texts!.join("");
+      const bytes = textBytes + utf16Lens!.byteLength + protectedOffsets.byteLength;
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "ingest",
+        "js-to-wasm",
+        bytes,
+        "bulk",
+        1,
+        Math.max(textBytes, utf16Lens!.byteLength, protectedOffsets.byteLength),
+      );
       this.wasm.hydratePageStringsPacked(
         handle,
         col,
         start,
-        texts!.join(""),
+        packedTexts,
         utf16Lens!,
         0,
         protectedOffsets,
@@ -2799,6 +2993,9 @@ export class StoreDataEngine {
     const handle = this.handleOf(sheet);
     const columns = this.sheetMeta(sheet).columns;
     let loadedFormulas = false;
+    let scalarCalls = 0;
+    let scalarBytes = 0;
+    let largestScalarBytes = 0;
     for (let c = 0; c < columns.length; c++) {
       const column = columns[c]!;
       const source = data.columns[column.key];
@@ -2807,7 +3004,16 @@ export class StoreDataEngine {
         column.type === "number" || column.type === "currency" || column.type === "date";
       if (numericColumn) {
         if (source instanceof Float64Array) {
-          this.wasm.setColumnNumbers(handle, c, 0, source.subarray(0, data.rowCount), 0);
+          const values = source.subarray(0, data.rowCount);
+          this.boundaryAccounting.record(
+            this.resourceOperation ?? "ingest",
+            "js-to-wasm",
+            values.byteLength,
+            "bulk",
+            1,
+            values.byteLength,
+          );
+          this.wasm.setColumnNumbers(handle, c, 0, values, 0);
           continue;
         }
 
@@ -2816,6 +3022,14 @@ export class StoreDataEngine {
           const value = columnarScalar(source[r], column.type);
           nums[r] = typeof value === "number" ? value : Number.NaN;
         }
+        this.boundaryAccounting.record(
+          this.resourceOperation ?? "ingest",
+          "js-to-wasm",
+          nums.byteLength,
+          "bulk",
+          1,
+          nums.byteLength,
+        );
         this.wasm.setColumnNumbers(handle, c, 0, nums, 0);
       } else {
         const stringSource = stringArrayForRows(source, data.rowCount);
@@ -2837,22 +3051,48 @@ export class StoreDataEngine {
           if (value.kind === "formula") {
             this.formulaSrc.set(cellKey({ sheet, row: r, col: c }), value.src);
             this.wasm.setFormula(handle, r, c, value.src, 0);
+            scalarCalls += 1;
+            const bytes = utf8ByteLength(value.src);
+            scalarBytes += bytes;
+            largestScalarBytes = Math.max(largestScalarBytes, bytes);
             loadedFormulas = true;
           }
           continue;
         }
         if (typeof value === "boolean") {
           this.wasm.setBool(handle, r, c, value, 0);
+          scalarCalls += 1;
+          scalarBytes += 1;
+          largestScalarBytes = Math.max(largestScalarBytes, 1);
         } else if (numericColumn && typeof value === "string") {
           this.wasm.setString(handle, r, c, value, 0);
+          scalarCalls += 1;
+          const bytes = utf8ByteLength(value);
+          scalarBytes += bytes;
+          largestScalarBytes = Math.max(largestScalarBytes, bytes);
         } else if (value === null || value === undefined) {
           this.wasm.clearCell(handle, r, c, 0);
+          scalarCalls += 1;
         }
       }
     }
 
+    if (scalarCalls > 0) {
+      this.boundaryAccounting.record(
+        this.resourceOperation ?? "ingest",
+        "js-to-wasm",
+        scalarBytes,
+        "scalar",
+        scalarCalls,
+        largestScalarBytes,
+      );
+    }
+
     // Same barrier a transaction ends with: evaluate everything just ingested.
-    if (loadedFormulas) this.wasm.recompute(handle);
+    if (loadedFormulas) {
+      this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
+      this.wasm.recompute(handle);
+    }
   }
 
   /**
@@ -2862,8 +3102,21 @@ export class StoreDataEngine {
    */
   private loadPackedStrings(handle: number, col: number, values: readonly string[]): void {
     const lens = new Uint32Array(values.length);
-    for (let r = 0; r < values.length; r++) lens[r] = values[r]!.length;
-    this.wasm.setColumnStringsPacked(handle, col, 0, values.join(""), lens, 0);
+    let textBytes = 0;
+    for (let r = 0; r < values.length; r++) {
+      lens[r] = values[r]!.length;
+      textBytes += utf8ByteLength(values[r]!);
+    }
+    const packed = values.join("");
+    this.boundaryAccounting.record(
+      this.resourceOperation ?? "ingest",
+      "js-to-wasm",
+      textBytes + lens.byteLength,
+      "bulk",
+      1,
+      Math.max(textBytes, lens.byteLength),
+    );
+    this.wasm.setColumnStringsPacked(handle, col, 0, packed, lens, 0);
   }
 }
 
@@ -2906,6 +3159,30 @@ function columnarScalar(
     return columnarScalar(unwrapped.value, type);
   }
   return typeof unwrapped === "string" ? parseCellLiteralInput(unwrapped, type) : unwrapped;
+}
+
+/** Allocation-free byte count matching wasm-bindgen's UTF-8 string copy. */
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x7f) {
+      bytes += 1;
+    } else if (code <= 0x7ff) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        index += 1;
+      } else {
+        bytes += 3;
+      }
+    } else {
+      bytes += 3;
+    }
+  }
+  return bytes;
 }
 
 function toNumber(value: DataCell | undefined): number {

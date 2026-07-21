@@ -1,3 +1,4 @@
+import type { ResourceOwnerBytes } from "../resource-accounting.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -18,6 +19,8 @@ export class StoreWindowReader {
   private valuesScratch: CellScalar[] = [];
   private readonly stringCache = new Map<number, string>();
   private readonly condRulesSynced = new Map<SheetId, string>();
+  private conditionalRuleInputBytes = 0;
+  private conditionalRuleLargestInputBytes = 0;
 
   constructor(
     private readonly wasm: RecomputingCellStore,
@@ -36,15 +39,29 @@ export class StoreWindowReader {
     const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
     let ffiCalls = 1;
+    let ffiInputBytes = colsU32.byteLength;
+    let ffiLargestTransferBytes = colsU32.byteLength;
     if (this.wasm.isPaged(handle)) {
       this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
       ffiCalls += 1;
+      ffiInputBytes += colsU32.byteLength;
     }
-    const hasCondRules = applyConditionalRules && this.syncConditionalRules(sheet, handle);
+    const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;
+    const hasCondRules = (conditionalSync & 1) !== 0;
+    if ((conditionalSync & 2) !== 0) {
+      ffiCalls += 1;
+      ffiInputBytes += this.conditionalRuleInputBytes;
+      ffiLargestTransferBytes = Math.max(
+        ffiLargestTransferBytes,
+        this.conditionalRuleLargestInputBytes,
+      );
+    }
 
     let view: ConsumingWindowView;
     if (order) {
       const dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
+      ffiInputBytes += dataRows.byteLength;
+      ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);
       view = this.wasm.getWindowRows(handle, dataRows, colsU32) as ConsumingWindowView;
     } else {
       view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32) as ConsumingWindowView;
@@ -60,6 +77,29 @@ export class StoreWindowReader {
     const strings = view.takeStrings();
     const condMatches = hasCondRules ? view.takeCondMatches() : EMPTY_COND_MATCHES;
     view.free();
+    let ffiBoundaryCalls = ffiCalls + 8 + (hasCondRules ? 1 : 0);
+    let ffiOutputBytes =
+      kinds.byteLength +
+      numbers.byteLength +
+      stringIds.byteLength +
+      stringIndex.byteLength +
+      styleIds.byteLength +
+      styleDict.byteLength +
+      condMatches.byteLength;
+    let localStringBytes = 0;
+    for (const value of strings) localStringBytes += utf8ByteLength(value);
+    ffiOutputBytes += localStringBytes;
+    ffiLargestTransferBytes = Math.max(
+      ffiLargestTransferBytes,
+      kinds.byteLength,
+      numbers.byteLength,
+      stringIds.byteLength,
+      stringIndex.byteLength,
+      styleIds.byteLength,
+      styleDict.byteLength,
+      condMatches.byteLength,
+      localStringBytes,
+    );
 
     let stringPoolUpdateIds: Uint32Array | undefined;
     let stringPoolUpdateValues: string[] | undefined;
@@ -77,6 +117,16 @@ export class StoreWindowReader {
       stringPoolUpdateIds = Uint32Array.from(missingIdSet);
       stringPoolUpdateValues = this.wasm.poolStrings(stringPoolUpdateIds);
       ffiCalls += 1;
+      ffiBoundaryCalls += 1;
+      ffiInputBytes += stringPoolUpdateIds.byteLength;
+      let poolStringBytes = 0;
+      for (const value of stringPoolUpdateValues) poolStringBytes += utf8ByteLength(value);
+      ffiOutputBytes += poolStringBytes;
+      ffiLargestTransferBytes = Math.max(
+        ffiLargestTransferBytes,
+        stringPoolUpdateIds.byteLength,
+        poolStringBytes,
+      );
       for (let i = 0; i < stringPoolUpdateValues.length; i++) {
         this.stringCache.set(stringPoolUpdateIds[i] ?? 0xffffffff, stringPoolUpdateValues[i] ?? "");
       }
@@ -120,6 +170,10 @@ export class StoreWindowReader {
       stringPoolUpdateIds,
       stringPoolUpdateValues,
       localStrings: strings,
+      ffiInputBytes,
+      ffiOutputBytes,
+      ffiLargestTransferBytes,
+      ffiBoundaryCalls,
       ffiCalls,
     };
   }
@@ -127,6 +181,43 @@ export class StoreWindowReader {
   conditionalRulesChanged(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
     this.syncConditionalRules(sheet, this.handleOf(sheet));
+  }
+
+  resourceOwners(): ResourceOwnerBytes[] {
+    let cachedStringBytes = 0;
+    for (const value of this.stringCache.values()) cachedStringBytes += value.length * 2;
+    let conditionalSignatureBytes = 0;
+    for (const value of this.condRulesSynced.values())
+      conditionalSignatureBytes += value.length * 2;
+    return [
+      {
+        owner: "js.window.values-scratch",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: this.valuesScratch.length,
+        measurement: "entry-count-only",
+      },
+      {
+        owner: "js.window.string-cache",
+        logicalBytes: cachedStringBytes,
+        allocatedBytes: cachedStringBytes,
+        entries: this.stringCache.size,
+        measurement: "utf16-upper-bound",
+      },
+      {
+        owner: "js.window.conditional-signatures",
+        logicalBytes: conditionalSignatureBytes,
+        allocatedBytes: conditionalSignatureBytes,
+        entries: this.condRulesSynced.size,
+        measurement: "utf16-upper-bound",
+      },
+    ];
+  }
+
+  clear(): void {
+    this.valuesScratch = [];
+    this.stringCache.clear();
+    this.condRulesSynced.clear();
   }
 
   removeSheet(sheet: SheetId): void {
@@ -170,11 +261,15 @@ export class StoreWindowReader {
     return styles;
   }
 
-  private syncConditionalRules(sheet: SheetId, handle: number): boolean {
+  private syncConditionalRules(sheet: SheetId, handle: number): number {
     const rules = this.sheetMeta(sheet).conditionalFormats ?? [];
     const packable = rules.filter((rule) => rule.range.sheet === sheet).slice(0, 32);
     const signature = conditionalRulesSignature(packable);
-    if (this.condRulesSynced.get(sheet) === signature) return packable.length > 0;
+    if (this.condRulesSynced.get(sheet) === signature) {
+      this.conditionalRuleInputBytes = 0;
+      this.conditionalRuleLargestInputBytes = 0;
+      return packable.length > 0 ? 1 : 0;
+    }
     this.condRulesSynced.set(sheet, signature);
 
     const kinds = new Uint8Array(packable.length);
@@ -213,8 +308,18 @@ export class StoreWindowReader {
         flags[i] = when.matchCase ? 1 : 0;
       }
     }
+    const stringBytes = strs.reduce((bytes, value) => bytes + utf8ByteLength(value), 0);
+    this.conditionalRuleInputBytes =
+      kinds.byteLength + bounds.byteLength + nums.byteLength + flags.byteLength + stringBytes;
+    this.conditionalRuleLargestInputBytes = Math.max(
+      kinds.byteLength,
+      bounds.byteLength,
+      nums.byteLength,
+      flags.byteLength,
+      stringBytes,
+    );
     this.wasm.setConditionalRules(handle, kinds, bounds, nums, strs, flags);
-    return packable.length > 0;
+    return (packable.length > 0 ? 1 : 0) | 2;
   }
 
   private mergeCondMatches(
@@ -282,4 +387,21 @@ function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): str
     }
   }
   return signature;
+}
+
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x7f) bytes += 1;
+    else if (code <= 0x7ff) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        index += 1;
+      } else bytes += 3;
+    } else bytes += 3;
+  }
+  return bytes;
 }

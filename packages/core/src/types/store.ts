@@ -54,6 +54,14 @@ export interface VisibleWindowView {
   localStrings?: readonly string[];
   /** Internal count of WASM boundary calls used to produce this window. */
   ffiCalls?: number;
+  /** Every wasm-bindgen method/accessor/free crossing used by diagnostics. */
+  ffiBoundaryCalls?: number;
+  /** Exact copied input bytes for this packed boundary operation. */
+  ffiInputBytes?: number;
+  /** Exact copied output bytes for this packed boundary operation. */
+  ffiOutputBytes?: number;
+  /** Largest individual copied buffer/string payload in this operation. */
+  ffiLargestTransferBytes?: number;
 }
 
 export interface ClipboardFormulaEntry {

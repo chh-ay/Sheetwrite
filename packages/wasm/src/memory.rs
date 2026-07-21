@@ -121,6 +121,16 @@ impl StoreMemoryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CellStore;
+
+    fn owner(encoded: &[f64], index: usize) -> (usize, usize, usize) {
+        let at = 3 + index * 3;
+        (
+            encoded[at] as usize,
+            encoded[at + 1] as usize,
+            encoded[at + 2] as usize,
+        )
+    }
 
     #[test]
     fn encoded_totals_are_non_overlapping_sums() {
@@ -142,5 +152,101 @@ mod tests {
         assert_eq!(owner.logical_bytes, 2 * 4 + bucket);
         assert_eq!(owner.allocated_bytes, 4 * 4 + 3 * bucket);
         assert_eq!(owner.entries, 3);
+    }
+
+    #[test]
+    fn tiny_dense_store_has_exact_non_overlapping_cell_arrays() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 3);
+        let encoded = store.memory_stats();
+        assert_eq!(owner(&encoded, DENSE_KINDS), (6, 6, 6));
+        assert_eq!(owner(&encoded, DENSE_PAYLOADS), (48, 48, 6));
+        assert_eq!(owner(&encoded, DENSE_STYLES), (24, 24, 6));
+        for index in 0..STORE_MEMORY_OWNER_COUNT {
+            let (logical, allocated, _) = owner(&encoded, index);
+            assert!(allocated >= logical);
+        }
+        assert_eq!(
+            encoded[encoded.len() - 2] as usize,
+            (0..STORE_MEMORY_OWNER_COUNT)
+                .map(|index| owner(&encoded, index).0)
+                .sum::<usize>()
+        );
+        assert_eq!(sheet, 0);
+    }
+
+    #[test]
+    fn repeated_and_unique_strings_change_only_pool_and_index_owners() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 3);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, row as f64, 0);
+        }
+        store.recompute(sheet);
+        let baseline = store.memory_stats();
+        store.set_string(sheet, 0, 0, "same", 0);
+        store.set_string(sheet, 1, 0, "same", 0);
+        store.recompute(sheet);
+        let repeated = store.memory_stats();
+        assert_eq!(
+            owner(&repeated, STRING_POOL_UTF8).0 - owner(&baseline, STRING_POOL_UTF8).0,
+            4
+        );
+        assert_eq!(
+            owner(&repeated, STRING_POOL_SPANS).2 - owner(&baseline, STRING_POOL_SPANS).2,
+            1
+        );
+        store.set_string(sheet, 2, 0, "unique", 0);
+        store.recompute(sheet);
+        let unique = store.memory_stats();
+        assert_eq!(
+            owner(&unique, STRING_POOL_UTF8).0 - owner(&repeated, STRING_POOL_UTF8).0,
+            6
+        );
+        assert_eq!(
+            owner(&unique, STRING_POOL_SPANS).2 - owner(&repeated, STRING_POOL_SPANS).2,
+            1
+        );
+        for index in 0..STORE_MEMORY_OWNER_COUNT {
+            if [STRING_POOL_UTF8, STRING_POOL_SPANS, STRING_INDEX].contains(&index) {
+                continue;
+            }
+            assert_eq!(
+                owner(&repeated, index),
+                owner(&baseline, index),
+                "owner {index} changed on repeat"
+            );
+            assert_eq!(
+                owner(&unique, index),
+                owner(&repeated, index),
+                "owner {index} changed on unique"
+            );
+        }
+        assert!(owner(&unique, STRING_INDEX).1 >= owner(&unique, STRING_INDEX).0);
+    }
+
+    #[test]
+    fn formula_and_paged_fixtures_name_their_own_structures() {
+        let mut formulas = CellStore::new();
+        let sheet = formulas.add_sheet(1, 2);
+        formulas.set_number(sheet, 0, 0, 1.0, 0);
+        formulas.set_formula(sheet, 1, 0, "=A1+1", 0);
+        formulas.recompute(sheet);
+        let formula_stats = formulas.memory_stats();
+        assert!(owner(&formula_stats, FORMULAS).0 > 0);
+        assert!(owner(&formula_stats, DEPENDENCY_NODES).2 > 0);
+        assert!(owner(&formula_stats, DEPENDENCY_EDGES).2 > 0);
+
+        let mut paged = CellStore::new();
+        let sheet = paged.add_paged_sheet(1, 100, 4, 4096);
+        paged.begin_page_load();
+        paged.set_number(sheet, 0, 0, 2.0, 0);
+        paged.end_page_load();
+        let paged_stats = paged.memory_stats();
+        assert_eq!(owner(&paged_stats, PAGED_KINDS).2, 4);
+        assert_eq!(owner(&paged_stats, PAGED_PAYLOADS).2, 4);
+        assert_eq!(owner(&paged_stats, PAGED_STYLES).2, 4);
+        assert_eq!(owner(&paged_stats, PAGED_LOADED_BITMAPS).2, 1);
+        assert_eq!(owner(&paged_stats, PAGED_DIRTY_BITMAPS).2, 1);
     }
 }

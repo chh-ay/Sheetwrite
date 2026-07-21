@@ -60,6 +60,28 @@ describe("StoreViewState packed inverse index", () => {
     expect(view.viewRowOf("s1", 6)).toBeNull();
   });
 
+  it("attributes exact packed order and inverse-index byte lengths", () => {
+    const { view } = sortedView(6, [5, 1, 3]);
+    const order = view.resourceOwners().find((owner) => owner.owner === "js.view.order")!;
+    expect(order).toMatchObject({ logicalBytes: 12, allocatedBytes: 12, entries: 3 });
+    expect(
+      view.resourceOwners().find((owner) => owner.owner === "js.view.inverse-index"),
+    ).toMatchObject({ logicalBytes: 0, allocatedBytes: 0, entries: 0 });
+
+    expect(view.viewRowOf("s1", 5)).toBe(0);
+    expect(
+      view.resourceOwners().find((owner) => owner.owner === "js.view.inverse-index"),
+    ).toMatchObject({ logicalBytes: 24, allocatedBytes: 24, entries: 6 });
+
+    view.dispose();
+    expect(
+      view
+        .resourceOwners()
+        .filter((owner) => owner.owner.startsWith("js.view."))
+        .every((owner) => owner.logicalBytes === 0 && owner.entries === 0),
+    ).toBe(true);
+  });
+
   it("invalidates reused storage after query changes without exposing stale entries", () => {
     const state = sortedView(6, [5, 1, 3]);
     expect(state.view.viewRowOf("s1", 5)).toBe(0);

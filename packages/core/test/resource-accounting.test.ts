@@ -152,6 +152,19 @@ describe("runtime resource accounting", () => {
     expect(counters.snapshot().every((entry) => entry.ffiCalls === 0)).toBe(true);
   });
 
+  it("rejects cumulative overflow without partially mutating counters", () => {
+    const counters = new BoundaryResourceAccounting();
+    counters.record("ingest", "js-to-wasm", Number.MAX_SAFE_INTEGER, "bulk", 0);
+    expect(() => counters.record("ingest", "js-to-wasm", 1, "bulk", 0)).toThrow(
+      "exceeded Number.MAX_SAFE_INTEGER",
+    );
+    expect(counters.snapshot().find((entry) => entry.operation === "ingest")).toMatchObject({
+      ffiCalls: 0,
+      jsToWasmBytes: Number.MAX_SAFE_INTEGER,
+      bulkCalls: 0,
+    });
+  });
+
   it("reports owner and runtime phase deltas without mutating either snapshot", () => {
     const wasm = decodeStoreMemoryStats(encodedStoreMemory(), null);
     const before = createRuntimeResourceSnapshot({

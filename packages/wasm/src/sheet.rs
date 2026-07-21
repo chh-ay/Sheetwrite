@@ -3,6 +3,11 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use crate::memory::{
+    StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
+    PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
+    SHEET_INDEXES_METADATA,
+};
 use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, NO_STRING};
 
 /// One conditional-format predicate, mirroring the host's rule kinds. String
@@ -591,6 +596,37 @@ impl PagedStorage {
 
     fn dirty_cells(&self) -> usize {
         self.dirty.len()
+    }
+    fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
+        let indexes = stats.owner_mut(PAGED_INDEXES);
+        indexes.add_hash_table::<(usize, usize), CellChunk>(
+            self.chunks.len(),
+            self.chunks.capacity(),
+        );
+        indexes.add_hash_table::<(usize, usize), ()>(self.pinned.len(), self.pinned.capacity());
+        // `std::collections::BTreeSet` exposes no node capacity. Report its
+        // eviction entries without inventing allocator bytes from `size_of_val`.
+        indexes.entries = indexes
+            .entries
+            .saturating_add(self.evictable.borrow().len());
+
+        for chunk in self.chunks.values() {
+            stats
+                .owner_mut(PAGED_KINDS)
+                .add_vec::<u8>(chunk.kind.len(), chunk.kind.capacity());
+            stats
+                .owner_mut(PAGED_PAYLOADS)
+                .add_vec::<u64>(chunk.payload.len(), chunk.payload.capacity());
+            stats
+                .owner_mut(PAGED_STYLES)
+                .add_vec::<u32>(chunk.style.len(), chunk.style.capacity());
+            stats
+                .owner_mut(PAGED_LOADED_BITMAPS)
+                .add_vec::<u64>(chunk.loaded.len(), chunk.loaded.capacity());
+            stats
+                .owner_mut(PAGED_DIRTY_BITMAPS)
+                .add_vec::<u64>(chunk.dirty.len(), chunk.dirty.capacity());
+        }
     }
 }
 
@@ -1396,6 +1432,46 @@ impl SheetData {
 
         self.clear_dirty();
         self.all_dirty = true;
+    }
+    pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
+        stats
+            .owner_mut(DENSE_KINDS)
+            .add_vec::<u8>(self.kind.len(), self.kind.capacity());
+        stats
+            .owner_mut(DENSE_PAYLOADS)
+            .add_vec::<u64>(self.payload.len(), self.payload.capacity());
+        stats
+            .owner_mut(DENSE_STYLES)
+            .add_vec::<u32>(self.style.len(), self.style.capacity());
+        if let Some(paged) = &self.paged {
+            paged.add_memory_stats(stats);
+        }
+
+        let formulas = stats.owner_mut(FORMULAS);
+        formulas.add_hash_table::<CellKey, FormulaEntry>(
+            self.formulas.len(),
+            self.formulas.capacity(),
+        );
+        for entry in self.formulas.values() {
+            entry.heap_memory_stats(formulas);
+        }
+
+        let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
+        metadata.add_hash_table::<CellKey, ()>(
+            self.dirty_cells.len(),
+            self.dirty_cells.capacity(),
+        );
+        metadata.add_vec::<CondRule>(self.cond_rules.len(), self.cond_rules.capacity());
+        for rule in &self.cond_rules {
+            let text = match &rule.pred {
+                CondPred::EqStr(value) => Some(value),
+                CondPred::Contains { needle, .. } => Some(needle),
+                _ => None,
+            };
+            if let Some(text) = text {
+                metadata.add_payload(text.len(), text.capacity());
+            }
+        }
     }
 }
 
