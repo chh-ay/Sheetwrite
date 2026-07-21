@@ -17,6 +17,10 @@ describe("directional datasource prefetch gate", () => {
       expect(repetition.servedByteMultiplier).toBeLessThanOrEqual(
         report.policy.requestMultiplierLimit,
       );
+      expect(repetition.peakActiveRequests).toBeLessThanOrEqual(report.policy.activeRequestLimit);
+      expect(repetition.peakActiveSpeculativeRows).toBeLessThanOrEqual(
+        report.policy.lookaheadRowsLimit,
+      );
       expect(repetition.reversalAborts).toBeGreaterThan(0);
       expect(repetition.jumpAborts).toBeGreaterThan(0);
       expect(repetition.cacheAllocatedBytes).toBeLessThanOrEqual(report.policy.cacheBytes);

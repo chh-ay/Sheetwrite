@@ -37,6 +37,7 @@ test("logical-clock directional prefetch stays resident and bounded", async ({ p
     expect(repetition.servedByteMultiplier).toBeLessThanOrEqual(
       report.policy.requestMultiplierLimit,
     );
+    expect(repetition.peakActiveRequests).toBeLessThanOrEqual(report.policy.activeRequestLimit);
     expect(repetition.reversalAborts).toBeGreaterThan(0);
     expect(repetition.jumpAborts).toBeGreaterThan(0);
     expect(repetition.cacheAllocatedBytes).toBeLessThanOrEqual(report.policy.cacheBytes);

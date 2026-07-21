@@ -550,4 +550,96 @@ describe("DatasourceController revision retention", () => {
     controller.destroy();
     store.dispose();
   });
+  it("clamps unaligned tall-view speculation to the advertised row and byte horizon", () => {
+    const workbook = makeWorkbook(3_000);
+    workbook.sheets[0]!.columns = [{ key: "name", header: "Name", width: 100, type: "text" }];
+    const store = new SheetwriteStore(workbook);
+    let now = 0;
+    const controller = new DatasourceController(
+      {
+        datasource: () => Promise.withResolvers<DataSourcePage>().promise,
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 3_000,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => now,
+      },
+      3_000,
+    );
+    const assertBounded = () => {
+      const speculativeRows = controller.getTelemetry().activeSpeculativeRows;
+      expect(speculativeRows).toBeLessThanOrEqual(DATASOURCE_PREFETCH_MAX_ROWS);
+      expect(speculativeRows * 16).toBeLessThanOrEqual(DATASOURCE_PREFETCH_MAX_BYTES);
+    };
+
+    controller.updateViewport(1, 1_001);
+    assertBounded();
+    now = 16.7;
+    controller.updateViewport(1_500, 2_500);
+    now = 33.4;
+    controller.updateViewport(1, 1_001);
+    assertBounded();
+
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("bounds requests and retained revisions across one-row pending scrolls and a jump", () => {
+    const store = new SheetwriteStore(makeWorkbook(1_000));
+    let now = 0;
+    let retainedRevisions = 0;
+    let peakRetainedRevisions = 0;
+    let peakActiveRequests = 0;
+    let peakActiveSpeculativeRows = 0;
+    const controller = new DatasourceController(
+      {
+        datasource: () => Promise.withResolvers<DataSourcePage>().promise,
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 1_000,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => {
+          retainedRevisions += 1;
+          peakRetainedRevisions = Math.max(peakRetainedRevisions, retainedRevisions);
+          return () => {
+            retainedRevisions -= 1;
+          };
+        },
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => now,
+      },
+      1_000,
+    );
+    const sampleResources = () => {
+      const telemetry = controller.getTelemetry();
+      peakActiveRequests = Math.max(peakActiveRequests, telemetry.activeRequests);
+      peakActiveSpeculativeRows = Math.max(
+        peakActiveSpeculativeRows,
+        telemetry.activeSpeculativeRows,
+      );
+      expect(retainedRevisions).toBe(telemetry.activeRequests);
+    };
+
+    for (let row = 0; row < 200; row++) {
+      controller.updateViewport(row, row + 10);
+      sampleResources();
+      now += 16.7;
+    }
+    controller.updateViewport(700, 710);
+    sampleResources();
+
+    expect(peakActiveRequests).toBeLessThanOrEqual(5);
+    expect(peakRetainedRevisions).toBeLessThanOrEqual(5);
+    expect(peakActiveSpeculativeRows).toBeLessThanOrEqual(DATASOURCE_PREFETCH_MAX_ROWS);
+    expect(controller.getTelemetry().jumpAborts).toBeGreaterThan(0);
+    controller.destroy();
+    expect(retainedRevisions).toBe(0);
+    store.dispose();
+  });
 });

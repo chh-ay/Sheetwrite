@@ -18,6 +18,7 @@ const COLUMN_COUNT = 6;
 const CHUNK_ROWS = 20;
 const CACHE_BYTES = 12 * 1024;
 const REQUEST_MULTIPLIER_LIMIT = 3;
+const ACTIVE_REQUEST_LIMIT = 6;
 
 interface ScheduledTask {
   readonly id: number;
@@ -88,6 +89,8 @@ export interface PrefetchTraceRepetition {
   readonly promotions: number;
   readonly cacheAllocatedBytes: number;
   readonly cacheChunks: number;
+  readonly peakActiveRequests: number;
+  readonly peakActiveSpeculativeRows: number;
   readonly jumpVisibleResidentBeforeResponse: boolean;
   readonly jumpVisibleResidentAfterResponse: boolean;
 }
@@ -100,6 +103,7 @@ export interface PrefetchBenchmarkReport {
     readonly lookaheadRowsLimit: number;
     readonly lookaheadBytesLimit: number;
     readonly requestMultiplierLimit: number;
+    readonly activeRequestLimit: number;
     readonly cacheBytes: number;
   };
   readonly repetitions: readonly PrefetchTraceRepetition[];
@@ -210,9 +214,20 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
     },
     ROW_COUNT,
   );
+  let peakActiveRequests = 0;
+  let peakActiveSpeculativeRows = 0;
+  const sampleActiveResources = () => {
+    const telemetry = controller.getTelemetry();
+    peakActiveRequests = Math.max(peakActiveRequests, telemetry.activeRequests);
+    peakActiveSpeculativeRows = Math.max(
+      peakActiveSpeculativeRows,
+      telemetry.activeSpeculativeRows,
+    );
+  };
 
   // Declared warm-up: visible demand plus the two aligned look-ahead bands.
   controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+  sampleActiveResources();
   await clock.advance(SOURCE_LATENCY_MS);
   await flushRequests();
   controller.resetTelemetry();
@@ -229,18 +244,21 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
     visibleStart += VIEWPORT_ROWS / 4;
     recordDemand();
     controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+    sampleActiveResources();
   }
 
   // Hold the final window for one complete measured logical frame.
   await clock.advance(FRAME_MS);
   recordDemand();
   controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+  sampleActiveResources();
 
   for (let frame = 0; frame < REVERSE_BANDS * 4; frame++) {
     await clock.advance(FRAME_MS);
     visibleStart -= VIEWPORT_ROWS / 4;
     recordDemand();
     controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+    sampleActiveResources();
   }
   await flushRequests();
 
@@ -250,9 +268,18 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
     JSON.stringify(traceRows(0, demandedRows.size)),
   ).byteLength;
 
+  // Repeated non-jump band steps create fresh visible/speculative ownership so
+  // the immediate distant jump deterministically proves both cancellation paths.
+  for (let step = 0; step < 3; step++) {
+    visibleStart += VIEWPORT_ROWS * 2;
+    controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+    sampleActiveResources();
+  }
+
   // The distant jump must expose unloaded state until its real 90 ms response.
   visibleStart = 3_000;
   controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+  sampleActiveResources();
   const jumpVisibleResidentBeforeResponse = store.isRangeFullyLoaded({
     sheet: "trace",
     start: { row: visibleStart, col: 0 },
@@ -261,6 +288,7 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
   await clock.advance(SOURCE_LATENCY_MS);
   await flushRequests();
   controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+  sampleActiveResources();
   const jumpVisibleResidentAfterResponse = store.isRangeFullyLoaded({
     sheet: "trace",
     start: { row: visibleStart, col: 0 },
@@ -290,6 +318,8 @@ async function runRepetition(repetition: number): Promise<PrefetchTraceRepetitio
     promotions: complete.promotions,
     cacheAllocatedBytes: cache.allocatedBytes,
     cacheChunks: cache.chunks,
+    peakActiveRequests,
+    peakActiveSpeculativeRows,
     jumpVisibleResidentBeforeResponse,
     jumpVisibleResidentAfterResponse,
   };
@@ -324,6 +354,16 @@ function assertRepetition(result: PrefetchTraceRepetition): void {
       `repetition ${result.repetition}: reversal/jump aborts ${result.reversalAborts}/${result.jumpAborts}`,
     );
   }
+  if (result.peakActiveRequests > ACTIVE_REQUEST_LIMIT) {
+    throw new Error(
+      `repetition ${result.repetition}: peak active requests ${result.peakActiveRequests} > ${ACTIVE_REQUEST_LIMIT}`,
+    );
+  }
+  if (result.peakActiveSpeculativeRows > DATASOURCE_PREFETCH_MAX_ROWS) {
+    throw new Error(
+      `repetition ${result.repetition}: peak speculative rows ${result.peakActiveSpeculativeRows} > ${DATASOURCE_PREFETCH_MAX_ROWS}`,
+    );
+  }
   if (result.cacheAllocatedBytes > CACHE_BYTES) {
     throw new Error(
       `repetition ${result.repetition}: cache ${result.cacheAllocatedBytes} > ${CACHE_BYTES}`,
@@ -352,6 +392,7 @@ export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmar
       lookaheadRowsLimit: DATASOURCE_PREFETCH_MAX_ROWS,
       lookaheadBytesLimit: DATASOURCE_PREFETCH_MAX_BYTES,
       requestMultiplierLimit: REQUEST_MULTIPLIER_LIMIT,
+      activeRequestLimit: ACTIVE_REQUEST_LIMIT,
       cacheBytes: CACHE_BYTES,
     },
     repetitions,

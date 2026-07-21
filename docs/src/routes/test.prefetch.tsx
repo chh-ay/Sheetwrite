@@ -13,6 +13,7 @@ const REPETITIONS = 5;
 const CACHE_BYTES = 12 * 1024;
 const COLUMN_COUNT = 6;
 const REQUEST_MULTIPLIER_LIMIT = 3;
+const ACTIVE_REQUEST_LIMIT = 6;
 
 export interface RendererPrefetchRepetition {
   repetition: number;
@@ -30,6 +31,7 @@ export interface RendererPrefetchRepetition {
   jumpAborts: number;
   cacheAllocatedBytes: number;
   cacheChunks: number;
+  peakActiveRequests: number;
   jumpVisibleResidentBeforeResponse: boolean;
   jumpVisibleResidentAfterResponse: boolean;
 }
@@ -41,6 +43,7 @@ export interface RendererPrefetchReport {
     viewportRows: number;
     velocityWindowsPerFrame: number;
     requestMultiplierLimit: number;
+    activeRequestLimit: number;
     cacheBytes: number;
     devicePixelRatio: number;
   };
@@ -171,6 +174,8 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
   let rowsServed = 0;
   let bytesServed = 0;
   let aborts = 0;
+  const activeRequests = new Set<AbortSignal>();
+  let peakActiveRequests = 0;
 
   try {
     grid = createGrid(host, {
@@ -179,17 +184,20 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
         getRows({ start, end, signal }) {
           requests += 1;
           requestedRows += end - start;
+          activeRequests.add(signal);
           const result = Promise.withResolvers<DataSourcePage>();
           const cancel = clock.schedule(() => {
             const pageRows = rows(start, end);
             rowsServed += pageRows.length;
             bytesServed += new TextEncoder().encode(JSON.stringify(pageRows)).byteLength;
+            activeRequests.delete(signal);
             result.resolve({ start, rows: pageRows });
           });
           signal.addEventListener(
             "abort",
             () => {
               cancel();
+              activeRequests.delete(signal);
               aborts += 1;
               result.reject(new DOMException("Logical datasource request aborted", "AbortError"));
             },
@@ -213,6 +221,7 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
     const renderAt = (row: number): boolean => {
       scroller.scrollTop = row * ROW_HEIGHT;
       grid!.refresh();
+      peakActiveRequests = Math.max(peakActiveRequests, activeRequests.size);
       return store.isRangeFullyLoaded({
         sheet: "trace",
         start: { row: visible.start, col: 0 },
@@ -295,6 +304,7 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
       jumpAborts: abortsAfterJump - steady.aborts,
       cacheAllocatedBytes: cache.allocatedBytes,
       cacheChunks: cache.chunks,
+      peakActiveRequests,
       jumpVisibleResidentBeforeResponse,
       jumpVisibleResidentAfterResponse,
     };
@@ -319,6 +329,7 @@ async function runRendererPrefetchTrace(): Promise<RendererPrefetchReport> {
       viewportRows: VIEWPORT_ROWS,
       velocityWindowsPerFrame: 0.25,
       requestMultiplierLimit: REQUEST_MULTIPLIER_LIMIT,
+      activeRequestLimit: ACTIVE_REQUEST_LIMIT,
       cacheBytes: CACHE_BYTES,
       devicePixelRatio: globalThis.devicePixelRatio,
     },

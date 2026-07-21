@@ -43,6 +43,9 @@ interface ActiveRequest {
   readonly end: number;
   readonly controller: AbortController;
   readonly releaseRevision: () => void;
+  readonly speculativeOrigin: boolean;
+  readonly viewportOrigin: boolean;
+  durableDemand: boolean;
   priority: RequestPriority;
   direction: -1 | 0 | 1;
   released: boolean;
@@ -147,7 +150,7 @@ export class DatasourceController {
 
   /** Requests a demand-critical interval without applying speculative policy. */
   ensureLoaded(start: number, end: number): void {
-    this.ensureRange(start, end, "visible", 0);
+    this.ensureRange(start, end, "visible", 0, false);
   }
 
   /**
@@ -200,7 +203,7 @@ export class DatasourceController {
     if (fullyResident) this.telemetry.residentFrames += 1;
 
     // Visible demand is always issued/promoted before any new speculation.
-    this.ensureRange(visibleStart, visibleEnd, "visible", 0);
+    this.ensureRange(visibleStart, visibleEnd, "visible", 0, true);
     for (const interval of speculative) {
       this.ensureSpeculativeBands(interval.start, interval.end, visibleRows, effectiveDirection);
     }
@@ -267,12 +270,24 @@ export class DatasourceController {
     if (start >= end) return;
     if (direction > 0) {
       for (let bandStart = start; bandStart < end; bandStart += bandRows) {
-        this.ensureRange(bandStart, Math.min(end, bandStart + bandRows), "speculative", direction);
+        this.ensureRange(
+          bandStart,
+          Math.min(end, bandStart + bandRows),
+          "speculative",
+          direction,
+          false,
+        );
       }
       return;
     }
     for (let bandEnd = end; bandEnd > start; bandEnd -= bandRows) {
-      this.ensureRange(Math.max(start, bandEnd - bandRows), bandEnd, "speculative", direction);
+      this.ensureRange(
+        Math.max(start, bandEnd - bandRows),
+        bandEnd,
+        "speculative",
+        direction,
+        false,
+      );
     }
   }
 
@@ -297,19 +312,24 @@ export class DatasourceController {
     const intervals: Array<{ start: number; end: number }> = [];
 
     if (direction > 0) {
-      const aheadStart = Math.floor(visibleEnd / bandRows) * bandRows;
-      const alignedVisibleEnd = Math.ceil(visibleEnd / bandRows) * bandRows;
-      const aheadEnd = Math.min(this.loaded.length, alignedVisibleEnd + aheadRows);
       const behindEnd = Math.floor(visibleStart / bandRows) * bandRows;
       const behindStart = Math.max(0, behindEnd - behindRows);
+      const actualBehindRows = behindEnd - behindStart;
+      const aheadStart = Math.floor(visibleEnd / bandRows) * bandRows;
+      const desiredAheadEnd = Math.ceil((visibleEnd + aheadRows) / bandRows) * bandRows;
+      const boundedAheadEnd = aheadStart + (horizonRows - actualBehindRows);
+      const aheadEnd = Math.min(this.loaded.length, desiredAheadEnd, boundedAheadEnd);
       if (behindStart < behindEnd) intervals.push({ start: behindStart, end: behindEnd });
       if (aheadStart < aheadEnd) intervals.push({ start: aheadStart, end: aheadEnd });
     } else {
-      const aheadEnd = Math.ceil(visibleStart / bandRows) * bandRows;
-      const alignedVisibleStart = Math.floor(visibleStart / bandRows) * bandRows;
-      const aheadStart = Math.max(0, alignedVisibleStart - aheadRows);
-      const behindStart = Math.ceil(visibleEnd / bandRows) * bandRows;
+      const aheadEnd = Math.min(this.loaded.length, Math.ceil(visibleStart / bandRows) * bandRows);
+      const behindStart = Math.min(this.loaded.length, Math.ceil(visibleEnd / bandRows) * bandRows);
       const behindEnd = Math.min(this.loaded.length, behindStart + behindRows);
+      const actualBehindRows = behindEnd - behindStart;
+      const desiredAheadStart =
+        Math.floor(Math.max(0, visibleStart - aheadRows) / bandRows) * bandRows;
+      const boundedAheadStart = aheadEnd - (horizonRows - actualBehindRows);
+      const aheadStart = Math.max(0, desiredAheadStart, boundedAheadStart);
       if (aheadStart < aheadEnd) intervals.push({ start: aheadStart, end: aheadEnd });
       if (behindStart < behindEnd) intervals.push({ start: behindStart, end: behindEnd });
     }
@@ -329,6 +349,7 @@ export class DatasourceController {
     end: number,
     priority: RequestPriority,
     direction: -1 | 0 | 1,
+    viewportOrigin: boolean,
   ): void {
     const datasource = this.options.datasource;
     const loadable = this.options.loadable;
@@ -344,6 +365,7 @@ export class DatasourceController {
       const owner = this.owners[row] ?? 0;
       if (owner !== 0) {
         const request = this.activeIds.get(owner);
+        if (priority === "visible" && !viewportOrigin && request) request.durableDemand = true;
         if (priority === "visible" && request?.priority === "speculative") {
           request.priority = "visible";
           request.direction = 0;
@@ -355,7 +377,15 @@ export class DatasourceController {
 
       const requestStart = row;
       while (row < requestLimit && this.loaded[row] === 0 && this.owners[row] === 0) row += 1;
-      this.requestBand(datasource, loadable, requestStart, row, priority, direction);
+      this.requestBand(
+        datasource,
+        loadable,
+        requestStart,
+        row,
+        priority,
+        direction,
+        viewportOrigin,
+      );
     }
   }
 
@@ -429,13 +459,22 @@ export class DatasourceController {
     cancelGeneration: boolean,
   ): void {
     for (const request of [...this.requests]) {
-      if (request.priority !== "speculative") continue;
-      if (intersects(request.start, request.end, visibleStart, visibleEnd)) continue;
-      const wanted = intervals.some((interval) =>
-        intersects(request.start, request.end, interval.start, interval.end),
-      );
-      if (!cancelGeneration && wanted) continue;
-      this.abortRequest(request, reason);
+      if (request.durableDemand) continue;
+      if (request.speculativeOrigin) {
+        if (intersects(request.start, request.end, visibleStart, visibleEnd)) continue;
+        const wanted = intervals.some((interval) =>
+          intersects(request.start, request.end, interval.start, interval.end),
+        );
+        if (!cancelGeneration && wanted) continue;
+        this.abortRequest(request, reason);
+        continue;
+      }
+      if (
+        request.viewportOrigin &&
+        !intersects(request.start, request.end, visibleStart, visibleEnd)
+      ) {
+        this.abortRequest(request, reason);
+      }
     }
   }
 
@@ -458,6 +497,7 @@ export class DatasourceController {
     requestEnd: number,
     priority: RequestPriority,
     direction: -1 | 0 | 1,
+    viewportOrigin: boolean,
   ): void {
     const id = this.allocateRequestId();
     for (let row = requestStart; row < requestEnd; row++) this.owners[row] = id;
@@ -472,6 +512,9 @@ export class DatasourceController {
       end: requestEnd,
       controller,
       releaseRevision: this.options.retainRevision(revision),
+      speculativeOrigin: priority === "speculative",
+      viewportOrigin,
+      durableDemand: priority === "visible" && !viewportOrigin,
       priority,
       direction,
       released: false,
