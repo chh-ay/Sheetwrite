@@ -2437,7 +2437,10 @@ it("does not clone unrelated refs for an accepted terminal sheet removal", () =>
   third.id = "s3";
   third.name = "Third";
   workbook.sheets.push(second, third);
-  const store = new SheetwriteStore(workbook, undefined, { storage: "paged" });
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
   expect(
     store.applyTransaction(
       {
