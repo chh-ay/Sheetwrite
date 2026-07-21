@@ -19,7 +19,7 @@ logical cell area covered by compact operations.
 <div class="api-member-list">
 
 <details class="api-member" id="transaction-resource-limits-max-operations" data-pagefind-weight="1">
-<summary><code>maxOperations</code> <span class="api-member-summary">Maximum number of DocumentOp objects in one atomic transaction.</span></summary>
+<summary><code>maxOperations</code> <span class="api-member-summary">DocumentOp objects in one atomic transaction; defaults to 10,000.</span></summary>
 
 ```ts generated
 maxOperations: number;
@@ -28,7 +28,7 @@ maxOperations: number;
 </details>
 
 <details class="api-member" id="transaction-resource-limits-max-encoded-bytes" data-pagefind-weight="1">
-<summary><code>maxEncodedBytes</code> <span class="api-member-summary">Maximum UTF-8 bytes in the JSON-encoded DocumentOp array.</span></summary>
+<summary><code>maxEncodedBytes</code> <span class="api-member-summary">UTF-8 bytes in the JSON-encoded DocumentOp array; defaults to 8 MiB.</span></summary>
 
 ```ts generated
 maxEncodedBytes: number;

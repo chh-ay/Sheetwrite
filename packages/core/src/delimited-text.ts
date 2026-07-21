@@ -1,35 +1,46 @@
 /** Resource ceilings shared by synchronous CSV and TSV parsing and encoding. */
 export interface DelimitedTextResourceLimits {
-  /** Maximum UTF-8 bytes accepted from one input string. */
+  /** Input string size in UTF-8 bytes; defaults to 32 MiB. */
   maxInputBytes: number;
-  /** Maximum UTF-8 bytes produced by one output string, including a BOM when present. */
+  /** Output string size in UTF-8 bytes, including a BOM; defaults to 64 MiB. */
   maxOutputBytes: number;
-  /** Maximum syntactically present records. */
+  /** Syntactically present records; defaults to 1,000,000. */
   maxRows: number;
-  /** Maximum fields in any record. */
+  /** Fields in any one record; defaults to 16,384. */
   maxColumns: number;
-  /** Maximum fields across all records. */
+  /** Aggregate fields across all records; defaults to 1,000,000. */
   maxCells: number;
-  /** Maximum decoded UTF-8 bytes in one field. */
+  /** Decoded UTF-8 bytes in one field; defaults to 1 MiB. */
   maxFieldBytes: number;
-  /** Maximum rows fetched by an export writer in one packed store read. */
+  /** Rows fetched by an export writer in one packed store read; defaults to 4,096. */
   maxWriterWindowRows: number;
 }
 
 /** Optional resource ceilings for an in-memory delimited-text operation. */
 export interface DelimitedTextOptions {
+  /** Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`. */
   resourceLimits?: Partial<DelimitedTextResourceLimits>;
 }
 
-/** Conservative defaults for synchronous, in-memory CSV and TSV operations. */
+/**
+ * Synchronous operations return one in-memory string, so byte/cell ceilings
+ * bound allocation while sheet-compatible dimensions remain independently valid.
+ */
 export const DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS: Readonly<DelimitedTextResourceLimits> =
   Object.freeze({
+    // Bound the caller-owned string before parser field/row allocations begin.
     maxInputBytes: 32 * 1024 * 1024,
+    // Bound the single returned string; exports cannot stream partial output.
     maxOutputBytes: 64 * 1024 * 1024,
+    // Preserve the million-row Sheetwrite data contract.
     maxRows: 1_000_000,
+    // Preserve the XLSX-compatible worksheet width.
     maxColumns: 16_384,
+    // Bound aggregate parser arrays and encoder field work.
     maxCells: 1_000_000,
+    // Prevent one quoted field from dominating synchronous memory.
     maxFieldBytes: 1 * 1024 * 1024,
+    // Bound each store read even though the final export remains in memory.
     maxWriterWindowRows: 4_096,
   });
 

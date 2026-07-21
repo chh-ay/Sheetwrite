@@ -35,16 +35,17 @@ privacy?: PresencePrivacyOptions;
 </details>
 
 <details class="api-member" id="presence-coordinator-options-heartbeat-ms" data-pagefind-weight="1">
-<summary><code>heartbeatMs</code></summary>
+<summary><code>heartbeatMs</code> <span class="api-member-summary">Publish/prune interval in milliseconds; defaults to 15,000.</span></summary>
 
 ```ts generated
 heartbeatMs?: number;
 ```
 
+<p class="api-member-doc">Publish/prune interval in milliseconds; defaults to 15,000. Use 0 to disable the timer.</p>
 </details>
 
 <details class="api-member" id="presence-coordinator-options-timeout-ms" data-pagefind-weight="1">
-<summary><code>timeoutMs</code></summary>
+<summary><code>timeoutMs</code> <span class="api-member-summary">Idle receipt time before a remote actor expires; defaults to 45,000 milliseconds.</span></summary>
 
 ```ts generated
 timeoutMs?: number;
@@ -53,7 +54,7 @@ timeoutMs?: number;
 </details>
 
 <details class="api-member" id="presence-coordinator-options-max-actors" data-pagefind-weight="1">
-<summary><code>maxActors</code></summary>
+<summary><code>maxActors</code> <span class="api-member-summary">Remote actors retained at once; defaults to 32 and is clamped to at least 1.</span></summary>
 
 ```ts generated
 maxActors?: number;
@@ -62,7 +63,7 @@ maxActors?: number;
 </details>
 
 <details class="api-member" id="presence-coordinator-options-max-ranges-per-actor" data-pagefind-weight="1">
-<summary><code>maxRangesPerActor</code></summary>
+<summary><code>maxRangesPerActor</code> <span class="api-member-summary">Selection ranges sent or accepted per actor; defaults to 8 and is clamped to at least 1.</span></summary>
 
 ```ts generated
 maxRangesPerActor?: number;

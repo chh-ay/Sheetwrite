@@ -9,7 +9,7 @@ Path-qualified schema failure found while validating an untrusted snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L185</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L202</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

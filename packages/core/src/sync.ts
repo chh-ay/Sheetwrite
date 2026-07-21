@@ -94,48 +94,57 @@ export interface SyncVersionGapRequest {
 
 /** Aggregate ceilings for local commits retained until durable acknowledgement. */
 export interface SyncPendingQueueLimits {
-  /** Maximum number of pending local commits, including synchronous reservations. */
+  /** Pending local commits, including synchronous reservations; defaults to 10,000. */
   maxPendingCommits: number;
-  /** Maximum aggregate DocumentOp count across pending local commits. */
+  /** Aggregate DocumentOp count across pending commits; defaults to 100,000. */
   maxPendingOperations: number;
-  /** Maximum aggregate UTF-8 bytes across JSON-encoded pending operation arrays. */
+  /** Aggregate UTF-8 bytes across pending operation arrays; defaults to 128 MiB. */
   maxPendingEncodedBytes: number;
 }
 
 /** Resource ceilings applied independently to remote collaboration input and local durability. */
 export interface SyncCoordinatorLimits extends SyncPendingQueueLimits {
-  /** Maximum UTF-8 bytes in a remote or pending client mutation ID. */
+  /** UTF-8 bytes in a remote or pending mutation ID; defaults to 256. */
   maxMutationIdBytes: number;
-  /** Maximum operations accepted in one hostile remote version. */
+  /** Operations accepted in one remote version; defaults to 10,000. */
   maxOperationsPerVersion: number;
-  /** Maximum encoded operation bytes accepted in one hostile remote version. */
+  /** Encoded operation bytes accepted in one remote version; defaults to 8 MiB. */
   maxVersionPayloadBytes: number;
-  /** Maximum allowed version distance ahead of the contiguous remote head. */
+  /** Version distance allowed ahead of the contiguous head; defaults to 1,024. */
   maxFutureVersionDistance: number;
-  /** Maximum remote future versions retained in the gap buffer. */
+  /** Remote future versions retained in the gap buffer; defaults to 256. */
   maxBufferedVersions: number;
-  /** Maximum aggregate operations retained in the remote gap buffer. */
+  /** Aggregate operations retained in the gap buffer; defaults to 40,000. */
   maxBufferedOperations: number;
-  /** Maximum aggregate encoded bytes retained in the remote gap buffer. */
+  /** Aggregate encoded bytes retained in the gap buffer; defaults to 32 MiB. */
   maxBufferedBytes: number;
   /**
-   * Recently acknowledged mutation IDs retained for echo deduplication. Once
-   * an ID expires, a stale operation carrying it is treated as a protocol
-   * violation that requires reload; its operations are never reapplied.
+   * Recently acknowledged mutation IDs retained for echo deduplication;
+   * defaults to 4,096. Once an ID expires, a stale operation carrying it is a
+   * reload-requiring protocol violation and its operations are never reapplied.
    */
   maxRecentAcknowledgements: number;
 }
 
-/** Conservative synchronization limits suitable for untrusted collaboration input and offline work. */
+/**
+ * Security and durability defaults bound hostile remote versions, recovery
+ * buffers, acknowledgement memory, and the offline pending queue independently.
+ */
 export const DEFAULT_SYNC_COORDINATOR_LIMITS: Readonly<SyncCoordinatorLimits> = Object.freeze({
+  // IDs cross persistence and transport boundaries.
   maxMutationIdBytes: 256,
+  // One remote version uses the same atomic-operation ceilings as a transaction.
   maxOperationsPerVersion: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations,
   maxVersionPayloadBytes: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes,
+  // Bound version-gap recovery distance before requiring a snapshot reload.
   maxFutureVersionDistance: 1_024,
+  // Bound future-version retention along count, operation, and byte dimensions.
   maxBufferedVersions: 256,
   maxBufferedOperations: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations * 4,
   maxBufferedBytes: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes * 4,
+  // Retain a finite echo-deduplication window.
   maxRecentAcknowledgements: 4_096,
+  // Bound durable offline work independently of any single transaction.
   maxPendingCommits: 10_000,
   maxPendingOperations: 100_000,
   maxPendingEncodedBytes: 128 * 1024 * 1024,
@@ -196,7 +205,7 @@ export interface SyncCoordinatorOptions {
   recoverVersionGap?: (
     request: SyncVersionGapRequest,
   ) => Promise<readonly VersionedOperation[] | WorkbookSnapshot>;
-  /** Overrides remote collaboration and durable local pending-queue ceilings. */
+  /** Positive safe-integer overrides merged over `DEFAULT_SYNC_COORDINATOR_LIMITS`. */
   limits?: Partial<SyncCoordinatorLimits>;
 }
 

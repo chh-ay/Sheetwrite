@@ -17,12 +17,13 @@ Optional resource ceilings for an in-memory delimited-text operation.
 <div class="api-member-list">
 
 <details class="api-member" id="delimited-text-options-resource-limits" data-pagefind-weight="1">
-<summary><code>resourceLimits</code></summary>
+<summary><code>resourceLimits</code> <span class="api-member-summary">Positive safe-integer overrides merged over DEFAULTDELIMITEDTEXTRESOURCELIMITS.</span></summary>
 
 ```ts generated
 resourceLimits?: Partial<DelimitedTextResourceLimits>;
 ```
 
+<p class="api-member-doc">Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`.</p>
 </details>
 </div>
 

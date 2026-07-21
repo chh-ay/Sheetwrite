@@ -86,6 +86,7 @@ pub(crate) fn payload_str_id(bits: u64) -> u32 {
     }
 }
 
+/// Default allocation-lazy row granularity used when the host does not supply one.
 pub(crate) const DEFAULT_PAGE_CHUNK_ROWS: usize = 4096;
 const BITS_PER_WORD: usize = 64;
 
@@ -593,6 +594,7 @@ impl PagedStorage {
     }
 }
 
+/// Aggregate eager-allocation ceiling mirrored by `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`.
 pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
 
 pub(crate) fn checked_dense_cell_count(n_cols: usize, row_count: usize) -> Option<usize> {

@@ -14,7 +14,8 @@ export const WORKBOOK_SCHEMA_VERSION = 1 as const;
 
 /**
  * Inclusive defaults for every atomic document transaction accepted by a
- * Store or Grid. Encoded bytes are the UTF-8 JSON size of the DocumentOp array.
+ * Store or Grid. The count bounds object-heavy validation and dispatch; the
+ * exact UTF-8 JSON size bounds hostile or accidentally oversized payloads.
  */
 export const DEFAULT_TRANSACTION_RESOURCE_LIMITS: Readonly<TransactionResourceLimits> =
   Object.freeze({
@@ -128,29 +129,45 @@ export type SnapshotStorageMode = "dense" | "paged";
 
 /** Resource ceilings applied before snapshot normalization or store allocation. */
 export interface SnapshotResourceLimits {
+  /** Workbook sheets; defaults to 256. */
   maxSheets: number;
+  /** Rows in any sheet; defaults to 1,000,000. */
   maxRowsPerSheet: number;
+  /** Columns in any sheet; defaults to 16,384. */
   maxColumnsPerSheet: number;
+  /** Aggregate workbook/sheet metadata array entries; defaults to 1,000,000. */
   maxMetadataEntries: number;
+  /** UTF-8 JSON bytes inspected while validating a snapshot; defaults to 64 MiB. */
   maxSerializedBytes: number;
+  /** Logical row-by-column cells in any sheet; defaults to 4,294,967,295. */
   maxLogicalCellsPerSheet: number;
+  /** Aggregate cells allocated by dense storage; defaults to 5,000,000. */
   maxDenseCells: number;
 }
 
 /** Conservative defaults that retain the million-row paged-sheet contract. */
 export const DEFAULT_SNAPSHOT_RESOURCE_LIMITS: Readonly<SnapshotResourceLimits> = Object.freeze({
+  // Bound sheet-indexed schema and store allocations.
   maxSheets: 256,
+  // Product compatibility contract for allocation-lazy sheets.
   maxRowsPerSheet: 1_000_000,
+  // Match the XLSX worksheet-width boundary.
   maxColumnsPerSheet: 16_384,
+  // Bound aggregate names, ranges, cells, and sheet metadata inspection.
   maxMetadataEntries: 1_000_000,
+  // Bound synchronous JSON-safety traversal without constructing a JSON string.
   maxSerializedBytes: 64 * 1024 * 1024,
+  // Bound logical sheet area even when paged storage defers physical allocation.
   maxLogicalCellsPerSheet: 0xffff_ffff,
+  // Bound eager dense allocation across the workbook.
   maxDenseCells: 5_000_000,
 });
 
 /** Validation and allocation policy for an untrusted workbook snapshot. */
 export interface SnapshotValidationOptions {
+  /** Allocation model used for capacity checks; defaults to `dense`. */
   storage?: SnapshotStorageMode;
+  /** Non-negative safe-integer overrides merged over `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`. */
   resourceLimits?: Partial<SnapshotResourceLimits>;
 }
 

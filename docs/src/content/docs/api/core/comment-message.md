@@ -9,7 +9,7 @@ One immutable author message in a comment thread.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L365</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L378</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

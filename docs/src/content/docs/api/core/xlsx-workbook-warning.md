@@ -9,7 +9,7 @@ Structured fidelity warning emitted during XLSX conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L338</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L363</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

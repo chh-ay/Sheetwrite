@@ -26,23 +26,22 @@ mode?: "dense" | "paged";
 </details>
 
 <details class="api-member" id="data-source-storage-options-chunk-rows" data-pagefind-weight="1">
-<summary><code>chunkRows</code> <span class="api-member-summary">Power-of-two row chunk size.</span></summary>
+<summary><code>chunkRows</code> <span class="api-member-summary">Paged row chunk size; defaults to 4,096 and is normalized to a power of two.</span></summary>
 
 ```ts generated
 chunkRows?: number;
 ```
 
-<p class="api-member-doc">Power-of-two row chunk size. Defaults to 4096.</p>
 </details>
 
 <details class="api-member" id="data-source-storage-options-cache-bytes" data-pagefind-weight="1">
-<summary><code>cacheBytes</code> <span class="api-member-summary">Clean-chunk cache budget.</span></summary>
+<summary><code>cacheBytes</code> <span class="api-member-summary">Per-sheet clean-chunk budget; defaults to 32 MiB.</span></summary>
 
 ```ts generated
 cacheBytes?: number;
 ```
 
-<p class="api-member-doc">Clean-chunk cache budget. Dirty and visible chunks may exceed it.</p>
+<p class="api-member-doc">Per-sheet clean-chunk budget; defaults to 32 MiB. Dirty and visible chunks may exceed it.</p>
 </details>
 </div>
 

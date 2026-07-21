@@ -316,7 +316,10 @@ export interface GridOptions {
   renderers?: Record<string, CellRenderer>;
   /** Named custom editors resolved from each column's `editor` field. */
   editors?: Record<string, CellEditor>;
-  /** Rows rendered above/below the viewport to absorb fast scrolls. */
+  /**
+   * Extra row and visible-column positions painted on each viewport edge.
+   * Defaults to 6; use 0 to disable the buffer.
+   */
   overscan?: number;
   /** Render at least this many columns (empty padding columns past the data, like a spreadsheet). */
   minColumns?: number;
@@ -471,8 +474,8 @@ export interface Grid {
   /** Active column filters on the active sheet, keyed by column index. */
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
   /**
-   * Distinct resolved values of a column (Rust scan), capped at `limit`
-   * (default 1000) — the data source for a filter-by-values UI.
+   * Distinct resolved values of a column in first-seen order. Defaults to
+   * 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
    */
   distinctValues(col: number, limit?: number): CellScalar[];
   /** Hide the given data rows (composes with filters/sort). */
@@ -545,8 +548,8 @@ export interface Grid {
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
   getNote(addr: CellAddress): string | null;
   /**
-   * Live-update the render window overscan (rows/cols painted beyond the
-   * viewport); `undefined` restores the default.
+   * Live-update the render window overscan (row/column positions painted past
+   * each edge); `undefined` restores the default of 6.
    */
   setOverscan(overscan?: number): void;
   /**

@@ -30,7 +30,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `mutationPolicy` | `"atomic" \| "partial"` | `"atomic"` | Reject the whole local transaction on a denied protected operation, or apply allowed operations and report denied ones. |
 | `renderers` | `Record<string, CellRenderer>` | `{}` | Custom cell renderers registered up front; reference one by name via `Column.renderer`. Also see `defineCellRenderer`. |
 | `editors` | `Record<string, CellEditor>` | `{}` | Host-owned cell editors registered up front; reference one by name via `Column.editor`. |
-| `overscan` | `number` | `6` | Rows rendered above and below the viewport to absorb fast scrolls. |
+| `overscan` | `number` | `6` | Row and visible-column positions painted on each viewport edge; `0` disables the buffer. |
 | `minColumns` | `number` | workbook width | Minimum rendered/store column count, including empty spreadsheet padding columns. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar (see below). Omit for no toolbar. |
 
@@ -311,6 +311,7 @@ bounds clean cached chunks, while dirty chunks remain pinned until
 acknowledgement. Full-sheet queries and exports report incomplete data until all
 required pages are loaded. `Store.queryCapability(sheet)` and
 `getCellLoadState(addr)` expose that state.
+Default chunk/cache values and eviction behavior are listed in [Compatibility and limits](/docs/reference/compatibility-limits/#rendering-interaction-and-paged-data).
 
 
 ### Serializable documents

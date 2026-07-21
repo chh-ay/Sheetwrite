@@ -9,7 +9,7 @@ Applied, duplicate, or conflict acknowledgement for a comment mutation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L407</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L420</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

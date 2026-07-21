@@ -9,7 +9,7 @@ Success or structured errors returned by document validation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L180</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L197</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

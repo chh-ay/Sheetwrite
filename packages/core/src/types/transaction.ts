@@ -11,9 +11,9 @@ import type { CommitReason, DocumentOp, MutationIssue, WorkbookSnapshot } from "
  * logical cell area covered by compact operations.
  */
 export interface TransactionResourceLimits {
-  /** Maximum number of DocumentOp objects in one atomic transaction. */
+  /** DocumentOp objects in one atomic transaction; defaults to 10,000. */
   maxOperations: number;
-  /** Maximum UTF-8 bytes in the JSON-encoded DocumentOp array. */
+  /** UTF-8 bytes in the JSON-encoded DocumentOp array; defaults to 8 MiB. */
   maxEncodedBytes: number;
 }
 

@@ -93,9 +93,9 @@ import type {
 import { ValidationEditor } from "./validation-editor.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
-/** Conservative sizer ceiling when the real layout clamp cannot be measured. */
+/** Platform fallback used when no reliable browser scroll clamp can be measured. */
 const MAX_ELEMENT_HEIGHT_FALLBACK = 15_000_000;
-/** Keep the sizer safely under the measured clamp so rounding never truncates it. */
+/** Safety margin below the measured clamp, reserved for layout rounding. */
 const MAX_ELEMENT_HEIGHT_MARGIN = 4_096;
 
 /**
@@ -128,7 +128,9 @@ export function measureMaxElementHeight(
   if (!Number.isFinite(measured) || measured < 1_000_000) return MAX_ELEMENT_HEIGHT_FALLBACK;
   return Math.floor(measured) - MAX_ELEMENT_HEIGHT_MARGIN;
 }
+/** Interaction-tuning default: paint six row and visible-column positions past each viewport edge. */
 const DEFAULT_OVERSCAN = 6;
+/** Width of synthesized workbook and presentation-padding columns, in CSS pixels. */
 const DEFAULT_COL_WIDTH = 100;
 const GRID_COMMANDS: readonly GridCommandName[] = [
   "bold",
@@ -212,7 +214,7 @@ function formattingCommandActive(
   }
 }
 
-/** Hard ceiling for one auto-fit bulk read. */
+/** Bounds each auto-fit store read; larger scans continue in frame-scheduled chunks. */
 export const AUTO_FIT_CHUNK_CELLS = 16_384;
 
 export interface AutoFitResourceStats {

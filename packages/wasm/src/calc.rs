@@ -16,6 +16,7 @@
 //! The evaluator lives on `CellStore` (it needs cell access); this module is the
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
+/// Matches evaluator depth so parsing cannot admit an expression the engine cannot safely recurse.
 const PARSE_RECURSION_LIMIT: usize = 256;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

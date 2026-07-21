@@ -9,7 +9,7 @@ Typed rejection of malformed or resource-exhausting synchronization input.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L163</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L172</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

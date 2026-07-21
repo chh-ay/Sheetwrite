@@ -9,7 +9,7 @@ Pluggable first-row-header, first-sheet table export backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L271</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L296</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

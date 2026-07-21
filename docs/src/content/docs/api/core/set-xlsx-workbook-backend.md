@@ -9,7 +9,7 @@ Registers the optional workbook XLSX implementation used by core.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L380</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L405</code></dd></div>
 </dl>
 
 ## Declaration

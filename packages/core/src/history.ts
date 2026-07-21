@@ -17,6 +17,9 @@ interface UndoEntry {
   redo: DocumentOp[];
 }
 
+/** Retains recent transaction-level undo resources without allowing unbounded history growth. */
+const DEFAULT_HISTORY_LIMIT = 200;
+
 /**
  * Bounded undo/redo over document transactions. Destructive bulk edits may
  * retain opaque store-local range resources, which are materialized into a
@@ -26,7 +29,7 @@ export class UndoManager {
   private readonly undoStack: UndoEntry[] = [];
   private readonly redoStack: UndoEntry[] = [];
 
-  constructor(private readonly limit = 200) {}
+  constructor(private readonly limit = DEFAULT_HISTORY_LIMIT) {}
 
   /** Record an applied edit. A fresh edit disposes the discarded redo stack. */
   push(undo: HistoryAction, redo: DocumentOp[]): void {

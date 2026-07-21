@@ -9,7 +9,7 @@ Host persistence contract for revision history and restore.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L251</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L264</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

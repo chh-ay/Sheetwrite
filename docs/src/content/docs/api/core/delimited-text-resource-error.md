@@ -9,7 +9,7 @@ Stable resource-limit failure raised before the next oversized parse or encode a
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L40</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L51</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>

@@ -9,7 +9,7 @@ Typed local transaction rejection produced when the durable queue cannot reserve
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L175</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L184</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

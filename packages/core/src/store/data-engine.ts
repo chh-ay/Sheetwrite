@@ -72,6 +72,9 @@ const KIND_FORMULA = 4;
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
+/** Rows per allocation-lazy chunk; this matches the store engine's native default. */
+const DEFAULT_PAGED_CHUNK_ROWS = 4_096;
+/** Per-sheet budget for clean, unpinned chunks; dirty or visible chunks stay resident. */
 const DEFAULT_PAGED_CACHE_BYTES = 32 * 1024 * 1024;
 const DEFAULT_PAGED_DIRTY_CELL_LIMIT = 1_000_000;
 const EMPTY_U32 = new Uint32Array(0);
@@ -100,8 +103,11 @@ export interface RangeMutationAllocationStats {
 }
 
 export interface SheetwriteStoreOptions {
+  /** Storage engine; defaults to eager `dense` allocation. */
   storage?: "dense" | "paged";
+  /** Paged row chunk size; defaults to 4,096 and is normalized to a power of two. */
   chunkRows?: number;
+  /** Per-sheet clean-chunk budget; defaults to 32 MiB. Dirty and pinned chunks may exceed it. */
   cacheBytes?: number;
   dirtyCellLimit?: number;
   protectionResolver?: ProtectionResolver;
@@ -258,7 +264,7 @@ export class StoreDataEngine {
       ? this.wasm.addPagedSheet(
           columns,
           rows,
-          this.storageOptions.chunkRows ?? 4096,
+          this.storageOptions.chunkRows ?? DEFAULT_PAGED_CHUNK_ROWS,
           this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES,
           this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
         )

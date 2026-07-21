@@ -210,40 +210,65 @@ export function downloadBytes(bytes: Uint8Array | string, filename: string, mime
 
 /** Resource dimensions bounded by every XLSX import and export path. */
 export interface XlsxResourceLimits {
+  /** Compressed workbook input bytes; defaults to 32 MiB. */
   maxInputBytes: number;
+  /** Encoded workbook output bytes; defaults to 128 MiB. */
   maxOutputBytes: number;
+  /** ZIP archive entries; defaults to 1,024. */
   maxArchiveEntries: number;
+  /** Uncompressed bytes in any one ZIP entry; defaults to 64 MiB. */
   maxEntryUncompressedBytes: number;
+  /** Aggregate uncompressed ZIP entry bytes; defaults to 256 MiB. */
   maxTotalUncompressedBytes: number;
+  /** Uncompressed-to-compressed ratio for one ZIP entry; defaults to 100. */
   maxCompressionRatio: number;
+  /** Workbook worksheets; defaults to 256. */
   maxSheets: number;
+  /** Rows in any worksheet; defaults to 1,048,576. */
   maxRowsPerSheet: number;
+  /** Columns in any worksheet; defaults to 16,384. */
   maxColumnsPerSheet: number;
+  /** Cells accounted by the active conversion path; defaults to 1,000,000. */
   maxCells: number;
+  /** Aggregate merged ranges; defaults to 100,000. */
   maxMerges: number;
+  /** Shared-string table entries; defaults to 1,000,000. */
   maxSharedStrings: number;
+  /** Style-related records; defaults to 65,536. */
   maxStyles: number;
+  /** Elements in any one XML part; defaults to 2,000,000. */
   maxXmlElements: number;
+  /** Element nesting depth in any one XML part; defaults to 64. */
   maxXmlDepth: number;
+  /** Attributes on any one XML element; defaults to 128. */
   maxXmlAttributesPerElement: number;
+  /** UTF-8 text bytes in one XML element or attribute; defaults to 16 MiB. */
   maxXmlTextBytes: number;
 }
 
-/** Conservative defaults used by the optional XLSX codec. */
+/**
+ * Codec defaults combine SpreadsheetML worksheet dimensions with independent
+ * ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.
+ */
 export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object.freeze({
+  // Bound caller input and the single returned byte array.
   maxInputBytes: 32 * 1024 * 1024,
   maxOutputBytes: 128 * 1024 * 1024,
+  // Bound archive fan-out and decompression, including zip-bomb ratios.
   maxArchiveEntries: 1_024,
   maxEntryUncompressedBytes: 64 * 1024 * 1024,
   maxTotalUncompressedBytes: 256 * 1024 * 1024,
   maxCompressionRatio: 100,
+  // SpreadsheetML worksheet compatibility dimensions.
   maxSheets: 256,
   maxRowsPerSheet: 1_048_576,
   maxColumnsPerSheet: 16_384,
+  // Bound aggregate conversion collections.
   maxCells: 1_000_000,
   maxMerges: 100_000,
   maxSharedStrings: 1_000_000,
   maxStyles: 65_536,
+  // Bound each hand-parsed XML part independently.
   maxXmlElements: 2_000_000,
   maxXmlDepth: 64,
   maxXmlAttributesPerElement: 128,
@@ -357,9 +382,9 @@ export interface XlsxWorkbookWarning {
 export interface XlsxWorkbookOptions {
   /** Abort before or between bounded codec operations. */
   signal?: AbortSignal;
-  /** Maximum logical cells processed. Defaults to 1,000,000. */
+  /** Cells accounted by the active conversion path; defaults to 1,000,000. */
   maxCells?: number;
-  /** Overrides for all other XLSX resource dimensions. */
+  /** Positive overrides for every XLSX resource dimension except `maxCells`. */
   resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
   onWarning?: (warning: XlsxWorkbookWarning) => void;
 }

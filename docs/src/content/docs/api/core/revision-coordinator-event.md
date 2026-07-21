@@ -9,7 +9,7 @@ State or restore transition emitted by revision coordination.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L266</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L279</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

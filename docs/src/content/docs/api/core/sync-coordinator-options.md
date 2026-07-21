@@ -9,7 +9,7 @@ Document, version, durability, and online options for synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L185</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L194</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
@@ -73,12 +73,13 @@ snapshot for the host to remount before calling `resumeAfterReload`.</p>
 </details>
 
 <details class="api-member" id="sync-coordinator-options-limits" data-pagefind-weight="1">
-<summary><code>limits</code> <span class="api-member-summary">Overrides remote collaboration and durable local pending-queue ceilings.</span></summary>
+<summary><code>limits</code> <span class="api-member-summary">Positive safe-integer overrides merged over DEFAULTSYNCCOORDINATORLIMITS.</span></summary>
 
 ```ts generated
 limits?: Partial<SyncCoordinatorLimits>;
 ```
 
+<p class="api-member-doc">Positive safe-integer overrides merged over `DEFAULT_SYNC_COORDINATOR_LIMITS`.</p>
 </details>
 </div>
 

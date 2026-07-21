@@ -12,7 +12,9 @@ pub(crate) const KIND_BOOL: u8 = 3;
 pub(crate) const KIND_FORMULA: u8 = 4;
 
 pub(crate) const NO_STRING: u32 = u32::MAX;
+/// Bounds dependency/evaluation recursion; deeper formulas resolve to `#NUM!`.
 pub(crate) const FORMULA_RECURSION_LIMIT: usize = 256;
+/// Bounds one materialized formula range; larger ranges resolve to `#NUM!`.
 pub(crate) const RANGE_CELL_LIMIT: u64 = 1_000_000;
 
 pub(crate) type CellKey = (u32, u32);
