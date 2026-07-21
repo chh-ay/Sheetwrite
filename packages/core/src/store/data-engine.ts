@@ -125,7 +125,7 @@ export class IncompleteDataError extends Error {
   }
 }
 interface PagedDirtyPreflightState {
-  handle: number;
+  handle: number | null;
   rows: number;
   cols: number;
   columnKeys: string[];
@@ -347,9 +347,10 @@ export class StoreDataEngine {
     const states = new Map<SheetId, PagedDirtyPreflightState>();
     const keyOf = (row: number, col: number) => `${row}:${col}`;
     const stateFor = (sheet: SheetId) => {
+      const existing = states.get(sheet);
+      if (existing) return existing;
       if (!this.handles.has(sheet)) return undefined;
-      let state = states.get(sheet);
-      if (state) return state;
+      let state: PagedDirtyPreflightState;
       const meta = this.sheetMeta(sheet);
       state = {
         handle: this.handleOf(sheet),
@@ -386,10 +387,12 @@ export class StoreDataEngine {
     };
     const materializeExisting = (state: PagedDirtyPreflightState) => {
       if (state.existing) return;
-      const coordinates = this.wasm.pagedDirtyCoordinates(state.handle);
       const existing = new Set<string>();
-      for (let index = 0; index + 1 < coordinates.length; index += 2) {
-        existing.add(keyOf(coordinates[index]!, coordinates[index + 1]!));
+      if (state.handle !== null) {
+        const coordinates = this.wasm.pagedDirtyCoordinates(state.handle);
+        for (let index = 0; index + 1 < coordinates.length; index += 2) {
+          existing.add(keyOf(coordinates[index]!, coordinates[index + 1]!));
+        }
       }
       state.existing = existing;
       state.dirty = existing.size;
@@ -428,7 +431,9 @@ export class StoreDataEngine {
       if (state.seen.has(key)) return null;
       if (
         state.existing?.has(key) ||
-        (state.existing === null && this.wasm.cellState(state.handle, row, col) === 3)
+        (state.existing === null &&
+          state.handle !== null &&
+          this.wasm.cellState(state.handle, row, col) === 3)
       ) {
         return null;
       }
@@ -475,6 +480,35 @@ export class StoreDataEngine {
 
     for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
       const patch = patches[operationIndex]!;
+      if (patch.op === "addSheet") {
+        const snapshot = patch.sheet;
+        const state: PagedDirtyPreflightState = {
+          handle: null,
+          rows: snapshot.rowCount,
+          cols: snapshot.columns.length,
+          columnKeys: snapshot.columns.map((column) => column.key),
+          dirty: 0,
+          additional: 0,
+          existing: new Set<string>(),
+          seen: new Set<string>(),
+        };
+        states.set(snapshot.id, state);
+        for (const block of snapshot.cells) {
+          for (const cell of block.cells) {
+            const rejection = addSparse(
+              snapshot.id,
+              block.startRow + cell.rowOffset,
+              block.startCol + cell.colOffset,
+            );
+            if (rejection) return rejection;
+          }
+        }
+        continue;
+      }
+      if (patch.op === "removeSheet") {
+        states.delete(patch.sheet);
+        continue;
+      }
       const sheet = patchSheetId(patch);
       if (
         sheet !== null &&

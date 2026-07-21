@@ -2264,6 +2264,116 @@ it("rejects mixed clear/set growth atomically at the dirty limit", () => {
   store.dispose();
 });
 
+it("rejects unknown operation and reference sheets before policy or engine access", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+  const missing = "missing";
+  const range = {
+    sheet: missing,
+    start: { row: 0, col: 0 },
+    end: { row: 0, col: 0 },
+  };
+  const operations: DocumentOp[] = [
+    {
+      op: "setRange",
+      range,
+      cells: [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 1 } }],
+    },
+    {
+      op: "setBlock",
+      range,
+      block: { rowCount: 1, colCount: 1, values: [1] },
+    },
+    { op: "setRangeStyle", range, style: { bold: true } },
+    { op: "clearRange", range },
+    { op: "addRows", sheet: missing, at: 0, count: 1 },
+    {
+      op: "set",
+      addr: { sheet: missing, row: 0, col: 0 },
+      value: { kind: "formula", src: "=1+1" },
+    },
+    {
+      op: "set",
+      addr: addr(0, 0),
+      value: { kind: "ref", target: { sheet: missing, row: 0, col: 0 } },
+    },
+    {
+      op: "setRange",
+      range: { ...range, sheet: "s1" },
+      cells: [
+        {
+          rowOffset: 0,
+          colOffset: 0,
+          value: { kind: "ref", target: { sheet: missing, row: 0, col: 0 } },
+        },
+      ],
+    },
+    {
+      op: "setBlock",
+      range: { ...range, sheet: "s1" },
+      block: {
+        rowCount: 1,
+        colCount: 1,
+        values: [null],
+        refs: [[0, { sheet: missing, row: 0, col: 0 }]],
+      },
+    },
+  ];
+  for (const operation of operations) {
+    expect(store.applyTransaction({ patches: [operation] })).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+    });
+  }
+  expect(store.getCellLoadState(addr(0, 0))).toBe("unloaded");
+  store.dispose();
+});
+
+it("preflights new-sheet snapshot cells and later writes against one dirty limit", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+    storage: "paged",
+    dirtyCellLimit: 2,
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s2",
+          name: "Second",
+          order: 1,
+          rowCount: 3,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [
+            {
+              startRow: 0,
+              startCol: 0,
+              rowCount: 2,
+              colCount: 1,
+              cells: [
+                { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "first" } },
+                { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: "second" } },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s2", row: 2, col: 0 },
+        value: { kind: "literal", value: "overflow" },
+      },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 3, max: 2 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  store.dispose();
+});
+
 describe("validation, protection, and notes metadata", () => {
   it("applies reject, warn, and partial validation policy at the transaction boundary", () => {
     const workbook = makeWorkbook(4);

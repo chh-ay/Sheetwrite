@@ -16,6 +16,7 @@ import {
   type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
+import { patchSheetId } from "./store/ranges.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -430,25 +431,104 @@ export class SheetwriteStore implements Store {
     if (!resourceValidation.ok) {
       return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
     }
+    const liveSheets = new Set(this.engine.getWorkbook().sheets.map((sheet) => sheet.id));
     for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
       const operationPath = `transaction.patches[${operationIndex}]`;
       const unsafeError = validateDocumentOperationShape(
         tx.patches[operationIndex],
         operationPath,
       ).find((error) => error.code !== "out-of-bounds");
-      if (!unsafeError) continue;
-      return {
-        status: "rejected",
-        epoch: this.epoch,
-        issues: [
-          {
-            kind: "invalid-operation",
-            severity: "error",
-            operationIndex,
-            message: unsafeError.message,
-          },
-        ],
-      };
+      if (unsafeError) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "invalid-operation",
+              severity: "error",
+              operationIndex,
+              message: unsafeError.message,
+            },
+          ],
+        };
+      }
+      const operation = tx.patches[operationIndex]!;
+      const requiredSheets: SheetId[] = [];
+      if (operation.op === "addSheet") {
+        if (liveSheets.has(operation.sheet.id)) {
+          return {
+            status: "rejected",
+            epoch: this.epoch,
+            issues: [
+              {
+                kind: "invalid-operation",
+                severity: "error",
+                operationIndex,
+                message: `Sheet ${operation.sheet.id} already exists`,
+              },
+            ],
+          };
+        }
+        liveSheets.add(operation.sheet.id);
+        for (const block of operation.sheet.cells) {
+          for (const cell of block.cells) {
+            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+          }
+        }
+        for (const rule of operation.sheet.conditionalFormats ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const rule of operation.sheet.validationRules ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const entry of operation.sheet.protectedRanges ?? []) {
+          requiredSheets.push(entry.range.sheet);
+        }
+        for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+      } else {
+        const primarySheet = patchSheetId(operation);
+        if (primarySheet !== null) requiredSheets.push(primarySheet);
+        if (operation.op === "set" && operation.value.kind === "ref") {
+          requiredSheets.push(operation.value.target.sheet);
+        } else if (operation.op === "setRange") {
+          for (const cell of operation.cells) {
+            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+          }
+        } else if (operation.op === "setBlock") {
+          for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+        } else if (operation.op === "setNamedRange") {
+          requiredSheets.push(operation.namedRange.range.sheet);
+          if (operation.namedRange.scope !== undefined) {
+            requiredSheets.push(operation.namedRange.scope);
+          }
+        } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
+          requiredSheets.push(operation.scope);
+        } else if (operation.op === "setValidationRule") {
+          requiredSheets.push(operation.rule.range.sheet);
+        } else if (operation.op === "setProtectedRange") {
+          requiredSheets.push(operation.protectedRange.range.sheet);
+        } else if (operation.op === "setSheetMeta") {
+          for (const rule of operation.patch.conditionalFormats ?? []) {
+            requiredSheets.push(rule.range.sheet);
+          }
+        }
+      }
+      const missingSheet = requiredSheets.find((sheet) => !liveSheets.has(sheet));
+      if (missingSheet !== undefined) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "invalid-operation",
+              severity: "error",
+              operationIndex,
+              message: `Sheet ${missingSheet} does not exist`,
+            },
+          ],
+        };
+      }
+      if (operation.op === "removeSheet") liveSheets.delete(operation.sheet);
     }
     const options =
       typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
