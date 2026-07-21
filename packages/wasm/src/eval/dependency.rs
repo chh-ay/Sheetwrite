@@ -3,11 +3,11 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::calc::{Ast, Func};
+use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
     AbsCellKey, CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT,
 };
-use crate::memory::MemoryOwnerStats;
 
 pub(crate) struct DepIndex {
     exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>>,

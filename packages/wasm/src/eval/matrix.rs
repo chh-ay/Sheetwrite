@@ -40,11 +40,7 @@ impl EvalMatrix {
         MATRIX_RESOURCE_STATS.with(|stats| {
             let [current, peak, allocations] = stats.get();
             let current = current.saturating_add(bytes);
-            stats.set([
-                current,
-                peak.max(current),
-                allocations.saturating_add(1),
-            ]);
+            stats.set([current, peak.max(current), allocations.saturating_add(1)]);
         });
         Self {
             rows,
@@ -103,10 +99,7 @@ impl EvalMatrix {
         self.validate_copies(1)
     }
 
-    pub(super) fn validate_copies(
-        &self,
-        copies: usize,
-    ) -> Result<(), crate::types::FormulaError> {
+    pub(super) fn validate_copies(&self, copies: usize) -> Result<(), crate::types::FormulaError> {
         let base = self
             .values
             .capacity()
@@ -127,7 +120,6 @@ impl EvalMatrix {
         }
         Ok(())
     }
-
 
     pub(super) fn get(&self, row: usize, col: usize) -> Option<&Value> {
         (row < self.rows && col < self.cols)
@@ -174,9 +166,7 @@ pub(super) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        matrix_resource_stats, range_from_ast, reset_matrix_resource_stats, EvalMatrix,
-    };
+    use super::{matrix_resource_stats, range_from_ast, reset_matrix_resource_stats, EvalMatrix};
     use crate::calc::{Ast, NamedRangeRef, RangeFlags, RefFlags, SheetRef};
     use crate::types::{CellRange, Value};
 

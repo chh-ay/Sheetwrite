@@ -4,8 +4,8 @@ use crate::calc::{
     invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast, Func,
     RefFlags, SheetRef,
 };
-use std::rc::Rc;
 use crate::memory::MemoryOwnerStats;
+use std::rc::Rc;
 
 pub(crate) const KIND_EMPTY: u8 = 0;
 pub(crate) const KIND_NUMBER: u8 = 1;

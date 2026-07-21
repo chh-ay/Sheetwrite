@@ -10,9 +10,7 @@ use crate::store::CellStore;
 use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 
 use super::lookup::integer_arg;
-use super::matrix::{
-    optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS,
-};
+use super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::value::{bool_from_value, compare_values};
 
 impl CellStore {
@@ -31,7 +29,10 @@ impl CellStore {
             }
             _ => return None,
         };
-        Some(self.matrix_shape(source, formula_sheet).map(|(_, _, cells)| cells))
+        Some(
+            self.matrix_shape(source, formula_sheet)
+                .map(|(_, _, cells)| cells),
+        )
     }
 
     pub(super) fn eval_dynamic_array(
@@ -80,7 +81,6 @@ impl CellStore {
             Err(FormulaError::Value)
         }
     }
-
 
     fn matrix_shape(
         &self,
@@ -137,14 +137,7 @@ impl CellStore {
         let Some(ast) = optional_ast(args, index) else {
             return Ok(default);
         };
-        bool_from_value(&self.scalar_array_arg(
-            ast,
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        ))
+        bool_from_value(&self.scalar_array_arg(ast, sheet, affected, memo, visiting, depth + 1))
     }
 
     fn eval_filter(
@@ -177,22 +170,10 @@ impl CellStore {
         {
             return Err(FormulaError::Num);
         }
-        let array = self.eval_array_matrix_arg(
-            &args[0],
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        )?;
-        let include = self.eval_array_matrix_arg(
-            &args[1],
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        )?;
+        let array =
+            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
+        let include =
+            self.eval_array_matrix_arg(&args[1], sheet, affected, memo, visiting, depth + 1)?;
         array.validate_copies(2)?;
         debug_assert_eq!(array.values.len(), array_cells);
 
@@ -215,14 +196,7 @@ impl CellStore {
             return Ok(EvalMatrix::new(
                 1,
                 1,
-                vec![self.scalar_array_arg(
-                    empty,
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                )],
+                vec![self.scalar_array_arg(empty, sheet, affected, memo, visiting, depth + 1)],
             ));
         }
 
@@ -261,7 +235,14 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(
-            args, 3, false, sheet, affected, memo, visiting, depth + 1,
+            args,
+            3,
+            false,
+            sheet,
+            affected,
+            memo,
+            visiting,
+            depth + 1,
         )?;
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet)?;
         let item_count = if by_col { array_cols } else { array_rows };
@@ -278,14 +259,8 @@ impl CellStore {
         if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
             return Err(FormulaError::Num);
         }
-        let array = self.eval_array_matrix_arg(
-            &args[0],
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        )?;
+        let array =
+            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
         array.validate_copies(2)?;
         let dimension = if by_col { array.rows } else { array.cols };
         let sort_index = match optional_ast(args, 1) {
@@ -381,7 +356,14 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(
-            args, 1, false, sheet, affected, memo, visiting, depth + 1,
+            args,
+            1,
+            false,
+            sheet,
+            affected,
+            memo,
+            visiting,
+            depth + 1,
         )?;
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet)?;
         let item_count = if by_col { array_cols } else { array_rows };
@@ -390,17 +372,18 @@ impl CellStore {
             .checked_mul(UNIQUE_ITEM_BYTES)
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
-        let array = self.eval_array_matrix_arg(
-            &args[0],
+        let array =
+            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
+        array.validate_copies(2)?;
+        let exactly_once = self.optional_bool_array_arg(
+            args,
+            2,
+            false,
             sheet,
             affected,
             memo,
             visiting,
             depth + 1,
-        )?;
-        array.validate_copies(2)?;
-        let exactly_once = self.optional_bool_array_arg(
-            args, 2, false, sheet, affected, memo, visiting, depth + 1,
         )?;
         debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
 

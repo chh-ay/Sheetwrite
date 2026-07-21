@@ -132,7 +132,6 @@ pub struct RangeSnapshot {
 
 #[wasm_bindgen]
 impl RangeSnapshot {
-
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
         let mut offsets = Vec::new();
@@ -212,7 +211,6 @@ const BLOCK_OK: u32 = 0;
 const BLOCK_INVALID: u32 = 1;
 const BLOCK_SOURCE_INVALID: u32 = 2;
 const BLOCK_RESOURCE_LIMIT: u32 = 3;
-
 
 type InternMap = HashMap<u64, InternSlot, BuildHasherDefault<IdentityHasher>>;
 
@@ -901,7 +899,9 @@ impl CellStore {
 
         let mut source_kinds = vec![0u8; cell_count];
         let mut seen_offsets = HashSet::with_capacity(
-            formula_offsets.len().saturating_add(reference_offsets.len()),
+            formula_offsets
+                .len()
+                .saturating_add(reference_offsets.len()),
         );
         for &offset in formula_offsets {
             let offset = offset as usize;
@@ -936,11 +936,7 @@ impl CellStore {
                 col: reference_targets[target_index + 2],
             };
             let target_sheet = target.sheet as usize;
-            if !self
-                .sheet_alive
-                .get(target_sheet)
-                .copied()
-                .unwrap_or(false)
+            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
                 || !self.sheets[target_sheet]
                     .contains_cell(target.row as usize, target.col as usize)
             {
@@ -959,13 +955,7 @@ impl CellStore {
         }
 
         if let Some(revision) = dirty_revision {
-            if !self.sheets[sheet].prepare_dirty_rect(
-                start_row,
-                start_col,
-                rows,
-                cols,
-                revision,
-            ) {
+            if !self.sheets[sheet].prepare_dirty_rect(start_row, start_col, rows, cols, revision) {
                 return BLOCK_RESOURCE_LIMIT;
             }
         }
@@ -993,14 +983,7 @@ impl CellStore {
                         _ => (KIND_EMPTY, 0),
                     }
                 };
-                if !s.write_cell(
-                    row,
-                    col,
-                    kind,
-                    payload,
-                    styles[offset],
-                    dirty_revision,
-                ) {
+                if !s.write_cell(row, col, kind, payload, styles[offset], dirty_revision) {
                     return BLOCK_RESOURCE_LIMIT;
                 }
                 if let Some(key) = cell_key(row, col) {
@@ -1083,7 +1066,9 @@ impl CellStore {
             destination_cells.push((start_row + offset / cols, start_col + offset % cols));
         }
         let mut source_offsets = HashSet::with_capacity(
-            formula_offsets.len().saturating_add(reference_offsets.len()),
+            formula_offsets
+                .len()
+                .saturating_add(reference_offsets.len()),
         );
         for &offset in formula_offsets {
             if !entry_offsets.contains(&offset) || !source_offsets.insert(offset) {
@@ -1108,11 +1093,7 @@ impl CellStore {
                 col: reference_targets[target_index + 2],
             };
             let target_sheet = target.sheet as usize;
-            if !self
-                .sheet_alive
-                .get(target_sheet)
-                .copied()
-                .unwrap_or(false)
+            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
                 || !self.sheets[target_sheet]
                     .contains_cell(target.row as usize, target.col as usize)
             {
@@ -1425,7 +1406,11 @@ impl CellStore {
                 let index = s.idx(row, col);
                 let key = (row as u32, col as u32);
                 let derived = s.spill_owner(key).is_some_and(|anchor| anchor != key);
-                kind.push(if derived { KIND_EMPTY } else { s.kind_at(index) });
+                kind.push(if derived {
+                    KIND_EMPTY
+                } else {
+                    s.kind_at(index)
+                });
                 payload.push(if derived {
                     0
                 } else if s.str_id_at(index) != NO_STRING {
@@ -2144,10 +2129,7 @@ impl CellStore {
         };
         let row_start = row_start.min(data.row_count);
         let row_end = row_end.min(data.row_count);
-        let Some(len) = row_end
-            .saturating_sub(row_start)
-            .checked_mul(cols.len())
-        else {
+        let Some(len) = row_end.saturating_sub(row_start).checked_mul(cols.len()) else {
             return Vec::new();
         };
         let mut mask = vec![0; len];
@@ -2166,12 +2148,7 @@ impl CellStore {
     }
     /// Row-major derived-cell mask for an explicit view-row order.
     #[wasm_bindgen(js_name = spillDerivedMaskForRows)]
-    pub fn spill_derived_mask_for_rows(
-        &self,
-        sheet: usize,
-        rows: &[u32],
-        cols: &[u32],
-    ) -> Vec<u8> {
+    pub fn spill_derived_mask_for_rows(&self, sheet: usize, rows: &[u32], cols: &[u32]) -> Vec<u8> {
         let Some(data) = self.sheets.get(sheet) else {
             return Vec::new();
         };
@@ -2232,10 +2209,6 @@ impl CellStore {
         }
         owners
     }
-
-
-
-
 
     #[wasm_bindgen(js_name = poolStrings)]
     pub fn pool_strings(&self, ids: &[u32]) -> Vec<String> {
@@ -2307,17 +2280,18 @@ impl CellStore {
         }
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        metadata.add_payload(std::mem::size_of::<CellStore>(), std::mem::size_of::<CellStore>());
+        metadata.add_payload(
+            std::mem::size_of::<CellStore>(),
+            std::mem::size_of::<CellStore>(),
+        );
         metadata.add_vec::<SheetData>(self.sheets.len(), self.sheets.capacity());
         metadata.add_vec::<String>(self.sheet_names.len(), self.sheet_names.capacity());
         for name in &self.sheet_names {
             metadata.add_payload(name.len(), name.capacity());
         }
         metadata.add_vec::<bool>(self.sheet_alive.len(), self.sheet_alive.capacity());
-        metadata.add_hash_table::<String, usize>(
-            self.sheet_lookup.len(),
-            self.sheet_lookup.capacity(),
-        );
+        metadata
+            .add_hash_table::<String, usize>(self.sheet_lookup.len(), self.sheet_lookup.capacity());
         for name in self.sheet_lookup.keys() {
             metadata.add_payload(name.len(), name.capacity());
         }
@@ -2425,9 +2399,8 @@ impl CellStore {
                 .formulas
                 .iter()
                 .filter_map(|(key, entry)| {
-                    (entry.is_reference()
-                        && entry.reference_target(sheet_index as u32).is_none())
-                    .then_some(*key)
+                    (entry.is_reference() && entry.reference_target(sheet_index as u32).is_none())
+                        .then_some(*key)
                 })
                 .collect();
             for key in invalid {

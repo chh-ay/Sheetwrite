@@ -2641,10 +2641,7 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     assert_eq!(sources.formula_offsets(), vec![1]);
     assert_eq!(sources.formula_sources(), vec!["=A1*3"]);
     assert_eq!(sources.reference_offsets(), vec![2]);
-    assert_eq!(
-        sources.reference_targets(),
-        vec![sheet as u32, 0, 1]
-    );
+    assert_eq!(sources.reference_targets(), vec![sheet as u32, 0, 1]);
 
     assert_eq!(
         store.set_sparse_block(
@@ -2774,10 +2771,7 @@ fn range_snapshot_round_trip_preserves_plain_reference_sources() {
     let snapshot = store.capture_range(sheet, 0, 0, 2, 2).unwrap();
     assert_eq!(snapshot.formula_offsets(), vec![0, 1]);
     assert_eq!(snapshot.reference_offsets(), vec![1, 0]);
-    assert_eq!(
-        snapshot.reference_targets(),
-        vec![sheet as u32, 0, 1]
-    );
+    assert_eq!(snapshot.reference_targets(), vec![sheet as u32, 0, 1]);
 
     assert!(store.clear_range(sheet, 0, 0, 1, 1, true, true));
     assert!(store.restore_range(sheet, 0, 0, &snapshot));
@@ -2818,9 +2812,7 @@ fn million_row_source_snapshot_scales_with_source_cardinality() {
     store.end_page_load();
     store.recompute_changed_sources();
 
-    let sources = store
-        .capture_sources(sheet, 0, 0, 1_000_000, 2)
-        .unwrap();
+    let sources = store.capture_sources(sheet, 0, 0, 1_000_000, 2).unwrap();
     assert_eq!(sources.formula_offsets().len(), 1);
     assert_eq!(sources.reference_offsets().len(), 1);
     assert!(sources.byte_length() < 128);

@@ -21,14 +21,14 @@ use crate::types::{
     KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
+use array::dynamic_recompute_within_limit;
 use criteria::{aggregate_if, Criterion};
 pub(crate) use dependency::DepIndex;
 use dependency::{build_dep_index, collect_affected_formulas, seed_dependency_depth_errors};
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator};
 use lookup::{find_match_index, integer_arg, positive_index};
-use array::dynamic_recompute_within_limit;
-use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
+use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 use value::{
     bool_from_value, cached_formula_value, compare_values, number_from_value, text_from_value,
 };
@@ -312,20 +312,15 @@ impl CellStore {
             .skip(1)
             .filter(|value| matches!(value, Value::Error(_)))
             .count();
-        let current_owner_cells = self
-            .sheets
-            .iter()
-            .try_fold(0usize, |total, data| total.checked_add(data.spill_owners.len()));
-        let current_error_cells = self
-            .sheets
-            .iter()
-            .try_fold(0usize, |total, data| total.checked_add(data.spill_errors.len()));
+        let current_owner_cells = self.sheets.iter().try_fold(0usize, |total, data| {
+            total.checked_add(data.spill_owners.len())
+        });
+        let current_error_cells = self.sheets.iter().try_fold(0usize, |total, data| {
+            total.checked_add(data.spill_errors.len())
+        });
         let within_budget = current_owner_cells
             .and_then(|total| total.checked_add(matrix.values.len()))
-            .zip(
-                current_error_cells
-                    .and_then(|total| total.checked_add(additional_errors)),
-            )
+            .zip(current_error_cells.and_then(|total| total.checked_add(additional_errors)))
             .is_some_and(|(owners, errors)| {
                 owners <= self.spill_owner_cell_limit
                     && spill_ownership_within_budget(owners, errors)
@@ -349,10 +344,7 @@ impl CellStore {
         let mut changed = Vec::with_capacity(matrix.values.len().saturating_sub(1));
         for row_offset in 0..matrix.rows {
             for col_offset in 0..matrix.cols {
-                let cell = (
-                    local.0 + row_offset as u32,
-                    local.1 + col_offset as u32,
-                );
+                let cell = (local.0 + row_offset as u32, local.1 + col_offset as u32);
                 self.sheets[sheet].spill_owners.insert(cell, local);
                 if cell == local {
                     continue;

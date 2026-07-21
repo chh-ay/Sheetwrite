@@ -650,10 +650,8 @@ impl PagedStorage {
     }
     fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let indexes = stats.owner_mut(PAGED_INDEXES);
-        indexes.add_hash_table::<(usize, usize), CellChunk>(
-            self.chunks.len(),
-            self.chunks.capacity(),
-        );
+        indexes
+            .add_hash_table::<(usize, usize), CellChunk>(self.chunks.len(), self.chunks.capacity());
         indexes.add_hash_table::<(usize, usize), ()>(self.pinned.len(), self.pinned.capacity());
         // `std::collections::BTreeSet` exposes no node capacity. Report its
         // eviction entries without inventing allocator bytes from `size_of_val`.
@@ -718,12 +716,8 @@ impl SpillRange {
         if rows == 0 || cols == 0 {
             return None;
         }
-        let row_end = anchor
-            .0
-            .checked_add(u32::try_from(rows - 1).ok()?)?;
-        let col_end = anchor
-            .1
-            .checked_add(u32::try_from(cols - 1).ok()?)?;
+        let row_end = anchor.0.checked_add(u32::try_from(rows - 1).ok()?)?;
+        let col_end = anchor.1.checked_add(u32::try_from(cols - 1).ok()?)?;
         Some(Self {
             anchor,
             row_end,
@@ -752,8 +746,6 @@ pub(crate) struct SpillBlocker {
     pub(crate) row_end: u32,
     pub(crate) col_end: u32,
 }
-
-
 
 /// One sheet's column-major scalar grid.
 pub(crate) struct SheetData {
@@ -932,16 +924,12 @@ impl SheetData {
         cols: usize,
         revision: u64,
     ) -> bool {
-        self.paged.as_mut().is_none_or(|paged| {
-            paged.prepare_dirty_rect(r0, c0, rows, cols, revision)
-        })
+        self.paged
+            .as_mut()
+            .is_none_or(|paged| paged.prepare_dirty_rect(r0, c0, rows, cols, revision))
     }
 
-    pub(crate) fn prepare_dirty_cells(
-        &mut self,
-        cells: &[(usize, usize)],
-        revision: u64,
-    ) -> bool {
+    pub(crate) fn prepare_dirty_cells(&mut self, cells: &[(usize, usize)], revision: u64) -> bool {
         self.paged
             .as_mut()
             .is_none_or(|paged| paged.prepare_dirty_cells(cells, revision))
@@ -1181,14 +1169,22 @@ impl SheetData {
         if self.spill_owners.is_empty() {
             self.spill_owners = HashMap::new();
         } else if self.spill_owners.capacity() > self.spill_owners.len().saturating_mul(2)
-            && self.spill_owners.capacity().saturating_sub(self.spill_owners.len()) > 4096
+            && self
+                .spill_owners
+                .capacity()
+                .saturating_sub(self.spill_owners.len())
+                > 4096
         {
             self.spill_owners.shrink_to_fit();
         }
         if self.spill_errors.is_empty() {
             self.spill_errors = HashMap::new();
         } else if self.spill_errors.capacity() > self.spill_errors.len().saturating_mul(2)
-            && self.spill_errors.capacity().saturating_sub(self.spill_errors.len()) > 4096
+            && self
+                .spill_errors
+                .capacity()
+                .saturating_sub(self.spill_errors.len())
+                > 4096
         {
             self.spill_errors.shrink_to_fit();
         }
@@ -1689,10 +1685,8 @@ impl SheetData {
         }
 
         let formulas = stats.owner_mut(FORMULAS);
-        formulas.add_hash_table::<CellKey, FormulaEntry>(
-            self.formulas.len(),
-            self.formulas.capacity(),
-        );
+        formulas
+            .add_hash_table::<CellKey, FormulaEntry>(self.formulas.len(), self.formulas.capacity());
         for entry in self.formulas.values() {
             entry.heap_memory_stats(formulas);
         }
@@ -1714,10 +1708,7 @@ impl SheetData {
             .add_vec::<SpillBlocker>(self.spill_blockers.len(), self.spill_blockers.capacity());
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        metadata.add_hash_table::<CellKey, ()>(
-            self.dirty_cells.len(),
-            self.dirty_cells.capacity(),
-        );
+        metadata.add_hash_table::<CellKey, ()>(self.dirty_cells.len(), self.dirty_cells.capacity());
         metadata.add_vec::<CondRule>(self.cond_rules.len(), self.cond_rules.capacity());
         for rule in &self.cond_rules {
             let text = match &rule.pred {

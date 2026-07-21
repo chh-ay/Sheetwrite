@@ -92,15 +92,15 @@ impl StoreMemoryStats {
     }
 
     pub(crate) fn logical_bytes(&self) -> usize {
-        self.owners
-            .iter()
-            .fold(0usize, |total, owner| total.saturating_add(owner.logical_bytes))
+        self.owners.iter().fold(0usize, |total, owner| {
+            total.saturating_add(owner.logical_bytes)
+        })
     }
 
     pub(crate) fn allocated_bytes(&self) -> usize {
-        self.owners
-            .iter()
-            .fold(0usize, |total, owner| total.saturating_add(owner.allocated_bytes))
+        self.owners.iter().fold(0usize, |total, owner| {
+            total.saturating_add(owner.allocated_bytes)
+        })
     }
 
     /// Flat protocol consumed by `packages/core/src/resource-accounting.ts`:
