@@ -6,9 +6,9 @@
     "version": "1.0.0"
   },
   "meta": {
-    "commit": "efc0a1c67086bdbe57667a1281501dc4db0bb850",
+    "commit": "3d534115223f33a84bfc506c5553931f3f09a5d4",
     "dirty": true,
-    "timestamp": "2026-07-21T22:48:53.888Z"
+    "timestamp": "2026-07-21T22:57:38.797Z"
   },
   "toolchain": {
     "bun": "1.3.14",
@@ -38,37 +38,37 @@
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.brotliBytes": {
-      "actual": 210983,
+      "actual": 210893,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.gzipBytes": {
-      "actual": 251090,
+      "actual": 251102,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.rawBytes": {
-      "actual": 850805,
+      "actual": 850994,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.wasm.brotliBytes": {
-      "actual": 166737,
+      "actual": 167055,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.wasm.gzipBytes": {
-      "actual": 213808,
+      "actual": 214569,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.wasm.rawBytes": {
-      "actual": 540921,
+      "actual": 542612,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "next:core-initial"
@@ -110,37 +110,37 @@
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.brotliBytes": {
-      "actual": 93349,
+      "actual": 93319,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.gzipBytes": {
-      "actual": 110168,
+      "actual": 110195,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.rawBytes": {
-      "actual": 388317,
+      "actual": 388509,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.wasm.brotliBytes": {
-      "actual": 166737,
+      "actual": 167055,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.wasm.gzipBytes": {
-      "actual": 213808,
+      "actual": 214569,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.wasm.rawBytes": {
-      "actual": 540921,
+      "actual": 542612,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:core-initial"
@@ -164,37 +164,37 @@
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.brotliBytes": {
-      "actual": 146488,
+      "actual": 146470,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.gzipBytes": {
-      "actual": 171771,
+      "actual": 171795,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.rawBytes": {
-      "actual": 581966,
+      "actual": 582158,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.wasm.brotliBytes": {
-      "actual": 166737,
+      "actual": 167055,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.wasm.gzipBytes": {
-      "actual": 213808,
+      "actual": 214569,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.wasm.rawBytes": {
-      "actual": 540921,
+      "actual": 542612,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:react-initial"
@@ -218,37 +218,37 @@
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.brotliBytes": {
-      "actual": 109198,
+      "actual": 109178,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.gzipBytes": {
-      "actual": 127654,
+      "actual": 127677,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.rawBytes": {
-      "actual": 433326,
+      "actual": 433518,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.wasm.brotliBytes": {
-      "actual": 166737,
+      "actual": 167055,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.wasm.gzipBytes": {
-      "actual": 213808,
+      "actual": 214569,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.wasm.rawBytes": {
-      "actual": 540921,
+      "actual": 542612,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:svelte-initial"
@@ -272,37 +272,37 @@
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.brotliBytes": {
-      "actual": 118164,
+      "actual": 118143,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.gzipBytes": {
-      "actual": 137537,
+      "actual": 137562,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.rawBytes": {
-      "actual": 458012,
+      "actual": 458204,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.wasm.brotliBytes": {
-      "actual": 166737,
+      "actual": 167055,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.wasm.gzipBytes": {
-      "actual": 213808,
+      "actual": 214569,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.wasm.rawBytes": {
-      "actual": 540921,
+      "actual": 542612,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "vite:vue-initial"
@@ -344,7 +344,7 @@
       "owner": "vite:worker-loader-initial"
     },
     "bundler.vite.xlsxAsync.javascript.brotliBytes": {
-      "actual": 29071,
+      "actual": 29075,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:xlsx-async"
@@ -362,7 +362,7 @@
       "owner": "vite:xlsx-async"
     },
     "bundler.vite.xlsxLoaderInitial.javascript.brotliBytes": {
-      "actual": 1072,
+      "actual": 1069,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:xlsx-loader-initial"
@@ -380,37 +380,37 @@
       "owner": "vite:xlsx-loader-initial"
     },
     "bundler.webpack.coreInitial.javascript.brotliBytes": {
-      "actual": 5146,
+      "actual": 5156,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.javascript.gzipBytes": {
-      "actual": 5925,
+      "actual": 5945,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.javascript.rawBytes": {
-      "actual": 24035,
+      "actual": 24226,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.wasm.brotliBytes": {
-      "actual": 166737,
+      "actual": 167055,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.wasm.gzipBytes": {
-      "actual": 213808,
+      "actual": 214569,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "webpack:core-initial"
     },
     "bundler.webpack.coreInitial.wasm.rawBytes": {
-      "actual": 540921,
+      "actual": 542612,
       "unit": "bytes",
       "category": "browser-wasm",
       "owner": "webpack:core-initial"
@@ -434,7 +434,7 @@
       "owner": "webpack:worker-async"
     },
     "closure.core-xlsx.logicalBytes": {
-      "actual": 4241266,
+      "actual": 4244232,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core-xlsx"
@@ -446,7 +446,7 @@
       "owner": "core-xlsx"
     },
     "closure.core.logicalBytes": {
-      "actual": 3068863,
+      "actual": 3071829,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core"
@@ -464,7 +464,7 @@
       "owner": "core"
     },
     "closure.react.logicalBytes": {
-      "actual": 3270268,
+      "actual": 3273234,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "react"
@@ -482,7 +482,7 @@
       "owner": "react"
     },
     "closure.svelte.logicalBytes": {
-      "actual": 8120215,
+      "actual": 8123181,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "svelte"
@@ -500,7 +500,7 @@
       "owner": "svelte"
     },
     "closure.vue.logicalBytes": {
-      "actual": 19959441,
+      "actual": 19962407,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "vue"
@@ -800,7 +800,7 @@
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.declarationsBytes": {
-      "actual": 44316,
+      "actual": 44840,
       "unit": "bytes",
       "category": "package-declarations",
       "owner": "@sheetwrite/wasm"
@@ -824,7 +824,7 @@
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.runtimeJsBytes": {
-      "actual": 68470,
+      "actual": 69221,
       "unit": "bytes",
       "category": "package-runtime-js",
       "owner": "@sheetwrite/wasm"
@@ -836,19 +836,19 @@
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.tarballBytes": {
-      "actual": 234591,
+      "actual": 235486,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.unpackedBytes": {
-      "actual": 657020,
+      "actual": 659986,
       "unit": "bytes",
       "category": "package",
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.wasmBytes": {
-      "actual": 540921,
+      "actual": 542612,
       "unit": "bytes",
       "category": "package-wasm",
       "owner": "@sheetwrite/wasm"
@@ -977,17 +977,17 @@
     },
     {
       "name": "@sheetwrite/wasm",
-      "tarballBytes": 234591,
-      "unpackedBytes": 657020,
+      "tarballBytes": 235486,
+      "unpackedBytes": 659986,
       "fileCount": 12,
       "categories": {
         "css": 0,
-        "declarations": 44316,
+        "declarations": 44840,
         "maps": 0,
         "metadata": 3313,
-        "runtime-js": 68470,
+        "runtime-js": 69221,
         "runtime-source": 0,
-        "wasm": 540921
+        "wasm": 542612
       }
     },
     {
@@ -1010,13 +1010,13 @@
     {
       "name": "core",
       "packageCount": 2,
-      "logicalBytes": 3068863,
+      "logicalBytes": 3071829,
       "packages": ["@sheetwrite/core@0.2.0", "@sheetwrite/wasm@0.2.0"]
     },
     {
       "name": "core-xlsx",
       "packageCount": 4,
-      "logicalBytes": 4241266,
+      "logicalBytes": 4244232,
       "packages": [
         "@sheetwrite/core@0.2.0",
         "@sheetwrite/wasm@0.2.0",
@@ -1027,7 +1027,7 @@
     {
       "name": "react",
       "packageCount": 4,
-      "logicalBytes": 3270268,
+      "logicalBytes": 3273234,
       "packages": [
         "@sheetwrite/core@0.2.0",
         "@sheetwrite/react@0.2.0",
@@ -1038,7 +1038,7 @@
     {
       "name": "svelte",
       "packageCount": 23,
-      "logicalBytes": 8120215,
+      "logicalBytes": 8123181,
       "packages": [
         "@jridgewell/gen-mapping@0.3.13",
         "@jridgewell/remapping@2.3.5",
@@ -1068,7 +1068,7 @@
     {
       "name": "vue",
       "packageCount": 26,
-      "logicalBytes": 19959441,
+      "logicalBytes": 19962407,
       "packages": [
         "@babel/helper-string-parser@7.29.7",
         "@babel/helper-validator-identifier@7.29.7",
@@ -1105,7 +1105,7 @@
       "version": "15.5.9",
       "assets": [
         {
-          "path": "test/bundler-fixtures/next/.next/static/8SKNJFgE-byiWFzTDBJKn/_buildManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/_dNE9i0nFtuUt1WtzGihV/_buildManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
@@ -1115,7 +1115,7 @@
           "sha256": "549fc1f6f226df947f859689a5217eeedc49d3ff876d9f364976a47ef4aad63d"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/8SKNJFgE-byiWFzTDBJKn/_ssgManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/_dNE9i0nFtuUt1WtzGihV/_ssgManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
@@ -1145,14 +1145,14 @@
           "sha256": "2c752a401191671d5bbbe7514f5828bbb0a7cc50bfbe77ddaf1b1ccba4412ed2"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/604-432c7423aa1a6df4.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/604-1da5ed13b8abd506.js",
           "kind": "javascript",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 386872,
-          "gzipBytes": 108077,
-          "brotliBytes": 88697,
-          "sha256": "7408e8afcc950eeff3cd8a30a119921d7b8e05980b0e6b910781247500abc347"
+          "rawBytes": 387061,
+          "gzipBytes": 108089,
+          "brotliBytes": 88607,
+          "sha256": "fac0d10837ebc40c55515084010693ddf6f1cae54f6c51bc11f4ce52a06bdda0"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/chunks/app/_not-found/page-52855012294ab07e.js",
@@ -1265,14 +1265,14 @@
           "sha256": "995b9fe012beca23233de01ab6900bb1e309fdd1d8682dd3ced4c0f2c7953344"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/media/sheetwrite_wasm_bg.2226f04b.wasm",
+          "path": "test/bundler-fixtures/next/.next/static/media/sheetwrite_wasm_bg.ba7d6163.wasm",
           "kind": "wasm",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 540921,
-          "gzipBytes": 213808,
-          "brotliBytes": 166737,
-          "sha256": "c15b296c0d1adc52a406853a1704cc6d0d062dbfc57c487aa12958bf47588782"
+          "rawBytes": 542612,
+          "gzipBytes": 214569,
+          "brotliBytes": 167055,
+          "sha256": "679c0f3482fc97b11eafe4473ccb1fbce550b7a762d0bf1bff3014bb7a5deedf"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/media/worker.3657eea0.js",
@@ -1291,16 +1291,6 @@
       "version": "7.2.2",
       "assets": [
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/core-BUQ-h5p7.js",
-          "kind": "javascript",
-          "owner": "core-initial",
-          "roles": ["core-initial"],
-          "rawBytes": 220,
-          "gzipBytes": 191,
-          "brotliBytes": 152,
-          "sha256": "b8419af420b8023e6fee93914ed6a2ee9aefd52c190c6949b14ed0db0623c403"
-        },
-        {
           "path": "test/bundler-fixtures/vite/dist/assets/core-CsScP21U.css",
           "kind": "css",
           "owner": "core-initial",
@@ -1311,44 +1301,54 @@
           "sha256": "26ef9ab7c220770fd35fbe26d7998a5275d9c006a5ece97bb1a7d5c07267519e"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/export-DERwlylY.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/core-HL2-ZC1U.js",
+          "kind": "javascript",
+          "owner": "core-initial",
+          "roles": ["core-initial"],
+          "rawBytes": 220,
+          "gzipBytes": 192,
+          "brotliBytes": 156,
+          "sha256": "b8bacf25ba813c3401e7011136111c96ec79052d5b1b308fcc2e8ba2d7ae16eb"
+        },
+        {
+          "path": "test/bundler-fixtures/vite/dist/assets/export-DqhrCpsU.js",
           "kind": "javascript",
           "owner": "shared-initial",
           "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
-          "rawBytes": 146098,
-          "gzipBytes": 40209,
-          "brotliBytes": 34483,
-          "sha256": "5f23c35b51c770df20847d0470578d73c3f4a8efaf08a8c9e5b81408f4c80fa3"
+          "rawBytes": 146290,
+          "gzipBytes": 40235,
+          "brotliBytes": 34407,
+          "sha256": "b78894ffcb2d80e1668cdab67695ca4753dc7bbba2216bf771947ac168eaa2dd"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/grid-Cnx8LQtS.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/grid-DWeCCSHt.js",
           "kind": "javascript",
           "owner": "shared-initial",
           "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 241288,
           "gzipBytes": 69367,
-          "brotliBytes": 58383,
-          "sha256": "dfbc584946e41d5689c1d9631af50d35c2af8b47964fa15904a2c2209cd66f1f"
+          "brotliBytes": 58425,
+          "sha256": "c1c32109b33d8306715954a1873e4f1d9a7fec17228c3810ab48194175432525"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/index-BcEQX9W1.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/index-CEnYPKBl.js",
           "kind": "javascript",
           "owner": "xlsx-async",
           "roles": ["xlsx-async"],
           "rawBytes": 90499,
           "gzipBytes": 32629,
-          "brotliBytes": 29071,
-          "sha256": "16b6ba2dc9db3fb6b053a2a53af14f5cff3032e809f74d597454099368dc7b27"
+          "brotliBytes": 29075,
+          "sha256": "9f2849f96a0adc8f9b452a8a7ab4b90b5ce3cbee8c1baa62a9ed68a8d9d2e72d"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/lifecycle-Bq68vNnD.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/lifecycle-BH4WorTe.js",
           "kind": "javascript",
           "owner": "shared-initial",
           "roles": ["react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 3684,
-          "gzipBytes": 1575,
-          "brotliBytes": 1382,
-          "sha256": "6f7abccec4677bbc48ee440f14c16e7ef040f74f5c40ecf00c03461743afb1b3"
+          "gzipBytes": 1574,
+          "brotliBytes": 1381,
+          "sha256": "f12fff8b90724ee7d0971832561cf1a1530ac3544f07726919cd7bb15a50de97"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/modulepreload-polyfill-B5Qt9EMX.js",
@@ -1368,6 +1368,16 @@
           "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0"
         },
         {
+          "path": "test/bundler-fixtures/vite/dist/assets/react-C9Hpmw6j.js",
+          "kind": "javascript",
+          "owner": "react-initial",
+          "roles": ["react-initial"],
+          "rawBytes": 190185,
+          "gzipBytes": 60218,
+          "brotliBytes": 51926,
+          "sha256": "73ccdef3ccee2dbaa30941307fdd5a08c5b98f2f5f83266dda296ea36712e517"
+        },
+        {
           "path": "test/bundler-fixtures/vite/dist/assets/react-CVCueHV7.css",
           "kind": "css",
           "owner": "shared-initial",
@@ -1378,44 +1388,34 @@
           "sha256": "b00f8b4e8f44d26f1a76a37ccec0820f0d67ffd14fb43a0cd5a716f36f9acda8"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/react-Ol9q2Wke.js",
-          "kind": "javascript",
-          "owner": "react-initial",
-          "roles": ["react-initial"],
-          "rawBytes": 190185,
-          "gzipBytes": 60219,
-          "brotliBytes": 51909,
-          "sha256": "9fab0244a3dc3995bffbf3b30d68a844a5c77934d63a31fe2653953c8ad0d06c"
-        },
-        {
-          "path": "test/bundler-fixtures/vite/dist/assets/sheetwrite_wasm_bg-C9T-lRT4.wasm",
+          "path": "test/bundler-fixtures/vite/dist/assets/sheetwrite_wasm_bg-n-gC6eN3.wasm",
           "kind": "wasm",
           "owner": "shared-initial",
           "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
-          "rawBytes": 540921,
-          "gzipBytes": 213808,
-          "brotliBytes": 166737,
-          "sha256": "c15b296c0d1adc52a406853a1704cc6d0d062dbfc57c487aa12958bf47588782"
+          "rawBytes": 542612,
+          "gzipBytes": 214569,
+          "brotliBytes": 167055,
+          "sha256": "679c0f3482fc97b11eafe4473ccb1fbce550b7a762d0bf1bff3014bb7a5deedf"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/svelte-ojykvp-j.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/svelte-BnaduVtx.js",
           "kind": "javascript",
           "owner": "svelte-initial",
           "roles": ["svelte-initial"],
           "rawBytes": 41545,
-          "gzipBytes": 16102,
-          "brotliBytes": 14619,
-          "sha256": "834031021f9dfdcca974450709e17d19fe1a33dc9625aa3c0cacc4c9a84ce3e1"
+          "gzipBytes": 16100,
+          "brotliBytes": 14634,
+          "sha256": "d1dc27ba6ebc2fdab24045364a9d9df7861ef13049ae3cc90a6cf9aa5c91950d"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/vue-CyD5tL2q.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/vue-4TumbIBD.js",
           "kind": "javascript",
           "owner": "vue-initial",
           "roles": ["vue-initial"],
           "rawBytes": 66231,
           "gzipBytes": 25985,
-          "brotliBytes": 23585,
-          "sha256": "e0ea8dabfd96562dbf645b019b7685d79c3ed87ddf50fa8b13fe7ab6cae03794"
+          "brotliBytes": 23599,
+          "sha256": "5410d8950737e8ca19f83592f043ccdec30a28a81838aa1a0b843bb3c0435e88"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/worker-Csb9A0xA.js",
@@ -1438,14 +1438,14 @@
           "sha256": "6f192d766bc5b31f639e9810317064c5f2f396ed46a6410fc84dd645251649ca"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/xlsx-CDNTZIo4.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/xlsx-DBqaGbHl.js",
           "kind": "javascript",
           "owner": "xlsx-loader-initial",
           "roles": ["xlsx-loader-initial"],
           "rawBytes": 1543,
           "gzipBytes": 877,
-          "brotliBytes": 741,
-          "sha256": "e7dde5d834160deed4f978a3028fe27f2007fd83e06c22809fc023e55ac6d5ad"
+          "brotliBytes": 738,
+          "sha256": "0af055718db6e693625911aed9771eed2dc648d9319dc0ec4d00fe8f73c6c0ff"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/recipe-worker-Dz-KM2mF.js",
@@ -1464,24 +1464,24 @@
       "version": "5.102.1",
       "assets": [
         {
-          "path": "test/bundler-fixtures/webpack/dist/assets/sheetwrite_wasm_bg-c8331b6ab54b68a04137.wasm",
+          "path": "test/bundler-fixtures/webpack/dist/assets/sheetwrite_wasm_bg-6697f041d2390b26b391.wasm",
           "kind": "wasm",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 540921,
-          "gzipBytes": 213808,
-          "brotliBytes": 166737,
-          "sha256": "c15b296c0d1adc52a406853a1704cc6d0d062dbfc57c487aa12958bf47588782"
+          "rawBytes": 542612,
+          "gzipBytes": 214569,
+          "brotliBytes": 167055,
+          "sha256": "679c0f3482fc97b11eafe4473ccb1fbce550b7a762d0bf1bff3014bb7a5deedf"
         },
         {
           "path": "test/bundler-fixtures/webpack/dist/main.js",
           "kind": "javascript",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 24035,
-          "gzipBytes": 5925,
-          "brotliBytes": 5146,
-          "sha256": "3ca15f7f4d62f6519ad45f93d61b490ed4355975981343721a067070dcd63a52"
+          "rawBytes": 24226,
+          "gzipBytes": 5945,
+          "brotliBytes": 5156,
+          "sha256": "22df18c910824c91387fbdd2bebf66e3010875b6b1ad8017f2838ad9430e045e"
         },
         {
           "path": "test/bundler-fixtures/webpack/dist/worker-878-2675331be91ec4d7c89c.js",

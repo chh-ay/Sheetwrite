@@ -1429,18 +1429,19 @@ export class StoreDataEngine {
     const spillDerived = this.windowReader.spillDerivedMaskForRows(sheet, dataRows, cols);
     const formulas: Array<{ offset: number; source: string }> = [];
     const refs: Array<{ offset: number; target: CellAddress }> = [];
-    for (let rowIndex = 0; rowIndex < dataRows.length; rowIndex++) {
-      const row = dataRows[rowIndex]!;
-      for (let colIndex = 0; colIndex < cols.length; colIndex++) {
-        const offset = rowIndex * cols.length + colIndex;
-        const addr = { sheet, row, col: cols[colIndex]! };
-        const formula = this.getFormula(addr);
-        if (formula !== null) {
-          formulas.push({ offset, source: formula });
-          continue;
-        }
-        const target = this.getRefTarget(addr);
-        if (target !== null) refs.push({ offset, target });
+    const sourceSnapshot = this.windowReader.captureSourcesForRows(sheet, dataRows, cols);
+    if (sourceSnapshot) {
+      const sources = consumeSourceSnapshot(sourceSnapshot, this.sheetIdsByHandle);
+      for (let index = 0; index < sources.formulaOffsets.length; index++) {
+        formulas.push({
+          offset: sources.formulaOffsets[index]!,
+          source: sources.formulaSources[index]!,
+        });
+      }
+      for (let index = 0; index < sources.referenceOffsets.length; index++) {
+        const offset = sources.referenceOffsets[index]!;
+        const target = sources.referenceAt(offset);
+        if (target) refs.push({ offset, target });
       }
     }
     return {
@@ -1454,7 +1455,7 @@ export class StoreDataEngine {
       spillDerived,
       formulas,
       refs,
-      ffiCalls: (window.ffiCalls ?? 0) + 1,
+      ffiCalls: (window.ffiCalls ?? 0) + (sourceSnapshot ? 2 : 1),
       transferredElements:
         window.values.length +
         window.styleIds.length +

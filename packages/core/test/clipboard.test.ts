@@ -848,7 +848,7 @@ describe("SheetwriteStore clipboard bulk reads", () => {
       expect(single.values.length).toBe(1);
       expect(large.values.length).toBe(10_000);
       expect(single.ffiCalls).toBe(large.ffiCalls);
-      expect(large.ffiCalls).toBeLessThanOrEqual(3);
+      expect(large.ffiCalls).toBe(4);
       expect(large.transferredElements).toBeGreaterThanOrEqual(20_000);
     } finally {
       store.dispose();
@@ -881,10 +881,18 @@ describe("SheetwriteStore clipboard bulk reads", () => {
       expect(rich.styles[rich.styleIds[1]!]).toMatchObject({ italic: true });
 
       store.sortBy("s1", 1, false);
-      const sorted = store.getClipboardWindow("s1", { start: 0, end: 3 }, [1]);
-      expect(Array.from(sorted.dataRows)).not.toEqual([0, 1, 2]);
-      expect(sorted.values).toHaveLength(3);
-      expect(sorted.ffiCalls).toBeLessThanOrEqual(3);
+      const sorted = store.getClipboardWindow("s1", { start: 0, end: 10 }, [1]);
+      expect(Array.from(sorted.dataRows)).not.toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(sorted.values).toHaveLength(10);
+      expect(sorted.ffiCalls).toBe(4);
+      const sortedRows = Array.from(sorted.dataRows);
+      expect(sorted.formulas).toEqual([{ offset: sortedRows.indexOf(0), source: "=1+1" }]);
+      expect(sorted.refs).toEqual([
+        {
+          offset: sortedRows.indexOf(1),
+          target: { sheet: "s1", row: 0, col: 1 },
+        },
+      ]);
     } finally {
       store.dispose();
     }

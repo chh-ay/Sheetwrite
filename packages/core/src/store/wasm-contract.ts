@@ -117,6 +117,11 @@ export type RecomputingCellStore = CellStore & {
     rows: number,
     cols: number,
   ): SourceSnapshot | undefined;
+  captureSourcesForRows(
+    sheet: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ): SourceSnapshot | undefined;
   captureReferences(sheet: number, maxEntries: number): SourceSnapshot | undefined;
   referencesTargeting(targetSheet: number, maxEntries: number): Uint32Array | undefined;
   snapshotNumbers(snapshot: RangeSnapshot): Float64Array;

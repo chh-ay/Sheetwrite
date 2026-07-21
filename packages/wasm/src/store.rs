@@ -1323,6 +1323,53 @@ impl CellStore {
         })
     }
 
+    /// Capture persisted formula/reference sources for arbitrary row/column
+    /// coordinates. Offsets follow the caller's row-major coordinate order.
+    #[wasm_bindgen(js_name = captureSourcesForRows)]
+    pub fn capture_sources_for_rows(
+        &self,
+        sheet: usize,
+        rows: &[u32],
+        cols: &[u32],
+    ) -> Option<SourceSnapshot> {
+        let data = self.sheets.get(sheet)?;
+        let cell_count = rows.len().checked_mul(cols.len())?;
+        if rows.is_empty()
+            || cols.is_empty()
+            || cell_count > u32::MAX as usize
+            || rows.iter().any(|&row| row as usize >= data.row_count)
+            || cols.iter().any(|&col| col as usize >= data.n_cols)
+        {
+            return None;
+        }
+
+        let mut formula_offsets = Vec::new();
+        let mut formula_sources = Vec::new();
+        let mut reference_offsets = Vec::new();
+        let mut reference_targets = Vec::new();
+        for (row_index, &row) in rows.iter().enumerate() {
+            for (col_index, &col) in cols.iter().enumerate() {
+                let Some(entry) = data.formulas.get(&(row, col)) else {
+                    continue;
+                };
+                let offset = (row_index * cols.len() + col_index) as u32;
+                if entry.is_formula() {
+                    formula_offsets.push(offset);
+                    formula_sources.push(entry.source.clone());
+                } else if let Some(target) = entry.reference_target(sheet as u32) {
+                    reference_offsets.push(offset);
+                    reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
+                }
+            }
+        }
+        Some(SourceSnapshot {
+            formula_offsets,
+            formula_sources,
+            reference_offsets,
+            reference_targets,
+        })
+    }
+
     /// Capture only persisted references for one sheet. The explicit entry cap
     /// bounds allocation for host-side structural admission simulation.
     #[wasm_bindgen(js_name = captureReferences)]

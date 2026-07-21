@@ -2648,6 +2648,20 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     assert_eq!(sources.reference_offsets(), vec![2]);
     assert_eq!(sources.reference_targets(), vec![sheet as u32, 0, 1]);
 
+    let reordered = store
+        .capture_sources_for_rows(sheet, &[1, 0], &[1, 0])
+        .unwrap();
+    assert_eq!(reordered.formula_offsets(), vec![2]);
+    assert_eq!(reordered.formula_sources(), vec!["=A1*3"]);
+    assert_eq!(reordered.reference_offsets(), vec![1]);
+    assert_eq!(
+        reordered.reference_targets(),
+        vec![sheet as u32, 0, 1]
+    );
+    assert!(store
+        .capture_sources_for_rows(sheet, &[2], &[0])
+        .is_none());
+
     assert_eq!(
         store.set_sparse_block(
             sheet,

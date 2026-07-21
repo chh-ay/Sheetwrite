@@ -1,3 +1,4 @@
+import type { SourceSnapshot } from "@sheetwrite/wasm";
 import type { ResourceOwnerBytes } from "../resource-accounting.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
@@ -42,6 +43,14 @@ export class StoreWindowReader {
   }
   spillDerivedMaskForRows(sheet: SheetId, rows: Uint32Array, cols: readonly number[]): Uint8Array {
     return this.wasm.spillDerivedMaskForRows(this.handleOf(sheet), rows, this.colsU32For(cols));
+  }
+  captureSourcesForRows(
+    sheet: SheetId,
+    rows: Uint32Array,
+    cols: readonly number[],
+  ): SourceSnapshot | undefined {
+    if (rows.length === 0 || cols.length === 0) return undefined;
+    return this.wasm.captureSourcesForRows(this.handleOf(sheet), rows, this.colsU32For(cols));
   }
 
   spillOwnerCoordinates(
