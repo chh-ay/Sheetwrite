@@ -218,10 +218,20 @@ describe("StoreViewState packed inverse index", () => {
     );
   });
 
-  it("rejects corrupt view orders instead of creating coordinate aliases", () => {
-    const { view } = sortedView(3, [0, 3]);
-    expect(() => view.viewRowOf("s1", 0)).toThrow(
+  it("rejects out-of-bounds and duplicate view rows instead of creating coordinate aliases", () => {
+    const outOfBounds = sortedView(3, [0, 3]);
+    expect(() => outOfBounds.view.viewRowOf("s1", 0)).toThrow(
       "view order for sheet s1 contains out-of-bounds data row 3",
+    );
+
+    const denseDuplicate = sortedView(3, [0, 1, 1]);
+    expect(() => denseDuplicate.view.viewRowOf("s1", 0)).toThrow(
+      "view order for sheet s1 contains duplicate data row 1",
+    );
+
+    const sparseDuplicate = sortedView(1_000_000, [0, 8, 0]);
+    expect(() => sparseDuplicate.view.viewRowOf("s1", 0)).toThrow(
+      "view order for sheet s1 contains duplicate data row 0",
     );
   });
 });

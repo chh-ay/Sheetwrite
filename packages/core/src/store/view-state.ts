@@ -406,6 +406,11 @@ export class StoreViewState {
             `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
           );
         }
+        if (index.storage[dataRow] !== ABSENT_VIEW_ROW) {
+          throw new RangeError(
+            `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
+          );
+        }
         index.storage[dataRow] = viewRow;
       }
     } else {
@@ -422,7 +427,12 @@ export class StoreViewState {
         for (;;) {
           const at = slot * 2;
           const storedDataRow = index.storage[at]!;
-          if (storedDataRow === ABSENT_VIEW_ROW || storedDataRow === dataRow) {
+          if (storedDataRow === dataRow) {
+            throw new RangeError(
+              `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
+            );
+          }
+          if (storedDataRow === ABSENT_VIEW_ROW) {
             index.storage[at] = dataRow;
             index.storage[at + 1] = viewRow;
             break;
