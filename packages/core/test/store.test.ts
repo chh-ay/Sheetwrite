@@ -2375,7 +2375,7 @@ it("preflights new-sheet snapshot cells and later writes against one dirty limit
 });
 
 it("preflights inbound clean ref rewrites before removing their target sheet", () => {
-  const workbook = makeWorkbook(4);
+  const workbook = makeWorkbook(1_002);
   const second = structuredClone(workbook.sheets[0]!);
   second.id = "s2";
   second.name = "Second";
@@ -2397,12 +2397,18 @@ it("preflights inbound clean ref rewrites before removing their target sheet", (
           addr: addr(1, 0),
           value: { kind: "ref", target: { sheet: "s2", row: 0, col: 0 } },
         },
+        ...Array.from({ length: 1_000 }, (_, offset) => ({
+          op: "set" as const,
+          addr: addr(offset + 2, 0),
+          value: { kind: "ref" as const, target: addr(0, 1) },
+        })),
       ],
     },
     { source: "remote" },
   );
   expect(remote).toMatchObject({ status: "applied", epoch: 1 });
   expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.resetRangeMutationAllocationStats();
 
   const removed = store.applyTransaction({
     patches: [{ op: "removeSheet", sheet: "s2" }],
@@ -2414,6 +2420,10 @@ it("preflights inbound clean ref rewrites before removing their target sheet", (
   });
   expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s2"]);
   expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 2,
+    admissionReferenceMapsMaterialized: 1,
+  });
   store.dispose();
 });
 
@@ -2456,6 +2466,45 @@ it("rebases clean refs before counting a later target-sheet removal", () => {
   });
   expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s2"]);
   expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.dispose();
+});
+
+it("does not scan or clone a large clean ref graph for an ordinary cell edit", () => {
+  const refCount = 2_000;
+  const store = new SheetwriteStore(makeWorkbook(refCount + 2), undefined, {
+    storage: "paged",
+  });
+  const remote = store.applyTransaction(
+    {
+      patches: Array.from({ length: refCount }, (_, row) => ({
+        op: "set" as const,
+        addr: addr(row, 0),
+        value: {
+          kind: "ref" as const,
+          target: addr(refCount, 1),
+        },
+      })),
+    },
+    { source: "remote" },
+  );
+  expect(remote).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  expect(
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: addr(refCount + 1, 2),
+          value: { kind: "literal", value: "local" },
+        },
+      ],
+    }),
+  ).toMatchObject({ status: "applied" });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 0,
+  });
   store.dispose();
 });
 
@@ -2537,6 +2586,51 @@ it("keeps lifecycle names aligned when rename collides with another sheet id", (
   expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
     ["s1", "Sheet 1"],
     ["s2", "Second"],
+  ]);
+  store.dispose();
+});
+
+it("keeps lifecycle names aligned after a new sheet name shadows an existing id", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s2",
+          name: "s1",
+          order: 1,
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [],
+        },
+      },
+      { op: "renameSheet", sheet: "s1", name: "Primary" },
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s3",
+          name: "Sheet 1",
+          order: 2,
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [],
+        },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s3", row: 0, col: 0 },
+        value: { kind: "literal", value: "unsafe" },
+      },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 3 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
+    ["s1", "Sheet 1"],
   ]);
   store.dispose();
 });

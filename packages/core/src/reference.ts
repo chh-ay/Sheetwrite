@@ -60,11 +60,14 @@ export class ReferenceGraph {
     return this.target.get(key) ?? null;
   }
 
+  /** Iterate live references without materializing an intermediate array. */
+  *entryIterator(): IterableIterator<[CellAddress, CellAddress]> {
+    for (const [key, target] of this.target) yield [parseCellKey(key), target];
+  }
+
   /** Snapshot all live references as `[source, target]` pairs. */
   entries(): Array<[CellAddress, CellAddress]> {
-    const out: Array<[CellAddress, CellAddress]> = [];
-    for (const [key, target] of this.target) out.push([parseCellKey(key), target]);
-    return out;
+    return [...this.entryIterator()];
   }
 
   /** Re-resolve every live reference after an external formula barrier. */

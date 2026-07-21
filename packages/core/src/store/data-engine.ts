@@ -103,6 +103,8 @@ export interface RangeMutationAllocationStats {
   readonly historyMaterializations: number;
   readonly historyDisposals: number;
   readonly styleDictionaryEntries: number;
+  readonly admissionReferenceEntriesScanned: number;
+  readonly admissionReferenceMapsMaterialized: number;
 }
 
 export interface SheetwriteStoreOptions {
@@ -174,6 +176,8 @@ export class StoreDataEngine {
     historySnapshotBytes: 0,
     historyMaterializations: 0,
     historyDisposals: 0,
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 0,
   };
 
   constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
@@ -350,21 +354,36 @@ export class StoreDataEngine {
     const wasmIndexLimit = 0xffff_ffff;
     const states = new Map<SheetId, PagedDirtyPreflightState>();
     const sheetLifecycle = createSheetLifecycleState(this.workbook.sheets);
-    let virtualRefs = new Map(
-      this.refs.entries().map(([source, target]) => [cellKey(source), { ...target }] as const),
-    );
+    const mayRemoveSheet = patches.some((patch) => patch.op === "removeSheet");
+    let virtualRefs: Map<string, CellAddress> | null = null;
+    const materializeVirtualRefs = (): Map<string, CellAddress> | null => {
+      if (!mayRemoveSheet) return null;
+      if (virtualRefs) return virtualRefs;
+      this.rangeMutationStats.admissionReferenceMapsMaterialized++;
+      virtualRefs = new Map();
+      for (const [source, target] of this.refs.entryIterator()) {
+        this.rangeMutationStats.admissionReferenceEntriesScanned++;
+        virtualRefs.set(cellKey(source), { ...target });
+      }
+      return virtualRefs;
+    };
     const setVirtualRef = (source: CellAddress, target: CellAddress | null): void => {
+      const refs = materializeVirtualRefs();
+      if (!refs) return;
       const key = cellKey(source);
-      virtualRefs.delete(key);
-      if (target) virtualRefs.set(key, { ...target });
+      refs.delete(key);
+      if (target) refs.set(key, { ...target });
     };
     const rebaseVirtualRefs = (
       sheet: SheetId,
       rowAt: (row: number) => number | null,
       colAt: (col: number) => number | null,
     ): void => {
+      const refs = materializeVirtualRefs();
+      if (!refs) return;
+      this.rangeMutationStats.admissionReferenceMapsMaterialized++;
       const rebased = new Map<string, CellAddress>();
-      for (const [sourceKey, target] of virtualRefs) {
+      for (const [sourceKey, target] of refs) {
         const source = parseCellKey(sourceKey);
         const sourceRow = source.sheet === sheet ? rowAt(source.row) : source.row;
         const sourceCol = source.sheet === sheet ? colAt(source.col) : source.col;
@@ -389,7 +408,9 @@ export class StoreDataEngine {
       rows: number,
       cols: number,
     ): void => {
-      for (const sourceKey of virtualRefs.keys()) {
+      const refs = materializeVirtualRefs();
+      if (!refs) return;
+      for (const sourceKey of refs.keys()) {
         const source = parseCellKey(sourceKey);
         if (
           source.sheet === sheet &&
@@ -398,7 +419,7 @@ export class StoreDataEngine {
           source.col >= startCol &&
           source.col < startCol + cols
         ) {
-          virtualRefs.delete(sourceKey);
+          refs.delete(sourceKey);
         }
       }
     };
@@ -599,18 +620,27 @@ export class StoreDataEngine {
       }
       if (patch.op === "removeSheet") {
         if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
-        for (const [sourceKey, target] of virtualRefs) {
-          const source = parseCellKey(sourceKey);
-          if (source.sheet === patch.sheet || target.sheet !== patch.sheet) continue;
-          const rejection = addSparse(source.sheet, source.row, source.col);
-          if (rejection) return rejection;
+        const materializedRefs = virtualRefs;
+        const entries: Iterable<[CellAddress, CellAddress]> = materializedRefs
+          ? (function* () {
+              for (const [sourceKey, target] of materializedRefs) {
+                yield [parseCellKey(sourceKey), target] as [CellAddress, CellAddress];
+              }
+            })()
+          : this.refs.entryIterator();
+        this.rangeMutationStats.admissionReferenceMapsMaterialized++;
+        const remaining = new Map<string, CellAddress>();
+        for (const [source, target] of entries) {
+          if (!materializedRefs) this.rangeMutationStats.admissionReferenceEntriesScanned++;
+          if (source.sheet !== patch.sheet && target.sheet === patch.sheet) {
+            const rejection = addSparse(source.sheet, source.row, source.col);
+            if (rejection) return rejection;
+          }
+          if (source.sheet !== patch.sheet && target.sheet !== patch.sheet) {
+            remaining.set(cellKey(source), { ...target });
+          }
         }
-        virtualRefs = new Map(
-          [...virtualRefs].filter(([sourceKey, target]) => {
-            const source = parseCellKey(sourceKey);
-            return source.sheet !== patch.sheet && target.sheet !== patch.sheet;
-          }),
-        );
+        virtualRefs = remaining;
         states.delete(patch.sheet);
         continue;
       }
