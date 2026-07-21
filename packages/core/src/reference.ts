@@ -55,6 +55,10 @@ export class ReferenceGraph {
     return this.target.size > 0;
   }
 
+  entryCount(): number {
+    return this.target.size;
+  }
+
   isRef(key: string): boolean {
     return this.target.has(key);
   }

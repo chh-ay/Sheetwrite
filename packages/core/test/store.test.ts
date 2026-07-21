@@ -2422,7 +2422,134 @@ it("preflights inbound clean ref rewrites before removing their target sheet", (
   expect(store.getPagedStats("s1").dirtyCells).toBe(0);
   expect(store.getRangeMutationAllocationStats()).toMatchObject({
     admissionReferenceEntriesScanned: 2,
-    admissionReferenceMapsMaterialized: 1,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("does not clone unrelated refs for an accepted terminal sheet removal", () => {
+  const refCount = 2_000;
+  const workbook = makeWorkbook(refCount + 1);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  const third = structuredClone(workbook.sheets[0]!);
+  third.id = "s3";
+  third.name = "Third";
+  workbook.sheets.push(second, third);
+  const store = new SheetwriteStore(workbook, undefined, { storage: "paged" });
+  expect(
+    store.applyTransaction(
+      {
+        patches: Array.from({ length: refCount }, (_, row) => ({
+          op: "set" as const,
+          addr: addr(row, 0),
+          value: {
+            kind: "ref" as const,
+            target: { sheet: "s3", row: 0, col: 1 },
+          },
+        })),
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  expect(store.applyTransaction({ patches: [{ op: "removeSheet", sheet: "s2" }] })).toMatchObject({
+    status: "applied",
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s3"]);
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: refCount,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("fails closed before retaining an oversized ref graph for later removal", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  expect(
+    store.applyTransaction(
+      {
+        patches: [0, 1].map((row) => ({
+          op: "set" as const,
+          addr: addr(row, 0),
+          value: { kind: "ref" as const, target: addr(2, 1) },
+        })),
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "set", addr: addr(3, 0), value: { kind: "literal", value: "local" } },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 1,
+    issues: [
+      {
+        kind: "resource-limit",
+        resource: "paged-reference-simulation",
+        actual: 2,
+        max: 1,
+      },
+    ],
+  });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("does not apply the ref simulation cap to an engine-skipped mutation", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  expect(
+    store.applyTransaction(
+      {
+        patches: [0, 1].map((row) => ({
+          op: "set" as const,
+          addr: addr(row, 0),
+          value: { kind: "ref" as const, target: addr(2, 1) },
+        })),
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "set", addr: addr(99, 0), value: { kind: "literal", value: "skipped" } },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 2 });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 2,
+    admissionReferenceMapsMaterialized: 0,
   });
   store.dispose();
 });

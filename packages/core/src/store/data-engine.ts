@@ -92,6 +92,7 @@ const DEFAULT_PAGED_CHUNK_ROWS = 4_096;
 /** Per-sheet budget for clean, unpinned chunks; dirty or visible chunks stay resident. */
 const DEFAULT_PAGED_CACHE_BYTES = 32 * 1024 * 1024;
 const DEFAULT_PAGED_DIRTY_CELL_LIMIT = 1_000_000;
+const MAX_PAGED_REFERENCE_SIMULATION_ENTRIES = 100_000;
 const EMPTY_U32 = new Uint32Array(0);
 
 /** Store-local compact history resource. Never serialize `resource`. */
@@ -128,6 +129,8 @@ export interface SheetwriteStoreOptions {
   cacheBytes?: number;
   /** Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000 cells; further edits reject atomically. */
   dirtyCellLimit?: number;
+  /** Maximum clean references retained for exact multi-operation remove-sheet simulation. */
+  referenceSimulationLimit?: number;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
 }
@@ -513,14 +516,40 @@ export class StoreDataEngine {
   pagedDirtyCapacityIssue(patches: readonly DocumentOp[]): MutationIssue | null {
     if (this.storageOptions.storage !== "paged") return null;
     const limit = this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT;
+    const referenceSimulationLimit =
+      this.storageOptions.referenceSimulationLimit ?? MAX_PAGED_REFERENCE_SIMULATION_ENTRIES;
     const wasmIndexLimit = 0xffff_ffff;
     const states = new Map<SheetId, PagedDirtyPreflightState>();
     const sheetLifecycle = createSheetLifecycleState(this.workbook.sheets);
-    const mayRemoveSheet = patches.some((patch) => patch.op === "removeSheet");
+    const referenceLifecycle = createSheetLifecycleState(this.workbook.sheets);
+    const applicableRemove = patches.map((patch) => {
+      const applied = applySheetLifecycleOperation(referenceLifecycle, patch);
+      return patch.op === "removeSheet" && applied === true;
+    });
+    const removeAfter = new Array<boolean>(patches.length);
+    let laterRemove = false;
+    for (let index = patches.length - 1; index >= 0; index--) {
+      removeAfter[index] = laterRemove;
+      if (applicableRemove[index]) laterRemove = true;
+    }
+    let trackVirtualRefs = false;
+    let referenceSimulationExceeded = false;
     let virtualRefs: Map<string, CellAddress> | null = null;
+    const referenceSimulationIssue = (): MutationIssue => ({
+      kind: "resource-limit",
+      severity: "error",
+      resource: "paged-reference-simulation",
+      actual: this.refs.entryCount(),
+      max: referenceSimulationLimit,
+      message: `Paged reference simulation exceeds the ${referenceSimulationLimit} entry limit`,
+    });
     const materializeVirtualRefs = (): Map<string, CellAddress> | null => {
-      if (!mayRemoveSheet) return null;
+      if (!trackVirtualRefs) return null;
       if (virtualRefs) return virtualRefs;
+      if (this.refs.entryCount() > referenceSimulationLimit) {
+        referenceSimulationExceeded = true;
+        return null;
+      }
       this.rangeMutationStats.admissionReferenceMapsMaterialized++;
       virtualRefs = new Map();
       for (const [source, target] of this.refs.entryIterator()) {
@@ -744,6 +773,7 @@ export class StoreDataEngine {
 
     for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
       const patch = patches[operationIndex]!;
+      trackVirtualRefs = removeAfter[operationIndex] ?? false;
       if (patch.op === "addSheet") {
         if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
         const snapshot = patch.sheet;
@@ -778,10 +808,19 @@ export class StoreDataEngine {
             }
           }
         }
+        if (referenceSimulationExceeded) return referenceSimulationIssue();
         continue;
       }
       if (patch.op === "removeSheet") {
         if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
+        if (referenceSimulationExceeded) return referenceSimulationIssue();
+        if (
+          trackVirtualRefs &&
+          virtualRefs === null &&
+          this.refs.entryCount() > referenceSimulationLimit
+        ) {
+          return referenceSimulationIssue();
+        }
         const materializedRefs = virtualRefs;
         const entries: Iterable<[CellAddress, CellAddress]> = materializedRefs
           ? (function* () {
@@ -790,15 +829,17 @@ export class StoreDataEngine {
               }
             })()
           : this.refs.entryIterator();
-        this.rangeMutationStats.admissionReferenceMapsMaterialized++;
-        const remaining = new Map<string, CellAddress>();
+        if (trackVirtualRefs) {
+          this.rangeMutationStats.admissionReferenceMapsMaterialized++;
+        }
+        const remaining = trackVirtualRefs ? new Map<string, CellAddress>() : null;
         for (const [source, target] of entries) {
           if (!materializedRefs) this.rangeMutationStats.admissionReferenceEntriesScanned++;
           if (source.sheet !== patch.sheet && target.sheet === patch.sheet) {
             const rejection = addSparse(source.sheet, source.row, source.col);
             if (rejection) return rejection;
           }
-          if (source.sheet !== patch.sheet && target.sheet !== patch.sheet) {
+          if (remaining && source.sheet !== patch.sheet && target.sheet !== patch.sheet) {
             remaining.set(cellKey(source), { ...target });
           }
         }
@@ -909,6 +950,7 @@ export class StoreDataEngine {
           const movedKeys = state.columnKeys.splice(patch.from, patch.count);
           state.columnKeys.splice(patch.to, 0, ...movedKeys);
         }
+        if (referenceSimulationExceeded) return referenceSimulationIssue();
         continue;
       }
       let rejection: MutationIssue | null = null;
@@ -1023,6 +1065,7 @@ export class StoreDataEngine {
           );
         }
       }
+      if (referenceSimulationExceeded) return referenceSimulationIssue();
       if (rejection) return rejection;
     }
     return null;
