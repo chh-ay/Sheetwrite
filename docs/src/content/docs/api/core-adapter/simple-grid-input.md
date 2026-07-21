@@ -9,10 +9,10 @@ Normalized workbook and columnar data produced from simple adapter props.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L196</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L202</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -33,6 +33,15 @@ data: ColumnarData;
 ```
 
 </details>
+
+<details class="api-member" id="simple-grid-input-presentation" data-pagefind-weight="1">
+<summary><code>presentation</code> <span class="api-member-summary">Simple row-object input always opts into semantic data-grid presentation.</span></summary>
+
+```ts generated
+presentation: "data-grid";
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -44,6 +53,7 @@ data: ColumnarData;
 export interface SimpleGridInput {
   workbook: Workbook;
   data: ColumnarData;
+  presentation: "data-grid";
 }
 ```
 

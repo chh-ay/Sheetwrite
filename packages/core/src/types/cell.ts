@@ -86,7 +86,7 @@ export type CellValue =
 export interface Column {
   /** Non-empty key, unique within the sheet, used to map input and datasource values. */
   key: string;
-  /** Schema label written by table exports; the canvas header displays positional column letters. */
+  /** Schema label used by table exports and data-grid presentation headers. */
   header: string;
   /** Unzoomed column width in CSS pixels. */
   width: number;
@@ -96,7 +96,7 @@ export interface Column {
   numberFormat?: string;
   /** Explicit BCP 47 locale for separators; omitted keeps the deterministic default. */
   numberLocale?: string;
-  /** Overrides theme styling for the painted column-letter header. */
+  /** Overrides theme styling for the painted column header. */
   headerStyle?: CellStyle;
   /** Base style merged beneath each cell's own style. */
   cellStyle?: CellStyle;
@@ -104,4 +104,6 @@ export interface Column {
   visible?: boolean;
   /** Name of a registered custom cell renderer (see `Grid.defineCellRenderer`). */
   renderer?: string;
+  /** Name of a registered custom editor (see `GridOptions.editors`). */
+  editor?: string;
 }

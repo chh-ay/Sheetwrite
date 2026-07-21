@@ -35,12 +35,25 @@ WASM initializes on client mount. Use `fallback` while loading, `onInitializatio
 ## Advanced component
 
 ```svelte
-<SheetwriteGrid bind:grid {workbook} {data} fill />
+<SheetwriteGrid
+  bind:grid
+  {workbook}
+  {data}
+  presentation="data-grid"
+  {editors}
+  fill
+/>
 ```
 
-The bindable `grid` is published before `onReady({ grid, generation, reason })` and clears during replacement or unmount. Reset-bound inputs replace the generation; presentation props update live.
+The bindable `grid` is published before
+`onReady({ grid, generation, reason })` and clears during replacement or
+unmount. Reset-bound inputs are `workbook`, `data`, `datasource`,
+`datasourceStorage`, `presentation`, `editors`, `protectionResolver`,
+`mutationPolicy`, `transactionResourceLimits`, `renderer`, `workerUrl`, and
+`renderers`; `theme`, `readOnly`, `config`, `overscan`, and `minColumns` update
+live.
 
-Grid callbacks are `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`.
+Grid callbacks are `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onCommandStateChange`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`.
 
 For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Svelte integration](https://sheetwrite.vercel.app/docs/frameworks/svelte/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
 

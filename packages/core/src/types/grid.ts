@@ -38,6 +38,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "./document.js";
+import type { CellEditor } from "./editor.js";
 import type { CellRenderer, Theme } from "./render.js";
 import type { Store } from "./store.js";
 import type {
@@ -60,6 +61,9 @@ import type {
  *   a read-only grid on paste).
  */
 export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
+
+/** Header semantics used by the retained canvas and accessibility mirror. */
+export type GridPresentation = "spreadsheet" | "data-grid";
 
 /** Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`. */
 export interface GridActions {
@@ -125,6 +129,20 @@ export type ToolbarActionName =
   | "undo"
   | "redo"
   | "separator";
+
+/** Built-in command names accepted by state queries and change events. */
+export type GridCommandName = Exclude<ToolbarActionName, "separator">;
+
+/** Observable availability and selection-derived activity for one command. */
+export interface GridCommandState {
+  readonly disabled: boolean;
+  readonly activity: "inactive" | "active" | "mixed";
+}
+
+/** Complete command-state snapshot emitted whenever availability or activity can change. */
+export interface GridCommandStateChangeEvent {
+  readonly states: Readonly<Record<GridCommandName, GridCommandState>>;
+}
 
 /** Text, DOM node, or node factory used as toolbar icon content. */
 export type ToolbarIcon = string | Node | (() => Node);
@@ -274,6 +292,13 @@ export interface GridOptions {
    * renderer and emits `renderer-fallback` once.
    */
   workerUrl?: string | URL;
+  /**
+   * Header presentation. Spreadsheet mode (default) paints positional A/B/C
+   * labels; data-grid mode paints each column's semantic `header`. Cell
+   * addressing, row indices, clipboard values, formulas, and exports are
+   * unchanged in both modes.
+   */
+  presentation?: GridPresentation;
   /** Overrides merged over the default theme and host CSS custom properties. */
   theme?: Partial<Theme>;
   /** Disables mutating interactions while preserving navigation and selection. */
@@ -289,6 +314,8 @@ export interface GridOptions {
   transactionResourceLimits?: Partial<TransactionResourceLimits>;
   /** Custom cell renderers registered up front; also see `Grid.defineCellRenderer`. */
   renderers?: Record<string, CellRenderer>;
+  /** Named custom editors resolved from each column's `editor` field. */
+  editors?: Record<string, CellEditor>;
   /** Rows rendered above/below the viewport to absorb fast scrolls. */
   overscan?: number;
   /** Render at least this many columns (empty padding columns past the data, like a spreadsheet). */
@@ -351,6 +378,8 @@ export interface GridEvents {
   "edit-begin": { addr: CellAddress };
   "edit-commit": { addr: CellAddress; value: CellValue };
   search: SearchResult;
+  /** Command availability or formatting activity changed. */
+  "command-state-change": GridCommandStateChangeEvent;
   "mutation-rejected": { issues: MutationIssue[] };
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
@@ -369,6 +398,8 @@ export interface Grid {
   readonly store: Store;
   /** Imperative action surface for binding custom toolbars/menus. */
   readonly actions: GridActions;
+  /** Query undo/redo availability and formatting active/mixed/disabled state. */
+  getCommandState(command: GridCommandName): GridCommandState;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   /**

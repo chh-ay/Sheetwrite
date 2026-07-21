@@ -19,6 +19,8 @@ export interface InputControllerDeps {
   scroller: HTMLDivElement;
   viewportEl: HTMLDivElement;
   editor: EditController;
+  /** True for the stock, validation, or a host-supplied editor. */
+  isEditing: () => boolean;
   findBar: () => FindBar | null;
   store: Store;
   loadable: SheetwriteStore | null;
@@ -177,11 +179,11 @@ export class InputController {
     }
     // A selected cell must own subsequent keyboard input across browsers.
     // Keep touch and active-editor gestures focused where they already are.
-    if (!isTouch && !editor.isEditing) this.deps.host.focus({ preventScroll: true });
+    if (!isTouch && !this.deps.isEditing()) this.deps.host.focus({ preventScroll: true });
 
     const viewportRect = this.deps.viewportEl.getBoundingClientRect();
     const fillHandle = this.fillHandleScreen(this.deps.contentTop(), this.deps.scroller.scrollLeft);
-    if (fillHandle && !editor.isEditing) {
+    if (fillHandle && !this.deps.isEditing()) {
       const hx = e.clientX - viewportRect.left;
       const hy = e.clientY - viewportRect.top;
       if (Math.abs(hx - fillHandle.x) <= 5 && Math.abs(hy - fillHandle.y) <= 5) {
@@ -193,7 +195,7 @@ export class InputController {
 
     // Resize gesture: near a column boundary in the top header, or a row boundary
     // in the left gutter. Takes priority over selection; disabled while editing.
-    if (!editor.isEditing && !this.deps.readOnly()) {
+    if (!this.deps.isEditing() && !this.deps.readOnly()) {
       const resize = this.resizeAt(e);
       if (resize) {
         e.preventDefault();
@@ -424,7 +426,7 @@ export class InputController {
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (this.deps.editor.isEditing) return;
+    if (this.deps.isEditing()) return;
     // Keys typed into an editable widget inside the host (find bar, custom
     // toolbar fields) belong to that widget. Without this guard the grid's
     // type-to-edit default steals focus mid-keystroke and Backspace becomes a

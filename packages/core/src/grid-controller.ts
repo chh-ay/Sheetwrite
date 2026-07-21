@@ -30,6 +30,8 @@ export interface GridControllerHandlers {
 
   /** Forwarded whenever the active search result changes. */
   onSearch?(result: GridEvents["search"]): void;
+  /** Forwarded whenever command availability or formatting activity changes. */
+  onCommandStateChange?(event: GridEvents["command-state-change"]): void;
 
   /** Forwarded after the visible sheet changes. */
   onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
@@ -116,6 +118,7 @@ export function createGridController(
     grid.on("edit-begin", (event) => handlers.onEditBegin?.(event)),
     grid.on("edit-commit", (event) => handlers.onEditCommit?.(event)),
     grid.on("search", (result) => handlers.onSearch?.(result)),
+    grid.on("command-state-change", (event) => handlers.onCommandStateChange?.(event)),
     grid.on("active-sheet", (event) => handlers.onActiveSheetChange?.(event)),
     grid.on("mutation-rejected", (event) => handlers.onMutationRejected?.(event)),
     grid.on("renderer-fallback", (event) => handlers.onRendererFallback?.(event)),

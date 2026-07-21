@@ -9,7 +9,7 @@ Convenience component for local object rows with live option updates.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L433</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L449</code></dd></div>
 </dl>
 
 ## Declaration

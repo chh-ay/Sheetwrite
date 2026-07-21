@@ -185,6 +185,14 @@ export class DocumentController {
     return outcome;
   }
 
+  get canUndo(): boolean {
+    return this.history.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return this.history.canRedo;
+  }
+
   undo(): void {
     const action = this.history.undo();
     if (!action) return;

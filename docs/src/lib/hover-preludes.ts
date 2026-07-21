@@ -10,7 +10,7 @@
  */
 
 const CORE_TYPES =
-  'import type { AggregateOp, ApplyTransactionResult, CellAddress, CellBorders, CellPaintContext, CellRenderer, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, ColumnFilter, DataSource, DataValidationRule, DocumentOp, Grid, GridActions, GridConfig, GridEvents, GridOptions, HighlightRange, MutationPolicyMode, PersistenceAdapter, ProtectedRange, ProtectionResolver, ReplaceResult, ResolvedCell, RowGroup, SearchOptions, SearchResult, Selection, SheetId, SortKey, Store, SyncCoordinator, Theme, Transaction, VisibleWindowView, Workbook, WorkbookSnapshot } from "@sheetwrite/core";';
+  'import type { AggregateOp, ApplyTransactionResult, CellAddress, CellBorders, CellEditor, CellPaintContext, CellRenderer, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, ColumnFilter, DataSource, DataValidationRule, DocumentOp, Grid, GridActions, GridCommandName, GridCommandState, GridConfig, GridEvents, GridOptions, HighlightRange, MutationPolicyMode, PersistenceAdapter, ProtectedRange, ProtectionResolver, ReplaceResult, ResolvedCell, RowGroup, SearchOptions, SearchResult, Selection, SheetId, SortKey, Store, SyncCoordinator, Theme, Transaction, VisibleWindowView, Workbook, WorkbookSnapshot } from "@sheetwrite/core";';
 const CORE_VALUES =
   'import { createGrid, createGridFromSnapshot, initSheetwrite, validateWorkbookSnapshot } from "@sheetwrite/core";';
 const CORE_PRELUDE = [
@@ -21,6 +21,9 @@ const CORE_PRELUDE = [
   "declare const workbook: Workbook;",
   "declare const data: ColumnarData;",
   "declare const store: Store;",
+  "declare const people: readonly Record<string, CellScalar>[];",
+  "declare const boldButton: HTMLButtonElement;",
+  "declare const undoButton: HTMLButtonElement;",
 ].join("\n");
 const FRAMEWORK_PRELUDE = [
   CORE_PRELUDE,
@@ -33,6 +36,11 @@ const FRAMEWORK_PRELUDE = [
   "declare const observe: (grid: Grid, generation: number, reason: string) => void;",
   "declare const connect: (grid: Grid) => void;",
   'declare const operationQueue: { push(...patches: Transaction["patches"]): void };',
+  "declare const statusEditor: CellEditor;",
+  "declare const assigneeAutocomplete: CellEditor;",
+  "declare const editors: Record<string, CellEditor>;",
+  "declare const setCommandStates: (states: Readonly<Record<GridCommandName, GridCommandState>>) => void;",
+  "declare let commandStates: Readonly<Record<GridCommandName, GridCommandState>>;",
 ].join("\n");
 
 export const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([

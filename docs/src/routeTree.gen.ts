@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
+import { Route as TestSemanticGridRouteImport } from './routes/test.semantic-grid'
 import { Route as TestRenderersRouteImport } from './routes/test.renderers'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
@@ -65,6 +66,11 @@ const DocsIndexRoute = DocsIndexRouteImport.update({
 const TestXlsxRoute = TestXlsxRouteImport.update({
   id: '/test/xlsx',
   path: '/test/xlsx',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestSemanticGridRoute = TestSemanticGridRouteImport.update({
+  id: '/test/semantic-grid',
+  path: '/test/semantic-grid',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TestRenderersRoute = TestRenderersRouteImport.update({
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/renderers': typeof TestRenderersRoute
+  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/renderers': typeof TestRenderersRoute
+  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/renderers': typeof TestRenderersRoute
+  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/showcases/performance'
     | '/test/collaboration'
     | '/test/renderers'
+    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/showcases/performance'
     | '/test/collaboration'
     | '/test/renderers'
+    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs'
     | '/showcases'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/showcases/performance'
     | '/test/collaboration'
     | '/test/renderers'
+    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
   TestRenderersRoute: typeof TestRenderersRoute
+  TestSemanticGridRoute: typeof TestSemanticGridRoute
   TestXlsxRoute: typeof TestXlsxRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
@@ -309,6 +322,13 @@ declare module '@tanstack/react-router' {
       path: '/test/xlsx'
       fullPath: '/test/xlsx'
       preLoaderRoute: typeof TestXlsxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/semantic-grid': {
+      id: '/test/semantic-grid'
+      path: '/test/semantic-grid'
+      fullPath: '/test/semantic-grid'
+      preLoaderRoute: typeof TestSemanticGridRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/test/renderers': {
@@ -391,6 +411,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   TestCollaborationRoute: TestCollaborationRoute,
   TestRenderersRoute: TestRenderersRoute,
+  TestSemanticGridRoute: TestSemanticGridRoute,
   TestXlsxRoute: TestXlsxRoute,
   DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,

@@ -9,10 +9,10 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L57</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L59</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>13</span>
+## Members <span class="api-count" data-pagefind-ignore>14</span>
 
 <div class="api-member-list">
 <h3 id="ongridchange" class="api-search-anchor">onGridChange</h3>
@@ -75,6 +75,15 @@ onSearch?: (result: GridEvents["search"]) => void;
 
 ```ts generated
 onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-command-state-change" data-pagefind-weight="1">
+<summary><code>onCommandStateChange</code> <span class="api-member-summary">Receives observable undo/redo and formatting command state.</span></summary>
+
+```ts generated
+onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
 ```
 
 </details>
@@ -148,6 +157,7 @@ export interface GridAdapterEventHandlers {
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
   onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
   onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
   onDatasourceError?: (event: GridEvents["datasource-error"]) => void;

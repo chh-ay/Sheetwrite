@@ -9,10 +9,10 @@ Event payloads emitted by the Vue components, keyed by template event name.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L102</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L106</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>13</span>
+## Members <span class="api-count" data-pagefind-ignore>14</span>
 
 <div class="api-member-list">
 
@@ -66,6 +66,15 @@ Event payloads emitted by the Vue components, keyed by template event name.
 
 ```ts generated
 search: GridEvents["search"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-emits-command-state-change" data-pagefind-weight="1">
+<summary><code>command-state-change</code> <span class="api-member-summary">Command availability or formatting activity changed.</span></summary>
+
+```ts generated
+"command-state-change": GridEvents["command-state-change"];
 ```
 
 </details>
@@ -147,6 +156,7 @@ export interface SheetwriteGridEmits {
   "edit-begin": GridEvents["edit-begin"];
   "edit-commit": GridEvents["edit-commit"];
   search: GridEvents["search"];
+  "command-state-change": GridEvents["command-state-change"];
   "active-sheet-change": GridEvents["active-sheet"];
   "mutation-rejected": GridEvents["mutation-rejected"];
   "renderer-fallback": GridEvents["renderer-fallback"];

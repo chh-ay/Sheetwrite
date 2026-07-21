@@ -9,10 +9,10 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L289</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L314</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>81</span>
+## Members <span class="api-count" data-pagefind-ignore>82</span>
 
 <div class="api-member-list">
 
@@ -30,6 +30,15 @@ readonly store: Store;
 
 ```ts generated
 readonly actions: GridActions;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-command-state" data-pagefind-weight="1">
+<summary><code>getCommandState</code> <span class="api-member-summary">Query undo/redo availability and formatting active/mixed/disabled state.</span></summary>
+
+```ts generated
+getCommandState(command: GridCommandName): GridCommandState;
 ```
 
 </details>
@@ -796,6 +805,7 @@ destroy(): void;
 export interface Grid {
   readonly store: Store;
   readonly actions: GridActions;
+  getCommandState(command: GridCommandName): GridCommandState;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null;

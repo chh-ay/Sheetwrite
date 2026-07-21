@@ -18,7 +18,7 @@ Every field is optional; a missing callback simply drops that event.
 <div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L16</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>11</span>
+## Members <span class="api-count" data-pagefind-ignore>12</span>
 
 <div class="api-member-list">
 
@@ -72,6 +72,15 @@ onEditCommit?(event: GridEvents["edit-commit"]): void;
 
 ```ts generated
 onSearch?(result: GridEvents["search"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-command-state-change" data-pagefind-weight="1">
+<summary><code>onCommandStateChange</code> <span class="api-member-summary">Forwarded whenever command availability or formatting activity changes.</span></summary>
+
+```ts generated
+onCommandStateChange?(event: GridEvents["command-state-change"]): void;
 ```
 
 </details>
@@ -135,6 +144,7 @@ export interface GridControllerHandlers {
   onEditBegin?(event: GridEvents["edit-begin"]): void;
   onEditCommit?(event: GridEvents["edit-commit"]): void;
   onSearch?(result: GridEvents["search"]): void;
+  onCommandStateChange?(event: GridEvents["command-state-change"]): void;
   onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
   onMutationRejected?(event: GridEvents["mutation-rejected"]): void;
   onRendererFallback?(event: GridEvents["renderer-fallback"]): void;

@@ -61,6 +61,8 @@ export interface SheetwriteGridProps {
   renderer?: GridOptions["renderer"];
   /** Browser-fetchable worker module URL. */
   workerUrl?: GridOptions["workerUrl"];
+  /** Positional spreadsheet or semantic data-grid headers. */
+  presentation?: GridOptions["presentation"];
   /** Live overrides merged into the resolved Grid theme. */
   theme?: Partial<Theme>;
   /** Disables mutation while preserving navigation and selection. */
@@ -73,6 +75,8 @@ export interface SheetwriteGridProps {
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
   /** Named custom renderers registered when the Grid is created. */
   renderers?: Record<string, CellRenderer>;
+  /** Named custom editors registered when the Grid is created. */
+  editors?: GridOptions["editors"];
   /** Extra rows painted above and below the viewport. */
   overscan?: number;
   /** Minimum rendered column count, including empty padding columns. */
@@ -112,6 +116,8 @@ export interface SheetwriteGridEmits {
   "edit-commit": GridEvents["edit-commit"];
   /** Refreshed search matches and active-match index. */
   search: GridEvents["search"];
+  /** Command availability or formatting activity changed. */
+  "command-state-change": GridEvents["command-state-change"];
   /** The visible sheet changed. */
   "active-sheet-change": GridEvents["active-sheet"];
   /** A Grid mutation was rejected. */
@@ -163,6 +169,8 @@ const gridProps = {
     type: [String, URL] as unknown as PropType<GridOptions["workerUrl"]>,
     default: undefined,
   },
+  /** Positional spreadsheet or semantic data-grid headers. */
+  presentation: { type: String as PropType<GridOptions["presentation"]>, default: undefined },
   /** Live overrides merged into the resolved Grid theme. */
   theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
   /** Disables mutation while preserving navigation and selection. */
@@ -184,6 +192,8 @@ const gridProps = {
   },
   /** Named custom renderers registered when the Grid is created. */
   renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
+  /** Named custom editors registered when the Grid is created. */
+  editors: { type: Object as PropType<GridOptions["editors"]>, default: undefined },
   /** Extra rows painted above and below the viewport. */
   overscan: { type: Number, default: undefined },
   /** Minimum rendered column count, including empty padding columns. */
@@ -208,6 +218,7 @@ const gridEmits = {
   "edit-begin": (_event: GridEvents["edit-begin"]) => true,
   "edit-commit": (_event: GridEvents["edit-commit"]) => true,
   search: (_result: GridEvents["search"]) => true,
+  "command-state-change": (_event: GridEvents["command-state-change"]) => true,
   "active-sheet-change": (_event: GridEvents["active-sheet"]) => true,
   "mutation-rejected": (_event: GridEvents["mutation-rejected"]) => true,
   "renderer-fallback": (_event: GridEvents["renderer-fallback"]) => true,
@@ -238,6 +249,7 @@ const SheetwriteGridComponent = defineComponent({
       onEditBegin: (event) => emit("edit-begin", event),
       onEditCommit: (event) => emit("edit-commit", event),
       onSearch: (result) => emit("search", result),
+      onCommandStateChange: (event) => emit("command-state-change", event),
       onActiveSheetChange: (event) => emit("active-sheet-change", event),
       onMutationRejected: (event) => emit("mutation-rejected", event),
       onRendererFallback: (event) => emit("renderer-fallback", event),
@@ -253,12 +265,14 @@ const SheetwriteGridComponent = defineComponent({
         datasourceStorage: props.datasourceStorage,
         renderer: props.renderer,
         workerUrl: props.workerUrl,
+        presentation: props.presentation,
         theme: props.theme,
         readOnly: props.readOnly,
         protectionResolver: props.protectionResolver,
         mutationPolicy: props.mutationPolicy,
         transactionResourceLimits: props.transactionResourceLimits,
         renderers: props.renderers,
+        editors: props.editors,
         overscan: props.overscan,
         minColumns: props.minColumns,
         config: props.config,
@@ -328,10 +342,12 @@ const SheetwriteGridComponent = defineComponent({
         props.datasourceStorage,
         props.renderer,
         props.workerUrl,
+        props.presentation,
         props.protectionResolver,
         props.mutationPolicy,
         props.transactionResourceLimits,
         props.renderers,
+        props.editors,
       ],
       () => {
         if (isSheetwriteReady()) void createCurrentGrid();
@@ -435,5 +451,14 @@ export const Sheetwrite = SheetwriteSimpleComponent as unknown as SheetwriteComp
   SheetwriteGridEmits
 >;
 
-export type { CellScalar, Grid } from "@sheetwrite/core";
+export type {
+  CellEditor,
+  CellEditorContext,
+  CellEditorInstance,
+  CellEditorNavigation,
+  CellScalar,
+  Grid,
+  GridCommandName,
+  GridCommandState,
+} from "@sheetwrite/core";
 export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";

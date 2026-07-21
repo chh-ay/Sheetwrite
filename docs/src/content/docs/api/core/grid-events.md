@@ -9,10 +9,10 @@ Payload map for events emitted by a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L347</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L374</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>11</span>
+## Members <span class="api-count" data-pagefind-ignore>12</span>
 
 <div class="api-member-list">
 
@@ -66,6 +66,15 @@ scroll: { scrollTop: number; firstRow: number; lastRow: number };
 
 ```ts generated
 search: SearchResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-events-command-state-change" data-pagefind-weight="1">
+<summary><code>command-state-change</code> <span class="api-member-summary">Command availability or formatting activity changed.</span></summary>
+
+```ts generated
+"command-state-change": GridCommandStateChangeEvent;
 ```
 
 </details>
@@ -140,6 +149,7 @@ export interface GridEvents {
     value: CellValue;
   };
   search: SearchResult;
+  "command-state-change": GridCommandStateChangeEvent;
   "mutation-rejected": {
     issues: MutationIssue[];
   };

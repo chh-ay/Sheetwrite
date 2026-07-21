@@ -43,14 +43,25 @@ The component initializes WASM on client mount. `fallback` renders inside the st
 import { SheetwriteGrid } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
 
-<SheetwriteGrid ref={gridRef} workbook={workbook} data={data} fill />;
+<SheetwriteGrid
+  ref={gridRef}
+  workbook={workbook}
+  data={data}
+  presentation="data-grid"
+  editors={editors}
+  fill
+/>;
 ```
 
-Reset-bound inputs are `workbook`, `data`, `datasource`, `datasourceStorage`, `renderer`, `workerUrl`, and `renderers`. They replace the grid. Live inputs are `theme`, `readOnly`, `config`, `overscan`, and `minColumns`.
+Reset-bound inputs are `workbook`, `data`, `datasource`, `datasourceStorage`,
+`presentation`, `editors`, `protectionResolver`, `mutationPolicy`,
+`transactionResourceLimits`, `renderer`, `workerUrl`, and `renderers`. They
+replace the grid. Live inputs are `theme`, `readOnly`, `config`, `overscan`, and
+`minColumns`.
 
 `ref` receives the current `Grid` before `onReady({ grid, generation, reason })` runs and clears on replacement or unmount. Reasons are `initial`, `input-reset`, and `renderer-reset`.
 
-Grid events use collision-free names: `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`. Native host `onChange` and `onScroll` remain ordinary DOM handlers.
+Grid events use collision-free names: `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onCommandStateChange`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`. Native host `onChange` and `onScroll` remain ordinary DOM handlers.
 
 For vanilla/preload control, import `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [React integration](https://sheetwrite.vercel.app/docs/frameworks/react/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).
 

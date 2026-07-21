@@ -49,12 +49,14 @@ describe("shared adapter option policy", () => {
       datasourceStorage: { mode: "paged" },
       renderer: "worker",
       workerUrl: new URL("https://sheetwrite.invalid/worker.js"),
+      presentation: "data-grid",
       theme: { bg: "#fff" },
       readOnly: true,
       protectionResolver: () => "allow",
       mutationPolicy: "partial",
       transactionResourceLimits: { maxOperations: 25 },
       renderers: {},
+      editors: {},
       overscan: 2,
       minColumns: 4,
       config: { toolbar: false },
@@ -150,6 +152,7 @@ describe("simple data conversion", () => {
       defaultRows: rows,
     });
     expect(input.workbook.sheets[0]?.columns[0]?.header).toBe("Name");
+    expect(input.presentation).toBe("data-grid");
     expect(Array.from(input.data.columns.price ?? [])).toEqual([2, null]);
     expect(rows).toEqual(before);
   });
@@ -170,5 +173,11 @@ describe("simple data conversion", () => {
         defaultRows: [{ "": "A" }],
       }),
     ).toThrow("requires a non-empty key");
+    expect(() =>
+      createSimpleGridInput({
+        columns: [{ key: "name", title: "" }],
+        defaultRows: [{ name: "A" }],
+      }),
+    ).toThrow("requires a title");
   });
 });

@@ -9,10 +9,10 @@ Workbook, data, rendering, policy, and built-in UI options used to create a Grid
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L254</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L272</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>15</span>
+## Members <span class="api-count" data-pagefind-ignore>17</span>
 
 <div class="api-member-list">
 
@@ -79,6 +79,19 @@ can't be constructed, the grid falls back to the main-thread canvas
 renderer and emits `renderer-fallback` once.</p>
 </details>
 
+<details class="api-member" id="grid-options-presentation" data-pagefind-weight="1">
+<summary><code>presentation</code> <span class="api-member-summary">Header presentation. Spreadsheet mode (default) paints positional A/B/C labels; data-grid mode paints each column's semantic header.</span></summary>
+
+```ts generated
+presentation?: GridPresentation;
+```
+
+<p class="api-member-doc">Header presentation. Spreadsheet mode (default) paints positional A/B/C
+labels; data-grid mode paints each column's semantic `header`. Cell
+addressing, row indices, clipboard values, formulas, and exports are
+unchanged in both modes.</p>
+</details>
+
 <details class="api-member" id="grid-options-theme" data-pagefind-weight="1">
 <summary><code>theme</code> <span class="api-member-summary">Overrides merged over the default theme and host CSS custom properties.</span></summary>
 
@@ -135,6 +148,15 @@ renderers?: Record<string, CellRenderer>;
 
 </details>
 
+<details class="api-member" id="grid-options-editors" data-pagefind-weight="1">
+<summary><code>editors</code> <span class="api-member-summary">Named custom editors resolved from each column's editor field.</span></summary>
+
+```ts generated
+editors?: Record<string, CellEditor>;
+```
+
+</details>
+
 <details class="api-member" id="grid-options-overscan" data-pagefind-weight="1">
 <summary><code>overscan</code> <span class="api-member-summary">Rows rendered above/below the viewport to absorb fast scrolls.</span></summary>
 
@@ -176,12 +198,14 @@ export interface GridOptions {
   datasourceStorage?: DataSourceStorageOptions;
   renderer?: "canvas" | "worker";
   workerUrl?: string | URL;
+  presentation?: GridPresentation;
   theme?: Partial<Theme>;
   readOnly?: boolean;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
   transactionResourceLimits?: Partial<TransactionResourceLimits>;
   renderers?: Record<string, CellRenderer>;
+  editors?: Record<string, CellEditor>;
   overscan?: number;
   minColumns?: number;
   config?: GridConfig;

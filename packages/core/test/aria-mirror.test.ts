@@ -31,6 +31,8 @@ function mountMirror(): { host: HTMLDivElement; mirror: AriaMirror } {
       rowCount: 100,
       colCount: 40,
       readOnly: false,
+      presentation: "spreadsheet",
+      columnHeader: (col) => String.fromCharCode(65 + col),
       focusCell: () => null,
       noteAt: () => null,
       selection: () => null,

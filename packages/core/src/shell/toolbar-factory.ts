@@ -35,7 +35,7 @@ export function createToolbar(
   bar.setAttribute("aria-label", options.label ?? "Spreadsheet formatting");
 
   const items = options.items ?? defaultToolbarItems({ export: true });
-  renderToolbarItems(bar, items, grid, options.icons);
+  const disposeState = renderToolbarItems(bar, items, grid, options.icons);
 
   // Local roving focus across focusable controls while the toolbar owns focus.
   const onKeydown = (event: KeyboardEvent): void => {
@@ -66,6 +66,7 @@ export function createToolbar(
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      disposeState();
       bar.removeEventListener("keydown", onKeydown);
       bar.remove();
     },

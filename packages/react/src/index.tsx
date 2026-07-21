@@ -45,6 +45,7 @@ type GridAdapterEventHandlerName =
   | "onEditBegin"
   | "onEditCommit"
   | "onSearch"
+  | "onCommandStateChange"
   | "onActiveSheetChange"
   | "onMutationRejected"
   | "onRendererFallback"
@@ -105,6 +106,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       onEditBegin,
       onEditCommit,
       onSearch,
+      onCommandStateChange,
       onActiveSheetChange,
       onMutationRejected,
       onRendererFallback,
@@ -117,12 +119,14 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       datasourceStorage,
       renderer,
       workerUrl,
+      presentation,
       theme,
       readOnly,
       protectionResolver,
       mutationPolicy,
       transactionResourceLimits,
       renderers,
+      editors,
       overscan,
       minColumns,
       config,
@@ -178,6 +182,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       onEditBegin,
       onEditCommit,
       onSearch,
+      onCommandStateChange,
       onActiveSheetChange,
       onMutationRejected,
       onRendererFallback,
@@ -243,7 +248,9 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         datasourceStorage,
         renderer,
         workerUrl,
+        presentation,
         renderers,
+        editors,
         protectionResolver,
         mutationPolicy,
         transactionResourceLimits,
@@ -261,6 +268,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         onEditBegin: (event) => handlers.current?.onEditBegin?.(event),
         onEditCommit: (event) => handlers.current?.onEditCommit?.(event),
         onSearch: (result) => handlers.current?.onSearch?.(result),
+        onCommandStateChange: (event) => handlers.current?.onCommandStateChange?.(event),
         onActiveSheetChange: (event) => handlers.current?.onActiveSheetChange?.(event),
         onMutationRejected: (event) => handlers.current?.onMutationRejected?.(event),
         onRendererFallback: (event) => handlers.current?.onRendererFallback?.(event),
@@ -329,10 +337,12 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       datasourceStorage,
       renderer,
       workerUrl,
+      presentation,
       protectionResolver,
       mutationPolicy,
       transactionResourceLimits,
       renderers,
+      editors,
     ]);
 
     useEffect(() => controllerRef.current?.setReadOnly(readOnly ?? false), [readOnly]);
@@ -389,5 +399,14 @@ export const Sheetwrite = SheetwriteComponent as <Row extends Record<string, Cel
   },
 ) => ReactElement;
 
-export type { CellScalar, Grid } from "@sheetwrite/core";
+export type {
+  CellEditor,
+  CellEditorContext,
+  CellEditorInstance,
+  CellEditorNavigation,
+  CellScalar,
+  Grid,
+  GridCommandName,
+  GridCommandState,
+} from "@sheetwrite/core";
 export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";

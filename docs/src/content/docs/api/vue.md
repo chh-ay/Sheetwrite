@@ -8,17 +8,21 @@ description: "API reference for @sheetwrite/vue."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>11</dd></div>
+<div><dt>Exports</dt><dd>17</dd></div>
 </dl>
 
 Source entry: `packages/vue/src/index.ts`
 
 ## Exported symbols
 
-### Interfaces <span class="api-count" data-pagefind-ignore>7</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>11</span>
 
 <div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/vue/cell-editor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CellEditor</code></span><span class="api-symbol-card__desc">Framework-neutral named editor definition registered through GridOptions.editors.</span></a>
+<a class="api-symbol-card" href="/docs/api/vue/cell-editor-context/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CellEditorContext</code></span><span class="api-symbol-card__desc">Immutable state and guarded completion callbacks for one mounted editor.</span></a>
+<a class="api-symbol-card" href="/docs/api/vue/cell-editor-instance/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>CellEditorInstance</code></span><span class="api-symbol-card__desc">Retained lifecycle returned by a custom editor's mount method.</span></a>
 <a class="api-symbol-card" href="/docs/api/vue/grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Grid</code></span><span class="api-symbol-card__desc">Imperative grid handle for document commands, events, rendering, and teardown.</span></a>
+<a class="api-symbol-card" href="/docs/api/vue/grid-command-state/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridCommandState</code></span><span class="api-symbol-card__desc">Observable availability and selection-derived activity for one command.</span></a>
 <a class="api-symbol-card" href="/docs/api/vue/grid-ready-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridReadyEvent</code></span><span class="api-symbol-card__desc">Grid handle, generation, and reason published after adapter initialization.</span></a>
 <a class="api-symbol-card" href="/docs/api/vue/sheetwrite-grid-emits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteGridEmits</code></span><span class="api-symbol-card__desc">Event payloads emitted by the Vue components, keyed by template event name.</span></a>
 <a class="api-symbol-card" href="/docs/api/vue/sheetwrite-grid-expose/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteGridExpose</code></span><span class="api-symbol-card__desc">Imperative Grid handle exposed by the Vue advanced component.</span></a>
@@ -27,10 +31,12 @@ Source entry: `packages/vue/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/vue/simple-column/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SimpleColumn</code></span><span class="api-symbol-card__desc">Column definition accepted by the adapters’ simple row-object API.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>2</span>
+### Types <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/vue/cell-editor-navigation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CellEditorNavigation</code></span><span class="api-symbol-card__desc">Selection movement applied after a successful editor commit.</span></a>
 <a class="api-symbol-card" href="/docs/api/vue/cell-scalar/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CellScalar</code></span><span class="api-symbol-card__desc">A scalar that can be displayed directly.</span></a>
+<a class="api-symbol-card" href="/docs/api/vue/grid-command-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridCommandName</code></span><span class="api-symbol-card__desc">Built-in command names accepted by state queries and change events.</span></a>
 <a class="api-symbol-card" href="/docs/api/vue/sheetwrite-component-constructor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteComponentConstructor</code></span><span class="api-symbol-card__desc">Vue constructor type for Sheetwrite components: Sheetwrite-owned props, emitted events exposed as on listener props, and the exposed instance surface reachable through a template ref.</span></a>
 </div>
 

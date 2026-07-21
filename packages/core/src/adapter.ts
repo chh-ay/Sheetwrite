@@ -27,7 +27,9 @@ export const GRID_OPTION_POLICY = {
   datasourceStorage: "reset",
   renderer: "reset",
   workerUrl: "reset",
+  presentation: "reset",
   renderers: "reset",
+  editors: "reset",
   protectionResolver: "reset",
   mutationPolicy: "reset",
   transactionResourceLimits: "reset",
@@ -69,6 +71,8 @@ export interface GridAdapterEventHandlers {
   onSearch?: (result: GridEvents["search"]) => void;
   /** Fires after the visible sheet changes. */
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  /** Receives observable undo/redo and formatting command state. */
+  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
   /** Receives structured issues when a Grid mutation is rejected. */
   onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
   /** Fires when worker rendering falls back to the main-thread canvas renderer. */
@@ -169,7 +173,7 @@ export const DEFAULT_SIMPLE_COLUMN_WIDTH = 120;
 export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   /** Non-empty row-object key, unique within the column list. */
   key: keyof Row & string;
-  /** Schema header label used by exports. */
+  /** Semantic title painted in data-grid mode and written by table exports. */
   title: string;
   /** Unzoomed width in CSS pixels; defaults to 120. */
   width?: number;
@@ -177,8 +181,10 @@ export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   type?: CellFormat;
   /** Excel number-format code used for number, date, or currency display. */
   numberFormat?: string;
-  /** Style applied to the painted column-letter header. */
+  /** Style applied to the painted column header. */
   headerStyle?: CellStyle;
+  /** Name of a custom editor registered through `GridOptions.editors`. */
+  editor?: string;
   /** Base style merged beneath cell-specific styles. */
   cellStyle?: CellStyle;
   /** Set to `false` to exclude the column from the live view and table exports. */
@@ -196,6 +202,8 @@ export interface SimpleSheetwriteOptions<Row extends Record<string, CellScalar>>
 export interface SimpleGridInput {
   workbook: Workbook;
   data: ColumnarData;
+  /** Simple row-object input always opts into semantic data-grid presentation. */
+  presentation: "data-grid";
 }
 
 /** Converts simple columns and row objects into canonical workbook and columnar input. */
@@ -205,6 +213,7 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
   const keys = new Set<string>();
   const columns = options.columns.map((column) => {
     if (!column.key) throw new Error("Sheetwrite: every simple column requires a non-empty key");
+    if (!column.title) throw new Error("Sheetwrite: every simple column requires a title");
     if (keys.has(column.key)) {
       throw new Error(`Sheetwrite: duplicate simple column key "${column.key}"`);
     }
@@ -217,6 +226,7 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
       numberFormat: column.numberFormat,
       headerStyle: column.headerStyle,
       cellStyle: column.cellStyle,
+      editor: column.editor,
       visible: column.visible,
     };
   });
@@ -243,5 +253,6 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
       ],
     },
     data: { rowCount: options.defaultRows.length, columns: dataColumns },
+    presentation: "data-grid",
   };
 }

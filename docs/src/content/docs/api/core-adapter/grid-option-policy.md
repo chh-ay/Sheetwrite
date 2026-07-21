@@ -24,7 +24,9 @@ const GRID_OPTION_POLICY: {
   readonly datasourceStorage: "reset";
   readonly renderer: "reset";
   readonly workerUrl: "reset";
+  readonly presentation: "reset";
   readonly renderers: "reset";
+  readonly editors: "reset";
   readonly protectionResolver: "reset";
   readonly mutationPolicy: "reset";
   readonly transactionResourceLimits: "reset";

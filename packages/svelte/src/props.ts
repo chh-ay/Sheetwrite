@@ -25,6 +25,8 @@ export interface SheetwriteGridProps
   renderer?: GridOptions["renderer"];
   /** Browser-fetchable worker module URL. */
   workerUrl?: GridOptions["workerUrl"];
+  /** Positional spreadsheet or semantic data-grid headers. */
+  presentation?: GridOptions["presentation"];
   /** Live resolved-theme overrides. */
   theme?: GridOptions["theme"];
   /** Disables mutations, not navigation. */
@@ -37,6 +39,8 @@ export interface SheetwriteGridProps
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
   /** Named custom cell renderers. */
   renderers?: GridOptions["renderers"];
+  /** Named custom cell editors. */
+  editors?: GridOptions["editors"];
   /** Extra rows painted around the viewport. */
   overscan?: GridOptions["overscan"];
   /** Minimum column count with padding. */

@@ -18,11 +18,13 @@ let {
   renderer = "canvas",
   workerUrl,
   theme,
+  presentation,
   readOnly,
   protectionResolver,
   mutationPolicy,
   transactionResourceLimits,
   renderers,
+  editors,
   overscan,
   minColumns,
   config,
@@ -37,6 +39,7 @@ let {
   onEditCommit,
   onSearch,
   onActiveSheetChange,
+  onCommandStateChange,
   onMutationRejected,
   onRendererFallback,
   onDatasourceError,
@@ -63,6 +66,8 @@ const handlers = {
   onSearch: (event: Parameters<NonNullable<typeof onSearch>>[0]) => onSearch?.(event),
   onActiveSheetChange: (event: Parameters<NonNullable<typeof onActiveSheetChange>>[0]) =>
     onActiveSheetChange?.(event),
+  onCommandStateChange: (event: Parameters<NonNullable<typeof onCommandStateChange>>[0]) =>
+    onCommandStateChange?.(event),
   onMutationRejected: (event: Parameters<NonNullable<typeof onMutationRejected>>[0]) =>
     onMutationRejected?.(event),
   onRendererFallback: (event: Parameters<NonNullable<typeof onRendererFallback>>[0]) =>
@@ -111,10 +116,12 @@ $effect(() => {
     datasourceStorage,
     renderer,
     workerUrl,
+    presentation,
     protectionResolver,
     mutationPolicy,
     transactionResourceLimits,
     renderers,
+    editors,
     wasmSource,
   };
   const currentOptions = (): GridOptions =>
@@ -125,10 +132,12 @@ $effect(() => {
       datasourceStorage: resetInputs.datasourceStorage,
       renderer: resetInputs.renderer,
       workerUrl: resetInputs.workerUrl,
+      presentation: resetInputs.presentation,
       protectionResolver: resetInputs.protectionResolver,
       mutationPolicy: resetInputs.mutationPolicy,
       transactionResourceLimits: resetInputs.transactionResourceLimits,
       renderers: resetInputs.renderers,
+      editors: resetInputs.editors,
       theme,
       readOnly,
       overscan,

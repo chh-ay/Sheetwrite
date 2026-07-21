@@ -12,6 +12,7 @@ import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { ContextMenu } from "./context-menu.js";
+import { CustomEditorController } from "./custom-editor.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
@@ -50,6 +51,7 @@ import type {
   Selection,
   SheetId,
 } from "./types/coordinates.js";
+import type { CellEditor, CellEditorRect } from "./types/editor.js";
 import type { AggregateOp } from "./types/data.js";
 import type {
   AddSheetInput,
@@ -71,8 +73,11 @@ import type {
   Grid,
   GridActions,
   GridConfig,
+  GridCommandName,
+  GridCommandState,
   GridEvents,
   GridOptions,
+  GridPresentation,
   ReplaceResult,
   SearchOptions,
   SearchResult,
@@ -125,6 +130,87 @@ export function measureMaxElementHeight(
 }
 const DEFAULT_OVERSCAN = 6;
 const DEFAULT_COL_WIDTH = 100;
+const GRID_COMMANDS: readonly GridCommandName[] = [
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "alignLeft",
+  "alignCenter",
+  "alignRight",
+  "textColor",
+  "fillColor",
+  "border",
+  "clearFormat",
+  "merge",
+  "unmerge",
+  "sortAsc",
+  "sortDesc",
+  "exportCsv",
+  "exportXlsx",
+  "undo",
+  "redo",
+];
+const COMMAND_STATE_ACTIVITY_COMMANDS: readonly GridCommandName[] = [
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "alignLeft",
+  "alignCenter",
+  "alignRight",
+  "border",
+];
+/** Bound synchronous command-state work; larger uniform selections report mixed conservatively. */
+const COMMAND_STATE_CELL_LIMIT = 4_096;
+
+function isFormattingCommand(command: GridCommandName): boolean {
+  return (
+    command === "bold" ||
+    command === "italic" ||
+    command === "underline" ||
+    command === "strikethrough" ||
+    command === "alignLeft" ||
+    command === "alignCenter" ||
+    command === "alignRight" ||
+    command === "textColor" ||
+    command === "fillColor" ||
+    command === "border" ||
+    command === "clearFormat"
+  );
+}
+
+function effectiveStyleValue<Key extends keyof CellStyle>(
+  cell: CellStyle,
+  column: CellStyle | undefined,
+  key: Key,
+): CellStyle[Key] {
+  return Object.hasOwn(cell, key) ? cell[key] : column?.[key];
+}
+
+function formattingCommandActive(
+  command: GridCommandName,
+  cell: CellStyle,
+  column: CellStyle | undefined,
+): boolean {
+  switch (command) {
+    case "bold":
+    case "italic":
+    case "underline":
+    case "strikethrough":
+      return effectiveStyleValue(cell, column, command) === true;
+    case "alignLeft":
+      return effectiveStyleValue(cell, column, "align") === "left";
+    case "alignCenter":
+      return effectiveStyleValue(cell, column, "align") === "center";
+    case "alignRight":
+      return effectiveStyleValue(cell, column, "align") === "right";
+    case "border":
+      return effectiveStyleValue(cell, column, "border") !== undefined;
+    default:
+      return false;
+  }
+}
 
 /** Hard ceiling for one auto-fit bulk read. */
 export const AUTO_FIT_CHUNK_CELLS = 16_384;
@@ -255,6 +341,7 @@ export class GridImpl implements Grid {
   private renderer: Renderer;
   private readonly editor: EditController;
   private readonly validationEditor: ValidationEditor;
+  private readonly customEditor: CustomEditorController;
   private readonly input: InputController;
   private readonly ariaMirror: AriaMirror;
   private readonly searchController: SearchController;
@@ -281,6 +368,7 @@ export class GridImpl implements Grid {
   private contextMenu: ContextMenu | null = null;
   private findBar: FindBar | null = null;
   private config: GridConfig | undefined;
+  private readonly presentation: GridPresentation;
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
   private readonly onContextMenu = (e: MouseEvent): void => {
@@ -301,6 +389,7 @@ export class GridImpl implements Grid {
     });
   };
   private readonly customRenderers = new Map<string, CellRenderer>();
+  private readonly customEditors = new Map<string, CellEditor>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
     selection: new Set(),
@@ -308,6 +397,7 @@ export class GridImpl implements Grid {
     "edit-begin": new Set(),
     "edit-commit": new Set(),
     search: new Set(),
+    "command-state-change": new Set(),
     "active-sheet": new Set(),
     "renderer-fallback": new Set(),
     "datasource-error": new Set(),
@@ -330,6 +420,8 @@ export class GridImpl implements Grid {
   private autoFitGeneration = 0;
   private autoFitFrame = 0;
   private autoFitActive = false;
+  private commandStateQueued = false;
+  private commandStateGeneration = 0;
   private readonly autoFitStats = {
     windowRequests: 0,
     maxWindowCells: 0,
@@ -352,6 +444,7 @@ export class GridImpl implements Grid {
       opts.transactionResourceLimits,
     );
     this.host = host;
+    this.presentation = opts.presentation ?? "spreadsheet";
     const workbook = opts.workbook;
     if (!(store instanceof SheetwriteStore)) {
       assertWorkbookAllocationLimits(workbook, {
@@ -411,6 +504,9 @@ export class GridImpl implements Grid {
 
     for (const [name, r] of Object.entries(opts.renderers ?? {})) {
       this.customRenderers.set(name, r);
+    }
+    for (const [name, editor] of Object.entries(opts.editors ?? {})) {
+      this.customEditors.set(name, editor);
     }
 
     const sheet = this.sheet();
@@ -535,11 +631,14 @@ export class GridImpl implements Grid {
       sheet: () => this.activeSheet,
     });
     this.validationEditor = new ValidationEditor(this.viewportEl);
+    this.customEditor = new CustomEditorController(this.viewportEl);
     this.input = new InputController({
       host,
       scroller: this.scroller,
       viewportEl: this.viewportEl,
       editor: this.editor,
+      isEditing: () =>
+        this.editor.isEditing || this.validationEditor.isEditing || this.customEditor.isEditing,
       findBar: () => this.findBar,
       store: this.store,
       loadable: this.loadable,
@@ -615,7 +714,8 @@ export class GridImpl implements Grid {
       screenRect: (row, col, contentTop, scrollLeft) =>
         this.screenRect(row, col, contentTop, scrollLeft),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
-      isEditing: () => this.editor.isEditing || this.validationEditor.isEditing,
+      isEditing: () =>
+        this.editor.isEditing || this.validationEditor.isEditing || this.customEditor.isEditing,
       fillTarget: () => this.input.fillPreview,
       fillHandleScreen: (contentTop, scrollLeft) =>
         this.input.fillHandleScreen(contentTop, scrollLeft),
@@ -641,6 +741,8 @@ export class GridImpl implements Grid {
       rowCount: sheet.rowCount,
       colCount: this.geometry.columnIndices.length,
       readOnly: this.readOnly,
+      presentation: this.presentation,
+      columnHeader: (col) => this.columnHeader(col),
       focusCell: () => this.selection.focusCell,
       noteAt: (row, col) =>
         this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
@@ -735,9 +837,12 @@ export class GridImpl implements Grid {
       if (shouldRebuildColumns) this.rebuildColumnIndex();
       if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
       if (sheetsChanged) this.renderTabs();
+      if (shouldResetDatasource) this.customEditor.cancel();
+      else this.refreshCustomEditor();
       this.ariaMirror.bumpVersion();
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
+      this.queueCommandStateChange();
     });
 
     this.applyLayout();
@@ -944,12 +1049,36 @@ export class GridImpl implements Grid {
     return this.geometry.pointerContentY(viewportY, this.scroller.scrollTop);
   }
 
+  private columnHeader(col: number): string {
+    if (this.presentation === "spreadsheet") return colToA1(col);
+    const column = this.sheet().columns[col];
+    return (
+      column?.header ||
+      (column?.key.startsWith("__pad_") ? colToA1(col) : column?.key) ||
+      colToA1(col)
+    );
+  }
+
+  private editorLabel(row: number, col: number): string {
+    return `Edit ${this.columnHeader(col)}, row ${row + 1}`;
+  }
+
+  private editorRect(
+    row: number,
+    col: number,
+    contentTop: number,
+    scrollLeft: number,
+  ): CellEditorRect {
+    const rect = this.screenRect(row, col, contentTop, scrollLeft);
+    return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
+  }
+
   private applyLayout(): void {
     this.renderCoordinator.invalidate();
     const sheet = this.sheet();
     const columns = sheet.columns.map((column, c) => ({
       ...column,
-      header: column.visible === false ? "" : colToA1(c),
+      header: column.visible === false ? "" : this.columnHeader(c),
       // Paint geometry is zoomed to match the column index; base widths stay
       // untouched on the workbook.
       width: column.visible === false ? 0 : column.width * this.zoom,
@@ -968,12 +1097,37 @@ export class GridImpl implements Grid {
       totalRows: sheet.rowCount,
       zoom: this.zoom,
       merges: this.loadable?.hasView(this.activeSheet) ? [] : (sheet.merges ?? []),
+
       domRendererColumns,
     };
     this.renderer.setLayout(layout);
     this.domOverlay.setLayout(layout);
     this.selection.setBounds(sheet.rowCount, this.firstCol(), this.lastCol());
     this.syncSizer();
+  }
+  private refreshCustomEditor(): void {
+    const cell = this.customEditor.editingCell;
+    if (!cell) return;
+    const column = this.sheet().columns[cell.col];
+    if (!column) {
+      this.customEditor.cancel();
+      return;
+    }
+    const address = {
+      sheet: this.activeSheet,
+      row: this.toDataRow(cell.row),
+      col: cell.col,
+    };
+    const value = this.store.getCell(address).resolved;
+    const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
+    this.customEditor.update({
+      address,
+      viewAddress: { sheet: this.activeSheet, row: cell.row, col: cell.col },
+      column,
+      value,
+      text: formula ?? cellScalarToText(value),
+      label: this.editorLabel(cell.row, cell.col),
+    });
   }
 
   private syncSizer(): void {
@@ -1054,6 +1208,12 @@ export class GridImpl implements Grid {
         this.screenRect(validationCell.row, validationCell.col, contentTop, scrollLeft),
       );
     }
+    const customCell = this.customEditor.editingCell;
+    if (customCell) {
+      this.customEditor.position(
+        this.editorRect(customCell.row, customCell.col, contentTop, scrollLeft),
+      );
+    }
   }
 
   // ── editing ──────────────────────────────────────────────────────────────--
@@ -1092,6 +1252,31 @@ export class GridImpl implements Grid {
         dataAddr.col <= Math.max(rule.range.start.col, rule.range.end.col) &&
         (rule.condition.kind === "list" || rule.condition.kind === "checkbox"),
     );
+    const custom = column.editor ? this.customEditors.get(column.editor) : undefined;
+    if (custom) {
+      this.editor.cancel();
+      this.validationEditor.cancel(false);
+      this.customEditor.begin({
+        editor: custom,
+        grid: this,
+        address: dataAddr,
+        viewAddress: { sheet: this.activeSheet, row: editCell.row, col: editCell.col },
+        column,
+        value: current,
+        text,
+        initialInput: initial,
+        selectAll: selectAll || initial === undefined,
+        label: this.editorLabel(editCell.row, editCell.col),
+        rect: this.editorRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
+        onCommit: (value, navigate) => this.commitEdit(editCell.row, editCell.col, value, navigate),
+        onCancel: () => {
+          this.host.focus();
+          this.scheduleRender();
+        },
+      });
+      return;
+    }
+    this.customEditor.cancel(false);
     if (initial === undefined && validationRule) {
       this.editor.cancel();
       this.validationEditor.begin({
@@ -1118,6 +1303,7 @@ export class GridImpl implements Grid {
       initial: text,
       selectAll: selectAll || initial === undefined,
       rect: this.screenRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
+      label: this.editorLabel(editCell.row, editCell.col),
       theme: this.theme,
       onCommit: (value, navigate) => this.commitEdit(editCell.row, editCell.col, value, navigate),
       onCancel: () => {
@@ -1232,6 +1418,7 @@ export class GridImpl implements Grid {
     this.ariaMirror.bumpVersion();
     const sel = this.getSelection();
     for (const fn of this.listeners.selection) fn({ selection: sel });
+    this.emitCommandStateChange();
   }
 
   search(query: string, opts: SearchOptions = {}): SearchResult {
@@ -1670,6 +1857,7 @@ export class GridImpl implements Grid {
 
     this.editor.cancel();
     this.validationEditor.cancel();
+    this.customEditor.cancel();
     this.cancelAutoFit();
     this.domOverlay.reset();
     this.mutationRevisions.clear();
@@ -1800,6 +1988,7 @@ export class GridImpl implements Grid {
       this.cancelAutoFit();
       this.editor.cancel();
       this.validationEditor.cancel();
+      this.customEditor.cancel();
     }
     if (readOnly) this.host.setAttribute("aria-readonly", "true");
     else this.host.removeAttribute("aria-readonly");
@@ -1809,6 +1998,7 @@ export class GridImpl implements Grid {
       this.config?.find === false
         ? null
         : new FindBar(this.host, this.baseTheme, this, this.readOnly);
+    this.emitCommandStateChange();
   }
 
   setConfig(config: GridConfig | undefined): void {
@@ -2250,6 +2440,106 @@ export class GridImpl implements Grid {
     };
   }
 
+  getCommandState(command: GridCommandName): GridCommandState {
+    const summary = COMMAND_STATE_ACTIVITY_COMMANDS.includes(command)
+      ? this.formattingSummary()
+      : undefined;
+    return this.resolveCommandState(command, summary);
+  }
+
+  private resolveCommandState(
+    command: GridCommandName,
+    summary?: Readonly<Partial<Record<GridCommandName, number>>>,
+  ): GridCommandState {
+    if (command === "undo") {
+      return {
+        disabled: this.readOnly || !this.document.canUndo,
+        activity: "inactive",
+      };
+    }
+    if (command === "redo") {
+      return {
+        disabled: this.readOnly || !this.document.canRedo,
+        activity: "inactive",
+      };
+    }
+
+    const selectionRequired =
+      isFormattingCommand(command) ||
+      command === "merge" ||
+      command === "unmerge" ||
+      command === "sortAsc" ||
+      command === "sortDesc";
+    const disabled =
+      (selectionRequired && this.selection.isEmpty) ||
+      (this.readOnly && command !== "exportCsv" && command !== "exportXlsx");
+    const activity = summary?.[command] ?? 0;
+    return {
+      disabled,
+      activity: activity === 3 ? "mixed" : activity === 1 ? "active" : "inactive",
+    };
+  }
+
+  private formattingSummary(): Readonly<Partial<Record<GridCommandName, number>>> {
+    const summary: Partial<Record<GridCommandName, number>> = {};
+    for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
+    if (this.selection.isEmpty) return summary;
+
+    let visited = 0;
+    let complete = true;
+    this.selection.forEachRect((rect) => {
+      if (!complete) return;
+      for (let row = rect.r0; row <= rect.r1; row++) {
+        const dataRow = this.toDataRow(row);
+        for (let col = rect.c0; col <= rect.c1; col++) {
+          if (visited >= COMMAND_STATE_CELL_LIMIT) {
+            complete = false;
+            return;
+          }
+          const column = this.sheet().columns[col];
+          if (!column) continue;
+          visited += 1;
+          const cell = this.store.getCell({ sheet: this.activeSheet, row: dataRow, col });
+          for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
+            const bit = formattingCommandActive(command, cell.style, column.cellStyle) ? 1 : 2;
+            summary[command] = (summary[command] ?? 0) | bit;
+          }
+        }
+      }
+    });
+    if (!complete) {
+      for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 3;
+    }
+    return summary;
+  }
+
+  private commandStateSnapshot(): Readonly<Record<GridCommandName, GridCommandState>> {
+    const summary = this.formattingSummary();
+    const states = {} as Record<GridCommandName, GridCommandState>;
+    for (const command of GRID_COMMANDS) {
+      states[command] = this.resolveCommandState(command, summary);
+    }
+    return states;
+  }
+
+  private emitCommandStateChange(): void {
+    this.commandStateQueued = false;
+    this.commandStateGeneration += 1;
+    if (this.destroyed || this.listeners["command-state-change"].size === 0) return;
+    const event = { states: this.commandStateSnapshot() };
+    for (const listener of this.listeners["command-state-change"]) listener(event);
+  }
+
+  private queueCommandStateChange(): void {
+    if (this.commandStateQueued || this.destroyed) return;
+    this.commandStateQueued = true;
+    const generation = ++this.commandStateGeneration;
+    queueMicrotask(() => {
+      if (!this.commandStateQueued || generation !== this.commandStateGeneration) return;
+      this.emitCommandStateChange();
+    });
+  }
+
   on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void {
     this.listeners[evt].add(fn);
     return () => this.listeners[evt].delete(fn);
@@ -2446,10 +2736,12 @@ export class GridImpl implements Grid {
 
   undo(): void {
     if (!this.readOnly) this.document.undo();
+    this.queueCommandStateChange();
   }
 
   redo(): void {
     if (!this.readOnly) this.document.redo();
+    this.queueCommandStateChange();
   }
 
   private emitExportError(error: unknown): void {
@@ -2499,6 +2791,7 @@ export class GridImpl implements Grid {
     this.geometry.rebuildRows(count);
     this.selection.clear();
     this.selection.setBounds(count, this.firstCol(), this.lastCol());
+    this.emitSelection();
     this.scroller.scrollTop = 0;
     // The view permutation lives outside the store, so it must invalidate the
     // data signature itself — a view change with an identical window/scroll
@@ -2522,6 +2815,7 @@ export class GridImpl implements Grid {
     this.renderCoordinator.destroy();
     this.editor.destroy();
     this.validationEditor.destroy();
+    this.customEditor.destroy();
     this.input.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.scroller.removeEventListener("contextmenu", this.onContextMenu);

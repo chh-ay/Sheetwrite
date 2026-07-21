@@ -6,6 +6,7 @@ import type {
 } from "../packages/core/src/adapter.js";
 import type {
   ColumnarData,
+  CellEditor,
   DataSource,
   DataSourcePage,
   Grid,
@@ -28,6 +29,7 @@ export interface AdapterLifecycleCase {
     | "publication-agreement"
     | "operational-events"
     | "initial-sync-datasource-error"
+    | "semantic-extensibility"
     | "generation-safe-events";
   observable: string;
 }
@@ -73,6 +75,10 @@ export const ADAPTER_LIFECYCLE_CONTRACT = [
     id: "generation-safe-events",
     observable: "replaced and unmounted grids cannot deliver stale adapter events",
   },
+  {
+    id: "semantic-extensibility",
+    observable: "semantic headers and custom editor lifecycle cross the framework boundary",
+  },
 ] as const satisfies readonly AdapterLifecycleCase[];
 
 type GridOptionConformance =
@@ -86,12 +92,14 @@ export const GRID_OPTION_CONFORMANCE = {
   datasourceStorage: { policy: "reset", reason: "input-reset" },
   renderer: { policy: "reset", reason: "renderer-reset" },
   workerUrl: { policy: "reset", reason: "renderer-reset" },
+  presentation: { policy: "reset", reason: "input-reset" },
   theme: { policy: "live", reason: null },
   readOnly: { policy: "live", reason: null },
   protectionResolver: { policy: "reset", reason: "input-reset" },
   mutationPolicy: { policy: "reset", reason: "input-reset" },
   transactionResourceLimits: { policy: "reset", reason: "input-reset" },
   renderers: { policy: "reset", reason: "renderer-reset" },
+  editors: { policy: "reset", reason: "input-reset" },
   overscan: { policy: "live", reason: null },
   minColumns: { policy: "live", reason: null },
   config: { policy: "live", reason: null },
@@ -480,6 +488,54 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       unmountedRequest.reject(new Error("unmounted generation"));
       await nextTask();
       expect(currentEvents).toHaveLength(1);
+    });
+
+    it("forwards semantic headers and custom editor lifecycle through the framework boundary", async () => {
+      const recorder = createLifecycleRecorder();
+      const workbook = makeConformanceWorkbook();
+      workbook.sheets[0]!.columns[0]!.editor = "framework";
+      let mounts = 0;
+      let destroys = 0;
+      let signal: AbortSignal | undefined;
+      const editor: CellEditor = {
+        mount(host, context) {
+          mounts += 1;
+          signal = context.signal;
+          const input = document.createElement("input");
+          input.value = context.text;
+          host.appendChild(input);
+          return {
+            update() {},
+            reposition() {},
+            commit: () => input.value,
+            cancel() {},
+            destroy() {
+              destroys += 1;
+            },
+          };
+        },
+      };
+      const mounted = await mount({
+        workbook,
+        data: makeConformanceData(),
+        presentation: "data-grid",
+        editors: { framework: editor },
+        fallbackLabel: "semantic fallback",
+        onReady: (event) => recorder.onReady(event),
+      });
+      const grid = mounted.getPublishedGrid()!;
+
+      expect(mounted.host.querySelector<HTMLElement>('[role="columnheader"]')?.textContent).toBe(
+        "Name",
+      );
+      grid.beginEdit(0, 0);
+      expect(mounts).toBe(1);
+      expect(signal?.aborted).toBe(false);
+      expect(mounted.host.querySelector(".sheetwrite-custom-editor input")).not.toBeNull();
+
+      await mounted.unmount();
+      expect(signal?.aborted).toBe(true);
+      expect(destroys).toBe(1);
     });
 
     for (const resetCase of ["workbook", "data", "datasource", "renderer"] as const) {

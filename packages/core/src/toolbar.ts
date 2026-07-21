@@ -2,6 +2,8 @@ import type {
   Grid,
   GridActions,
   GridConfig,
+  GridCommandName,
+  GridCommandState,
   ToolbarActionName,
   ToolbarIcon,
   ToolbarItem,
@@ -193,7 +195,8 @@ export function renderToolbarItems(
   items: readonly ToolbarItem[],
   grid: Grid,
   icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>,
-): void {
+): () => void {
+  const controls = new Map<GridCommandName, HTMLButtonElement | HTMLInputElement>();
   const setIcon = (el: HTMLElement, content: ToolbarIcon): void => {
     if (typeof content === "string") {
       // Icon strings are text-only; never interpret them as HTML.
@@ -210,7 +213,7 @@ export function renderToolbarItems(
     icon: ToolbarIcon,
     title: string,
     onClick: () => void,
-  ): void => {
+  ): HTMLButtonElement => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `sheetwrite-tb-button sheetwrite-tb-${suffix}`;
@@ -223,9 +226,14 @@ export function renderToolbarItems(
     button.addEventListener("click", onClick);
 
     bar.appendChild(button);
+    return button;
   };
 
-  const addColorInput = (suffix: string, title: string, onPick: (color: string) => void): void => {
+  const addColorInput = (
+    suffix: string,
+    title: string,
+    onPick: (color: string) => void,
+  ): HTMLInputElement => {
     const input = document.createElement("input");
     input.type = "color";
     input.className = `sheetwrite-tb-color sheetwrite-tb-${suffix}`;
@@ -234,6 +242,7 @@ export function renderToolbarItems(
     input.addEventListener("input", () => onPick(input.value));
 
     bar.appendChild(input);
+    return input;
   };
 
   for (const item of items) {
@@ -252,24 +261,63 @@ export function renderToolbarItems(
 
     if (item.onClick) {
       const onClick = item.onClick;
-      addButton(action ?? "custom", icon, title, () => onClick(grid));
+      const button = addButton(action ?? "custom", icon, title, () => onClick(grid));
+      if (action) controls.set(action, button);
       continue;
     }
 
     if (action === "textColor") {
-      addColorInput("textColor", title, (color) => grid.actions.setTextColor(color));
+      controls.set(
+        action,
+        addColorInput("textColor", title, (color) => grid.actions.setTextColor(color)),
+      );
       continue;
     }
 
     if (action === "fillColor") {
-      addColorInput("fillColor", title, (color) => grid.actions.setFillColor(color));
+      controls.set(
+        action,
+        addColorInput("fillColor", title, (color) => grid.actions.setFillColor(color)),
+      );
       continue;
     }
 
     if (action) {
-      addButton(action, icon, title, () => runAction(grid.actions, action));
+      controls.set(
+        action,
+        addButton(action, icon, title, () => runAction(grid.actions, action)),
+      );
     }
   }
+
+  const update = (states?: Readonly<Record<GridCommandName, GridCommandState>>): void => {
+    for (const [action, control] of controls) {
+      const state = states?.[action] ?? grid.getCommandState(action);
+      control.disabled = state.disabled;
+      if (
+        control instanceof HTMLButtonElement &&
+        (action === "bold" ||
+          action === "italic" ||
+          action === "underline" ||
+          action === "strikethrough" ||
+          action === "alignLeft" ||
+          action === "alignCenter" ||
+          action === "alignRight" ||
+          action === "border")
+      ) {
+        control.setAttribute(
+          "aria-pressed",
+          state.activity === "mixed" ? "mixed" : String(state.activity === "active"),
+        );
+        if (state.activity === "mixed") control.setAttribute("data-state", "mixed");
+        else control.removeAttribute("data-state");
+      }
+    }
+  };
+  update();
+  return typeof grid.on === "function"
+    ? grid.on("command-state-change", (event) => update(event.states))
+    : () => {};
 }
 
 /**
@@ -282,6 +330,7 @@ export class Toolbar {
   static readonly height = 36;
 
   private readonly el: HTMLDivElement;
+  private readonly disposeState: () => void;
 
   constructor(host: HTMLElement, config: GridConfig, theme: Theme, grid: Grid) {
     seedWidgetTheme(host, theme);
@@ -298,13 +347,14 @@ export class Toolbar {
     bar.setAttribute("aria-label", "Spreadsheet formatting");
 
     const items = Array.isArray(config.toolbar) ? config.toolbar : defaultToolbarItems(config);
-    renderToolbarItems(bar, items, grid, config.icons);
+    this.disposeState = renderToolbarItems(bar, items, grid, config.icons);
 
     host.appendChild(bar);
     this.el = bar;
   }
 
   destroy(): void {
+    this.disposeState();
     this.el.remove();
   }
 }

@@ -12,7 +12,7 @@ Advanced Vue adapter props for workbook data or datasource ownership.
 <div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L51</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>20</span>
 
 <div class="api-member-list">
 
@@ -70,6 +70,15 @@ workerUrl?: GridOptions["workerUrl"];
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-presentation" data-pagefind-weight="1">
+<summary><code>presentation</code> <span class="api-member-summary">Positional spreadsheet or semantic data-grid headers.</span></summary>
+
+```ts generated
+presentation?: GridOptions["presentation"];
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-theme" data-pagefind-weight="1">
 <summary><code>theme</code> <span class="api-member-summary">Live overrides merged into the resolved Grid theme.</span></summary>
 
@@ -120,6 +129,15 @@ transactionResourceLimits?: GridOptions["transactionResourceLimits"];
 
 ```ts generated
 renderers?: Record<string, CellRenderer>;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-editors" data-pagefind-weight="1">
+<summary><code>editors</code> <span class="api-member-summary">Named custom editors registered when the Grid is created.</span></summary>
+
+```ts generated
+editors?: GridOptions["editors"];
 ```
 
 </details>
@@ -192,12 +210,14 @@ export interface SheetwriteGridProps {
   datasourceStorage?: DataSourceStorageOptions;
   renderer?: GridOptions["renderer"];
   workerUrl?: GridOptions["workerUrl"];
+  presentation?: GridOptions["presentation"];
   theme?: Partial<Theme>;
   readOnly?: boolean;
   protectionResolver?: GridOptions["protectionResolver"];
   mutationPolicy?: GridOptions["mutationPolicy"];
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
   renderers?: Record<string, CellRenderer>;
+  editors?: GridOptions["editors"];
   overscan?: number;
   minColumns?: number;
   config?: GridOptions["config"];

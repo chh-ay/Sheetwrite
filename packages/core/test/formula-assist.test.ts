@@ -302,6 +302,7 @@ describe("EditController with assist deps", () => {
       initial: "",
       selectAll: false,
       rect: { x: 10, y: 20, w: 80, h: 24 },
+      label: "Edit A, row 1",
       theme: THEME,
       onCommit: (value) => {
         state.committed = value;
