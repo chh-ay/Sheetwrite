@@ -679,11 +679,7 @@ impl SheetData {
             kind: Vec::new(),
             payload: Vec::new(),
             style: Vec::new(),
-            paged: Some(PagedStorage::new(
-                chunk_rows,
-                byte_budget,
-                max_dirty_cells,
-            )),
+            paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)),
             formulas: HashMap::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -753,13 +749,7 @@ impl SheetData {
             .is_none_or(|paged| paged.can_dirty_cell(row, col))
     }
 
-    pub(crate) fn can_dirty_rect(
-        &self,
-        r0: usize,
-        c0: usize,
-        rows: usize,
-        cols: usize,
-    ) -> bool {
+    pub(crate) fn can_dirty_rect(&self, r0: usize, c0: usize, rows: usize, cols: usize) -> bool {
         self.paged
             .as_ref()
             .is_none_or(|paged| paged.can_dirty_rect(r0, c0, rows, cols))
@@ -855,7 +845,6 @@ impl SheetData {
         }
     }
 
-
     pub(crate) fn mark_cell_clean_revision(
         &mut self,
         row: usize,
@@ -940,11 +929,11 @@ impl SheetData {
         if self.paged.is_some() {
             let (row, col) = self.coordinates(i);
             let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
-            let _ = self
-                .paged
-                .as_mut()
-                .unwrap()
-                .write(row, col, kind, encode_num(value), style, None);
+            let _ =
+                self.paged
+                    .as_mut()
+                    .unwrap()
+                    .write(row, col, kind, encode_num(value), style, None);
         } else {
             self.payload[i] = encode_num(value);
         }
@@ -955,11 +944,11 @@ impl SheetData {
         if self.paged.is_some() {
             let (row, col) = self.coordinates(i);
             let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
-            let _ = self
-                .paged
-                .as_mut()
-                .unwrap()
-                .write(row, col, kind, encode_str_id(id), style, None);
+            let _ =
+                self.paged
+                    .as_mut()
+                    .unwrap()
+                    .write(row, col, kind, encode_str_id(id), style, None);
         } else {
             self.payload[i] = encode_str_id(id);
         }
@@ -1468,16 +1457,27 @@ mod paged_storage_tests {
 
         sheet.insert_rows(0, 0, 2);
         sheet.insert_cols(0, 0, 1);
-        assert_eq!(sheet.paged.as_ref().unwrap().read(3, 1), (KIND_EMPTY, 10, 0, true, true));
-        assert_eq!(sheet.paged.as_ref().unwrap().read(5, 2), (KIND_EMPTY, 20, 0, true, true));
+        assert_eq!(
+            sheet.paged.as_ref().unwrap().read(3, 1),
+            (KIND_EMPTY, 10, 0, true, true)
+        );
+        assert_eq!(
+            sheet.paged.as_ref().unwrap().read(5, 2),
+            (KIND_EMPTY, 20, 0, true, true)
+        );
 
         sheet.acknowledge_revision(11);
-        assert_eq!(sheet.paged.as_ref().unwrap().read(3, 1), (KIND_EMPTY, 10, 0, true, false));
-        assert_eq!(sheet.paged.as_ref().unwrap().read(5, 2), (KIND_EMPTY, 20, 0, true, true));
+        assert_eq!(
+            sheet.paged.as_ref().unwrap().read(3, 1),
+            (KIND_EMPTY, 10, 0, true, false)
+        );
+        assert_eq!(
+            sheet.paged.as_ref().unwrap().read(5, 2),
+            (KIND_EMPTY, 20, 0, true, true)
+        );
         sheet.acknowledge_revision(12);
         assert_eq!(sheet.paged.as_ref().unwrap().dirty_cells(), 0);
     }
-
 
     #[test]
     fn dirty_overlay_precedes_hydration_survives_eviction_and_cleans_by_revision() {

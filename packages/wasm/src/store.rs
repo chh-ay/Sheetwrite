@@ -775,14 +775,7 @@ impl CellStore {
                     KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
                     _ => (KIND_EMPTY, 0),
                 };
-                if !s.write_cell(
-                    row,
-                    col,
-                    kind,
-                    payload,
-                    styles[offset],
-                    dirty_revision,
-                ) {
+                if !s.write_cell(row, col, kind, payload, styles[offset], dirty_revision) {
                     return false;
                 }
                 if let Some(key) = cell_key(row, col) {
@@ -818,8 +811,7 @@ impl CellStore {
             || c0 > c1
             || r1 >= s.row_count
             || c1 >= s.n_cols
-            || (dirty_revision.is_some()
-                && !s.can_dirty_rect(r0, c0, r1 - r0 + 1, c1 - c0 + 1))
+            || (dirty_revision.is_some() && !s.can_dirty_rect(r0, c0, r1 - r0 + 1, c1 - c0 + 1))
         {
             return false;
         }
@@ -912,8 +904,7 @@ impl CellStore {
             || r1 >= s.row_count
             || c1 >= s.n_cols
             || old_ids.len() != new_ids.len()
-            || (dirty_revision.is_some()
-                && !s.can_dirty_rect(r0, c0, r1 - r0 + 1, c1 - c0 + 1))
+            || (dirty_revision.is_some() && !s.can_dirty_rect(r0, c0, r1 - r0 + 1, c1 - c0 + 1))
         {
             return false;
         }
@@ -1021,8 +1012,7 @@ impl CellStore {
             || c0
                 .checked_add(snapshot.cols)
                 .is_none_or(|end| end > s.n_cols)
-            || (dirty_revision.is_some()
-                && !s.can_dirty_rect(r0, c0, snapshot.rows, snapshot.cols))
+            || (dirty_revision.is_some() && !s.can_dirty_rect(r0, c0, snapshot.rows, snapshot.cols))
         {
             return false;
         }
@@ -1558,9 +1548,7 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return f64::NAN;
         };
-        if !s.contains_cell(row, col)
-            || (dirty_revision.is_some() && !s.can_dirty_cell(row, col))
-        {
+        if !s.contains_cell(row, col) || (dirty_revision.is_some() && !s.can_dirty_cell(row, col)) {
             return f64::NAN;
         }
 
