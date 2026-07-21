@@ -57,6 +57,8 @@ export interface ResourceOptimizationEvidence {
   readonly threshold: number;
   readonly unit: "ratio" | "bytes" | "calls" | "milliseconds";
   readonly before: number;
+  readonly timingBeforeMs: number;
+  readonly timingAfterMs: number;
   readonly after: number;
   readonly budgetBefore: number;
   readonly budgetAfter: number;
@@ -203,6 +205,14 @@ export function validateResourceBenchmark(
       optimization.budgetAfter >= optimization.budgetBefore
     ) {
       throw new Error(`${optimization.owner} budget was not lowered around the measured result`);
+    }
+    if (
+      !Number.isFinite(optimization.timingBeforeMs) ||
+      !Number.isFinite(optimization.timingAfterMs) ||
+      optimization.timingBeforeMs < 0 ||
+      optimization.timingAfterMs < 0
+    ) {
+      throw new Error(`${optimization.owner} lacks finite before/after timing`);
     }
     if (optimization.admissionRule === "timing-profile" && !optimization.profileArtifact) {
       throw new Error(`${optimization.owner} timing admission requires a CPU profile`);

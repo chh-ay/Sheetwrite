@@ -28,6 +28,7 @@ import {
   RESOURCE_FULL_SCENARIOS,
   RESOURCE_SMOKE_SCENARIOS,
   type ResourceBenchmarkArtifact,
+  type ResourceOptimizationEvidence,
   type ResourceScenarioId,
   type ResourceScenarioResult,
   validateResourceBenchmark,
@@ -38,6 +39,9 @@ const PAGED_ROWS = 1_000_000;
 const CHUNK_ROWS = 4_096;
 const CACHE_BYTES = 8 * 1024 * 1024;
 const DIRTY_LIMIT = 1_000_000;
+const DENSE_STRING_POOL_CAPACITY_BEFORE = 20_971_520;
+const DENSE_INGEST_TIMING_BEFORE_MS = 1_044.660_382;
+const DENSE_STRING_POOL_CAPACITY_BUDGET = 16 * 1024 * 1024;
 
 interface ResourceGrid extends Grid {
   getAutoFitResourceStats(): {
@@ -238,14 +242,19 @@ function dirtyEditClear(): ResourceScenarioResult {
 
 function formulaRecompute(mode: BenchmarkMode): ResourceScenarioResult {
   const operation = "formula-recompute" as const;
-  const rows = mode === "smoke" ? 500 : 9_999;
+  const rows = mode === "smoke" ? 500 : 100_000;
   const store = new SheetwriteStore(workbook(rows, 2));
-  const patches = [
-    ...Array.from({ length: rows }, (_, row) => ({
-      op: "set" as const,
-      addr: { sheet: "resource", row, col: 0 },
-      value: { kind: "literal" as const, value: rows - row },
-    })),
+  for (let start = 0; start < rows; start += 10_000) {
+    const seed = store.applyTransaction({
+      patches: Array.from({ length: Math.min(10_000, rows - start) }, (_, offset) => ({
+        op: "set" as const,
+        addr: { sheet: "resource", row: start + offset, col: 0 },
+        value: { kind: "literal" as const, value: rows - start - offset },
+      })),
+    });
+    if (seed.status !== "applied") throw new Error(`formula seed ${seed.status}`);
+  }
+  const formulaPatch = [
     {
       op: "set" as const,
       addr: { sheet: "resource", row: 0, col: 1 },
@@ -254,9 +263,12 @@ function formulaRecompute(mode: BenchmarkMode): ResourceScenarioResult {
   ];
   Bun.gc(true);
   store.resetFormulaMatrixResourcePeak();
+  store.resetRuntimeResourceAccounting();
   const before = storeSnapshot(store, operation, "before");
   const started = performance.now();
-  const outcome = store.withResourceOperation(operation, () => store.applyTransaction({ patches }));
+  const outcome = store.withResourceOperation(operation, () =>
+    store.applyTransaction({ patches: formulaPatch }),
+  );
   if (outcome.status !== "applied") throw new Error(`formula transaction ${outcome.status}`);
   const matrixPeak = store.getFormulaMatrixResourcePeak();
   const peak = storeSnapshot(store, operation, "peak");
@@ -471,6 +483,35 @@ function isolatedScenario(id: ResourceScenarioId, mode: BenchmarkMode): Resource
   return parseScenario(child.stdout.toString(), id);
 }
 
+function optimizationEvidence(
+  scenarios: readonly ResourceScenarioResult[],
+): ResourceOptimizationEvidence[] {
+  const dense = scenarios.find((scenario) => scenario.id === "dense-ingest");
+  const owner = dense?.phases.settled?.wasm.owners.find(
+    (candidate) => candidate.owner === "wasm.string-pool.utf8",
+  );
+  if (!dense || !owner) throw new Error("dense string-pool optimization lacks owner evidence");
+  return [
+    {
+      owner: owner.owner,
+      scenario: dense.id,
+      admissionRule: "capacity-slack",
+      observed:
+        (DENSE_STRING_POOL_CAPACITY_BEFORE - owner.allocatedBytes) /
+        DENSE_STRING_POOL_CAPACITY_BEFORE,
+      threshold: 0.25,
+      unit: "ratio",
+      before: DENSE_STRING_POOL_CAPACITY_BEFORE,
+      after: owner.allocatedBytes,
+      timingBeforeMs: DENSE_INGEST_TIMING_BEFORE_MS,
+      timingAfterMs: dense.durationMs,
+      budgetBefore: DENSE_STRING_POOL_CAPACITY_BEFORE,
+      budgetAfter: DENSE_STRING_POOL_CAPACITY_BUDGET,
+      profileArtifact: null,
+    },
+  ];
+}
+
 function currentCommit(): string {
   const result = Bun.spawnSync(["git", "rev-parse", "HEAD"], { stdout: "pipe", stderr: "inherit" });
   if (result.exitCode !== 0) throw new Error("could not resolve resource benchmark commit");
@@ -490,7 +531,7 @@ async function runArtifact(mode: BenchmarkMode): Promise<void> {
       forcedGcCheckpoints: ["before", "settled", "after-destroy"],
     },
     scenarios,
-    optimizations: [],
+    optimizations: mode === "full" ? optimizationEvidence(scenarios) : [],
   };
   validateResourceBenchmark(artifact, mode);
   if (mode === "full") {

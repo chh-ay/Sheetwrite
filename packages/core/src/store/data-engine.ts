@@ -3109,6 +3109,9 @@ export class StoreDataEngine {
       );
     }
 
+    this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
+    this.wasm.compactStringStorage();
+
     // Same barrier a transaction ends with: evaluate everything just ingested.
     if (loadedFormulas) {
       this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");

@@ -418,6 +418,11 @@ impl StringPool {
         });
         id
     }
+
+    pub(crate) fn shrink_to_fit(&mut self) {
+        self.bytes.shrink_to_fit();
+        self.spans.shrink_to_fit();
+    }
 }
 
 impl StringPool {

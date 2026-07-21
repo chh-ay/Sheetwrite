@@ -105,6 +105,8 @@ function artifact(mode: "smoke" | "full" = "smoke"): ResourceBenchmarkArtifact {
               unit: "ratio",
               before: 100,
               after: 70,
+              timingBeforeMs: 10,
+              timingAfterMs: 8,
               budgetBefore: 120,
               budgetAfter: 80,
               profileArtifact: null,
@@ -203,6 +205,7 @@ describe("resource benchmark protocol", () => {
       [{ observed: evidence.threshold }, "did not cross"],
       [{ after: evidence.before }, "lacks a lower"],
       [{ budgetAfter: evidence.budgetBefore }, "budget was not lowered"],
+      [{ timingAfterMs: Number.NaN }, "lacks finite"],
     ] as const) {
       expect(() =>
         validateResourceBenchmark({ ...full, optimizations: [{ ...evidence, ...patch }] }, "full"),

@@ -229,6 +229,35 @@ mod tests {
     }
 
     #[test]
+    fn bulk_string_compaction_releases_only_admitted_owner_slack() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 3_000);
+        for row in 0..3_000 {
+            store.set_string(sheet, row, 0, &format!("unique-string-{row:04}"), 0);
+        }
+        let before = store.memory_stats();
+        store.compact_string_storage();
+        let after = store.memory_stats();
+        for index in 0..STORE_MEMORY_OWNER_COUNT {
+            assert_eq!(
+                owner(&after, index).0,
+                owner(&before, index).0,
+                "owner {index} logical bytes changed during compaction"
+            );
+            assert!(owner(&after, index).1 <= owner(&before, index).1);
+        }
+        assert!(
+            owner(&after, STRING_POOL_UTF8).1 < owner(&before, STRING_POOL_UTF8).1
+                || owner(&after, STRING_POOL_SPANS).1 < owner(&before, STRING_POOL_SPANS).1
+                || owner(&after, STRING_INDEX).1 < owner(&before, STRING_INDEX).1
+        );
+        assert_eq!(
+            store.get_cell(sheet, 2_999, 0).string().as_deref(),
+            Some("unique-string-2999")
+        );
+    }
+
+    #[test]
     fn spill_anchors_owners_and_blockers_have_disjoint_capacity_owners() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(2, 3);

@@ -294,6 +294,12 @@ impl CellStore {
         crate::eval::reset_matrix_resource_stats();
     }
 
+    /// Release geometric growth slack after a bounded bulk ingest.
+    #[wasm_bindgen(js_name = compactStringStorage)]
+    pub fn compact_string_storage(&mut self) {
+        self.strings.shrink_to_fit();
+    }
+
     #[wasm_bindgen(js_name = wasmCommittedBytes)]
     pub fn wasm_committed_bytes(&self) -> usize {
         #[cfg(target_arch = "wasm32")]
