@@ -79,6 +79,7 @@ export class DocumentController {
       {
         source: "remote",
         commitReason: options.commitReason ?? "api",
+        localReplay: options.localReplay,
       },
     );
   }

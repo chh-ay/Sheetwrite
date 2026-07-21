@@ -744,7 +744,8 @@ export class StoreDataEngine {
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
-    const storageRevision = remoteLoad ? 0n : this.wasm.beginMutation();
+    const tracksPagedRevision = !remoteLoad && this.storageOptions.storage === "paged";
+    const storageRevision = tracksPagedRevision ? this.wasm.beginMutation() : 0n;
     const touchedSheets = new Set<SheetId>();
     let hasStructuralPatch = false;
 
@@ -784,7 +785,7 @@ export class StoreDataEngine {
       }
     } finally {
       if (remoteLoad) this.wasm.endPageLoad();
-      else this.wasm.endMutation();
+      else if (tracksPagedRevision) this.wasm.endMutation();
     }
 
     if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
@@ -1958,6 +1959,28 @@ export class StoreDataEngine {
     for (const [key, src] of next) this.formulaSrc.set(key, src);
   }
 
+  private acknowledgedSetStillMatches(
+    addr: CellAddress,
+    value: CellValue,
+    style: CellStyle | undefined,
+  ): boolean {
+    const current = this.getCell(addr);
+    if (this.styles.intern(current.style) !== this.styles.intern(style)) return false;
+    const key = cellKey(addr);
+    if (value.kind === "formula") return this.formulaSrc.get(key) === value.src;
+    if (value.kind === "ref") {
+      const target = this.refs.targetOf(key);
+      return (
+        target?.sheet === value.target.sheet &&
+        target.row === value.target.row &&
+        target.col === value.target.col
+      );
+    }
+    return (
+      !this.formulaSrc.has(key) && !this.refs.isRef(key) && Object.is(current.resolved, value.value)
+    );
+  }
+
   acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
     if (storageRevision !== undefined && storageRevision !== 0n) {
       this.wasm.acknowledgeRevision(storageRevision);
@@ -1965,6 +1988,9 @@ export class StoreDataEngine {
     }
     for (const operation of operations) {
       if (operation.op === "set") {
+        if (!this.acknowledgedSetStillMatches(operation.addr, operation.value, operation.style)) {
+          continue;
+        }
         this.wasm.markRangeClean(
           this.handleOf(operation.addr.sheet),
           operation.addr.row,
@@ -1977,6 +2003,15 @@ export class StoreDataEngine {
         for (const cell of operation.cells) {
           const row = range.start.row + cell.rowOffset;
           const col = range.start.col + cell.colOffset;
+          if (
+            !this.acknowledgedSetStillMatches(
+              { sheet: range.sheet, row, col },
+              cell.value,
+              cell.style,
+            )
+          ) {
+            continue;
+          }
           this.wasm.markRangeClean(this.handleOf(range.sheet), row, row + 1, col, col + 1);
         }
       } else if (

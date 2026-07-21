@@ -1818,9 +1818,10 @@ describe("paged datasource storage", () => {
       ],
     });
     expect(store.getPagedStats("s1")).toMatchObject({
-      chunks: 1,
+      chunks: 0,
       loadedCells: 1,
       dirtyCells: 1,
+      allocatedBytes: 0,
     });
     store.dispose();
   });

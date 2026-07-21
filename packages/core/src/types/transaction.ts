@@ -61,11 +61,15 @@ export interface TransactionApplicationOptions {
   source?: OperationSource;
   /** Event classification; defaults to `api`. */
   commitReason?: CommitReason;
+  /** Internal durable-queue replay: bypass remote hydration while retaining remote event semantics. */
+  localReplay?: boolean;
 }
 
 /** Classification metadata for host-supplied remote operations. */
 export interface RemoteOperationOptions {
   commitReason?: CommitReason;
+  /** Reapply a durable local mutation as dirty pending state rather than authoritative remote data. */
+  localReplay?: boolean;
 }
 
 /** Immutable local operation batch awaiting a host acknowledgement. */

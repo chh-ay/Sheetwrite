@@ -1010,13 +1010,19 @@ export class SyncCoordinator {
 
     for (const { record } of prepared) {
       if (ambiguousIds.has(record.clientMutationId)) continue;
-      const outcome = this.grid.applyRemoteOperations(record.operations);
+      const outcome = this.grid.applyRemoteOperations(record.operations, { localReplay: true });
       if (
         outcome.status === "conflict" ||
         outcome.status === "rejected" ||
         (outcome.status === "noop" && record.operations.length > 0)
       ) {
         throw new Error(`Durable mutation ${record.clientMutationId} could not be restored`);
+      }
+      if (outcome.status === "applied") {
+        const revision = transactionStorageRevision(outcome.transaction);
+        if (revision !== undefined) {
+          this.recordStorageRevisions.set(record.clientMutationId, revision);
+        }
       }
     }
     if (this.destroyed) return;

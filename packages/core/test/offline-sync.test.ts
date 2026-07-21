@@ -8,6 +8,7 @@ import {
   type PersistenceAdapter,
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
+  type SheetwriteStore,
   SyncCoordinator,
   SyncProtocolError,
   type VersionedOperation,
@@ -174,10 +175,14 @@ function setValue(value: number) {
   };
 }
 
-function mountGrid(version = 4, rowCount = 2) {
+function mountGrid(version = 4, rowCount = 2, paged = false) {
   const host = document.createElement("div");
   document.body.appendChild(host);
-  return createGridFromSnapshot(host, snapshot(version, rowCount));
+  return createGridFromSnapshot(host, snapshot(version, rowCount), {
+    ...(paged
+      ? { datasourceStorage: { mode: "paged" as const, chunkRows: 4, cacheBytes: 104 } }
+      : {}),
+  });
 }
 
 describe("durable offline sync", () => {
@@ -699,6 +704,47 @@ describe("durable offline sync", () => {
     expect(storage.records.size).toBe(300);
     reopened.destroy();
     reopenedGrid.destroy();
+  });
+
+  it("restores durable paged edits as dirty until their exact mutation is acknowledged", async () => {
+    const storage = new FakePendingStorage();
+    storage.records.set("paged-m1", {
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "paged-m1",
+      operations: [setValue(9)],
+    });
+    const adapter = new ControlledAdapter(snapshot(4, 100));
+    adapter.responders.push(async (request) => ({
+      status: "applied",
+      version: 5,
+      clientMutationId: request.clientMutationId,
+    }));
+    const grid = mountGrid(4, 100, true);
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      initialConnection: "offline",
+    });
+
+    await coordinator.ready();
+    expect((grid.store as SheetwriteStore).getPagedStats("s1")).toMatchObject({
+      chunks: 0,
+      loadedCells: 1,
+      dirtyCells: 1,
+      allocatedBytes: 0,
+    });
+    coordinator.setOnline(true);
+    await coordinator.flush();
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
+    expect((grid.store as SheetwriteStore).getPagedStats("s1")).toMatchObject({
+      chunks: 1,
+      dirtyCells: 0,
+    });
+
+    coordinator.destroy();
+    grid.destroy();
   });
 
   it("rejects oversized durable queues before cloning or partially restoring", async () => {

@@ -463,7 +463,7 @@ export class SheetwriteStore implements Store {
     const hasListeners = this.listeners.size > 0;
     const effects = this.engine.applyPatches(
       effectiveTx.patches,
-      source === "remote",
+      source === "remote" && options.localReplay !== true,
       hasListeners,
     );
     if (effects.appliedPatches.length === 0) {
