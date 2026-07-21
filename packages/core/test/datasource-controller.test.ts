@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import {
+  DATASOURCE_MAX_ACTIVE_REQUESTS,
   DATASOURCE_PREFETCH_MAX_BYTES,
   DATASOURCE_PREFETCH_MAX_ROWS,
   DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT,
@@ -931,5 +932,201 @@ describe("DatasourceController revision retention", () => {
     expect(requests[0]!.signal.aborted).toBe(true);
     expect(controller.getTelemetry()).toMatchObject({ loadedBands: 0, ownedBands: 0 });
     controller.destroy();
+  });
+
+  it("caps highly fragmented visible gaps and continues them as requests settle", async () => {
+    const store = new SheetwriteStore(makeWorkbook(24));
+    let retainCount = 0;
+    let fragmented = false;
+    const pending: Array<{
+      request: { start: number; end: number };
+      result: PromiseWithResolvers<DataSourcePage>;
+    }> = [];
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          if (!fragmented) {
+            return Promise.resolve({
+              start: request.start,
+              rows: [{ name: `row-${request.start}` }],
+            });
+          }
+          const result = Promise.withResolvers<DataSourcePage>();
+          pending.push({ request, result });
+          return result.promise;
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 24,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => {
+          retainCount += 1;
+          return () => {
+            retainCount -= 1;
+          };
+        },
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      24,
+    );
+
+    for (let row = 0; row < 24; row += 2) {
+      controller.ensureLoaded(row, row + 1);
+      await flushRequest();
+    }
+    expect(controller.getTelemetry()).toMatchObject({ loadedBands: 12, activeRequests: 0 });
+
+    fragmented = true;
+    controller.ensureLoaded(0, 24);
+    expect(pending).toHaveLength(DATASOURCE_MAX_ACTIVE_REQUESTS);
+    expect(controller.getTelemetry()).toMatchObject({
+      activeRequests: DATASOURCE_MAX_ACTIVE_REQUESTS,
+      ownedBands: DATASOURCE_MAX_ACTIVE_REQUESTS,
+    });
+    expect(retainCount).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+
+    let settled = 0;
+    let peakActive = 0;
+    while (settled < pending.length) {
+      const entry = pending[settled]!;
+      entry.result.resolve({
+        start: entry.request.start,
+        rows: [{ name: `row-${entry.request.start}` }],
+      });
+      settled += 1;
+      await flushRequest();
+      peakActive = Math.max(peakActive, controller.getTelemetry().activeRequests);
+      expect(controller.getTelemetry().activeRequests).toBeLessThanOrEqual(
+        DATASOURCE_MAX_ACTIVE_REQUESTS,
+      );
+      expect(retainCount).toBe(controller.getTelemetry().activeRequests);
+    }
+    expect(pending).toHaveLength(12);
+    expect(peakActive).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+    expect(controller.getTelemetry()).toMatchObject({
+      activeRequests: 0,
+      ownedBands: 0,
+      loadedBands: 1,
+    });
+    expect(retainCount).toBe(0);
+
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("cancels a stuck full-span viewport owner before serving a narrow inner viewport", () => {
+    const logicalRows = 1_000_000_000;
+    const requests: Array<{ start: number; end: number; signal: AbortSignal }> = [];
+    const loadable = {
+      isPaged: () => false,
+      getWorkbook: () => ({
+        activeSheet: "s1",
+        sheets: [{ id: "s1", columns: [{ key: "name" }] }],
+      }),
+    } as unknown as SheetwriteStore;
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          requests.push(request);
+          return Promise.withResolvers<DataSourcePage>().promise;
+        },
+        loadable,
+        activeSheet: () => "s1",
+        rowCount: () => logicalRows,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => 0,
+      },
+      logicalRows,
+    );
+
+    controller.updateViewport(0, logicalRows);
+    expect(requests.map(({ start, end }) => [start, end])).toEqual([[0, logicalRows]]);
+    const stale = requests[0]!;
+    const narrowStart = 700_000_000;
+    controller.updateViewport(narrowStart, narrowStart + 10);
+
+    expect(stale.signal.aborted).toBe(true);
+    expect(requests[1]).toMatchObject({ start: narrowStart, end: narrowStart + 10 });
+    expect(requests[1]!.signal.aborted).toBe(false);
+    expect(controller.getTelemetry()).toMatchObject({
+      visibleWaitingRows: 10,
+      visibleWaitingBands: 1,
+    });
+    expect(controller.getTelemetry().activeRequests).toBeLessThanOrEqual(
+      DATASOURCE_MAX_ACTIVE_REQUESTS,
+    );
+
+    controller.destroy();
+    expect(requests.slice(1).every(({ signal }) => signal.aborted)).toBe(true);
+  });
+
+  it("detaches a saturated set of abort-ignoring owners before a visible jump", () => {
+    const requests: Array<{ start: number; end: number; signal: AbortSignal }> = [];
+    let retained = 0;
+    const loadable = {
+      isPaged: () => false,
+      getWorkbook: () => ({
+        activeSheet: "s1",
+        sheets: [{ id: "s1", columns: { length: 40_000 } }],
+      }),
+    } as unknown as SheetwriteStore;
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          requests.push(request);
+          return Promise.withResolvers<DataSourcePage>().promise;
+        },
+        loadable,
+        activeSheet: () => "s1",
+        rowCount: () => 1_000,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => {
+          retained += 1;
+          return () => {
+            retained -= 1;
+          };
+        },
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => 0,
+      },
+      1_000,
+    );
+
+    for (const [start, end] of [
+      [0, 100],
+      [25, 125],
+      [50, 150],
+      [75, 175],
+      [99, 199],
+      [99, 225],
+    ] as const) {
+      controller.updateViewport(start, end);
+    }
+    expect(requests).toHaveLength(DATASOURCE_MAX_ACTIVE_REQUESTS);
+    expect(controller.getTelemetry()).toMatchObject({
+      activeRequests: DATASOURCE_MAX_ACTIVE_REQUESTS,
+      ownedBands: DATASOURCE_MAX_ACTIVE_REQUESTS,
+    });
+    expect(retained).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+
+    controller.updateViewport(900, 910);
+    expect(
+      requests.slice(0, DATASOURCE_MAX_ACTIVE_REQUESTS).every(({ signal }) => signal.aborted),
+    ).toBe(true);
+    expect(requests.at(-1)).toMatchObject({ start: 900, end: 910 });
+    expect(requests.at(-1)!.signal.aborted).toBe(false);
+    expect(controller.getTelemetry()).toMatchObject({ activeRequests: 1, ownedBands: 1 });
+    expect(retained).toBe(1);
+
+    controller.destroy();
+    expect(retained).toBe(0);
   });
 });

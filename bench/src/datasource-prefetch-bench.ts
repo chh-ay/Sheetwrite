@@ -1,4 +1,5 @@
 import {
+  DATASOURCE_MAX_ACTIVE_REQUESTS,
   DatasourceController,
   DATASOURCE_PREFETCH_MAX_BYTES,
   DATASOURCE_PREFETCH_MAX_ROWS,
@@ -18,7 +19,6 @@ const COLUMN_COUNT = 6;
 const CHUNK_ROWS = 20;
 const CACHE_BYTES = 12 * 1024;
 const REQUEST_MULTIPLIER_LIMIT = 3;
-const ACTIVE_REQUEST_LIMIT = 6;
 
 interface ScheduledTask {
   readonly id: number;
@@ -366,9 +366,9 @@ function assertRepetition(result: PrefetchTraceRepetition): void {
       `repetition ${result.repetition}: reversal/jump aborts ${result.reversalAborts}/${result.jumpAborts}`,
     );
   }
-  if (result.peakActiveRequests > ACTIVE_REQUEST_LIMIT) {
+  if (result.peakActiveRequests > DATASOURCE_MAX_ACTIVE_REQUESTS) {
     throw new Error(
-      `repetition ${result.repetition}: peak active requests ${result.peakActiveRequests} > ${ACTIVE_REQUEST_LIMIT}`,
+      `repetition ${result.repetition}: peak active requests ${result.peakActiveRequests} > ${DATASOURCE_MAX_ACTIVE_REQUESTS}`,
     );
   }
   if (result.peakActiveSpeculativeRows > DATASOURCE_PREFETCH_MAX_ROWS) {
@@ -448,7 +448,7 @@ export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmar
       lookaheadRowsLimit: DATASOURCE_PREFETCH_MAX_ROWS,
       lookaheadBytesLimit: DATASOURCE_PREFETCH_MAX_BYTES,
       requestMultiplierLimit: REQUEST_MULTIPLIER_LIMIT,
-      activeRequestLimit: ACTIVE_REQUEST_LIMIT,
+      activeRequestLimit: DATASOURCE_MAX_ACTIVE_REQUESTS,
       cacheBytes: CACHE_BYTES,
     },
     repetitions,

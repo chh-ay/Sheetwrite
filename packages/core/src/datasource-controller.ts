@@ -7,6 +7,7 @@ import type { DataSourcePage, DataSourceRequest } from "./types/data.js";
 export const DATASOURCE_PREFETCH_MAX_ROWS = 512;
 export const DATASOURCE_PREFETCH_MAX_BYTES = 512 * 1024;
 export const DATASOURCE_PREFETCH_MAX_BANDS = 2;
+export const DATASOURCE_MAX_ACTIVE_REQUESTS = 6;
 const LOGICAL_FRAME_MS = 16.7;
 const ESTIMATED_CELL_BYTES = 16;
 export const DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT = 4_096;
@@ -51,6 +52,12 @@ interface ActiveRequest {
   priority: RequestPriority;
   direction: -1 | 0 | 1;
   released: boolean;
+}
+
+interface PendingDemand extends RowBand {
+  readonly priority: RequestPriority;
+  readonly direction: -1 | 0 | 1;
+  readonly viewportOrigin: boolean;
 }
 
 export interface DatasourcePrefetchTelemetry {
@@ -140,6 +147,10 @@ class SparseRowSet {
 
   get bandCount(): number {
     return this.bands.length;
+  }
+
+  first(): RowBand | undefined {
+    return this.bands[0];
   }
 
   clear(): void {
@@ -491,6 +502,10 @@ export class DatasourceController {
   private readonly visibleWaitStarted = new SparseVisibleWaits();
   private readonly activeIds = new Map<number, ActiveRequest>();
   private readonly requests = new Set<ActiveRequest>();
+  private readonly durableDemand = new SparseRowSet();
+  private viewportDemand: PendingDemand | null = null;
+  private speculativeDemand: PendingDemand[] = [];
+  private drainingDemand = false;
   private rowCount: number;
   private nextRequestId = 1;
   private generation = 0;
@@ -511,7 +526,12 @@ export class DatasourceController {
 
   /** Requests a demand-critical interval without applying speculative policy. */
   ensureLoaded(start: number, end: number): void {
-    this.ensureRange(start, end, "visible", 0, false);
+    if (!this.options.datasource || !this.options.loadable || this.destroyed) return;
+    const demandStart = Math.min(this.rowCount, Math.max(0, Math.floor(start)));
+    const demandEnd = Math.min(this.rowCount, Math.max(demandStart, Math.ceil(end)));
+    if (demandStart === demandEnd) return;
+    this.durableDemand.add(demandStart, demandEnd);
+    this.drainDemand();
   }
 
   /**
@@ -567,10 +587,19 @@ export class DatasourceController {
     this.telemetry.measuredFrames += 1;
     if (fullyResident) this.telemetry.residentFrames += 1;
 
-    // Visible demand is always issued/promoted before any new speculation.
-    this.ensureRange(visibleStart, visibleEnd, "visible", 0, true);
-    for (const interval of speculative) {
-      this.ensureSpeculativeBands(interval.start, interval.end, visibleRows, effectiveDirection);
+    if (this.options.datasource && this.options.loadable) {
+      this.viewportDemand = {
+        start: visibleStart,
+        end: visibleEnd,
+        priority: "visible",
+        direction: 0,
+        viewportOrigin: true,
+      };
+      this.setSpeculativeDemand(speculative, visibleRows, effectiveDirection);
+      this.drainDemand();
+    } else {
+      this.viewportDemand = null;
+      this.speculativeDemand.length = 0;
     }
   }
 
@@ -670,31 +699,88 @@ export class DatasourceController {
     this.visibleWaitStarted.clear();
   }
 
-  private ensureSpeculativeBands(
-    start: number,
-    end: number,
+  private setSpeculativeDemand(
+    intervals: readonly RowBand[],
     bandRows: number,
     direction: -1 | 1,
   ): void {
-    if (start >= end) return;
-    if (direction > 0) {
-      let cursor = start;
-      while (cursor < end) {
-        const remainingRows = this.remainingSpeculativeRows();
-        if (remainingRows === 0) return;
-        const requestEnd = Math.min(end, cursor + bandRows, cursor + remainingRows);
-        this.ensureRange(cursor, requestEnd, "speculative", direction, false);
-        cursor = requestEnd;
+    this.speculativeDemand.length = 0;
+    for (const interval of intervals) {
+      if (direction > 0) {
+        for (let cursor = interval.start; cursor < interval.end; cursor += bandRows) {
+          this.speculativeDemand.push({
+            start: cursor,
+            end: Math.min(interval.end, cursor + bandRows),
+            priority: "speculative",
+            direction,
+            viewportOrigin: false,
+          });
+        }
+        continue;
       }
-      return;
+      for (let cursor = interval.end; cursor > interval.start; cursor -= bandRows) {
+        this.speculativeDemand.push({
+          start: Math.max(interval.start, cursor - bandRows),
+          end: cursor,
+          priority: "speculative",
+          direction,
+          viewportOrigin: false,
+        });
+      }
     }
-    let cursor = end;
-    while (cursor > start) {
-      const remainingRows = this.remainingSpeculativeRows();
-      if (remainingRows === 0) return;
-      const requestStart = Math.max(start, cursor - bandRows, cursor - remainingRows);
-      this.ensureRange(requestStart, cursor, "speculative", direction, false);
-      cursor = requestStart;
+  }
+
+  private drainDemand(): void {
+    const datasource = this.options.datasource;
+    const loadable = this.options.loadable;
+    if (!datasource || !loadable || this.destroyed || this.drainingDemand) return;
+    this.drainingDemand = true;
+    try {
+      for (;;) {
+        const durable = this.durableDemand.first();
+        if (durable) {
+          const remaining = this.dispatchRange(datasource, loadable, {
+            ...durable,
+            priority: "visible",
+            direction: 0,
+            viewportOrigin: false,
+          });
+          if (remaining === null) this.durableDemand.remove(durable.start, durable.end);
+          else if (remaining > durable.start) this.durableDemand.remove(durable.start, remaining);
+          else return;
+          continue;
+        }
+
+        const viewport = this.viewportDemand;
+        if (viewport) {
+          const remaining = this.dispatchRange(datasource, loadable, viewport);
+          if (remaining === null) this.viewportDemand = null;
+          else if (remaining > viewport.start)
+            this.viewportDemand = { ...viewport, start: remaining };
+          else return;
+          continue;
+        }
+
+        const speculative = this.speculativeDemand[0];
+        if (!speculative) return;
+        const availableRows = this.remainingSpeculativeRows();
+        if (availableRows === 0) return;
+        const dispatchEnd = Math.min(speculative.end, speculative.start + availableRows);
+        const remaining = this.dispatchRange(datasource, loadable, {
+          ...speculative,
+          end: dispatchEnd,
+        });
+        if (remaining === null) {
+          if (dispatchEnd === speculative.end) this.speculativeDemand.shift();
+          else speculative.start = dispatchEnd;
+        } else if (remaining > speculative.start) {
+          speculative.start = remaining;
+        } else {
+          return;
+        }
+      }
+    } finally {
+      this.drainingDemand = false;
     }
   }
 
@@ -761,48 +847,65 @@ export class DatasourceController {
     return Math.max(ESTIMATED_CELL_BYTES, (schema?.columns.length ?? 1) * ESTIMATED_CELL_BYTES);
   }
 
-  private ensureRange(
-    start: number,
-    end: number,
-    priority: RequestPriority,
-    direction: -1 | 0 | 1,
-    viewportOrigin: boolean,
-  ): void {
-    const datasource = this.options.datasource;
-    const loadable = this.options.loadable;
-    if (!datasource || !loadable || this.destroyed) return;
-
-    this.refreshPagedResidency(loadable, start, end);
-    const requestLimit = Math.min(this.rowCount, Math.max(0, Math.ceil(end)));
-    let row = Math.min(requestLimit, Math.max(0, Math.floor(start)));
-    while (row < requestLimit) {
+  private dispatchRange(
+    datasource: NonNullable<DatasourceControllerOptions["datasource"]>,
+    loadable: SheetwriteStore,
+    demand: PendingDemand,
+  ): number | null {
+    this.refreshPagedResidency(loadable, demand.start, demand.end);
+    let row = demand.start;
+    while (row < demand.end) {
       const loadedBand = this.loaded.atOrAfter(row);
       if (loadedBand && loadedBand.start <= row) {
-        row = Math.min(requestLimit, loadedBand.end);
+        row = Math.min(demand.end, loadedBand.end);
         continue;
       }
 
       const ownerBand = this.owners.atOrAfter(row);
       if (ownerBand && ownerBand.start <= row) {
         const request = this.activeIds.get(ownerBand.owner);
-        if (priority === "visible" && !viewportOrigin && request) request.durableDemand = true;
-        if (priority === "visible" && request?.priority === "speculative") {
+        if (demand.priority === "visible" && !demand.viewportOrigin && request) {
+          request.durableDemand = true;
+        }
+        if (demand.priority === "visible" && request?.priority === "speculative") {
           request.priority = "visible";
           request.direction = 0;
           this.telemetry.promotions += 1;
         }
-        row = Math.min(requestLimit, ownerBand.end);
+        row = Math.min(demand.end, ownerBand.end);
         continue;
       }
 
+      if (this.requests.size >= DATASOURCE_MAX_ACTIVE_REQUESTS) {
+        if (demand.priority === "visible") {
+          const speculative = [...this.requests].find(
+            (request) => request.priority === "speculative" && !request.durableDemand,
+          );
+          if (speculative) {
+            this.abortRequest(speculative, "obsolete");
+            continue;
+          }
+        }
+        return row;
+      }
+
       const requestEnd = Math.min(
-        requestLimit,
-        loadedBand?.start ?? requestLimit,
-        ownerBand?.start ?? requestLimit,
+        demand.end,
+        loadedBand?.start ?? demand.end,
+        ownerBand?.start ?? demand.end,
       );
-      this.requestBand(datasource, loadable, row, requestEnd, priority, direction, viewportOrigin);
+      this.requestBand(
+        datasource,
+        loadable,
+        row,
+        requestEnd,
+        demand.priority,
+        demand.direction,
+        demand.viewportOrigin,
+      );
       row = requestEnd;
     }
+    return null;
   }
 
   /** Fast-path resident bands, then refine rows without clearing resident peers. */
@@ -874,6 +977,9 @@ export class DatasourceController {
   reset(rowCount: number): void {
     const normalized = normalizeRowCount(rowCount);
     this.generation += 1;
+    this.durableDemand.clear();
+    this.viewportDemand = null;
+    this.speculativeDemand.length = 0;
     for (const request of [...this.requests]) this.abortRequest(request, "reset");
     this.rowCount = normalized;
     this.loaded.clear();
@@ -888,6 +994,9 @@ export class DatasourceController {
     if (this.destroyed) return;
     this.destroyed = true;
     this.generation += 1;
+    this.durableDemand.clear();
+    this.viewportDemand = null;
+    this.speculativeDemand.length = 0;
     for (const request of [...this.requests]) this.abortRequest(request, "destroy");
     this.loaded.clear();
     this.owners.clear();
@@ -917,11 +1026,15 @@ export class DatasourceController {
         this.abortRequest(request, reason);
         continue;
       }
-      if (
-        request.viewportOrigin &&
-        !intersects(request.start, request.end, visibleStart, visibleEnd)
-      ) {
-        this.abortRequest(request, reason);
+      if (request.viewportOrigin) {
+        const requestRows = request.end - request.start;
+        const currentRows = visibleEnd - visibleStart;
+        const oversized =
+          requestRows >
+          Math.max(DATASOURCE_PREFETCH_MAX_ROWS, currentRows * DATASOURCE_PREFETCH_MAX_BANDS);
+        if (!intersects(request.start, request.end, visibleStart, visibleEnd) || oversized) {
+          this.abortRequest(request, reason);
+        }
       }
     }
   }
@@ -1046,7 +1159,10 @@ export class DatasourceController {
         this.clearOwned(activeRequest);
         this.options.onError({ sheet, start: requestStart, end: requestEnd, revision }, error);
       })
-      .finally(() => this.finishRequest(activeRequest));
+      .finally(() => {
+        this.finishRequest(activeRequest);
+        if (!this.destroyed && generation === this.generation) this.drainDemand();
+      });
   }
 
   private allocateRequestId(): number {
