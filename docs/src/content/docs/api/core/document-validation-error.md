@@ -9,7 +9,7 @@ Path-qualified validation failure for a document operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L182</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L195</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

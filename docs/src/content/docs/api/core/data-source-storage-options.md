@@ -12,7 +12,7 @@ Dense or allocation-lazy paged storage policy for datasource cells.
 <div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L45</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -35,13 +35,23 @@ chunkRows?: number;
 </details>
 
 <details class="api-member" id="data-source-storage-options-cache-bytes" data-pagefind-weight="1">
-<summary><code>cacheBytes</code> <span class="api-member-summary">Per-sheet clean-chunk budget; defaults to 32 MiB.</span></summary>
+<summary><code>cacheBytes</code> <span class="api-member-summary">Per-sheet clean-chunk cache budget; defaults to 32 MiB.</span></summary>
 
 ```ts generated
 cacheBytes?: number;
 ```
 
-<p class="api-member-doc">Per-sheet clean-chunk budget; defaults to 32 MiB. Dirty and visible chunks may exceed it.</p>
+<p class="api-member-doc">Per-sheet clean-chunk cache budget; defaults to 32 MiB. Sparse local edits are accounted separately; dirty and visible chunks may exceed it.</p>
+</details>
+
+<details class="api-member" id="data-source-storage-options-dirty-cell-limit" data-pagefind-weight="1">
+<summary><code>dirtyCellLimit</code> <span class="api-member-summary">Maximum sparse local edits retained outside the clean page cache.</span></summary>
+
+```ts generated
+dirtyCellLimit?: number;
+```
+
+<p class="api-member-doc">Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000.</p>
 </details>
 </div>
 
@@ -55,6 +65,7 @@ export interface DataSourceStorageOptions {
   mode?: "dense" | "paged";
   chunkRows?: number;
   cacheBytes?: number;
+  dirtyCellLimit?: number;
 }
 ```
 

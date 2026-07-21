@@ -27,7 +27,10 @@ Successful byte/count inspection or one structured transaction rejection.
 ```ts generated
 {
   ok: false;
-  issue: Extract<MutationIssue, { kind: "resource-limit" }>;
+  issue: Extract<
+    MutationIssue,
+    { kind: "resource-limit" } | { kind: "invalid-operation" }
+  >;
 }
 ```
 
@@ -50,9 +53,12 @@ export type TransactionResourceValidationResult =
       ok: false;
       issue: Extract<
         MutationIssue,
-        {
-          kind: "resource-limit";
-        }
+        | {
+            kind: "resource-limit";
+          }
+        | {
+            kind: "invalid-operation";
+          }
       >;
     };
 ```

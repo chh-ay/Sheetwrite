@@ -12,15 +12,24 @@ The workbook-wide store: every sheet, one string pool.
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>62</span>
+## Members <span class="api-count" data-pagefind-ignore>69</span>
 
 <div class="api-member-list">
+
+<details class="api-member" id="cell-store-acknowledge-revision" data-pagefind-weight="1">
+<summary><code>acknowledgeRevision</code></summary>
+
+```ts generated
+acknowledgeRevision: (revision: bigint) => void;
+```
+
+</details>
 
 <details class="api-member" id="cell-store-add-paged-sheet" data-pagefind-weight="1">
 <summary><code>addPagedSheet</code> <span class="api-member-summary">Allocate a logical sheet whose cell chunks materialize on page load or edit.</span></summary>
 
 ```ts generated
-addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number) => number;
+addPagedSheet: (n_cols: number, row_count: number, chunk_rows: number, byte_budget: number, max_dirty_cells: number) => number;
 ```
 
 </details>
@@ -53,11 +62,29 @@ aggregate: (sheet: number, col: number, op: number) => number;
 <p class="api-member-doc">Column aggregate over numeric cells. op: 0 sum, 1 avg, 2 min, 3 max, 4 count.</p>
 </details>
 
+<details class="api-member" id="cell-store-begin-mutation" data-pagefind-weight="1">
+<summary><code>beginMutation</code></summary>
+
+```ts generated
+beginMutation: () => bigint;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-begin-page-load" data-pagefind-weight="1">
 <summary><code>beginPageLoad</code></summary>
 
 ```ts generated
 beginPageLoad: () => void;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-can-dirty-cell" data-pagefind-weight="1">
+<summary><code>canDirtyCell</code></summary>
+
+```ts generated
+canDirtyCell: (sheet: number, row: number, col: number) => boolean;
 ```
 
 </details>
@@ -133,11 +160,29 @@ dataEdgeOrdered: (sheet: number, order: Uint32Array, row: number, col: number, d
 
 </details>
 
+<details class="api-member" id="cell-store-dirty-revision" data-pagefind-weight="1">
+<summary><code>dirtyRevision</code></summary>
+
+```ts generated
+dirtyRevision: (sheet: number, row: number, col: number) => bigint;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-distinct-values" data-pagefind-weight="1">
 <summary><code>distinctValues</code></summary>
 
 ```ts generated
 distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-end-mutation" data-pagefind-weight="1">
+<summary><code>endMutation</code></summary>
+
+```ts generated
+endMutation: () => void;
 ```
 
 </details>
@@ -278,6 +323,15 @@ isSheetAlive: (sheet: number) => boolean;
 
 </details>
 
+<details class="api-member" id="cell-store-mark-cell-clean-revision" data-pagefind-weight="1">
+<summary><code>markCellCleanRevision</code></summary>
+
+```ts generated
+markCellCleanRevision: (sheet: number, row: number, col: number, revision: bigint) => boolean;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-mark-range-clean" data-pagefind-weight="1">
 <summary><code>markRangeClean</code></summary>
 
@@ -287,8 +341,17 @@ markRangeClean: (sheet: number, start_row: number, end_row: number, start_col: n
 
 </details>
 
+<details class="api-member" id="cell-store-paged-dirty-coordinates" data-pagefind-weight="1">
+<summary><code>pagedDirtyCoordinates</code></summary>
+
+```ts generated
+pagedDirtyCoordinates: (sheet: number) => Float64Array;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-paged-stats" data-pagefind-weight="1">
-<summary><code>pagedStats</code> <span class="api-member-summary">[chunks, loaded cells, dirty cells, allocated bytes, fully loaded].</span></summary>
+<summary><code>pagedStats</code> <span class="api-member-summary">[chunks, loaded cells, dirty cells, clean chunk bytes, fully loaded, dirty bytes].</span></summary>
 
 ```ts generated
 pagedStats: (sheet: number) => Float64Array;
@@ -638,16 +701,20 @@ the cell's style.</p>
 
 ```ts generated
 class CellStore {
+  acknowledgeRevision: (revision: bigint) => void;
   addPagedSheet: (
     n_cols: number,
     row_count: number,
     chunk_rows: number,
     byte_budget: number,
+    max_dirty_cells: number,
   ) => number;
   addRows: (sheet: number, at: number, count: number) => void;
   addSheet: (n_cols: number, row_count: number) => number;
   aggregate: (sheet: number, col: number, op: number) => number;
+  beginMutation: () => bigint;
   beginPageLoad: () => void;
+  canDirtyCell: (sheet: number, row: number, col: number) => boolean;
   captureRange: (
     sheet: number,
     r0: number,
@@ -682,11 +749,13 @@ class CellStore {
     d_row: number,
     d_col: number,
   ) => number;
+  dirtyRevision: (sheet: number, row: number, col: number) => bigint;
   distinctValues: (
     sheet: number,
     col: number,
     limit: number,
   ) => DistinctColumn;
+  endMutation: () => void;
   endPageLoad: () => void;
   filterRows: (sheet: number, col: number, needle: string) => Uint32Array;
   filterRowsMulti: (
@@ -739,6 +808,12 @@ class CellStore {
   isFullyLoaded: (sheet: number) => boolean;
   isPaged: (sheet: number) => boolean;
   isSheetAlive: (sheet: number) => boolean;
+  markCellCleanRevision: (
+    sheet: number,
+    row: number,
+    col: number,
+    revision: bigint,
+  ) => boolean;
   markRangeClean: (
     sheet: number,
     start_row: number,
@@ -746,6 +821,7 @@ class CellStore {
     start_col: number,
     end_col: number,
   ) => void;
+  pagedDirtyCoordinates: (sheet: number) => Float64Array;
   pagedStats: (sheet: number) => Float64Array;
   pinRange: (
     sheet: number,

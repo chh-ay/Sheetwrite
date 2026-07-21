@@ -9,7 +9,7 @@ Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L79</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L81</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>51</span>
@@ -26,10 +26,10 @@ constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOp
 </details>
 
 <details class="api-member" id="sheetwrite-store-acknowledge-operations" data-pagefind-weight="1">
-<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release paged dirty pins after server acknowledgement.</span></summary>
+<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release sparse paged edits after server acknowledgement.</span></summary>
 
 ```ts generated
-acknowledgeOperations: (operations: readonly DocumentOp[]) => void;
+acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void;
 ```
 
 </details>
@@ -505,7 +505,10 @@ class SheetwriteStore implements Store {
     data?: ColumnarData,
     options?: SheetwriteStoreOptions,
   );
-  acknowledgeOperations: (operations: readonly DocumentOp[]) => void;
+  acknowledgeOperations: (
+    operations: readonly DocumentOp[],
+    storageRevision?: bigint,
+  ) => void;
   aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number;
   applyTransaction: (
     tx: Transaction,

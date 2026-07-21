@@ -9,7 +9,7 @@ Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L108</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L110</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>17</span>
@@ -160,10 +160,10 @@ getCellLoadState?(addr: CellAddress): CellLoadState;
 </details>
 
 <details class="api-member" id="store-acknowledge-operations" data-pagefind-weight="1">
-<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release paged dirty pins after server acknowledgement.</span></summary>
+<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release sparse paged edits after server acknowledgement.</span></summary>
 
 ```ts generated
-acknowledgeOperations?(operations: readonly DocumentOp[]): void;
+acknowledgeOperations?(operations: readonly DocumentOp[], storageRevision?: bigint): void;
 ```
 
 </details>
@@ -235,7 +235,10 @@ export interface Store {
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
   queryCapability?(sheet: SheetId): QueryCapability;
   getCellLoadState?(addr: CellAddress): CellLoadState;
-  acknowledgeOperations?(operations: readonly DocumentOp[]): void;
+  acknowledgeOperations?(
+    operations: readonly DocumentOp[],
+    storageRevision?: bigint,
+  ): void;
   exportSnapshot?(): WorkbookSnapshot;
   viewRowCount(sheet: SheetId): number;
 }

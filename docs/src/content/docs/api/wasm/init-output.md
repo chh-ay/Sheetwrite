@@ -9,10 +9,10 @@ Result of module initialization: the instantiated exports plus the shared linear
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L307</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L314</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>97</span>
+## Members <span class="api-count" data-pagefind-ignore>104</span>
 
 <div class="api-member-list">
 
@@ -106,11 +106,20 @@ readonly cellout_style: (a: number) => number;
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-acknowledge-revision" data-pagefind-weight="1">
+<summary><code>cellstore_acknowledgeRevision</code></summary>
+
+```ts generated
+readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-add-paged-sheet" data-pagefind-weight="1">
 <summary><code>cellstore_addPagedSheet</code></summary>
 
 ```ts generated
-readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number) => number;
+readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
 ```
 
 </details>
@@ -142,11 +151,29 @@ readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => nu
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-begin-mutation" data-pagefind-weight="1">
+<summary><code>cellstore_beginMutation</code></summary>
+
+```ts generated
+readonly cellstore_beginMutation: (a: number) => bigint;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-begin-page-load" data-pagefind-weight="1">
 <summary><code>cellstore_beginPageLoad</code></summary>
 
 ```ts generated
 readonly cellstore_beginPageLoad: (a: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-can-dirty-cell" data-pagefind-weight="1">
+<summary><code>cellstore_canDirtyCell</code></summary>
+
+```ts generated
+readonly cellstore_canDirtyCell: (a: number, b: number, c: number, d: number) => number;
 ```
 
 </details>
@@ -214,11 +241,29 @@ readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number,
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-dirty-revision" data-pagefind-weight="1">
+<summary><code>cellstore_dirtyRevision</code></summary>
+
+```ts generated
+readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) => bigint;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-distinct-values" data-pagefind-weight="1">
 <summary><code>cellstore_distinctValues</code></summary>
 
 ```ts generated
 readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-end-mutation" data-pagefind-weight="1">
+<summary><code>cellstore_endMutation</code></summary>
+
+```ts generated
+readonly cellstore_endMutation: (a: number) => void;
 ```
 
 </details>
@@ -340,6 +385,15 @@ readonly cellstore_isSheetAlive: (a: number, b: number) => number;
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-mark-cell-clean-revision" data-pagefind-weight="1">
+<summary><code>cellstore_markCellCleanRevision</code></summary>
+
+```ts generated
+readonly cellstore_markCellCleanRevision: (a: number, b: number, c: number, d: number, e: bigint) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-mark-range-clean" data-pagefind-weight="1">
 <summary><code>cellstore_markRangeClean</code></summary>
 
@@ -354,6 +408,15 @@ readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, 
 
 ```ts generated
 readonly cellstore_new: () => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-paged-dirty-coordinates" data-pagefind-weight="1">
+<summary><code>cellstore_pagedDirtyCoordinates</code></summary>
+
+```ts generated
+readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number];
 ```
 
 </details>
@@ -907,12 +970,14 @@ export interface InitOutput {
   readonly cellout_num: (a: number) => number;
   readonly cellout_string: (a: number) => [number, number];
   readonly cellout_style: (a: number) => number;
+  readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void;
   readonly cellstore_addPagedSheet: (
     a: number,
     b: number,
     c: number,
     d: number,
     e: number,
+    f: number,
   ) => number;
   readonly cellstore_addRows: (
     a: number,
@@ -927,7 +992,14 @@ export interface InitOutput {
     c: number,
     d: number,
   ) => number;
+  readonly cellstore_beginMutation: (a: number) => bigint;
   readonly cellstore_beginPageLoad: (a: number) => void;
+  readonly cellstore_canDirtyCell: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
   readonly cellstore_captureRange: (
     a: number,
     b: number,
@@ -978,12 +1050,19 @@ export interface InitOutput {
     g: number,
     h: number,
   ) => number;
+  readonly cellstore_dirtyRevision: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => bigint;
   readonly cellstore_distinctValues: (
     a: number,
     b: number,
     c: number,
     d: number,
   ) => number;
+  readonly cellstore_endMutation: (a: number) => void;
   readonly cellstore_endPageLoad: (a: number) => void;
   readonly cellstore_filterRows: (
     a: number,
@@ -1073,6 +1152,13 @@ export interface InitOutput {
   readonly cellstore_isFullyLoaded: (a: number, b: number) => number;
   readonly cellstore_isPaged: (a: number, b: number) => number;
   readonly cellstore_isSheetAlive: (a: number, b: number) => number;
+  readonly cellstore_markCellCleanRevision: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: bigint,
+  ) => number;
   readonly cellstore_markRangeClean: (
     a: number,
     b: number,
@@ -1082,6 +1168,10 @@ export interface InitOutput {
     f: number,
   ) => void;
   readonly cellstore_new: () => number;
+  readonly cellstore_pagedDirtyCoordinates: (
+    a: number,
+    b: number,
+  ) => [number, number];
   readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
   readonly cellstore_pinRange: (
     a: number,

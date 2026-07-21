@@ -12,7 +12,7 @@ Source and commit classification used when applying a transaction.
 <div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L59</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -33,6 +33,15 @@ commitReason?: CommitReason;
 ```
 
 </details>
+
+<details class="api-member" id="transaction-application-options-local-replay" data-pagefind-weight="1">
+<summary><code>localReplay</code> <span class="api-member-summary">Internal durable-queue replay: bypass remote hydration while retaining remote event semantics.</span></summary>
+
+```ts generated
+localReplay?: boolean;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -44,6 +53,7 @@ commitReason?: CommitReason;
 export interface TransactionApplicationOptions {
   source?: OperationSource;
   commitReason?: CommitReason;
+  localReplay?: boolean;
 }
 ```
 

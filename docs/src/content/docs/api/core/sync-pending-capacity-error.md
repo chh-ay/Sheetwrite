@@ -9,7 +9,7 @@ Typed local transaction rejection produced when the durable queue cannot reserve
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L184</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L185</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -38,7 +38,7 @@ code: "pending-capacity";
 <summary><code>issue</code></summary>
 
 ```ts generated
-issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "pending-commits" | "pending-operations" | "pending-encoded-bytes"; actual: number; max: number; message: string; };
+issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells"; actual: number; max: number; message: string; };
 ```
 
 </details>
@@ -77,7 +77,8 @@ class SyncPendingCapacityError extends RangeError {
       | "encoded-bytes"
       | "pending-commits"
       | "pending-operations"
-      | "pending-encoded-bytes";
+      | "pending-encoded-bytes"
+      | "paged-dirty-cells";
     actual: number;
     max: number;
     message: string;

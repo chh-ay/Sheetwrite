@@ -9,7 +9,7 @@ Stable category identifying which synchronization protocol bound was violated.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L153</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L154</code></dd></div>
 </dl>
 
 ## Declaration

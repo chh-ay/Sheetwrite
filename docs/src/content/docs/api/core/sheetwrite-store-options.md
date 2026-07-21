@@ -9,10 +9,10 @@ Storage layout plus snapshot and transaction resource ceilings for one store.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L55</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L57</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -62,6 +62,15 @@ cacheBytes?: number;
 <p class="api-member-doc">Per-sheet clean-chunk budget; defaults to 32 MiB. Dirty and pinned chunks may exceed it.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-store-options-dirty-cell-limit" data-pagefind-weight="1">
+<summary><code>dirtyCellLimit</code></summary>
+
+```ts generated
+dirtyCellLimit?: number;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-options-protection-resolver" data-pagefind-weight="1">
 <summary><code>protectionResolver</code></summary>
 
@@ -93,6 +102,7 @@ export interface SheetwriteStoreOptions {
   storage?: "dense" | "paged";
   chunkRows?: number;
   cacheBytes?: number;
+  dirtyCellLimit?: number;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
 }

@@ -12,7 +12,7 @@ Structured warning or rejection produced while applying an operation.
 <div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L204</code></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>3</span>
+## Variants <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -48,6 +48,18 @@ Structured warning or rejection produced while applying an operation.
 
 ```ts generated
 {
+  kind: "invalid-operation";
+  severity: "error";
+  operationIndex: number;
+  message: string;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
   kind: "resource-limit";
   severity: "error";
   resource:
@@ -55,7 +67,8 @@ Structured warning or rejection produced while applying an operation.
     | "encoded-bytes"
     | "pending-commits"
     | "pending-operations"
-    | "pending-encoded-bytes";
+    | "pending-encoded-bytes"
+    | "paged-dirty-cells";
   actual: number;
   max: number;
   message: string;
@@ -90,6 +103,12 @@ export type MutationIssue =
       message: string;
     }
   | {
+      kind: "invalid-operation";
+      severity: "error";
+      operationIndex: number;
+      message: string;
+    }
+  | {
       kind: "resource-limit";
       severity: "error";
       resource:
@@ -97,7 +116,8 @@ export type MutationIssue =
         | "encoded-bytes"
         | "pending-commits"
         | "pending-operations"
-        | "pending-encoded-bytes";
+        | "pending-encoded-bytes"
+        | "paged-dirty-cells";
       actual: number;
       max: number;
       message: string;
