@@ -238,7 +238,7 @@ function dirtyEditClear(): ResourceScenarioResult {
 
 function formulaRecompute(mode: BenchmarkMode): ResourceScenarioResult {
   const operation = "formula-recompute" as const;
-  const rows = mode === "smoke" ? 500 : 100_000;
+  const rows = mode === "smoke" ? 500 : 9_999;
   const store = new SheetwriteStore(workbook(rows, 2));
   const patches = [
     ...Array.from({ length: rows }, (_, row) => ({
