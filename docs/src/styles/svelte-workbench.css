@@ -395,6 +395,33 @@
     flex-basis: 12rem;
   }
 
+  .sw-svw-chrome {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    overflow: visible;
+  }
+
+  .sw-svw-chrome .sw-demo-controlbar__identity {
+    overflow: hidden;
+  }
+
+  .sw-svw-chrome .sw-demo-controlbar__identity h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sw-svw-shellbar,
+  .sw-svw-presence {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sw-svw-presence {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
   .sw-svw-presence li {
     max-width: 9rem;
     overflow: hidden;

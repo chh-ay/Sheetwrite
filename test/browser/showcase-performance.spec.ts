@@ -153,6 +153,134 @@ test("wide sheet pages hydrate 121-column rows while staying under budget", asyn
   expect(errors.console).toEqual([]);
 });
 
+test("row jump remains sheet-relative across click, Enter, clamp, and invalid input", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await bootScale(page);
+  const input = page.locator('[data-testid="scale-jump-input"]');
+  const status = page.locator('[data-testid="scale-status"]');
+
+  await page.click('[data-testid="scale-sheet-wide"]');
+  await expect(input).toHaveAttribute("min", "1");
+  await expect(input).toHaveAttribute("max", "250000");
+  await expect(input).toHaveAttribute("aria-describedby", /scale-jump-help/);
+
+  await input.fill("1");
+  await page.click('[data-testid="scale-jump"]');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            window.__sheetwriteScaleGrid?.store.getCell({ sheet: "wide", row: 0, col: 0 }).resolved,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(1);
+  await expect(status).toContainText("Wide metrics row 1");
+
+  await input.fill("250000");
+  await input.press("Enter");
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            window.__sheetwriteScaleGrid?.store.getCell({ sheet: "wide", row: 249_999, col: 0 })
+              .resolved,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(250_000);
+  await expect(status).toContainText("Wide metrics row 250,000");
+  await expect(input).toBeFocused();
+
+  await input.fill("120000");
+  await page.click('[data-testid="scale-jump"]');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            window.__sheetwriteScaleGrid?.store.getCell({ sheet: "wide", row: 119_999, col: 0 })
+              .resolved,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(120_000);
+  await expect(status).toContainText("Wide metrics row 120,000");
+  expect(await page.evaluate(() => window.__sheetwriteScaleGrid?.getActiveSheet())).toBe("wide");
+
+  await input.fill("120001");
+  await input.press("Enter");
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            window.__sheetwriteScaleGrid?.store.getCell({ sheet: "wide", row: 120_000, col: 0 })
+              .resolved,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(120_001);
+  await expect(input).toBeFocused();
+
+  await input.fill("742000");
+  await page.click('[data-testid="scale-jump"]');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            window.__sheetwriteScaleGrid?.store.getCell({ sheet: "wide", row: 249_999, col: 0 })
+              .resolved,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(250_000);
+  await expect(status).toContainText("Requested Wide metrics row 742,000");
+  await expect(status).toContainText("clamped to row 250,000");
+  expect(await page.evaluate(() => window.__sheetwriteScaleGrid?.getActiveSheet())).toBe("wide");
+
+  const scrollTop = await page.locator(".sheetwrite-scroller").evaluate((node) => node.scrollTop);
+  for (const invalid of ["", "0", "-1", "1.5"]) {
+    await input.fill(invalid);
+    await page.click('[data-testid="scale-jump"]');
+    await expect(status).toContainText("Enter a whole row from 1 to 250,000 for Wide metrics");
+    expect(await page.locator(".sheetwrite-scroller").evaluate((node) => node.scrollTop)).toBe(
+      scrollTop,
+    );
+  }
+
+  await page.click('[data-testid="scale-sheet-feed"]');
+  await expect(input).toHaveAttribute("max", "1000000");
+  await input.fill("500");
+  await page.click('[data-testid="scale-jump"]');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            window.__sheetwriteScaleGrid?.store.getCell({ sheet: "feed", row: 499, col: 0 })
+              .resolved,
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(500);
+  await expect(status).toContainText("Telemetry feed row 500");
+  expect(await page.evaluate(() => window.__sheetwriteScaleGrid?.getActiveSheet())).toBe("feed");
+
+  await page.click('[data-testid="scale-sheet-wide"]');
+  await input.fill("100");
+  await input.press("Enter");
+  await expect(status).toContainText("Wide metrics row 100");
+  expect(await page.evaluate(() => window.__sheetwriteScaleGrid?.getActiveSheet())).toBe("wide");
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("cache churn sweep keeps the clean cache inside its byte budget", async ({ page }) => {
   test.setTimeout(90_000);
   const errors = collectErrors(page);

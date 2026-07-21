@@ -6,6 +6,78 @@ import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinat
 import type { Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
 
+const PRESENCE_LABEL_HEIGHT = 18;
+const PRESENCE_LABEL_MAX_WIDTH = 160;
+const PRESENCE_LABEL_MAX_CHARS = 80;
+const PRESENCE_MARKER_SIZE = 8;
+
+interface PresenceColor {
+  readonly css: string;
+  readonly red: number;
+  readonly green: number;
+  readonly blue: number;
+}
+
+interface NormalizedPresenceOverlay {
+  readonly actorId: string;
+  readonly activeSheet: SheetId;
+  readonly ranges: PresenceOverlay["ranges"];
+  readonly identity: string;
+  readonly label: string;
+  readonly color: PresenceColor;
+  readonly tint: string;
+  readonly border: string;
+  readonly foreground: "#000000" | "#ffffff";
+}
+
+function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null): PresenceColor {
+  const input = value.trim();
+  const hex = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(input);
+  if (hex) {
+    const digits = hex[1]!;
+    const expanded =
+      digits.length === 3
+        ? `${digits[0]}${digits[0]}${digits[1]}${digits[1]}${digits[2]}${digits[2]}`
+        : digits;
+    return {
+      css: `#${expanded}`,
+      red: Number.parseInt(expanded.slice(0, 2), 16),
+      green: Number.parseInt(expanded.slice(2, 4), 16),
+      blue: Number.parseInt(expanded.slice(4, 6), 16),
+    };
+  }
+  const rgb = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i.exec(input);
+  if (rgb) {
+    const red = Math.min(255, Number(rgb[1]));
+    const green = Math.min(255, Number(rgb[2]));
+    const blue = Math.min(255, Number(rgb[3]));
+    return { css: `rgb(${red}, ${green}, ${blue})`, red, green, blue };
+  }
+  if (resolver && input) {
+    const sentinel = "#010203";
+    resolver.fillStyle = sentinel;
+    resolver.fillStyle = input;
+    const resolved = String(resolver.fillStyle);
+    if (resolved !== sentinel || input.toLowerCase() === sentinel) {
+      const parsed = presenceColor(resolved);
+      return { ...parsed, css: input };
+    }
+  }
+  return { css: input || "#475569", red: 71, green: 85, blue: 105 };
+}
+
+function readablePresenceForeground(color: PresenceColor): "#000000" | "#ffffff" {
+  const channel = (value: number): number => {
+    const normalized = value / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance =
+    0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue);
+  const blackContrast = (luminance + 0.05) / 0.05;
+  const whiteContrast = 1.05 / (luminance + 0.05);
+  return blackContrast >= whiteContrast ? "#000000" : "#ffffff";
+}
+
 export interface OverlayPainterDeps {
   theme: () => Theme;
   activeSheet: () => SheetId;
@@ -46,7 +118,7 @@ export class OverlayPainter {
   private readonly overlay: HTMLDivElement;
   private readonly deps: OverlayPainterDeps;
   private manualHighlights: { ranges: readonly HighlightRange[]; color: string } | null = null;
-  private presenceOverlays: readonly PresenceOverlay[] = [];
+  private presenceOverlays: readonly NormalizedPresenceOverlay[] = [];
 
   // ── Rect pool ──────────────────────────────────────────────────────────
   // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
@@ -55,6 +127,11 @@ export class OverlayPainter {
   // `display:none`, never removed, so subsequent passes can reclaim them.
   private readonly pool: HTMLDivElement[] = [];
   private cursor = 0;
+  private readonly presenceLabelPool: HTMLDivElement[] = [];
+  private readonly presenceLabelBounds = new Float64Array(32 * 8 * 4);
+  private presenceLabelCursor = 0;
+  private presenceLabelBoundsCount = 0;
+  private presenceColorContext: CanvasRenderingContext2D | null | undefined;
 
   // ── Per-pass context ───────────────────────────────────────────────────
   // Threaded into the `forEachRect` selection callback, which cannot take args.
@@ -112,9 +189,38 @@ export class OverlayPainter {
   }
 
   setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void {
-    this.presenceOverlays = overlays ? overlays.slice(0, 32) : [];
+    if (!overlays) {
+      this.presenceOverlays = [];
+    } else {
+      const count = Math.min(overlays.length, 32);
+      const normalized = new Array<NormalizedPresenceOverlay>(count);
+      const colorResolver = this.getPresenceColorContext();
+      for (let index = 0; index < count; index++) {
+        const overlay = overlays[index]!;
+        const identity = overlay.displayName?.trim() || overlay.actorId;
+        const color = presenceColor(overlay.color, colorResolver);
+        normalized[index] = {
+          actorId: overlay.actorId,
+          activeSheet: overlay.activeSheet,
+          ranges: overlay.ranges,
+          identity,
+          label: identity.slice(0, PRESENCE_LABEL_MAX_CHARS),
+          color,
+          foreground: readablePresenceForeground(color),
+          tint: `color-mix(in srgb, ${color.css} 12%, transparent)`,
+          border: `color-mix(in srgb, ${color.css} 72%, #000000 28%)`,
+        };
+      }
+      this.presenceOverlays = normalized;
+    }
     this.presenceVersion += 1;
     this.deps.scheduleRender();
+  }
+
+  private getPresenceColorContext(): CanvasRenderingContext2D | null {
+    if (this.presenceColorContext !== undefined) return this.presenceColorContext;
+    this.presenceColorContext = document.createElement("canvas").getContext("2d");
+    return this.presenceColorContext;
   }
 
   paint(contentTop: number, scrollLeft: number, clientW: number, clientH: number): void {
@@ -123,6 +229,8 @@ export class OverlayPainter {
 
     const sheet = this.deps.sheet();
     this.cursor = 0;
+    this.presenceLabelCursor = 0;
+    this.presenceLabelBoundsCount = 0;
     this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintPresence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintNotes(sheet, contentTop, scrollLeft, clientW, clientH);
@@ -145,6 +253,7 @@ export class OverlayPainter {
     }
 
     this.hideSurplus();
+    this.hideSurplusPresenceLabels();
   }
 
   destroy(): void {
@@ -389,7 +498,10 @@ export class OverlayPainter {
 
     for (const presence of this.presenceOverlays) {
       if (presence.activeSheet !== activeSheet) continue;
-      for (const range of presence.ranges.slice(0, 8)) {
+      const rangeCount = Math.min(presence.ranges.length, 8);
+      let labelPainted = false;
+      for (let rangeIndex = 0; rangeIndex < rangeCount; rangeIndex++) {
+        const range = presence.ranges[rangeIndex]!;
         if (range.sheet !== activeSheet) continue;
         const dataR0 = Math.max(0, Math.min(maxRow, Math.min(range.start.row, range.end.row)));
         const dataR1 = Math.max(0, Math.min(maxRow, Math.max(range.start.row, range.end.row)));
@@ -404,8 +516,8 @@ export class OverlayPainter {
           c0,
           Math.max(viewR0, viewR1),
           c1,
-          "transparent",
-          presence.color,
+          presence.tint,
+          presence.color.css,
           theme,
           sheet,
           contentTop,
@@ -413,21 +525,218 @@ export class OverlayPainter {
           clientW,
           clientH,
         );
-        for (let i = before; i < this.cursor; i++) {
-          const rect = this.pool[i]!;
+        for (let index = before; index < this.cursor; index++) {
+          const rect = this.pool[index]!;
           rect.dataset.sheetwritePresence = presence.actorId;
+          rect.dataset.sheetwritePresenceRange = "";
+          rect.setAttribute("aria-hidden", "true");
           rect.style.outlineWidth = "2px";
-          rect.title = presence.displayName ?? presence.actorId;
-          if (i === before && presence.displayName) {
-            rect.textContent = presence.displayName;
-            rect.style.color = presence.color;
-            rect.style.font = `600 11px ${theme.font}`;
-            rect.style.lineHeight = "14px";
-            rect.style.paddingLeft = "2px";
-          }
+        }
+        const firstVisibleSegment = this.pool[before];
+        if (!labelPainted && firstVisibleSegment) {
+          labelPainted = this.paintPresenceLabel(
+            presence,
+            firstVisibleSegment,
+            theme,
+            clientW,
+            clientH,
+          );
         }
       }
     }
+  }
+
+  private paintPresenceLabel(
+    presence: NormalizedPresenceOverlay,
+    segment: HTMLDivElement,
+    theme: Theme,
+    clientW: number,
+    clientH: number,
+  ): boolean {
+    const segmentLeft = Number.parseFloat(segment.style.left);
+    const segmentTop = Number.parseFloat(segment.style.top);
+    const segmentWidth = Number.parseFloat(segment.style.width);
+    const minLeft = theme.rowHeaderWidth;
+    const minTop = theme.headerHeight;
+    const availableWidth = Math.max(0, clientW - minLeft);
+    const labelWidth = Math.min(
+      PRESENCE_LABEL_MAX_WIDTH,
+      availableWidth,
+      Math.max(28, Math.ceil(presence.label.length * 6.6) + 14),
+    );
+    const maxLabelLeft = Math.max(minLeft, clientW - labelWidth);
+    const preferredLeft = Math.min(Math.max(segmentLeft, minLeft), maxLabelLeft);
+    const labelTop = segmentTop - PRESENCE_LABEL_HEIGHT - 2;
+    if (labelWidth >= 28 && labelTop >= 0 && labelTop + PRESENCE_LABEL_HEIGHT <= minTop) {
+      if (this.reservePresenceLabel(preferredLeft, labelTop, labelWidth, PRESENCE_LABEL_HEIGHT)) {
+        this.acquirePresenceLabel(
+          presence,
+          theme,
+          "chip",
+          preferredLeft,
+          labelTop,
+          labelWidth,
+          PRESENCE_LABEL_HEIGHT,
+        );
+        return true;
+      }
+      for (let candidateLeft = minLeft; candidateLeft <= maxLabelLeft; candidateLeft += 4) {
+        if (
+          !this.reservePresenceLabel(candidateLeft, labelTop, labelWidth, PRESENCE_LABEL_HEIGHT)
+        ) {
+          continue;
+        }
+        this.acquirePresenceLabel(
+          presence,
+          theme,
+          "chip",
+          candidateLeft,
+          labelTop,
+          labelWidth,
+          PRESENCE_LABEL_HEIGHT,
+        );
+        return true;
+      }
+    }
+
+    const markerTop = Math.min(
+      Math.max(segmentTop + 1, minTop),
+      Math.max(minTop, clientH - PRESENCE_MARKER_SIZE),
+    );
+    const markerMinLeft = Math.min(
+      Math.max(segmentLeft + 2, minLeft),
+      Math.max(minLeft, clientW - PRESENCE_MARKER_SIZE),
+    );
+    const markerMaxLeft = Math.min(
+      Math.max(segmentLeft + segmentWidth - PRESENCE_MARKER_SIZE - 2, markerMinLeft),
+      Math.max(minLeft, clientW - PRESENCE_MARKER_SIZE),
+    );
+    for (
+      let markerLeft = markerMaxLeft;
+      markerLeft >= markerMinLeft;
+      markerLeft -= PRESENCE_MARKER_SIZE
+    ) {
+      if (
+        !this.reservePresenceLabel(
+          markerLeft,
+          markerTop,
+          PRESENCE_MARKER_SIZE,
+          PRESENCE_MARKER_SIZE,
+        )
+      ) {
+        continue;
+      }
+      this.acquirePresenceLabel(
+        presence,
+        theme,
+        "marker",
+        markerLeft,
+        markerTop,
+        PRESENCE_MARKER_SIZE,
+        PRESENCE_MARKER_SIZE,
+      );
+      return true;
+    }
+
+    if (theme.headerHeight < PRESENCE_MARKER_SIZE) return false;
+    const railMarkerTop = Math.max(0, (theme.headerHeight - PRESENCE_MARKER_SIZE) / 2);
+    const maxRailMarkerLeft = Math.max(minLeft, clientW - PRESENCE_MARKER_SIZE);
+    for (
+      let markerLeft = minLeft;
+      markerLeft <= maxRailMarkerLeft;
+      markerLeft += PRESENCE_MARKER_SIZE
+    ) {
+      if (
+        !this.reservePresenceLabel(
+          markerLeft,
+          railMarkerTop,
+          PRESENCE_MARKER_SIZE,
+          PRESENCE_MARKER_SIZE,
+        )
+      ) {
+        continue;
+      }
+      this.acquirePresenceLabel(
+        presence,
+        theme,
+        "marker",
+        markerLeft,
+        railMarkerTop,
+        PRESENCE_MARKER_SIZE,
+        PRESENCE_MARKER_SIZE,
+      );
+      return true;
+    }
+    return false;
+  }
+
+  private reservePresenceLabel(left: number, top: number, width: number, height: number): boolean {
+    const right = left + width;
+    const bottom = top + height;
+    for (let index = 0; index < this.presenceLabelBoundsCount; index++) {
+      const offset = index * 4;
+      if (
+        right > this.presenceLabelBounds[offset]! &&
+        left < this.presenceLabelBounds[offset + 2]! &&
+        bottom > this.presenceLabelBounds[offset + 1]! &&
+        top < this.presenceLabelBounds[offset + 3]!
+      ) {
+        return false;
+      }
+    }
+    const offset = this.presenceLabelBoundsCount * 4;
+    this.presenceLabelBounds[offset] = left;
+    this.presenceLabelBounds[offset + 1] = top;
+    this.presenceLabelBounds[offset + 2] = right;
+    this.presenceLabelBounds[offset + 3] = bottom;
+    this.presenceLabelBoundsCount += 1;
+    return true;
+  }
+
+  private acquirePresenceLabel(
+    presence: NormalizedPresenceOverlay,
+    theme: Theme,
+    kind: "chip" | "marker",
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ): void {
+    let label = this.presenceLabelPool[this.presenceLabelCursor];
+    if (!label) {
+      label = document.createElement("div");
+      label.className = "sheetwrite-presence-label";
+      label.setAttribute("role", "img");
+      label.style.position = "absolute";
+      label.style.pointerEvents = "none";
+      label.style.boxSizing = "border-box";
+      label.style.zIndex = "3";
+      this.presenceLabelPool[this.presenceLabelCursor] = label;
+      this.overlay.appendChild(label);
+    } else if (label.style.display === "none") {
+      label.style.display = "";
+    }
+    this.presenceLabelCursor += 1;
+
+    label.dataset.sheetwritePresenceLabel = presence.actorId;
+    label.dataset.presenceKind = kind;
+    label.title = presence.identity;
+    label.setAttribute("aria-label", `Remote selection: ${presence.identity}`);
+    label.textContent = kind === "chip" ? presence.label : "";
+    label.style.left = `${left}px`;
+    label.style.top = `${top}px`;
+    label.style.width = `${width}px`;
+    label.style.height = `${height}px`;
+    label.style.background = presence.color.css;
+    label.style.border = `1px solid ${presence.border}`;
+    label.style.borderRadius = kind === "chip" ? "4px" : "999px";
+    label.style.color = presence.foreground;
+    label.style.font = `600 11px ${theme.font}`;
+    label.style.lineHeight = kind === "chip" ? "16px" : "0";
+    label.style.overflow = "hidden";
+    label.style.padding = kind === "chip" ? "0 6px" : "0";
+    label.style.textOverflow = "ellipsis";
+    label.style.whiteSpace = "nowrap";
   }
 
   private paintNotes(
@@ -617,6 +926,8 @@ export class OverlayPainter {
     el.style.clipPath = "";
     el.textContent = "";
     el.removeAttribute("data-sheetwrite-presence");
+    el.removeAttribute("data-sheetwrite-presence-range");
+    el.removeAttribute("aria-hidden");
     el.removeAttribute("title");
     el.style.color = "";
     el.style.font = "";
@@ -639,9 +950,23 @@ export class OverlayPainter {
     for (let i = this.cursor; i < this.pool.length; i++) {
       const el = this.pool[i]!;
       el.removeAttribute("data-sheetwrite-presence");
+      el.removeAttribute("data-sheetwrite-presence-range");
+      el.removeAttribute("aria-hidden");
       el.removeAttribute("title");
       el.textContent = "";
       if (el.style.display !== "none") el.style.display = "none";
+    }
+  }
+
+  private hideSurplusPresenceLabels(): void {
+    for (let index = this.presenceLabelCursor; index < this.presenceLabelPool.length; index++) {
+      const label = this.presenceLabelPool[index]!;
+      label.removeAttribute("data-sheetwrite-presence-label");
+      label.removeAttribute("data-presence-kind");
+      label.removeAttribute("title");
+      label.removeAttribute("aria-label");
+      label.textContent = "";
+      if (label.style.display !== "none") label.style.display = "none";
     }
   }
 }

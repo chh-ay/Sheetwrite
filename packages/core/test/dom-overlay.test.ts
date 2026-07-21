@@ -1,7 +1,13 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellPaintContext, CellRenderer, ColumnarData, Workbook } from "../src/types.js";
+import type {
+  CellPaintContext,
+  CellRenderer,
+  ColumnarData,
+  PresenceOverlay,
+  Workbook,
+} from "../src/types.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -578,6 +584,165 @@ describe("retained DOM cell renderer overlay", () => {
     });
     expect(calls).toBeGreaterThan(initialCalls);
     expect(cell(host, 0, 0).textContent).toBe("legacy-edit");
+    grid.destroy();
+  });
+
+  it("separates pooled presence ranges from contrast-safe identity chips", () => {
+    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
+    const { workbook, data } = fixture();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: trackedRenderer("presence", stats) },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    const longIdentity = `Remote ${"operator ".repeat(20)}`.trim();
+    const overlays: PresenceOverlay[] = [
+      {
+        actorId: "long",
+        displayName: longIdentity,
+        color: "#58c4dc",
+        activeSheet: "s1",
+        ranges: [
+          { sheet: "s1", start: { row: 3, col: 2 }, end: { row: 3, col: 2 } },
+          { sheet: "s1", start: { row: 4, col: 3 }, end: { row: 4, col: 3 } },
+        ],
+      },
+      {
+        actorId: "top",
+        displayName: "Top row",
+        color: "hsl(12, 80%, 45%)",
+        activeSheet: "s1",
+        ranges: [{ sheet: "s1", start: { row: 0, col: 2 }, end: { row: 0, col: 2 } }],
+      },
+    ];
+
+    grid.setPresenceOverlays(overlays);
+    grid.refresh();
+    const ranges = [...host.querySelectorAll<HTMLElement>("[data-sheetwrite-presence]")];
+    const labels = [...host.querySelectorAll<HTMLElement>("[data-sheetwrite-presence-label]")];
+    expect(ranges.length).toBeGreaterThanOrEqual(3);
+    expect(labels).toHaveLength(2);
+    expect(host.querySelectorAll('[data-sheetwrite-presence-label="long"]')).toHaveLength(1);
+    expect(ranges.every((range) => range.textContent === "")).toBe(true);
+    expect(ranges.every((range) => range.getAttribute("aria-hidden") === "true")).toBe(true);
+
+    const marker = host.querySelector<HTMLElement>('[data-sheetwrite-presence-label="long"]')!;
+    const longRange = host.querySelector<HTMLElement>('[data-sheetwrite-presence="long"]')!;
+    expect(marker.dataset.presenceKind).toBe("marker");
+    expect(marker.getAttribute("role")).toBe("img");
+    expect(marker.getAttribute("aria-label")).toBe(`Remote selection: ${longIdentity}`);
+    expect(marker.title).toBe(longIdentity);
+    expect(marker.textContent).toBe("");
+    expect(marker.style.background).not.toBe("");
+    expect(px(marker.style.top)).toBeGreaterThanOrEqual(px(longRange.style.top));
+    expect(px(marker.style.top) + px(marker.style.height)).toBeLessThanOrEqual(
+      px(longRange.style.top) + px(longRange.style.height),
+    );
+
+    const topChip = host.querySelector<HTMLElement>('[data-sheetwrite-presence-label="top"]')!;
+    expect(topChip.dataset.presenceKind).toBe("chip");
+    expect(topChip.textContent).toBe("Top row");
+    expect(topChip.style.background).toContain("hsl");
+    expect(["#000000", "#ffffff"]).toContain(topChip.style.color);
+    expect(px(topChip.style.left)).toBeGreaterThanOrEqual(0);
+    expect(px(topChip.style.top)).toBeGreaterThanOrEqual(0);
+    expect(px(topChip.style.top) + px(topChip.style.height)).toBeLessThanOrEqual(
+      px(longRange.style.top),
+    );
+
+    const pooledNodeCount = host.querySelector(".sheetwrite-overlay")!.childElementCount;
+    grid.setPresenceOverlays(null);
+    grid.highlightCells([{ sheet: "s1", start: { row: 2, col: 1 }, end: { row: 2, col: 1 } }]);
+    grid.refresh();
+    expect(host.querySelectorAll("[data-sheetwrite-presence]")).toHaveLength(0);
+    expect(host.querySelectorAll("[data-sheetwrite-presence-range]")).toHaveLength(0);
+    expect(host.querySelectorAll("[data-sheetwrite-presence-label]")).toHaveLength(0);
+    expect(host.querySelector(".sheetwrite-overlay")!.childElementCount).toBe(pooledNodeCount);
+
+    grid.setPresenceOverlays(overlays);
+    grid.refresh();
+    const warmedNodeCount = host.querySelector(".sheetwrite-overlay")!.childElementCount;
+    expect(warmedNodeCount).toBeGreaterThanOrEqual(pooledNodeCount);
+    expect(host.querySelectorAll('[data-sheetwrite-presence-label="long"]')).toHaveLength(1);
+    grid.setPresenceOverlays(null);
+    grid.refresh();
+    grid.setPresenceOverlays(overlays);
+    grid.refresh();
+    expect(host.querySelector(".sheetwrite-overlay")!.childElementCount).toBe(warmedNodeCount);
+    grid.destroy();
+  });
+
+  it("keeps the 32-actor by 8-range limit bounded to rail or range markers", () => {
+    const { workbook, data } = fixture();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    const overlays: PresenceOverlay[] = Array.from({ length: 32 }, (_, index) => ({
+      actorId: `actor-${index}`,
+      displayName: index === 0 ? "  " : `Remote operator with a long identity ${index}`,
+      color: index % 2 === 0 ? "#58c4dc" : "#e76f51",
+      activeSheet: "s1",
+      ranges: Array.from({ length: 8 }, (_, rangeIndex) => ({
+        sheet: "s1",
+        start: { row: rangeIndex % 5, col: 0 },
+        end: { row: rangeIndex % 5, col: 2 },
+      })),
+    }));
+
+    grid.setPresenceOverlays(overlays);
+    grid.refresh();
+    const labels = [...host.querySelectorAll<HTMLElement>("[data-sheetwrite-presence-label]")];
+    expect(labels).toHaveLength(overlays.length);
+    expect(labels.some((label) => label.dataset.presenceKind === "marker")).toBe(true);
+    expect(labels[0]!.title).toBe("actor-0");
+    expect(labels[0]!.getAttribute("aria-label")).toBe("Remote selection: actor-0");
+    for (const label of labels) {
+      expect(px(label.style.left)).toBeGreaterThanOrEqual(0);
+      expect(px(label.style.top)).toBeGreaterThanOrEqual(0);
+      expect(px(label.style.left) + px(label.style.width)).toBeLessThanOrEqual(360);
+      expect(px(label.style.top) + px(label.style.height)).toBeLessThanOrEqual(168);
+    }
+    grid.destroy();
+  });
+
+  it("does not compact a visible chip because offscreen peers exist", () => {
+    const { workbook, data } = fixture();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    const overlays: PresenceOverlay[] = Array.from({ length: 32 }, (_, index) => ({
+      actorId: `peer-${index}`,
+      displayName: `Peer ${index}`,
+      color: "#58c4dc",
+      activeSheet: "s1",
+      ranges: [
+        {
+          sheet: "s1",
+          start: { row: index === 0 ? 0 : 19, col: 2 },
+          end: { row: index === 0 ? 0 : 19, col: 2 },
+        },
+      ],
+    }));
+
+    grid.setPresenceOverlays(overlays);
+    grid.refresh();
+    const visible = host.querySelector<HTMLElement>('[data-sheetwrite-presence-label="peer-0"]')!;
+    expect(visible.dataset.presenceKind).toBe("chip");
+    expect(visible.textContent).toBe("Peer 0");
     grid.destroy();
   });
 });

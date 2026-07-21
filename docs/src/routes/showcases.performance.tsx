@@ -31,9 +31,12 @@ import {
   PAGED_EVIDENCE,
   pagedStatsOf,
   queryCapabilityOf,
+  SCALE_SHEETS,
   SCALE_STORAGE,
   SCALE_THEME,
+  type ScaleSheetId,
   type ScanAttempt,
+  scaleSheetDescriptor,
   sweepCacheChurn,
   WIDE_METRIC_COLUMNS,
   WIDE_ROWS,
@@ -194,24 +197,41 @@ function PerformanceRoute() {
 
   const handleJump = () => {
     const grid = gridRef.current;
-    const row = Number.parseInt(jumpRow, 10);
-    if (!grid || !Number.isFinite(row)) return;
-    const clamped = Math.min(Math.max(row - 1, 0), FEED_ROWS - 1);
-    grid.setActiveSheet(FEED_SHEET);
-    setActiveSheet(FEED_SHEET);
-    grid.scrollToCell({ sheet: FEED_SHEET, row: clamped, col: 0 });
-    setStatus(`Jumped to row ${(clamped + 1).toLocaleString()} — pages fetch on demand.`);
+    if (!grid) return;
+    const descriptor = scaleSheetDescriptor(grid.getActiveSheet());
+    const raw = jumpRow.trim();
+    if (!/^\d+$/.test(raw)) {
+      setStatus(
+        `Enter a whole row from 1 to ${descriptor.rowCount.toLocaleString()} for ${descriptor.label}.`,
+      );
+      return;
+    }
+    const requestedRow = Number(raw);
+    if (!Number.isSafeInteger(requestedRow) || requestedRow < 1) {
+      setStatus(
+        `Enter a whole row from 1 to ${descriptor.rowCount.toLocaleString()} for ${descriptor.label}.`,
+      );
+      return;
+    }
+    const resolvedRow = Math.min(requestedRow, descriptor.rowCount);
+    grid.scrollToCell({ sheet: descriptor.id, row: resolvedRow - 1, col: 0 });
+    setStatus(
+      resolvedRow === requestedRow
+        ? `Jumped to ${descriptor.label} row ${resolvedRow.toLocaleString()} — pages fetch on demand.`
+        : `Requested ${descriptor.label} row ${requestedRow.toLocaleString()}; clamped to row ${resolvedRow.toLocaleString()} (sheet maximum).`,
+    );
   };
 
-  const handleSheet = (sheet: typeof FEED_SHEET | typeof WIDE_SHEET) => {
+  const handleSheet = (sheet: ScaleSheetId) => {
     const grid = gridRef.current;
     if (!grid) return;
-    grid.setActiveSheet(sheet);
-    setActiveSheet(sheet);
+    const descriptor = scaleSheetDescriptor(sheet);
+    grid.setActiveSheet(descriptor.id);
+    setActiveSheet(descriptor.id);
     setStatus(
-      sheet === WIDE_SHEET
-        ? `Wide sheet active: ${WIDE_ROWS.toLocaleString()} rows × ${WIDE_METRIC_COLUMNS + 1} columns, still paged.`
-        : `Telemetry feed active: ${FEED_ROWS.toLocaleString()} rows × 6 columns.`,
+      descriptor.id === WIDE_SHEET
+        ? `${descriptor.label} active: ${descriptor.rowCount.toLocaleString()} rows × ${WIDE_METRIC_COLUMNS + 1} columns, still paged.`
+        : `${descriptor.label} active: ${descriptor.rowCount.toLocaleString()} rows × 6 columns.`,
     );
   };
 
@@ -266,6 +286,7 @@ function PerformanceRoute() {
     setScan(attemptColumnScan(grid, 3, "sum"));
   };
 
+  const activeSheetDescriptor = scaleSheetDescriptor(activeSheet);
   const activeStats = activeSheet === WIDE_SHEET ? stats.wide : stats.feed;
   const denseBytes = gridRef.current ? denseEquivalentBytes(gridRef.current, activeSheet) : 0;
   const cachePct = Math.min(
@@ -327,7 +348,7 @@ function PerformanceRoute() {
                   onClick={() => handleSheet(FEED_SHEET)}
                   type="button"
                 >
-                  <span className="sw-sp-seg__label">Telemetry feed</span>
+                  <span className="sw-sp-seg__label">{SCALE_SHEETS[FEED_SHEET].label}</span>
                   <span className="sw-sp-seg__dims">1M × 6</span>
                 </button>
                 <button
@@ -336,7 +357,7 @@ function PerformanceRoute() {
                   onClick={() => handleSheet(WIDE_SHEET)}
                   type="button"
                 >
-                  <span className="sw-sp-seg__label">Wide metrics</span>
+                  <span className="sw-sp-seg__label">{SCALE_SHEETS[WIDE_SHEET].label}</span>
                   <span className="sw-sp-seg__dims">
                     {WIDE_ROWS.toLocaleString()} × {WIDE_METRIC_COLUMNS + 1}
                   </span>
@@ -349,10 +370,15 @@ function PerformanceRoute() {
                     id="scale-jump-row"
                     data-testid="scale-jump-input"
                     inputMode="numeric"
+                    aria-describedby="scale-jump-help scale-status"
+                    max={activeSheetDescriptor.rowCount}
+                    min={1}
                     onChange={(event) => setJumpRow(event.currentTarget.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") handleJump();
                     }}
+                    step={1}
+                    type="number"
                     value={jumpRow}
                   />
                   <button
@@ -364,6 +390,10 @@ function PerformanceRoute() {
                     Jump
                   </button>
                 </div>
+                <p className="sw-sp-stat-context" id="scale-jump-help">
+                  {activeSheetDescriptor.label}: rows 1–
+                  {activeSheetDescriptor.rowCount.toLocaleString()}.
+                </p>
               </div>
             </div>
             {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this canvas host into a virtualized ARIA grid; a table cannot host the runtime. */}

@@ -30,11 +30,22 @@ import { SHOWCASE_THEME } from "../revenue.js";
 
 // ── Dataset geometry ─────────────────────────────────────────────────────────
 
-export const FEED_SHEET: SheetId = "feed";
-export const WIDE_SHEET: SheetId = "wide";
-export const FEED_ROWS = 1_000_000;
-export const WIDE_ROWS = 250_000;
+export const FEED_SHEET = "feed" satisfies SheetId;
+export const WIDE_SHEET = "wide" satisfies SheetId;
+export const SCALE_SHEETS = {
+  [FEED_SHEET]: { id: FEED_SHEET, label: "Telemetry feed", rowCount: 1_000_000 },
+  [WIDE_SHEET]: { id: WIDE_SHEET, label: "Wide metrics", rowCount: 250_000 },
+} as const;
+export type ScaleSheetId = keyof typeof SCALE_SHEETS;
+export const FEED_ROWS = SCALE_SHEETS[FEED_SHEET].rowCount;
+export const WIDE_ROWS = SCALE_SHEETS[WIDE_SHEET].rowCount;
 export const WIDE_METRIC_COLUMNS = 120;
+
+export function scaleSheetDescriptor(sheet: SheetId) {
+  if (sheet === FEED_SHEET) return SCALE_SHEETS[FEED_SHEET];
+  if (sheet === WIDE_SHEET) return SCALE_SHEETS[WIDE_SHEET];
+  throw new Error(`Unknown performance showcase sheet: ${sheet}`);
+}
 export const SCALE_THEME: Partial<Theme> = {
   font: SHOWCASE_THEME.font,
   rowHeight: SHOWCASE_THEME.rowHeight,
@@ -91,8 +102,8 @@ export function createScaleWorkbook(): Workbook {
     sheets: [
       {
         id: FEED_SHEET,
-        name: "Telemetry feed",
-        rowCount: FEED_ROWS,
+        name: SCALE_SHEETS[FEED_SHEET].label,
+        rowCount: SCALE_SHEETS[FEED_SHEET].rowCount,
         columns: [
           { key: "id", header: "ID", width: 84, type: "number" },
           { key: "sensor", header: "Sensor", width: 100, type: "text" },
@@ -104,8 +115,8 @@ export function createScaleWorkbook(): Workbook {
       },
       {
         id: WIDE_SHEET,
-        name: "Wide metrics",
-        rowCount: WIDE_ROWS,
+        name: SCALE_SHEETS[WIDE_SHEET].label,
+        rowCount: SCALE_SHEETS[WIDE_SHEET].rowCount,
         columns: [
           { key: "id", header: "ID", width: 84, type: "number" },
           ...Array.from({ length: WIDE_METRIC_COLUMNS }, (_, column) => ({
