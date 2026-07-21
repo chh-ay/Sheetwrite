@@ -204,7 +204,9 @@ impl ReadSet {
                 self.collect(left, formula_sheet);
                 self.collect(right, formula_sheet);
             }
-            Ast::Neg(inner) => self.collect(inner, formula_sheet),
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                self.collect(inner, formula_sheet);
+            }
             Ast::SheetCell(..)
             | Ast::SheetRange(..)
             | Ast::InvalidRef
@@ -244,7 +246,7 @@ fn ast_is_volatile(ast: &Ast) -> bool {
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_is_volatile(left) || ast_is_volatile(right)
         }
-        Ast::Neg(inner) => ast_is_volatile(inner),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_volatile(inner),
         _ => false,
     }
 }
@@ -280,7 +282,7 @@ impl FormulaEntry {
         let volatile = ast_is_volatile(&ast);
         Self {
             ast: Some(ast),
-            source,
+            source: source.to_string(),
             reads,
             error: None,
             value_kind: FormulaValueKind::Number,

@@ -29,7 +29,10 @@ fn sheet_insert_rows_moves_cells_and_shifts_formulas() {
     put_number(&mut sheet, 2, 1, 30.0);
     sheet
         .formulas
-        .insert((0, 0), FormulaEntry::parsed(parse("=A2+B3").unwrap(), 0));
+        .insert(
+            (0, 0),
+            FormulaEntry::parsed(parse("=A2+B3").unwrap(), 0, "=A2+B3"),
+        );
 
     sheet.insert_rows(0, 1, 1);
 
@@ -52,10 +55,16 @@ fn sheet_delete_rows_moves_cells_removes_formulas_and_shifts_refs() {
     put_number(&mut sheet, 3, 0, 4.0);
     sheet
         .formulas
-        .insert((0, 0), FormulaEntry::parsed(parse("=A4").unwrap(), 0));
+        .insert(
+            (0, 0),
+            FormulaEntry::parsed(parse("=A4").unwrap(), 0, "=A4"),
+        );
     sheet
         .formulas
-        .insert((1, 0), FormulaEntry::parsed(parse("=A1").unwrap(), 0));
+        .insert(
+            (1, 0),
+            FormulaEntry::parsed(parse("=A1").unwrap(), 0, "=A1"),
+        );
 
     sheet.delete_rows(0, 1, 1);
 
@@ -76,7 +85,10 @@ fn sheet_resize_rows_preserves_overlap_and_drops_oob_formulas() {
     put_number(&mut sheet, 2, 1, 24.0);
     sheet
         .formulas
-        .insert((2, 1), FormulaEntry::parsed(parse("=A3").unwrap(), 0));
+        .insert(
+            (2, 1),
+            FormulaEntry::parsed(parse("=A3").unwrap(), 0, "=A3"),
+        );
 
     sheet.resize_rows(5);
     assert_eq!(sheet.row_count, 5);
@@ -93,7 +105,10 @@ fn sheet_resize_rows_preserves_overlap_and_drops_oob_formulas() {
     paged.set_num(paged_index, 24.0);
     paged
         .formulas
-        .insert((2, 1), FormulaEntry::parsed(parse("=A3").unwrap(), 0));
+        .insert(
+            (2, 1),
+            FormulaEntry::parsed(parse("=A3").unwrap(), 0, "=A3"),
+        );
     paged.resize_rows(2);
     assert_eq!(paged.row_count, 2);
     assert_eq!(paged.kind_at(paged.idx(1, 1)), 0);

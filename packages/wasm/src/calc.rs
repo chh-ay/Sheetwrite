@@ -1,12 +1,14 @@
-//! Arithmetic formula parser for the optional calc tier (M5).
+//! Formula parser for the optional calc tier.
 //!
 //! Grammar (A1 references with optional sheet qualifiers):
-//!   expr   := additive (comparison additive)?
-//!   additive := term (('+' | '-') term)*
-//!   term   := factor (('*' | '/') factor)*
-//!   factor := '-' factor | primary
-//!   primary:= number | '(' expr ')' | func '(' args ')' | range | cell
-//!   cell   := A1 | Sheet!A1 | 'Sheet Name'!A1
+//!   expr       := concat (comparison concat)?
+//!   concat     := additive ('&' additive)*
+//!   additive   := term (('+' | '-') term)*
+//!   term       := power (('*' | '/') power)*
+//!   power      := postfix ('^' postfix)*
+//!   postfix    := unary ('%')*
+//!   unary      := ('+' | '-') unary | primary
+//!   primary    := number | '(' expr ')' | func '(' args ')' | range | cell
 //!   range  := cell ':' cell
 //!
 //! Cell references accept optional absolute markers (`$A$1`, `A$1`, `$A1`).
@@ -27,6 +29,8 @@ pub enum Op {
     Sub,
     Mul,
     Div,
+    Pow,
+    Concat,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -83,6 +87,9 @@ pub enum Func {
     HLookup,
     XLookup,
     Na,
+    Filter,
+    Sort,
+    Unique,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -151,6 +158,8 @@ pub enum Ast {
     Bin(Op, Box<Ast>, Box<Ast>),
     Cmp(CmpOp, Box<Ast>, Box<Ast>),
     Neg(Box<Ast>),
+    Pos(Box<Ast>),
+    Percent(Box<Ast>),
 }
 impl Ast {
     /// Heap payload owned below an inline AST root. The root itself is already
@@ -401,7 +410,7 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, String> {
             i += len;
         } else {
             match c {
-                '+' | '-' | '*' | '/' => toks.push(Tok::Op(c)),
+                '+' | '-' | '*' | '/' | '^' | '&' | '%' => toks.push(Tok::Op(c)),
                 '(' => toks.push(Tok::LParen),
                 ')' => toks.push(Tok::RParen),
                 ',' => toks.push(Tok::Comma),
@@ -449,12 +458,24 @@ impl Parser {
     fn expr_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 
-        let left = self.additive_at(depth)?;
+        let left = self.concat_at(depth)?;
         if let Some(Tok::Cmp(op)) = self.peek() {
             let op = *op;
             self.pos += 1;
-            let right = self.additive_at(depth)?;
+            let right = self.concat_at(depth)?;
             return Ok(Ast::Cmp(op, Box::new(left), Box::new(right)));
+        }
+        Ok(left)
+    }
+    
+    fn concat_at(&mut self, depth: usize) -> Result<Ast, String> {
+        Self::guard_depth(depth)?;
+
+        let mut left = self.additive_at(depth)?;
+        while self.peek() == Some(&Tok::Op('&')) {
+            self.pos += 1;
+            let right = self.additive_at(depth)?;
+            left = Ast::Bin(Op::Concat, Box::new(left), Box::new(right));
         }
         Ok(left)
     }
@@ -475,22 +496,51 @@ impl Parser {
     fn term_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 
-        let mut left = self.factor_at(depth)?;
+        let mut left = self.power_at(depth)?;
         while let Some(Tok::Op(c @ ('*' | '/'))) = self.peek() {
             let op = if *c == '*' { Op::Mul } else { Op::Div };
             self.pos += 1;
-            let right = self.factor_at(depth)?;
+            let right = self.power_at(depth)?;
             left = Ast::Bin(op, Box::new(left), Box::new(right));
         }
         Ok(left)
     }
 
-    fn factor_at(&mut self, depth: usize) -> Result<Ast, String> {
+    fn power_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 
-        if let Some(Tok::Op('-')) = self.peek() {
+        let mut left = self.postfix_at(depth)?;
+        while self.peek() == Some(&Tok::Op('^')) {
             self.pos += 1;
-            return Ok(Ast::Neg(Box::new(self.factor_at(depth + 1)?)));
+            let right = self.postfix_at(depth)?;
+            left = Ast::Bin(Op::Pow, Box::new(left), Box::new(right));
+        }
+        Ok(left)
+    }
+
+    fn postfix_at(&mut self, depth: usize) -> Result<Ast, String> {
+        Self::guard_depth(depth)?;
+
+        let mut value = self.unary_at(depth)?;
+        while self.peek() == Some(&Tok::Op('%')) {
+            self.pos += 1;
+            value = Ast::Percent(Box::new(value));
+        }
+        Ok(value)
+    }
+
+    fn unary_at(&mut self, depth: usize) -> Result<Ast, String> {
+        Self::guard_depth(depth)?;
+
+        if let Some(Tok::Op(sign @ ('+' | '-'))) = self.peek() {
+            let sign = *sign;
+            self.pos += 1;
+            let inner = Box::new(self.unary_at(depth + 1)?);
+            return Ok(if sign == '-' {
+                Ast::Neg(inner)
+            } else {
+                Ast::Pos(inner)
+            });
         }
         self.primary_at(depth)
     }
@@ -581,6 +631,9 @@ impl Parser {
                 "HLOOKUP" => Some(Func::HLookup),
                 "XLOOKUP" => Some(Func::XLookup),
                 "NA" => Some(Func::Na),
+                "FILTER" => Some(Func::Filter),
+                "SORT" => Some(Func::Sort),
+                "UNIQUE" => Some(Func::Unique),
                 _ => None,
             };
             let mut args = Vec::new();
@@ -752,6 +805,8 @@ where
             Box::new(resolve_sheet_refs(*right, resolve)?),
         )),
         Ast::Neg(inner) => Ok(Ast::Neg(Box::new(resolve_sheet_refs(*inner, resolve)?))),
+        Ast::Pos(inner) => Ok(Ast::Pos(Box::new(resolve_sheet_refs(*inner, resolve)?))),
+        Ast::Percent(inner) => Ok(Ast::Percent(Box::new(resolve_sheet_refs(*inner, resolve)?))),
         other => Ok(other),
     }
 }
@@ -786,6 +841,16 @@ where
             Box::new(resolve_named_ranges(*right, formula_sheet, resolve)),
         ),
         Ast::Neg(inner) => Ast::Neg(Box::new(resolve_named_ranges(
+            *inner,
+            formula_sheet,
+            resolve,
+        ))),
+        Ast::Pos(inner) => Ast::Pos(Box::new(resolve_named_ranges(
+            *inner,
+            formula_sheet,
+            resolve,
+        ))),
+        Ast::Percent(inner) => Ast::Percent(Box::new(resolve_named_ranges(
             *inner,
             formula_sheet,
             resolve,
@@ -874,7 +939,7 @@ fn rewrite_axis(
             rewrite_axis(left, axis, at, delta, formula_sheet, edited_sheet);
             rewrite_axis(right, axis, at, delta, formula_sheet, edited_sheet);
         }
-        Ast::Neg(inner) => {
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
             rewrite_axis(inner, axis, at, delta, formula_sheet, edited_sheet);
         }
         _ => {}
@@ -974,7 +1039,9 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
             changed |= rename_sheet_refs(left, handle, name);
             changed |= rename_sheet_refs(right, handle, name);
         }
-        Ast::Neg(inner) => changed |= rename_sheet_refs(inner, handle, name),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            changed |= rename_sheet_refs(inner, handle, name);
+        }
         _ => {}
     }
     changed
@@ -1002,7 +1069,9 @@ pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
             changed |= invalidate_sheet_refs(left, handle);
             changed |= invalidate_sheet_refs(right, handle);
         }
-        Ast::Neg(inner) => changed |= invalidate_sheet_refs(inner, handle),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            changed |= invalidate_sheet_refs(inner, handle);
+        }
         _ => {}
     }
     changed
@@ -1081,6 +1150,8 @@ fn write_ast(ast: &Ast, out: &mut String) {
                 Op::Sub => '-',
                 Op::Mul => '*',
                 Op::Div => '/',
+                Op::Pow => '^',
+                Op::Concat => '&',
             });
             write_ast(right, out);
             out.push(')');
@@ -1103,6 +1174,16 @@ fn write_ast(ast: &Ast, out: &mut String) {
             out.push_str("-(");
             write_ast(inner, out);
             out.push(')');
+        }
+        Ast::Pos(inner) => {
+            out.push_str("+(");
+            write_ast(inner, out);
+            out.push(')');
+        }
+        Ast::Percent(inner) => {
+            out.push('(');
+            write_ast(inner, out);
+            out.push_str(")%");
         }
     }
 }
@@ -1196,6 +1277,9 @@ fn func_name(func: Func) -> &'static str {
         Func::HLookup => "HLOOKUP",
         Func::XLookup => "XLOOKUP",
         Func::Na => "NA",
+        Func::Filter => "FILTER",
+        Func::Sort => "SORT",
+        Func::Unique => "UNIQUE",
     }
 }
 
@@ -1270,7 +1354,9 @@ mod tests {
                     collect_cell_refs(left, refs);
                     collect_cell_refs(right, refs);
                 }
-                Ast::Neg(inner) => collect_cell_refs(inner, refs),
+                Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                    collect_cell_refs(inner, refs);
+                }
                 _ => {}
             }
         }

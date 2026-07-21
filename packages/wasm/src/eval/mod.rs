@@ -588,8 +588,42 @@ impl CellStore {
                 Ok(value) => Value::number(-value),
                 Err(error) => Value::Error(error),
             },
+            Ast::Pos(expr) => match number_from_value(&self.eval_ast(
+                expr,
+                sheet,
+                affected,
+                memo,
+                visiting,
+                depth + 1,
+            )) {
+                Ok(value) => Value::number(value),
+                Err(error) => Value::Error(error),
+            },
+            Ast::Percent(expr) => match number_from_value(&self.eval_ast(
+                expr,
+                sheet,
+                affected,
+                memo,
+                visiting,
+                depth + 1,
+            )) {
+                Ok(value) => Value::number(value / 100.0),
+                Err(error) => Value::Error(error),
+            },
             Ast::Bin(op, left, right) => {
                 let left = self.eval_ast(left, sheet, affected, memo, visiting, depth + 1);
+                if *op == Op::Concat {
+                    let left = match text_from_value(&left) {
+                        Ok(value) => value,
+                        Err(error) => return Value::Error(error),
+                    };
+                    let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
+                    let right = match text_from_value(&right) {
+                        Ok(value) => value,
+                        Err(error) => return Value::Error(error),
+                    };
+                    return Value::text(left + &right);
+                }
                 let a = match number_from_value(&left) {
                     Ok(value) => value,
                     Err(error) => return Value::Error(error),
@@ -610,6 +644,14 @@ impl CellStore {
                             Value::number(a / b)
                         }
                     }
+                    Op::Pow => {
+                        if a == 0.0 && b < 0.0 {
+                            Value::Error(FormulaError::DivZero)
+                        } else {
+                            Value::number(a.powf(b))
+                        }
+                    }
+                    Op::Concat => unreachable!("concatenation returned before numeric coercion"),
                 }
             }
             Ast::Cmp(op, left, right) => {

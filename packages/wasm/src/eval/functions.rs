@@ -336,7 +336,10 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Match
         | Func::VLookup
         | Func::HLookup
-        | Func::XLookup => Value::Error(FormulaError::Value),
+        | Func::XLookup
+        | Func::Filter
+        | Func::Sort
+        | Func::Unique => Value::Error(FormulaError::Value),
         Func::Exact => {
             let left = match text_arg(values, 0) {
                 Ok(text) => text,
