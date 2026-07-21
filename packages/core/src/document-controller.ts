@@ -508,6 +508,7 @@ export class DocumentController {
     return {
       kind: "rangeSnapshot",
       range: snapshot.range,
+      byteLength: snapshot.byteLength,
       toPatch: (target) => snapshot.toDocumentOp(target),
       dispose: () => snapshot.dispose(),
     };

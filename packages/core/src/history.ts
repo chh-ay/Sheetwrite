@@ -6,6 +6,7 @@ export type HistoryPart =
   | {
       kind: "rangeSnapshot";
       range: Range;
+      byteLength: number;
       toPatch: (range: Range) => Extract<DocumentOp, { op: "setBlock" }>;
       dispose: () => void;
     };
@@ -15,6 +16,13 @@ export type HistoryAction = HistoryPart[];
 interface UndoEntry {
   undo: HistoryAction;
   redo: DocumentOp[];
+}
+
+export interface HistoryResourceStats {
+  readonly undoEntries: number;
+  readonly redoEntries: number;
+  readonly retainedSnapshots: number;
+  readonly retainedSnapshotBytes: number;
 }
 
 /** Retains recent transaction-level undo resources without allowing unbounded history growth. */
@@ -92,6 +100,27 @@ export class UndoManager {
 
   get canRedo(): boolean {
     return this.redoStack.length > 0;
+  }
+
+  /** On-demand aggregate; retained history never emits per-cell allocation events. */
+  getResourceStats(): HistoryResourceStats {
+    let retainedSnapshots = 0;
+    let retainedSnapshotBytes = 0;
+    for (const stack of [this.undoStack, this.redoStack]) {
+      for (const entry of stack) {
+        for (const part of entry.undo) {
+          if (part.kind !== "rangeSnapshot") continue;
+          retainedSnapshots += 1;
+          retainedSnapshotBytes += part.byteLength;
+        }
+      }
+    }
+    return {
+      undoEntries: this.undoStack.length,
+      redoEntries: this.redoStack.length,
+      retainedSnapshots,
+      retainedSnapshotBytes,
+    };
   }
 
   private rebase(mapAddr: (addr: CellAddress) => CellAddress | null): void {
