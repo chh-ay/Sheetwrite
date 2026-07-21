@@ -2,6 +2,12 @@
 // No runtime values live here.
 
 import type {
+  RuntimeMemoryObservation,
+  RuntimeResourceOperation,
+  RuntimeResourcePhase,
+  RuntimeResourceSnapshot,
+} from "../resource-accounting.js";
+import type {
   CellAlign,
   CellFormat,
   CellScalar,
@@ -401,6 +407,12 @@ export interface Grid {
   readonly store: Store;
   /** Imperative action surface for binding custom toolbars/menus. */
   readonly actions: GridActions;
+  /** Versioned coarse runtime ownership snapshot, including datasource state. */
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot;
   /** Query undo/redo availability and formatting active/mixed/disabled state. */
   getCommandState(command: GridCommandName): GridCommandState;
   setActiveSheet(id: SheetId): void;

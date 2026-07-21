@@ -28,6 +28,13 @@ import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
+import {
+  createRuntimeResourceSnapshot,
+  type RuntimeMemoryObservation,
+  type RuntimeResourceOperation,
+  type RuntimeResourcePhase,
+  type RuntimeResourceSnapshot,
+} from "./resource-accounting.js";
 import { RenderCoordinator } from "./render-coordinator.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
@@ -1522,6 +1529,10 @@ export class GridImpl implements Grid {
     if (capability.status === "incomplete") throw new IncompleteDataError(range.sheet, capability);
   }
 
+  private withStoreResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
+    return this.loadable ? this.loadable.withResourceOperation(operation, run) : run();
+  }
+
   private noteAutoFitWindow(rows: number, columns: number): void {
     const cells = rows * columns;
     this.autoFitStats.windowRequests += 1;
@@ -1671,7 +1682,9 @@ export class GridImpl implements Grid {
 
     if (rowCount * columnCount <= AUTO_FIT_CHUNK_CELLS) {
       const columns = Array.from({ length: columnCount }, (_, index) => c0 + index);
-      const view = this.store.getVisibleWindow(sheetId, { start: r0, end: r1 + 1 }, columns);
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: r0, end: r1 + 1 }, columns),
+      );
       this.noteAutoFitWindow(rowCount, columnCount);
       const required = new Float64Array(rowCount);
       required.fill(this.baseTheme.rowHeight);
@@ -1679,7 +1692,7 @@ export class GridImpl implements Grid {
       appendRowPatches(r0, required);
       this.autoFitStats.completedJobs += 1;
       this.autoFitStats.committedPatches += patches.length;
-      this.document.commit(patches, "structure");
+      this.withStoreResourceOperation("auto-fit", () => this.document.commit(patches, "structure"));
       return;
     }
 
@@ -1704,10 +1717,8 @@ export class GridImpl implements Grid {
       }
       const count = Math.min(columnsPerWindow, c1 - columnStart + 1);
       const columns = Array.from({ length: count }, (_, index) => columnStart + index);
-      const view = this.store.getVisibleWindow(
-        sheetId,
-        { start: bandStart, end: bandEnd },
-        columns,
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: bandStart, end: bandEnd }, columns),
       );
       this.noteAutoFitWindow(bandEnd - bandStart, columns.length);
       this.measureAutoFitRowWindow(context, sheet, view, columns, bandStart, required, mergeWidths);
@@ -1719,7 +1730,9 @@ export class GridImpl implements Grid {
           this.autoFitActive = false;
           this.autoFitStats.completedJobs += 1;
           this.autoFitStats.committedPatches += patches.length;
-          this.document.commit(patches, "structure");
+          this.withStoreResourceOperation("auto-fit", () =>
+            this.document.commit(patches, "structure"),
+          );
           return;
         }
         bandEnd = Math.min(r1 + 1, bandStart + rowsPerBand);
@@ -1769,12 +1782,14 @@ export class GridImpl implements Grid {
       }
       this.autoFitStats.completedJobs += 1;
       this.autoFitStats.committedPatches += patches.length;
-      this.document.commit(patches, "structure");
+      this.withStoreResourceOperation("auto-fit", () => this.document.commit(patches, "structure"));
     };
 
     const totalCells = sheet.rowCount * targets.length;
     if (totalCells <= AUTO_FIT_CHUNK_CELLS) {
-      const view = this.store.getVisibleWindow(sheetId, { start: 0, end: sheet.rowCount }, targets);
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: 0, end: sheet.rowCount }, targets),
+      );
       this.noteAutoFitWindow(sheet.rowCount, targets.length);
       this.measureAutoFitColumnWindow(context, sheet, view, targets, 0, widths);
       commitWidths();
@@ -1799,7 +1814,9 @@ export class GridImpl implements Grid {
         return;
       }
       const rowEnd = Math.min(sheet.rowCount, rowStart + rowsPerWindow);
-      const view = this.store.getVisibleWindow(sheetId, { start: rowStart, end: rowEnd }, columns);
+      const view = this.withStoreResourceOperation("auto-fit", () =>
+        this.store.getVisibleWindow(sheetId, { start: rowStart, end: rowEnd }, columns),
+      );
       this.noteAutoFitWindow(rowEnd - rowStart, columns.length);
       this.measureAutoFitColumnWindow(context, sheet, view, columns, targetOffset, widths);
       rowStart = rowEnd;
@@ -1876,6 +1893,25 @@ export class GridImpl implements Grid {
     this.autoFitStats.completedJobs = 0;
     this.autoFitStats.cancelledJobs = 0;
     this.autoFitStats.committedPatches = 0;
+  }
+
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot {
+    if (!this.loadable) {
+      throw new Error("Runtime resource diagnostics require a SheetwriteStore");
+    }
+    const store = this.loadable.getRuntimeResourceSnapshot(operation, phase, runtime);
+    return createRuntimeResourceSnapshot({
+      operation,
+      phase,
+      wasm: store.wasm,
+      jsOwners: [...store.jsOwners, ...this.datasourceController.getResourceOwners()],
+      boundary: store.boundary,
+      runtime: store.runtime,
+    });
   }
 
   setActiveSheet(id: SheetId): void {

@@ -1,6 +1,6 @@
 /** Stable protocol for runtime ownership and operation-cost reports. */
-export const RUNTIME_RESOURCE_SCHEMA_VERSION = 1 as const;
-export const STORE_MEMORY_PROTOCOL_VERSION = 1 as const;
+export const RUNTIME_RESOURCE_SCHEMA_VERSION = 2 as const;
+export const STORE_MEMORY_PROTOCOL_VERSION = 2 as const;
 export const STORE_MEMORY_HASH_ESTIMATE_VERSION = 1 as const;
 
 export const WASM_MEMORY_OWNERS = [
