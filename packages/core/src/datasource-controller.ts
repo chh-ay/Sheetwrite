@@ -218,7 +218,7 @@ export class DatasourceController {
     let activeSpeculativeRequests = 0;
     let activeSpeculativeRows = 0;
     for (const request of this.requests) {
-      if (request.priority !== "speculative") continue;
+      if (!request.speculativeOrigin) continue;
       activeSpeculativeRequests += 1;
       activeSpeculativeRows += request.end - request.start;
     }
@@ -269,26 +269,32 @@ export class DatasourceController {
   ): void {
     if (start >= end) return;
     if (direction > 0) {
-      for (let bandStart = start; bandStart < end; bandStart += bandRows) {
-        this.ensureRange(
-          bandStart,
-          Math.min(end, bandStart + bandRows),
-          "speculative",
-          direction,
-          false,
-        );
+      let cursor = start;
+      while (cursor < end) {
+        const remainingRows = this.remainingSpeculativeRows();
+        if (remainingRows === 0) return;
+        const requestEnd = Math.min(end, cursor + bandRows, cursor + remainingRows);
+        this.ensureRange(cursor, requestEnd, "speculative", direction, false);
+        cursor = requestEnd;
       }
       return;
     }
-    for (let bandEnd = end; bandEnd > start; bandEnd -= bandRows) {
-      this.ensureRange(
-        Math.max(start, bandEnd - bandRows),
-        bandEnd,
-        "speculative",
-        direction,
-        false,
-      );
+    let cursor = end;
+    while (cursor > start) {
+      const remainingRows = this.remainingSpeculativeRows();
+      if (remainingRows === 0) return;
+      const requestStart = Math.max(start, cursor - bandRows, cursor - remainingRows);
+      this.ensureRange(requestStart, cursor, "speculative", direction, false);
+      cursor = requestStart;
     }
+  }
+
+  private remainingSpeculativeRows(): number {
+    let activeRows = 0;
+    for (const request of this.requests) {
+      if (request.speculativeOrigin) activeRows += request.end - request.start;
+    }
+    return Math.max(0, this.speculativeRowHorizon() - activeRows);
   }
 
   private speculativeIntervals(
@@ -297,9 +303,7 @@ export class DatasourceController {
     direction: -1 | 1,
     bandRows: number,
   ): Array<{ start: number; end: number }> {
-    const rowBytes = this.estimatedRowBytes();
-    const byteBoundRows = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / rowBytes);
-    const horizonRows = Math.min(DATASOURCE_PREFETCH_MAX_ROWS, Math.max(0, byteBoundRows));
+    const horizonRows = this.speculativeRowHorizon();
     if (horizonRows === 0) return [];
     const speedInWindowsPerFrame =
       (Math.abs(this.velocityRowsPerMs) * LOGICAL_FRAME_MS) / Math.max(1, bandRows);
@@ -334,6 +338,11 @@ export class DatasourceController {
       if (behindStart < behindEnd) intervals.push({ start: behindStart, end: behindEnd });
     }
     return intervals;
+  }
+
+  private speculativeRowHorizon(): number {
+    const byteBoundRows = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / this.estimatedRowBytes());
+    return Math.min(DATASOURCE_PREFETCH_MAX_ROWS, Math.max(0, byteBoundRows));
   }
 
   private estimatedRowBytes(): number {
@@ -462,10 +471,13 @@ export class DatasourceController {
       if (request.durableDemand) continue;
       if (request.speculativeOrigin) {
         if (intersects(request.start, request.end, visibleStart, visibleEnd)) continue;
-        const wanted = intervals.some((interval) =>
-          intersects(request.start, request.end, interval.start, interval.end),
+        const fullyWanted = intervals.some(
+          (interval) => request.start >= interval.start && request.end <= interval.end,
         );
-        if (!cancelGeneration && wanted) continue;
+        if (!cancelGeneration && fullyWanted) {
+          request.priority = "speculative";
+          continue;
+        }
         this.abortRequest(request, reason);
         continue;
       }

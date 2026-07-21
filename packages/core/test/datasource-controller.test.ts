@@ -550,6 +550,60 @@ describe("DatasourceController revision retention", () => {
     controller.destroy();
     store.dispose();
   });
+  it("caps the full retained speculative union after partial-overlap viewport shifts", () => {
+    const columnCount = 100;
+    const rowBytes = columnCount * 16;
+    const rowHorizon = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / rowBytes);
+    const assertShiftBounded = (
+      initial: readonly [number, number],
+      shifted: readonly [number, number],
+      expectAbort = true,
+    ) => {
+      const workbook = makeWorkbook(3_000);
+      workbook.sheets[0]!.columns = Array.from({ length: columnCount }, (_, column) => ({
+        key: `c${column}`,
+        header: `C${column}`,
+        width: 100,
+        type: "text" as const,
+      }));
+      const store = new SheetwriteStore(workbook);
+      const requests: Array<{ signal: AbortSignal }> = [];
+      let now = 0;
+      const controller = new DatasourceController(
+        {
+          datasource: (request) => {
+            requests.push(request);
+            return Promise.withResolvers<DataSourcePage>().promise;
+          },
+          loadable: store,
+          activeSheet: () => "s1",
+          rowCount: () => 3_000,
+          revision: () => 0,
+          isCellNewerThan: () => false,
+          retainRevision: () => () => {},
+          onRowsLoaded: () => {},
+          onError: () => {},
+          now: () => now,
+        },
+        3_000,
+      );
+
+      controller.updateViewport(initial[0], initial[1]);
+      now = 16.7;
+      controller.updateViewport(shifted[0], shifted[1]);
+      const activeSpeculativeRows = controller.getTelemetry().activeSpeculativeRows;
+      expect(activeSpeculativeRows).toBeLessThanOrEqual(rowHorizon);
+      expect(activeSpeculativeRows * rowBytes).toBeLessThanOrEqual(DATASOURCE_PREFETCH_MAX_BYTES);
+      expect(requests.some(({ signal }) => signal.aborted)).toBe(expectAbort);
+      controller.destroy();
+      store.dispose();
+    };
+
+    assertShiftBounded([0, 1_000], [900, 1_000]);
+    assertShiftBounded([0, 1_000], [900, 1_900], false);
+    assertShiftBounded([1_000, 2_000], [100, 1_100]);
+  });
+
   it("clamps unaligned tall-view speculation to the advertised row and byte horizon", () => {
     const workbook = makeWorkbook(3_000);
     workbook.sheets[0]!.columns = [{ key: "name", header: "Name", width: 100, type: "text" }];
