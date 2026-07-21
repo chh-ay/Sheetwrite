@@ -16,6 +16,7 @@ import {
 } from "./store/data-engine.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
+import { setTransactionStorageRevision } from "./transaction-admission.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { AggregateOp, ColumnarData, RowData } from "./types/data.js";
@@ -478,6 +479,7 @@ export class SheetwriteStore implements Store {
       effects.appliedPatches.length === effectiveTx.patches.length
         ? effectiveTx
         : { ...effectiveTx, patches: effects.appliedPatches };
+    setTransactionStorageRevision(transaction, effects.storageRevision);
     if (!hasListeners) {
       return {
         status: "applied",
@@ -510,8 +512,8 @@ export class SheetwriteStore implements Store {
     return () => this.listeners.delete(fn);
   }
 
-  acknowledgeOperations(operations: readonly DocumentOp[]): void {
-    this.engine.acknowledgeOperations(operations);
+  acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
+    this.engine.acknowledgeOperations(operations, storageRevision);
   }
 
   exportSnapshot(): WorkbookSnapshot {

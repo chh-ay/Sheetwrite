@@ -1695,6 +1695,7 @@ describe("paged datasource storage", () => {
       loadedCells: 0,
       dirtyCells: 0,
       allocatedBytes: 0,
+      dirtyAllocatedBytes: 0,
       fullyLoaded: false,
     });
     expect(store.getCellLoadState(addr(0, 0))).toBe("unloaded");

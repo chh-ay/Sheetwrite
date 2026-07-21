@@ -36,6 +36,8 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
     loadedCells: number;
     dirtyCells: number;
     allocatedBytes: number;
+    dirtyAllocatedBytes: number;
+    retainedBytes: number;
     fullyLoaded: boolean;
   }> = [
     {
@@ -45,6 +47,8 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
       loadedCells: 0,
       dirtyCells: 0,
       allocatedBytes: 0,
+      dirtyAllocatedBytes: 0,
+      retainedBytes: 0,
       fullyLoaded: false,
     },
     {
@@ -53,16 +57,20 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
       chunks: 5,
       loadedCells: 150,
       dirtyCells: 0,
-      allocatedBytes: 271_360,
+      allocatedBytes: 268_800,
+      dirtyAllocatedBytes: 0,
+      retainedBytes: 268_800,
       fullyLoaded: false,
     },
     {
-      scenario: "dirty",
+      scenario: "dirty-100",
       wasmDeltaBytes: 1024,
-      chunks: 15,
+      chunks: 0,
       loadedCells: 100,
       dirtyCells: 100,
-      allocatedBytes: 814_080,
+      allocatedBytes: 0,
+      dirtyAllocatedBytes: 4_000,
+      retainedBytes: 4_000,
       fullyLoaded: false,
     },
   ];
@@ -78,13 +86,14 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
     runs: 2,
     pageRows: 120,
     cacheBudgetBytes: 32 * 1024 * 1024,
+    chunkRows: 4096,
     denseLogicalBytes: PAGED_SMOKE_ROWS * 5 * (1 + 8 + 4),
     widePageColumns: 256,
     cacheChurnPages: 2048,
-    cacheChurnBudgetBytes: 34_816,
+    cacheChurnBudgetBytes: 30_720,
     cacheChurnRetainedChunks: 512,
     timings,
-    peakAllocatedBytes: 542_720,
+    peakAllocatedBytes: 537_600,
     peakChunks: 10,
     probes: typedProbes,
   };
@@ -96,13 +105,21 @@ function fullFixture(): PagedBenchmarkResult {
     samplesMs: [...samplesMs],
     stat: summarize(samplesMs),
   });
-  const probe = (scenario: PagedScenario, chunks: number, loadedCells: number, dirtyCells = 0) => ({
+  const probe = (
+    scenario: PagedScenario,
+    chunks: number,
+    loadedCells: number,
+    dirtyCells = 0,
+    dirtyAllocatedBytes = 0,
+  ) => ({
     scenario,
     wasmDeltaBytes: 65_536,
     chunks,
     loadedCells,
     dirtyCells,
-    allocatedBytes: chunks * 54_272,
+    allocatedBytes: chunks * 53_760,
+    dirtyAllocatedBytes,
+    retainedBytes: chunks * 53_760 + dirtyAllocatedBytes,
     fullyLoaded: false,
   });
   return {
@@ -114,10 +131,11 @@ function fullFixture(): PagedBenchmarkResult {
     runs: 12,
     pageRows: 120,
     cacheBudgetBytes: 32 * 1024 * 1024,
+    chunkRows: 4096,
     denseLogicalBytes: PAGED_FULL_ROWS * 5 * (1 + 8 + 4),
     widePageColumns: 256,
     cacheChurnPages: 2048,
-    cacheChurnBudgetBytes: 34_816,
+    cacheChurnBudgetBytes: 30_720,
     cacheChurnRetainedChunks: 512,
     timings: {
       startup: timing(),
@@ -126,7 +144,7 @@ function fullFixture(): PagedBenchmarkResult {
       "wide-page": timing(),
       "cache-churn": timing(),
     },
-    peakAllocatedBytes: 542_720,
+    peakAllocatedBytes: 537_600,
     peakChunks: 10,
     probes: [
       probe("empty", 0, 0),
@@ -134,8 +152,9 @@ function fullFixture(): PagedBenchmarkResult {
       probe("viewport", 5, 150),
       probe("scroll-1", 15, 50_000),
       probe("scroll-10", 125, 500_000),
-      probe("scroll-100", 618, 2_513_728),
-      probe("dirty", 100, 100, 100),
+      probe("scroll-100", 624, 2_538_304),
+      probe("dirty-100", 0, 100, 100, 4_000),
+      probe("dirty-10000", 0, 10_000, 10_000, 450_000),
     ],
   };
 }
@@ -151,7 +170,7 @@ describe("paged benchmark exact matrix", () => {
     const corrupted = {
       ...source,
       probes: source.probes.map((probe) =>
-        probe.scenario === "scroll-100" ? { ...probe, loadedCells: 2_513_727 } : probe,
+        probe.scenario === "scroll-100" ? { ...probe, loadedCells: 2_538_303 } : probe,
       ),
     };
     expect(() => validatePagedBenchmark(corrupted, "full")).toThrow(

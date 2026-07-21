@@ -94,9 +94,7 @@ struct CellChunk {
     payload: Vec<u64>,
     style: Vec<u32>,
     loaded: Vec<u64>,
-    dirty: Vec<u64>,
     last_access: Cell<u64>,
-    dirty_count: usize,
 }
 
 impl CellChunk {
@@ -107,9 +105,7 @@ impl CellChunk {
             payload: vec![0; rows],
             style: vec![0; rows],
             loaded: vec![0; words],
-            dirty: vec![0; words],
             last_access: Cell::new(last_access),
-            dirty_count: 0,
         }
     }
 
@@ -127,35 +123,41 @@ impl CellChunk {
         }
     }
 
-    fn has_dirty(&self) -> bool {
-        self.dirty_count != 0
-    }
-
-    fn set_dirty(&mut self, offset: usize, value: bool) {
-        let was_dirty = Self::bit(&self.dirty, offset);
-        if was_dirty == value {
-            return;
-        }
-        Self::set_bit(&mut self.dirty, offset, value);
-        if value {
-            self.dirty_count += 1;
-        } else {
-            self.dirty_count -= 1;
-        }
-    }
-
     fn byte_len(&self) -> usize {
         self.kind.len()
             + self.payload.len() * std::mem::size_of::<u64>()
             + self.style.len() * std::mem::size_of::<u32>()
-            + (self.loaded.len() + self.dirty.len()) * std::mem::size_of::<u64>()
+            + self.loaded.len() * std::mem::size_of::<u64>()
     }
 }
+
+#[derive(Clone, Copy)]
+struct DirtyCell {
+    payload: u64,
+    revision: u64,
+    style: u32,
+    revision_index: usize,
+    kind: u8,
+}
+
+struct StorageEntry {
+    row: usize,
+    col: usize,
+    kind: u8,
+    payload: u64,
+    style: u32,
+    dirty_revision: Option<u64>,
+}
+
+pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
 
 pub(crate) struct PagedStorage {
     chunk_rows: usize,
     byte_budget: usize,
+    max_dirty_cells: usize,
     chunks: HashMap<(usize, usize), CellChunk>,
+    dirty: HashMap<(usize, usize), DirtyCell>,
+    dirty_by_revision: HashMap<u64, Vec<(usize, usize)>>,
     pinned: HashSet<(usize, usize)>,
     evictable: RefCell<BTreeSet<(u64, usize, usize)>>,
     clock: Cell<u64>,
@@ -164,11 +166,14 @@ pub(crate) struct PagedStorage {
 }
 
 impl PagedStorage {
-    fn new(chunk_rows: usize, byte_budget: usize) -> Self {
+    fn new(chunk_rows: usize, byte_budget: usize, max_dirty_cells: usize) -> Self {
         Self {
             chunk_rows: chunk_rows.max(1).next_power_of_two(),
             byte_budget,
+            max_dirty_cells,
             chunks: HashMap::new(),
+            dirty: HashMap::new(),
+            dirty_by_revision: HashMap::new(),
             pinned: HashSet::new(),
             evictable: RefCell::new(BTreeSet::new()),
             clock: Cell::new(0),
@@ -185,7 +190,7 @@ impl PagedStorage {
         let words = self.chunk_rows.div_ceil(BITS_PER_WORD);
         self.chunk_rows
             * (std::mem::size_of::<u8>() + std::mem::size_of::<u64>() + std::mem::size_of::<u32>())
-            + words * std::mem::size_of::<u64>() * 2
+            + words * std::mem::size_of::<u64>()
     }
 
     fn next_access(&self) -> u64 {
@@ -198,7 +203,7 @@ impl PagedStorage {
         let Some(chunk) = self.chunks.get(&key) else {
             return;
         };
-        let eligible = !self.pinned.contains(&key) && !chunk.has_dirty();
+        let eligible = !self.pinned.contains(&key);
         let previous = chunk.last_access.get();
         let mut evictable = self.evictable.borrow_mut();
         if eligible {
@@ -242,7 +247,17 @@ impl PagedStorage {
         self.chunks.get_mut(&key).expect("inserted paged chunk")
     }
 
+    fn clean_loaded(&self, row: usize, col: usize) -> bool {
+        let (key, offset) = self.key_offset(row, col);
+        self.chunks
+            .get(&key)
+            .is_some_and(|chunk| CellChunk::bit(&chunk.loaded, offset))
+    }
+
     fn read(&self, row: usize, col: usize) -> (u8, u64, u32, bool, bool) {
+        if let Some(cell) = self.dirty.get(&(row, col)) {
+            return (cell.kind, cell.payload, cell.style, true, true);
+        }
         let (key, offset) = self.key_offset(row, col);
         let Some(chunk) = self.chunks.get(&key) else {
             return (KIND_EMPTY, 0, 0, false, false);
@@ -256,56 +271,204 @@ impl PagedStorage {
             chunk.payload[offset],
             chunk.style[offset],
             true,
-            CellChunk::bit(&chunk.dirty, offset),
+            false,
         )
     }
 
-    fn write(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32, dirty: bool) {
+    fn write_clean(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32) {
         let (key, offset) = self.key_offset(row, col);
-        let pinned = self.pinned.contains(&key);
-        let (became_dirty, access) = {
-            let chunk = self.ensure_chunk(key);
-            let was_dirty = chunk.has_dirty();
-            chunk.kind[offset] = kind;
-            chunk.payload[offset] = payload;
-            chunk.style[offset] = style;
-            CellChunk::set_bit(&mut chunk.loaded, offset, true);
-            if dirty {
-                chunk.set_dirty(offset, true);
-            }
-            (!was_dirty && chunk.has_dirty(), chunk.last_access.get())
-        };
-        if became_dirty && !pinned {
-            self.evictable.get_mut().remove(&(access, key.0, key.1));
-        }
+        let chunk = self.ensure_chunk(key);
+        chunk.kind[offset] = kind;
+        chunk.payload[offset] = payload;
+        chunk.style[offset] = style;
+        CellChunk::set_bit(&mut chunk.loaded, offset, true);
     }
 
-    fn hydrate(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32) -> bool {
-        let (key, offset) = self.key_offset(row, col);
-        if self
-            .chunks
-            .get(&key)
-            .is_some_and(|chunk| CellChunk::bit(&chunk.dirty, offset))
-        {
-            self.touch(key);
-            return false;
+    fn can_dirty_cell(&self, row: usize, col: usize) -> bool {
+        self.dirty.contains_key(&(row, col)) || self.dirty.len() < self.max_dirty_cells
+    }
+
+    fn can_dirty_rect(&self, r0: usize, c0: usize, rows: usize, cols: usize) -> bool {
+        let mut additional = 0usize;
+        for col in c0..c0 + cols {
+            for row in r0..r0 + rows {
+                if !self.dirty.contains_key(&(row, col)) {
+                    additional += 1;
+                    if self.dirty.len() + additional > self.max_dirty_cells {
+                        return false;
+                    }
+                }
+            }
         }
-        self.write(row, col, kind, payload, style, false);
         true
     }
 
-    fn mark_clean(&mut self, row: usize, col: usize) {
-        let (key, offset) = self.key_offset(row, col);
-        let pinned = self.pinned.contains(&key);
-        let became_clean = self.chunks.get_mut(&key).and_then(|chunk| {
-            let was_dirty = chunk.has_dirty();
-            chunk.set_dirty(offset, false);
-            (was_dirty && !chunk.has_dirty()).then_some(chunk.last_access.get())
-        });
-        if let Some(access) = became_clean {
-            if !pinned {
-                self.evictable.get_mut().insert((access, key.0, key.1));
+    fn reserve_revision_slot(&mut self, revision: u64, key: (usize, usize)) -> Option<usize> {
+        if !self.dirty_by_revision.contains_key(&revision)
+            && self.dirty_by_revision.try_reserve(1).is_err()
+        {
+            return None;
+        }
+        let slots = self.dirty_by_revision.entry(revision).or_default();
+        if slots.try_reserve(1).is_err() {
+            return None;
+        }
+        let index = slots.len();
+        slots.push(key);
+        Some(index)
+    }
+
+    fn remove_revision_slot(&mut self, revision: u64, index: usize) {
+        let Some(slots) = self.dirty_by_revision.get_mut(&revision) else {
+            return;
+        };
+        let moved = (index + 1 < slots.len()).then(|| slots[slots.len() - 1]);
+        slots.swap_remove(index);
+        let empty = slots.is_empty();
+        if let Some(moved) = moved {
+            if let Some(cell) = self.dirty.get_mut(&moved) {
+                cell.revision_index = index;
             }
+        }
+        if empty {
+            self.dirty_by_revision.remove(&revision);
+        }
+    }
+
+    fn write_dirty(
+        &mut self,
+        row: usize,
+        col: usize,
+        kind: u8,
+        payload: u64,
+        style: u32,
+        revision: u64,
+    ) -> bool {
+        debug_assert_ne!(revision, 0);
+        let key = (row, col);
+        if let Some(cell) = self.dirty.get(&key).copied() {
+            if cell.revision == revision {
+                self.dirty.insert(
+                    key,
+                    DirtyCell {
+                        payload,
+                        revision,
+                        revision_index: cell.revision_index,
+                        style,
+                        kind,
+                    },
+                );
+                return true;
+            }
+            let Some(revision_index) = self.reserve_revision_slot(revision, key) else {
+                return false;
+            };
+            self.remove_revision_slot(cell.revision, cell.revision_index);
+            self.dirty.insert(
+                key,
+                DirtyCell {
+                    payload,
+                    revision,
+                    revision_index,
+                    style,
+                    kind,
+                },
+            );
+            return true;
+        }
+        if self.dirty.len() >= self.max_dirty_cells || self.dirty.try_reserve(1).is_err() {
+            return false;
+        }
+        let Some(revision_index) = self.reserve_revision_slot(revision, key) else {
+            return false;
+        };
+        self.dirty.insert(
+            key,
+            DirtyCell {
+                payload,
+                revision,
+                revision_index,
+                style,
+                kind,
+            },
+        );
+        true
+    }
+
+    fn restore_dirty(
+        &mut self,
+        row: usize,
+        col: usize,
+        kind: u8,
+        payload: u64,
+        style: u32,
+        revision: u64,
+    ) -> bool {
+        self.write_dirty(row, col, kind, payload, style, revision)
+    }
+
+    fn write(
+        &mut self,
+        row: usize,
+        col: usize,
+        kind: u8,
+        payload: u64,
+        style: u32,
+        dirty_revision: Option<u64>,
+    ) -> bool {
+        if let Some(revision) = dirty_revision {
+            return self.write_dirty(row, col, kind, payload, style, revision);
+        }
+        if let Some(cell) = self.dirty.get_mut(&(row, col)) {
+            cell.kind = kind;
+            cell.payload = payload;
+            cell.style = style;
+        } else {
+            self.write_clean(row, col, kind, payload, style);
+        }
+        true
+    }
+
+    fn hydrate(&mut self, row: usize, col: usize, kind: u8, payload: u64, style: u32) -> bool {
+        if self.dirty.contains_key(&(row, col)) {
+            return false;
+        }
+        self.write_clean(row, col, kind, payload, style);
+        true
+    }
+
+    fn dirty_revision(&self, row: usize, col: usize) -> Option<u64> {
+        self.dirty.get(&(row, col)).map(|cell| cell.revision)
+    }
+
+    fn mark_clean(&mut self, row: usize, col: usize, revision: Option<u64>) -> bool {
+        let key = (row, col);
+        let Some(cell) = self.dirty.get(&key).copied() else {
+            return false;
+        };
+        if revision.is_some_and(|expected| expected != cell.revision) {
+            return false;
+        }
+        self.remove_revision_slot(cell.revision, cell.revision_index);
+        self.dirty.remove(&key);
+        self.write_clean(row, col, cell.kind, cell.payload, cell.style);
+        true
+    }
+
+    fn acknowledge_revision(&mut self, revision: u64) {
+        let Some(matches) = self.dirty_by_revision.remove(&revision) else {
+            return;
+        };
+        for (row, col) in matches {
+            let key = (row, col);
+            let Some(cell) = self.dirty.get(&key).copied() else {
+                continue;
+            };
+            if cell.revision != revision {
+                continue;
+            }
+            self.dirty.remove(&key);
+            self.write_clean(row, col, cell.kind, cell.payload, cell.style);
         }
     }
 
@@ -319,20 +482,16 @@ impl PagedStorage {
 
         for key in self.pinned.difference(&next) {
             if let Some(chunk) = self.chunks.get(key) {
-                if !chunk.has_dirty() {
-                    self.evictable
-                        .get_mut()
-                        .insert((chunk.last_access.get(), key.0, key.1));
-                }
+                self.evictable
+                    .get_mut()
+                    .insert((chunk.last_access.get(), key.0, key.1));
             }
         }
         for key in next.difference(&self.pinned) {
             if let Some(chunk) = self.chunks.get(key) {
-                if !chunk.has_dirty() {
-                    self.evictable
-                        .get_mut()
-                        .remove(&(chunk.last_access.get(), key.0, key.1));
-                }
+                self.evictable
+                    .get_mut()
+                    .remove(&(chunk.last_access.get(), key.0, key.1));
             }
         }
         self.pinned = next;
@@ -344,24 +503,36 @@ impl PagedStorage {
         }
     }
 
-    fn entries(&self) -> Vec<(usize, usize, u8, u64, u32, bool)> {
+    fn entries(&self) -> Vec<StorageEntry> {
         let mut entries = Vec::with_capacity(self.loaded_cells());
         for (&(col, chunk_index), chunk) in &self.chunks {
             for offset in 0..self.chunk_rows {
                 if !CellChunk::bit(&chunk.loaded, offset) {
                     continue;
                 }
-                entries.push((
-                    chunk_index * self.chunk_rows + offset,
+                let row = chunk_index * self.chunk_rows + offset;
+                if self.dirty.contains_key(&(row, col)) {
+                    continue;
+                }
+                entries.push(StorageEntry {
+                    row,
                     col,
-                    chunk.kind[offset],
-                    chunk.payload[offset],
-                    chunk.style[offset],
-                    CellChunk::bit(&chunk.dirty, offset),
-                ));
+                    kind: chunk.kind[offset],
+                    payload: chunk.payload[offset],
+                    style: chunk.style[offset],
+                    dirty_revision: None,
+                });
             }
         }
-        entries.sort_unstable_by_key(|entry| (entry.1, entry.0));
+        entries.extend(self.dirty.iter().map(|(&(row, col), cell)| StorageEntry {
+            row,
+            col,
+            kind: cell.kind,
+            payload: cell.payload,
+            style: cell.style,
+            dirty_revision: Some(cell.revision),
+        }));
+        entries.sort_unstable_by_key(|entry| (entry.col, entry.row));
         entries
     }
 
@@ -369,8 +540,26 @@ impl PagedStorage {
         self.chunks.values().map(CellChunk::byte_len).sum()
     }
 
+    fn dirty_byte_len(&self) -> usize {
+        let dirty_cells = self.dirty.capacity()
+            * (std::mem::size_of::<(usize, usize)>()
+                + std::mem::size_of::<DirtyCell>()
+                + std::mem::size_of::<u8>());
+        let revision_map = self.dirty_by_revision.capacity()
+            * (std::mem::size_of::<u64>()
+                + std::mem::size_of::<Vec<(usize, usize)>>()
+                + std::mem::size_of::<u8>());
+        let revision_cells = self
+            .dirty_by_revision
+            .values()
+            .map(|cells| cells.capacity() * std::mem::size_of::<(usize, usize)>())
+            .sum::<usize>();
+        dirty_cells + revision_map + revision_cells
+    }
+
     fn loaded_cells(&self) -> usize {
-        self.chunks
+        let clean = self
+            .chunks
             .values()
             .map(|chunk| {
                 chunk
@@ -379,11 +568,17 @@ impl PagedStorage {
                     .map(|word| word.count_ones() as usize)
                     .sum::<usize>()
             })
-            .sum()
+            .sum::<usize>();
+        clean
+            + self
+                .dirty
+                .keys()
+                .filter(|&&(row, col)| !self.clean_loaded(row, col))
+                .count()
     }
 
     fn dirty_cells(&self) -> usize {
-        self.chunks.values().map(|chunk| chunk.dirty_count).sum()
+        self.dirty.len()
     }
 }
 
@@ -463,6 +658,7 @@ impl SheetData {
         row_count: usize,
         chunk_rows: usize,
         byte_budget: usize,
+        max_dirty_cells: usize,
     ) -> Self {
         Self {
             n_cols,
@@ -470,7 +666,11 @@ impl SheetData {
             kind: Vec::new(),
             payload: Vec::new(),
             style: Vec::new(),
-            paged: Some(PagedStorage::new(chunk_rows, byte_budget)),
+            paged: Some(PagedStorage::new(
+                chunk_rows,
+                byte_budget,
+                max_dirty_cells,
+            )),
             formulas: HashMap::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -509,11 +709,12 @@ impl SheetData {
     pub(crate) fn set_kind(&mut self, index: usize, kind: u8) {
         if self.paged.is_some() {
             let (row, col) = self.coordinates(index);
-            let (_, payload, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
-            self.paged
+            let (_, payload, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
+            let _ = self
+                .paged
                 .as_mut()
                 .unwrap()
-                .write(row, col, kind, payload, style, dirty);
+                .write(row, col, kind, payload, style, None);
         } else {
             self.kind[index] = kind;
         }
@@ -522,20 +723,64 @@ impl SheetData {
     pub(crate) fn set_style(&mut self, index: usize, style: u32) {
         if self.paged.is_some() {
             let (row, col) = self.coordinates(index);
-            let (kind, payload, _, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
-            self.paged
+            let (kind, payload, _, _, _) = self.paged.as_ref().unwrap().read(row, col);
+            let _ = self
+                .paged
                 .as_mut()
                 .unwrap()
-                .write(row, col, kind, payload, style, dirty);
+                .write(row, col, kind, payload, style, None);
         } else {
             self.style[index] = style;
         }
     }
 
+    pub(crate) fn can_dirty_cell(&self, row: usize, col: usize) -> bool {
+        self.paged
+            .as_ref()
+            .is_none_or(|paged| paged.can_dirty_cell(row, col))
+    }
+
+    pub(crate) fn can_dirty_rect(
+        &self,
+        r0: usize,
+        c0: usize,
+        rows: usize,
+        cols: usize,
+    ) -> bool {
+        self.paged
+            .as_ref()
+            .is_none_or(|paged| paged.can_dirty_rect(r0, c0, rows, cols))
+    }
+
+    pub(crate) fn write_cell(
+        &mut self,
+        row: usize,
+        col: usize,
+        kind: u8,
+        payload: u64,
+        style: u32,
+        dirty_revision: Option<u64>,
+    ) -> bool {
+        if let Some(paged) = &mut self.paged {
+            return paged.write(row, col, kind, payload, style, dirty_revision);
+        }
+        let index = self.idx(row, col);
+        self.kind[index] = kind;
+        self.payload[index] = payload;
+        self.style[index] = style;
+        true
+    }
+
     pub(crate) fn mark_cell_loaded(&mut self, row: usize, col: usize, dirty: bool) {
         if let Some(paged) = &mut self.paged {
             let (kind, payload, style, _, was_dirty) = paged.read(row, col);
-            paged.write(row, col, kind, payload, style, dirty || was_dirty);
+            let revision = if dirty {
+                Some(paged.dirty_revision(row, col).unwrap_or(1))
+            } else {
+                None
+            };
+            let _ = paged.write(row, col, kind, payload, style, revision);
+            debug_assert!(!was_dirty || paged.dirty_revision(row, col).is_some());
         }
     }
 
@@ -569,6 +814,12 @@ impl SheetData {
             .is_some_and(|paged| paged.read(row, col).4)
     }
 
+    pub(crate) fn dirty_revision(&self, row: usize, col: usize) -> Option<u64> {
+        self.paged
+            .as_ref()
+            .and_then(|paged| paged.dirty_revision(row, col))
+    }
+
     pub(crate) fn mark_range_clean(
         &mut self,
         start_row: usize,
@@ -579,12 +830,29 @@ impl SheetData {
         if let Some(paged) = &mut self.paged {
             for col in start_col..end_col {
                 for row in start_row..end_row {
-                    paged.mark_clean(row, col);
+                    paged.mark_clean(row, col, None);
                 }
             }
         }
     }
 
+
+    pub(crate) fn mark_cell_clean_revision(
+        &mut self,
+        row: usize,
+        col: usize,
+        revision: u64,
+    ) -> bool {
+        self.paged
+            .as_mut()
+            .is_some_and(|paged| paged.mark_clean(row, col, Some(revision)))
+    }
+
+    pub(crate) fn acknowledge_revision(&mut self, revision: u64) {
+        if let Some(paged) = &mut self.paged {
+            paged.acknowledge_revision(revision);
+        }
+    }
     pub(crate) fn pin_range(&mut self, start_row: usize, end_row: usize, cols: &[u32]) {
         if let Some(paged) = &mut self.paged {
             if start_row < end_row {
@@ -593,13 +861,14 @@ impl SheetData {
         }
     }
 
-    pub(crate) fn paged_stats(&self) -> Option<(usize, usize, usize, usize)> {
+    pub(crate) fn paged_stats(&self) -> Option<(usize, usize, usize, usize, usize)> {
         self.paged.as_ref().map(|paged| {
             (
                 paged.chunks.len(),
                 paged.loaded_cells(),
                 paged.dirty_cells(),
                 paged.byte_len(),
+                paged.dirty_byte_len(),
             )
         })
     }
@@ -651,11 +920,12 @@ impl SheetData {
     pub(crate) fn set_num(&mut self, i: usize, value: f64) {
         if self.paged.is_some() {
             let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
-            self.paged
+            let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
+            let _ = self
+                .paged
                 .as_mut()
                 .unwrap()
-                .write(row, col, kind, encode_num(value), style, dirty);
+                .write(row, col, kind, encode_num(value), style, None);
         } else {
             self.payload[i] = encode_num(value);
         }
@@ -665,11 +935,12 @@ impl SheetData {
     pub(crate) fn set_str(&mut self, i: usize, id: u32) {
         if self.paged.is_some() {
             let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
-            self.paged
+            let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
+            let _ = self
+                .paged
                 .as_mut()
                 .unwrap()
-                .write(row, col, kind, encode_str_id(id), style, dirty);
+                .write(row, col, kind, encode_str_id(id), style, None);
         } else {
             self.payload[i] = encode_str_id(id);
         }
@@ -679,11 +950,12 @@ impl SheetData {
     pub(crate) fn clear_payload(&mut self, i: usize) {
         if self.paged.is_some() {
             let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, dirty) = self.paged.as_ref().unwrap().read(row, col);
-            self.paged
+            let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
+            let _ = self
+                .paged
                 .as_mut()
                 .unwrap()
-                .write(row, col, kind, 0, style, dirty);
+                .write(row, col, kind, 0, style, None);
         } else {
             self.payload[i] = 0;
         }
@@ -719,11 +991,33 @@ impl SheetData {
             return;
         };
         let entries = current.entries();
-        let mut next = PagedStorage::new(current.chunk_rows, current.byte_budget);
-        for (row, col, kind, payload, style, dirty) in entries {
-            if let Some((new_row, new_col)) = remap(row, col) {
+        let mut next = PagedStorage::new(
+            current.chunk_rows,
+            current.byte_budget,
+            current.max_dirty_cells,
+        );
+        for entry in entries {
+            if let Some((new_row, new_col)) = remap(entry.row, entry.col) {
                 if new_row < new_rows && new_col < new_cols {
-                    next.write(new_row, new_col, kind, payload, style, dirty);
+                    if let Some(revision) = entry.dirty_revision {
+                        let _ = next.restore_dirty(
+                            new_row,
+                            new_col,
+                            entry.kind,
+                            entry.payload,
+                            entry.style,
+                            revision,
+                        );
+                    } else {
+                        let _ = next.write(
+                            new_row,
+                            new_col,
+                            entry.kind,
+                            entry.payload,
+                            entry.style,
+                            None,
+                        );
+                    }
                 }
             }
         }
@@ -1103,62 +1397,107 @@ pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<Formul
 
 #[cfg(test)]
 mod paged_storage_tests {
-    use super::{PagedStorage, KIND_EMPTY};
+    use super::{PagedStorage, SheetData, KIND_EMPTY};
 
     #[test]
-    fn eviction_index_tracks_access_dirty_and_pin_transitions() {
-        let mut storage = PagedStorage::new(4, 2 * PagedStorage::new(4, 0).chunk_bytes());
-        storage.write(0, 0, KIND_EMPTY, 0, 0, false);
-        storage.write(4, 0, KIND_EMPTY, 0, 0, false);
+    fn clean_eviction_index_tracks_access_and_pin_transitions() {
+        let chunk_bytes = PagedStorage::new(4, 0, 100).chunk_bytes();
+        let mut storage = PagedStorage::new(4, 2 * chunk_bytes, 100);
+        assert!(storage.write(0, 0, KIND_EMPTY, 0, 0, None));
+        assert!(storage.write(4, 0, KIND_EMPTY, 0, 0, None));
         storage.read(0, 0);
-        storage.write(8, 0, KIND_EMPTY, 0, 0, false);
+        assert!(storage.write(8, 0, KIND_EMPTY, 0, 0, None));
         assert!(storage.chunks.contains_key(&(0, 0)));
         assert!(!storage.chunks.contains_key(&(0, 1)));
 
         storage.pin_range(0, 3, &[0]);
-        storage.write(12, 0, KIND_EMPTY, 0, 7, true);
-        storage.write(16, 0, KIND_EMPTY, 0, 0, false);
-        assert_eq!(storage.chunks.len(), 3);
+        assert!(storage.write(12, 0, KIND_EMPTY, 0, 7, Some(1)));
+        assert!(storage.write(16, 0, KIND_EMPTY, 0, 0, None));
+        assert_eq!(storage.chunks.len(), 2);
         assert!(storage.chunks.contains_key(&(0, 0)));
-        assert!(storage.chunks.contains_key(&(0, 3)));
+        assert_eq!(storage.read(12, 0), (KIND_EMPTY, 0, 7, true, true));
 
-        storage.mark_clean(12, 0);
         storage.pin_range(16, 19, &[0]);
-        storage.write(20, 0, KIND_EMPTY, 0, 0, false);
+        assert!(storage.write(20, 0, KIND_EMPTY, 0, 0, None));
         assert_eq!(storage.chunks.len(), 2);
         assert!(storage.chunks.contains_key(&(0, 4)));
         assert!(storage.chunks.contains_key(&(0, 5)));
+        assert_eq!(storage.dirty_cells(), 1);
+    }
+    #[test]
+    fn revision_index_cleans_only_cells_still_owned_by_the_acknowledged_write() {
+        let mut storage = PagedStorage::new(4, 0, 4);
+        assert!(storage.write(0, 0, KIND_EMPTY, 10, 0, Some(7)));
+        assert!(storage.write(4, 0, KIND_EMPTY, 20, 0, Some(7)));
+        assert!(storage.write(0, 0, KIND_EMPTY, 30, 0, Some(8)));
+
+        storage.acknowledge_revision(7);
+        assert_eq!(storage.read(4, 0), (KIND_EMPTY, 20, 0, true, false));
+        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 30, 0, true, true));
+        assert_eq!(storage.dirty_cells(), 1);
+
+        storage.acknowledge_revision(8);
+        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 30, 0, true, false));
+        assert_eq!(storage.dirty_cells(), 0);
     }
 
     #[test]
-    fn dirty_count_keeps_chunk_ineligible_until_its_last_dirty_cell_is_clean() {
-        let chunk_bytes = PagedStorage::new(4, 0).chunk_bytes();
-        let mut storage = PagedStorage::new(4, chunk_bytes);
-        storage.write(0, 0, KIND_EMPTY, 0, 0, true);
-        storage.write(1, 0, KIND_EMPTY, 0, 0, true);
-        assert_eq!(storage.dirty_cells(), 2);
+    fn structural_rebase_preserves_revision_ownership_at_the_moved_cell() {
+        let mut sheet = SheetData::new_paged(2, 8, 4, 0, 4);
+        assert!(sheet.write_cell(1, 0, KIND_EMPTY, 10, 0, Some(11)));
+        assert!(sheet.write_cell(3, 1, KIND_EMPTY, 20, 0, Some(12)));
 
-        storage.mark_clean(0, 0);
-        assert_eq!(storage.dirty_cells(), 1);
-        storage.write(4, 0, KIND_EMPTY, 0, 0, false);
-        assert!(storage.chunks.contains_key(&(0, 0)));
+        sheet.insert_rows(0, 0, 2);
+        sheet.insert_cols(0, 0, 1);
+        assert_eq!(sheet.paged.as_ref().unwrap().read(3, 1), (KIND_EMPTY, 10, 0, true, true));
+        assert_eq!(sheet.paged.as_ref().unwrap().read(5, 2), (KIND_EMPTY, 20, 0, true, true));
 
-        storage.mark_clean(1, 0);
-        assert_eq!(storage.dirty_cells(), 0);
-        storage.write(8, 0, KIND_EMPTY, 0, 0, false);
+        sheet.acknowledge_revision(11);
+        assert_eq!(sheet.paged.as_ref().unwrap().read(3, 1), (KIND_EMPTY, 10, 0, true, false));
+        assert_eq!(sheet.paged.as_ref().unwrap().read(5, 2), (KIND_EMPTY, 20, 0, true, true));
+        sheet.acknowledge_revision(12);
+        assert_eq!(sheet.paged.as_ref().unwrap().dirty_cells(), 0);
+    }
+
+
+    #[test]
+    fn dirty_overlay_precedes_hydration_survives_eviction_and_cleans_by_revision() {
+        let chunk_bytes = PagedStorage::new(4, 0, 2).chunk_bytes();
+        let mut storage = PagedStorage::new(4, chunk_bytes, 2);
+        assert!(storage.hydrate(0, 0, KIND_EMPTY, 10, 1));
+        assert!(storage.write(0, 0, KIND_EMPTY, 20, 2, Some(7)));
+        assert!(!storage.hydrate(0, 0, KIND_EMPTY, 30, 3));
+        assert!(storage.write(4, 0, KIND_EMPTY, 40, 4, None));
+        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 20, 2, true, true));
         assert_eq!(storage.chunks.len(), 1);
-        assert!(!storage.chunks.contains_key(&(0, 0)));
+        assert!(!storage.mark_clean(0, 0, Some(6)));
+        assert_eq!(storage.dirty_cells(), 1);
+        assert!(storage.mark_clean(0, 0, Some(7)));
+        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 20, 2, true, false));
+        assert_eq!(storage.dirty_cells(), 0);
+    }
+
+    #[test]
+    fn dirty_overlay_limit_fails_closed_without_changing_existing_cells() {
+        let mut storage = PagedStorage::new(4, 0, 2);
+        assert!(storage.write(0, 0, KIND_EMPTY, 1, 0, Some(1)));
+        assert!(storage.write(4, 0, KIND_EMPTY, 2, 0, Some(1)));
+        assert!(!storage.write(8, 0, KIND_EMPTY, 3, 0, Some(1)));
+        assert_eq!(storage.dirty_cells(), 2);
+        assert_eq!(storage.read(8, 0), (KIND_EMPTY, 0, 0, false, false));
+        assert!(storage.write(0, 0, KIND_EMPTY, 4, 0, Some(2)));
+        assert_eq!(storage.read(0, 0), (KIND_EMPTY, 4, 0, true, true));
     }
 
     #[test]
     fn cache_churn_examines_one_index_entry_per_eviction() {
         const RETAINED: usize = 8;
         const CHUNKS: usize = 10_000;
-        let chunk_bytes = PagedStorage::new(4, 0).chunk_bytes();
-        let mut storage = PagedStorage::new(4, RETAINED * chunk_bytes);
+        let chunk_bytes = PagedStorage::new(4, 0, 100).chunk_bytes();
+        let mut storage = PagedStorage::new(4, RETAINED * chunk_bytes, 100);
 
         for chunk in 0..CHUNKS {
-            storage.write(chunk * 4, 0, KIND_EMPTY, 0, 0, false);
+            assert!(storage.write(chunk * 4, 0, KIND_EMPTY, 0, 0, None));
         }
 
         assert_eq!(storage.chunks.len(), RETAINED);

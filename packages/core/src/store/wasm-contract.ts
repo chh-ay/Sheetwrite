@@ -80,10 +80,21 @@ export type RecomputingCellStore = CellStore & {
   snapshotNumbers(snapshot: RangeSnapshot): Float64Array;
   snapshotTexts(snapshot: RangeSnapshot): string[];
   restoreRange(sheet: number, r0: number, c0: number, snapshot: RangeSnapshot): boolean;
-  addPagedSheet(columns: number, rows: number, chunkRows: number, byteBudget: number): number;
+  addPagedSheet(
+    columns: number,
+    rows: number,
+    chunkRows: number,
+    byteBudget: number,
+    maxDirtyCells: number,
+  ): number;
   isPaged(sheet: number): boolean;
   pagedStats(sheet: number): Float64Array;
   cellState(sheet: number, row: number, col: number): number;
+  canDirtyCell(sheet: number, row: number, col: number): boolean;
+  dirtyRevision(sheet: number, row: number, col: number): bigint;
+  beginMutation(): bigint;
+  endMutation(): void;
+  acknowledgeRevision(revision: bigint): void;
   isFullyLoaded(sheet: number): boolean;
   rangeFullyLoaded(sheet: number, r0: number, c0: number, r1: number, c1: number): boolean;
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
@@ -113,6 +124,7 @@ export type RecomputingCellStore = CellStore & {
     startCol: number,
     endCol: number,
   ): void;
+  markCellCleanRevision(sheet: number, row: number, col: number, revision: bigint): boolean;
 };
 
 /** Consuming accessors transfer packed arrays out of one WASM window exactly once. */

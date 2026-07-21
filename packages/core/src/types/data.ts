@@ -47,6 +47,8 @@ export interface DataSourceStorageOptions {
   mode?: "dense" | "paged";
   /** Power-of-two row chunk size. Defaults to 4096. */
   chunkRows?: number;
-  /** Clean-chunk cache budget. Dirty and visible chunks may exceed it. */
+  /** Clean-chunk cache budget; sparse local edits are accounted separately. */
   cacheBytes?: number;
+  /** Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000. */
+  dirtyCellLimit?: number;
 }

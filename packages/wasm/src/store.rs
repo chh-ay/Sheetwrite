@@ -9,7 +9,7 @@ use crate::calc::{parse, resolve_named_ranges, resolve_sheet_refs, shift_range, 
 use crate::eval::DepIndex;
 use crate::sheet::{
     encode_num, encode_str_id, formula_error_at, payload_num, payload_str_id, CondPred, CondRule,
-    SheetData, DEFAULT_PAGE_CHUNK_ROWS,
+    SheetData, DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
 };
 use crate::types::{
     cell_key, string_from_pool, FormulaEntry, FormulaError, FormulaValueKind, StringPool,
@@ -142,6 +142,8 @@ pub struct CellStore {
     pub(crate) dep_index: Option<DepIndex>,
     loading_page: usize,
     named_ranges: HashMap<(Option<u32>, String), NamedRangeRef>,
+    mutation_revision: u64,
+    active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
 }
 
@@ -159,9 +161,29 @@ impl CellStore {
             formula_epoch: 0,
             dep_index: None,
             loading_page: 0,
+            mutation_revision: 0,
+            active_mutation_revision: None,
             named_ranges: HashMap::new(),
             volatile_serial: 0.0,
         }
+    }
+
+    fn next_mutation_revision(&mut self) -> u64 {
+        self.mutation_revision = self.mutation_revision.wrapping_add(1);
+        if self.mutation_revision == 0 {
+            self.mutation_revision = 1;
+        }
+        self.mutation_revision
+    }
+
+    fn local_dirty_revision(&mut self) -> Option<u64> {
+        if self.loading_page > 0 {
+            return None;
+        }
+        Some(
+            self.active_mutation_revision
+                .unwrap_or_else(|| self.next_mutation_revision()),
+        )
     }
     #[wasm_bindgen(js_name = snapshotNumbers)]
     pub fn snapshot_numbers(&self, snapshot: &RangeSnapshot) -> Vec<f64> {
@@ -202,6 +224,7 @@ impl CellStore {
         row_count: usize,
         chunk_rows: usize,
         byte_budget: usize,
+        max_dirty_cells: usize,
     ) -> usize {
         let index = self.sheets.len();
         self.sheets.push(SheetData::new_paged(
@@ -213,6 +236,11 @@ impl CellStore {
                 chunk_rows
             },
             byte_budget,
+            if max_dirty_cells == 0 {
+                DEFAULT_MAX_PAGED_DIRTY_CELLS
+            } else {
+                max_dirty_cells
+            },
         ));
         self.sheet_names.push(String::new());
         self.sheet_alive.push(true);
@@ -224,21 +252,22 @@ impl CellStore {
         self.sheets.get(sheet).is_some_and(SheetData::is_paged)
     }
 
-    /// `[chunks, loaded cells, dirty cells, allocated bytes, fully loaded]`.
+    /// `[chunks, loaded cells, dirty cells, clean chunk bytes, fully loaded, dirty bytes]`.
     #[wasm_bindgen(js_name = pagedStats)]
     pub fn paged_stats(&self, sheet: usize) -> Vec<f64> {
         let Some(data) = self.sheets.get(sheet) else {
-            return vec![0.0; 5];
+            return vec![0.0; 6];
         };
-        let Some((chunks, loaded, dirty, bytes)) = data.paged_stats() else {
-            return vec![0.0, 0.0, 0.0, 0.0, 1.0];
+        let Some((chunks, loaded, dirty, clean_bytes, dirty_bytes)) = data.paged_stats() else {
+            return vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         };
         vec![
             chunks as f64,
             loaded as f64,
             dirty as f64,
-            bytes as f64,
+            clean_bytes as f64,
             if data.is_fully_loaded() { 1.0 } else { 0.0 },
+            dirty_bytes as f64,
         ]
     }
 
@@ -258,6 +287,23 @@ impl CellStore {
         } else {
             2
         }
+    }
+
+    #[wasm_bindgen(js_name = canDirtyCell)]
+    pub fn can_dirty_cell(&self, sheet: usize, row: usize, col: usize) -> bool {
+        self.loading_page > 0
+            || self
+                .sheets
+                .get(sheet)
+                .is_some_and(|data| data.contains_cell(row, col) && data.can_dirty_cell(row, col))
+    }
+
+    #[wasm_bindgen(js_name = dirtyRevision)]
+    pub fn dirty_revision(&self, sheet: usize, row: usize, col: usize) -> u64 {
+        self.sheets
+            .get(sheet)
+            .and_then(|data| data.dirty_revision(row, col))
+            .unwrap_or(0)
     }
 
     #[wasm_bindgen(js_name = isFullyLoaded)]
@@ -295,11 +341,48 @@ impl CellStore {
         }
     }
 
+    #[wasm_bindgen(js_name = markCellCleanRevision)]
+    pub fn mark_cell_clean_revision(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        col: usize,
+        revision: u64,
+    ) -> bool {
+        revision != 0
+            && self
+                .sheets
+                .get_mut(sheet)
+                .is_some_and(|data| data.mark_cell_clean_revision(row, col, revision))
+    }
+
+    #[wasm_bindgen(js_name = acknowledgeRevision)]
+    pub fn acknowledge_revision(&mut self, revision: u64) {
+        if revision == 0 {
+            return;
+        }
+        for sheet in &mut self.sheets {
+            sheet.acknowledge_revision(revision);
+        }
+    }
+
     #[wasm_bindgen(js_name = pinRange)]
     pub fn pin_range(&mut self, sheet: usize, start_row: usize, end_row: usize, cols: &[u32]) {
         if let Some(data) = self.sheets.get_mut(sheet) {
             data.pin_range(start_row, end_row, cols);
         }
+    }
+
+    #[wasm_bindgen(js_name = beginMutation)]
+    pub fn begin_mutation(&mut self) -> u64 {
+        let revision = self.next_mutation_revision();
+        self.active_mutation_revision = Some(revision);
+        revision
+    }
+
+    #[wasm_bindgen(js_name = endMutation)]
+    pub fn end_mutation(&mut self) {
+        self.active_mutation_revision = None;
     }
 
     #[wasm_bindgen(js_name = beginPageLoad)]
@@ -434,20 +517,23 @@ impl CellStore {
         let Some(key) = cell_key(row, col) else {
             return;
         };
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let removed_formula = {
             let Some(s) = self.sheets.get_mut(sheet) else {
                 return;
             };
-            if !s.contains_cell(row, col) {
+            if !s.contains_cell(row, col)
+                || !s.write_cell(
+                    row,
+                    col,
+                    KIND_NUMBER,
+                    encode_num(value),
+                    style,
+                    dirty_revision,
+                )
+            {
                 return;
             }
-
-            let i = s.idx(row, col);
-            s.set_kind(i, KIND_NUMBER);
-            s.set_num(i, value);
-            s.set_style(i, style);
-            s.mark_cell_loaded(row, col, local_dirty);
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -462,19 +548,23 @@ impl CellStore {
         let Some(key) = cell_key(row, col) else {
             return;
         };
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let removed_formula = {
             let Some(s) = self.sheets.get_mut(sheet) else {
                 return;
             };
-            if !s.contains_cell(row, col) {
+            if !s.contains_cell(row, col)
+                || !s.write_cell(
+                    row,
+                    col,
+                    KIND_BOOL,
+                    encode_num(f64::from(value)),
+                    style,
+                    dirty_revision,
+                )
+            {
                 return;
             }
-            let i = s.idx(row, col);
-            s.set_kind(i, KIND_BOOL);
-            s.set_num(i, f64::from(value));
-            s.set_style(i, style);
-            s.mark_cell_loaded(row, col, local_dirty);
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -563,22 +653,29 @@ impl CellStore {
         let Some(key) = cell_key(row, col) else {
             return;
         };
+        let dirty_revision = self.local_dirty_revision();
         let Some(existing) = self.sheets.get(sheet) else {
             return;
         };
-        if !existing.contains_cell(row, col) {
+        if !existing.contains_cell(row, col)
+            || (dirty_revision.is_some() && !existing.can_dirty_cell(row, col))
+        {
             return;
         }
 
-        let local_dirty = self.loading_page == 0;
         let id = self.intern(value);
         let removed_formula = {
             let s = &mut self.sheets[sheet];
-            let i = s.idx(row, col);
-            s.set_kind(i, KIND_STRING);
-            s.set_str(i, id);
-            s.set_style(i, style);
-            s.mark_cell_loaded(row, col, local_dirty);
+            if !s.write_cell(
+                row,
+                col,
+                KIND_STRING,
+                encode_str_id(id),
+                style,
+                dirty_revision,
+            ) {
+                return;
+            }
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -593,20 +690,16 @@ impl CellStore {
         let Some(key) = cell_key(row, col) else {
             return;
         };
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let removed_formula = {
             let Some(s) = self.sheets.get_mut(sheet) else {
                 return;
             };
-            if !s.contains_cell(row, col) {
+            if !s.contains_cell(row, col)
+                || !s.write_cell(row, col, KIND_EMPTY, 0, style, dirty_revision)
+            {
                 return;
             }
-
-            let i = s.idx(row, col);
-            s.set_kind(i, KIND_EMPTY);
-            s.clear_payload(i);
-            s.set_style(i, style);
-            s.mark_cell_loaded(row, col, local_dirty);
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -634,6 +727,7 @@ impl CellStore {
         let Some(cell_count) = rows.checked_mul(cols) else {
             return false;
         };
+        let dirty_revision = self.local_dirty_revision();
         let Some(existing) = self.sheets.get(sheet) else {
             return false;
         };
@@ -649,6 +743,8 @@ impl CellStore {
             || start_col
                 .checked_add(cols)
                 .is_none_or(|end| end > existing.n_cols)
+            || (dirty_revision.is_some()
+                && !existing.can_dirty_rect(start_row, start_col, rows, cols))
         {
             return false;
         }
@@ -660,27 +756,28 @@ impl CellStore {
             }
         }
 
-        let local_dirty = self.loading_page == 0;
         let s = &mut self.sheets[sheet];
         let mut removed_formula = false;
         for col_offset in 0..cols {
             let col = start_col + col_offset;
-            let base = col * s.row_count + start_row;
             for row_offset in 0..rows {
                 let row = start_row + row_offset;
                 let offset = row_offset * cols + col_offset;
-                let index = base + row_offset;
-                s.set_kind(index, kinds[offset]);
-                match kinds[offset] {
-                    KIND_NUMBER | KIND_BOOL => s.set_num(index, numbers[offset]),
-                    KIND_STRING => s.set_str(index, string_ids[offset]),
-                    _ => {
-                        s.set_kind(index, KIND_EMPTY);
-                        s.clear_payload(index);
-                    }
+                let (kind, payload) = match kinds[offset] {
+                    KIND_NUMBER | KIND_BOOL => (kinds[offset], encode_num(numbers[offset])),
+                    KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
+                    _ => (KIND_EMPTY, 0),
+                };
+                if !s.write_cell(
+                    row,
+                    col,
+                    kind,
+                    payload,
+                    styles[offset],
+                    dirty_revision,
+                ) {
+                    return false;
                 }
-                s.set_style(index, styles[offset]);
-                s.mark_cell_loaded(row, col, local_dirty);
                 if let Some(key) = cell_key(row, col) {
                     removed_formula |= s.formulas.remove(&key).is_some();
                 }
@@ -706,32 +803,47 @@ impl CellStore {
         contents: bool,
         style: bool,
     ) -> bool {
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let Some(s) = self.sheets.get_mut(sheet) else {
             return false;
         };
-        if r0 > r1 || c0 > c1 || r1 >= s.row_count || c1 >= s.n_cols {
+        if r0 > r1
+            || c0 > c1
+            || r1 >= s.row_count
+            || c1 >= s.n_cols
+            || (dirty_revision.is_some()
+                && !s.can_dirty_rect(r0, c0, r1 - r0 + 1, c1 - c0 + 1))
+        {
             return false;
         }
         let mut removed_formula = false;
         for col in c0..=c1 {
-            let base = col * s.row_count;
             for row in r0..=r1 {
-                let index = base + row;
                 if s.is_paged() && !s.is_loaded(row, col) {
                     continue;
                 }
+                let index = s.idx(row, col);
+                let kind = if contents {
+                    KIND_EMPTY
+                } else {
+                    s.kind_at(index)
+                };
+                let payload = if contents {
+                    0
+                } else if s.str_id_at(index) != NO_STRING {
+                    encode_str_id(s.str_id_at(index))
+                } else {
+                    encode_num(s.num_at(index))
+                };
+                let next_style = if style { 0 } else { s.style_at(index) };
+                if !s.write_cell(row, col, kind, payload, next_style, dirty_revision) {
+                    return false;
+                }
                 if contents {
-                    s.set_kind(index, KIND_EMPTY);
-                    s.clear_payload(index);
                     if let Some(key) = cell_key(row, col) {
                         removed_formula |= s.formulas.remove(&key).is_some();
                     }
                 }
-                if style {
-                    s.set_style(index, 0);
-                }
-                s.mark_cell_loaded(row, col, local_dirty);
             }
         }
         s.clear_dirty();
@@ -784,7 +896,7 @@ impl CellStore {
         old_ids: &[u32],
         new_ids: &[u32],
     ) -> bool {
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let Some(s) = self.sheets.get_mut(sheet) else {
             return false;
         };
@@ -793,6 +905,8 @@ impl CellStore {
             || r1 >= s.row_count
             || c1 >= s.n_cols
             || old_ids.len() != new_ids.len()
+            || (dirty_revision.is_some()
+                && !s.can_dirty_rect(r0, c0, r1 - r0 + 1, c1 - c0 + 1))
         {
             return false;
         }
@@ -802,15 +916,23 @@ impl CellStore {
             .zip(new_ids.iter().copied())
             .collect();
         for col in c0..=c1 {
-            let base = col * s.row_count;
             for row in r0..=r1 {
                 if !s.is_loaded(row, col) {
                     continue;
                 }
-                let old_style = s.style_at(base + row);
-                if let Some(new_style) = mapping.get(&old_style) {
-                    s.set_style(base + row, *new_style);
-                    s.mark_cell_loaded(row, col, local_dirty);
+                let index = s.idx(row, col);
+                let old_style = s.style_at(index);
+                let Some(&new_style) = mapping.get(&old_style) else {
+                    continue;
+                };
+                let kind = s.kind_at(index);
+                let payload = if s.str_id_at(index) != NO_STRING {
+                    encode_str_id(s.str_id_at(index))
+                } else {
+                    encode_num(s.num_at(index))
+                };
+                if !s.write_cell(row, col, kind, payload, new_style, dirty_revision) {
+                    return false;
                 }
             }
         }
@@ -882,7 +1004,7 @@ impl CellStore {
         c0: usize,
         snapshot: &RangeSnapshot,
     ) -> bool {
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let Some(s) = self.sheets.get_mut(sheet) else {
             return false;
         };
@@ -892,6 +1014,8 @@ impl CellStore {
             || c0
                 .checked_add(snapshot.cols)
                 .is_none_or(|end| end > s.n_cols)
+            || (dirty_revision.is_some()
+                && !s.can_dirty_rect(r0, c0, snapshot.rows, snapshot.cols))
         {
             return false;
         }
@@ -905,18 +1029,16 @@ impl CellStore {
             let col = c0 + col_offset;
             for row_offset in 0..snapshot.rows {
                 let row = r0 + row_offset;
-                let target = s.idx(row, col);
-                s.set_kind(target, snapshot.kind[source + row_offset]);
-                if payload_str_id(snapshot.payload[source + row_offset]) != NO_STRING {
-                    s.set_str(
-                        target,
-                        payload_str_id(snapshot.payload[source + row_offset]),
-                    );
-                } else {
-                    s.set_num(target, payload_num(snapshot.payload[source + row_offset]));
+                if !s.write_cell(
+                    row,
+                    col,
+                    snapshot.kind[source + row_offset],
+                    snapshot.payload[source + row_offset],
+                    snapshot.style[source + row_offset],
+                    dirty_revision,
+                ) {
+                    return false;
                 }
-                s.set_style(target, snapshot.style[source + row_offset]);
-                s.mark_cell_loaded(row, col, local_dirty);
             }
         }
         for (row, col, entry) in &snapshot.formulas {
@@ -1049,7 +1171,7 @@ impl CellStore {
         values: &[f64],
         style: u32,
     ) {
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let removed_formula = {
             let Some(s) = self.sheets.get_mut(sheet) else {
                 return;
@@ -1059,18 +1181,25 @@ impl CellStore {
             }
 
             let limit = values.len().min(s.row_count - start_row);
-            let base = col * s.row_count;
+            if dirty_revision.is_some() && !s.can_dirty_rect(start_row, col, limit, 1) {
+                return;
+            }
             let mut removed_formula = false;
             for (offset, &value) in values.iter().take(limit).enumerate() {
                 let row = start_row + offset;
                 let Some(key) = cell_key(row, col) else {
                     continue;
                 };
-                let i = base + row;
-                s.set_kind(i, KIND_NUMBER);
-                s.set_num(i, value);
-                s.set_style(i, style);
-                s.mark_cell_loaded(row, col, local_dirty);
+                if !s.write_cell(
+                    row,
+                    col,
+                    KIND_NUMBER,
+                    encode_num(value),
+                    style,
+                    dirty_revision,
+                ) {
+                    return;
+                }
                 removed_formula |= s.formulas.remove(&key).is_some();
             }
             if limit > 0 {
@@ -1093,7 +1222,7 @@ impl CellStore {
         values: Vec<String>,
         style: u32,
     ) {
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let Some(existing) = self.sheets.get(sheet) else {
             return;
         };
@@ -1101,11 +1230,11 @@ impl CellStore {
             return;
         }
 
-        let row_count = existing.row_count;
-        let limit = values.len().min(row_count - start_row);
-        let base = col * row_count;
+        let limit = values.len().min(existing.row_count - start_row);
+        if dirty_revision.is_some() && !existing.can_dirty_rect(start_row, col, limit, 1) {
+            return;
+        }
         let mut removed_formula = false;
-
         for (offset, value) in values.into_iter().take(limit).enumerate() {
             let row = start_row + offset;
             let Some(key) = cell_key(row, col) else {
@@ -1113,11 +1242,16 @@ impl CellStore {
             };
             let id = self.intern(&value);
             let s = &mut self.sheets[sheet];
-            let i = base + row;
-            s.set_kind(i, KIND_STRING);
-            s.set_str(i, id);
-            s.set_style(i, style);
-            s.mark_cell_loaded(row, col, local_dirty);
+            if !s.write_cell(
+                row,
+                col,
+                KIND_STRING,
+                encode_str_id(id),
+                style,
+                dirty_revision,
+            ) {
+                return;
+            }
             removed_formula |= s.formulas.remove(&key).is_some();
         }
         if limit > 0 {
@@ -1142,7 +1276,7 @@ impl CellStore {
         utf16_lens: &[u32],
         style: u32,
     ) {
-        let local_dirty = self.loading_page == 0;
+        let dirty_revision = self.local_dirty_revision();
         let Some(existing) = self.sheets.get(sheet) else {
             return;
         };
@@ -1150,10 +1284,10 @@ impl CellStore {
             return;
         }
 
-        let row_count = existing.row_count;
-        let limit = utf16_lens.len().min(row_count - start_row);
-        let base = col * row_count;
-
+        let limit = utf16_lens.len().min(existing.row_count - start_row);
+        if dirty_revision.is_some() && !existing.can_dirty_rect(start_row, col, limit, 1) {
+            return;
+        }
         let slices = utf16_slices(&buf, utf16_lens, limit);
 
         let mut removed_formula = false;
@@ -1164,11 +1298,16 @@ impl CellStore {
             };
             let id = self.intern(text);
             let s = &mut self.sheets[sheet];
-            let i = base + row;
-            s.set_kind(i, KIND_STRING);
-            s.set_str(i, id);
-            s.set_style(i, style);
-            s.mark_cell_loaded(row, col, local_dirty);
+            if !s.write_cell(
+                row,
+                col,
+                KIND_STRING,
+                encode_str_id(id),
+                style,
+                dirty_revision,
+            ) {
+                return;
+            }
             removed_formula |= s.formulas.remove(&key).is_some();
         }
         if limit > 0 {
@@ -1408,31 +1547,34 @@ impl CellStore {
         let Some(key) = cell_key(row, col) else {
             return f64::NAN;
         };
+        let dirty_revision = self.local_dirty_revision();
         let Some(s) = self.sheets.get(sheet) else {
             return f64::NAN;
         };
-        if !s.contains_cell(row, col) {
+        if !s.contains_cell(row, col)
+            || (dirty_revision.is_some() && !s.can_dirty_cell(row, col))
+        {
             return f64::NAN;
         }
 
         let entry = self.parse_formula_entry(src, sheet as u32);
-        let local_dirty = self.loading_page == 0;
-
         let cached_value = {
             let s = &mut self.sheets[sheet];
-            let i = s.idx(row, col);
-            s.set_kind(i, KIND_FORMULA);
-            // A formula keeps the previous numeric cached value until the
-            // barrier recompute; a previous string payload reads as 0.0,
-            // matching the old zeroed `num` slot.
             let carried = if entry.error.is_some() {
                 0.0
             } else {
-                s.num_at(i)
+                s.num_at(s.idx(row, col))
             };
-            s.set_num(i, carried);
-            s.set_style(i, style);
-            s.mark_cell_loaded(row, col, local_dirty);
+            if !s.write_cell(
+                row,
+                col,
+                KIND_FORMULA,
+                encode_num(carried),
+                style,
+                dirty_revision,
+            ) {
+                return f64::NAN;
+            }
             s.formulas.insert(key, entry);
             s.dirty_cells.insert(key);
             carried

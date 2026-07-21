@@ -7,6 +7,7 @@ import { boundedJsonByteLength, JsonByteLengthError } from "./json-byte-length.j
 import {
   type GridTransactionAdmissionDecision,
   registerGridTransactionAdmission,
+  transactionStorageRevision,
 } from "./transaction-admission.js";
 import type { DocumentOp, MutationIssue, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -239,6 +240,7 @@ let nextMutation = 1;
  */
 export class SyncCoordinator {
   private readonly records = new Map<string, SyncMutationRecord>();
+  private readonly recordStorageRevisions = new Map<string, bigint>();
   private readonly recordBytes = new Map<string, number>();
   private readonly localReservations: LocalPendingReservation[] = [];
   private readonly order: string[] = [];
@@ -582,7 +584,10 @@ export class SyncCoordinator {
         throw error;
       }
     }
-    this.grid.store.acknowledgeOperations?.(record.operations);
+    this.grid.store.acknowledgeOperations?.(
+      record.operations,
+      this.recordStorageRevisions.get(record.clientMutationId),
+    );
 
     const storage = this.options.pendingStorage;
     if (storage) {
@@ -607,6 +612,7 @@ export class SyncCoordinator {
     this.pendingOperationTotal -= record.operations.length;
     this.pendingEncodedByteTotal -= encodedBytes;
     this.recordBytes.delete(id);
+    this.recordStorageRevisions.delete(id);
     this.records.delete(id);
     const index = this.order.indexOf(id);
     if (index >= 0) this.order.splice(index, 1);
@@ -744,6 +750,7 @@ export class SyncCoordinator {
     this.activeSends.clear();
     this.clearGapBuffer();
     this.records.clear();
+    this.recordStorageRevisions.clear();
     this.recordBytes.clear();
     this.order.length = 0;
     this.localReservations.length = 0;
@@ -859,6 +866,7 @@ export class SyncCoordinator {
             reservation.status = "cancelled";
           } else {
             reservation.status = "applied";
+            reservation.storageRevision = transactionStorageRevision(outcome.transaction);
             reservation.appliedOperations = immutableOperations(outcome.transaction.patches);
             reservation.appliedEncodedBytes = boundedJsonByteLength(
               reservation.appliedOperations,
@@ -894,6 +902,9 @@ export class SyncCoordinator {
         status: this.options.pendingStorage ? "persisting" : "pending",
       };
       this.records.set(record.clientMutationId, record);
+      if (reservation.storageRevision !== undefined) {
+        this.recordStorageRevisions.set(record.clientMutationId, reservation.storageRevision);
+      }
       this.recordBytes.set(record.clientMutationId, encodedBytes);
       this.order.push(record.clientMutationId);
 
@@ -1388,6 +1399,7 @@ interface LocalPendingReservation {
   encodedBytes: number;
   appliedOperations?: readonly DocumentOp[];
   appliedEncodedBytes?: number;
+  storageRevision?: bigint;
 }
 
 interface BufferedVersionedOperation {

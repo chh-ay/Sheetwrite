@@ -57,6 +57,7 @@ export function createGridFromSnapshot(
       storage: gridOptions.datasourceStorage?.mode ?? "dense",
       chunkRows: gridOptions.datasourceStorage?.chunkRows,
       cacheBytes: gridOptions.datasourceStorage?.cacheBytes,
+      dirtyCellLimit: gridOptions.datasourceStorage?.dirtyCellLimit,
       protectionResolver: gridOptions.protectionResolver,
       mutationPolicy: gridOptions.mutationPolicy,
       snapshotResourceLimits,

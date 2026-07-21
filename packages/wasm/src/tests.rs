@@ -87,7 +87,7 @@ fn sheet_resize_rows_preserves_overlap_and_drops_oob_formulas() {
     assert_eq!(sheet.row_count, 2);
     assert!(!sheet.formulas.contains_key(&(2, 1)));
 
-    let mut paged = SheetData::new_paged(2, 3, 2, 1_000_000);
+    let mut paged = SheetData::new_paged(2, 3, 2, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     let paged_index = paged.idx(2, 1);
     paged.set_kind(paged_index, KIND_NUMBER);
     paged.set_num(paged_index, 24.0);
@@ -131,7 +131,7 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     dense.clear_dirty();
     assert!(dense.dirty_cells.is_empty());
 
-    let mut paged = SheetData::new_paged(2, 2, 1, 0);
+    let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     assert!(!paged.is_fully_loaded());
     assert!(!paged.range_fully_loaded(0, 0, 1, 1));
     for col in 0..2 {
@@ -152,7 +152,7 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
 #[test]
 fn page_hydration_preserves_dirty_and_explicitly_protected_cells() {
     let mut store = CellStore::new();
-    let sheet = store.add_paged_sheet(1, 3, 4, 1024);
+    let sheet = store.add_paged_sheet(1, 3, 4, 1024, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.set_number(sheet, 0, 0, 10.0, 7);
     store.set_formula(sheet, 1, 0, "=1+1", 9);
     store.mark_range_clean(sheet, 1, 2, 0, 1);
@@ -1909,7 +1909,7 @@ fn range_style_remap_bounds_output_by_distinct_ids_and_rejects_invalid_tables() 
 #[test]
 fn range_style_remap_scans_only_loaded_paged_cells() {
     let mut store = CellStore::new();
-    let sheet = store.add_paged_sheet(2, 8, 4, 1_000_000);
+    let sheet = store.add_paged_sheet(2, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.begin_page_load();
     store.set_number(sheet, 3, 1, 12.0, 9);
     store.end_page_load();
@@ -1990,7 +1990,7 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
 #[test]
 fn public_store_lifecycle_metadata_preserves_paged_and_named_range_state() {
     let mut store = CellStore::default();
-    let sheet = store.add_paged_sheet(2, 4, 0, 1_000_000);
+    let sheet = store.add_paged_sheet(2, 4, 0, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.set_sheet_name(sheet, "sheet-1", "Sheet 1");
 
     assert_eq!(store.cell_state(sheet, 0, 0), 0);
@@ -2020,8 +2020,8 @@ fn public_store_lifecycle_metadata_preserves_paged_and_named_range_state() {
 #[test]
 fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
     let mut store = CellStore::new();
-    let sheet = store.add_paged_sheet(1, 1_000_000, 4096, 110_000);
-    assert_eq!(store.paged_stats(sheet), vec![0.0, 0.0, 0.0, 0.0, 0.0]);
+    let sheet = store.add_paged_sheet(1, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    assert_eq!(store.paged_stats(sheet), vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     assert_eq!(store.cell_state(sheet, 0, 0), 0);
     assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#LOADING!"));
 
@@ -2034,8 +2034,8 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
     assert_eq!(loaded[1], 2.0);
     assert_eq!(loaded[2], 0.0);
 
-    // A local edit dirties and pins chunk 0. Loading two more clean chunks
-    // evicts the older clean chunk, never the dirty edit.
+    // A local edit moves into the sparse overlay. Loading two more clean chunks
+    // evicts the older clean chunk without affecting the local edit.
     store.set_number(sheet, 0, 0, 10.0, 0);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 8192, &[3.0], 0);
@@ -2054,7 +2054,7 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
 #[test]
 fn paged_formulas_propagate_loading_until_dependencies_arrive() {
     let mut store = CellStore::new();
-    let sheet = store.add_paged_sheet(2, 6000, 4096, 1_000_000);
+    let sheet = store.add_paged_sheet(2, 6000, 4096, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.set_formula(sheet, 0, 1, "=A5001+1", 0);
     store.recompute(sheet);
     assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("#LOADING!"));
@@ -2069,7 +2069,7 @@ fn paged_formulas_propagate_loading_until_dependencies_arrive() {
 #[test]
 fn fully_loaded_paged_queries_match_dense_query_semantics() {
     let mut store = CellStore::new();
-    let sheet = store.add_paged_sheet(2, 3, 4, 1_000_000);
+    let sheet = store.add_paged_sheet(2, 3, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 0, &[3.0, 1.0, 2.0], 0);
     store.set_column_strings(
@@ -2095,7 +2095,7 @@ fn fully_loaded_paged_queries_match_dense_query_semantics() {
 #[test]
 fn paged_structural_edits_remap_loaded_cells_without_dense_allocation() {
     let mut store = CellStore::new();
-    let sheet = store.add_paged_sheet(2, 6, 4, 1_000_000);
+    let sheet = store.add_paged_sheet(2, 6, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 0);
     store.set_column_strings(

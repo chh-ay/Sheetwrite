@@ -96,6 +96,8 @@ export interface PagedStoreStats {
   loadedCells: number;
   dirtyCells: number;
   allocatedBytes: number;
+  /** Sparse local-edit overlay bytes, excluded from the clean chunk cache budget. */
+  dirtyAllocatedBytes: number;
   fullyLoaded: boolean;
 }
 
@@ -171,8 +173,8 @@ export interface Store {
   queryCapability?(sheet: SheetId): QueryCapability;
   /** Loaded/empty/local state; dense stores always return a loaded state. */
   getCellLoadState?(addr: CellAddress): CellLoadState;
-  /** Release paged dirty pins after server acknowledgement. */
-  acknowledgeOperations?(operations: readonly DocumentOp[]): void;
+  /** Release sparse paged edits after server acknowledgement. */
+  acknowledgeOperations?(operations: readonly DocumentOp[], storageRevision?: bigint): void;
   /** Deterministic, JSON-safe authoritative runtime document. */
   exportSnapshot?(): WorkbookSnapshot;
   /** Displayed row count after any active sort/filter view. */

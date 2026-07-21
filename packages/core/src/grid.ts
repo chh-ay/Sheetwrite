@@ -457,6 +457,7 @@ export class GridImpl implements Grid {
         storage: opts.datasourceStorage?.mode ?? "dense",
         chunkRows: opts.datasourceStorage?.chunkRows,
         cacheBytes: opts.datasourceStorage?.cacheBytes,
+        dirtyCellLimit: opts.datasourceStorage?.dirtyCellLimit,
         protectionResolver: opts.protectionResolver,
         mutationPolicy: opts.mutationPolicy,
         transactionResourceLimits: this.transactionResourceLimits,

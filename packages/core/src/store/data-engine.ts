@@ -72,6 +72,7 @@ const KIND_FORMULA = 4;
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
 const DEFAULT_PAGED_CACHE_BYTES = 32 * 1024 * 1024;
+const DEFAULT_PAGED_DIRTY_CELL_LIMIT = 1_000_000;
 const EMPTY_U32 = new Uint32Array(0);
 
 /** Store-local compact history resource. Never serialize `resource`. */
@@ -101,6 +102,7 @@ export interface SheetwriteStoreOptions {
   storage?: "dense" | "paged";
   chunkRows?: number;
   cacheBytes?: number;
+  dirtyCellLimit?: number;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
 }
@@ -119,6 +121,7 @@ export class IncompleteDataError extends Error {
 export interface StoreDataEngineEffects {
   readonly appliedPatches: DocumentOp[];
   readonly changes: ChangeEvent["changes"] | null;
+  readonly storageRevision: bigint;
 }
 
 function literalOf(value: CellScalar): CellValue {
@@ -246,6 +249,7 @@ export class StoreDataEngine {
           rows,
           this.storageOptions.chunkRows ?? 4096,
           this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES,
+          this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
         )
       : this.wasm.addSheet(columns, rows);
   }
@@ -261,6 +265,7 @@ export class StoreDataEngine {
       loadedCells: stats[1] ?? 0,
       dirtyCells: stats[2] ?? 0,
       allocatedBytes: stats[3] ?? 0,
+      dirtyAllocatedBytes: stats[5] ?? 0,
       fullyLoaded: stats[4] === 1,
     };
   }
@@ -739,6 +744,7 @@ export class StoreDataEngine {
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
+    const storageRevision = remoteLoad ? 0n : this.wasm.beginMutation();
     const touchedSheets = new Set<SheetId>();
     let hasStructuralPatch = false;
 
@@ -747,7 +753,6 @@ export class StoreDataEngine {
       for (const patch of patches) {
         if (!this.applyPatch(patch, changes)) continue;
         appliedPatches.push(patch);
-
         if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
         else if (
           patch.op === "setRange" ||
@@ -779,9 +784,10 @@ export class StoreDataEngine {
       }
     } finally {
       if (remoteLoad) this.wasm.endPageLoad();
+      else this.wasm.endMutation();
     }
 
-    if (appliedPatches.length === 0) return { appliedPatches, changes };
+    if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
     this.rangeMutationStats.documentOperations += appliedPatches.length;
     this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
 
@@ -800,7 +806,7 @@ export class StoreDataEngine {
     if (this.refs.hasRefs()) {
       this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
     }
-    return { appliedPatches, changes };
+    return { appliedPatches, changes, storageRevision };
   }
 
   private applyPatch(patch: DocumentOp, changes: ChangeEvent["changes"] | null): boolean {
@@ -1952,7 +1958,11 @@ export class StoreDataEngine {
     for (const [key, src] of next) this.formulaSrc.set(key, src);
   }
 
-  acknowledgeOperations(operations: readonly DocumentOp[]): void {
+  acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
+    if (storageRevision !== undefined && storageRevision !== 0n) {
+      this.wasm.acknowledgeRevision(storageRevision);
+      return;
+    }
     for (const operation of operations) {
       if (operation.op === "set") {
         this.wasm.markRangeClean(
