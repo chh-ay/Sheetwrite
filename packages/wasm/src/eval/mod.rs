@@ -287,12 +287,14 @@ impl CellStore {
         let matrix = match result {
             Ok(matrix) => matrix,
             Err(error) => {
+                self.sheets[sheet].spill_ranges.remove(&local);
                 self.sheets[sheet].compact_spill_metadata();
                 memo.insert(key, Value::Error(error));
                 return Vec::new();
             }
         };
         let Some(range) = SpillRange::new(local, matrix.rows, matrix.cols) else {
+            self.sheets[sheet].spill_ranges.remove(&local);
             self.sheets[sheet].compact_spill_metadata();
             memo.insert(key, Value::Error(FormulaError::Num));
             return Vec::new();

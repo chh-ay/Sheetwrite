@@ -428,6 +428,10 @@ fn blocked_spills_retry_when_an_unrelated_spill_shrinks() {
         [0, 1, 2].map(|col| number(&store, sheet, 2, col)),
         [13.0, 14.0, 15.0]
     );
+    store.set_bool(sheet, 0, 7, false, 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("#CALC!"));
+    assert!(!store.sheets[sheet].spill_ranges.contains_key(&(0, 1)));
 }
 
 #[test]
