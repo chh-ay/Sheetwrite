@@ -31,7 +31,7 @@ export type TransactionResourceValidationResult =
     }
   | {
       ok: false;
-      issue: Extract<MutationIssue, { kind: "resource-limit" }>;
+      issue: Extract<MutationIssue, { kind: "resource-limit" } | { kind: "invalid-operation" }>;
     };
 
 const TRANSACTION_RESOURCE_KEYS = [
@@ -94,17 +94,30 @@ export function validateTransactionResources(
       }),
     };
   } catch (error) {
-    if (!(error instanceof JsonByteLengthError) || error.code !== "limit") throw error;
-    const actual = error.actual ?? limits.maxEncodedBytes + 1;
+    if (error instanceof JsonByteLengthError && error.code === "limit") {
+      const actual = error.actual ?? limits.maxEncodedBytes + 1;
+      return {
+        ok: false,
+        issue: {
+          kind: "resource-limit",
+          severity: "error",
+          resource: "encoded-bytes",
+          actual,
+          max: limits.maxEncodedBytes,
+          message: `Transaction encoded operation payload exceeds maximum ${limits.maxEncodedBytes} bytes (${actual} bytes observed)`,
+        },
+      };
+    }
     return {
       ok: false,
       issue: {
-        kind: "resource-limit",
+        kind: "invalid-operation",
         severity: "error",
-        resource: "encoded-bytes",
-        actual,
-        max: limits.maxEncodedBytes,
-        message: `Transaction encoded operation payload exceeds maximum ${limits.maxEncodedBytes} bytes (${actual} bytes observed)`,
+        operationIndex: 0,
+        message:
+          error instanceof Error
+            ? `Transaction operations must be JSON-safe: ${error.message}`
+            : "Transaction operations must be JSON-safe",
       },
     };
   }
@@ -1405,7 +1418,9 @@ export function validateDocumentOperationShape(
     case "setRange": {
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const cells = arrayAt(ownValue(operation, "cells"), `${path}.cells`, errors);
-      cells?.forEach((cell, index) => validateOperationCell(cell, `${path}.cells[${index}]`, errors));
+      cells?.forEach((cell, index) =>
+        validateOperationCell(cell, `${path}.cells[${index}]`, errors),
+      );
       break;
     }
     case "setBlock": {
@@ -1607,7 +1622,11 @@ export function validateDocumentOperationShape(
       if (conditionalFormats !== undefined) {
         const entries = arrayAt(conditionalFormats, `${patchPath}.conditionalFormats`, errors);
         entries?.forEach((entry, index) =>
-          validateOperationConditionalFormat(entry, `${patchPath}.conditionalFormats[${index}]`, errors),
+          validateOperationConditionalFormat(
+            entry,
+            `${patchPath}.conditionalFormats[${index}]`,
+            errors,
+          ),
         );
       }
       const rowGroups = ownValue(patch, "rowGroups");
@@ -1644,7 +1663,11 @@ export function validateDocumentOperationShape(
       break;
     case "setProtectedRange":
       validateOperationSheetId(operation, path, errors);
-      validateOperationProtectedRange(ownValue(operation, "protectedRange"), `${path}.protectedRange`, errors);
+      validateOperationProtectedRange(
+        ownValue(operation, "protectedRange"),
+        `${path}.protectedRange`,
+        errors,
+      );
       break;
     case "setNote": {
       validateAddress(ownValue(operation, "addr"), `${path}.addr`, errors);

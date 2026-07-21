@@ -431,13 +431,32 @@ export class SheetwriteStore implements Store {
       return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
     }
     for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
-      const operation = tx.patches[operationIndex]!;
-      if (operation.op !== "setBlock") continue;
-      const invalidBlock = validateDocumentOperationShape(
-        operation,
-        `transaction.patches[${operationIndex}]`,
-      ).find((error) => error.path.includes(".block"));
-      if (!invalidBlock) continue;
+      const operation = tx.patches[operationIndex];
+      const operationPath = `transaction.patches[${operationIndex}]`;
+      const errors = validateDocumentOperationShape(operation, operationPath);
+      const operationRecord =
+        typeof operation === "object" && operation !== null ? operation : undefined;
+      const addr = operationRecord && "addr" in operationRecord ? operationRecord.addr : undefined;
+      const range =
+        operationRecord && "range" in operationRecord ? operationRecord.range : undefined;
+      const unsafeError = errors.find(
+        (error) =>
+          ![
+            [addr?.row, `${operationPath}.addr.row`],
+            [addr?.col, `${operationPath}.addr.col`],
+            [range?.start?.row, `${operationPath}.range.start.row`],
+            [range?.start?.col, `${operationPath}.range.start.col`],
+            [range?.end?.row, `${operationPath}.range.end.row`],
+            [range?.end?.col, `${operationPath}.range.end.col`],
+          ].some(
+            ([coordinate, path]) =>
+              error.path === path &&
+              typeof coordinate === "number" &&
+              Number.isInteger(coordinate) &&
+              coordinate < 0,
+          ),
+      );
+      if (!unsafeError) continue;
       return {
         status: "rejected",
         epoch: this.epoch,
@@ -446,7 +465,7 @@ export class SheetwriteStore implements Store {
             kind: "invalid-operation",
             severity: "error",
             operationIndex,
-            message: invalidBlock.message,
+            message: unsafeError.message,
           },
         ],
       };

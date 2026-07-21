@@ -1943,6 +1943,32 @@ it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
     storage: "paged",
     dirtyCellLimit: 1,
   });
+  const cyclic: Record<string, unknown> = { op: "set" };
+  cyclic.self = cyclic;
+  const throwingAccessor = Object.defineProperty({}, "op", {
+    enumerable: true,
+    get: () => {
+      throw new Error("hostile getter");
+    },
+  });
+  for (const patch of [
+    1,
+    { op: "setRangeStyle", range: {}, style: { bold: true } },
+    { op: "set", addr: addr(0, 0), value: { kind: "literal", value: Number.NaN } },
+    cyclic,
+    throwingAccessor,
+  ] as const) {
+    expect(
+      store.applyTransaction({
+        patches: [patch as unknown as DocumentOp],
+      }),
+    ).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+    });
+  }
+
   const malformed = store.applyTransaction({
     patches: [
       {
