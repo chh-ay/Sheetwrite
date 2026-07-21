@@ -31,6 +31,8 @@ import {
   useState,
 } from "react";
 
+const useCommitLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
   if (typeof ref === "function") ref(grid);
   else if (ref) ref.current = grid;
@@ -148,8 +150,28 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
     });
     liveOptionsRef.current = { theme, readOnly, overscan, minColumns, config };
 
-    const handlers = useRef<GridAdapterEventHandlers>({});
-    Object.assign(handlers.current, {
+    const handlers = useRef<GridAdapterEventHandlers | null>(null);
+    useCommitLayoutEffect(() => {
+      const committedHandlers: GridAdapterEventHandlers = {
+        onGridChange,
+        onSelectionChange,
+        onViewportChange,
+        onEditBegin,
+        onEditCommit,
+        onSearch,
+        onActiveSheetChange,
+        onMutationRejected,
+        onRendererFallback,
+        onDatasourceError,
+        onExportError,
+        onReady,
+        onInitializationError,
+      };
+      handlers.current = committedHandlers;
+      return () => {
+        if (handlers.current === committedHandlers) handlers.current = null;
+      };
+    }, [
       onGridChange,
       onSelectionChange,
       onViewportChange,
@@ -163,9 +185,9 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       onExportError,
       onReady,
       onInitializationError,
-    });
+    ]);
 
-    useLayoutEffect(() => {
+    useCommitLayoutEffect(() => {
       const previous = publishedRef.current;
       if (previous && previous !== ref) publishGrid(previous, null);
       publishedRef.current = ref;
@@ -202,7 +224,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
           if (!current || !mountedRef.current) return;
           initializedRef.current = false;
           setInitializationState("error");
-          handlers.current.onInitializationError?.(error);
+          handlers.current?.onInitializationError?.(error);
         },
       );
       return () => {
@@ -233,22 +255,22 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
           ? "initial"
           : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
       const controller = createGridController(host, options, {
-        onGridChange: (event) => handlers.current.onGridChange?.(event),
-        onSelectionChange: (selection) => handlers.current.onSelectionChange?.(selection),
-        onViewportChange: (event) => handlers.current.onViewportChange?.(event),
-        onEditBegin: (event) => handlers.current.onEditBegin?.(event),
-        onEditCommit: (event) => handlers.current.onEditCommit?.(event),
-        onSearch: (result) => handlers.current.onSearch?.(result),
-        onActiveSheetChange: (event) => handlers.current.onActiveSheetChange?.(event),
-        onMutationRejected: (event) => handlers.current.onMutationRejected?.(event),
-        onRendererFallback: (event) => handlers.current.onRendererFallback?.(event),
-        onDatasourceError: (event) => handlers.current.onDatasourceError?.(event),
-        onExportError: (event) => handlers.current.onExportError?.(event),
+        onGridChange: (event) => handlers.current?.onGridChange?.(event),
+        onSelectionChange: (selection) => handlers.current?.onSelectionChange?.(selection),
+        onViewportChange: (event) => handlers.current?.onViewportChange?.(event),
+        onEditBegin: (event) => handlers.current?.onEditBegin?.(event),
+        onEditCommit: (event) => handlers.current?.onEditCommit?.(event),
+        onSearch: (result) => handlers.current?.onSearch?.(result),
+        onActiveSheetChange: (event) => handlers.current?.onActiveSheetChange?.(event),
+        onMutationRejected: (event) => handlers.current?.onMutationRejected?.(event),
+        onRendererFallback: (event) => handlers.current?.onRendererFallback?.(event),
+        onDatasourceError: (event) => handlers.current?.onDatasourceError?.(event),
+        onExportError: (event) => handlers.current?.onExportError?.(event),
       });
       controllerRef.current = controller;
       generationRef.current += 1;
       publishGrid(publishedRef.current, controller.grid);
-      handlers.current.onReady?.({
+      handlers.current?.onReady?.({
         grid: controller.grid,
         generation: generationRef.current,
         reason,

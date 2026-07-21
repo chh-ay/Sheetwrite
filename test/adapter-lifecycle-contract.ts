@@ -27,6 +27,7 @@ export interface AdapterLifecycleCase {
     | "exact-cleanup"
     | "publication-agreement"
     | "operational-events"
+    | "initial-sync-datasource-error"
     | "generation-safe-events";
   observable: string;
 }
@@ -63,6 +64,10 @@ export const ADAPTER_LIFECYCLE_CONTRACT = [
   {
     id: "operational-events",
     observable: "all operational Grid events retain typed declarative payloads",
+  },
+  {
+    id: "initial-sync-datasource-error",
+    observable: "an initial synchronous datasource failure reaches the mounted adapter",
   },
   {
     id: "generation-safe-events",
@@ -367,6 +372,45 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       rejectProtectedEdit(grid);
       expect(mutationEvents).toHaveLength(1);
       expect(swapped).toHaveLength(1);
+
+      const hostFailure = new Error("throwing host callback");
+      await mounted.render({
+        ...props,
+        onMutationRejected: () => {
+          throw hostFailure;
+        },
+      });
+      expect(() => rejectProtectedEdit(grid)).toThrow(hostFailure);
+
+      await mounted.unmount();
+    });
+
+    it("delivers an initial synchronous datasource throw after listener wiring", async () => {
+      const recorder = createLifecycleRecorder();
+      const datasourceFailure = new Error("initial synchronous datasource failure");
+      const datasourceEvents: Array<GridEvents["datasource-error"]> = [];
+      let requests = 0;
+      const props: AdapterConformanceProps = {
+        ...initialProps(recorder),
+        data: undefined,
+        datasource: {
+          getRows() {
+            requests += 1;
+            if (requests === 1) throw datasourceFailure;
+            return new Promise<DataSourcePage>(() => {});
+          },
+        },
+        onDatasourceError: (event) => datasourceEvents.push(event),
+      };
+
+      const mounted = await mount(props);
+      await waitFor(() => datasourceEvents.length === 1);
+
+      expect(datasourceEvents[0]).toMatchObject({
+        request: { sheet: "lifecycle", start: 0 },
+        error: datasourceFailure,
+      });
+      expect("signal" in datasourceEvents[0]!.request).toBe(false);
 
       await mounted.unmount();
     });

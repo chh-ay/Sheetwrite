@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
 import { DEFAULT_THEME, initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
-import { act, createRef, StrictMode } from "react";
+import { act, createRef, type ReactElement, startTransition, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import {
   type AdapterConformanceProps,
@@ -90,6 +90,46 @@ async function mountConformanceGrid(props: AdapterConformanceProps): Promise<Mou
 runSharedAdapterLifecycleContract("React", mountConformanceGrid);
 
 describe("SheetwriteGrid React lifecycle", () => {
+  it("renders on the server without layout-effect diagnostics", async () => {
+    const source = new URL("../src/index.tsx", import.meta.url).pathname;
+    const script = `
+      import { createElement } from "react";
+      import { renderToString } from "react-dom/server";
+      import { SheetwriteGrid } from ${JSON.stringify(source)};
+      const errors = [];
+      console.error = (...args) => errors.push(args.map(String).join(" "));
+      const workbook = {
+        activeSheet: "sheet",
+        sheets: [{
+          id: "sheet",
+          name: "Sheet",
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+        }],
+      };
+      const html = renderToString(createElement(SheetwriteGrid, {
+        workbook,
+        onViewportChange() {},
+      }));
+      process.stdout.write(JSON.stringify({ errors, html }));
+    `;
+    const process = Bun.spawn(["bun", "-e", script], {
+      cwd: new URL("../../../", import.meta.url).pathname,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+      process.exited,
+    ]);
+
+    expect(exitCode, stderr).toBe(0);
+    const result = JSON.parse(stdout) as { errors: string[]; html: string };
+    expect(result.errors).toEqual([]);
+    expect(result.html).toContain('class="sheetwrite"');
+  });
+
   it("publishes, replaces, transfers, and clears the forwarded Grid ref", async () => {
     const workbook = makeWorkbook();
     const host = document.createElement("div");
@@ -240,6 +280,68 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(events).toEqual([{ sheet: "sheet2" }]);
     expect(swapped).toEqual([{ sheet: "sheet" }]);
 
+    await act(async () => root.unmount());
+  });
+
+  it("does not publish callbacks from a concurrent render that is later abandoned", async () => {
+    const workbook = makeWorkbook();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const gridRef = createRef<Grid>();
+    const calls: string[] = [];
+    const suspended = Promise.withResolvers<void>();
+    let suspendedRenders = 0;
+
+    function SuspendAfterGrid({ active }: { active: boolean }): ReactElement | null {
+      if (!active) return null;
+      suspendedRenders += 1;
+      throw suspended.promise;
+    }
+
+    function Harness({ callback, suspend }: { callback: string; suspend: boolean }): ReactElement {
+      return (
+        <Suspense fallback={null}>
+          <SheetwriteGrid
+            ref={gridRef}
+            workbook={workbook}
+            onViewportChange={() => calls.push(callback)}
+          />
+          <SuspendAfterGrid active={suspend} />
+        </Suspense>
+      );
+    }
+
+    await act(async () => {
+      root.render(<Harness callback="committed" suspend={false} />);
+    });
+    const committedGrid = gridRef.current!;
+    calls.length = 0;
+
+    await act(async () => {
+      startTransition(() => {
+        root.render(<Harness callback="abandoned" suspend />);
+      });
+      await Promise.resolve();
+    });
+    expect(suspendedRenders).toBeGreaterThan(0);
+    expect(gridRef.current).toBe(committedGrid);
+
+    calls.length = 0;
+    committedGrid.refresh();
+    expect(calls).toContain("committed");
+    expect(calls).not.toContain("abandoned");
+
+    await act(async () => {
+      root.render(<Harness callback="replacement" suspend={false} />);
+    });
+    expect(gridRef.current).toBe(committedGrid);
+    calls.length = 0;
+    committedGrid.refresh();
+    expect(calls).toContain("replacement");
+    expect(calls).not.toContain("committed");
+
+    suspended.resolve();
     await act(async () => root.unmount());
   });
 

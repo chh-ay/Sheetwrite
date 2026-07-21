@@ -241,11 +241,20 @@ describe("DatasourceController revision retention", () => {
 
     controller.ensureLoaded(0, 1);
     expect(revisions.stats().retainedRequests).toBe(0);
+    expect(errors).toHaveLength(0);
+    controller.reset(4);
+    await flushRequest();
+    expect(errors).toHaveLength(0);
+
+    controller.ensureLoaded(0, 1);
+    await flushRequest();
+    expect(errors).toHaveLength(1);
 
     mode = "reject";
     controller.ensureLoaded(0, 1);
     await flushRequest();
     expect(revisions.stats().retainedRequests).toBe(0);
+    expect(errors).toHaveLength(2);
 
     mode = "pending";
     controller.ensureLoaded(0, 1);
@@ -260,8 +269,11 @@ describe("DatasourceController revision retention", () => {
 
     controller.ensureLoaded(1, 2);
     expect(revisions.stats().retainedRequests).toBe(1);
+    mode = "throw";
+    controller.ensureLoaded(2, 3);
     controller.destroy();
     expect(revisions.stats().retainedRequests).toBe(0);
+    await flushRequest();
     expect(errors).toHaveLength(2);
     store.dispose();
   });

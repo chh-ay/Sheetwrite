@@ -139,7 +139,10 @@ export class DatasourceController {
     } catch (error) {
       this.clearOwned(activeRequest);
       this.finishRequest(activeRequest);
-      this.options.onError({ sheet, start: requestStart, end: requestEnd, revision }, error);
+      queueMicrotask(() => {
+        if (this.destroyed || generation !== this.generation || controller.signal.aborted) return;
+        this.options.onError({ sheet, start: requestStart, end: requestEnd, revision }, error);
+      });
       return;
     }
 

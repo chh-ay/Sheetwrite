@@ -91,15 +91,14 @@ export interface GridController {
  *
  * ### Live handlers
  * `handlers` is held **by reference**, not copied. Every event reads the
- * object's *current* fields (`handlers.onGridChange?.(…)`), so a host swaps
- * callbacks across renders by **mutating the fields of the same object** it
- * passed in — never by replacing the object, which the controller would not
- * see. This is what lets a framework feed fresh closures each render without
- * tearing the grid down and rebuilding it.
+ * object's *current* fields (`handlers.onGridChange?.(…)`), so a host may swap
+ * callbacks without rebuilding the grid. Framework adapters must mutate the
+ * shared object only from their commit lifecycle; mutating it during render can
+ * expose callbacks from work that never commits.
  *
  * @param host     element the grid mounts into
  * @param options  grid options forwarded verbatim to {@link createGrid}
- * @param handlers mutable callback bag, read live on every event
+ * @param handlers mutable callback bag, read live on every event after host commit
  */
 export function createGridController(
   host: HTMLElement,
