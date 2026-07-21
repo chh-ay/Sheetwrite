@@ -9,10 +9,23 @@ import type {
 } from "./types/editor.js";
 import type { Grid } from "./types/grid.js";
 
+const NO_EDITOR_ERROR = Symbol("no-editor-error");
+
+function reportCustomEditorError(error: unknown): void {
+  const reporter = "reportError" in globalThis ? globalThis.reportError : undefined;
+  if (typeof reporter === "function") {
+    reporter(error);
+    return;
+  }
+  queueMicrotask(() => {
+    throw error;
+  });
+}
+
 export interface CustomEditorState {
   grid: Grid;
-  address: CellAddress;
-  viewAddress: CellAddress;
+  address: Readonly<CellAddress>;
+  viewAddress: Readonly<CellAddress>;
   column: Readonly<Column>;
   value: CellScalar;
   text: string;
@@ -58,6 +71,10 @@ export class CustomEditorController {
     return address ? { row: address.row, col: address.col } : null;
   }
 
+  get editingAddress(): Readonly<CellAddress> | null {
+    return this.active?.state.address ?? null;
+  }
+
   begin(options: BeginCustomEditorOptions): void {
     this.cancel(false);
 
@@ -74,7 +91,11 @@ export class CustomEditorController {
       abort: new AbortController(),
       wrapper,
       instance: null,
-      state: options,
+      state: {
+        ...options,
+        address: { ...options.address },
+        viewAddress: { ...options.viewAddress },
+      },
       rect: options.rect,
       onCommit: options.onCommit,
       onCancel: options.onCancel,
@@ -95,20 +116,27 @@ export class CustomEditorController {
     try {
       const instance = options.editor.mount(wrapper, context);
       if (this.active !== active) {
-        instance.destroy();
+        try {
+          instance.destroy();
+        } catch (error) {
+          reportCustomEditorError(error);
+        }
         return;
       }
       active.instance = instance;
       instance.reposition(options.rect);
       this.focusEditor(active);
     } catch (error) {
-      this.teardown(active);
+      const teardownError = this.teardown(active);
+      if (teardownError !== NO_EDITOR_ERROR) reportCustomEditorError(teardownError);
       throw error;
     }
   }
 
   /** Refresh external state after a transaction without replacing ownership. */
-  update(state: Partial<Omit<CustomEditorState, "grid" | "initialInput" | "selectAll">>): void {
+  update(
+    state: Partial<Omit<CustomEditorState, "grid" | "address" | "initialInput" | "selectAll">>,
+  ): void {
     const active = this.active;
     if (!active?.instance) return;
     active.state = { ...active.state, ...state };
@@ -130,11 +158,19 @@ export class CustomEditorController {
   cancel(notify = true): void {
     const active = this.active;
     if (!active) return;
+    active.abort.abort();
+    let cancelError: unknown = NO_EDITOR_ERROR;
     try {
       active.instance?.cancel();
-    } finally {
-      this.teardown(active);
+    } catch (error) {
+      cancelError = error;
+    }
+    const teardownError = this.teardown(active);
+    try {
       if (notify) active.onCancel();
+    } finally {
+      if (cancelError !== NO_EDITOR_ERROR) reportCustomEditorError(cancelError);
+      if (teardownError !== NO_EDITOR_ERROR) reportCustomEditorError(teardownError);
     }
   }
 
@@ -146,9 +182,15 @@ export class CustomEditorController {
     const generation = active.generation;
     return {
       ...active.state,
+      address: { ...active.state.address },
+      viewAddress: { ...active.state.viewAddress },
       signal: active.abort.signal,
       commit: (value, navigation = "none") => {
         if (this.active?.generation !== generation || active.abort.signal.aborted) return;
+        if (typeof value !== "string") {
+          this.cancel();
+          return;
+        }
         this.finishCommit(active, value, navigation);
       },
       cancel: () => {
@@ -221,12 +263,16 @@ export class CustomEditorController {
     navigation: CellEditorNavigation,
   ): void {
     if (this.active !== active || active.abort.signal.aborted) return;
-    this.teardown(active);
-    active.onCommit(value, navigation);
+    const teardownError = this.teardown(active);
+    try {
+      active.onCommit(value, navigation);
+    } finally {
+      if (teardownError !== NO_EDITOR_ERROR) reportCustomEditorError(teardownError);
+    }
   }
 
-  private teardown(active: ActiveEditor): void {
-    if (this.active !== active || active.tearingDown) return;
+  private teardown(active: ActiveEditor): unknown {
+    if (this.active !== active || active.tearingDown) return NO_EDITOR_ERROR;
     active.tearingDown = true;
     this.active = null;
     active.abort.abort();
@@ -234,13 +280,17 @@ export class CustomEditorController {
     active.wrapper.removeEventListener("compositionend", this.onCompositionEnd);
     active.wrapper.removeEventListener("keydown", this.onKeyDown);
     active.wrapper.removeEventListener("focusout", this.onFocusOut);
+    let error: unknown = NO_EDITOR_ERROR;
     try {
       active.instance?.destroy();
+    } catch (caught) {
+      error = caught;
     } finally {
       active.wrapper.remove();
       active.instance = null;
       active.tearingDown = false;
     }
+    return error;
   }
 
   private readonly onCompositionStart = (): void => {

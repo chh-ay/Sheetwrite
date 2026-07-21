@@ -31,7 +31,7 @@ readonly grid: Grid;
 <summary><code>address</code></summary>
 
 ```ts generated
-readonly address: CellAddress;
+readonly address: Readonly<CellAddress>;
 ```
 
 </details>
@@ -40,7 +40,7 @@ readonly address: CellAddress;
 <summary><code>viewAddress</code></summary>
 
 ```ts generated
-readonly viewAddress: CellAddress;
+readonly viewAddress: Readonly<CellAddress>;
 ```
 
 </details>
@@ -135,8 +135,8 @@ cancel(): void;
 ```ts generated
 export interface CellEditorContext {
   readonly grid: Grid;
-  readonly address: CellAddress;
-  readonly viewAddress: CellAddress;
+  readonly address: Readonly<CellAddress>;
+  readonly viewAddress: Readonly<CellAddress>;
   readonly column: Readonly<Column>;
   readonly value: CellScalar;
   readonly text: string;

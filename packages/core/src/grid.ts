@@ -1106,27 +1106,22 @@ export class GridImpl implements Grid {
     this.syncSizer();
   }
   private refreshCustomEditor(): void {
-    const cell = this.customEditor.editingCell;
-    if (!cell) return;
-    const column = this.sheet().columns[cell.col];
-    if (!column) {
+    const address = this.customEditor.editingAddress;
+    if (!address || address.sheet !== this.activeSheet) return;
+    const viewRow = this.toViewRow(address.row);
+    const column = this.sheet().columns[address.col];
+    if (viewRow === null || !column) {
       this.customEditor.cancel();
       return;
     }
-    const address = {
-      sheet: this.activeSheet,
-      row: this.toDataRow(cell.row),
-      col: cell.col,
-    };
     const value = this.store.getCell(address).resolved;
     const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
     this.customEditor.update({
-      address,
-      viewAddress: { sheet: this.activeSheet, row: cell.row, col: cell.col },
+      viewAddress: { sheet: this.activeSheet, row: viewRow, col: address.col },
       column,
       value,
       text: formula ?? cellScalarToText(value),
-      label: this.editorLabel(cell.row, cell.col),
+      label: this.editorLabel(viewRow, address.col),
     });
   }
 
@@ -1268,7 +1263,7 @@ export class GridImpl implements Grid {
         selectAll: selectAll || initial === undefined,
         label: this.editorLabel(editCell.row, editCell.col),
         rect: this.editorRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
-        onCommit: (value, navigate) => this.commitEdit(editCell.row, editCell.col, value, navigate),
+        onCommit: (value, navigate) => this.commitDataEdit(dataAddr, value, navigate),
         onCancel: () => {
           this.host.focus();
           this.scheduleRender();
@@ -1318,15 +1313,44 @@ export class GridImpl implements Grid {
     this.commitCellEdit(row, col, parseCellInput(raw, column?.type ?? "text"), navigate);
   }
 
+  private commitDataEdit(
+    address: Readonly<CellAddress>,
+    raw: string,
+    navigate: EditNavigate,
+  ): void {
+    if (address.sheet !== this.activeSheet) return;
+    const viewRow = this.toViewRow(address.row);
+    if (viewRow === null) {
+      this.host.focus();
+      this.scheduleRender();
+      return;
+    }
+    const column = this.sheet().columns[address.col];
+    this.commitCellEditAt(address, viewRow, parseCellInput(raw, column?.type ?? "text"), navigate);
+  }
+
   private commitCellEdit(row: number, col: number, value: CellValue, navigate: EditNavigate): void {
-    const dataRow = this.toDataRow(row);
+    this.commitCellEditAt(
+      { sheet: this.activeSheet, row: this.toDataRow(row), col },
+      row,
+      value,
+      navigate,
+    );
+  }
+
+  private commitCellEditAt(
+    address: Readonly<CellAddress>,
+    viewRow: number,
+    value: CellValue,
+    navigate: EditNavigate,
+  ): void {
     const reason: CommitReason =
       navigate === "down" ? "edit-enter" : navigate === "none" ? "edit-blur" : "edit-tab";
     const outcome = this.document.commit(
       [
         {
           op: "set",
-          addr: { sheet: this.activeSheet, row: dataRow, col },
+          addr: { ...address },
           value,
         },
       ],
@@ -1335,9 +1359,9 @@ export class GridImpl implements Grid {
 
     if (outcome.status === "applied") {
       for (const fn of this.listeners["edit-commit"]) {
-        fn({ addr: { sheet: this.activeSheet, row, col }, value });
+        fn({ addr: { sheet: address.sheet, row: viewRow, col: address.col }, value });
       }
-      this.moveAfterCommit(row, col, navigate);
+      this.moveAfterCommit(viewRow, address.col, navigate);
     }
     this.host.focus();
     this.scheduleRender();
@@ -2789,6 +2813,7 @@ export class GridImpl implements Grid {
       ? this.loadable.viewRowCount(this.activeSheet)
       : this.sheet().rowCount;
     this.geometry.rebuildRows(count);
+    this.refreshCustomEditor();
     this.selection.clear();
     this.selection.setBounds(count, this.firstCol(), this.lastCol());
     this.emitSelection();
@@ -2849,6 +2874,9 @@ export class GridImpl implements Grid {
     cleanup(() => this.viewportEl.remove());
     cleanup(() => this.ariaMirror.destroy());
     cleanup(() => this.host.classList.remove("sheetwrite"));
+    cleanup(() => {
+      for (const listeners of Object.values(this.listeners)) listeners.clear();
+    });
     if (failed) throw failure;
   }
 }

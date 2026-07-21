@@ -138,9 +138,14 @@ const grid = createGrid(host, {
 The returned value is parsed with the column's normal type and committed through
 the same document transaction as stock editing. That preserves protection,
 validation, mutation policy, undo/redo, change events, and edit-commit events.
-Returning a rejected promise or `undefined` cancels the edit. Enter commits and
-moves down, Tab/Shift+Tab commit and move horizontally, and Escape cancels.
-Focus returns to the grid after commit or cancel.
+An asynchronous commit remains bound to the data row captured at `mount`, even
+when sorting or `clearView()` moves that row before the promise settles. If a
+filter removes the row from the view, Sheetwrite cancels and aborts the pending
+edit instead of retargeting another row. Returning a rejected promise,
+`undefined`, or a non-string value from untyped JavaScript cancels without a
+mutation. Enter commits and moves down, Tab/Shift+Tab commit and move
+horizontally, and Escape cancels. Focus returns to the grid after commit or
+cancel.
 
 For remote choices, use the editor-owned `AbortSignal`; never let a late request
 write into a destroyed editor:
@@ -203,16 +208,16 @@ One retained wrapper and one `CellEditorInstance` exist per active edit:
 | Hook / value | Guarantee |
 | --- | --- |
 | `mount(host, context)` | Runs once. The host is positioned over the active cell. |
-| `context.address` / `viewAddress` | Stable data-row address and current displayed-row address. |
+| `context.address` / `viewAddress` | Canonical data-row and current displayed-row snapshots. They are readonly and mutating a JavaScript object received by the editor cannot retarget the edit. |
 | `context.value` / `text` / `initialInput` | Resolved scalar, formatted text, and optional typed character. |
 | `context.label` | Accessible name derived from semantic/positional header plus row number. |
-| `context.signal` | Aborted before teardown on cancel, commit, reset, or unmount. |
-| `context.commit()` / `cancel()` | Optional editor-driven completion using the canonical path. |
-| `update(context)` | External value, theme, zoom, or geometry-sensitive state changed without replacing ownership. |
+| `context.signal` | Aborted before the editor's `cancel()` or `destroy()` hook on cancel, commit, reset, or unmount. |
+| `context.commit()` / `cancel()` | Optional editor-driven completion using the canonical path. A non-string commit from untyped JavaScript cancels safely. |
+| `update(context)` | External value, theme, zoom, view permutation, or geometry-sensitive state changed without replacing ownership. |
 | `reposition(rect)` | The active cell moved or resized. |
 | `commit()` | May return input synchronously or asynchronously; duplicate completion is ignored. |
-| `cancel()` | Notification before a host-requested cancellation. |
-| `destroy()` | Runs exactly once; late async work must observe the aborted signal. |
+| `cancel()` | Notification before a host-requested cancellation; the signal is already aborted. |
+| `destroy()` | Runs exactly once; late async work must observe the aborted signal. A thrown hook error is reported without interrupting Sheetwrite's DOM, listener, or store cleanup. |
 
 `editors` is construction-bound so React/Vue/Svelte resets safely abort and
 destroy an active editor before publishing the new grid generation. All adapters

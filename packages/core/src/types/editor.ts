@@ -21,8 +21,8 @@ export interface CellEditorRect {
  */
 export interface CellEditorContext {
   readonly grid: Grid;
-  readonly address: CellAddress;
-  readonly viewAddress: CellAddress;
+  readonly address: Readonly<CellAddress>;
+  readonly viewAddress: Readonly<CellAddress>;
   readonly column: Readonly<Column>;
   readonly value: CellScalar;
   readonly text: string;

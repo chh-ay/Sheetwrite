@@ -684,6 +684,7 @@ describe("Grid editing (Layer 3)", () => {
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
     const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
 
     const colorInput = host.querySelector(".sheetwrite-tb-textColor");
     expect(colorInput).toBeInstanceOf(HTMLInputElement);

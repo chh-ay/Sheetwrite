@@ -7,17 +7,24 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 let restoreCanvas: () => void;
+let reportErrorDescriptor: PropertyDescriptor | undefined;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
+  reportErrorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "reportError");
   restoreCanvas = installCanvasTestStubs();
 });
 
 afterEach(() => {
   restoreCanvas();
+  if (reportErrorDescriptor) {
+    Object.defineProperty(globalThis, "reportError", reportErrorDescriptor);
+  } else {
+    Reflect.deleteProperty(globalThis, "reportError");
+  }
   document.body.innerHTML = "";
 });
 
@@ -152,6 +159,35 @@ describe("semantic presentation contract", () => {
       host.remove();
     }
     expect(written).toEqual(["Customer 0\t0.5", "Customer 0\t0.5"]);
+  });
+
+  it("keeps semantic headers stable across missing labels and minColumns changes", () => {
+    const workbook = makeWorkbook(1);
+    workbook.sheets[0]!.columns[0]!.header = "";
+    const store = new SheetwriteStore(workbook, makeColumnarData(1));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, presentation: "data-grid", minColumns: 8 }, store);
+
+    expect(headers(host)).toEqual(["name", "Amount", "City", "D", "E", "F", "G", "H"]);
+    grid.setMinColumns(12);
+    grid.refresh();
+    expect(headers(host)).toEqual([
+      "name",
+      "Amount",
+      "City",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+    ]);
+
+    grid.destroy();
+    store.dispose();
   });
 });
 
@@ -328,8 +364,10 @@ describe("custom editor canonical lifecycle", () => {
     let attempt = 0;
     let cancels = 0;
     let destroys = 0;
+    let latestContext: CellEditorContext | undefined;
     const editor: CellEditor = {
-      mount(root) {
+      mount(root, context) {
+        latestContext = context;
         const input = document.createElement("input");
         root.appendChild(input);
         return {
@@ -363,8 +401,228 @@ describe("custom editor canonical lifecycle", () => {
     }
     expect({ cancels, destroys }).toEqual({ cancels: 2, destroys: 2 });
 
+    grid.beginEdit(0, 0);
+    expect(latestContext).toBeDefined();
+    expect(() => latestContext?.commit(42 as never)).not.toThrow();
+    expect(latestContext?.signal.aborted).toBe(true);
+    expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
+    expect({ cancels, destroys }).toEqual({ cancels: 3, destroys: 3 });
+
     grid.destroy();
     store.dispose();
+  });
+
+  it("keeps async commits bound to their canonical row through sort and clearView", async () => {
+    for (const resetView of [false, true]) {
+      const workbook = makeWorkbook(3);
+      workbook.sheets[0]!.columns[0]!.editor = "pending";
+      const store = new SheetwriteStore(workbook, makeColumnarData(3));
+      const host = mountHost();
+      const result = Promise.withResolvers<string>();
+      const contexts: CellEditorContext[] = [];
+      const editor: CellEditor = {
+        mount(root, context) {
+          contexts.push(context);
+          const input = document.createElement("input");
+          root.appendChild(input);
+          return {
+            update(next) {
+              contexts.push(next);
+            },
+            reposition() {},
+            commit: () => result.promise,
+            cancel() {},
+            destroy() {},
+          };
+        },
+      };
+      const grid = new GridImpl(host, { workbook, editors: { pending: editor } }, store);
+      if (resetView) grid.sortBy(1, false);
+      grid.beginEdit(0, 0);
+      const originalDataRow = resetView ? 2 : 0;
+      const otherDataRow = resetView ? 0 : 2;
+      const committed: CellEditorContext["address"][] = [];
+      grid.on("edit-commit", ({ addr }) => {
+        committed.push(addr);
+      });
+      activeEditorInput(host).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+      );
+
+      if (resetView) grid.clearView();
+      else grid.sortBy(1, false);
+      const expectedViewRow = resetView ? 2 : 2;
+      expect(contexts.at(-1)?.address).toEqual({
+        sheet: "s1",
+        row: originalDataRow,
+        col: 0,
+      });
+      expect(contexts.at(-1)?.viewAddress.row).toBe(expectedViewRow);
+
+      result.resolve(resetView ? "ClearView target" : "Sort target");
+      await result.promise;
+      await Promise.resolve();
+      expect(store.getCell({ sheet: "s1", row: originalDataRow, col: 0 }).resolved).toBe(
+        resetView ? "ClearView target" : "Sort target",
+      );
+      expect(store.getCell({ sheet: "s1", row: otherDataRow, col: 0 }).resolved).toBe(
+        `Customer ${otherDataRow}`,
+      );
+      expect(committed).toEqual([{ sheet: "s1", row: expectedViewRow, col: 0 }]);
+
+      grid.destroy();
+      store.dispose();
+      host.remove();
+    }
+  });
+
+  it("cancels a pending commit when filtering hides its canonical row", async () => {
+    const workbook = makeWorkbook(3);
+    workbook.sheets[0]!.columns[0]!.editor = "pending";
+    const store = new SheetwriteStore(workbook, makeColumnarData(3));
+    const host = mountHost();
+    const result = Promise.withResolvers<string>();
+    let context: CellEditorContext | undefined;
+    let cancels = 0;
+    let destroys = 0;
+    const editor: CellEditor = {
+      mount(root, next) {
+        context = next;
+        root.appendChild(document.createElement("input"));
+        return {
+          update(updated) {
+            context = updated;
+          },
+          reposition() {},
+          commit: () => result.promise,
+          cancel() {
+            cancels += 1;
+          },
+          destroy() {
+            destroys += 1;
+          },
+        };
+      },
+    };
+    const grid = new GridImpl(host, { workbook, editors: { pending: editor } }, store);
+    grid.beginEdit(0, 0);
+    activeEditorInput(host).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    grid.filterBy(2, "Tokyo");
+
+    expect(context?.signal.aborted).toBe(true);
+    expect({ cancels, destroys }).toEqual({ cancels: 1, destroys: 1 });
+    expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
+    result.resolve("Must not move");
+    await result.promise;
+    await Promise.resolve();
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("isolates mutable context addresses from the canonical commit target", () => {
+    const workbook = makeWorkbook(2);
+    workbook.sheets[0]!.columns[0]!.editor = "mutator";
+    const store = new SheetwriteStore(workbook, makeColumnarData(2));
+    const host = mountHost();
+    let context: CellEditorContext | undefined;
+    const editor: CellEditor = {
+      mount(root, mounted) {
+        context = mounted;
+        const input = document.createElement("input");
+        input.value = "Canonical";
+        root.appendChild(input);
+        return {
+          update(next) {
+            context = next;
+          },
+          reposition() {},
+          commit: () => input.value,
+          cancel() {},
+          destroy() {},
+        };
+      },
+    };
+    const grid = new GridImpl(host, { workbook, editors: { mutator: editor } }, store);
+    grid.beginEdit(0, 0);
+    if (!context) throw new Error("editor context missing");
+    Reflect.set(context.address, "row", 1);
+    activeEditorInput(host).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Canonical");
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("Customer 1");
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("finishes cancel and Grid teardown when an editor destroy hook throws", () => {
+    const reported: unknown[] = [];
+    Object.defineProperty(globalThis, "reportError", {
+      configurable: true,
+      value: (error: unknown) => reported.push(error),
+    });
+    const workbook = makeWorkbook(1);
+    workbook.sheets[0]!.columns[0]!.editor = "hostile";
+    const host = mountHost();
+    const hookSignals: boolean[] = [];
+    let destroys = 0;
+    const editor: CellEditor = {
+      mount(root, context) {
+        root.appendChild(document.createElement("input"));
+        return {
+          update() {},
+          reposition() {},
+          commit() {},
+          cancel() {
+            hookSignals.push(context.signal.aborted);
+          },
+          destroy() {
+            hookSignals.push(context.signal.aborted);
+            destroys += 1;
+            throw new Error("hostile destroy");
+          },
+        };
+      },
+    };
+    const grid = new GridImpl(host, {
+      workbook,
+      data: makeColumnarData(1),
+      editors: { hostile: editor },
+    });
+    const ownedStore = grid.store;
+    if (!(ownedStore instanceof SheetwriteStore)) throw new Error("owned store missing");
+    const originalDispose = ownedStore.dispose.bind(ownedStore);
+    let disposals = 0;
+    ownedStore.dispose = () => {
+      disposals += 1;
+      originalDispose();
+    };
+
+    grid.beginEdit(0, 0);
+    activeEditorInput(host).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    );
+    expect(hookSignals).toEqual([true, true]);
+    expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
+    expect(document.activeElement).toBe(host);
+    expect(reported).toHaveLength(1);
+
+    grid.beginEdit(0, 0);
+    expect(() => grid.destroy()).not.toThrow();
+    expect(() => grid.destroy()).not.toThrow();
+    expect(hookSignals).toEqual([true, true, true, true]);
+    expect(destroys).toBe(2);
+    expect(disposals).toBe(1);
+    expect(reported).toHaveLength(2);
+    expect(host.classList.contains("sheetwrite")).toBe(false);
+    expect(host.getAttribute("role")).toBeNull();
+    expect(host.childElementCount).toBe(0);
   });
 });
 
