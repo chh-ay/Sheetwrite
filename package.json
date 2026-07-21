@@ -19,6 +19,7 @@
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",
     "api:check": "bun scripts/public-api.ts check",
+    "api:baseline": "bun scripts/public-api.ts baseline",
     "docs:generate": "bun scripts/docs.ts generate",
     "docs:check": "bun scripts/docs.ts check",
     "check:cycles": "bun scripts/check-import-cycles.ts",

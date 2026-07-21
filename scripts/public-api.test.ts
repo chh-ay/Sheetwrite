@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   analyzePublicApi,
   checkManifestBaseline,
   publicApiDigest,
+  readPublicApiBaseline,
+  writePublicApiBaseline,
   validateManifest,
 } from "./public-api.js";
 
@@ -292,6 +294,30 @@ describe("public API policy", () => {
   it("rejects malformed or partial reports", () => {
     expect(validateManifest({ formatVersion: 2, packages: [{ name: "partial" }] })).toContainEqual(
       expect.objectContaining({ code: "malformed-report" }),
+    );
+  });
+
+  it("writes and reads an explicit baseline artifact", async () => {
+    const root = await fixture();
+    const { manifest } = await analyzePublicApi(root);
+    const written = await writePublicApiBaseline(root, manifest);
+
+    expect(written.sha256).toBe(publicApiDigest(manifest));
+    expect(await readPublicApiBaseline(root)).toEqual(written);
+    expect(
+      JSON.parse(await readFile(join(root, "scripts/public-api-baseline.json"), "utf8")),
+    ).toEqual(written);
+  });
+
+  it("rejects malformed baseline artifacts", async () => {
+    const root = await fixture();
+    await mkdir(join(root, "scripts"), { recursive: true });
+    await writeFile(
+      join(root, "scripts/public-api-baseline.json"),
+      JSON.stringify({ schemaVersion: 1, manifestFormatVersion: 2, sha256: "not-a-digest" }),
+    );
+    await expect(readPublicApiBaseline(root)).rejects.toThrow(
+      "Invalid public API baseline artifact",
     );
   });
 
