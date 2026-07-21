@@ -6,6 +6,7 @@ import {
   type SnapshotResourceLimits,
   SnapshotValidationError,
   validateTransactionResources,
+  validateDocumentOperationShape,
 } from "./document-protocol.js";
 import {
   type CompactRangeHistory,
@@ -429,15 +430,33 @@ export class SheetwriteStore implements Store {
     if (!resourceValidation.ok) {
       return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
     }
+    for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
+      const operation = tx.patches[operationIndex]!;
+      if (operation.op !== "setBlock") continue;
+      const invalidBlock = validateDocumentOperationShape(
+        operation,
+        `transaction.patches[${operationIndex}]`,
+      ).find((error) => error.path.includes(".block"));
+      if (!invalidBlock) continue;
+      return {
+        status: "rejected",
+        epoch: this.epoch,
+        issues: [
+          {
+            kind: "invalid-operation",
+            severity: "error",
+            operationIndex,
+            message: invalidBlock.message,
+          },
+        ],
+      };
+    }
     const options =
       typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
     const commitReason = options.commitReason ?? "api";
     const source = options.source ?? "local";
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
       return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
-    }
-    if (source === "local" && tx.patches.some((patch) => !this.engine.canApplyLocally(patch))) {
-      return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
     }
 
     let effectiveTx = tx;
@@ -465,6 +484,12 @@ export class SheetwriteStore implements Store {
       if (dirtyCapacityIssue) {
         return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
       }
+    }
+    if (
+      source === "local" &&
+      effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
+    ) {
+      return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
     }
 
     const hasListeners = this.listeners.size > 0;

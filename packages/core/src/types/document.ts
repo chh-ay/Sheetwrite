@@ -220,6 +220,12 @@ export type MutationIssue =
       message: string;
     }
   | {
+      kind: "invalid-operation";
+      severity: "error";
+      operationIndex: number;
+      message: string;
+    }
+  | {
       kind: "resource-limit";
       severity: "error";
       /** Resource dimension exceeded by the transaction or durable pending queue. */

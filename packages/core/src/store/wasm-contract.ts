@@ -91,6 +91,13 @@ export type RecomputingCellStore = CellStore & {
   pagedStats(sheet: number): Float64Array;
   cellState(sheet: number, row: number, col: number): number;
   canDirtyCell(sheet: number, row: number, col: number): boolean;
+  pagedDirtyCellsInRange(
+    sheet: number,
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number,
+  ): number;
   dirtyRevision(sheet: number, row: number, col: number): bigint;
   beginMutation(): bigint;
   endMutation(): void;

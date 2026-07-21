@@ -536,6 +536,21 @@ impl PagedStorage {
         entries
     }
 
+    fn dirty_cells_in_range(
+        &self,
+        start_row: usize,
+        end_row: usize,
+        start_col: usize,
+        end_col: usize,
+    ) -> usize {
+        self.dirty
+            .keys()
+            .filter(|&&(row, col)| {
+                row >= start_row && row < end_row && col >= start_col && col < end_col
+            })
+            .count()
+    }
+
     fn byte_len(&self) -> usize {
         self.chunks.values().map(CellChunk::byte_len).sum()
     }
@@ -818,6 +833,18 @@ impl SheetData {
         self.paged
             .as_ref()
             .and_then(|paged| paged.dirty_revision(row, col))
+    }
+
+    pub(crate) fn dirty_cells_in_range(
+        &self,
+        start_row: usize,
+        end_row: usize,
+        start_col: usize,
+        end_col: usize,
+    ) -> usize {
+        self.paged.as_ref().map_or(0, |paged| {
+            paged.dirty_cells_in_range(start_row, end_row, start_col, end_col)
+        })
     }
 
     pub(crate) fn mark_range_clean(

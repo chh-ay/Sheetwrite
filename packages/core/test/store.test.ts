@@ -1938,6 +1938,156 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 });
+it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  const malformed = store.applyTransaction({
+    patches: [
+      {
+        op: "setBlock",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        block: { rowCount: 0xffff_ffff, colCount: 1, values: [] },
+      } as DocumentOp,
+    ],
+  });
+  expect(malformed).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+
+  const started = performance.now();
+  const huge = store.applyTransaction({
+    patches: [
+      {
+        op: "clearRange",
+        range: {
+          sheet: "s1",
+          start: { row: 0, col: 0 },
+          end: { row: 0xffff_ffff, col: 0 },
+        },
+      },
+    ],
+  });
+  expect(performance.now() - started).toBeLessThan(100);
+  expect(huge).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", max: 1 }],
+  });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    documentOperations: 0,
+    ffiCalls: 0,
+  });
+  store.dispose();
+});
+
+it("accounts for structural row and column ordering before admitting writes", () => {
+  const makeLimited = () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged" as const,
+      dirtyCellLimit: 1,
+    });
+    store.loadRows("s1", 0, [
+      { name: "A", amount: 1, city: "A" },
+      { name: "B", amount: 2, city: "B" },
+      { name: "C", amount: 3, city: "C" },
+      { name: "D", amount: 4, city: "D" },
+    ]);
+    return store;
+  };
+
+  const addedRow = makeLimited();
+  addedRow.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "dirty" } }],
+  });
+  const rejectedRow = addedRow.applyTransaction({
+    patches: [
+      { op: "addRows", sheet: "s1", at: 0, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "gap" } },
+    ],
+  });
+  expect(rejectedRow).toMatchObject({ status: "rejected", epoch: 1 });
+  expect(addedRow.getWorkbook().sheets[0]!.rowCount).toBe(4);
+  expect(addedRow.getCell(addr(0, 0)).resolved).toBe("dirty");
+  addedRow.dispose();
+
+  const removedRow = makeLimited();
+  removedRow.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "removed" } }],
+  });
+  const admittedRow = removedRow.applyTransaction({
+    patches: [
+      { op: "removeRows", sheet: "s1", at: 0, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "replacement" } },
+    ],
+  });
+  expect(admittedRow).toMatchObject({ status: "applied", epoch: 2 });
+  expect(removedRow.getWorkbook().sheets[0]!.rowCount).toBe(3);
+  expect(removedRow.getCell(addr(0, 0)).resolved).toBe("replacement");
+  removedRow.dispose();
+
+  const addedColumn = makeLimited();
+  addedColumn.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "dirty" } }],
+  });
+  const rejectedColumn = addedColumn.applyTransaction({
+    patches: [
+      {
+        op: "addColumns",
+        sheet: "s1",
+        at: 0,
+        columns: [{ key: "inserted", header: "Inserted", width: 100, type: "text" }],
+      },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "gap" } },
+    ],
+  });
+  expect(rejectedColumn).toMatchObject({ status: "rejected", epoch: 1 });
+  expect(addedColumn.getWorkbook().sheets[0]!.columns[0]!.key).toBe("name");
+  expect(addedColumn.getCell(addr(0, 0)).resolved).toBe("dirty");
+  addedColumn.dispose();
+
+  const removedColumn = makeLimited();
+  removedColumn.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "removed" } }],
+  });
+  const admittedColumn = removedColumn.applyTransaction({
+    patches: [
+      { op: "removeColumns", sheet: "s1", at: 0, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "replacement" } },
+    ],
+  });
+  expect(admittedColumn).toMatchObject({ status: "applied", epoch: 2 });
+  expect(removedColumn.getWorkbook().sheets[0]!.columns[0]!.key).toBe("amount");
+  expect(removedColumn.getCell(addr(0, 0)).resolved).toBe("replacement");
+  removedColumn.dispose();
+});
+
+it("rejects mixed clear/set growth atomically at the dirty limit", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  store.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "kept" } }],
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "clearRange",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      },
+      { op: "set", addr: addr(1, 0), value: { kind: "literal", value: "overflow" } },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "rejected", epoch: 1 });
+  expect(store.getCell(addr(0, 0)).resolved).toBe("kept");
+  expect(store.getCellLoadState(addr(1, 0))).toBe("unloaded");
+  expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+  store.dispose();
+});
 
 describe("validation, protection, and notes metadata", () => {
   it("applies reject, warn, and partial validation policy at the transaction boundary", () => {

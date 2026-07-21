@@ -118,6 +118,15 @@ export class IncompleteDataError extends Error {
     this.capability = capability;
   }
 }
+interface PagedDirtyPreflightState {
+  handle: number;
+  rows: number;
+  cols: number;
+  dirty: number;
+  additional: number;
+  structural: boolean;
+  seen: Set<string>;
+}
 
 export interface StoreDataEngineEffects {
   readonly appliedPatches: DocumentOp[];
@@ -327,63 +336,158 @@ export class StoreDataEngine {
   pagedDirtyCapacityIssue(patches: readonly DocumentOp[]): MutationIssue | null {
     if (this.storageOptions.storage !== "paged") return null;
     const limit = this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT;
-    const candidates = new Map<SheetId, Set<number>>();
-    const add = (sheet: SheetId, row: number, col: number): void => {
+    const states = new Map<SheetId, PagedDirtyPreflightState>();
+    const stateFor = (sheet: SheetId) => {
+      if (!this.handles.has(sheet)) return undefined;
+      let state = states.get(sheet);
+      if (state) return state;
       const meta = this.sheetMeta(sheet);
-      if (row < 0 || col < 0 || row >= meta.rowCount || col >= meta.columns.length) return;
-      let cells = candidates.get(sheet);
-      if (!cells) {
-        cells = new Set();
-        candidates.set(sheet, cells);
+      state = {
+        handle: this.handleOf(sheet),
+        rows: meta.rowCount,
+        cols: meta.columns.length,
+        dirty: this.getPagedStats(sheet).dirtyCells,
+        additional: 0,
+        structural: false,
+        seen: new Set<string>(),
+      };
+      states.set(sheet, state);
+      return state;
+    };
+    const issue = (actual: number): MutationIssue => ({
+      kind: "resource-limit",
+      severity: "error",
+      resource: "paged-dirty-cells",
+      actual: Math.min(Number.MAX_SAFE_INTEGER, actual),
+      max: limit,
+      message: `Paged dirty cells exceed the ${limit} cell limit`,
+    });
+    const consume = (state: PagedDirtyPreflightState, count: number): MutationIssue | null => {
+      if (!Number.isSafeInteger(count) || count < 0) return issue(Number.MAX_SAFE_INTEGER);
+      const actual = state.dirty + state.additional + count;
+      if (actual > limit) return issue(actual);
+      state.additional += count;
+      return null;
+    };
+    const addSparse = (sheet: SheetId, row: number, col: number): MutationIssue | null => {
+      const state = stateFor(sheet);
+      if (!state || row < 0 || col < 0 || row >= state.rows || col >= state.cols) return null;
+      const key = `${row}:${col}`;
+      if (state.seen.has(key)) return null;
+      state.seen.add(key);
+      if (!state.structural && this.wasm.cellState(state.handle, row, col) === 3) return null;
+      return consume(state, 1);
+    };
+    const addRectangle = (
+      sheet: SheetId,
+      startRow: number,
+      startCol: number,
+      rows: number,
+      cols: number,
+    ): MutationIssue | null => {
+      if (rows === 1 && cols === 1) return addSparse(sheet, startRow, startCol);
+      const state = stateFor(sheet);
+      if (!state) return null;
+      if (
+        !Number.isSafeInteger(rows) ||
+        !Number.isSafeInteger(cols) ||
+        rows < 0 ||
+        cols < 0 ||
+        rows > Math.floor(Number.MAX_SAFE_INTEGER / Math.max(cols, 1))
+      ) {
+        return issue(Number.MAX_SAFE_INTEGER);
       }
-      cells.add(row * meta.columns.length + col);
+      return consume(state, rows * cols);
     };
 
     for (const patch of patches) {
+      const sheet = patchSheetId(patch);
+      if (
+        sheet !== null &&
+        (patch.op === "addRows" ||
+          patch.op === "removeRows" ||
+          patch.op === "moveRows" ||
+          patch.op === "addColumns" ||
+          patch.op === "removeColumns" ||
+          patch.op === "moveColumns")
+      ) {
+        const state = stateFor(sheet);
+        if (state) {
+          if (patch.op === "addRows") {
+            if (patch.count > Number.MAX_SAFE_INTEGER - state.rows) {
+              return issue(Number.MAX_SAFE_INTEGER);
+            }
+            state.rows += patch.count;
+          } else if (patch.op === "removeRows") {
+            const start = Math.min(patch.at, state.rows);
+            const removed = Math.min(patch.count, state.rows - start);
+            if (!state.structural) {
+              state.dirty -= this.wasm.pagedDirtyCellsInRange(
+                state.handle,
+                start,
+                start + removed,
+                0,
+                state.cols,
+              );
+            }
+            state.rows -= removed;
+          } else if (patch.op === "addColumns") {
+            if (patch.columns.length > Number.MAX_SAFE_INTEGER - state.cols) {
+              return issue(Number.MAX_SAFE_INTEGER);
+            }
+            state.cols += patch.columns.length;
+          } else if (patch.op === "removeColumns") {
+            const start = Math.min(patch.at, state.cols);
+            const removed = Math.min(patch.count, state.cols - start);
+            if (!state.structural) {
+              state.dirty -= this.wasm.pagedDirtyCellsInRange(
+                state.handle,
+                0,
+                state.rows,
+                start,
+                start + removed,
+              );
+            }
+            state.cols -= removed;
+          }
+          state.structural = true;
+          state.seen.clear();
+        }
+        continue;
+      }
+      let rejection: MutationIssue | null = null;
       if (patch.op === "set") {
-        add(patch.addr.sheet, patch.addr.row, patch.addr.col);
+        rejection = addSparse(patch.addr.sheet, patch.addr.row, patch.addr.col);
       } else if (patch.op === "setRange") {
         const range = normalizedRange(patch.range);
         for (const cell of patch.cells) {
-          add(range.sheet, range.start.row + cell.rowOffset, range.start.col + cell.colOffset);
+          rejection = addSparse(
+            range.sheet,
+            range.start.row + cell.rowOffset,
+            range.start.col + cell.colOffset,
+          );
+          if (rejection) break;
         }
       } else if (patch.op === "setBlock") {
         const range = normalizedRange(patch.range);
-        for (let row = 0; row < patch.block.rowCount; row++) {
-          for (let col = 0; col < patch.block.colCount; col++) {
-            add(range.sheet, range.start.row + row, range.start.col + col);
-          }
-        }
+        rejection = addRectangle(
+          range.sheet,
+          range.start.row,
+          range.start.col,
+          patch.block.rowCount,
+          patch.block.colCount,
+        );
       } else if (patch.op === "setRangeStyle" || patch.op === "clearRange") {
         const range = normalizedRange(patch.range);
-        for (let row = range.start.row; row <= range.end.row; row++) {
-          for (let col = range.start.col; col <= range.end.col; col++) {
-            add(range.sheet, row, col);
-          }
-        }
+        rejection = addRectangle(
+          range.sheet,
+          range.start.row,
+          range.start.col,
+          range.end.row - range.start.row + 1,
+          range.end.col - range.start.col + 1,
+        );
       }
-    }
-
-    for (const [sheet, cells] of candidates) {
-      const meta = this.sheetMeta(sheet);
-      const handle = this.handleOf(sheet);
-      let additional = 0;
-      for (const index of cells) {
-        const row = Math.floor(index / meta.columns.length);
-        const col = index % meta.columns.length;
-        if (this.wasm.cellState(handle, row, col) !== 3) additional += 1;
-      }
-      const actual = this.getPagedStats(sheet).dirtyCells + additional;
-      if (actual > limit) {
-        return {
-          kind: "resource-limit",
-          severity: "error",
-          resource: "paged-dirty-cells",
-          actual,
-          max: limit,
-          message: `Paged dirty cells exceed the ${limit} cell limit`,
-        };
-      }
+      if (rejection) return rejection;
     }
     return null;
   }
