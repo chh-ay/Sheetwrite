@@ -184,6 +184,12 @@ test("bulk commits cross the WASM boundary a bounded number of times", async ({ 
   // 20,000 cells must NOT mean ~20,000 crossings; bulk ops batch the boundary.
   expect(valueCrossings).toBeLessThan(100);
   await expect(page.locator('[data-testid="scale-crossings-latest"]')).toContainText("20,000");
+  await expect(page.locator('[data-testid="scale-resource-delta"]')).toContainText(
+    "Latest measured bulk-edit delta",
+  );
+  await expect(page.locator('[data-testid="scale-resource-delta"]')).toContainText(
+    "before → settled",
+  );
 
   await page.click('[data-testid="scale-crossings-styles"]');
   await expect
@@ -251,6 +257,17 @@ test("benchmark evidence is committed, attributed, and separated from live numbe
 
   // The page explicitly refuses to mix live and committed measurements.
   await expect(page.locator("#evidence")).toContainText("never mixed");
+  await expect(page.locator('[data-testid="scale-resource-schema"]')).toHaveText("2");
+  await expect(page.locator('[data-testid="scale-resource-summary"]')).toContainText(
+    "Logical live payload",
+  );
+  await expect(page.locator('[data-testid="scale-resource-summary"]')).toContainText(
+    "Allocated owner capacity",
+  );
+  await expect(page.locator('[data-testid="scale-resource-summary"]')).toContainText(
+    "WASM committed pages",
+  );
+  await expect(page.locator('[data-testid="scale-resource-owners"] tbody tr')).not.toHaveCount(0);
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -268,6 +285,7 @@ test("performance page stays operable on a phone viewport", async ({ page }) => 
     "cache-churn",
     "worker",
     "wasm-crossings",
+    "resource-ownership",
     "evidence",
   ]) {
     await expect(page.locator(`#${anchor}`)).toHaveCount(1);

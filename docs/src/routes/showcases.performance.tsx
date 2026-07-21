@@ -1,5 +1,11 @@
-import type { Grid, PagedStoreStats, QueryCapability } from "@sheetwrite/core";
-import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import type {
+  Grid,
+  PagedStoreStats,
+  QueryCapability,
+  RuntimeResourcePhaseDelta,
+  RuntimeResourceSnapshot,
+} from "@sheetwrite/core";
+import { createGrid, diffRuntimeResourcePhases, initSheetwrite } from "@sheetwrite/core";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -43,7 +49,12 @@ declare global {
 }
 
 const description =
-  "Executable performance showcase: one million paged rows, 121-column wide pages, cache churn under a fixed byte budget, Worker rendering with honest fallback, measured WASM boundary crossings, and committed benchmark evidence with full provenance.";
+  "Executable performance showcase: one million paged rows, 121-column wide pages, cache churn under a fixed byte budget, Worker rendering with honest fallback, measured WASM boundary crossings, versioned runtime resource ownership, and committed benchmark evidence with full provenance.";
+
+function formatByteDelta(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  return `${bytes > 0 ? "+" : "−"}${formatBytes(Math.abs(bytes))}`;
+}
 
 export const Route = createFileRoute("/showcases/performance")({
   head: () => ({
@@ -59,6 +70,7 @@ const SECTIONS = [
   { id: "cache-churn", label: "Cache churn" },
   { id: "worker", label: "Worker rendering" },
   { id: "wasm-crossings", label: "WASM crossings" },
+  { id: "resource-ownership", label: "Resource ownership" },
   { id: "evidence", label: "Committed evidence" },
 ] as const;
 
@@ -72,6 +84,7 @@ interface LiveStats {
   feed: PagedStoreStats | null;
   wide: PagedStoreStats | null;
   query: QueryCapability | null;
+  resource: RuntimeResourceSnapshot | null;
 }
 
 function PerformanceRoute() {
@@ -84,7 +97,12 @@ function PerformanceRoute() {
   const [gridReady, setGridReady] = useState(false);
   const [activeSheet, setActiveSheet] = useState(FEED_SHEET);
   const [telemetry, setTelemetry] = useState<DatasourceTelemetry>(emptyTelemetry);
-  const [stats, setStats] = useState<LiveStats>({ feed: null, wide: null, query: null });
+  const [stats, setStats] = useState<LiveStats>({
+    feed: null,
+    wide: null,
+    query: null,
+    resource: null,
+  });
   const [jumpRow, setJumpRow] = useState("742000");
   const [status, setStatus] = useState("Booting the WASM engine…");
   const [churn, setChurn] = useState<ChurnReport | null>(null);
@@ -92,6 +110,7 @@ function PerformanceRoute() {
   const [crossings, setCrossings] = useState<CrossingReport[]>([]);
   const [exportAttempt, setExportAttempt] = useState<FullExportAttempt | null>(null);
   const [scan, setScan] = useState<ScanAttempt | null>(null);
+  const [resourceDelta, setResourceDelta] = useState<RuntimeResourcePhaseDelta | null>(null);
 
   // One grid generation per renderer choice — the paint backend is
   // construction-bound, exactly as in a host application.
@@ -167,6 +186,7 @@ function PerformanceRoute() {
         feed: pagedStatsOf(grid, FEED_SHEET),
         wide: pagedStatsOf(grid, WIDE_SHEET),
         query: queryCapabilityOf(grid, FEED_SHEET),
+        resource: grid.getRuntimeResourceSnapshot("scroll", "settled"),
       });
     }, 500);
     return () => clearInterval(timer);
@@ -221,7 +241,10 @@ function PerformanceRoute() {
     if (!grid) return;
     grid.setActiveSheet(FEED_SHEET);
     setActiveSheet(FEED_SHEET);
+    const before = grid.getRuntimeResourceSnapshot("edit", "before");
     const report = measureBulkMutation(grid, kind, 20_000);
+    const after = grid.getRuntimeResourceSnapshot("edit", "settled");
+    setResourceDelta(diffRuntimeResourcePhases(before, after));
     setCrossings((previous) => [{ ...report }, ...previous.slice(0, 4)]);
     setStatus(
       `${kind === "values" ? "Value" : "Style"} commit over ${report.cells.toLocaleString()} cells crossed the WASM boundary ${report.ffiCalls} time${report.ffiCalls === 1 ? "" : "s"}.`,
@@ -255,6 +278,16 @@ function PerformanceRoute() {
   const maxMedianRatio = COMPARISON_EVIDENCE.available
     ? Math.max(...COMPARISON_EVIDENCE.sizes.map((size) => size.medianRatio), 1)
     : 1;
+  const resourceOwners = stats.resource
+    ? [...stats.resource.wasm.owners, ...stats.resource.jsOwners]
+        .filter((owner) => owner.logicalBytes > 0 || owner.allocatedBytes > 0)
+        .sort((left, right) => right.allocatedBytes - left.allocatedBytes)
+        .slice(0, 8)
+    : [];
+  const changedResourceOwners =
+    resourceDelta?.owners.filter(
+      (owner) => owner.logicalBytes !== 0 || owner.allocatedBytes !== 0 || owner.entries !== 0,
+    ) ?? [];
 
   return (
     <div className="sw-sp-frame">
@@ -710,6 +743,108 @@ function PerformanceRoute() {
               </table>
             )}
           </div>
+        </section>
+
+        <section
+          aria-labelledby="resource-ownership-title"
+          className="sw-sp-section"
+          id="resource-ownership"
+        >
+          <h2 id="resource-ownership-title">Runtime resource ownership</h2>
+          <p>
+            This live snapshot uses public resource protocol v
+            <span data-testid="scale-resource-schema">{stats.resource?.schemaVersion ?? "—"}</span>.
+            Logical payload, allocated capacity, and committed WASM pages stay separate: committed
+            pages are a runtime observation and are never added to live owner totals.
+          </p>
+          <dl className="sw-sp-stats" data-testid="scale-resource-summary">
+            <div>
+              <dt>Logical live payload</dt>
+              <dd data-testid="scale-resource-logical">
+                {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0)}
+              </dd>
+            </div>
+            <div>
+              <dt>Allocated owner capacity</dt>
+              <dd data-testid="scale-resource-allocated">
+                {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0)}
+              </dd>
+            </div>
+            <div>
+              <dt>WASM committed pages</dt>
+              <dd data-testid="scale-resource-committed">
+                {stats.resource?.wasm.wasmCommittedBytes === null ||
+                stats.resource?.wasm.wasmCommittedBytes === undefined
+                  ? "Unavailable"
+                  : formatBytes(stats.resource.wasm.wasmCommittedBytes)}
+              </dd>
+            </div>
+          </dl>
+          <div className="sw-sp-tablewrap">
+            <table className="sw-sp-table" data-testid="scale-resource-owners">
+              <caption>Largest live owners in the mounted grid, measured in this browser.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Exclusive owner</th>
+                  <th scope="col">Logical</th>
+                  <th scope="col">Allocated</th>
+                  <th scope="col">Entries</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resourceOwners.map((owner) => (
+                  <tr key={owner.owner}>
+                    <th scope="row">
+                      <code>{owner.owner}</code>
+                    </th>
+                    <td>{formatBytes(owner.logicalBytes)}</td>
+                    <td>{formatBytes(owner.allocatedBytes)}</td>
+                    <td>{owner.entries.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {resourceDelta && (
+            <div className="sw-sp-evidence" data-testid="scale-resource-delta">
+              <h3>Latest measured bulk-edit delta</h3>
+              <p className="sw-sp-provenance">
+                Protocol v{resourceDelta.schemaVersion}, {resourceDelta.operation},{" "}
+                {resourceDelta.from} → {resourceDelta.to}. Zero-change owners are omitted.
+              </p>
+              {changedResourceOwners.length === 0 ? (
+                <p>No retained owner changed; the operation reused existing capacity.</p>
+              ) : (
+                <div className="sw-sp-tablewrap">
+                  <table className="sw-sp-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Exclusive owner</th>
+                        <th scope="col">Logical Δ</th>
+                        <th scope="col">Allocated Δ</th>
+                        <th scope="col">Entries Δ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {changedResourceOwners.map((owner) => (
+                        <tr key={owner.owner}>
+                          <th scope="row">
+                            <code>{owner.owner}</code>
+                          </th>
+                          <td>{formatByteDelta(owner.logicalBytes)}</td>
+                          <td>{formatByteDelta(owner.allocatedBytes)}</td>
+                          <td>
+                            {owner.entries > 0 ? "+" : ""}
+                            {owner.entries.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         <section aria-labelledby="evidence-title" className="sw-sp-section" id="evidence">

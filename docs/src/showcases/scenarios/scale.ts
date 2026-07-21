@@ -47,6 +47,7 @@ export const SCALE_STORAGE: Required<DataSourceStorageOptions> = {
   mode: "paged",
   chunkRows: 4096,
   cacheBytes: 8 * 1024 * 1024,
+  dirtyCellLimit: 1_000_000,
 };
 
 /** Visible latency for every page after the first, so lazy loading is observable. */

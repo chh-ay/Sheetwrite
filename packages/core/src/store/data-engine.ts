@@ -2991,6 +2991,8 @@ export class StoreDataEngine {
     }
     this.noteRangeMutationFfi();
     this.wasm.recomputeChanged();
+    this.noteRangeMutationFfi();
+    this.wasm.compactStringStorage();
   }
 }
 

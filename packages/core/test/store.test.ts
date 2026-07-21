@@ -73,6 +73,24 @@ describe("SheetwriteStore", () => {
     expect(store.aggregate("s1", 1, "sum")).toBe(31.5);
   });
 
+  it("releases admitted string-arena slack after bounded columnar ingest", () => {
+    const store = new SheetwriteStore(makeWorkbook(3_000), makeColumnarData(3_000));
+    const snapshot = store.getRuntimeResourceSnapshot("ingest", "settled");
+    const strings = snapshot.wasm.owners.filter((owner) =>
+      owner.owner.startsWith("wasm.string-pool."),
+    );
+    expect(strings).toHaveLength(2);
+    for (const owner of strings) {
+      expect(owner.allocatedBytes).toBe(owner.logicalBytes);
+    }
+    expect(snapshot.boundary.find((entry) => entry.operation === "ingest")).toMatchObject({
+      ffiCalls: 3,
+      bulkCalls: 1,
+      scalarCalls: 2,
+    });
+    store.dispose();
+  });
+
   it("returns a row-major bulk window without per-cell reads", () => {
     const store = new SheetwriteStore(makeWorkbook(50), makeColumnarData(50));
     const view = store.getVisibleWindow("s1", { start: 3, end: 6 }, [0, 1, 2]);
