@@ -683,7 +683,21 @@ export class DatasourceController {
         owner: "js.datasource.pending-requests",
         logicalBytes: 0,
         allocatedBytes: 0,
-        entries: this.requests.size + this.activeIds.size + queuedDemandEntries,
+        entries: this.requests.size,
+        measurement: "entry-count-only",
+      },
+      {
+        owner: "js.datasource.request-index",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: this.activeIds.size,
+        measurement: "entry-count-only",
+      },
+      {
+        owner: "js.datasource.queued-demand",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: queuedDemandEntries,
         measurement: "entry-count-only",
       },
       {

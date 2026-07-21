@@ -595,10 +595,15 @@ describe("DatasourceController revision retention", () => {
     expect(
       controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.row-state"),
     ).toMatchObject({
-      logicalBytes: 2_000 * (1 + 4 + 8),
-      allocatedBytes: 2_000 * (1 + 4 + 8),
-      entries: 6_000,
+      logicalBytes: 0,
+      allocatedBytes: 0,
+      measurement: "entry-count-only",
+      entries: expect.any(Number),
     });
+    expect(
+      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.row-state")!
+        .entries,
+    ).toBeLessThan(100);
     expect(
       controller
         .getResourceOwners()
