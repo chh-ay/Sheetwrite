@@ -20,8 +20,9 @@
 
 use crate::memory::MemoryOwnerStats;
 
-/// Matches evaluator depth so parsing cannot admit an expression the engine cannot safely recurse.
-const PARSE_RECURSION_LIMIT: usize = 256;
+/// Bounds syntax recursion below the evaluator limit because each parenthesized
+/// expression traverses the complete precedence stack.
+const PARSE_RECURSION_LIMIT: usize = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Op {
@@ -183,7 +184,9 @@ impl Ast {
                 add_boxed_ast_memory(left, out);
                 add_boxed_ast_memory(right, out);
             }
-            Ast::Neg(inner) => add_boxed_ast_memory(inner, out),
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                add_boxed_ast_memory(inner, out);
+            }
             Ast::Num(_)
             | Ast::Bool(_)
             | Ast::Missing
@@ -467,7 +470,7 @@ impl Parser {
         }
         Ok(left)
     }
-    
+
     fn concat_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 

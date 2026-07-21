@@ -27,12 +27,10 @@ fn sheet_insert_rows_moves_cells_and_shifts_formulas() {
     put_number(&mut sheet, 0, 0, 10.0);
     put_number(&mut sheet, 1, 0, 20.0);
     put_number(&mut sheet, 2, 1, 30.0);
-    sheet
-        .formulas
-        .insert(
-            (0, 0),
-            FormulaEntry::parsed(parse("=A2+B3").unwrap(), 0, "=A2+B3"),
-        );
+    sheet.formulas.insert(
+        (0, 0),
+        FormulaEntry::parsed(parse("=A2+B3").unwrap(), 0, "=A2+B3"),
+    );
 
     sheet.insert_rows(0, 1, 1);
 
@@ -53,18 +51,14 @@ fn sheet_delete_rows_moves_cells_removes_formulas_and_shifts_refs() {
     put_number(&mut sheet, 1, 0, 2.0);
     put_number(&mut sheet, 2, 0, 3.0);
     put_number(&mut sheet, 3, 0, 4.0);
-    sheet
-        .formulas
-        .insert(
-            (0, 0),
-            FormulaEntry::parsed(parse("=A4").unwrap(), 0, "=A4"),
-        );
-    sheet
-        .formulas
-        .insert(
-            (1, 0),
-            FormulaEntry::parsed(parse("=A1").unwrap(), 0, "=A1"),
-        );
+    sheet.formulas.insert(
+        (0, 0),
+        FormulaEntry::parsed(parse("=A4").unwrap(), 0, "=A4"),
+    );
+    sheet.formulas.insert(
+        (1, 0),
+        FormulaEntry::parsed(parse("=A1").unwrap(), 0, "=A1"),
+    );
 
     sheet.delete_rows(0, 1, 1);
 
@@ -83,12 +77,10 @@ fn sheet_resize_rows_preserves_overlap_and_drops_oob_formulas() {
     let mut sheet = SheetData::new(2, 3);
     put_number(&mut sheet, 2, 0, 12.0);
     put_number(&mut sheet, 2, 1, 24.0);
-    sheet
-        .formulas
-        .insert(
-            (2, 1),
-            FormulaEntry::parsed(parse("=A3").unwrap(), 0, "=A3"),
-        );
+    sheet.formulas.insert(
+        (2, 1),
+        FormulaEntry::parsed(parse("=A3").unwrap(), 0, "=A3"),
+    );
 
     sheet.resize_rows(5);
     assert_eq!(sheet.row_count, 5);
@@ -103,12 +95,10 @@ fn sheet_resize_rows_preserves_overlap_and_drops_oob_formulas() {
     let paged_index = paged.idx(2, 1);
     paged.set_kind(paged_index, KIND_NUMBER);
     paged.set_num(paged_index, 24.0);
-    paged
-        .formulas
-        .insert(
-            (2, 1),
-            FormulaEntry::parsed(parse("=A3").unwrap(), 0, "=A3"),
-        );
+    paged.formulas.insert(
+        (2, 1),
+        FormulaEntry::parsed(parse("=A3").unwrap(), 0, "=A3"),
+    );
     paged.resize_rows(2);
     assert_eq!(paged.row_count, 2);
     assert_eq!(paged.kind_at(paged.idx(1, 1)), 0);
@@ -2458,7 +2448,7 @@ fn formula_ast_boundaries_preserve_blank_comparison_and_named_cell_semantics() {
         store.set_formula(sheet, 0, offset + 2, formula, 0);
     }
     let errors = [
-        ("=A1:A2", "#VALUE!"),
+        ("=A1:A2", "#SPILL!"),
         ("=-(1/0)", "#DIV/0!"),
         ("=IF()", "#VALUE!"),
         ("=IF(1/0,1,2)", "#DIV/0!"),

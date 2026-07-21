@@ -2477,7 +2477,7 @@ it("does not clone unrelated refs for an accepted terminal sheet removal", () =>
   });
   expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s3"]);
   expect(store.getRangeMutationAllocationStats()).toMatchObject({
-    admissionReferenceEntriesScanned: refCount,
+    admissionReferenceEntriesScanned: 0,
     admissionReferenceMapsMaterialized: 0,
   });
   store.dispose();
@@ -2565,7 +2565,7 @@ it("does not apply the ref simulation cap to an engine-skipped mutation", () => 
   expect(outcome).toMatchObject({ status: "applied", epoch: 2 });
   expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
   expect(store.getRangeMutationAllocationStats()).toMatchObject({
-    admissionReferenceEntriesScanned: 2,
+    admissionReferenceEntriesScanned: 0,
     admissionReferenceMapsMaterialized: 0,
   });
   store.dispose();

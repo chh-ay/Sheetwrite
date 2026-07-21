@@ -70,9 +70,8 @@ impl CellStore {
         if dep_index_stale {
             self.dep_index = Some(build_dep_index(&self.sheets, self.formula_epoch));
         }
-        let mut affected = match self.dep_index.as_ref() {
-            Some(index) => collect_affected_formulas(&self.sheets, sheet, index),
-            None => return,
+        let Some(index) = self.dep_index.as_ref() else {
+            return;
         };
         let mut affected = HashSet::new();
         for &sheet in seeds {
@@ -113,11 +112,13 @@ impl CellStore {
             for (key, result) in results {
                 self.store_formula_result(key, result);
             }
-            self.sheets[sheet].clear_dirty();
+            for &sheet in seeds {
+                self.sheets[sheet].clear_dirty();
+            }
             return;
         }
 
-        let mut seeded_sheets = HashSet::from([sheet]);
+        let mut seeded_sheets: HashSet<usize> = seeds.iter().copied().collect();
         let mut spill_work = 0usize;
 
         loop {
@@ -229,7 +230,7 @@ impl CellStore {
         for (key, result) in results {
             self.store_formula_result(key, result);
         }
-        for &seeded_sheet in seeds {
+        for seeded_sheet in seeded_sheets {
             self.sheets[seeded_sheet].clear_dirty();
         }
     }
@@ -421,7 +422,7 @@ impl CellStore {
             }
             Value::Blank => {
                 entry.error = None;
-                entry.value_kind = FormulaValueKind::Number;
+                entry.value_kind = FormulaValueKind::Blank;
             }
             Value::Error(error) => {
                 entry.error = Some(*error);

@@ -6,6 +6,8 @@ import {
   decodeStoreMemoryStats,
   diffRuntimeResourcePhases,
   RUNTIME_RESOURCE_SCHEMA_VERSION,
+  STORE_MEMORY_HASH_ESTIMATE_VERSION,
+  STORE_MEMORY_PROTOCOL_VERSION,
   WASM_MEMORY_OWNERS,
   type ResourceOwnerBytes,
   type RuntimeResourceSnapshot,
@@ -14,7 +16,11 @@ import {
 function encodedStoreMemory(
   overrides: Partial<Record<(typeof WASM_MEMORY_OWNERS)[number], [number, number, number]>> = {},
 ) {
-  const encoded = [1, WASM_MEMORY_OWNERS.length, 1];
+  const encoded: number[] = [
+    STORE_MEMORY_PROTOCOL_VERSION,
+    WASM_MEMORY_OWNERS.length,
+    STORE_MEMORY_HASH_ESTIMATE_VERSION,
+  ];
   let logical = 0;
   let allocated = 0;
   for (const owner of WASM_MEMORY_OWNERS) {
@@ -103,7 +109,7 @@ describe("runtime resource accounting", () => {
 
   it("fails closed on protocol drift, negatives, capacity inversion, and unaccounted bytes", () => {
     const badVersion = encodedStoreMemory();
-    badVersion[0] = 2;
+    badVersion[0] = STORE_MEMORY_PROTOCOL_VERSION + 1;
     expect(() => decodeStoreMemoryStats(badVersion, null)).toThrow(
       "Unsupported store memory protocol",
     );

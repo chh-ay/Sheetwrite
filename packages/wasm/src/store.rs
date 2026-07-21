@@ -1323,6 +1323,75 @@ impl CellStore {
         })
     }
 
+    /// Capture only persisted references for one sheet. The explicit entry cap
+    /// bounds allocation for host-side structural admission simulation.
+    #[wasm_bindgen(js_name = captureReferences)]
+    pub fn capture_references(&self, sheet: usize, max_entries: usize) -> Option<SourceSnapshot> {
+        let data = self.sheets.get(sheet)?;
+        let cell_count = data.row_count.checked_mul(data.n_cols)?;
+        if cell_count > u32::MAX as usize {
+            return None;
+        }
+        let mut references = Vec::new();
+        for (&(row, col), entry) in &data.formulas {
+            let Some(target) = entry.reference_target(sheet as u32) else {
+                continue;
+            };
+            if references.len() >= max_entries {
+                return None;
+            }
+            let offset = (row as usize)
+                .checked_mul(data.n_cols)?
+                .checked_add(col as usize)?;
+            references.push((offset as u32, target));
+        }
+        references.sort_unstable_by_key(|(offset, _)| *offset);
+        let mut reference_offsets = Vec::with_capacity(references.len());
+        let mut reference_targets = Vec::with_capacity(references.len().saturating_mul(3));
+        for (offset, target) in references {
+            reference_offsets.push(offset);
+            reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
+        }
+        Some(SourceSnapshot {
+            formula_offsets: Vec::new(),
+            formula_sources: Vec::new(),
+            reference_offsets,
+            reference_targets,
+        })
+    }
+
+    /// Return packed `[source_sheet, source_row, source_col, ...]` references
+    /// targeting one sheet, bounded before crossing into the host.
+    #[wasm_bindgen(js_name = referencesTargeting)]
+    pub fn references_targeting(
+        &self,
+        target_sheet: usize,
+        max_entries: usize,
+    ) -> Option<Vec<u32>> {
+        if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false) {
+            return Some(Vec::new());
+        }
+        let mut sources = Vec::new();
+        for (source_sheet, data) in self.sheets.iter().enumerate() {
+            if !self.sheet_alive.get(source_sheet).copied().unwrap_or(false) {
+                continue;
+            }
+            for (&(row, col), entry) in &data.formulas {
+                if entry
+                    .reference_target(source_sheet as u32)
+                    .is_none_or(|target| target.sheet as usize != target_sheet)
+                {
+                    continue;
+                }
+                if sources.len() / 3 >= max_entries {
+                    return None;
+                }
+                sources.extend_from_slice(&[source_sheet as u32, row, col]);
+            }
+        }
+        Some(sources)
+    }
+
     /// Remap styles over a rectangle using parallel old/new id tables.
     #[wasm_bindgen(js_name = remapRangeStyles)]
     pub fn remap_range_styles(

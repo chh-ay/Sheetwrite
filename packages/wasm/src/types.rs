@@ -272,9 +272,9 @@ pub(crate) struct FormulaEntry {
 }
 
 impl FormulaEntry {
-    pub(crate) fn parsed(ast: Ast, sheet: u32) -> Self {
-        let source = serialize(&ast);
-        Self::parsed_source(ast, sheet, source)
+    #[cfg(test)]
+    pub(crate) fn parsed(ast: Ast, sheet: u32, source: &str) -> Self {
+        Self::parsed_source(ast, sheet, source.to_string())
     }
 
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
@@ -307,7 +307,7 @@ impl FormulaEntry {
             ast: Some(ast),
             source: String::new(),
             error: None,
-            value_kind: FormulaValueKind::Number,
+            value_kind: FormulaValueKind::Blank,
             volatile: false,
             source_kind: PersistedSourceKind::Reference,
         }

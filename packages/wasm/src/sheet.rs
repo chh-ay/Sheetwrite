@@ -672,9 +672,15 @@ impl PagedStorage {
             stats
                 .owner_mut(PAGED_LOADED_BITMAPS)
                 .add_vec::<u64>(chunk.loaded.len(), chunk.loaded.capacity());
-            stats
-                .owner_mut(PAGED_DIRTY_BITMAPS)
-                .add_vec::<u64>(chunk.dirty.len(), chunk.dirty.capacity());
+        }
+        let dirty = stats.owner_mut(PAGED_DIRTY_BITMAPS);
+        dirty.add_hash_table::<(usize, usize), DirtyCell>(self.dirty.len(), self.dirty.capacity());
+        dirty.add_hash_table::<u64, Vec<(usize, usize)>>(
+            self.dirty_by_revision.len(),
+            self.dirty_by_revision.capacity(),
+        );
+        for cells in self.dirty_by_revision.values() {
+            dirty.add_vec::<(usize, usize)>(cells.len(), cells.capacity());
         }
     }
 }
@@ -890,20 +896,6 @@ impl SheetData {
         }
     }
 
-    pub(crate) fn set_style(&mut self, index: usize, style: u32) {
-        if self.paged.is_some() {
-            let (row, col) = self.coordinates(index);
-            let (kind, payload, _, _, _) = self.paged.as_ref().unwrap().read(row, col);
-            let _ = self
-                .paged
-                .as_mut()
-                .unwrap()
-                .write(row, col, kind, payload, style, None);
-        } else {
-            self.style[index] = style;
-        }
-    }
-
     pub(crate) fn can_dirty_cell(&self, row: usize, col: usize) -> bool {
         self.paged
             .as_ref()
@@ -944,6 +936,14 @@ impl SheetData {
         style: u32,
         dirty_revision: Option<u64>,
     ) -> bool {
+        if let (Some(paged), Some(revision)) = (&mut self.paged, dirty_revision) {
+            if !paged.prepare_dirty_cells(&[(row, col)], revision) {
+                return false;
+            }
+        }
+        if let (Ok(row), Ok(col)) = (u32::try_from(row), u32::try_from(col)) {
+            self.prepare_cell_write((row, col));
+        }
         if let Some(paged) = &mut self.paged {
             return paged.write(row, col, kind, payload, style, dirty_revision);
         }

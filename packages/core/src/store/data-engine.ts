@@ -170,6 +170,15 @@ function literalOf(value: CellScalar): CellValue {
   return { kind: "literal", value };
 }
 
+function cellKey(addr: CellAddress): string {
+  return JSON.stringify([addr.sheet, addr.row, addr.col]);
+}
+
+function parseCellKey(key: string): CellAddress {
+  const [sheet, row, col] = JSON.parse(key) as [SheetId, number, number];
+  return { sheet, row, col };
+}
+
 /**
  * Owns the raw workbook/WASM state and returns typed effects to the public
  * transaction facade. It never owns public listeners, epochs, or policy.
@@ -326,36 +335,12 @@ export class StoreDataEngine {
   }
 
   private resourceOwners(): ResourceOwnerBytes[] {
-    let formulaSourceBytes = 0;
-    for (const [key, value] of this.formulaSrc) {
-      formulaSourceBytes += (key.length + value.length) * 2;
-    }
-    const refs = this.refs.getResourceStats();
     return [
       {
         owner: "js.store.sheet-handles",
         logicalBytes: 0,
         allocatedBytes: 0,
         entries: this.handles.size,
-        measurement: "entry-count-only",
-      },
-      {
-        owner: "js.store.formula-sources",
-        logicalBytes: formulaSourceBytes,
-        allocatedBytes: formulaSourceBytes,
-        entries: this.formulaSrc.size,
-        measurement: "utf16-upper-bound",
-      },
-      {
-        owner: "js.store.reference-graph",
-        logicalBytes: 0,
-        allocatedBytes: 0,
-        entries:
-          refs.references +
-          refs.targetKeys +
-          refs.reverseTargets +
-          refs.reverseEdges +
-          refs.cachedValues,
         measurement: "entry-count-only",
       },
       ...this.styles.resourceOwners(),
@@ -619,7 +604,7 @@ export class StoreDataEngine {
     }
     let trackVirtualRefs = false;
     let referenceSimulationExceeded = false;
-    let referenceSimulationActual = this.refs.entryCount();
+    let referenceSimulationActual = 0;
     let virtualRefs: Map<string, CellAddress> | null = null;
     const referenceSimulationIssue = (): MutationIssue => ({
       kind: "resource-limit",
@@ -629,25 +614,42 @@ export class StoreDataEngine {
       max: referenceSimulationLimit,
       message: `Paged reference simulation exceeds the ${referenceSimulationLimit} entry limit`,
     });
-    const materializeVirtualRefs = (): Map<string, CellAddress> | null => {
-      if (!trackVirtualRefs) return null;
+    const materializeVirtualRefs = (force = false): Map<string, CellAddress> | null => {
+      if (!trackVirtualRefs && !force) return null;
       if (virtualRefs) return virtualRefs;
-      if (this.refs.entryCount() > referenceSimulationLimit) {
-        referenceSimulationActual = this.refs.entryCount();
-        referenceSimulationExceeded = true;
-        return null;
+      const refs = new Map<string, CellAddress>();
+      for (const sheet of this.workbook.sheets) {
+        if (!this.handles.has(sheet.id) || sheet.rowCount === 0 || sheet.columns.length === 0) {
+          continue;
+        }
+        this.noteRangeMutationFfi();
+        const snapshot = this.wasm.captureReferences(
+          this.handleOf(sheet.id),
+          referenceSimulationLimit - refs.size,
+        );
+        if (!snapshot) {
+          referenceSimulationActual = referenceSimulationLimit + 1;
+          referenceSimulationExceeded = true;
+          return null;
+        }
+        const projection = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
+        for (const [offset, target] of projection.references()) {
+          referenceSimulationActual++;
+          this.rangeMutationStats.admissionReferenceEntriesScanned++;
+          if (referenceSimulationActual > referenceSimulationLimit) {
+            referenceSimulationExceeded = true;
+            return null;
+          }
+          const source = {
+            sheet: sheet.id,
+            row: Math.floor(offset / sheet.columns.length),
+            col: offset % sheet.columns.length,
+          };
+          refs.set(cellKey(source), target);
+        }
       }
+      virtualRefs = refs;
       this.rangeMutationStats.admissionReferenceMapsMaterialized++;
-      virtualRefs = new Map();
-      for (const [source, target] of this.refs.entryIterator()) {
-        this.rangeMutationStats.admissionReferenceEntriesScanned++;
-        virtualRefs.set(cellKey(source), { ...target });
-      }
-      if (virtualRefs.size > referenceSimulationLimit) {
-        referenceSimulationActual = virtualRefs.size;
-        referenceSimulationExceeded = true;
-        return null;
-      }
       return virtualRefs;
     };
     const setVirtualRef = (source: CellAddress, target: CellAddress | null): void => {
@@ -918,27 +920,35 @@ export class StoreDataEngine {
       if (patch.op === "removeSheet") {
         if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
         if (referenceSimulationExceeded) return referenceSimulationIssue();
-        if (
-          trackVirtualRefs &&
-          virtualRefs === null &&
-          this.refs.entryCount() > referenceSimulationLimit
-        ) {
-          return referenceSimulationIssue();
+        if (!trackVirtualRefs && virtualRefs === null) {
+          this.noteRangeMutationFfi();
+          const sources = this.wasm.referencesTargeting(
+            this.handleOf(patch.sheet),
+            referenceSimulationLimit,
+          );
+          if (!sources) {
+            referenceSimulationActual = referenceSimulationLimit + 1;
+            return referenceSimulationIssue();
+          }
+          this.rangeMutationStats.admissionReferenceEntriesScanned += sources.length / 3;
+          for (let index = 0; index < sources.length; index += 3) {
+            const sourceSheet = this.sheetIdsByHandle[sources[index]!];
+            if (sourceSheet === undefined || sourceSheet === patch.sheet) continue;
+            const rejection = addSparse(sourceSheet, sources[index + 1]!, sources[index + 2]!);
+            if (rejection) return rejection;
+          }
+          states.delete(patch.sheet);
+          continue;
         }
-        const materializedRefs = virtualRefs;
-        const entries: Iterable<[CellAddress, CellAddress]> = materializedRefs
-          ? (function* () {
-              for (const [sourceKey, target] of materializedRefs) {
-                yield [parseCellKey(sourceKey), target] as [CellAddress, CellAddress];
-              }
-            })()
-          : this.refs.entryIterator();
-        if (trackVirtualRefs) {
-          this.rangeMutationStats.admissionReferenceMapsMaterialized++;
-        }
+        const materializedRefs = materializeVirtualRefs(true);
+        if (!materializedRefs) return referenceSimulationIssue();
+        const entries = (function* (): IterableIterator<[CellAddress, CellAddress]> {
+          for (const [sourceKey, target] of materializedRefs) {
+            yield [parseCellKey(sourceKey), target];
+          }
+        })();
         const remaining = trackVirtualRefs ? new Map<string, CellAddress>() : null;
         for (const [source, target] of entries) {
-          if (!materializedRefs) this.rangeMutationStats.admissionReferenceEntriesScanned++;
           if (source.sheet !== patch.sheet && target.sheet === patch.sheet) {
             const rejection = addSparse(source.sheet, source.row, source.col);
             if (rejection) return rejection;
@@ -2875,6 +2885,8 @@ export class StoreDataEngine {
       start: { row: start, col: 0 },
       end: { row: start + rowCount - 1, col: colCount - 1 },
     };
+    const previousOperation = this.resourceOperation;
+    this.resourceOperation ??= "ingest";
     let accepted = false;
     this.wasm.beginPageLoad();
     try {
@@ -2933,8 +2945,6 @@ export class StoreDataEngine {
     this.view.dispose();
     this.windowReader.clear();
     this.styles.clear();
-    this.refs.clear();
-    this.formulaSrc.clear();
     this.handles.clear();
     this.wasm.free();
     this.disposed = true;

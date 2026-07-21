@@ -196,8 +196,8 @@ export class StoreViewState {
     let inverseBytes = 0;
     let inverseEntries = 0;
     for (const index of this.rowIndexBySheet.values()) {
-      inverseBytes += index.rows.byteLength;
-      inverseEntries += index.rows.length;
+      inverseBytes += index.storage.byteLength;
+      inverseEntries += index.storage.length;
     }
     let configEntries = 0;
     for (const state of this.stateBySheet.values()) {
