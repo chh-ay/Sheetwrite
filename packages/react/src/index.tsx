@@ -269,19 +269,58 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       });
       controllerRef.current = controller;
       generationRef.current += 1;
-      publishGrid(publishedRef.current, controller.grid);
-      handlers.current?.onReady?.({
-        grid: controller.grid,
-        generation: generationRef.current,
-        reason,
-      });
-      previousOptionsRef.current = options;
-
-      return () => {
-        publishGrid(publishedRef.current, null);
+      let destroyed = false;
+      const teardown = (detachPublishedRef = false): void => {
+        if (destroyed) return;
+        destroyed = true;
         if (controllerRef.current === controller) controllerRef.current = null;
-        controller.destroy();
+
+        const published = publishedRef.current;
+        let cleanupError: unknown;
+        let cleanupFailed = false;
+        try {
+          publishGrid(published, null);
+        } catch (error) {
+          cleanupError = error;
+          cleanupFailed = true;
+        }
+        if (detachPublishedRef && publishedRef.current === published) publishedRef.current = null;
+
+        try {
+          controller.destroy();
+        } catch (error) {
+          cleanupError = cleanupFailed
+            ? new AggregateError(
+                [cleanupError, error],
+                "Sheetwrite React controller cleanup failed",
+              )
+            : error;
+          cleanupFailed = true;
+        }
+        if (cleanupFailed) throw cleanupError;
       };
+
+      try {
+        publishGrid(publishedRef.current, controller.grid);
+        handlers.current?.onReady?.({
+          grid: controller.grid,
+          generation: generationRef.current,
+          reason,
+        });
+        previousOptionsRef.current = options;
+      } catch (error) {
+        try {
+          teardown(true);
+        } catch (cleanupError) {
+          throw new AggregateError(
+            [error, cleanupError],
+            "Sheetwrite React controller creation and cleanup failed",
+          );
+        }
+        throw error;
+      }
+
+      return teardown;
     }, [
       initializationState,
       workbook,
