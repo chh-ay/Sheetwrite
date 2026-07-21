@@ -21,7 +21,7 @@ expose callbacks from work that never commits.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L103</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L105</code></dd></div>
 </dl>
 
 ## Declaration

@@ -9,7 +9,7 @@ Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L356</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L366</code></dd></div>
 </dl>
 
 ## Declaration

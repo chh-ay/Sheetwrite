@@ -9,10 +9,10 @@ Advanced framework adapter props for workbook data or datasource ownership.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L66</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L67</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>34</span>
+## Members <span class="api-count" data-pagefind-ignore>37</span>
 
 <div class="api-member-list">
 
@@ -169,6 +169,19 @@ can't be constructed, the grid falls back to the main-thread canvas
 renderer and emits `renderer-fallback` once.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-presentation" data-pagefind-weight="1">
+<summary><code>presentation</code> <span class="api-member-summary">Header presentation. Spreadsheet mode (default) paints positional A/B/C labels; data-grid mode paints each column's semantic header.</span></summary>
+
+```ts generated
+presentation?: GridPresentation;
+```
+
+<p class="api-member-doc">Header presentation. Spreadsheet mode (default) paints positional A/B/C
+labels; data-grid mode paints each column's semantic `header`. Cell
+addressing, row indices, clipboard values, formulas, and exports are
+unchanged in both modes.</p>
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-theme" data-pagefind-weight="1">
 <summary><code>theme</code> <span class="api-member-summary">Overrides merged over the default theme and host CSS custom properties.</span></summary>
 
@@ -221,6 +234,15 @@ transactionResourceLimits?: Partial<TransactionResourceLimits>;
 
 ```ts generated
 renderers?: Record<string, CellRenderer>;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-editors" data-pagefind-weight="1">
+<summary><code>editors</code> <span class="api-member-summary">Named custom editors resolved from each column's editor field.</span></summary>
+
+```ts generated
+editors?: Record<string, CellEditor>;
 ```
 
 </details>
@@ -315,6 +337,15 @@ onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-on-command-state-change" data-pagefind-weight="1">
+<summary><code>onCommandStateChange</code> <span class="api-member-summary">Receives observable undo/redo and formatting command state.</span></summary>
+
+```ts generated
+onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-on-initialization-error" data-pagefind-weight="1">
 <summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 
@@ -357,12 +388,14 @@ export interface SheetwriteGridProps {
   datasourceStorage?: DataSourceStorageOptions;
   renderer?: "canvas" | "worker";
   workerUrl?: string | URL;
+  presentation?: GridPresentation;
   theme?: Partial<Theme>;
   readOnly?: boolean;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
   transactionResourceLimits?: Partial<TransactionResourceLimits>;
   renderers?: Record<string, CellRenderer>;
+  editors?: Record<string, CellEditor>;
   overscan?: number;
   minColumns?: number;
   config?: GridConfig;
@@ -373,6 +406,7 @@ export interface SheetwriteGridProps {
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
   onInitializationError?: (error: unknown) => void;
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 }

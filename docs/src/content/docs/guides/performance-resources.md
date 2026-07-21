@@ -932,27 +932,10 @@ bun run --filter @sheetwrite/bench bench:formula
 
 ## Delivery size
 
-<div class="evidence-available"><strong>Validated evidence.</strong> Package tarball and bundler-output sizes, gated by absolute budgets in CI.</div>
+## Pending local evidence
 
-<dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Captured</dt><dd>2026-07-21 18:04 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>a37d73110d50</code> clean worktree</dd></div>
-<div><dt>Raw artifact</dt><dd><code>test-results/delivery-size/size-report.json</code></dd></div>
-</dl>
+These protocols have no validated artifact in this environment yet, so no numbers are published for them.
 
-| Package | Tarball | Unpacked |
-| --- | ---: | ---: |
-| `@sheetwrite/core` | 384.2 KiB | 2034.2 KiB |
-| `@sheetwrite/react` | 7.7 KiB | 25.1 KiB |
-| `@sheetwrite/svelte` | 5.3 KiB | 15.2 KiB |
-| `@sheetwrite/vue` | 8.9 KiB | 30.2 KiB |
-| `@sheetwrite/wasm` | 180.4 KiB | 490.1 KiB |
-| `@sheetwrite/xlsx` | 75.1 KiB | 366.9 KiB |
-
-A minimal Vite app that renders a grid ships 87.8 KiB of gzipped JavaScript.
-
-Reproduce with:
-
-```sh verify title="Delivery size evidence"
-bun run size:report
-```
+| Artifact | Status | Reproduce with |
+| --- | --- | --- |
+| `test-results/delivery-size/size-report.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run size:report` |
