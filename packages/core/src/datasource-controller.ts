@@ -684,10 +684,10 @@ export class DatasourceController {
       },
       {
         owner: "js.datasource.wait-samples",
-        logicalBytes: this.visibleWaitSampleCount * Float64Array.BYTES_PER_ELEMENT,
-        allocatedBytes: this.visibleWaitDurations.byteLength,
-        entries: this.visibleWaitSampleCount,
-        measurement: "typed-array-byte-length",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: this.visibleWaitDurations.length,
+        measurement: "entry-count-only",
       },
     ];
   }
