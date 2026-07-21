@@ -13,7 +13,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use crate::calc::{Ast, CmpOp, Func, Op};
-use crate::sheet::SpillRange;
+use crate::sheet::{spill_ownership_within_budget, SpillRange};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError,
@@ -74,10 +74,14 @@ impl CellStore {
             Some(index) => collect_affected_formulas(&self.sheets, sheet, index),
             None => return,
         };
-
         let mut affected = HashSet::new();
         for &sheet in seeds {
             affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
+            let data = &self.sheets[sheet];
+            affected.extend(data.spill_ranges.iter().filter_map(|(&anchor, &range)| {
+                (data.all_dirty || data.dirty_cells.iter().any(|&cell| range.contains(cell)))
+                    .then(|| AbsCellKey::from_local(sheet, anchor))
+            }));
         }
         if affected.is_empty() {
             for &sheet in seeds {
@@ -94,6 +98,25 @@ impl CellStore {
         }
         let mut visiting: HashSet<AbsCellKey> = HashSet::new();
         let mut processed_arrays: HashSet<AbsCellKey> = HashSet::new();
+        if self
+            .dep_index
+            .as_ref()
+            .is_some_and(|index| !index.has_dynamic_arrays)
+        {
+            for key in &affected {
+                let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
+            }
+            let results: Vec<(AbsCellKey, EvalResult)> = affected
+                .iter()
+                .filter_map(|key| memo.get(key).cloned().map(|result| (*key, result)))
+                .collect();
+            for (key, result) in results {
+                self.store_formula_result(key, result);
+            }
+            self.sheets[sheet].clear_dirty();
+            return;
+        }
+
         let mut seeded_sheets = HashSet::from([sheet]);
         let mut spill_work = 0usize;
 
@@ -124,11 +147,32 @@ impl CellStore {
                 processed_arrays.insert(key);
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
+                let vacated_range = self.sheets[output_sheet]
+                    .spill_owner(local)
+                    .and_then(|owner| {
+                        (owner == local)
+                            .then(|| self.sheets[output_sheet].spill_ranges.get(&local).copied())
+                    })
+                    .flatten();
                 let cleared = self.sheets[output_sheet].clear_spill(local);
                 if !cleared.is_empty() {
                     self.sheets[output_sheet].dirty_cells.extend(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
+                }
+                if let Some(vacated) = vacated_range {
+                    let collision_dependents: Vec<AbsCellKey> = self.sheets[output_sheet]
+                        .spill_ranges
+                        .iter()
+                        .filter_map(|(&anchor, &attempt)| {
+                            (anchor != local && attempt.intersects(vacated))
+                                .then(|| AbsCellKey::from_local(output_sheet, anchor))
+                        })
+                        .collect();
+                    for dependent in collision_dependents {
+                        affected.insert(dependent);
+                        processed_arrays.remove(&dependent);
+                    }
                 }
                 memo.remove(&key);
 
@@ -243,24 +287,58 @@ impl CellStore {
         let matrix = match result {
             Ok(matrix) => matrix,
             Err(error) => {
+                self.sheets[sheet].compact_spill_metadata();
                 memo.insert(key, Value::Error(error));
                 return Vec::new();
             }
         };
         let Some(range) = SpillRange::new(local, matrix.rows, matrix.cols) else {
+            self.sheets[sheet].compact_spill_metadata();
             memo.insert(key, Value::Error(FormulaError::Num));
             return Vec::new();
         };
         self.sheets[sheet].spill_ranges.insert(local, range);
-        if let Some(error) = matrix.values.iter().find_map(|value| match value {
-            Value::Error(error) => Some(*error),
-            _ => None,
-        }) {
+        if let Err(error) = self.spill_collision(sheet, range) {
+            self.sheets[sheet].compact_spill_metadata();
             memo.insert(key, Value::Error(error));
             return Vec::new();
         }
-        if let Err(error) = self.spill_collision(sheet, range) {
-            memo.insert(key, Value::Error(error));
+
+        let additional_errors = matrix
+            .values
+            .iter()
+            .skip(1)
+            .filter(|value| matches!(value, Value::Error(_)))
+            .count();
+        let current_owner_cells = self
+            .sheets
+            .iter()
+            .try_fold(0usize, |total, data| total.checked_add(data.spill_owners.len()));
+        let current_error_cells = self
+            .sheets
+            .iter()
+            .try_fold(0usize, |total, data| total.checked_add(data.spill_errors.len()));
+        let within_budget = current_owner_cells
+            .and_then(|total| total.checked_add(matrix.values.len()))
+            .zip(
+                current_error_cells
+                    .and_then(|total| total.checked_add(additional_errors)),
+            )
+            .is_some_and(|(owners, errors)| {
+                owners <= self.spill_owner_cell_limit
+                    && spill_ownership_within_budget(owners, errors)
+            });
+        if !within_budget {
+            self.sheets[sheet].compact_spill_metadata();
+            memo.insert(key, Value::Error(FormulaError::Num));
+            return Vec::new();
+        }
+        let data = &mut self.sheets[sheet];
+        if data.spill_owners.try_reserve(matrix.values.len()).is_err()
+            || data.spill_errors.try_reserve(additional_errors).is_err()
+        {
+            data.compact_spill_metadata();
+            memo.insert(key, Value::Error(FormulaError::Num));
             return Vec::new();
         }
 
@@ -303,12 +381,17 @@ impl CellStore {
                         data.set_kind(index, KIND_EMPTY);
                         data.clear_payload(index);
                     }
-                    Value::Error(_) => unreachable!("array errors were rejected before spilling"),
+                    Value::Error(error) => {
+                        data.set_kind(index, KIND_FORMULA);
+                        data.clear_payload(index);
+                        data.spill_errors.insert(cell, *error);
+                    }
                 }
                 data.mark_cell_loaded(cell.0 as usize, cell.1 as usize, false);
                 changed.push(cell);
             }
         }
+        self.sheets[sheet].compact_spill_metadata();
         changed
     }
 
@@ -396,6 +479,9 @@ impl CellStore {
                     return self.eval_formula_cell(abs_key, affected, memo, visiting, depth + 1);
                 }
                 return cached_formula_value(s, &self.strings, i, entry);
+            }
+            if let Some(error) = s.spill_errors.get(&key) {
+                return Value::Error(*error);
             }
         }
 

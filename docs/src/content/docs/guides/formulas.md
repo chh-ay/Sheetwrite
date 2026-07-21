@@ -184,6 +184,9 @@ coercions as the scalar engine:
 - `UNIQUE` preserves first-seen order. `by_col=TRUE` compares columns;
   `exactly_once=TRUE` keeps only items occurring once.
 
+Errors inside a returned array stay at their corresponding spill children; a mixed result such
+as `{1;#N/A;2}` does not collapse to an anchor-only error.
+
 The formula cell is the **anchor** and owns the complete runtime rectangle. Spill children
 have no formula source or persisted document identity. `store.getSpillAnchor(address)` returns
 the anchor for either the anchor or a child, and returns `null` for an ordinary cell.
@@ -203,8 +206,11 @@ warning rather than being silently treated as Sheetwrite spills.
 
 Each array dimension is capped at Excel's row/column limits, one spill is capped at 1,000,000
 cells and 64 MiB of bounded value/intermediate storage, and one dynamic recompute pass is
-capped at 2,000,000 cell operations. Oversized work returns `#NUM!`; unstable or colliding
-shapes return an explicit error rather than truncating.
+capped at 2,000,000 cell operations. Materialized spill ownership across the complete store is
+also capped at 1,000,000 cells and 64 MiB, including per-child error metadata. Installation
+checks that cumulative budget atomically; clearing, shrinking, or removing a spill releases its
+ownership. Oversized work returns stable `#NUM!` without partial children, while unstable or
+colliding shapes return an explicit error rather than truncating.
 
 ## Point mode and reference rewriting
 

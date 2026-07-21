@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use crate::calc::{Ast, Func};
 use crate::sheet::SheetData;
 use crate::types::{
     AbsCellKey, CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT,
@@ -13,6 +14,7 @@ pub(crate) struct DepIndex {
     range_groups: Vec<RangeGroup>,
     range_sheets: Vec<RangeSheetIndex>,
     pub(super) epoch: u64,
+    pub(super) has_dynamic_arrays: bool,
 }
 
 impl DepIndex {
@@ -131,9 +133,19 @@ impl RangeInterval {
 pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
     let mut exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>> = HashMap::new();
     let mut range_dependents: HashMap<CellRange, Vec<AbsCellKey>> = HashMap::new();
+    let mut has_dynamic_arrays = false;
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         for (&formula_cell, entry) in &sheet.formulas {
+            has_dynamic_arrays |= matches!(
+                entry.ast.as_ref(),
+                Some(
+                    Ast::Range(..)
+                        | Ast::AbsRange(..)
+                        | Ast::NamedRange(..)
+                        | Ast::Func(Func::Filter | Func::Sort | Func::Unique, _)
+                )
+            );
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
                 exact_dependents.entry(cell).or_default().push(formula_abs);
@@ -169,6 +181,7 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
         range_groups,
         range_sheets,
         epoch,
+        has_dynamic_arrays,
     }
 }
 

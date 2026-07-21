@@ -14,6 +14,7 @@ use crate::memory::{
 use crate::sheet::{
     encode_num, encode_str_id, formula_error_at, payload_num, payload_str_id, CondPred, CondRule,
     SheetData, SpillBlocker, DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
+    MAX_SPILL_OWNER_CELLS,
 };
 use crate::types::{
     cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, FormulaValueKind,
@@ -231,6 +232,7 @@ pub struct CellStore {
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
+    pub(crate) spill_owner_cell_limit: usize,
 }
 
 #[wasm_bindgen]
@@ -251,6 +253,7 @@ impl CellStore {
             active_mutation_revision: None,
             named_ranges: HashMap::new(),
             volatile_serial: 0.0,
+            spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
         }
     }
 
@@ -2327,6 +2330,11 @@ impl CellStore {
             metadata.add_payload(value.name.len(), value.name.capacity());
         }
         stats
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_spill_owner_limit_for_test(&mut self, cells: usize) {
+        self.spill_owner_cell_limit = cells.min(MAX_SPILL_OWNER_CELLS);
     }
 
     pub(crate) fn try_add_sheet(

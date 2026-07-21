@@ -617,6 +617,9 @@ fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
             let Some(key) = key_for_index(sheet, index) else {
                 return 0;
             };
+            if formula_error_at(sheet, key).is_some() {
+                return 2;
+            }
             let Some(entry) = sheet.formulas.get(&key) else {
                 return 0;
             };

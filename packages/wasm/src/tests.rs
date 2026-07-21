@@ -397,6 +397,106 @@ fn dynamic_array_errors_and_resource_caps_fail_closed() {
 }
 
 #[test]
+fn blocked_spills_retry_when_an_unrelated_spill_shrinks() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 4);
+    for col in 3..=5 {
+        store.set_number(sheet, 0, col, col as f64, 0);
+        store.set_number(sheet, 1, col, (col + 10) as f64, 0);
+    }
+    for row in 0..3 {
+        store.set_number(sheet, row, 6, (row + 1) as f64, 0);
+        store.set_bool(sheet, row, 7, true, 0);
+    }
+    // B1:B3 owns the intersections B2 and B3. A2 and A3 have unrelated
+    // dependencies, so only collision tracking can wake them after B1 shrinks.
+    store.set_formula(sheet, 0, 1, "=FILTER(G1:G3,H1:H3)", 0);
+    store.set_formula(sheet, 1, 0, "=D1:F1", 0);
+    store.set_formula(sheet, 2, 0, "=D2:F2", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("#SPILL!"));
+    assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("#SPILL!"));
+
+    store.set_bool(sheet, 1, 7, false, 0);
+    store.set_bool(sheet, 2, 7, false, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2].map(|col| number(&store, sheet, 1, col)),
+        [3.0, 4.0, 5.0]
+    );
+    assert_eq!(
+        [0, 1, 2].map(|col| number(&store, sheet, 2, col)),
+        [13.0, 14.0, 15.0]
+    );
+}
+
+#[test]
+fn mixed_spill_errors_materialize_at_their_array_positions() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(7, 4);
+    store.set_number(sheet, 0, 0, 1.0, 0);
+    store.set_formula(sheet, 1, 0, "=NA()", 0);
+    store.set_number(sheet, 2, 0, 2.0, 0);
+    for row in 0..3 {
+        store.set_bool(sheet, row, 1, true, 0);
+    }
+    store.set_formula(sheet, 0, 2, "=A1:A3", 0);
+    store.set_formula(sheet, 0, 4, "=FILTER(A1:A3,B1:B3)", 0);
+    store.set_formula(sheet, 0, 6, "=UNIQUE(A1:A3)", 0);
+    store.set_formula(sheet, 1, 3, "=C2+1", 0);
+    store.recompute(sheet);
+
+    for col in [2, 4, 6] {
+        assert_close(number(&store, sheet, 0, col), 1.0);
+        assert_eq!(string(&store, sheet, 1, col).as_deref(), Some("#N/A"));
+        assert_close(number(&store, sheet, 2, col), 2.0);
+        assert_eq!(store.spill_anchor_row(sheet, 1, col), 0);
+        assert_eq!(store.spill_anchor_col(sheet, 1, col), col as u32);
+    }
+    assert_eq!(string(&store, sheet, 1, 3).as_deref(), Some("#N/A"));
+
+    let snapshot = store
+        .capture_range(sheet, 0, 2, 3, 1)
+        .expect("mixed-error spill history should capture");
+    assert!(store.clear_range(sheet, 0, 2, 2, 2, true, false));
+    store.recompute(sheet);
+    assert!(store.restore_range(sheet, 0, 2, &snapshot));
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("#N/A"));
+    let mut distinct = store.distinct_values(sheet, 2, 0);
+    assert_eq!(distinct.take_texts(), vec!["#N/A"]);
+}
+
+#[test]
+fn spill_ownership_budget_is_store_wide_atomic_and_released() {
+    let mut store = CellStore::new();
+    store.set_spill_owner_limit_for_test(5);
+    let first = store.add_sheet(2, 3);
+    let second = store.add_sheet(2, 3);
+    for sheet in [first, second] {
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 1, "=A1:A3", 0);
+    }
+    store.recompute(first);
+    store.recompute(second);
+    assert_eq!(string(&store, second, 0, 1).as_deref(), Some("#NUM!"));
+    assert_eq!(store.get_cell(second, 1, 1).kind(), KIND_EMPTY);
+    assert_eq!(store.spill_anchor_row(second, 1, 1), u32::MAX);
+
+    store.clear_cell(first, 0, 1, 0);
+    store.recompute(first);
+    assert_eq!(store.sheets[first].spill_owners.capacity(), 0);
+    store.set_number(second, 0, 0, 1.0, 0);
+    store.recompute(second);
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, second, row, 1)),
+        [1.0, 2.0, 3.0]
+    );
+}
+
+#[test]
 fn text_functions_surface_string_and_boolean_values() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(4, 16);

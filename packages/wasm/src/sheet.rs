@@ -683,6 +683,22 @@ impl PagedStorage {
 
 /// Aggregate eager-allocation ceiling mirrored by `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`.
 pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
+pub(crate) const MAX_SPILL_OWNER_CELLS: usize = 1_000_000;
+pub(crate) const MAX_SPILL_OWNER_BYTES: usize = 64 * 1024 * 1024;
+const SPILL_OWNER_ENTRY_BYTES: usize = 32;
+const SPILL_ERROR_ENTRY_BYTES: usize = 16;
+
+pub(crate) fn spill_ownership_within_budget(owner_cells: usize, error_cells: usize) -> bool {
+    owner_cells <= MAX_SPILL_OWNER_CELLS
+        && owner_cells
+            .checked_mul(SPILL_OWNER_ENTRY_BYTES)
+            .and_then(|bytes| {
+                error_cells
+                    .checked_mul(SPILL_ERROR_ENTRY_BYTES)
+                    .and_then(|errors| bytes.checked_add(errors))
+            })
+            .is_some_and(|bytes| bytes <= MAX_SPILL_OWNER_BYTES)
+}
 
 pub(crate) fn checked_dense_cell_count(n_cols: usize, row_count: usize) -> Option<usize> {
     n_cols
@@ -721,6 +737,13 @@ impl SpillRange {
             && cell.1 >= self.anchor.1
             && cell.1 <= self.col_end
     }
+
+    pub(crate) fn intersects(self, other: Self) -> bool {
+        self.anchor.0 <= other.row_end
+            && self.row_end >= other.anchor.0
+            && self.anchor.1 <= other.col_end
+            && self.col_end >= other.anchor.1
+    }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct SpillBlocker {
@@ -750,6 +773,8 @@ pub(crate) struct SheetData {
     pub(crate) spill_ranges: HashMap<CellKey, SpillRange>,
     /// Every currently materialized spill cell (including its anchor) to its owner.
     pub(crate) spill_owners: HashMap<CellKey, CellKey>,
+    /// Errors projected into derived spill cells; anchors keep errors in FormulaEntry.
+    pub(crate) spill_errors: HashMap<CellKey, FormulaError>,
     /// Host-owned merge/protection cells that a spill must never overwrite.
     pub(crate) spill_blockers: Vec<SpillBlocker>,
     /// Cells changed since the last transaction-barrier formula recompute.
@@ -798,6 +823,7 @@ impl SheetData {
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
+            spill_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -822,6 +848,7 @@ impl SheetData {
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
+            spill_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -1150,24 +1177,51 @@ impl SheetData {
 
     /// Remove only cells still owned by `anchor`; a user-written obstruction that
     /// detached from the spill remains untouched.
-    pub(crate) fn clear_spill(&mut self, anchor: CellKey) -> Vec<CellKey> {
-        let owned: Vec<CellKey> = self
-            .spill_owners
-            .iter()
-            .filter_map(|(&cell, &owner)| (owner == anchor).then_some(cell))
-            .collect();
-        let mut changed = Vec::with_capacity(owned.len().saturating_sub(1));
-        for cell in owned {
-            self.spill_owners.remove(&cell);
-            if cell == anchor || !self.contains_cell(cell.0 as usize, cell.1 as usize) {
-                continue;
-            }
-            let index = self.idx(cell.0 as usize, cell.1 as usize);
-            self.set_kind(index, KIND_EMPTY);
-            self.clear_payload(index);
-            changed.push(cell);
+    pub(crate) fn compact_spill_metadata(&mut self) {
+        if self.spill_owners.is_empty() {
+            self.spill_owners = HashMap::new();
+        } else if self.spill_owners.capacity() > self.spill_owners.len().saturating_mul(2)
+            && self.spill_owners.capacity().saturating_sub(self.spill_owners.len()) > 4096
+        {
+            self.spill_owners.shrink_to_fit();
         }
-        self.spill_ranges.remove(&anchor);
+        if self.spill_errors.is_empty() {
+            self.spill_errors = HashMap::new();
+        } else if self.spill_errors.capacity() > self.spill_errors.len().saturating_mul(2)
+            && self.spill_errors.capacity().saturating_sub(self.spill_errors.len()) > 4096
+        {
+            self.spill_errors.shrink_to_fit();
+        }
+    }
+
+    pub(crate) fn clear_spill(&mut self, anchor: CellKey) -> Vec<CellKey> {
+        if self.spill_owner(anchor) != Some(anchor) {
+            return Vec::new();
+        }
+        let Some(range) = self.spill_ranges.get(&anchor).copied() else {
+            return Vec::new();
+        };
+        let mut changed = Vec::new();
+        for row in range.anchor.0..=range.row_end {
+            for col in range.anchor.1..=range.col_end {
+                let cell = (row, col);
+                if self.spill_owner(cell) != Some(anchor) {
+                    continue;
+                }
+                self.spill_owners.remove(&cell);
+                self.spill_errors.remove(&cell);
+                if cell == anchor || !self.contains_cell(row as usize, col as usize) {
+                    continue;
+                }
+                if !self.is_loaded(row as usize, col as usize) {
+                    continue;
+                }
+                let index = self.idx(row as usize, col as usize);
+                self.set_kind(index, KIND_EMPTY);
+                self.clear_payload(index);
+                changed.push(cell);
+            }
+        }
         changed
     }
 
@@ -1177,6 +1231,8 @@ impl SheetData {
         for anchor in anchors {
             changed.extend(self.clear_spill(anchor));
         }
+        self.spill_ranges.clear();
+        self.compact_spill_metadata();
         changed
     }
 
@@ -1191,9 +1247,12 @@ impl SheetData {
         if self.spill_ranges.contains_key(&cell) {
             let changed = self.clear_spill(cell);
             self.dirty_cells.extend(changed);
+            self.spill_ranges.remove(&cell);
         } else {
             self.spill_owners.remove(&cell);
+            self.spill_errors.remove(&cell);
         }
+        self.compact_spill_metadata();
         self.dirty_cells.extend(affected);
     }
 
@@ -1674,7 +1733,11 @@ impl SheetData {
 }
 
 pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<FormulaError> {
-    sheet.formulas.get(&key).and_then(|entry| entry.error)
+    sheet
+        .spill_errors
+        .get(&key)
+        .copied()
+        .or_else(|| sheet.formulas.get(&key).and_then(|entry| entry.error))
 }
 
 #[cfg(test)]
