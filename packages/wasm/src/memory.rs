@@ -6,9 +6,9 @@
 //! outside the logical store contract and are reported by the host as allocator
 //! margin rather than invented from `size_of_val`.
 
-pub(crate) const STORE_MEMORY_SCHEMA_VERSION: u32 = 1;
+pub(crate) const STORE_MEMORY_SCHEMA_VERSION: u32 = 3;
 pub(crate) const HASH_TABLE_ESTIMATE_VERSION: u32 = 1;
-pub(crate) const STORE_MEMORY_OWNER_COUNT: usize = 16;
+pub(crate) const STORE_MEMORY_OWNER_COUNT: usize = 19;
 
 pub(crate) const DENSE_KINDS: usize = 0;
 pub(crate) const DENSE_PAYLOADS: usize = 1;
@@ -26,6 +26,9 @@ pub(crate) const FORMULAS: usize = 12;
 pub(crate) const DEPENDENCY_NODES: usize = 13;
 pub(crate) const DEPENDENCY_EDGES: usize = 14;
 pub(crate) const SHEET_INDEXES_METADATA: usize = 15;
+pub(crate) const SPILL_RANGES: usize = 16;
+pub(crate) const SPILL_OWNERS: usize = 17;
+pub(crate) const SPILL_BLOCKERS: usize = 18;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct MemoryOwnerStats {
@@ -223,6 +226,28 @@ mod tests {
             );
         }
         assert!(owner(&unique, STRING_INDEX).1 >= owner(&unique, STRING_INDEX).0);
+    }
+
+    #[test]
+    fn spill_anchors_owners_and_blockers_have_disjoint_capacity_owners() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 3);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 1, "=A1:A3", 0);
+        store.recompute(sheet);
+        let materialized = store.memory_stats();
+        assert_eq!(owner(&materialized, SPILL_RANGES).2, 1);
+        assert_eq!(owner(&materialized, SPILL_OWNERS).2, 3);
+        assert_eq!(owner(&materialized, SPILL_BLOCKERS).2, 0);
+
+        assert!(store.set_spill_blockers(sheet, &[1, 1, 1, 1]));
+        store.recompute(sheet);
+        let blocked = store.memory_stats();
+        assert_eq!(owner(&blocked, SPILL_RANGES).2, 1);
+        assert_eq!(owner(&blocked, SPILL_OWNERS).2, 0);
+        assert_eq!(owner(&blocked, SPILL_BLOCKERS).2, 1);
     }
 
     #[test]

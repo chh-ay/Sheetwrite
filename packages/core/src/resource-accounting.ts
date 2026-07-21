@@ -1,6 +1,6 @@
 /** Stable protocol for runtime ownership and operation-cost reports. */
 export const RUNTIME_RESOURCE_SCHEMA_VERSION = 2 as const;
-export const STORE_MEMORY_PROTOCOL_VERSION = 2 as const;
+export const STORE_MEMORY_PROTOCOL_VERSION = 3 as const;
 export const STORE_MEMORY_HASH_ESTIMATE_VERSION = 1 as const;
 
 export const WASM_MEMORY_OWNERS = [
@@ -20,6 +20,9 @@ export const WASM_MEMORY_OWNERS = [
   "wasm.dependency-nodes",
   "wasm.dependency-edges",
   "wasm.sheet-indexes-metadata",
+  "wasm.spill-ranges",
+  "wasm.spill-owners",
+  "wasm.spill-blockers",
 ] as const;
 
 export type WasmMemoryOwner = (typeof WASM_MEMORY_OWNERS)[number];
@@ -259,7 +262,14 @@ export function decodeStoreMemoryStats(
       allocatedBytes,
       entries,
       measurement:
-        index === 8 || index === 11 || index === 12 || index === 13 || index === 15
+        index === 7 ||
+        index === 8 ||
+        index === 11 ||
+        index === 12 ||
+        index === 13 ||
+        index === 15 ||
+        index === 16 ||
+        index === 17
           ? "hash-capacity-v1"
           : "exact-capacity",
     });

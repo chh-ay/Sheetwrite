@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use crate::memory::{
     StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
     PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
-    SHEET_INDEXES_METADATA,
+    SHEET_INDEXES_METADATA, SPILL_BLOCKERS, SPILL_OWNERS, SPILL_RANGES,
 };
 use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, NO_STRING};
 
@@ -1455,6 +1455,22 @@ impl SheetData {
         for entry in self.formulas.values() {
             entry.heap_memory_stats(formulas);
         }
+
+        stats
+            .owner_mut(SPILL_RANGES)
+            .add_hash_table::<CellKey, SpillRange>(
+                self.spill_ranges.len(),
+                self.spill_ranges.capacity(),
+            );
+        stats
+            .owner_mut(SPILL_OWNERS)
+            .add_hash_table::<CellKey, CellKey>(
+                self.spill_owners.len(),
+                self.spill_owners.capacity(),
+            );
+        stats
+            .owner_mut(SPILL_BLOCKERS)
+            .add_vec::<SpillBlocker>(self.spill_blockers.len(), self.spill_blockers.capacity());
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         metadata.add_hash_table::<CellKey, ()>(

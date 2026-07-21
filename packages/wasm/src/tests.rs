@@ -254,6 +254,149 @@ fn formulas_cover_functions_ranges_and_comparisons() {
 }
 
 #[test]
+fn incumbent_operators_cover_precedence_coercion_errors_and_unicode() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 12);
+    store.set_number(sheet, 0, 0, 7.0, 0);
+    let formulas = [
+        (0, "=2^3^2"),
+        (1, "=-2^2"),
+        (2, "=-(2^2)"),
+        (3, "=2^3%"),
+        (4, "=50%%"),
+        (5, "=1&2+3"),
+        (6, "=\"漢\"&TRUE&\"🙂\""),
+        (7, "=\"2\"^3"),
+        (8, "=0^-1"),
+        (9, "=(-1)^0.5"),
+    ];
+    for (row, source) in formulas {
+        store.set_formula(sheet, row, 1, source, 0);
+    }
+    store.recompute(sheet);
+
+    assert_close(number(&store, sheet, 0, 1), 64.0);
+    assert_close(number(&store, sheet, 1, 1), 4.0);
+    assert_close(number(&store, sheet, 2, 1), -4.0);
+    assert_close(number(&store, sheet, 3, 1), 2.0f64.powf(0.03));
+    assert_close(number(&store, sheet, 4, 1), 0.005);
+    assert_eq!(string(&store, sheet, 5, 1).as_deref(), Some("15"));
+    assert_eq!(string(&store, sheet, 6, 1).as_deref(), Some("漢TRUE🙂"));
+    assert_close(number(&store, sheet, 7, 1), 8.0);
+    assert_eq!(string(&store, sheet, 8, 1).as_deref(), Some("#DIV/0!"));
+    assert_eq!(string(&store, sheet, 9, 1).as_deref(), Some("#NUM!"));
+}
+
+#[test]
+fn formula_ingest_preserves_original_source_until_a_structural_rewrite() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 2);
+    let source = " =  A1 & \" λ \"  ";
+    store.set_formula(sheet, 0, 1, source, 0);
+    assert_eq!(store.formula_source(sheet, 0, 1).as_deref(), Some(source));
+
+    store.add_rows(sheet, 0, 1);
+    assert_eq!(
+        store.formula_source(sheet, 1, 1).as_deref(),
+        Some("=(A2&\" λ \")")
+    );
+}
+
+#[test]
+fn dynamic_arrays_spill_resize_obstruct_persist_and_invalidate_dependents() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(9, 12);
+    for (row, value) in [3.0, 1.0, 3.0, 2.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+    for (row, value) in [true, false, true, true].into_iter().enumerate() {
+        store.set_bool(sheet, row, 1, value, 0);
+    }
+    store.set_number(sheet, 2, 7, 99.0, 0);
+    store.set_formula(sheet, 0, 3, "=FILTER(A1:A4,B1:B4)", 11);
+    store.set_formula(sheet, 0, 4, "=SORT(A1:A4)", 12);
+    store.set_formula(sheet, 0, 5, "=UNIQUE(A1:A4)", 13);
+    store.set_formula(sheet, 0, 6, "=A1:A4", 14);
+    store.set_formula(sheet, 0, 7, "=A1:A4", 15);
+    store.set_formula(sheet, 7, 2, "=D3", 0);
+    store.recompute(sheet);
+
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 3)),
+        [3.0, 3.0, 2.0]
+    );
+    assert_eq!(
+        [0, 1, 2, 3].map(|row| number(&store, sheet, row, 4)),
+        [1.0, 2.0, 3.0, 3.0]
+    );
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 5)),
+        [3.0, 1.0, 2.0]
+    );
+    assert_eq!(
+        [0, 1, 2, 3].map(|row| number(&store, sheet, row, 6)),
+        [3.0, 1.0, 3.0, 2.0]
+    );
+    assert_eq!(store.formula_source(sheet, 1, 3), None);
+    assert_eq!(store.spill_anchor_row(sheet, 2, 3), 0);
+    assert_eq!(store.spill_anchor_col(sheet, 2, 3), 3);
+    assert_eq!(string(&store, sheet, 0, 7).as_deref(), Some("#SPILL!"));
+    assert_close(number(&store, sheet, 2, 7), 99.0);
+    assert_close(number(&store, sheet, 7, 2), 2.0);
+
+    store.set_bool(sheet, 3, 1, false, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 3), 3.0);
+    assert_close(number(&store, sheet, 1, 3), 3.0);
+    assert_eq!(store.get_cell(sheet, 2, 3).kind(), KIND_EMPTY);
+    assert_close(number(&store, sheet, 7, 2), 0.0);
+
+    store.clear_cell(sheet, 2, 7, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2, 3].map(|row| number(&store, sheet, row, 7)),
+        [3.0, 1.0, 3.0, 2.0]
+    );
+
+    let snapshot = store
+        .capture_range(sheet, 0, 3, 3, 1)
+        .expect("spill history should capture");
+    assert_eq!(snapshot.kinds(), vec![KIND_FORMULA, KIND_EMPTY, KIND_EMPTY]);
+    assert_eq!(snapshot.formula_sources(), vec!["=FILTER(A1:A4,B1:B4)"]);
+    assert!(store.clear_range(sheet, 0, 3, 2, 3, true, false));
+    store.recompute(sheet);
+    assert!(store.restore_range(sheet, 0, 3, &snapshot));
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 3), 3.0);
+    assert_close(number(&store, sheet, 1, 3), 3.0);
+    assert_eq!(store.get_cell(sheet, 2, 3).kind(), KIND_EMPTY);
+}
+
+#[test]
+fn dynamic_array_errors_and_resource_caps_fail_closed() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    for row in 0..4 {
+        store.set_number(sheet, row, 0, row as f64, 0);
+        store.set_bool(sheet, row, 1, false, 0);
+    }
+    store.set_formula(sheet, 0, 2, "=FILTER(A1:A4,B1:B4)", 0);
+    store.set_formula(sheet, 1, 2, "=FILTER(A1:A4,B1:B4,\"none\")", 0);
+    store.set_formula(sheet, 2, 2, "=SORT(A1:A4,0)", 0);
+    store.set_formula(sheet, 3, 2, "=UNIQUE(A1:A4,FALSE,TRUE)", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#CALC!"));
+    assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("none"));
+    assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#VALUE!"));
+    assert_eq!(string(&store, sheet, 3, 2).as_deref(), Some("#SPILL!"));
+
+    let paged = store.add_paged_sheet(2, 1_000_001, 256, 1_000_000, 1_000_000);
+    store.set_formula(paged, 0, 1, "=SORT(A1:A1000001)", 0);
+    store.recompute(paged);
+    assert_eq!(string(&store, paged, 0, 1).as_deref(), Some("#NUM!"));
+}
+
+#[test]
 fn text_functions_surface_string_and_boolean_values() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(4, 16);
