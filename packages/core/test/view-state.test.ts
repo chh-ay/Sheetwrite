@@ -150,6 +150,74 @@ describe("StoreViewState packed inverse index", () => {
     expect(view.viewRowOf("s2", 2)).toBe(2);
   });
 
+  it("uses zero bytes for empty views, survivor-scaled sparse storage, and four-byte dense storage", () => {
+    const sparse = sortedView(1_000_000, [0, 8, 16, 24]);
+    expect(sparse.view.inverseIndexByteLength("s1")).toBe(0);
+    expect(sparse.view.viewRowOf("s1", 0)).toBe(0);
+    expect(sparse.view.viewRowOf("s1", 8)).toBe(1);
+    expect(sparse.view.viewRowOf("s1", 16)).toBe(2);
+    expect(sparse.view.viewRowOf("s1", 24)).toBe(3);
+    expect(sparse.view.viewRowOf("s1", 600_000)).toBeNull();
+    expect(sparse.view.inverseIndexByteLength("s1")).toBe(64);
+
+    sparse.setOrder([32, 40, 48, 56]);
+    expect(sparse.view.viewRowOf("s1", 0)).toBeNull();
+    expect(sparse.view.viewRowOf("s1", 24)).toBeNull();
+    expect(sparse.view.viewRowOf("s1", 32)).toBe(0);
+    expect(sparse.view.viewRowOf("s1", 40)).toBe(1);
+    expect(sparse.view.viewRowOf("s1", 48)).toBe(2);
+    expect(sparse.view.viewRowOf("s1", 56)).toBe(3);
+    expect(sparse.view.inverseIndexByteLength("s1")).toBe(64);
+
+    sparse.setOrder([]);
+    expect(sparse.view.inverseIndexByteLength("s1")).toBe(0);
+    expect(sparse.view.viewRowOf("s1", 56)).toBeNull();
+    expect(sparse.view.inverseIndexByteLength("s1")).toBe(0);
+
+    const denseOrder = Array.from({ length: 16 }, (_, row) => 15 - row);
+    const dense = sortedView(16, denseOrder);
+    expect(dense.view.viewRowOf("s1", 15)).toBe(0);
+    expect(dense.view.inverseIndexByteLength("s1")).toBe(16 * Uint32Array.BYTES_PER_ELEMENT);
+  });
+
+  it("bounds aggregate inverse storage across 256 sparse and empty sheets", () => {
+    const logicalRows = 1_000_000;
+    const sheets = Array.from({ length: 256 }, (_, handle) => ({
+      id: `s${handle}`,
+      name: `Sheet ${handle}`,
+      rowCount: logicalRows,
+      columns: [{ key: "value", header: "Value", width: 100, type: "number" as const }],
+      sortKeys: [{ col: 0, ascending: true }],
+    }));
+    const document: Workbook = { activeSheet: "s0", sheets };
+    const orders = sheets.map((_, handle) =>
+      handle % 2 === 0
+        ? new Uint32Array(0)
+        : Uint32Array.from([logicalRows - 1, 7, 12_345, 500_000]),
+    );
+    const handles = new Map(sheets.map((sheet, handle) => [sheet.id, handle]));
+    const wasm = {
+      sortRowsMulti: (handle: number) => orders[handle]!,
+    } as unknown as RecomputingCellStore;
+    const view = new StoreViewState(wasm, document, handles);
+
+    for (let handle = 0; handle < sheets.length; handle++) {
+      const sheet = sheets[handle]!;
+      view.metadataChanged(sheet.id);
+      expect(view.viewRowOf(sheet.id, logicalRows - 1)).toBe(handle % 2 === 0 ? null : 0);
+    }
+
+    const aggregateBytes = sheets.reduce(
+      (bytes, sheet) => bytes + view.inverseIndexByteLength(sheet.id),
+      0,
+    );
+    expect(aggregateBytes).toBe(128 * 64);
+    view.dispose();
+    expect(sheets.reduce((bytes, sheet) => bytes + view.inverseIndexByteLength(sheet.id), 0)).toBe(
+      0,
+    );
+  });
+
   it("rejects corrupt view orders instead of creating coordinate aliases", () => {
     const { view } = sortedView(3, [0, 3]);
     expect(() => view.viewRowOf("s1", 0)).toThrow(

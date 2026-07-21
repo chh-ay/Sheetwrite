@@ -8,9 +8,35 @@ const EMPTY_FILTERS: ReadonlyMap<number, ColumnFilter> = new Map();
 const EMPTY_GROUPS: readonly RowGroup[] = [];
 const ABSENT_VIEW_ROW = 0xffff_ffff;
 
+type PackedRowIndexKind = "empty" | "sparse" | "dense";
+
 interface PackedRowIndex {
-  readonly rows: Uint32Array;
+  readonly kind: PackedRowIndexKind;
+  readonly storage: Uint32Array;
+  logicalRows: number;
   valid: boolean;
+}
+
+interface PackedRowIndexShape {
+  readonly kind: PackedRowIndexKind;
+  readonly storageLength: number;
+}
+
+function packedIndexShape(logicalRows: number, survivors: number): PackedRowIndexShape {
+  if (survivors === 0) return { kind: "empty", storageLength: 0 };
+
+  const requiredSlots = survivors * 2;
+  if (requiredSlots < 0x8000_0000) {
+    let capacity = 1;
+    while (capacity < requiredSlots) capacity *= 2;
+    const storageLength = capacity * 2;
+    if (storageLength < logicalRows) return { kind: "sparse", storageLength };
+  }
+  return { kind: "dense", storageLength: logicalRows };
+}
+
+function hashDataRow(row: number): number {
+  return Math.imul(row ^ (row >>> 16), 0x045d_9f3b) >>> 0;
 }
 
 const COMPARE_OP: Record<"gt" | "gte" | "lt" | "lte" | "eq" | "neq", number> = {
@@ -60,38 +86,33 @@ export class StoreViewState {
     }
 
     let index = this.rowIndexBySheet.get(sheet);
-    if (index?.valid) {
-      if (dataRow >= index.rows.length) return null;
-      const viewRow = index.rows[dataRow]!;
+    if (!index?.valid) {
+      const meta = this.sheetMeta(sheet);
+      if (dataRow >= meta.rowCount) return null;
+      index = this.rebuildRowIndex(sheet, order, meta.rowCount, index);
+    }
+    if (dataRow >= index.logicalRows || index.kind === "empty") return null;
+
+    if (index.kind === "dense") {
+      const viewRow = index.storage[dataRow]!;
       return viewRow === ABSENT_VIEW_ROW ? null : viewRow;
     }
 
-    const meta = this.sheetMeta(sheet);
-    if (dataRow >= meta.rowCount) return null;
-    if (meta.rowCount > ABSENT_VIEW_ROW || order.length > ABSENT_VIEW_ROW) {
-      throw new RangeError(
-        `sheet ${sheet} exceeds the packed inverse row limit of ${ABSENT_VIEW_ROW}`,
-      );
+    const capacity = index.storage.length / 2;
+    const mask = capacity - 1;
+    let slot = hashDataRow(dataRow) & mask;
+    for (;;) {
+      const at = slot * 2;
+      const storedDataRow = index.storage[at]!;
+      if (storedDataRow === ABSENT_VIEW_ROW) return null;
+      if (storedDataRow === dataRow) return index.storage[at + 1]!;
+      slot = (slot + 1) & mask;
     }
-    if (!index || index.rows.length !== meta.rowCount) {
-      index = { rows: new Uint32Array(meta.rowCount), valid: false };
-      this.rowIndexBySheet.set(sheet, index);
-    }
+  }
 
-    index.rows.fill(ABSENT_VIEW_ROW);
-    for (let viewRow = 0; viewRow < order.length; viewRow++) {
-      const orderedDataRow = order[viewRow]!;
-      if (orderedDataRow >= meta.rowCount) {
-        throw new RangeError(
-          `view order for sheet ${sheet} contains out-of-bounds data row ${orderedDataRow}`,
-        );
-      }
-      index.rows[orderedDataRow] = viewRow;
-    }
-    index.valid = true;
-
-    const viewRow = index.rows[dataRow]!;
-    return viewRow === ABSENT_VIEW_ROW ? null : viewRow;
+  /** Retained packed backing bytes for focused resource attribution. */
+  inverseIndexByteLength(sheet: SheetId): number {
+    return this.rowIndexBySheet.get(sheet)?.storage.byteLength ?? 0;
   }
 
   columnFilters(sheet: SheetId): ReadonlyMap<number, ColumnFilter> {
@@ -345,10 +366,86 @@ export class StoreViewState {
     return state;
   }
 
+  private rebuildRowIndex(
+    sheet: SheetId,
+    order: Uint32Array,
+    logicalRows: number,
+    reusable: PackedRowIndex | undefined,
+  ): PackedRowIndex {
+    if (logicalRows > ABSENT_VIEW_ROW || order.length > ABSENT_VIEW_ROW) {
+      throw new RangeError(
+        `sheet ${sheet} exceeds the packed inverse row limit of ${ABSENT_VIEW_ROW}`,
+      );
+    }
+
+    const shape = packedIndexShape(logicalRows, order.length);
+    let index = reusable;
+    if (!index || index.kind !== shape.kind || index.storage.length !== shape.storageLength) {
+      index = {
+        kind: shape.kind,
+        storage: shape.storageLength === 0 ? EMPTY_U32 : new Uint32Array(shape.storageLength),
+        logicalRows,
+        valid: false,
+      };
+      this.rowIndexBySheet.set(sheet, index);
+    } else {
+      index.logicalRows = logicalRows;
+    }
+
+    if (index.kind === "empty") {
+      index.valid = true;
+      return index;
+    }
+
+    index.storage.fill(ABSENT_VIEW_ROW);
+    if (index.kind === "dense") {
+      for (let viewRow = 0; viewRow < order.length; viewRow++) {
+        const dataRow = order[viewRow]!;
+        if (dataRow >= logicalRows) {
+          throw new RangeError(
+            `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
+          );
+        }
+        index.storage[dataRow] = viewRow;
+      }
+    } else {
+      const capacity = index.storage.length / 2;
+      const mask = capacity - 1;
+      for (let viewRow = 0; viewRow < order.length; viewRow++) {
+        const dataRow = order[viewRow]!;
+        if (dataRow >= logicalRows) {
+          throw new RangeError(
+            `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
+          );
+        }
+        let slot = hashDataRow(dataRow) & mask;
+        for (;;) {
+          const at = slot * 2;
+          const storedDataRow = index.storage[at]!;
+          if (storedDataRow === ABSENT_VIEW_ROW || storedDataRow === dataRow) {
+            index.storage[at] = dataRow;
+            index.storage[at + 1] = viewRow;
+            break;
+          }
+          slot = (slot + 1) & mask;
+        }
+      }
+    }
+    index.valid = true;
+    return index;
+  }
+
   private setOrder(sheet: SheetId, order: Uint32Array): void {
     this.orderBySheet.set(sheet, order);
     const index = this.rowIndexBySheet.get(sheet);
-    if (index) index.valid = false;
+    if (!index) return;
+
+    const shape = packedIndexShape(this.sheetMeta(sheet).rowCount, order.length);
+    if (index.kind !== shape.kind || index.storage.length !== shape.storageLength) {
+      this.rowIndexBySheet.delete(sheet);
+    } else {
+      index.valid = false;
+    }
   }
 
   private dropOrder(sheet: SheetId): void {
