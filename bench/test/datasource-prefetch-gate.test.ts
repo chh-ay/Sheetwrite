@@ -8,6 +8,15 @@ describe("directional datasource prefetch gate", () => {
     expect(report.repetitions).toHaveLength(5);
     expect(report.medianResidencyRatio).toBeGreaterThanOrEqual(0.95);
     expect(report.medianP95VisibleWaitMs).toBeLessThan(report.policy.frameMs);
+    expect(report.sparseBookkeeping).toEqual({
+      logicalRows: 1_000_000_000,
+      visibleRows: 20,
+      loadedBands: 0,
+      ownedBands: 0,
+      visibleWaitingBands: 1,
+      visibleWaitingRows: 20,
+      modeledNumericPayloadBytes: 32,
+    });
     for (const repetition of report.repetitions) {
       expect(repetition.residencyRatio).toBeGreaterThanOrEqual(0.95);
       expect(repetition.p95VisibleWaitMs).toBeLessThan(report.policy.frameMs);

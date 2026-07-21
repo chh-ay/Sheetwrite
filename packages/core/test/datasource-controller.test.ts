@@ -447,7 +447,7 @@ describe("DatasourceController revision retention", () => {
   });
 
   it("preserves resident rows while refreshing a paged overlap and stays within cache budget", async () => {
-    const cacheBytes = 87;
+    const cacheBytes = 63;
     const workbook = makeWorkbook(20);
     workbook.sheets[0]!.columns = workbook.sheets[0]!.columns.slice(0, 1);
     const store = new SheetwriteStore(workbook, undefined, {
@@ -695,5 +695,178 @@ describe("DatasourceController revision retention", () => {
     controller.destroy();
     expect(retainedRevisions).toBe(0);
     store.dispose();
+  });
+
+  it("merges loaded gaps, retries partial tails, and ignores stale reset responses", async () => {
+    const store = new SheetwriteStore(makeWorkbook(40));
+    const pending: Array<{
+      request: { start: number; end: number; signal: AbortSignal };
+      result: PromiseWithResolvers<DataSourcePage>;
+    }> = [];
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          const result = Promise.withResolvers<DataSourcePage>();
+          pending.push({ request, result });
+          return result.promise;
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 40,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      40,
+    );
+
+    controller.ensureLoaded(10, 20);
+    pending[0]!.result.resolve({
+      start: 10,
+      rows: [{ name: "ten" }, { name: "eleven" }, { name: "twelve" }],
+    });
+    await flushRequest();
+    expect(controller.getTelemetry()).toMatchObject({ loadedBands: 1, ownedBands: 0 });
+
+    controller.ensureLoaded(10, 25);
+    expect(pending[1]!.request).toMatchObject({ start: 13, end: 25 });
+    pending[1]!.result.resolve({
+      start: 13,
+      rows: Array.from({ length: 12 }, (_, offset) => ({ name: `row-${13 + offset}` })),
+    });
+    await flushRequest();
+
+    controller.ensureLoaded(0, 5);
+    controller.ensureLoaded(5, 10);
+    expect(pending.slice(2).map(({ request }) => [request.start, request.end])).toEqual([
+      [0, 5],
+      [5, 10],
+    ]);
+    for (const entry of pending.slice(2)) {
+      entry.result.resolve({
+        start: entry.request.start,
+        rows: Array.from({ length: entry.request.end - entry.request.start }, (_, offset) => ({
+          name: `row-${entry.request.start + offset}`,
+        })),
+      });
+    }
+    await flushRequest();
+    expect(controller.getTelemetry()).toMatchObject({ loadedBands: 1, ownedBands: 0 });
+    controller.ensureLoaded(3, 22);
+    expect(pending).toHaveLength(4);
+
+    controller.ensureLoaded(30, 35);
+    const stale = pending[4]!;
+    controller.reset(40);
+    expect(stale.request.signal.aborted).toBe(true);
+    stale.result.resolve({
+      start: 30,
+      rows: Array.from({ length: 5 }, (_, offset) => ({ name: `stale-${offset}` })),
+    });
+    await flushRequest();
+    expect(controller.getTelemetry()).toMatchObject({
+      loadedBands: 0,
+      ownedBands: 0,
+      visibleWaitingBands: 0,
+    });
+    expect(store.getCell({ sheet: "s1", row: 30, col: 0 }).resolved).toBeNull();
+
+    controller.destroy();
+    store.dispose();
+  });
+
+  it("keeps billion-row construction, waits, ownership, reset, and destroy sparse", () => {
+    const logicalRows = 1_000_000_000;
+    const inert = new DatasourceController(
+      {
+        loadable: null,
+        activeSheet: () => "s1",
+        rowCount: () => logicalRows,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      logicalRows,
+    );
+    expect(inert.getTelemetry()).toMatchObject({
+      loadedBands: 0,
+      ownedBands: 0,
+      visibleWaitingRows: 0,
+      visibleWaitingBands: 0,
+    });
+    inert.updateViewport(0, logicalRows);
+    expect(inert.getTelemetry()).toMatchObject({
+      loadedBands: 0,
+      ownedBands: 0,
+      visibleWaitingRows: logicalRows,
+      visibleWaitingBands: 1,
+    });
+    inert.reset(logicalRows);
+    expect(inert.getTelemetry()).toMatchObject({
+      loadedBands: 0,
+      ownedBands: 0,
+      visibleWaitingRows: 0,
+      visibleWaitingBands: 0,
+    });
+    inert.destroy();
+
+    const probes: Array<[number, number]> = [];
+    const requests: Array<{ start: number; end: number; signal: AbortSignal }> = [];
+    const partiallyResident = {
+      isPaged: () => true,
+      getWorkbook: () => ({
+        activeSheet: "s1",
+        sheets: [{ id: "s1", columns: [{ key: "name" }] }],
+      }),
+      isRangeFullyLoaded: (range: {
+        start: { row: number; col: number };
+        end: { row: number; col: number };
+      }) => {
+        probes.push([range.start.row, range.end.row]);
+        return range.start.row === 42 && range.end.row === 42;
+      },
+      getPagedStats: () => ({
+        chunks: 1,
+        loadedCells: 1,
+        dirtyCells: 0,
+        allocatedBytes: 1,
+        dirtyAllocatedBytes: 0,
+        fullyLoaded: false,
+      }),
+    } as unknown as SheetwriteStore;
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          requests.push(request);
+          return Promise.withResolvers<DataSourcePage>().promise;
+        },
+        loadable: partiallyResident,
+        activeSheet: () => "s1",
+        rowCount: () => logicalRows,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      logicalRows,
+    );
+
+    controller.ensureLoaded(0, logicalRows);
+    expect(probes).toEqual([[0, logicalRows - 1]]);
+    expect(requests.map(({ start, end }) => [start, end])).toEqual([[0, logicalRows]]);
+    expect(controller.getTelemetry()).toMatchObject({
+      loadedBands: 0,
+      ownedBands: 1,
+      activeRequests: 1,
+    });
+    controller.reset(logicalRows);
+    expect(requests[0]!.signal.aborted).toBe(true);
+    expect(controller.getTelemetry()).toMatchObject({ loadedBands: 0, ownedBands: 0 });
+    controller.destroy();
   });
 });

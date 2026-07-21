@@ -8,6 +8,7 @@ export const DATASOURCE_PREFETCH_MAX_BYTES = 512 * 1024;
 export const DATASOURCE_PREFETCH_MAX_BANDS = 2;
 const LOGICAL_FRAME_MS = 16.7;
 const ESTIMATED_CELL_BYTES = 16;
+const MAX_RETAINED_VISIBLE_WAIT_BANDS = 4_096;
 
 let datasourceClockForTest: (() => number) | undefined;
 
@@ -76,6 +77,11 @@ export interface DatasourcePrefetchTelemetry {
   readonly activeRequests: number;
   readonly activeSpeculativeRequests: number;
   readonly activeSpeculativeRows: number;
+  /** Sparse bookkeeping cardinality, independent of logical row count. */
+  readonly loadedBands: number;
+  readonly ownedBands: number;
+  readonly visibleWaitingRows: number;
+  readonly visibleWaitingBands: number;
   readonly cacheChunks: number;
   readonly cacheAllocatedBytes: number;
 }
@@ -122,30 +128,384 @@ function intersects(start: number, end: number, otherStart: number, otherEnd: nu
   return start < otherEnd && otherStart < end;
 }
 
+interface RowBand {
+  start: number;
+  end: number;
+}
+
+/** Sorted, disjoint half-open row intervals. */
+class SparseRowSet {
+  private readonly bands: RowBand[] = [];
+
+  get bandCount(): number {
+    return this.bands.length;
+  }
+
+  clear(): void {
+    this.bands.length = 0;
+  }
+
+  covers(start: number, end: number): boolean {
+    if (start >= end) return true;
+    const band = this.atOrAfter(start);
+    return band !== undefined && band.start <= start && band.end >= end;
+  }
+
+  intersections(start: number, end: number): RowBand[] {
+    const result: RowBand[] = [];
+    let band = this.atOrAfter(start);
+    while (band && band.start < end) {
+      result.push({ start: Math.max(start, band.start), end: Math.min(end, band.end) });
+      band = this.atOrAfter(band.end);
+    }
+    return result;
+  }
+
+  atOrAfter(row: number): RowBand | undefined {
+    let low = 0;
+    let high = this.bands.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.bands[middle]!.end <= row) low = middle + 1;
+      else high = middle;
+    }
+    return this.bands[low];
+  }
+
+  add(start: number, end: number): void {
+    if (start >= end) return;
+    let low = 0;
+    let high = this.bands.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.bands[middle]!.end < start) low = middle + 1;
+      else high = middle;
+    }
+
+    let mergedStart = start;
+    let mergedEnd = end;
+    let last = low;
+    while (last < this.bands.length && this.bands[last]!.start <= mergedEnd) {
+      mergedStart = Math.min(mergedStart, this.bands[last]!.start);
+      mergedEnd = Math.max(mergedEnd, this.bands[last]!.end);
+      last += 1;
+    }
+    this.bands.splice(low, last - low, { start: mergedStart, end: mergedEnd });
+  }
+
+  remove(start: number, end: number): void {
+    if (start >= end) return;
+    let index = 0;
+    while (index < this.bands.length && this.bands[index]!.end <= start) index += 1;
+    while (index < this.bands.length) {
+      const band = this.bands[index]!;
+      if (band.start >= end) return;
+      if (band.start < start && band.end > end) {
+        const right = { start: end, end: band.end };
+        band.end = start;
+        this.bands.splice(index + 1, 0, right);
+        return;
+      }
+      if (band.start < start) {
+        band.end = start;
+        index += 1;
+        continue;
+      }
+      if (band.end > end) {
+        band.start = end;
+        return;
+      }
+      this.bands.splice(index, 1);
+    }
+  }
+
+  forEachGap(start: number, end: number, visit: (start: number, end: number) => void): void {
+    if (start >= end) return;
+    let cursor = start;
+    let band = this.atOrAfter(start);
+    while (band && band.start < end) {
+      if (band.start > cursor) visit(cursor, Math.min(end, band.start));
+      cursor = Math.max(cursor, band.end);
+      if (cursor >= end) return;
+      band = this.atOrAfter(cursor);
+    }
+    if (cursor < end) visit(cursor, end);
+  }
+}
+
+interface OwnerBand extends RowBand {
+  readonly owner: number;
+}
+
+/** Sorted ownership bands. Every active request owns exactly one disjoint band. */
+class SparseOwnerBands {
+  private readonly bands: OwnerBand[] = [];
+  private readonly byOwner = new Map<number, OwnerBand>();
+
+  get bandCount(): number {
+    return this.bands.length;
+  }
+
+  clear(): void {
+    this.bands.length = 0;
+    this.byOwner.clear();
+  }
+
+  atOrAfter(row: number): OwnerBand | undefined {
+    let low = 0;
+    let high = this.bands.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.bands[middle]!.end <= row) low = middle + 1;
+      else high = middle;
+    }
+    return this.bands[low];
+  }
+
+  add(start: number, end: number, owner: number): void {
+    if (start >= end || this.byOwner.has(owner)) {
+      throw new Error("Datasource request ownership must be a new non-empty band");
+    }
+    let low = 0;
+    let high = this.bands.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.bands[middle]!.start < start) low = middle + 1;
+      else high = middle;
+    }
+    const previous = this.bands[low - 1];
+    const next = this.bands[low];
+    if ((previous && previous.end > start) || (next && next.start < end)) {
+      throw new Error("Datasource request ownership bands must not overlap");
+    }
+    const band = { start, end, owner };
+    this.bands.splice(low, 0, band);
+    this.byOwner.set(owner, band);
+  }
+
+  remove(owner: number): void {
+    const band = this.byOwner.get(owner);
+    if (!band) return;
+    this.byOwner.delete(owner);
+    let low = 0;
+    let high = this.bands.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.bands[middle]!.start < band.start) low = middle + 1;
+      else high = middle;
+    }
+    while (low < this.bands.length && this.bands[low]!.start === band.start) {
+      if (this.bands[low] === band) {
+        this.bands.splice(low, 1);
+        return;
+      }
+      low += 1;
+    }
+  }
+
+  forEachGap(start: number, end: number, visit: (start: number, end: number) => void): void {
+    if (start >= end) return;
+    let cursor = start;
+    let band = this.atOrAfter(start);
+    while (band && band.start < end) {
+      if (band.start > cursor) visit(cursor, Math.min(end, band.start));
+      cursor = Math.max(cursor, band.end);
+      if (cursor >= end) return;
+      band = this.atOrAfter(cursor);
+    }
+    if (cursor < end) visit(cursor, end);
+  }
+
+  unionLength(include: (owner: number) => boolean): number {
+    let rows = 0;
+    let unionStart = -1;
+    let unionEnd = -1;
+    for (const band of this.bands) {
+      if (!include(band.owner)) continue;
+      if (unionStart < 0) {
+        unionStart = band.start;
+        unionEnd = band.end;
+      } else if (band.start <= unionEnd) {
+        unionEnd = Math.max(unionEnd, band.end);
+      } else {
+        rows += unionEnd - unionStart;
+        unionStart = band.start;
+        unionEnd = band.end;
+      }
+    }
+    return unionStart < 0 ? rows : rows + unionEnd - unionStart;
+  }
+}
+
+interface VisibleWaitBand extends RowBand {
+  readonly startedAt: number;
+}
+
+interface VisibleWaitSample {
+  readonly duration: number;
+  readonly rows: number;
+}
+
+/** Sparse timestamped visible-demand bands, split only when timestamps differ. */
+class SparseVisibleWaits {
+  private readonly bands: VisibleWaitBand[] = [];
+
+  get bandCount(): number {
+    return this.bands.length;
+  }
+
+  get rowCount(): number {
+    let rows = 0;
+    for (const band of this.bands) rows += band.end - band.start;
+    return rows;
+  }
+
+  clear(): void {
+    this.bands.length = 0;
+  }
+
+  discard(start: number, end: number): void {
+    if (start >= end) return;
+    let index = 0;
+    while (index < this.bands.length && this.bands[index]!.end <= start) index += 1;
+    while (index < this.bands.length) {
+      const band = this.bands[index]!;
+      if (band.start >= end) return;
+      if (band.start < start && band.end > end) {
+        const right = { start: end, end: band.end, startedAt: band.startedAt };
+        band.end = start;
+        this.bands.splice(index + 1, 0, right);
+        return;
+      }
+      if (band.start < start) {
+        band.end = start;
+        index += 1;
+        continue;
+      }
+      if (band.end > end) {
+        band.start = end;
+        return;
+      }
+      this.bands.splice(index, 1);
+    }
+  }
+
+  addMissing(start: number, end: number, startedAt: number): void {
+    let cursor = start;
+    while (cursor < end) {
+      const band = this.atOrAfter(cursor);
+      if (band && band.start <= cursor) {
+        cursor = Math.min(end, band.end);
+        continue;
+      }
+      const gapEnd = Math.min(end, band?.start ?? end);
+      this.insert(cursor, gapEnd, startedAt);
+      cursor = gapEnd;
+    }
+  }
+
+  complete(start: number, end: number, completedAt: number): VisibleWaitSample[] {
+    const samples: VisibleWaitSample[] = [];
+    if (start >= end) return samples;
+    let index = 0;
+    while (index < this.bands.length && this.bands[index]!.end <= start) index += 1;
+    while (index < this.bands.length) {
+      const band = this.bands[index]!;
+      if (band.start >= end) break;
+      const overlapStart = Math.max(start, band.start);
+      const overlapEnd = Math.min(end, band.end);
+      samples.push({
+        duration: Math.max(0, completedAt - band.startedAt),
+        rows: overlapEnd - overlapStart,
+      });
+      if (band.start < overlapStart && band.end > overlapEnd) {
+        const right = { start: overlapEnd, end: band.end, startedAt: band.startedAt };
+        band.end = overlapStart;
+        this.bands.splice(index + 1, 0, right);
+        break;
+      }
+      if (band.start < overlapStart) {
+        band.end = overlapStart;
+        index += 1;
+        continue;
+      }
+      if (band.end > overlapEnd) {
+        band.start = overlapEnd;
+        break;
+      }
+      this.bands.splice(index, 1);
+    }
+    return samples;
+  }
+
+  private atOrAfter(row: number): VisibleWaitBand | undefined {
+    let low = 0;
+    let high = this.bands.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.bands[middle]!.end <= row) low = middle + 1;
+      else high = middle;
+    }
+    return this.bands[low];
+  }
+
+  private insert(start: number, end: number, startedAt: number): void {
+    if (start >= end) return;
+    let low = 0;
+    let high = this.bands.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.bands[middle]!.start < start) low = middle + 1;
+      else high = middle;
+    }
+    const previous = this.bands[low - 1];
+    const next = this.bands[low];
+    if (previous?.end === start && previous.startedAt === startedAt) {
+      previous.end = end;
+      if (next?.start === end && next.startedAt === startedAt) {
+        previous.end = next.end;
+        this.bands.splice(low, 1);
+      }
+      return;
+    }
+    if (next?.start === end && next.startedAt === startedAt) {
+      next.start = start;
+      return;
+    }
+    this.bands.splice(low, 0, { start, end, startedAt });
+  }
+}
+
+function normalizeRowCount(rowCount: number): number {
+  if (!Number.isFinite(rowCount) || rowCount > Number.MAX_SAFE_INTEGER) {
+    throw new RangeError("Datasource row count must be finite and safely representable");
+  }
+  return Math.max(0, Math.floor(rowCount));
+}
+
 /** Owns datasource request bands, priority, cancellation, generations, and loaded-row state. */
 export class DatasourceController {
-  private loaded: Uint8Array;
-  private owners: Uint32Array;
-  private visibleWaitStarted: Float64Array;
+  private readonly loaded = new SparseRowSet();
+  private readonly owners = new SparseOwnerBands();
+  private readonly visibleWaitStarted = new SparseVisibleWaits();
   private readonly activeIds = new Map<number, ActiveRequest>();
   private readonly requests = new Set<ActiveRequest>();
+  private rowCount: number;
   private nextRequestId = 1;
   private generation = 0;
   private destroyed = false;
   private direction: -1 | 0 | 1 = 0;
   private velocityRowsPerMs = 0;
-  private lastViewport: { start: number; end: number; at: number } | null = null;
   private telemetry = emptyTelemetry();
-  private readonly visibleWaitDurations: number[] = [];
+  private lastViewport: { start: number; end: number; at: number } | null = null;
+  private readonly visibleWaitDurations: VisibleWaitSample[] = [];
+  private visibleWaitSampleCursor = 0;
 
   constructor(
     private readonly options: DatasourceControllerOptions,
     rowCount: number,
   ) {
-    this.loaded = new Uint8Array(rowCount);
-    this.owners = new Uint32Array(rowCount);
-    this.visibleWaitStarted = new Float64Array(rowCount);
-    this.visibleWaitStarted.fill(Number.NaN);
+    this.rowCount = normalizeRowCount(rowCount);
   }
 
   /** Requests a demand-critical interval without applying speculative policy. */
@@ -159,8 +519,8 @@ export class DatasourceController {
    */
   updateViewport(start: number, end: number): void {
     if (this.destroyed) return;
-    const visibleStart = Math.min(this.loaded.length, Math.max(0, Math.floor(start)));
-    const visibleEnd = Math.min(this.loaded.length, Math.max(visibleStart, Math.ceil(end)));
+    const visibleStart = Math.min(this.rowCount, Math.max(0, Math.floor(start)));
+    const visibleEnd = Math.min(this.rowCount, Math.max(visibleStart, Math.ceil(end)));
     if (visibleStart === visibleEnd) return;
 
     const now = this.now();
@@ -193,11 +553,15 @@ export class DatasourceController {
     );
 
     this.refreshPagedResidency(this.options.loadable, visibleStart, visibleEnd);
-    let fullyResident = true;
-    for (let row = visibleStart; row < visibleEnd; row++) {
-      if (this.loaded[row] !== 0) continue;
-      fullyResident = false;
-      if (Number.isNaN(this.visibleWaitStarted[row]!)) this.visibleWaitStarted[row] = now;
+    this.owners.forEachGap(0, this.rowCount, (gapStart, gapEnd) => {
+      this.visibleWaitStarted.discard(gapStart, Math.min(gapEnd, visibleStart));
+      this.visibleWaitStarted.discard(Math.max(gapStart, visibleEnd), gapEnd);
+    });
+    const fullyResident = this.loaded.covers(visibleStart, visibleEnd);
+    if (!fullyResident) {
+      this.loaded.forEachGap(visibleStart, visibleEnd, (gapStart, gapEnd) => {
+        this.visibleWaitStarted.addMissing(gapStart, gapEnd, now);
+      });
     }
     this.telemetry.measuredFrames += 1;
     if (fullyResident) this.telemetry.residentFrames += 1;
@@ -210,18 +574,28 @@ export class DatasourceController {
   }
 
   getTelemetry(): DatasourcePrefetchTelemetry {
-    const waits = [...this.visibleWaitDurations].sort((a, b) => a - b);
-    const p95Index = Math.max(0, Math.ceil(waits.length * 0.95) - 1);
+    const waits = [...this.visibleWaitDurations].sort((a, b) => a.duration - b.duration);
+    let visibleWaitSamples = 0;
+    for (const wait of waits) visibleWaitSamples += wait.rows;
+    const p95Rank = Math.max(1, Math.ceil(visibleWaitSamples * 0.95));
+    let p95VisibleWaitMs = 0;
+    let rankedRows = 0;
+    for (const wait of waits) {
+      rankedRows += wait.rows;
+      if (rankedRows < p95Rank) continue;
+      p95VisibleWaitMs = wait.duration;
+      break;
+    }
     const loadable = this.options.loadable;
     const sheet = this.options.activeSheet();
     const cache = loadable?.isPaged(sheet) ? loadable.getPagedStats(sheet) : null;
     let activeSpeculativeRequests = 0;
-    let activeSpeculativeRows = 0;
     for (const request of this.requests) {
-      if (!request.speculativeOrigin) continue;
-      activeSpeculativeRequests += 1;
-      activeSpeculativeRows += request.end - request.start;
+      if (request.speculativeOrigin) activeSpeculativeRequests += 1;
     }
+    const activeSpeculativeRows = this.owners.unionLength(
+      (owner) => this.activeIds.get(owner)?.speculativeOrigin === true,
+    );
     return {
       direction: this.direction,
       velocityRowsPerMs: this.velocityRowsPerMs,
@@ -231,9 +605,9 @@ export class DatasourceController {
         this.telemetry.measuredFrames === 0
           ? 1
           : this.telemetry.residentFrames / this.telemetry.measuredFrames,
-      visibleWaitSamples: waits.length,
-      p95VisibleWaitMs: waits[p95Index] ?? 0,
-      maxVisibleWaitMs: waits.at(-1) ?? 0,
+      visibleWaitSamples,
+      p95VisibleWaitMs,
+      maxVisibleWaitMs: waits.at(-1)?.duration ?? 0,
       requests: this.telemetry.requests,
       visibleRequests: this.telemetry.visibleRequests,
       speculativeRequests: this.telemetry.speculativeRequests,
@@ -250,6 +624,10 @@ export class DatasourceController {
       activeRequests: this.requests.size,
       activeSpeculativeRequests,
       activeSpeculativeRows,
+      loadedBands: this.loaded.bandCount,
+      ownedBands: this.owners.bandCount,
+      visibleWaitingRows: this.visibleWaitStarted.rowCount,
+      visibleWaitingBands: this.visibleWaitStarted.bandCount,
       cacheChunks: cache?.chunks ?? 0,
       cacheAllocatedBytes: cache?.allocatedBytes ?? 0,
     };
@@ -258,7 +636,8 @@ export class DatasourceController {
   resetTelemetry(): void {
     this.telemetry = emptyTelemetry();
     this.visibleWaitDurations.length = 0;
-    this.visibleWaitStarted.fill(Number.NaN);
+    this.visibleWaitSampleCursor = 0;
+    this.visibleWaitStarted.clear();
   }
 
   private ensureSpeculativeBands(
@@ -290,10 +669,9 @@ export class DatasourceController {
   }
 
   private remainingSpeculativeRows(): number {
-    let activeRows = 0;
-    for (const request of this.requests) {
-      if (request.speculativeOrigin) activeRows += request.end - request.start;
-    }
+    const activeRows = this.owners.unionLength(
+      (owner) => this.activeIds.get(owner)?.speculativeOrigin === true,
+    );
     return Math.max(0, this.speculativeRowHorizon() - activeRows);
   }
 
@@ -322,13 +700,13 @@ export class DatasourceController {
       const aheadStart = Math.floor(visibleEnd / bandRows) * bandRows;
       const desiredAheadEnd = Math.ceil((visibleEnd + aheadRows) / bandRows) * bandRows;
       const boundedAheadEnd = aheadStart + (horizonRows - actualBehindRows);
-      const aheadEnd = Math.min(this.loaded.length, desiredAheadEnd, boundedAheadEnd);
+      const aheadEnd = Math.min(this.rowCount, desiredAheadEnd, boundedAheadEnd);
       if (behindStart < behindEnd) intervals.push({ start: behindStart, end: behindEnd });
       if (aheadStart < aheadEnd) intervals.push({ start: aheadStart, end: aheadEnd });
     } else {
-      const aheadEnd = Math.min(this.loaded.length, Math.ceil(visibleStart / bandRows) * bandRows);
-      const behindStart = Math.min(this.loaded.length, Math.ceil(visibleEnd / bandRows) * bandRows);
-      const behindEnd = Math.min(this.loaded.length, behindStart + behindRows);
+      const aheadEnd = Math.min(this.rowCount, Math.ceil(visibleStart / bandRows) * bandRows);
+      const behindStart = Math.min(this.rowCount, Math.ceil(visibleEnd / bandRows) * bandRows);
+      const behindEnd = Math.min(this.rowCount, behindStart + behindRows);
       const actualBehindRows = behindEnd - behindStart;
       const desiredAheadStart =
         Math.floor(Math.max(0, visibleStart - aheadRows) / bandRows) * bandRows;
@@ -365,36 +743,35 @@ export class DatasourceController {
     if (!datasource || !loadable || this.destroyed) return;
 
     this.refreshPagedResidency(loadable, start, end);
-    const requestLimit = Math.min(this.loaded.length, Math.max(0, Math.ceil(end)));
+    const requestLimit = Math.min(this.rowCount, Math.max(0, Math.ceil(end)));
     let row = Math.min(requestLimit, Math.max(0, Math.floor(start)));
     while (row < requestLimit) {
-      while (row < requestLimit && this.loaded[row] !== 0) row += 1;
-      if (row >= requestLimit) return;
+      const loadedBand = this.loaded.atOrAfter(row);
+      if (loadedBand && loadedBand.start <= row) {
+        row = Math.min(requestLimit, loadedBand.end);
+        continue;
+      }
 
-      const owner = this.owners[row] ?? 0;
-      if (owner !== 0) {
-        const request = this.activeIds.get(owner);
+      const ownerBand = this.owners.atOrAfter(row);
+      if (ownerBand && ownerBand.start <= row) {
+        const request = this.activeIds.get(ownerBand.owner);
         if (priority === "visible" && !viewportOrigin && request) request.durableDemand = true;
         if (priority === "visible" && request?.priority === "speculative") {
           request.priority = "visible";
           request.direction = 0;
           this.telemetry.promotions += 1;
         }
-        row += 1;
+        row = Math.min(requestLimit, ownerBand.end);
         continue;
       }
 
-      const requestStart = row;
-      while (row < requestLimit && this.loaded[row] === 0 && this.owners[row] === 0) row += 1;
-      this.requestBand(
-        datasource,
-        loadable,
-        requestStart,
-        row,
-        priority,
-        direction,
-        viewportOrigin,
+      const requestEnd = Math.min(
+        requestLimit,
+        loadedBand?.start ?? requestLimit,
+        ownerBand?.start ?? requestLimit,
       );
+      this.requestBand(datasource, loadable, row, requestEnd, priority, direction, viewportOrigin);
+      row = requestEnd;
     }
   }
 
@@ -409,8 +786,8 @@ export class DatasourceController {
     if (!loadable.isPaged(sheet)) return;
     const schema = loadable.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
     const columnCount = schema?.columns.length ?? 0;
-    const rangeStart = Math.min(this.loaded.length, Math.max(0, Math.floor(start)));
-    const rangeEnd = Math.min(this.loaded.length, Math.max(rangeStart, Math.ceil(end)));
+    const rangeStart = Math.min(this.rowCount, Math.max(0, Math.floor(start)));
+    const rangeEnd = Math.min(this.rowCount, Math.max(rangeStart, Math.ceil(end)));
     if (columnCount === 0 || rangeStart === rangeEnd) return;
     if (
       loadable.isRangeFullyLoaded({
@@ -419,33 +796,59 @@ export class DatasourceController {
         end: { row: rangeEnd - 1, col: columnCount - 1 },
       })
     ) {
-      this.loaded.fill(1, rangeStart, rangeEnd);
+      this.loaded.add(rangeStart, rangeEnd);
       return;
     }
 
-    for (let row = rangeStart; row < rangeEnd; row++) {
-      if (this.owners[row] !== 0) continue;
-      this.loaded[row] = loadable.isRangeFullyLoaded({
+    this.owners.forEachGap(rangeStart, rangeEnd, (gapStart, gapEnd) => {
+      for (const band of this.loaded.intersections(gapStart, gapEnd)) {
+        this.reconcileLoadedResidency(loadable, sheet, columnCount, band.start, band.end);
+      }
+    });
+  }
+
+  /**
+   * Refines only rows already tracked as loaded. A wholly missing billion-row
+   * jump therefore costs one range probe rather than a billion cell probes.
+   */
+  private reconcileLoadedResidency(
+    loadable: SheetwriteStore,
+    sheet: SheetId,
+    columnCount: number,
+    start: number,
+    end: number,
+  ): void {
+    if (
+      loadable.isRangeFullyLoaded({
         sheet,
-        start: { row, col: 0 },
-        end: { row, col: columnCount - 1 },
+        start: { row: start, col: 0 },
+        end: { row: end - 1, col: columnCount - 1 },
       })
-        ? 1
-        : 0;
+    ) {
+      return;
     }
+    if (end - start === 1) {
+      this.loaded.remove(start, end);
+      return;
+    }
+    const middle = start + Math.floor((end - start) / 2);
+    this.reconcileLoadedResidency(loadable, sheet, columnCount, start, middle);
+    this.reconcileLoadedResidency(loadable, sheet, columnCount, middle, end);
   }
 
   resize(rowCount: number): void {
-    if (this.loaded.length !== rowCount) this.reset(rowCount);
+    const normalized = normalizeRowCount(rowCount);
+    if (this.rowCount !== normalized) this.reset(normalized);
   }
 
   reset(rowCount: number): void {
+    const normalized = normalizeRowCount(rowCount);
     this.generation += 1;
     for (const request of [...this.requests]) this.abortRequest(request, "reset");
-    this.loaded = new Uint8Array(rowCount);
-    this.owners = new Uint32Array(rowCount);
-    this.visibleWaitStarted = new Float64Array(rowCount);
-    this.visibleWaitStarted.fill(Number.NaN);
+    this.rowCount = normalized;
+    this.loaded.clear();
+    this.owners.clear();
+    this.visibleWaitStarted.clear();
     this.lastViewport = null;
     this.direction = 0;
     this.velocityRowsPerMs = 0;
@@ -456,7 +859,9 @@ export class DatasourceController {
     this.destroyed = true;
     this.generation += 1;
     for (const request of [...this.requests]) this.abortRequest(request, "destroy");
-    this.owners.fill(0);
+    this.loaded.clear();
+    this.owners.clear();
+    this.visibleWaitStarted.clear();
     this.lastViewport = null;
   }
 
@@ -512,7 +917,7 @@ export class DatasourceController {
     viewportOrigin: boolean,
   ): void {
     const id = this.allocateRequestId();
-    for (let row = requestStart; row < requestEnd; row++) this.owners[row] = id;
+    this.owners.add(requestStart, requestEnd, id);
 
     const sheet = this.options.activeSheet();
     const generation = this.generation;
@@ -588,12 +993,18 @@ export class DatasourceController {
           this.options.isCellNewerThan(address, revision),
         );
         const loadedAt = this.now();
-        for (let row = page.start; row < page.start + rows.length; row++) {
-          if (this.owners[row] === id) this.loaded[row] = 1;
-          const waitStarted = this.visibleWaitStarted[row];
-          if (waitStarted !== undefined && !Number.isNaN(waitStarted)) {
-            this.visibleWaitDurations.push(Math.max(0, loadedAt - waitStarted));
-            this.visibleWaitStarted[row] = Number.NaN;
+        const loadedEnd = page.start + rows.length;
+        const ownerBand = this.owners.atOrAfter(page.start);
+        if (ownerBand?.owner === id && ownerBand.start <= page.start) {
+          this.loaded.add(page.start, loadedEnd);
+        }
+        for (const sample of this.visibleWaitStarted.complete(page.start, loadedEnd, loadedAt)) {
+          if (this.visibleWaitDurations.length < MAX_RETAINED_VISIBLE_WAIT_BANDS) {
+            this.visibleWaitDurations.push(sample);
+          } else {
+            this.visibleWaitDurations[this.visibleWaitSampleCursor] = sample;
+            this.visibleWaitSampleCursor =
+              (this.visibleWaitSampleCursor + 1) % MAX_RETAINED_VISIBLE_WAIT_BANDS;
           }
         }
         this.clearOwned(activeRequest);
@@ -624,9 +1035,7 @@ export class DatasourceController {
   }
 
   private clearOwned(request: ActiveRequest): void {
-    for (let row = request.start; row < request.end; row++) {
-      if (this.owners[row] === request.id) this.owners[row] = 0;
-    }
+    this.owners.remove(request.id);
   }
 
   private now(): number {

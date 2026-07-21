@@ -95,6 +95,17 @@ export interface PrefetchTraceRepetition {
   readonly jumpVisibleResidentAfterResponse: boolean;
 }
 
+export interface SparseDatasourceBookkeepingEvidence {
+  readonly logicalRows: number;
+  readonly visibleRows: number;
+  readonly loadedBands: number;
+  readonly ownedBands: number;
+  readonly visibleWaitingBands: number;
+  readonly visibleWaitingRows: number;
+  /** Numeric interval payload only; JS object/container overhead is runtime-dependent. */
+  readonly modeledNumericPayloadBytes: number;
+}
+
 export interface PrefetchBenchmarkReport {
   readonly policy: {
     readonly sourceLatencyMs: number;
@@ -107,6 +118,7 @@ export interface PrefetchBenchmarkReport {
     readonly cacheBytes: number;
   };
   readonly repetitions: readonly PrefetchTraceRepetition[];
+  readonly sparseBookkeeping: SparseDatasourceBookkeepingEvidence;
   readonly medianResidencyRatio: number;
   readonly p95ResidencyRatio: number;
   readonly medianP95VisibleWaitMs: number;
@@ -374,6 +386,50 @@ function assertRepetition(result: PrefetchTraceRepetition): void {
   }
 }
 
+function sparseBookkeepingEvidence(): SparseDatasourceBookkeepingEvidence {
+  const logicalRows = 1_000_000_000;
+  const visibleStart = 900_000_000;
+  const controller = new DatasourceController(
+    {
+      loadable: null,
+      activeSheet: () => "trace",
+      rowCount: () => logicalRows,
+      revision: () => 0,
+      isCellNewerThan: () => false,
+      retainRevision: () => () => {},
+      onRowsLoaded: () => {},
+      onError: () => {},
+      now: () => 0,
+    },
+    logicalRows,
+  );
+  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS);
+  const telemetry = controller.getTelemetry();
+  const evidence: SparseDatasourceBookkeepingEvidence = {
+    logicalRows,
+    visibleRows: VIEWPORT_ROWS,
+    loadedBands: telemetry.loadedBands,
+    ownedBands: telemetry.ownedBands,
+    visibleWaitingBands: telemetry.visibleWaitingBands,
+    visibleWaitingRows: telemetry.visibleWaitingRows,
+    modeledNumericPayloadBytes:
+      8 +
+      telemetry.loadedBands * 2 * 8 +
+      telemetry.ownedBands * 3 * 8 +
+      telemetry.visibleWaitingBands * 3 * 8,
+  };
+  controller.destroy();
+  if (
+    evidence.loadedBands !== 0 ||
+    evidence.ownedBands !== 0 ||
+    evidence.visibleWaitingBands !== 1 ||
+    evidence.visibleWaitingRows !== VIEWPORT_ROWS
+  ) {
+    throw new Error("Billion-row datasource bookkeeping did not remain sparse");
+  }
+  return evidence;
+}
+
 export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmarkReport> {
   await initSheetwrite();
   const repetitions: PrefetchTraceRepetition[] = [];
@@ -396,6 +452,7 @@ export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmar
       cacheBytes: CACHE_BYTES,
     },
     repetitions,
+    sparseBookkeeping: sparseBookkeepingEvidence(),
     medianResidencyRatio: percentile(residency, 0.5),
     p95ResidencyRatio: percentile(residency, 0.95),
     medianP95VisibleWaitMs: percentile(waits, 0.5),
