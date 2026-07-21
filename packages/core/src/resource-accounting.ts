@@ -87,6 +87,14 @@ export interface RuntimeMemoryObservation {
   readonly browserBackingStoreBytes: number | null;
 }
 
+/** Operation-scoped transient peak, excluded from retained owner totals. */
+export interface TransientResourcePeak {
+  readonly owner: string;
+  readonly peakBytes: number;
+  readonly allocations: number;
+  readonly measurement: "instrumented-operation-peak";
+}
+
 export interface RuntimeResourceSnapshot {
   readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
   readonly operation: RuntimeResourceOperation;

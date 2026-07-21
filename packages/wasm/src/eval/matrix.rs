@@ -2,12 +2,78 @@
 
 use crate::calc::Ast;
 use crate::types::{CellRange, Value};
+use std::cell::Cell;
+use std::mem::size_of;
+
+thread_local! {
+    /// `[current matrix bytes, peak matrix bytes, matrix allocations]`.
+    static MATRIX_RESOURCE_STATS: Cell<[u64; 3]> = const { Cell::new([0, 0, 0]) };
+}
+
+pub(crate) fn matrix_resource_stats() -> [u64; 3] {
+    MATRIX_RESOURCE_STATS.with(Cell::get)
+}
+
+pub(crate) fn reset_matrix_resource_stats() {
+    MATRIX_RESOURCE_STATS.with(|stats| {
+        let current = stats.get()[0];
+        stats.set([current, current, 0]);
+    });
+}
+
+pub(super) const SPILL_MAX_ROWS: usize = 1_048_576;
+pub(super) const SPILL_MAX_COLS: usize = 16_384;
+pub(super) const SPILL_MAX_CELLS: usize = 1_000_000;
+pub(super) const SPILL_MAX_BYTES: usize = 64 * 1024 * 1024;
+pub(super) const SPILL_MAX_RECOMPUTE_CELLS: usize = 2_000_000;
 
 #[derive(Debug)]
 pub(super) struct EvalMatrix {
     pub(super) rows: usize,
     pub(super) cols: usize,
     pub(super) values: Vec<Value>,
+    accounted_bytes: u64,
+}
+
+impl EvalMatrix {
+    pub(super) fn new(rows: usize, cols: usize, values: Vec<Value>) -> Self {
+        let bytes = values.capacity().saturating_mul(size_of::<Value>()) as u64;
+        MATRIX_RESOURCE_STATS.with(|stats| {
+            let [current, peak, allocations] = stats.get();
+            let current = current.saturating_add(bytes);
+            stats.set([
+                current,
+                peak.max(current),
+                allocations.saturating_add(1),
+            ]);
+        });
+        Self {
+            rows,
+            cols,
+            values,
+            accounted_bytes: bytes,
+        }
+    }
+
+    pub(super) fn into_first(mut self) -> Value {
+        std::mem::take(&mut self.values)
+            .into_iter()
+            .next()
+            .unwrap_or(Value::Blank)
+    }
+}
+
+impl Drop for EvalMatrix {
+    fn drop(&mut self) {
+        MATRIX_RESOURCE_STATS.with(|stats| {
+            let [current, peak, allocations] = stats.get();
+            stats.set([
+                current.saturating_sub(self.accounted_bytes),
+                peak,
+                allocations,
+            ]);
+        });
+    }
 }
 
 impl EvalMatrix {
@@ -56,9 +122,11 @@ pub(super) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
 
 #[cfg(test)]
 mod tests {
-    use super::range_from_ast;
+    use super::{
+        matrix_resource_stats, range_from_ast, reset_matrix_resource_stats, EvalMatrix,
+    };
     use crate::calc::{Ast, NamedRangeRef, RangeFlags, RefFlags, SheetRef};
-    use crate::types::CellRange;
+    use crate::types::{CellRange, Value};
 
     #[test]
     fn converts_local_absolute_and_named_references_to_ranges() {
@@ -95,5 +163,27 @@ mod tests {
             ),
             Some(CellRange::new(13, 1, 2, 3, 4))
         );
+    }
+
+    #[test]
+    fn matrix_resource_stats_track_concurrent_peak_and_release() {
+        reset_matrix_resource_stats();
+        let first = EvalMatrix::new(1, 2, vec![Value::Number(1.0), Value::Number(2.0)]);
+        let first_bytes = matrix_resource_stats()[0];
+        assert!(first_bytes > 0);
+        {
+            let second = EvalMatrix::new(1, 1, vec![Value::Blank]);
+            let [current, peak, allocations] = matrix_resource_stats();
+            assert_eq!(current, peak);
+            assert!(current > first_bytes);
+            assert_eq!(allocations, 2);
+            drop(second);
+        }
+        assert_eq!(matrix_resource_stats()[0], first_bytes);
+        drop(first);
+        let [current, peak, allocations] = matrix_resource_stats();
+        assert_eq!(current, 0);
+        assert!(peak > first_bytes);
+        assert_eq!(allocations, 2);
     }
 }

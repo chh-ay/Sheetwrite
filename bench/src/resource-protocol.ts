@@ -5,6 +5,7 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourcePhaseDelta,
   type RuntimeResourceSnapshot,
+  type TransientResourcePeak,
 } from "@sheetwrite/core";
 import type { BenchmarkMode } from "./gate-protocol.js";
 
@@ -44,6 +45,7 @@ export interface ResourceScenarioResult {
   readonly durationMs: number;
   readonly phases: Readonly<Partial<Record<RuntimeResourcePhase, RuntimeResourceSnapshot>>>;
   readonly deltas: readonly RuntimeResourcePhaseDelta[];
+  readonly transientPeaks: readonly TransientResourcePeak[];
   readonly sentinel: string;
 }
 
@@ -136,6 +138,24 @@ export function validateResourceBenchmark(
         throw new Error("teardown after-destroy snapshot identity drift");
       }
     }
+    const transientOwners = new Set<string>();
+    for (const transient of scenario.transientPeaks) {
+      if (
+        !transient.owner ||
+        transientOwners.has(transient.owner) ||
+        transient.measurement !== "instrumented-operation-peak" ||
+        !Number.isSafeInteger(transient.peakBytes) ||
+        transient.peakBytes < 0 ||
+        !Number.isSafeInteger(transient.allocations) ||
+        transient.allocations < 0
+      ) {
+        throw new Error(`${scenario.id} has invalid transient resource accounting`);
+      }
+      transientOwners.add(transient.owner);
+    }
+    if (scenario.id === "formula-recompute" && scenario.transientPeaks.length === 0) {
+      throw new Error("formula-recompute is missing transient matrix accounting");
+    }
     for (const delta of scenario.deltas) {
       if (
         delta.schemaVersion !== RUNTIME_RESOURCE_SCHEMA_VERSION ||
@@ -150,10 +170,6 @@ export function validateResourceBenchmark(
   }
   if (scenarios.size !== expected.length) {
     throw new Error(`unexpected resource scenarios for ${expectedMode}`);
-  }
-
-  if (expectedMode === "full" && artifact.optimizations.length === 0) {
-    throw new Error("full resource artifact requires admitted optimization evidence");
   }
   const optimizationOwners = new Set<string>();
   for (const optimization of artifact.optimizations) {

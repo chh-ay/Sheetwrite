@@ -280,6 +280,20 @@ impl CellStore {
         self.store_memory_stats().encode()
     }
 
+    /// Benchmark diagnostic: `[current matrix bytes, peak matrix bytes, allocations]`.
+    #[wasm_bindgen(js_name = formulaMatrixResourceStats)]
+    pub fn formula_matrix_resource_stats(&self) -> Vec<f64> {
+        crate::eval::matrix_resource_stats()
+            .into_iter()
+            .map(|value| value as f64)
+            .collect()
+    }
+
+    #[wasm_bindgen(js_name = resetFormulaMatrixResourceStats)]
+    pub fn reset_formula_matrix_resource_stats(&self) {
+        crate::eval::reset_matrix_resource_stats();
+    }
+
     #[wasm_bindgen(js_name = wasmCommittedBytes)]
     pub fn wasm_committed_bytes(&self) -> usize {
         #[cfg(target_arch = "wasm32")]

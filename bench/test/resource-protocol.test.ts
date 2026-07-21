@@ -3,6 +3,8 @@ import {
   createRuntimeResourceSnapshot,
   decodeStoreMemoryStats,
   RUNTIME_RESOURCE_SCHEMA_VERSION,
+  STORE_MEMORY_HASH_ESTIMATE_VERSION,
+  STORE_MEMORY_PROTOCOL_VERSION,
   WASM_MEMORY_OWNERS,
   type RuntimeResourceOperation,
   type RuntimeResourcePhase,
@@ -31,7 +33,11 @@ const OPERATION_BY_SCENARIO: Record<ResourceScenarioId, RuntimeResourceOperation
 };
 
 function snapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase) {
-  const encoded = [1, WASM_MEMORY_OWNERS.length, 1];
+  const encoded: number[] = [
+    STORE_MEMORY_PROTOCOL_VERSION,
+    WASM_MEMORY_OWNERS.length,
+    STORE_MEMORY_HASH_ESTIMATE_VERSION,
+  ];
   for (let index = 0; index < WASM_MEMORY_OWNERS.length; index++) encoded.push(0, 0, 0);
   encoded.push(0, 0);
   return createRuntimeResourceSnapshot({
@@ -60,6 +66,17 @@ function scenario(id: ResourceScenarioId) {
       ...(id === "teardown" ? { "after-destroy": snapshot(operation, "after-destroy") } : {}),
     },
     deltas: [],
+    transientPeaks:
+      id === "formula-recompute"
+        ? [
+            {
+              owner: "wasm.formula.transient-matrices",
+              peakBytes: 4096,
+              allocations: 2,
+              measurement: "instrumented-operation-peak" as const,
+            },
+          ]
+        : [],
     sentinel: `${id}:ok`,
   } as const;
 }
@@ -142,6 +159,41 @@ describe("resource benchmark protocol", () => {
         "smoke",
       ),
     ).toThrow("counted twice");
+  });
+
+  it("keeps transient peaks out of retained totals and rejects duplicate transient owners", () => {
+    const full = artifact("full");
+    const formula = full.scenarios.find((entry) => entry.id === "formula-recompute")!;
+    const transient = formula.transientPeaks[0]!;
+    const measured = {
+      ...formula,
+      transientPeaks: [{ ...transient, peakBytes: Number.MAX_SAFE_INTEGER }],
+    };
+    expect(() =>
+      validateResourceBenchmark(
+        {
+          ...full,
+          scenarios: full.scenarios.map((entry) =>
+            entry.id === "formula-recompute" ? measured : entry,
+          ),
+        },
+        "full",
+      ),
+    ).not.toThrow();
+    expect(measured.phases.peak!.totals.allocatedCapacityBytes).toBe(0);
+    expect(() =>
+      validateResourceBenchmark(
+        {
+          ...full,
+          scenarios: full.scenarios.map((entry) =>
+            entry.id === "formula-recompute"
+              ? { ...formula, transientPeaks: [transient, transient] }
+              : entry,
+          ),
+        },
+        "full",
+      ),
+    ).toThrow("invalid transient resource accounting");
   });
 
   it("rejects unadmitted, non-improving, and unbudgeted optimizations", () => {

@@ -91,6 +91,8 @@ export type RecomputingCellStore = CellStore & {
   pagedStats(sheet: number): Float64Array;
   memoryStats(): Float64Array;
   wasmCommittedBytes(): number;
+  formulaMatrixResourceStats(): Float64Array;
+  resetFormulaMatrixResourceStats(): void;
   cellState(sheet: number, row: number, col: number): number;
   canDirtyCell(sheet: number, row: number, col: number): boolean;
   pagedDirtyCoordinates(sheet: number): Float64Array;

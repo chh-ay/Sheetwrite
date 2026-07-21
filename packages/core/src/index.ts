@@ -116,8 +116,10 @@ export {
   type RuntimeResourcePhaseDelta,
   type RuntimeResourceSnapshot,
   type StoreMemoryBreakdown,
+  STORE_MEMORY_HASH_ESTIMATE_VERSION,
   STORE_MEMORY_PROTOCOL_VERSION,
   type WasmMemoryOwner,
+  type TransientResourcePeak,
   WASM_MEMORY_OWNERS,
 } from "./resource-accounting.js";
 export {

@@ -13,6 +13,7 @@ import type {
   RuntimeResourceOperation,
   RuntimeResourcePhase,
   RuntimeResourceSnapshot,
+  TransientResourcePeak,
 } from "./resource-accounting.js";
 import {
   type CompactRangeHistory,
@@ -186,6 +187,14 @@ export class SheetwriteStore implements Store {
 
   resetRuntimeResourceAccounting(): void {
     this.engine.resetRuntimeResourceAccounting();
+  }
+
+  getFormulaMatrixResourcePeak(): TransientResourcePeak {
+    return this.engine.getFormulaMatrixResourcePeak();
+  }
+
+  resetFormulaMatrixResourcePeak(): void {
+    this.engine.resetFormulaMatrixResourcePeak();
   }
 
   withResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {

@@ -12,6 +12,7 @@ import {
   type RuntimeResourceOperation,
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
+  type TransientResourcePeak,
 } from "../resource-accounting.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import type {
@@ -277,6 +278,26 @@ export class StoreDataEngine {
 
   resetRuntimeResourceAccounting(): void {
     this.boundaryAccounting.reset();
+  }
+
+  getFormulaMatrixResourcePeak(): TransientResourcePeak {
+    const values = this.wasm.formulaMatrixResourceStats();
+    if (
+      values.length !== 3 ||
+      !values.every((value) => Number.isSafeInteger(value) && value >= 0)
+    ) {
+      throw new Error("Invalid formula matrix resource stats");
+    }
+    return {
+      owner: "wasm.formula.transient-matrices",
+      peakBytes: values[1]!,
+      allocations: values[2]!,
+      measurement: "instrumented-operation-peak",
+    };
+  }
+
+  resetFormulaMatrixResourcePeak(): void {
+    this.wasm.resetFormulaMatrixResourceStats();
   }
 
   withResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {

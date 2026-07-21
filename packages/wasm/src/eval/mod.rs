@@ -1,5 +1,6 @@
 //! Formula recompute: dependency index, affected-set growth, evaluation.
 
+mod array;
 mod criteria;
 mod date;
 mod dependency;
@@ -24,8 +25,12 @@ pub(crate) use dependency::DepIndex;
 use dependency::{build_dep_index, collect_affected_formulas, seed_dependency_depth_errors};
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator};
 use lookup::{find_match_index, integer_arg, positive_index};
-use matrix::{optional_ast, range_from_ast, EvalMatrix};
-use value::{bool_from_value, cached_formula_value, compare_values, number_from_value};
+use array::dynamic_recompute_within_limit;
+use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
+use value::{
+    bool_from_value, cached_formula_value, compare_values, number_from_value, text_from_value,
+};
 
 impl CellStore {
     pub(crate) fn recompute_sheet(&mut self, sheet: usize) {
@@ -313,6 +318,15 @@ impl CellStore {
                 };
                 Value::Bool(res)
             }
+            Ast::Func(Func::Filter | Func::Sort | Func::Unique, _) => {
+                match self
+                    .eval_dynamic_array(ast, sheet, affected, memo, visiting, depth + 1)
+                    .unwrap_or(Err(FormulaError::Value))
+                {
+                    Ok(matrix) => matrix.into_first(),
+                    Err(error) => Value::Error(error),
+                }
+            }
             Ast::Func(func, args) => {
                 self.eval_func(*func, args, sheet, affected, memo, visiting, depth + 1)
             }
@@ -487,7 +501,7 @@ impl CellStore {
                 values.push(self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1));
             }
         }
-        Ok(EvalMatrix { rows, cols, values })
+        Ok(EvalMatrix::new(rows, cols, values))
     }
 
     fn eval_criterion(
@@ -622,11 +636,11 @@ impl CellStore {
                         Err(error) => return Value::Error(error),
                     }
                 } else {
-                    EvalMatrix {
-                        rows: criteria_range.rows,
-                        cols: criteria_range.cols,
-                        values: criteria_range.values.clone(),
-                    }
+                    EvalMatrix::new(
+                        criteria_range.rows,
+                        criteria_range.cols,
+                        criteria_range.values.clone(),
+                    )
                 };
                 if !criteria_range.same_shape(&sum_range) {
                     return Value::Error(FormulaError::Value);
