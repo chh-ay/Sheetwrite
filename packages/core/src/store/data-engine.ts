@@ -2157,6 +2157,7 @@ export class StoreDataEngine {
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
   dispose(): void {
+    this.view.dispose();
     this.wasm.free();
   }
 

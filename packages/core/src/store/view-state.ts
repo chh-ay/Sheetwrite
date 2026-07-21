@@ -6,6 +6,12 @@ import type { RecomputingCellStore } from "./wasm-contract.js";
 const EMPTY_U32 = new Uint32Array(0);
 const EMPTY_FILTERS: ReadonlyMap<number, ColumnFilter> = new Map();
 const EMPTY_GROUPS: readonly RowGroup[] = [];
+const ABSENT_VIEW_ROW = 0xffff_ffff;
+
+interface PackedRowIndex {
+  readonly rows: Uint32Array;
+  valid: boolean;
+}
 
 const COMPARE_OP: Record<"gt" | "gte" | "lt" | "lte" | "eq" | "neq", number> = {
   gt: 0,
@@ -26,7 +32,7 @@ interface ViewState {
 /** Owns the mutable view permutation and its query configuration. */
 export class StoreViewState {
   private readonly orderBySheet = new Map<SheetId, Uint32Array>();
-  private readonly rowIndexBySheet = new Map<SheetId, Map<number, number>>();
+  private readonly rowIndexBySheet = new Map<SheetId, PackedRowIndex>();
   private readonly stateBySheet = new Map<SheetId, ViewState>();
 
   constructor(
@@ -45,23 +51,47 @@ export class StoreViewState {
   }
 
   viewRowOf(sheet: SheetId, dataRow: number): number | null {
+    if (!Number.isInteger(dataRow) || dataRow < 0) return null;
+
     const order = this.orderBySheet.get(sheet);
     if (!order) {
       const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-      const inBounds =
-        meta !== undefined && Number.isInteger(dataRow) && dataRow >= 0 && dataRow < meta.rowCount;
-      return inBounds ? dataRow : null;
+      return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
     }
 
     let index = this.rowIndexBySheet.get(sheet);
-    if (!index) {
-      index = new Map();
-      for (let viewRow = 0; viewRow < order.length; viewRow++) {
-        index.set(order[viewRow]!, viewRow);
-      }
+    if (index?.valid) {
+      if (dataRow >= index.rows.length) return null;
+      const viewRow = index.rows[dataRow]!;
+      return viewRow === ABSENT_VIEW_ROW ? null : viewRow;
+    }
+
+    const meta = this.sheetMeta(sheet);
+    if (dataRow >= meta.rowCount) return null;
+    if (meta.rowCount > ABSENT_VIEW_ROW || order.length > ABSENT_VIEW_ROW) {
+      throw new RangeError(
+        `sheet ${sheet} exceeds the packed inverse row limit of ${ABSENT_VIEW_ROW}`,
+      );
+    }
+    if (!index || index.rows.length !== meta.rowCount) {
+      index = { rows: new Uint32Array(meta.rowCount), valid: false };
       this.rowIndexBySheet.set(sheet, index);
     }
-    return index.get(dataRow) ?? null;
+
+    index.rows.fill(ABSENT_VIEW_ROW);
+    for (let viewRow = 0; viewRow < order.length; viewRow++) {
+      const orderedDataRow = order[viewRow]!;
+      if (orderedDataRow >= meta.rowCount) {
+        throw new RangeError(
+          `view order for sheet ${sheet} contains out-of-bounds data row ${orderedDataRow}`,
+        );
+      }
+      index.rows[orderedDataRow] = viewRow;
+    }
+    index.valid = true;
+
+    const viewRow = index.rows[dataRow]!;
+    return viewRow === ABSENT_VIEW_ROW ? null : viewRow;
   }
 
   columnFilters(sheet: SheetId): ReadonlyMap<number, ColumnFilter> {
@@ -132,6 +162,12 @@ export class StoreViewState {
     this.stateBySheet.delete(sheet);
     this.orderBySheet.delete(sheet);
     this.rowIndexBySheet.delete(sheet);
+  }
+
+  dispose(): void {
+    this.stateBySheet.clear();
+    this.orderBySheet.clear();
+    this.rowIndexBySheet.clear();
   }
 
   distinctValues(sheet: SheetId, col: number, limit: number): CellScalar[] {
@@ -311,7 +347,8 @@ export class StoreViewState {
 
   private setOrder(sheet: SheetId, order: Uint32Array): void {
     this.orderBySheet.set(sheet, order);
-    this.rowIndexBySheet.delete(sheet);
+    const index = this.rowIndexBySheet.get(sheet);
+    if (index) index.valid = false;
   }
 
   private dropOrder(sheet: SheetId): void {

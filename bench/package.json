@@ -12,6 +12,7 @@
     "bench:paged": "bun run src/paged-bench.ts",
     "bench:paged:smoke": "bun run src/paged-bench.ts --smoke",
     "bench:formula": "bun run src/formula-bench.ts",
+    "bench:view-index": "bun run src/view-index-bench.ts",
     "bench:formula:smoke": "bun run src/formula-bench.ts --smoke",
     "bench:render:prepare": "cd .. && bun run build:wasm && bun run --filter '@sheetwrite/core' build",
     "bench:render": "bun run src/render-driver.ts",
