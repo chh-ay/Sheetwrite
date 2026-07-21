@@ -737,6 +737,16 @@ export class DatasourceController {
     this.drainingDemand = true;
     try {
       for (;;) {
+        const viewport = this.viewportDemand;
+        if (viewport) {
+          const remaining = this.dispatchRange(datasource, loadable, viewport);
+          if (remaining === null) this.viewportDemand = null;
+          else if (remaining > viewport.start)
+            this.viewportDemand = { ...viewport, start: remaining };
+          else return;
+          continue;
+        }
+
         const durable = this.durableDemand.first();
         if (durable) {
           const remaining = this.dispatchRange(datasource, loadable, {
@@ -747,16 +757,6 @@ export class DatasourceController {
           });
           if (remaining === null) this.durableDemand.remove(durable.start, durable.end);
           else if (remaining > durable.start) this.durableDemand.remove(durable.start, remaining);
-          else return;
-          continue;
-        }
-
-        const viewport = this.viewportDemand;
-        if (viewport) {
-          const remaining = this.dispatchRange(datasource, loadable, viewport);
-          if (remaining === null) this.viewportDemand = null;
-          else if (remaining > viewport.start)
-            this.viewportDemand = { ...viewport, start: remaining };
           else return;
           continue;
         }
@@ -877,14 +877,20 @@ export class DatasourceController {
       }
 
       if (this.requests.size >= DATASOURCE_MAX_ACTIVE_REQUESTS) {
-        if (demand.priority === "visible") {
-          const speculative = [...this.requests].find(
-            (request) => request.priority === "speculative" && !request.durableDemand,
+        let preempted = [...this.requests].find(
+          (request) => request.priority === "speculative" && !request.durableDemand,
+        );
+        if (!preempted && demand.viewportOrigin) {
+          preempted = [...this.requests].find(
+            (request) =>
+              request.durableDemand &&
+              !intersects(request.start, request.end, demand.start, demand.end),
           );
-          if (speculative) {
-            this.abortRequest(speculative, "obsolete");
-            continue;
-          }
+          if (preempted) this.durableDemand.add(preempted.start, preempted.end);
+        }
+        if (preempted && demand.priority === "visible") {
+          this.abortRequest(preempted, "obsolete");
+          continue;
         }
         return row;
       }
@@ -908,6 +914,36 @@ export class DatasourceController {
     return null;
   }
 
+  private requeueShortPage(request: ActiveRequest, loadedEnd: number): void {
+    if (loadedEnd >= request.end) return;
+    if (request.durableDemand) {
+      this.durableDemand.add(loadedEnd, request.end);
+      return;
+    }
+    if (request.priority === "speculative") {
+      this.speculativeDemand.unshift({
+        start: loadedEnd,
+        end: request.end,
+        priority: "speculative",
+        direction: request.direction,
+        viewportOrigin: false,
+      });
+      return;
+    }
+    const viewport = this.lastViewport;
+    if (!viewport) return;
+    const start = Math.max(loadedEnd, viewport.start);
+    const end = Math.min(request.end, viewport.end);
+    if (start >= end) return;
+    const pending = this.viewportDemand;
+    this.viewportDemand = {
+      start: Math.min(start, pending?.start ?? start),
+      end: Math.max(end, pending?.end ?? end),
+      priority: "visible",
+      direction: 0,
+      viewportOrigin: true,
+    };
+  }
   /** Fast-path resident bands, then refine rows without clearing resident peers. */
   private refreshPagedResidency(
     loadable: SheetwriteStore | null,
@@ -1151,6 +1187,7 @@ export class DatasourceController {
               (this.visibleWaitSampleCursor + 1) % DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT;
           }
         }
+        if (rows.length > 0) this.requeueShortPage(activeRequest, loadedEnd);
         this.clearOwned(activeRequest);
         this.options.onRowsLoaded();
       })

@@ -792,23 +792,32 @@ describe("DatasourceController revision retention", () => {
       rows: [{ name: "ten" }, { name: "eleven" }, { name: "twelve" }],
     });
     await flushRequest();
-    expect(controller.getTelemetry()).toMatchObject({ loadedBands: 1, ownedBands: 0 });
+    expect(controller.getTelemetry()).toMatchObject({
+      loadedBands: 1,
+      ownedBands: 1,
+      activeRequests: 1,
+    });
+    expect(pending[1]!.request).toMatchObject({ start: 13, end: 20 });
 
     controller.ensureLoaded(10, 25);
-    expect(pending[1]!.request).toMatchObject({ start: 13, end: 25 });
-    pending[1]!.result.resolve({
-      start: 13,
-      rows: Array.from({ length: 12 }, (_, offset) => ({ name: `row-${13 + offset}` })),
-    });
+    expect(pending[2]!.request).toMatchObject({ start: 20, end: 25 });
+    for (const entry of pending.slice(1, 3)) {
+      entry.result.resolve({
+        start: entry.request.start,
+        rows: Array.from({ length: entry.request.end - entry.request.start }, (_, offset) => ({
+          name: `row-${entry.request.start + offset}`,
+        })),
+      });
+    }
     await flushRequest();
 
     controller.ensureLoaded(0, 5);
     controller.ensureLoaded(5, 10);
-    expect(pending.slice(2).map(({ request }) => [request.start, request.end])).toEqual([
+    expect(pending.slice(3).map(({ request }) => [request.start, request.end])).toEqual([
       [0, 5],
       [5, 10],
     ]);
-    for (const entry of pending.slice(2)) {
+    for (const entry of pending.slice(3)) {
       entry.result.resolve({
         start: entry.request.start,
         rows: Array.from({ length: entry.request.end - entry.request.start }, (_, offset) => ({
@@ -819,10 +828,10 @@ describe("DatasourceController revision retention", () => {
     await flushRequest();
     expect(controller.getTelemetry()).toMatchObject({ loadedBands: 1, ownedBands: 0 });
     controller.ensureLoaded(3, 22);
-    expect(pending).toHaveLength(4);
+    expect(pending).toHaveLength(5);
 
     controller.ensureLoaded(30, 35);
-    const stale = pending[4]!;
+    const stale = pending[5]!;
     controller.reset(40);
     expect(stale.request.signal.aborted).toBe(true);
     stale.result.resolve({
@@ -934,6 +943,58 @@ describe("DatasourceController revision retention", () => {
     controller.destroy();
   });
 
+  it("automatically continues a valid short page tail without another viewport update", async () => {
+    const store = new SheetwriteStore(makeWorkbook(12));
+    const requests: Array<{ start: number; end: number }> = [];
+    const tail = Promise.withResolvers<DataSourcePage>();
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          requests.push(request);
+          if (requests.length === 1) {
+            return Promise.resolve({
+              start: request.start,
+              rows: [{ name: "zero" }, { name: "one" }, { name: "two" }],
+            });
+          }
+          return tail.promise;
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 12,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      12,
+    );
+
+    controller.ensureLoaded(0, 10);
+    await flushRequest();
+    expect(requests.map(({ start, end }) => [start, end])).toEqual([
+      [0, 10],
+      [3, 10],
+    ]);
+    expect(controller.getTelemetry()).toMatchObject({ activeRequests: 1, ownedBands: 1 });
+
+    tail.resolve({
+      start: 3,
+      rows: Array.from({ length: 7 }, (_, offset) => ({ name: `row-${3 + offset}` })),
+    });
+    await flushRequest();
+    expect(controller.getTelemetry()).toMatchObject({
+      activeRequests: 0,
+      ownedBands: 0,
+      loadedBands: 1,
+    });
+    expect(store.getCell({ sheet: "s1", row: 9, col: 0 }).resolved).toBe("row-9");
+
+    controller.destroy();
+    store.dispose();
+  });
+
   it("caps highly fragmented visible gaps and continues them as requests settle", async () => {
     const store = new SheetwriteStore(makeWorkbook(24));
     let retainCount = 0;
@@ -1013,6 +1074,78 @@ describe("DatasourceController revision retention", () => {
     expect(retainCount).toBe(0);
 
     controller.destroy();
+    store.dispose();
+  });
+
+  it("serves the body viewport immediately while saturated durable gaps keep progressing", async () => {
+    const store = new SheetwriteStore(makeWorkbook(40));
+    let fragmented = false;
+    let retained = 0;
+    const pending: Array<{
+      request: { start: number; end: number; signal: AbortSignal };
+      result: PromiseWithResolvers<DataSourcePage>;
+    }> = [];
+    const controller = new DatasourceController(
+      {
+        datasource: (request) => {
+          if (!fragmented) {
+            return Promise.resolve({
+              start: request.start,
+              rows: [{ name: `row-${request.start}` }],
+            });
+          }
+          const result = Promise.withResolvers<DataSourcePage>();
+          pending.push({ request, result });
+          return result.promise;
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => 40,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => {
+          retained += 1;
+          return () => {
+            retained -= 1;
+          };
+        },
+        onRowsLoaded: () => {},
+        onError: () => {},
+      },
+      40,
+    );
+
+    for (let row = 0; row < 24; row += 2) {
+      controller.ensureLoaded(row, row + 1);
+      await flushRequest();
+    }
+    fragmented = true;
+    controller.ensureLoaded(0, 24);
+    expect(pending).toHaveLength(DATASOURCE_MAX_ACTIVE_REQUESTS);
+    expect(retained).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+
+    controller.updateViewport(30, 31);
+    expect(pending).toHaveLength(DATASOURCE_MAX_ACTIVE_REQUESTS + 1);
+    expect(
+      pending
+        .slice(0, DATASOURCE_MAX_ACTIVE_REQUESTS)
+        .some(({ request }) => request.signal.aborted),
+    ).toBe(true);
+    const body = pending.at(-1)!;
+    expect(body.request).toMatchObject({ start: 30, end: 31 });
+    expect(body.request.signal.aborted).toBe(false);
+    expect(controller.getTelemetry().activeRequests).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+    expect(retained).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+
+    body.result.resolve({ start: 30, rows: [{ name: "body" }] });
+    await flushRequest();
+    expect(pending).toHaveLength(DATASOURCE_MAX_ACTIVE_REQUESTS + 2);
+    expect(pending.at(-1)!.request.start).toBeLessThan(24);
+    expect(controller.getTelemetry().activeRequests).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+    expect(retained).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
+
+    controller.destroy();
+    expect(retained).toBe(0);
     store.dispose();
   });
 
