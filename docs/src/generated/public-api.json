@@ -1771,7 +1771,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L118",
+              "source": "src/store/data-engine.ts#L119",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -2879,6 +2879,10 @@
                 {
                   "name": "chunkRows",
                   "documentation": "Paged row chunk size; defaults to 4,096 and is normalized to a power of two."
+                },
+                {
+                  "name": "dirtyCellLimit",
+                  "documentation": "Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000 cells; further edits reject atomically."
                 },
                 {
                   "name": "snapshotResourceLimits",

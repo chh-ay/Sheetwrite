@@ -63,12 +63,13 @@ cacheBytes?: number;
 </details>
 
 <details class="api-member" id="sheetwrite-store-options-dirty-cell-limit" data-pagefind-weight="1">
-<summary><code>dirtyCellLimit</code></summary>
+<summary><code>dirtyCellLimit</code> <span class="api-member-summary">Maximum sparse local edits retained outside the clean page cache.</span></summary>
 
 ```ts generated
 dirtyCellLimit?: number;
 ```
 
+<p class="api-member-doc">Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000 cells; further edits reject atomically.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-store-options-protection-resolver" data-pagefind-weight="1">

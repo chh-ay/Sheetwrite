@@ -109,6 +109,7 @@ export interface SheetwriteStoreOptions {
   chunkRows?: number;
   /** Per-sheet clean-chunk budget; defaults to 32 MiB. Dirty and pinned chunks may exceed it. */
   cacheBytes?: number;
+  /** Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000 cells; further edits reject atomically. */
   dirtyCellLimit?: number;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
