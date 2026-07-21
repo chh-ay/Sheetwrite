@@ -9,7 +9,7 @@ Authoritative source value, evaluated value, style, and load state for a cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L87</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L95</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

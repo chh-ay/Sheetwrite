@@ -9,7 +9,7 @@ Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L110</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L120</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>17</span>

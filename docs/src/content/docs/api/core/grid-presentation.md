@@ -9,7 +9,7 @@ Header semantics used by the retained canvas and accessibility mirror.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L66</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L72</code></dd></div>
 </dl>
 
 ## Declaration

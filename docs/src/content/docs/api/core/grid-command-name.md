@@ -9,7 +9,7 @@ Built-in command names accepted by state queries and change events.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L134</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L140</code></dd></div>
 </dl>
 
 ## Declaration

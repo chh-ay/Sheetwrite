@@ -1,8 +1,11 @@
 /** Stable protocol for runtime ownership and operation-cost reports. */
 export const RUNTIME_RESOURCE_SCHEMA_VERSION = 2 as const;
+/** Flat WASM store-memory protocol version; decoders reject any mismatch. */
 export const STORE_MEMORY_PROTOCOL_VERSION = 3 as const;
+/** Version of the deterministic hash-table capacity estimate used by store owners. */
 export const STORE_MEMORY_HASH_ESTIMATE_VERSION = 1 as const;
 
+/** Stable ordered owner list encoded by the WASM store-memory protocol. */
 export const WASM_MEMORY_OWNERS = [
   "wasm.dense.kinds",
   "wasm.dense.payloads",
@@ -25,7 +28,9 @@ export const WASM_MEMORY_OWNERS = [
   "wasm.spill-blockers",
 ] as const;
 
+/** One retained-memory owner reported by the WASM cell store. */
 export type WasmMemoryOwner = (typeof WASM_MEMORY_OWNERS)[number];
+/** User-visible operation whose retained and transient resource costs are measured. */
 export type RuntimeResourceOperation =
   | "startup"
   | "scroll"
@@ -38,10 +43,14 @@ export type RuntimeResourceOperation =
   | "snapshot"
   | "persistence"
   | "teardown";
+/** Measurement point within one resource-accounted operation. */
 export type RuntimeResourcePhase = "before" | "peak" | "settled" | "after-destroy";
+/** Direction of a measured JS/WASM boundary crossing. */
 export type BoundaryDirection = "js-to-wasm" | "wasm-to-js";
+/** Whether a measured boundary crossing transfers one scalar or a packed batch. */
 export type BoundaryTransferKind = "bulk" | "scalar";
 
+/** Retained logical payload and allocated capacity attributed to one exclusive owner. */
 export interface ResourceOwnerBytes {
   readonly owner: string;
   /** Bytes containing live logical payload. Never includes runtime observations. */
@@ -57,6 +66,7 @@ export interface ResourceOwnerBytes {
     | "entry-count-only";
 }
 
+/** Decoded, fail-closed retained-memory ownership report from the WASM store. */
 export interface StoreMemoryBreakdown {
   readonly protocolVersion: typeof STORE_MEMORY_PROTOCOL_VERSION;
   readonly hashTableEstimateVersion: typeof STORE_MEMORY_HASH_ESTIMATE_VERSION;
@@ -70,6 +80,7 @@ export interface StoreMemoryBreakdown {
   readonly unaccountedBytes: number;
 }
 
+/** Fixed-cardinality boundary crossing counters for one operation. */
 export interface BoundaryOperationStats {
   readonly operation: RuntimeResourceOperation;
   readonly ffiCalls: number;
@@ -80,6 +91,7 @@ export interface BoundaryOperationStats {
   readonly scalarCalls: number;
 }
 
+/** Available runtime-level memory observations, kept separate from retained owner totals. */
 export interface RuntimeMemoryObservation {
   readonly usedJSHeapSize: number | null;
   readonly arrayBufferBytes: number | null;
@@ -95,6 +107,7 @@ export interface TransientResourcePeak {
   readonly measurement: "instrumented-operation-peak";
 }
 
+/** Complete retained-resource and boundary snapshot for one operation phase. */
 export interface RuntimeResourceSnapshot {
   readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
   readonly operation: RuntimeResourceOperation;
@@ -118,6 +131,7 @@ export interface ResourceOwnerDelta {
   readonly entries: number;
 }
 
+/** Owner and runtime deltas between two phases of the same operation. */
 export interface RuntimeResourcePhaseDelta {
   readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
   readonly operation: RuntimeResourceOperation;
@@ -305,6 +319,7 @@ export function decodeStoreMemoryStats(
   };
 }
 
+/** Construct a zero-owner store report when no WASM store is available. */
 export function emptyStoreMemoryStats(wasmCommittedBytes: number | null): StoreMemoryBreakdown {
   const encoded = new Float64Array(5 + WASM_MEMORY_OWNERS.length * 3);
   encoded[0] = STORE_MEMORY_PROTOCOL_VERSION;
@@ -313,6 +328,7 @@ export function emptyStoreMemoryStats(wasmCommittedBytes: number | null): StoreM
   return decodeStoreMemoryStats(encoded, wasmCommittedBytes);
 }
 
+/** Build and validate one operation-phase snapshot without double-counting runtime observations. */
 export function createRuntimeResourceSnapshot(input: {
   operation: RuntimeResourceOperation;
   phase: RuntimeResourcePhase;
@@ -372,6 +388,7 @@ export function assertRuntimeResourceSnapshot(snapshot: RuntimeResourceSnapshot)
   }
 }
 
+/** Diff two validated phases of the same operation by exclusive resource owner. */
 export function diffRuntimeResourcePhases(
   before: RuntimeResourceSnapshot,
   after: RuntimeResourceSnapshot,
@@ -419,6 +436,7 @@ export function diffRuntimeResourcePhases(
   };
 }
 
+/** Observe runtime memory buckets available in the current JS host without fabricating missing data. */
 export function observeRuntimeMemory(): RuntimeMemoryObservation {
   const performanceMemory = (
     globalThis.performance as Performance & {

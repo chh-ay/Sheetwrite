@@ -9,10 +9,10 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L400</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L406</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>82</span>
+## Members <span class="api-count" data-pagefind-ignore>83</span>
 
 <div class="api-member-list">
 
@@ -30,6 +30,15 @@ readonly store: Store;
 
 ```ts generated
 readonly actions: GridActions;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-runtime-resource-snapshot" data-pagefind-weight="1">
+<summary><code>getRuntimeResourceSnapshot</code> <span class="api-member-summary">Versioned coarse runtime ownership snapshot, including datasource state.</span></summary>
+
+```ts generated
+getRuntimeResourceSnapshot( operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation, ): RuntimeResourceSnapshot;
 ```
 
 </details>
@@ -807,6 +816,11 @@ destroy(): void;
 export interface Grid {
   readonly store: Store;
   readonly actions: GridActions;
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot;
   getCommandState(command: GridCommandName): GridCommandState;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;

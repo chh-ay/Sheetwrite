@@ -10,7 +10,7 @@ arrays whose buffers are surrendered once through the `take*` accessors.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L230</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L295</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

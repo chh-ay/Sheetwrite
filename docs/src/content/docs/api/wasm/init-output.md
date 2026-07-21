@@ -9,10 +9,10 @@ Result of module initialization: the instantiated exports plus the shared linear
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L314</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L397</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>104</span>
+## Members <span class="api-count" data-pagefind-ignore>129</span>
 
 <div class="api-member-list">
 
@@ -57,6 +57,15 @@ readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
 
 ```ts generated
 readonly __wbg_rangesnapshot_free: (a: number, b: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-wbg-sourcesnapshot-free" data-pagefind-weight="1">
+<summary><code>__wbg_sourcesnapshot_free</code></summary>
+
+```ts generated
+readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void;
 ```
 
 </details>
@@ -187,6 +196,24 @@ readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e:
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-capture-references" data-pagefind-weight="1">
+<summary><code>cellstore_captureReferences</code></summary>
+
+```ts generated
+readonly cellstore_captureReferences: (a: number, b: number, c: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-capture-sources" data-pagefind-weight="1">
+<summary><code>cellstore_captureSources</code></summary>
+
+```ts generated
+readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-cell-state" data-pagefind-weight="1">
 <summary><code>cellstore_cellState</code></summary>
 
@@ -219,6 +246,15 @@ readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: n
 
 ```ts generated
 readonly cellstore_colCount: (a: number, b: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-compact-string-storage" data-pagefind-weight="1">
+<summary><code>cellstore_compactStringStorage</code></summary>
+
+```ts generated
+readonly cellstore_compactStringStorage: (a: number) => void;
 ```
 
 </details>
@@ -291,6 +327,15 @@ readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: n
 
 ```ts generated
 readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-formula-matrix-resource-stats" data-pagefind-weight="1">
+<summary><code>cellstore_formulaMatrixResourceStats</code></summary>
+
+```ts generated
+readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number];
 ```
 
 </details>
@@ -403,6 +448,15 @@ readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, 
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-memory-stats" data-pagefind-weight="1">
+<summary><code>cellstore_memoryStats</code></summary>
+
+```ts generated
+readonly cellstore_memoryStats: (a: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-new" data-pagefind-weight="1">
 <summary><code>cellstore_new</code></summary>
 
@@ -484,11 +538,38 @@ readonly cellstore_recompute: (a: number, b: number) => void;
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-recompute-changed" data-pagefind-weight="1">
+<summary><code>cellstore_recomputeChanged</code></summary>
+
+```ts generated
+readonly cellstore_recomputeChanged: (a: number) => void;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-recompute-volatile" data-pagefind-weight="1">
 <summary><code>cellstore_recomputeVolatile</code></summary>
 
 ```ts generated
 readonly cellstore_recomputeVolatile: (a: number, b: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-reference-target" data-pagefind-weight="1">
+<summary><code>cellstore_referenceTarget</code></summary>
+
+```ts generated
+readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-references-targeting" data-pagefind-weight="1">
+<summary><code>cellstore_referencesTargeting</code></summary>
+
+```ts generated
+readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number];
 ```
 
 </details>
@@ -547,6 +628,15 @@ readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: 
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-reset-formula-matrix-resource-stats" data-pagefind-weight="1">
+<summary><code>cellstore_resetFormulaMatrixResourceStats</code></summary>
+
+```ts generated
+readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-reset-query-resource-stats" data-pagefind-weight="1">
 <summary><code>cellstore_resetQueryResourceStats</code></summary>
 
@@ -587,7 +677,7 @@ readonly cellstore_search: (a: number, b: number, c: number, d: number, e: numbe
 <summary><code>cellstore_setBlock</code></summary>
 
 ```ts generated
-readonly cellstore_setBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number) => number;
+readonly cellstore_setBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number) => number;
 ```
 
 </details>
@@ -673,6 +763,24 @@ readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e:
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-set-sparse-block" data-pagefind-weight="1">
+<summary><code>cellstore_setSparseBlock</code></summary>
+
+```ts generated
+readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-set-spill-blockers" data-pagefind-weight="1">
+<summary><code>cellstore_setSpillBlockers</code></summary>
+
+```ts generated
+readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-set-string" data-pagefind-weight="1">
 <summary><code>cellstore_setString</code></summary>
 
@@ -718,11 +826,65 @@ readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-spill-anchor-col" data-pagefind-weight="1">
+<summary><code>cellstore_spillAnchorCol</code></summary>
+
+```ts generated
+readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-spill-anchor-row" data-pagefind-weight="1">
+<summary><code>cellstore_spillAnchorRow</code></summary>
+
+```ts generated
+readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-spill-derived-mask" data-pagefind-weight="1">
+<summary><code>cellstore_spillDerivedMask</code></summary>
+
+```ts generated
+readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-spill-derived-mask-for-rows" data-pagefind-weight="1">
+<summary><code>cellstore_spillDerivedMaskForRows</code></summary>
+
+```ts generated
+readonly cellstore_spillDerivedMaskForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-spill-owner-coordinates" data-pagefind-weight="1">
+<summary><code>cellstore_spillOwnerCoordinates</code></summary>
+
+```ts generated
+readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-style-id-at" data-pagefind-weight="1">
 <summary><code>cellstore_styleIdAt</code></summary>
 
 ```ts generated
 readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-wasm-committed-bytes" data-pagefind-weight="1">
+<summary><code>cellstore_wasmCommittedBytes</code></summary>
+
+```ts generated
+readonly cellstore_wasmCommittedBytes: (a: number) => number;
 ```
 
 </details>
@@ -790,11 +952,74 @@ readonly rangesnapshot_kinds: (a: number) => [number, number];
 
 </details>
 
+<details class="api-member" id="init-output-rangesnapshot-reference-offsets" data-pagefind-weight="1">
+<summary><code>rangesnapshot_referenceOffsets</code></summary>
+
+```ts generated
+readonly rangesnapshot_referenceOffsets: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-rangesnapshot-reference-targets" data-pagefind-weight="1">
+<summary><code>rangesnapshot_referenceTargets</code></summary>
+
+```ts generated
+readonly rangesnapshot_referenceTargets: (a: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-rangesnapshot-style-ids" data-pagefind-weight="1">
 <summary><code>rangesnapshot_styleIds</code></summary>
 
 ```ts generated
 readonly rangesnapshot_styleIds: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-sourcesnapshot-byte-length" data-pagefind-weight="1">
+<summary><code>sourcesnapshot_byteLength</code></summary>
+
+```ts generated
+readonly sourcesnapshot_byteLength: (a: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-sourcesnapshot-formula-offsets" data-pagefind-weight="1">
+<summary><code>sourcesnapshot_formulaOffsets</code></summary>
+
+```ts generated
+readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-sourcesnapshot-formula-sources" data-pagefind-weight="1">
+<summary><code>sourcesnapshot_formulaSources</code></summary>
+
+```ts generated
+readonly sourcesnapshot_formulaSources: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-sourcesnapshot-reference-offsets" data-pagefind-weight="1">
+<summary><code>sourcesnapshot_referenceOffsets</code></summary>
+
+```ts generated
+readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-sourcesnapshot-reference-targets" data-pagefind-weight="1">
+<summary><code>sourcesnapshot_referenceTargets</code></summary>
+
+```ts generated
+readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
 ```
 
 </details>
@@ -965,6 +1190,7 @@ export interface InitOutput {
   readonly __wbg_cellstore_free: (a: number, b: number) => void;
   readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
   readonly __wbg_rangesnapshot_free: (a: number, b: number) => void;
+  readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void;
   readonly __wbg_windowview_free: (a: number, b: number) => void;
   readonly cellout_kind: (a: number) => number;
   readonly cellout_num: (a: number) => number;
@@ -1008,6 +1234,19 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => number;
+  readonly cellstore_captureReferences: (
+    a: number,
+    b: number,
+    c: number,
+  ) => number;
+  readonly cellstore_captureSources: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
   readonly cellstore_cellState: (
     a: number,
     b: number,
@@ -1032,6 +1271,7 @@ export interface InitOutput {
     h: number,
   ) => number;
   readonly cellstore_colCount: (a: number, b: number) => number;
+  readonly cellstore_compactStringStorage: (a: number) => void;
   readonly cellstore_dataEdge: (
     a: number,
     b: number,
@@ -1090,6 +1330,9 @@ export interface InitOutput {
     p: number,
     q: number,
     r: number,
+  ) => [number, number];
+  readonly cellstore_formulaMatrixResourceStats: (
+    a: number,
   ) => [number, number];
   readonly cellstore_formulaSource: (
     a: number,
@@ -1167,6 +1410,7 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => void;
+  readonly cellstore_memoryStats: (a: number) => [number, number];
   readonly cellstore_new: () => number;
   readonly cellstore_pagedDirtyCoordinates: (
     a: number,
@@ -1204,7 +1448,19 @@ export interface InitOutput {
     f: number,
   ) => [number, number];
   readonly cellstore_recompute: (a: number, b: number) => void;
+  readonly cellstore_recomputeChanged: (a: number) => void;
   readonly cellstore_recomputeVolatile: (a: number, b: number) => number;
+  readonly cellstore_referenceTarget: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => [number, number];
+  readonly cellstore_referencesTargeting: (
+    a: number,
+    b: number,
+    c: number,
+  ) => [number, number];
   readonly cellstore_remapRangeStyles: (
     a: number,
     b: number,
@@ -1244,6 +1500,7 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => number;
+  readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void;
   readonly cellstore_resetQueryResourceStats: (a: number) => void;
   readonly cellstore_restoreRange: (
     a: number,
@@ -1278,6 +1535,14 @@ export interface InitOutput {
     l: number,
     m: number,
     n: number,
+    o: number,
+    p: number,
+    q: number,
+    r: number,
+    s: number,
+    t: number,
+    u: number,
+    v: number,
   ) => number;
   readonly cellstore_setBool: (
     a: number,
@@ -1366,6 +1631,38 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => void;
+  readonly cellstore_setSparseBlock: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
+    l: number,
+    m: number,
+    n: number,
+    o: number,
+    p: number,
+    q: number,
+    r: number,
+    s: number,
+    t: number,
+    u: number,
+    v: number,
+    w: number,
+    x: number,
+  ) => number;
+  readonly cellstore_setSpillBlockers: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
   readonly cellstore_setString: (
     a: number,
     b: number,
@@ -1399,12 +1696,49 @@ export interface InitOutput {
     g: number,
     h: number,
   ) => [number, number];
+  readonly cellstore_spillAnchorCol: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly cellstore_spillAnchorRow: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => number;
+  readonly cellstore_spillDerivedMask: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => [number, number];
+  readonly cellstore_spillDerivedMaskForRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => [number, number];
+  readonly cellstore_spillOwnerCoordinates: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => [number, number];
   readonly cellstore_styleIdAt: (
     a: number,
     b: number,
     c: number,
     d: number,
   ) => number;
+  readonly cellstore_wasmCommittedBytes: (a: number) => number;
   readonly distinctcolumn_takeKinds: (a: number) => [number, number];
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
@@ -1412,7 +1746,14 @@ export interface InitOutput {
   readonly rangesnapshot_formulaOffsets: (a: number) => [number, number];
   readonly rangesnapshot_formulaSources: (a: number) => [number, number];
   readonly rangesnapshot_kinds: (a: number) => [number, number];
+  readonly rangesnapshot_referenceOffsets: (a: number) => [number, number];
+  readonly rangesnapshot_referenceTargets: (a: number) => [number, number];
   readonly rangesnapshot_styleIds: (a: number) => [number, number];
+  readonly sourcesnapshot_byteLength: (a: number) => number;
+  readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number];
+  readonly sourcesnapshot_formulaSources: (a: number) => [number, number];
+  readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number];
+  readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
   readonly windowview_nCols: (a: number) => number;
   readonly windowview_nRows: (a: number) => number;
   readonly windowview_takeCondMatches: (a: number) => [number, number];

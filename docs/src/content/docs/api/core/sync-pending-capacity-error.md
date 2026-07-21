@@ -38,7 +38,7 @@ code: "pending-capacity";
 <summary><code>issue</code></summary>
 
 ```ts generated
-issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells"; actual: number; max: number; message: string; };
+issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; };
 ```
 
 </details>
@@ -78,7 +78,8 @@ class SyncPendingCapacityError extends RangeError {
       | "pending-commits"
       | "pending-operations"
       | "pending-encoded-bytes"
-      | "paged-dirty-cells";
+      | "paged-dirty-cells"
+      | "paged-reference-simulation";
     actual: number;
     max: number;
     message: string;

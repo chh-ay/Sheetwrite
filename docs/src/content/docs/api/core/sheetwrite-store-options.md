@@ -9,10 +9,10 @@ Storage layout plus snapshot and transaction resource ceilings for one store.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L58</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L69</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>8</span>
+## Members <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-member-list">
 
@@ -72,6 +72,15 @@ dirtyCellLimit?: number;
 <p class="api-member-doc">Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000 cells; further edits reject atomically.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-store-options-reference-simulation-limit" data-pagefind-weight="1">
+<summary><code>referenceSimulationLimit</code> <span class="api-member-summary">Maximum clean references retained for exact multi-operation remove-sheet simulation.</span></summary>
+
+```ts generated
+referenceSimulationLimit?: number;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-options-protection-resolver" data-pagefind-weight="1">
 <summary><code>protectionResolver</code></summary>
 
@@ -104,6 +113,7 @@ export interface SheetwriteStoreOptions {
   chunkRows?: number;
   cacheBytes?: number;
   dirtyCellLimit?: number;
+  referenceSimulationLimit?: number;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
 }

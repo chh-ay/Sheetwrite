@@ -9,7 +9,7 @@ Layout dimensions installed by [`installCanvasTestStubs`](/docs/api/core-testing
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/testing</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L21</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L23</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

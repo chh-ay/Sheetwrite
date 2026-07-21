@@ -68,7 +68,8 @@ Structured warning or rejection produced while applying an operation.
     | "pending-commits"
     | "pending-operations"
     | "pending-encoded-bytes"
-    | "paged-dirty-cells";
+    | "paged-dirty-cells"
+    | "paged-reference-simulation";
   actual: number;
   max: number;
   message: string;
@@ -117,7 +118,8 @@ export type MutationIssue =
         | "pending-commits"
         | "pending-operations"
         | "pending-encoded-bytes"
-        | "paged-dirty-cells";
+        | "paged-dirty-cells"
+        | "paged-reference-simulation";
       actual: number;
       max: number;
       message: string;

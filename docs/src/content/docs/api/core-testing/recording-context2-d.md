@@ -11,7 +11,7 @@ that counts its invocations in `calls`, so tests can assert paint activity
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/testing</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L8</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L10</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>8</span>

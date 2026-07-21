@@ -9,10 +9,10 @@ Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L82</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L93</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>52</span>
+## Members <span class="api-count" data-pagefind-ignore>57</span>
 
 <div class="api-member-list">
 
@@ -209,6 +209,15 @@ getFormula: (addr: CellAddress) => string | null;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-get-formula-matrix-resource-peak" data-pagefind-weight="1">
+<summary><code>getFormulaMatrixResourcePeak</code></summary>
+
+```ts generated
+getFormulaMatrixResourcePeak: () => TransientResourcePeak;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-get-paged-stats" data-pagefind-weight="1">
 <summary><code>getPagedStats</code></summary>
 
@@ -232,6 +241,15 @@ getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
 
 ```ts generated
 getRefTarget: (addr: CellAddress) => CellAddress | null;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-runtime-resource-snapshot" data-pagefind-weight="1">
+<summary><code>getRuntimeResourceSnapshot</code></summary>
+
+```ts generated
+getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot;
 ```
 
 </details>
@@ -373,11 +391,29 @@ renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-reset-formula-matrix-resource-peak" data-pagefind-weight="1">
+<summary><code>resetFormulaMatrixResourcePeak</code></summary>
+
+```ts generated
+resetFormulaMatrixResourcePeak: () => void;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-reset-range-mutation-allocation-stats" data-pagefind-weight="1">
 <summary><code>resetRangeMutationAllocationStats</code></summary>
 
 ```ts generated
 resetRangeMutationAllocationStats: () => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-reset-runtime-resource-accounting" data-pagefind-weight="1">
+<summary><code>resetRuntimeResourceAccounting</code></summary>
+
+```ts generated
+resetRuntimeResourceAccounting: () => void;
 ```
 
 </details>
@@ -492,6 +528,15 @@ viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-with-resource-operation" data-pagefind-weight="1">
+<summary><code>withResourceOperation</code></summary>
+
+```ts generated
+withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-from-snapshot" data-pagefind-weight="1">
 <summary><code>fromSnapshot</code></summary>
 
@@ -563,9 +608,15 @@ class SheetwriteStore implements Store {
     cols: readonly number[],
   ) => VisibleWindowView;
   getFormula: (addr: CellAddress) => string | null;
+  getFormulaMatrixResourcePeak: () => TransientResourcePeak;
   getPagedStats: (sheet: SheetId) => PagedStoreStats;
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
   getRefTarget: (addr: CellAddress) => CellAddress | null;
+  getRuntimeResourceSnapshot: (
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ) => RuntimeResourceSnapshot;
   getSpillAnchor: (addr: CellAddress) => CellAddress | null;
   getVisibleWindow: (
     sheet: SheetId,
@@ -593,7 +644,9 @@ class SheetwriteStore implements Store {
   recalculateVolatile: (now?: Date) => void;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
   renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
+  resetFormulaMatrixResourcePeak: () => void;
   resetRangeMutationAllocationStats: () => void;
+  resetRuntimeResourceAccounting: () => void;
   rowGroups: (sheet: SheetId) => readonly RowGroup[];
   searchCells: (
     sheet: SheetId,
@@ -633,6 +686,10 @@ class SheetwriteStore implements Store {
   ungroupRows: (sheet: SheetId, start: number, end: number) => void;
   viewRowCount: (sheet: SheetId) => number;
   viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
+  withResourceOperation: <T>(
+    operation: RuntimeResourceOperation,
+    run: () => T,
+  ) => T;
   static fromSnapshot: (
     input: unknown,
     options?: SheetwriteStoreOptions,
