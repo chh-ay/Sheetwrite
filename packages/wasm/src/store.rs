@@ -13,7 +13,7 @@ use crate::memory::{
 };
 use crate::sheet::{
     encode_num, encode_str_id, formula_error_at, payload_num, payload_str_id, CondPred, CondRule,
-    SheetData, DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
+    SheetData, SpillBlocker, DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
 };
 use crate::types::{
     cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, FormulaValueKind,
@@ -664,6 +664,7 @@ impl CellStore {
             {
                 return;
             }
+
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -695,6 +696,7 @@ impl CellStore {
             {
                 return;
             }
+
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -830,6 +832,7 @@ impl CellStore {
             {
                 return;
             }
+
             let removed_formula = s.formulas.remove(&key).is_some();
             s.dirty_cells.insert(key);
             removed_formula
@@ -972,6 +975,7 @@ impl CellStore {
         }
 
         let s = &mut self.sheets[sheet];
+        s.clear_all_spills();
         for col_offset in 0..cols {
             let col = start_col + col_offset;
             for row_offset in 0..rows {
@@ -1204,6 +1208,9 @@ impl CellStore {
         {
             return false;
         }
+        if contents {
+            s.clear_all_spills();
+        }
         let mut removed_formula = false;
         for col in c0..=c1 {
             for row in r0..=r1 {
@@ -1413,8 +1420,12 @@ impl CellStore {
             for row_offset in 0..rows {
                 let row = r0 + row_offset;
                 let index = s.idx(row, col);
-                kind.push(s.kind_at(index));
-                payload.push(if s.str_id_at(index) != NO_STRING {
+                let key = (row as u32, col as u32);
+                let derived = s.spill_owner(key).is_some_and(|anchor| anchor != key);
+                kind.push(if derived { KIND_EMPTY } else { s.kind_at(index) });
+                payload.push(if derived {
+                    0
+                } else if s.str_id_at(index) != NO_STRING {
                     crate::sheet::encode_str_id(s.str_id_at(index))
                 } else {
                     crate::sheet::encode_num(s.num_at(index))
@@ -1465,6 +1476,7 @@ impl CellStore {
         {
             return false;
         }
+        s.clear_all_spills();
         s.formulas.retain(|&(row, col), _| {
             let row = row as usize;
             let col = col as usize;
@@ -1522,6 +1534,7 @@ impl CellStore {
         let mut removed_formula = false;
         let mut wrote = false;
         let s = &mut self.sheets[sheet];
+        s.clear_all_spills();
         for (offset, &value) in values.iter().take(limit).enumerate() {
             while protected_offsets
                 .get(protected_index)
@@ -1574,6 +1587,7 @@ impl CellStore {
         let mut protected_index = 0usize;
         let mut removed_formula = false;
         let mut wrote = false;
+        self.sheets[sheet].clear_all_spills();
         for (offset, text) in slices.into_iter().enumerate() {
             while protected_offsets
                 .get(protected_index)
@@ -1626,6 +1640,7 @@ impl CellStore {
                 return;
             }
 
+            s.clear_all_spills();
             let limit = values.len().min(s.row_count - start_row);
             if dirty_revision.is_some() && !s.can_dirty_rect(start_row, col, limit, 1) {
                 return;
@@ -1681,6 +1696,7 @@ impl CellStore {
             return;
         }
         let mut removed_formula = false;
+        self.sheets[sheet].clear_all_spills();
         for (offset, value) in values.into_iter().take(limit).enumerate() {
             let row = start_row + offset;
             let Some(key) = cell_key(row, col) else {
@@ -1737,6 +1753,7 @@ impl CellStore {
         let slices = utf16_slices(&buf, utf16_lens, limit);
 
         let mut removed_formula = false;
+        self.sheets[sheet].clear_all_spills();
         for (offset, text) in slices.iter().enumerate() {
             let row = start_row + offset;
             let Some(key) = cell_key(row, col) else {
@@ -1773,6 +1790,7 @@ impl CellStore {
             return;
         }
         let at = at.min(row_count);
+        self.sheets[sheet].clear_all_spills();
         self.sheets[sheet].insert_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
         self.bump_formula_epoch();
@@ -1787,6 +1805,7 @@ impl CellStore {
             return;
         }
         let count = count.min(row_count - at);
+        self.sheets[sheet].clear_all_spills();
         self.sheets[sheet].delete_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
         self.bump_formula_epoch();
@@ -1801,6 +1820,7 @@ impl CellStore {
             return;
         }
         let at = at.min(col_count);
+        self.sheets[sheet].clear_all_spills();
         self.sheets[sheet].insert_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
         self.bump_formula_epoch();
@@ -1815,6 +1835,7 @@ impl CellStore {
             return;
         }
         let count = count.min(col_count - at);
+        self.sheets[sheet].clear_all_spills();
         self.sheets[sheet].delete_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
         self.bump_formula_epoch();
@@ -2012,6 +2033,7 @@ impl CellStore {
         let entry = self.parse_formula_entry(src, sheet as u32);
         let cached_value = {
             let s = &mut self.sheets[sheet];
+
             let carried = if entry.error.is_some() {
                 0.0
             } else {
@@ -2053,6 +2075,164 @@ impl CellStore {
             .reference_target(sheet as u32)?;
         Some(vec![target.sheet, target.row, target.col])
     }
+    /// Replace the host-owned merge/protection collision ranges. Packed as
+    /// `[row_start, col_start, row_end, col_end, ...]`; invalid input fails
+    /// without weakening the old gate.
+    #[wasm_bindgen(js_name = setSpillBlockers)]
+    pub fn set_spill_blockers(&mut self, sheet: usize, bounds: &[u32]) -> bool {
+        if bounds.len() % 4 != 0 || bounds.len() / 4 > 100_000 {
+            return false;
+        }
+        let Some(data) = self.sheets.get(sheet) else {
+            return false;
+        };
+        let mut blockers = Vec::with_capacity(bounds.len() / 4);
+        for range in bounds.chunks_exact(4) {
+            if range[0] > range[2]
+                || range[1] > range[3]
+                || !data.contains_cell(range[2] as usize, range[3] as usize)
+            {
+                return false;
+            }
+            blockers.push(SpillBlocker {
+                row_start: range[0],
+                col_start: range[1],
+                row_end: range[2],
+                col_end: range[3],
+            });
+        }
+        let data = &mut self.sheets[sheet];
+        if data.spill_blockers != blockers {
+            data.spill_blockers = blockers;
+            data.clear_dirty();
+            data.all_dirty = true;
+        }
+        true
+    }
+
+    /// Stable spill owner coordinate, or `u32::MAX` when `cell` is not part of
+    /// a materialized spill.
+    #[wasm_bindgen(js_name = spillAnchorRow)]
+    pub fn spill_anchor_row(&self, sheet: usize, row: usize, col: usize) -> u32 {
+        cell_key(row, col)
+            .and_then(|cell| self.sheets.get(sheet)?.spill_owner(cell))
+            .map_or(u32::MAX, |anchor| anchor.0)
+    }
+
+    #[wasm_bindgen(js_name = spillAnchorCol)]
+    pub fn spill_anchor_col(&self, sheet: usize, row: usize, col: usize) -> u32 {
+        cell_key(row, col)
+            .and_then(|cell| self.sheets.get(sheet)?.spill_owner(cell))
+            .map_or(u32::MAX, |anchor| anchor.1)
+    }
+
+    /// Row-major mask aligned with render-window layout; `1` marks a derived
+    /// spill cell and deliberately excludes the anchor.
+    #[wasm_bindgen(js_name = spillDerivedMask)]
+    pub fn spill_derived_mask(
+        &self,
+        sheet: usize,
+        row_start: usize,
+        row_end: usize,
+        cols: &[u32],
+    ) -> Vec<u8> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        let row_start = row_start.min(data.row_count);
+        let row_end = row_end.min(data.row_count);
+        let Some(len) = row_end
+            .saturating_sub(row_start)
+            .checked_mul(cols.len())
+        else {
+            return Vec::new();
+        };
+        let mut mask = vec![0; len];
+        for (col_index, &col) in cols.iter().enumerate() {
+            if col as usize >= data.n_cols {
+                continue;
+            }
+            for row_index in 0..row_end.saturating_sub(row_start) {
+                let cell = ((row_start + row_index) as u32, col);
+                if data.spill_owner(cell).is_some_and(|anchor| anchor != cell) {
+                    mask[row_index * cols.len() + col_index] = 1;
+                }
+            }
+        }
+        mask
+    }
+    /// Row-major derived-cell mask for an explicit view-row order.
+    #[wasm_bindgen(js_name = spillDerivedMaskForRows)]
+    pub fn spill_derived_mask_for_rows(
+        &self,
+        sheet: usize,
+        rows: &[u32],
+        cols: &[u32],
+    ) -> Vec<u8> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        let Some(len) = rows.len().checked_mul(cols.len()) else {
+            return Vec::new();
+        };
+        let mut mask = vec![0; len];
+        for (row_index, &row) in rows.iter().enumerate() {
+            if row as usize >= data.row_count {
+                continue;
+            }
+            for (col_index, &col) in cols.iter().enumerate() {
+                if col as usize >= data.n_cols {
+                    continue;
+                }
+                let cell = (row, col);
+                if data.spill_owner(cell).is_some_and(|anchor| anchor != cell) {
+                    mask[row_index * cols.len() + col_index] = 1;
+                }
+            }
+        }
+        mask
+    }
+    /// Packed row-major `[anchor_row, anchor_col, ...]` owner coordinates.
+    #[wasm_bindgen(js_name = spillOwnerCoordinates)]
+    pub fn spill_owner_coordinates(
+        &self,
+        sheet: usize,
+        row_start: usize,
+        row_end: usize,
+        cols: &[u32],
+    ) -> Vec<u32> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        let row_start = row_start.min(data.row_count);
+        let row_end = row_end.min(data.row_count);
+        let Some(len) = row_end
+            .saturating_sub(row_start)
+            .checked_mul(cols.len())
+            .and_then(|cells| cells.checked_mul(2))
+        else {
+            return Vec::new();
+        };
+        let mut owners = vec![u32::MAX; len];
+        for (col_index, &col) in cols.iter().enumerate() {
+            if col as usize >= data.n_cols {
+                continue;
+            }
+            for row_index in 0..row_end.saturating_sub(row_start) {
+                let cell = ((row_start + row_index) as u32, col);
+                if let Some(anchor) = data.spill_owner(cell) {
+                    let offset = (row_index * cols.len() + col_index) * 2;
+                    owners[offset] = anchor.0;
+                    owners[offset + 1] = anchor.1;
+                }
+            }
+        }
+        owners
+    }
+
+
+
+
 
     #[wasm_bindgen(js_name = poolStrings)]
     pub fn pool_strings(&self, ids: &[u32]) -> Vec<String> {

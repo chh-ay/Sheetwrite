@@ -11,6 +11,17 @@ export type RecomputingCellStore = CellStore & {
   insertCols(sheet: number, at: number, count: number): void;
   formulaSource(sheet: number, row: number, col: number): string | undefined;
   referenceTarget(sheet: number, row: number, col: number): Uint32Array | undefined;
+  setSpillBlockers(sheet: number, bounds: Uint32Array): boolean;
+  spillAnchorRow(sheet: number, row: number, col: number): number;
+  spillAnchorCol(sheet: number, row: number, col: number): number;
+  spillDerivedMask(sheet: number, rowStart: number, rowEnd: number, cols: Uint32Array): Uint8Array;
+  spillDerivedMaskForRows(sheet: number, rows: Uint32Array, cols: Uint32Array): Uint8Array;
+  spillOwnerCoordinates(
+    sheet: number,
+    rowStart: number,
+    rowEnd: number,
+    cols: Uint32Array,
+  ): Uint32Array;
   setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
   recomputeVolatile(serial: number): void;
   setNamedRange(

@@ -86,6 +86,7 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "error-propagation", size: 1_000 }),
     formulaWorkloadKey({ id: "criteria-range-edit", size: smoke ? 10_000 : 100_000 }),
     formulaWorkloadKey({ id: "lookup-range-edit", size: smoke ? 10_000 : 100_000 }),
+    formulaWorkloadKey({ id: "spill-filter-resize", size: smoke ? 10_000 : 100_000 }),
   );
   return keys;
 }
@@ -458,6 +459,32 @@ function lookupRangeFixture(count: number): TimedFixture {
     dispose: () => store.free(),
   };
 }
+function spillFilterResizeFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+  );
+  for (let row = 0; row < count; row++) {
+    store.setBool(sheet, row, 1, row + 1 < count, 0);
+  }
+  store.setFormula(sheet, 0, 2, `=FILTER(A1:A${count},B1:B${count})`, 0);
+  store.recompute(sheet);
+  return {
+    run: () => {
+      store.setBool(sheet, count - 1, 1, true, 0);
+      store.recompute(sheet);
+    },
+    check: () => {
+      assert(numberAt(store, sheet, count - 1, 2) === count - 1, `spill resize ${count}`);
+      assert(store.spillAnchorRow(sheet, count - 1, 2) === 0, `spill owner ${count}`);
+    },
+    dispose: () => store.free(),
+  };
+}
 
 
 function runWorkloads(smoke: boolean): FormulaWorkloadResult[] {
@@ -511,6 +538,12 @@ function runWorkloads(smoke: boolean): FormulaWorkloadResult[] {
       "lookup-range-edit",
       smoke ? 10_000 : 100_000,
       () => lookupRangeFixture(smoke ? 10_000 : 100_000),
+      samples,
+    ),
+    collectFixture(
+      "spill-filter-resize",
+      smoke ? 10_000 : 100_000,
+      () => spillFilterResizeFixture(smoke ? 10_000 : 100_000),
       samples,
     ),
   );

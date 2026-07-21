@@ -100,6 +100,11 @@ export class StoreSnapshotCodec {
         sheet.rowCount === 0 || cols.length === 0
           ? null
           : this.captureSources(sheet.id, sheet.rowCount, cols.length);
+      const spillDerived = this.windowReader.spillDerivedMask(
+        sheet.id,
+        { start: 0, end: sheet.rowCount },
+        cols,
+      );
       const cells: SnapshotCell[] = [];
       for (let row = 0; row < sheet.rowCount; row++) {
         for (let col = 0; col < cols.length; col++) {
@@ -108,7 +113,7 @@ export class StoreSnapshotCodec {
           const target = sources?.referenceAt(index);
           const style = window.styles[window.styleIds[index] ?? 0] ?? {};
           const hasStyle = Object.keys(style).length > 0;
-          const resolved = window.values[index] ?? null;
+          const resolved = spillDerived[index] === 1 ? null : (window.values[index] ?? null);
           if (!formula && !target && resolved === null && !hasStyle) continue;
           const value: CellValue = formula
             ? { kind: "formula", src: formula }

@@ -690,6 +690,48 @@ pub(crate) fn checked_dense_cell_count(n_cols: usize, row_count: usize) -> Optio
         .filter(|&cells| cells <= MAX_DENSE_CELLS)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct SpillRange {
+    pub(crate) anchor: CellKey,
+    pub(crate) row_end: u32,
+    pub(crate) col_end: u32,
+}
+
+impl SpillRange {
+    pub(crate) fn new(anchor: CellKey, rows: usize, cols: usize) -> Option<Self> {
+        if rows == 0 || cols == 0 {
+            return None;
+        }
+        let row_end = anchor
+            .0
+            .checked_add(u32::try_from(rows - 1).ok()?)?;
+        let col_end = anchor
+            .1
+            .checked_add(u32::try_from(cols - 1).ok()?)?;
+        Some(Self {
+            anchor,
+            row_end,
+            col_end,
+        })
+    }
+
+    pub(crate) fn contains(self, cell: CellKey) -> bool {
+        cell.0 >= self.anchor.0
+            && cell.0 <= self.row_end
+            && cell.1 >= self.anchor.1
+            && cell.1 <= self.col_end
+    }
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct SpillBlocker {
+    pub(crate) row_start: u32,
+    pub(crate) col_start: u32,
+    pub(crate) row_end: u32,
+    pub(crate) col_end: u32,
+}
+
+
+
 /// One sheet's column-major scalar grid.
 pub(crate) struct SheetData {
     pub(crate) n_cols: usize,
@@ -703,6 +745,13 @@ pub(crate) struct SheetData {
     paged: Option<PagedStorage>,
     /// Arithmetic formulas keyed by (row, col); successful results cache in the payload.
     pub(crate) formulas: HashMap<CellKey, FormulaEntry>,
+    /// Attempted spill bounds remain registered even while obstructed so clearing
+    /// a blocker invalidates the owning anchor.
+    pub(crate) spill_ranges: HashMap<CellKey, SpillRange>,
+    /// Every currently materialized spill cell (including its anchor) to its owner.
+    pub(crate) spill_owners: HashMap<CellKey, CellKey>,
+    /// Host-owned merge/protection cells that a spill must never overwrite.
+    pub(crate) spill_blockers: Vec<SpillBlocker>,
     /// Cells changed since the last transaction-barrier formula recompute.
     pub(crate) dirty_cells: HashSet<CellKey>,
     /// Bulk load / structural rewrite touched (potentially) every cell; the
@@ -747,6 +796,9 @@ impl SheetData {
             style,
             paged: None,
             formulas: HashMap::new(),
+            spill_ranges: HashMap::new(),
+            spill_owners: HashMap::new(),
+            spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
             cond_rules: Vec::new(),
@@ -768,6 +820,9 @@ impl SheetData {
             style: Vec::new(),
             paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)),
             formulas: HashMap::new(),
+            spill_ranges: HashMap::new(),
+            spill_owners: HashMap::new(),
+            spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
             cond_rules: Vec::new(),
@@ -1087,6 +1142,59 @@ impl SheetData {
     #[inline]
     pub(crate) fn idx(&self, row: usize, col: usize) -> usize {
         col * self.row_count + row
+    }
+
+    pub(crate) fn spill_owner(&self, cell: CellKey) -> Option<CellKey> {
+        self.spill_owners.get(&cell).copied()
+    }
+
+    /// Remove only cells still owned by `anchor`; a user-written obstruction that
+    /// detached from the spill remains untouched.
+    pub(crate) fn clear_spill(&mut self, anchor: CellKey) -> Vec<CellKey> {
+        let owned: Vec<CellKey> = self
+            .spill_owners
+            .iter()
+            .filter_map(|(&cell, &owner)| (owner == anchor).then_some(cell))
+            .collect();
+        let mut changed = Vec::with_capacity(owned.len().saturating_sub(1));
+        for cell in owned {
+            self.spill_owners.remove(&cell);
+            if cell == anchor || !self.contains_cell(cell.0 as usize, cell.1 as usize) {
+                continue;
+            }
+            let index = self.idx(cell.0 as usize, cell.1 as usize);
+            self.set_kind(index, KIND_EMPTY);
+            self.clear_payload(index);
+            changed.push(cell);
+        }
+        self.spill_ranges.remove(&anchor);
+        changed
+    }
+
+    pub(crate) fn clear_all_spills(&mut self) -> Vec<CellKey> {
+        let anchors: Vec<CellKey> = self.spill_ranges.keys().copied().collect();
+        let mut changed = Vec::new();
+        for anchor in anchors {
+            changed.extend(self.clear_spill(anchor));
+        }
+        changed
+    }
+
+    /// Detach a direct write from any spill and invalidate every attempted spill
+    /// whose destination includes this cell.
+    pub(crate) fn prepare_cell_write(&mut self, cell: CellKey) {
+        let affected: Vec<CellKey> = self
+            .spill_ranges
+            .iter()
+            .filter_map(|(&anchor, &range)| range.contains(cell).then_some(anchor))
+            .collect();
+        if self.spill_ranges.contains_key(&cell) {
+            let changed = self.clear_spill(cell);
+            self.dirty_cells.extend(changed);
+        } else {
+            self.spill_owners.remove(&cell);
+        }
+        self.dirty_cells.extend(affected);
     }
 
     /// Reset dirty tracking after a recompute pass. Drops oversized capacity —

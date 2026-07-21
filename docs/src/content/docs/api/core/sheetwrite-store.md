@@ -12,7 +12,7 @@ Stable public facade and the sole transaction, epoch, policy, and event barrier.
 <div><dt>Source</dt><dd><code>packages/core/src/store.ts#L82</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>51</span>
+## Members <span class="api-count" data-pagefind-ignore>52</span>
 
 <div class="api-member-list">
 
@@ -232,6 +232,15 @@ getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
 
 ```ts generated
 getRefTarget: (addr: CellAddress) => CellAddress | null;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-spill-anchor" data-pagefind-weight="1">
+<summary><code>getSpillAnchor</code> <span class="api-member-summary">Owning dynamic-array formula cell, or null when addr is not spilled.</span></summary>
+
+```ts generated
+getSpillAnchor: (addr: CellAddress) => CellAddress | null;
 ```
 
 </details>
@@ -557,6 +566,7 @@ class SheetwriteStore implements Store {
   getPagedStats: (sheet: SheetId) => PagedStoreStats;
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
   getRefTarget: (addr: CellAddress) => CellAddress | null;
+  getSpillAnchor: (addr: CellAddress) => CellAddress | null;
   getVisibleWindow: (
     sheet: SheetId,
     rows: {

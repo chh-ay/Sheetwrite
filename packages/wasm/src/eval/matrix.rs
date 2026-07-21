@@ -20,7 +20,6 @@ pub(crate) fn reset_matrix_resource_stats() {
         stats.set([current, current, 0]);
     });
 }
-
 pub(super) const SPILL_MAX_ROWS: usize = 1_048_576;
 pub(super) const SPILL_MAX_COLS: usize = 16_384;
 pub(super) const SPILL_MAX_CELLS: usize = 1_000_000;
@@ -77,6 +76,59 @@ impl Drop for EvalMatrix {
 }
 
 impl EvalMatrix {
+    pub(super) fn validate_shape(
+        rows: usize,
+        cols: usize,
+        value_buffers: usize,
+        extra_bytes: usize,
+    ) -> Result<usize, crate::types::FormulaError> {
+        if rows == 0 || cols == 0 || rows > SPILL_MAX_ROWS || cols > SPILL_MAX_COLS {
+            return Err(crate::types::FormulaError::Num);
+        }
+        let cells = rows
+            .checked_mul(cols)
+            .filter(|cells| *cells <= SPILL_MAX_CELLS)
+            .ok_or(crate::types::FormulaError::Num)?;
+        let value_bytes = cells
+            .checked_mul(size_of::<Value>())
+            .and_then(|bytes| bytes.checked_mul(value_buffers))
+            .and_then(|bytes| bytes.checked_add(extra_bytes))
+            .ok_or(crate::types::FormulaError::Num)?;
+        if value_bytes > SPILL_MAX_BYTES {
+            return Err(crate::types::FormulaError::Num);
+        }
+        Ok(cells)
+    }
+    pub(super) fn validate_bytes(&self) -> Result<(), crate::types::FormulaError> {
+        self.validate_copies(1)
+    }
+
+    pub(super) fn validate_copies(
+        &self,
+        copies: usize,
+    ) -> Result<(), crate::types::FormulaError> {
+        let base = self
+            .values
+            .capacity()
+            .checked_mul(size_of::<Value>())
+            .ok_or(crate::types::FormulaError::Num)?;
+        let bytes = self.values.iter().try_fold(base, |total, value| {
+            let payload = match value {
+                Value::Text(text) => text.len(),
+                _ => 0,
+            };
+            total.checked_add(payload)
+        });
+        if bytes
+            .and_then(|bytes| bytes.checked_mul(copies))
+            .is_none_or(|bytes| bytes > SPILL_MAX_BYTES)
+        {
+            return Err(crate::types::FormulaError::Num);
+        }
+        Ok(())
+    }
+
+
     pub(super) fn get(&self, row: usize, col: usize) -> Option<&Value> {
         (row < self.rows && col < self.cols)
             .then(|| self.values.get(row * self.cols + col))

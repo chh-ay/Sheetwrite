@@ -39,7 +39,7 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 8];
+        let mut error_slots = [-1i32; 10];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
@@ -115,7 +115,7 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 8];
+        let mut error_slots = [-1i32; 10];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
@@ -187,7 +187,7 @@ pub(crate) fn fill_window_cell(
     str_local: &mut [i32],
     style_local: &mut [u32],
     string_ids: &mut [u32],
-    error_slots: &mut [i32; 8],
+    error_slots: &mut [i32; 10],
     strings: &mut Vec<String>,
     style_dict: &mut Vec<u32>,
 ) {
@@ -258,7 +258,7 @@ pub(crate) fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32
 /// table (one per `FormulaError` variant), allocation-free.
 pub(crate) fn local_error_index(
     error: FormulaError,
-    slots: &mut [i32; 8],
+    slots: &mut [i32; 10],
     strings: &mut Vec<String>,
 ) -> i32 {
     let slot = &mut slots[error.slot()];

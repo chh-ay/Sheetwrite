@@ -83,6 +83,8 @@ export interface ClipboardWindowView {
   readonly values: ArrayLike<CellScalar>;
   readonly styleIds: Uint32Array;
   readonly styles: readonly CellStyle[];
+  /** `1` for runtime spill children that have no independent clipboard identity. */
+  readonly spillDerived: Uint8Array;
   readonly formulas: readonly ClipboardFormulaEntry[];
   readonly refs: readonly ClipboardRefEntry[];
   readonly ffiCalls: number;

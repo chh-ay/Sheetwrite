@@ -5,6 +5,7 @@ import { hasOpaqueForeground } from "./canvas-assertions.js";
 declare global {
   interface Window {
     __sheetwriteVueWorkbench?: { grid: Grid };
+    __sheetwriteSvelteGrid?: Grid;
   }
 }
 
@@ -184,6 +185,162 @@ test("vanilla example commits an edit through the formula bar and undoes it", {
   await page.fill("#namebox", "B2");
   await page.press("#namebox", "Enter");
   await expect(page.locator("#formula")).not.toHaveValue("browser-smoke");
+});
+
+test("dynamic spill entry, obstruction, resize, ownership, and undo are visible", async ({
+  page,
+}) => {
+  await page.goto(urlOf("svelte"));
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => Boolean(window.__sheetwriteSvelteGrid))).toBe(true);
+
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteSvelteGrid!;
+    grid.store.applyTransaction({
+      patches: [
+        ...[3, 1, 2].map((value, row) => ({
+          op: "set" as const,
+          addr: { sheet: "dispatch", row, col: 0 },
+          value: { kind: "literal" as const, value },
+        })),
+        ...[true, true, false].map((value, row) => ({
+          op: "set" as const,
+          addr: { sheet: "dispatch", row, col: 1 },
+          value: { kind: "literal" as const, value },
+        })),
+        {
+          op: "clearRange",
+          range: {
+            sheet: "dispatch",
+            start: { row: 0, col: 5 },
+            end: { row: 2, col: 5 },
+          },
+        },
+        {
+          op: "set",
+          addr: { sheet: "dispatch", row: 2, col: 5 },
+          value: { kind: "literal", value: "blocker" },
+        },
+      ],
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "dispatch", row: 0, col: 5 } });
+  });
+  await page.locator(".sheetwrite-shell-formula").fill("=FILTER(A1:A3,B1:B3)");
+  await page.locator(".sheetwrite-shell-formula").press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        [0, 1].map(
+          (row) =>
+            window.__sheetwriteSvelteGrid!.store.getCell({
+              sheet: "dispatch",
+              row,
+              col: 5,
+            }).resolved,
+        ),
+      ),
+    )
+    .toEqual([3, 1]);
+
+  await page.locator(".sheetwrite").click({ position: { x: 200, y: 100 } });
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteSvelteGrid!.store.getCell({
+            sheet: "dispatch",
+            row: 0,
+            col: 5,
+          }).resolved,
+      ),
+    )
+    .toBeNull();
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteSvelteGrid!.store.getCell({
+            sheet: "dispatch",
+            row: 1,
+            col: 5,
+          }).resolved,
+      ),
+    )
+    .toBe(1);
+
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteSvelteGrid!;
+    grid.store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "dispatch", row: 2, col: 1 },
+          value: { kind: "literal", value: true },
+        },
+      ],
+    });
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteSvelteGrid!.store.getCell({
+            sheet: "dispatch",
+            row: 0,
+            col: 5,
+          }).resolved,
+      ),
+    )
+    .toBe("#SPILL!");
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteSvelteGrid!;
+    grid.store.applyTransaction({
+      patches: [
+        {
+          op: "clearRange",
+          range: {
+            sheet: "dispatch",
+            start: { row: 2, col: 5 },
+            end: { row: 2, col: 5 },
+          },
+        },
+      ],
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "dispatch", row: 1, col: 5 } });
+  });
+  await expect.poll(() => page.locator(".sheetwrite-shell-formula").inputValue()).toBe("1");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteSvelteGrid!.store.getCell({
+            sheet: "dispatch",
+            row: 2,
+            col: 5,
+          }).resolved,
+      ),
+    )
+    .toBe(2);
+  expect(
+    await page.evaluate(() =>
+      window.__sheetwriteSvelteGrid!.store.getSpillAnchor({
+        sheet: "dispatch",
+        row: 1,
+        col: 5,
+      }),
+    ),
+  ).toEqual({ sheet: "dispatch", row: 0, col: 5 });
+  await page.evaluate(() =>
+    window.__sheetwriteSvelteGrid!.setSelection({
+      kind: "cell",
+      addr: { sheet: "dispatch", row: 0, col: 5 },
+    }),
+  );
+  await expect
+    .poll(() => page.locator(".sheetwrite-shell-formula").inputValue())
+    .toBe("=FILTER(A1:A3,B1:B3)");
 });
 
 test("validation dropdown and checkbox editors are keyboard and ARIA operable", async ({

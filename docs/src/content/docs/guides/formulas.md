@@ -41,7 +41,7 @@ The Rust parser table in `packages/wasm/src/calc.rs` is the engine source of tru
 | Criteria | `COUNTIF`, `COUNTIFS`, `SUMIF`, `SUMIFS`, `AVERAGEIF`, `AVERAGEIFS` | Operators, wildcard criteria, and equal-shaped criteria ranges. |
 | Lookup/reference | `INDEX`, `MATCH`, `VLOOKUP`, `HLOOKUP`, `XLOOKUP` | Exact and documented approximate modes; missing matches return `#N/A`. |
 | Names | workbook- and sheet-scoped named ranges | Sheet scope shadows workbook scope; names rebase with structural edits. |
-| Dynamic arrays | none | `FILTER`, `SORT`, `UNIQUE`, and spill syntax are intentionally gated; see [Dynamic-array design gate](#dynamic-array-design-gate). |
+| Dynamic arrays | `FILTER`, `SORT`, `UNIQUE` | A rectangular result spills from one persisted anchor; direct range formulas spill too. |
 | External/volatile random | none | `IMPORT*`, `GOOGLEFINANCE`, custom JS, `RAND`, and `RANDBETWEEN` are unsupported. |
 
 Function names are case-insensitive. Commas are the only documented argument separator. Interior omitted optional arguments are preserved (`XLOOKUP(key, keys, results,, 0)`). Locale-specific separators are not accepted.
@@ -58,6 +58,8 @@ Persisted literals and evaluated formula results use `string | number | boolean 
 | `#NAME?` | Unknown function or unresolved named range. |
 | `#N/A` | Lookup did not find a compatible value. |
 | `#NUM!` | Non-finite numeric result, excessive recursion, or an oversized range. |
+| `#SPILL!` | A dynamic result intersects content, another spill, a merge, validation/protection metadata, or a sheet boundary. |
+| `#CALC!` | A supported array calculation has no result, such as `FILTER` without matches or an empty fallback. |
 | `#CYCLE!` | Direct or transitive formula/reference cycle. |
 | `#LOADING!` | A formula depends on datasource cells that have not loaded yet. |
 
@@ -111,16 +113,24 @@ A formula on `summary` resolves the sheet-scoped `Revenue`; formulas on other sh
 
 ## Operators
 
-| Category | Operators |
-| --- | --- |
-| Arithmetic | `+`, `-`, `*`, `/`, unary `-` |
-| Comparison | `=`, `<>`, `<`, `>`, `<=`, `>=` |
+| Precedence, high to low | Operators | Associativity |
+| --- | --- | --- |
+| Reference | `:` | — |
+| Unary sign | unary `+`, unary `-` | right |
+| Percentage | postfix `%` | left |
+| Exponentiation | `^` | left |
+| Multiplication | `*`, `/` | left |
+| Addition | `+`, `-` | left |
+| Concatenation | `&` | left |
+| Comparison | `=`, `<>`, `<`, `>`, `<=`, `>=` | one comparison |
 
-Comparisons return native booleans:
+This deliberately follows Excel's spreadsheet precedence rather than programming-language
+conventions: `=-2^2` is `4`, `=2^3^2` is `64`, and `=2^-2` is `0.25`. Parenthesize formulas
+when portability to a non-spreadsheet evaluator matters. Percentage divides its operand by
+100 and may repeat (`=50%%` is `0.005`). Concatenation formats numbers, booleans, and blanks
+as spreadsheet text; arithmetic and comparison bind before `&`.
 
-```text partial="illustrative output or schema" title="Illustrative excerpt"
-=IF(A1 >= 100, A1 * 0.9, A1)
-```
+Comparisons return native booleans. For example, `=IF(A1 >= 100, A1 * 0.9, A1)`.
 
 ## Date/time semantics
 
@@ -159,19 +169,42 @@ Every `*IFS` criteria range must have the same shape as its result range/first c
 
 Lookup errors in the scanned range propagate. Approximate modes validate ordering and do not silently return a result from unsorted input.
 
-## Dynamic-array design gate
+## Dynamic arrays and spills
 
-`FILTER`, `SORT`, `UNIQUE`, and spill ranges are not implemented. Unknown source is preserved and currently evaluates to `#NAME?`. Implementation is blocked until tests accept all of this model:
+`FILTER(array, include, [if_empty])`, `SORT(array, [sort_index], [sort_order], [by_col])`,
+and `UNIQUE(array, [by_col], [exactly_once])` return rectangular values. A direct range formula
+such as `=A1:B4` also spills. Arguments use the same 1-based indices and `TRUE`/`FALSE`
+coercions as the scalar engine:
 
-1. **Ownership:** the formula anchor owns one derived spill rectangle; projected children have no independent persisted `DocumentOp` identity.
-2. **Collision:** any nonempty cell, merge, protected/read-only cell, another spill, or sheet boundary collision makes the anchor `#SPILL!`; no child is partially written.
-3. **Editing:** the anchor is editable/removable. Direct edits to projected children are rejected, not converted into hidden overrides.
-4. **Persistence:** snapshots serialize only the anchor formula. Spill children are recomputed after hydration and never serialized as literals or opaque WASM handles.
-5. **Structure/merges:** row/column changes and merge changes invalidate and atomically recompute the complete spill.
-6. **Clipboard:** copying the full spill exports displayed values; copying the anchor as a formula preserves the source. Pasting over a spill follows collision rules.
-7. **Undo:** history stores the anchor operation and any overwritten pre-spill document cells, while derived children remain runtime state. Bulk projection must use the existing range-native machinery.
+- `FILTER` accepts a one-column include range matching the array's rows or a one-row include
+  range matching its columns. Shape mismatches are `#VALUE!`. No selected values returns
+  `if_empty`, or `#CALC!` when omitted.
+- `SORT` defaults to the first column, ascending. `sort_index` selects the row/column key;
+  `sort_order` is `1` or `-1`; `by_col=TRUE` sorts columns instead of rows.
+- `UNIQUE` preserves first-seen order. `by_col=TRUE` compares columns;
+  `exactly_once=TRUE` keeps only items occurring once.
 
-A dedicated `#SPILL!` error and collision tests are prerequisites. Until then, returning a partial array or silently overwriting cells is prohibited.
+The formula cell is the **anchor** and owns the complete runtime rectangle. Spill children
+have no formula source or persisted document identity. `store.getSpillAnchor(address)` returns
+the anchor for either the anchor or a child, and returns `null` for an ordinary cell.
+
+Spills publish atomically. Any nonempty destination, another spill, merge, validation or
+protected range, unloaded paged cell, or sheet boundary makes the anchor `#SPILL!`; no partial
+children remain. Styles, conditional formatting, and hidden rows/columns do not obstruct.
+Editing a projected child through canonical core mutations is rejected. Edit or clear the
+anchor instead. Structural and metadata changes invalidate ownership and recompute it.
+
+Snapshots and XLSX export serialize only the anchor formula. Children recompute after
+hydration. Internal rich copy preserves the anchor formula while treating children as
+derived blanks on paste; external TSV receives the displayed spill values. History snapshots
+likewise restore the anchor and recompute children, so undo never persists stale projections.
+Unsupported OOXML array/data-table formula records remain inert source text with an explicit
+warning rather than being silently treated as Sheetwrite spills.
+
+Each array dimension is capped at Excel's row/column limits, one spill is capped at 1,000,000
+cells and 64 MiB of bounded value/intermediate storage, and one dynamic recompute pass is
+capped at 2,000,000 cell operations. Oversized work returns `#NUM!`; unstable or colliding
+shapes return an explicit error rather than truncating.
 
 ## Point mode and reference rewriting
 

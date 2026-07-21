@@ -28,6 +28,34 @@ export class StoreWindowReader {
     private readonly handles: ReadonlyMap<SheetId, number>,
     private readonly styles: StyleDictionary,
   ) {}
+  spillDerivedMask(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+  ): Uint8Array {
+    return this.wasm.spillDerivedMask(
+      this.handleOf(sheet),
+      rows.start,
+      rows.end,
+      this.colsU32For(cols),
+    );
+  }
+  spillDerivedMaskForRows(sheet: SheetId, rows: Uint32Array, cols: readonly number[]): Uint8Array {
+    return this.wasm.spillDerivedMaskForRows(this.handleOf(sheet), rows, this.colsU32For(cols));
+  }
+
+  spillOwnerCoordinates(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+  ): Uint32Array {
+    return this.wasm.spillOwnerCoordinates(
+      this.handleOf(sheet),
+      rows.start,
+      rows.end,
+      this.colsU32For(cols),
+    );
+  }
 
   read(
     sheet: SheetId,

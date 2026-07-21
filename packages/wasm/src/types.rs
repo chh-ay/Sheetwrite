@@ -56,6 +56,8 @@ pub(crate) enum FormulaError {
     Value,
     Name,
     Na,
+    Spill,
+    Calc,
     Loading,
 }
 
@@ -69,6 +71,8 @@ impl FormulaError {
             FormulaError::Value => "#VALUE!",
             FormulaError::Name => "#NAME?",
             FormulaError::Na => "#N/A",
+            FormulaError::Spill => "#SPILL!",
+            FormulaError::Calc => "#CALC!",
             FormulaError::Loading => "#LOADING!",
         }
     }
@@ -83,7 +87,9 @@ impl FormulaError {
             FormulaError::Value => 4,
             FormulaError::Name => 5,
             FormulaError::Na => 6,
-            FormulaError::Loading => 7,
+            FormulaError::Spill => 7,
+            FormulaError::Calc => 8,
+            FormulaError::Loading => 9,
         }
     }
 }

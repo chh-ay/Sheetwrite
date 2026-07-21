@@ -188,6 +188,7 @@ export class StoreDataEngine {
   private resourceOperation: RuntimeResourceOperation | null = "startup";
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
+  private readonly spillBlockersDirty = new Set<SheetId>();
   private readonly rangeMutationStats = {
     documentOperations: 0,
     jsPatchObjects: 0,
@@ -238,6 +239,7 @@ export class StoreDataEngine {
       this.wasm.setSheetName(handle, sheet.id, sheet.name);
       this.handles.set(sheet.id, handle);
       this.sheetIdsByHandle[handle] = sheet.id;
+      this.syncSpillBlockers(sheet);
     }
     for (const namedRange of workbook.namedRanges ?? []) {
       if (!this.syncNamedRange(namedRange)) {
@@ -406,6 +408,67 @@ export class StoreDataEngine {
     const handle = this.handles.get(sheet);
     if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
     return handle;
+  }
+  private syncSpillBlockers(sheet: Sheet): void {
+    const bounds: number[] = [];
+    for (const merge of sheet.merges ?? []) {
+      bounds.push(merge.r0, merge.c0, merge.r1, merge.c1);
+    }
+    for (const protectedRange of sheet.protectedRanges ?? []) {
+      const range = normalizedRange(protectedRange.range);
+      bounds.push(range.start.row, range.start.col, range.end.row, range.end.col);
+    }
+    for (const validationRule of sheet.validationRules ?? []) {
+      const range = normalizedRange(validationRule.range);
+      bounds.push(range.start.row, range.start.col, range.end.row, range.end.col);
+    }
+    if (!this.wasm.setSpillBlockers(this.handleOf(sheet.id), Uint32Array.from(bounds))) {
+      throw new RangeError(`spill blocker resource limit exceeded for sheet: ${sheet.id}`);
+    }
+  }
+
+  private flushSpillBlockers(): void {
+    for (const sheetId of this.spillBlockersDirty) {
+      const sheet = this.workbook.sheets.find((candidate) => candidate.id === sheetId);
+      if (sheet) this.syncSpillBlockers(sheet);
+    }
+    this.spillBlockersDirty.clear();
+  }
+
+  private spillAnchor(addr: CellAddress): CellAddress | null {
+    const handle = this.handleOf(addr.sheet);
+    const row = this.wasm.spillAnchorRow(handle, addr.row, addr.col);
+    if (row === 0xffffffff) return null;
+    const col = this.wasm.spillAnchorCol(handle, addr.row, addr.col);
+    if (col === 0xffffffff) return null;
+    return { sheet: addr.sheet, row, col };
+  }
+
+  private rangeCutsSpill(range: Range): boolean {
+    const bounds = normalizedRange(range);
+    const cols = Array.from(
+      { length: bounds.end.col - bounds.start.col + 1 },
+      (_, index) => bounds.start.col + index,
+    );
+    const owners = this.windowReader.spillOwnerCoordinates(
+      bounds.sheet,
+      { start: bounds.start.row, end: bounds.end.row + 1 },
+      cols,
+    );
+    for (let offset = 0; offset < owners.length; offset += 2) {
+      const row = owners[offset] ?? 0xffffffff;
+      const col = owners[offset + 1] ?? 0xffffffff;
+      if (row === 0xffffffff || col === 0xffffffff) continue;
+      if (
+        row < bounds.start.row ||
+        row > bounds.end.row ||
+        col < bounds.start.col ||
+        col > bounds.end.col
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private captureSourceProjection(
@@ -1282,6 +1345,10 @@ export class StoreDataEngine {
   getFormula(addr: CellAddress): string | null {
     return this.wasm.formulaSource(this.handleOf(addr.sheet), addr.row, addr.col) ?? null;
   }
+  /** The owning formula anchor for a spill cell, including the anchor itself. */
+  getSpillAnchor(addr: CellAddress): CellAddress | null {
+    return this.spillAnchor(addr);
+  }
 
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null {
@@ -1349,6 +1416,7 @@ export class StoreDataEngine {
       false,
     );
     this.recordWindowBoundary(window, "export");
+    const spillDerived = this.windowReader.spillDerivedMaskForRows(sheet, dataRows, cols);
     const formulas: Array<{ offset: number; source: string }> = [];
     const refs: Array<{ offset: number; target: CellAddress }> = [];
     for (let rowIndex = 0; rowIndex < dataRows.length; rowIndex++) {
@@ -1373,16 +1441,18 @@ export class StoreDataEngine {
       values: window.values,
       styleIds: window.styleIds,
       styles: window.styles,
+      spillDerived,
       formulas,
       refs,
-      ffiCalls: window.ffiCalls ?? 0,
+      ffiCalls: (window.ffiCalls ?? 0) + 1,
       transferredElements:
         window.values.length +
         window.styleIds.length +
         dataRows.length +
         window.styles.length +
         formulas.length * 2 +
-        refs.length * 4,
+        refs.length * 4 +
+        spillDerived.length,
     };
   }
 
@@ -1615,6 +1685,8 @@ export class StoreDataEngine {
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
+    const touchedSheets = new Set<SheetId>();
+    let hasStructuralPatch = false;
     const tracksPagedRevision = !remoteLoad && this.storageOptions.storage === "paged";
     const storageRevision = tracksPagedRevision ? this.wasm.beginMutation() : 0n;
 
@@ -1623,12 +1695,44 @@ export class StoreDataEngine {
       for (const patch of patches) {
         if (!this.applyPatch(patch, changes)) continue;
         appliedPatches.push(patch);
+
+        if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
+        else if (
+          patch.op === "setRange" ||
+          patch.op === "setBlock" ||
+          patch.op === "setRangeStyle" ||
+          patch.op === "clearRange"
+        ) {
+          touchedSheets.add(patch.range.sheet);
+        } else if (
+          patch.op !== "setNamedRange" &&
+          patch.op !== "removeNamedRange" &&
+          patch.op !== "removeSheet"
+        ) {
+          touchedSheets.add(patch.op === "addSheet" ? patch.sheet.id : patch.sheet);
+        }
+        if (
+          patch.op === "addRows" ||
+          patch.op === "removeRows" ||
+          patch.op === "moveRows" ||
+          patch.op === "addColumns" ||
+          patch.op === "removeColumns" ||
+          patch.op === "moveColumns" ||
+          patch.op === "addSheet" ||
+          patch.op === "removeSheet"
+        ) {
+          hasStructuralPatch = true;
+        }
       }
     } finally {
       if (remoteLoad) this.wasm.endPageLoad();
       else if (tracksPagedRevision) this.wasm.endMutation();
     }
 
+    if (hasStructuralPatch) {
+      for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
+    }
+    this.flushSpillBlockers();
     if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
     this.rangeMutationStats.documentOperations += appliedPatches.length;
     this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
@@ -1642,6 +1746,8 @@ export class StoreDataEngine {
     switch (patch.op) {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
+        const owner = this.spillAnchor(patch.addr);
+        if (owner && (owner.row !== patch.addr.row || owner.col !== patch.addr.col)) return false;
         const before = changes ? this.getCell(patch.addr) : null;
         const bounds: Range = {
           sheet: patch.addr.sheet,
@@ -1683,6 +1789,19 @@ export class StoreDataEngine {
               bounds.start.row + cell.rowOffset > bounds.end.row ||
               bounds.start.col + cell.colOffset > bounds.end.col,
           )
+        ) {
+          return false;
+        }
+        if (
+          patch.cells.some((cell) => {
+            const addr = {
+              sheet: bounds.sheet,
+              row: bounds.start.row + cell.rowOffset,
+              col: bounds.start.col + cell.colOffset,
+            };
+            const owner = this.spillAnchor(addr);
+            return owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
+          })
         ) {
           return false;
         }
@@ -1749,6 +1868,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+        if (this.rangeCutsSpill(bounds)) return false;
 
         this.rangeMutationStats.jsPatchObjects += exceptions.length;
         return this.writePackedBlock(bounds, block);
@@ -1809,6 +1929,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+        if ((patch.contents ?? true) && this.rangeCutsSpill(bounds)) return false;
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
         this.noteRangeMutationFfi();
@@ -1938,6 +2059,7 @@ export class StoreDataEngine {
           next[index] = rule;
           sheet.validationRules = next;
         }
+        this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
       case "removeValidationRule": {
@@ -1945,6 +2067,7 @@ export class StoreDataEngine {
         const rules = sheet.validationRules ?? [];
         if (!rules.some((rule) => rule.id === patch.id)) return false;
         sheet.validationRules = rules.filter((rule) => rule.id !== patch.id);
+        this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
       case "setProtectedRange": {
@@ -1967,6 +2090,7 @@ export class StoreDataEngine {
           next[index] = protectedRange;
           sheet.protectedRanges = next;
         }
+        this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
       case "removeProtectedRange": {
@@ -1974,6 +2098,7 @@ export class StoreDataEngine {
         const ranges = sheet.protectedRanges ?? [];
         if (!ranges.some((range) => range.id === patch.id)) return false;
         sheet.protectedRanges = ranges.filter((range) => range.id !== patch.id);
+        this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
       case "setNote": {
@@ -2002,6 +2127,7 @@ export class StoreDataEngine {
         const merges = sheet.merges ?? [];
         if (merges.some((existing) => mergesOverlap(existing, merge))) return false;
         sheet.merges = [...merges, merge];
+        this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
       case "removeMerge": {
@@ -2011,6 +2137,7 @@ export class StoreDataEngine {
         const index = merges.findIndex((existing) => sameMerge(existing, merge));
         if (index < 0) return false;
         sheet.merges = [...merges.slice(0, index), ...merges.slice(index + 1)];
+        this.spillBlockersDirty.add(patch.sheet);
         return true;
       }
       case "addSheet":
@@ -2812,7 +2939,6 @@ export class StoreDataEngine {
     this.wasm.free();
     this.disposed = true;
   }
-
 
   private loadColumnar(sheet: SheetId, data: ColumnarData): void {
     const columns = this.sheetMeta(sheet).columns;

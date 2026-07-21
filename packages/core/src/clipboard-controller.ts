@@ -840,9 +840,11 @@ export class ClipboardController {
         const value: CellValue =
           formula !== null
             ? { kind: "formula", src: formula }
-            : ref !== null
-              ? { kind: "ref", target: ref }
-              : { kind: "literal", value: cell.resolved };
+            : bulk?.spillDerived?.[offset] === 1
+              ? { kind: "literal", value: null }
+              : ref !== null
+                ? { kind: "ref", target: ref }
+                : { kind: "literal", value: cell.resolved };
         cellLine.push({ value, resolved: cell.resolved, style: cell.style });
         valueLine.push(cell.resolved);
         if (!rangeClear) {

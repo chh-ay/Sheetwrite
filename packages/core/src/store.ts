@@ -240,6 +240,10 @@ export class SheetwriteStore implements Store {
   getFormula(addr: CellAddress): string | null {
     return this.engine.getFormula(addr);
   }
+  /** Owning dynamic-array formula cell, or null when `addr` is not spilled. */
+  getSpillAnchor(addr: CellAddress): CellAddress | null {
+    return this.engine.getSpillAnchor(addr);
+  }
 
   getRefTarget(addr: CellAddress): CellAddress | null {
     return this.engine.getRefTarget(addr);

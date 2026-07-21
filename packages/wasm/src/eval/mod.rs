@@ -13,6 +13,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use crate::calc::{Ast, CmpOp, Func, Op};
+use crate::sheet::SpillRange;
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError,
@@ -62,15 +63,16 @@ impl CellStore {
             return;
         }
 
-        let dep_index_stale = match &self.dep_index {
-            Some(index) => index.epoch != self.formula_epoch,
-            None => true,
-        };
+        let dep_index_stale = self
+            .dep_index
+            .as_ref()
+            .is_none_or(|index| index.epoch != self.formula_epoch);
         if dep_index_stale {
             self.dep_index = Some(build_dep_index(&self.sheets, self.formula_epoch));
         }
-        let Some(index) = self.dep_index.as_ref() else {
-            return;
+        let mut affected = match self.dep_index.as_ref() {
+            Some(index) => collect_affected_formulas(&self.sheets, sheet, index),
+            None => return,
         };
 
         let mut affected = HashSet::new();
@@ -87,76 +89,276 @@ impl CellStore {
         }
 
         let mut memo: HashMap<AbsCellKey, EvalResult> = HashMap::with_capacity(affected.len());
-        seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+        if let Some(index) = self.dep_index.as_ref() {
+            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+        }
         let mut visiting: HashSet<AbsCellKey> = HashSet::new();
+        let mut processed_arrays: HashSet<AbsCellKey> = HashSet::new();
+        let mut seeded_sheets = HashSet::from([sheet]);
+        let mut spill_work = 0usize;
+
+        loop {
+            let mut pending: Vec<(AbsCellKey, Ast)> = affected
+                .iter()
+                .filter(|key| !processed_arrays.contains(key))
+                .filter_map(|&key| {
+                    let ast = self
+                        .sheets
+                        .get(key.sheet as usize)?
+                        .formulas
+                        .get(&key.local())?
+                        .ast
+                        .as_ref()?;
+                    self.dynamic_array_bound(ast, key.sheet as usize)
+                        .is_some()
+                        .then(|| (key, ast.clone()))
+                })
+                .collect();
+            if pending.is_empty() {
+                break;
+            }
+            pending.sort_unstable_by_key(|(key, _)| (key.sheet, key.row, key.col));
+
+            let mut changed_sheets = HashSet::new();
+            for (key, ast) in pending {
+                processed_arrays.insert(key);
+                let local = key.local();
+                let output_sheet = key.sheet as usize;
+                let cleared = self.sheets[output_sheet].clear_spill(local);
+                if !cleared.is_empty() {
+                    self.sheets[output_sheet].dirty_cells.extend(cleared);
+                    changed_sheets.insert(output_sheet);
+                    seeded_sheets.insert(output_sheet);
+                }
+                memo.remove(&key);
+
+                let evaluated = match self.dynamic_array_bound(&ast, output_sheet) {
+                    Some(Ok(bound)) => match dynamic_recompute_within_limit(spill_work, bound) {
+                        Some(total) => {
+                            spill_work = total;
+                            self.eval_dynamic_array(
+                                &ast,
+                                output_sheet,
+                                &affected,
+                                &mut memo,
+                                &mut visiting,
+                                0,
+                            )
+                            .unwrap_or(Err(FormulaError::Value))
+                        }
+                        None => Err(FormulaError::Num),
+                    },
+                    Some(Err(error)) => Err(error),
+                    None => Err(FormulaError::Value),
+                };
+                let changed = self.install_spill_result(key, evaluated, &mut memo);
+                if !changed.is_empty() {
+                    self.sheets[output_sheet].dirty_cells.extend(changed);
+                    changed_sheets.insert(output_sheet);
+                    seeded_sheets.insert(output_sheet);
+                }
+            }
+
+            let Some(index) = self.dep_index.as_ref() else {
+                return;
+            };
+            for changed_sheet in changed_sheets {
+                affected.extend(collect_affected_formulas(
+                    &self.sheets,
+                    changed_sheet,
+                    index,
+                ));
+            }
+            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+        }
+
+        if let Some(index) = self.dep_index.as_ref() {
+            seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+        }
         for key in &affected {
             let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
         }
-
         let results: Vec<(AbsCellKey, EvalResult)> = affected
             .iter()
             .filter_map(|key| memo.get(key).cloned().map(|result| (*key, result)))
             .collect();
-        for (abs_key, result) in results {
-            let interned = match &result {
-                Value::Text(text) => Some(self.intern(text)),
-                _ => None,
-            };
-            let sheet_index = abs_key.sheet as usize;
-            let Some(data) = self.sheets.get_mut(sheet_index) else {
-                continue;
-            };
-            let (row, col) = abs_key.local();
-            let (row, col) = (row as usize, col as usize);
-            if !data.contains_cell(row, col) {
-                continue;
-            }
-            let index = data.idx(row, col);
-            {
-                let Some(entry) = data.formulas.get_mut(&abs_key.local()) else {
+        for (key, result) in results {
+            self.store_formula_result(key, result);
+        }
+        for &seeded_sheet in seeds {
+            self.sheets[seeded_sheet].clear_dirty();
+        }
+    }
+
+    fn spill_collision(&self, sheet: usize, range: SpillRange) -> Result<(), FormulaError> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Err(FormulaError::Ref);
+        };
+        if range.row_end as usize >= data.row_count || range.col_end as usize >= data.n_cols {
+            return Err(FormulaError::Spill);
+        }
+        if data.spill_blockers.iter().any(|blocker| {
+            let row_start = blocker.row_start.max(range.anchor.0);
+            let col_start = blocker.col_start.max(range.anchor.1);
+            let row_end = blocker.row_end.min(range.row_end);
+            let col_end = blocker.col_end.min(range.col_end);
+            row_start <= row_end
+                && col_start <= col_end
+                && !(row_start == range.anchor.0
+                    && row_end == range.anchor.0
+                    && col_start == range.anchor.1
+                    && col_end == range.anchor.1)
+        }) {
+            return Err(FormulaError::Spill);
+        }
+        for row in range.anchor.0..=range.row_end {
+            for col in range.anchor.1..=range.col_end {
+                let cell = (row, col);
+                if cell == range.anchor {
                     continue;
-                };
-                match &result {
-                    Value::Number(_) => {
-                        entry.error = None;
-                        entry.value_kind = FormulaValueKind::Number;
-                    }
-                    Value::Text(_) => {
-                        entry.error = None;
-                        entry.value_kind = FormulaValueKind::Text;
-                    }
-                    Value::Bool(_) => {
-                        entry.error = None;
-                        entry.value_kind = FormulaValueKind::Bool;
-                    }
-                    Value::Blank => {
-                        entry.error = None;
-                        entry.value_kind = if entry.is_reference() {
-                            FormulaValueKind::Blank
-                        } else {
-                            FormulaValueKind::Number
-                        };
-                    }
-                    Value::Error(error) => {
-                        entry.error = Some(*error);
-                        entry.value_kind = FormulaValueKind::Number;
-                    }
+                }
+                if !data.is_loaded(row as usize, col as usize) {
+                    return Err(FormulaError::Loading);
+                }
+                let index = data.idx(row as usize, col as usize);
+                if data.spill_owners.contains_key(&cell)
+                    || data.formulas.contains_key(&cell)
+                    || data.kind_at(index) != KIND_EMPTY
+                {
+                    return Err(FormulaError::Spill);
                 }
             }
-            match result {
-                Value::Number(value) => data.set_num(index, value),
-                Value::Text(_) => match interned {
-                    Some(id) => data.set_str(index, id),
-                    None => data.clear_payload(index),
-                },
-                Value::Bool(value) => data.set_num(index, f64::from(value)),
-                Value::Blank | Value::Error(_) => data.clear_payload(index),
+        }
+        Ok(())
+    }
+
+    fn install_spill_result(
+        &mut self,
+        key: AbsCellKey,
+        result: Result<EvalMatrix, FormulaError>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+    ) -> Vec<(u32, u32)> {
+        let sheet = key.sheet as usize;
+        let local = key.local();
+        let matrix = match result {
+            Ok(matrix) => matrix,
+            Err(error) => {
+                memo.insert(key, Value::Error(error));
+                return Vec::new();
+            }
+        };
+        let Some(range) = SpillRange::new(local, matrix.rows, matrix.cols) else {
+            memo.insert(key, Value::Error(FormulaError::Num));
+            return Vec::new();
+        };
+        self.sheets[sheet].spill_ranges.insert(local, range);
+        if let Some(error) = matrix.values.iter().find_map(|value| match value {
+            Value::Error(error) => Some(*error),
+            _ => None,
+        }) {
+            memo.insert(key, Value::Error(error));
+            return Vec::new();
+        }
+        if let Err(error) = self.spill_collision(sheet, range) {
+            memo.insert(key, Value::Error(error));
+            return Vec::new();
+        }
+
+        let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
+        memo.insert(key, first);
+        let mut changed = Vec::with_capacity(matrix.values.len().saturating_sub(1));
+        for row_offset in 0..matrix.rows {
+            for col_offset in 0..matrix.cols {
+                let cell = (
+                    local.0 + row_offset as u32,
+                    local.1 + col_offset as u32,
+                );
+                self.sheets[sheet].spill_owners.insert(cell, local);
+                if cell == local {
+                    continue;
+                }
+                let value = &matrix.values[row_offset * matrix.cols + col_offset];
+                let interned = match value {
+                    Value::Text(text) => Some(self.intern(text)),
+                    _ => None,
+                };
+                let data = &mut self.sheets[sheet];
+                let index = data.idx(cell.0 as usize, cell.1 as usize);
+                match value {
+                    Value::Number(number) => {
+                        data.set_kind(index, KIND_NUMBER);
+                        data.set_num(index, *number);
+                    }
+                    Value::Text(_) => {
+                        data.set_kind(index, KIND_STRING);
+                        if let Some(id) = interned {
+                            data.set_str(index, id);
+                        }
+                    }
+                    Value::Bool(value) => {
+                        data.set_kind(index, KIND_BOOL);
+                        data.set_num(index, f64::from(*value));
+                    }
+                    Value::Blank => {
+                        data.set_kind(index, KIND_EMPTY);
+                        data.clear_payload(index);
+                    }
+                    Value::Error(_) => unreachable!("array errors were rejected before spilling"),
+                }
+                data.mark_cell_loaded(cell.0 as usize, cell.1 as usize, false);
+                changed.push(cell);
             }
         }
-        for &sheet in seeds {
-            if let Some(data) = self.sheets.get_mut(sheet) {
-                data.clear_dirty();
+        changed
+    }
+
+    fn store_formula_result(&mut self, key: AbsCellKey, result: EvalResult) {
+        let interned = match &result {
+            Value::Text(text) => Some(self.intern(text)),
+            _ => None,
+        };
+        let sheet = key.sheet as usize;
+        let Some(data) = self.sheets.get_mut(sheet) else {
+            return;
+        };
+        let (row, col) = key.local();
+        if !data.contains_cell(row as usize, col as usize) {
+            return;
+        }
+        let index = data.idx(row as usize, col as usize);
+        let Some(entry) = data.formulas.get_mut(&key.local()) else {
+            return;
+        };
+        match &result {
+            Value::Number(_) => {
+                entry.error = None;
+                entry.value_kind = FormulaValueKind::Number;
             }
+            Value::Text(_) => {
+                entry.error = None;
+                entry.value_kind = FormulaValueKind::Text;
+            }
+            Value::Bool(_) => {
+                entry.error = None;
+                entry.value_kind = FormulaValueKind::Bool;
+            }
+            Value::Blank => {
+                entry.error = None;
+                entry.value_kind = FormulaValueKind::Number;
+            }
+            Value::Error(error) => {
+                entry.error = Some(*error);
+                entry.value_kind = FormulaValueKind::Number;
+            }
+        }
+        match result {
+            Value::Number(value) => data.set_num(index, value),
+            Value::Text(_) => match interned {
+                Some(id) => data.set_str(index, id),
+                None => data.clear_payload(index),
+            },
+            Value::Bool(value) => data.set_num(index, f64::from(value)),
+            Value::Blank | Value::Error(_) => data.clear_payload(index),
         }
     }
 
@@ -517,11 +719,26 @@ impl CellStore {
         let col_end = (range.col_end as usize).min(data.n_cols - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
-        let total = (rows as u64).saturating_mul(cols as u64);
-        if total > RANGE_CELL_LIMIT {
-            return Err(FormulaError::Num);
+        let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
+        let mut payload_bytes = total
+            .checked_mul(std::mem::size_of::<Value>())
+            .ok_or(FormulaError::Num)?;
+        for row in row_start..=row_end {
+            for col in col_start..=col_end {
+                let index = data.idx(row, col);
+                if matches!(data.kind_at(index), KIND_STRING | KIND_FORMULA) {
+                    if let Some(text) = string_from_pool_ref(&self.strings, data.str_id_at(index)) {
+                        payload_bytes = payload_bytes
+                            .checked_add(text.len())
+                            .ok_or(FormulaError::Num)?;
+                        if payload_bytes > SPILL_MAX_BYTES {
+                            return Err(FormulaError::Num);
+                        }
+                    }
+                }
+            }
         }
-        let mut values = Vec::with_capacity(total as usize);
+        let mut values = Vec::with_capacity(total);
         for row in row_start..=row_end {
             for col in col_start..=col_end {
                 if !data.is_loaded(row, col) {

@@ -1328,6 +1328,54 @@ mod tests {
     }
 
     #[test]
+    fn operator_precedence_is_excel_compatible_and_errors_stay_explicit() {
+        assert_eq!(serialize(&parse("=-1^2").unwrap()), "=(-(1)^2)");
+        assert_eq!(serialize(&parse("=2^3^2").unwrap()), "=((2^3)^2)");
+        assert_eq!(serialize(&parse("=1&2+3").unwrap()), "=(1&(2+3))");
+        assert_eq!(serialize(&parse("=2^2%").unwrap()), "=(2^(2)%)");
+        assert!(parse("=%2").is_err());
+        assert!(parse("=2^").is_err());
+        assert!(parse("=2&&3").is_err());
+    }
+
+    #[test]
+    fn seeded_operator_ast_round_trip_property() {
+        fn generated(seed: &mut u64, depth: usize) -> Ast {
+            *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            if depth == 0 {
+                return Ast::Num(((*seed >> 32) % 10_000) as f64 / 100.0);
+            }
+            match *seed % 9 {
+                0 => Ast::Neg(Box::new(generated(seed, depth - 1))),
+                1 => Ast::Pos(Box::new(generated(seed, depth - 1))),
+                2 => Ast::Percent(Box::new(generated(seed, depth - 1))),
+                operator => {
+                    let op = match operator {
+                        3 => Op::Add,
+                        4 => Op::Sub,
+                        5 => Op::Mul,
+                        6 => Op::Div,
+                        7 => Op::Pow,
+                        _ => Op::Concat,
+                    };
+                    Ast::Bin(
+                        op,
+                        Box::new(generated(seed, depth - 1)),
+                        Box::new(generated(seed, depth - 1)),
+                    )
+                }
+            }
+        }
+
+        let mut seed = 0x5eed_070_u64;
+        for _ in 0..512 {
+            let ast = generated(&mut seed, 5);
+            let source = serialize(&ast);
+            assert_eq!(parse(&source), Ok(ast), "failed source: {source}");
+        }
+    }
+
+    #[test]
     fn parse_rejects_deeply_nested_parentheses() {
         let mut src = String::new();
         for _ in 0..=PARSE_RECURSION_LIMIT {
