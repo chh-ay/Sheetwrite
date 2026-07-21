@@ -4,6 +4,7 @@ import {
 } from "./document-protocol.js";
 import {
   type HistoryAction,
+  type HistoryResourceStats,
   type HistoryPart,
   materializeHistoryAction,
   UndoManager,
@@ -214,6 +215,10 @@ export class DocumentController {
       this.history.restoreRedo();
       throw error;
     }
+  }
+
+  getHistoryResourceStats(): HistoryResourceStats {
+    return this.history.getResourceStats();
   }
 
   destroy(): void {
