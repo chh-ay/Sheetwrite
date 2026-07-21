@@ -278,6 +278,7 @@ describe("RenderCoordinator", () => {
       },
     } as unknown as OverlayPainter;
     const domOverlay = {
+      mergeAnchorRequests: () => [],
       paint: () => {},
       paintPanes: () => {},
     } as unknown as DomOverlay;

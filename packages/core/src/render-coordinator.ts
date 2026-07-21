@@ -1,6 +1,6 @@
 import type { AriaMirror } from "./aria-mirror.js";
 import type { DatasourceController } from "./datasource-controller.js";
-import type { DomOverlay } from "./dom-overlay.js";
+import type { DomMergeAnchorRequest, DomOverlay } from "./dom-overlay.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
 import type { CellScalar } from "./types/cell.js";
@@ -43,6 +43,11 @@ export class RenderCoordinator {
   private lastPaintView: VisibleWindowView | null = null;
   private cachedPaneViews: VisibleWindowView[] = [];
   private readonly paneValuePools: CellScalar[][] = [];
+  private cachedDomMergeAnchorViews: VisibleWindowView[] = [];
+  private readonly domMergeAnchorValuePools: CellScalar[][] = [];
+  private readonly domMergeSourceViews: VisibleWindowView[] = [];
+  private mainViewValuePool: CellScalar[] = [];
+  private domMergeAnchorSignature = "";
   private destroyed = false;
 
   constructor(private readonly options: RenderCoordinatorOptions) {}
@@ -99,8 +104,11 @@ export class RenderCoordinator {
     }
     this.lastPaintView = null;
     this.cachedPaneViews = [];
+    this.cachedDomMergeAnchorViews = [];
+    this.domMergeSourceViews.length = 0;
     this.lastDataSignature = "";
     this.lastPaintSignature = "";
+    this.domMergeAnchorSignature = "";
   }
 
   private render(): void {
@@ -190,7 +198,17 @@ export class RenderCoordinator {
       }
       view = this.lastPaintView!;
       if (repaint) {
-        this.options.domOverlay.paint(view, viewport);
+        this.domMergeSourceViews[0] = view;
+        this.domMergeSourceViews.length = 1;
+        const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
+        const refreshAnchors = this.domMergeAnchorsNeedRefresh(requests, refreshData);
+        if (refreshAnchors && requests.length > 0) {
+          view = this.retainMainView(view);
+          this.lastPaintView = view;
+          this.domMergeSourceViews[0] = view;
+        }
+        if (refreshAnchors) this.loadDomMergeAnchorViews(requests);
+        this.options.domOverlay.paint(view, viewport, this.cachedDomMergeAnchorViews);
         this.options.renderer().paint(view);
       }
     }
@@ -296,13 +314,66 @@ export class RenderCoordinator {
     });
     this.cachedPaneViews.length = panes.length;
     if (repaint) {
-      this.options.domOverlay.paintPanes(panes);
+      this.domMergeSourceViews.length = panes.length;
+      for (let slot = 0; slot < panes.length; slot++) {
+        this.domMergeSourceViews[slot] = panes[slot]!.view;
+      }
+      const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
+      if (this.domMergeAnchorsNeedRefresh(requests, refreshData)) {
+        this.loadDomMergeAnchorViews(requests);
+      }
+      this.options.domOverlay.paintPanes(panes, this.cachedDomMergeAnchorViews);
       this.options.renderer().paintPanes?.(panes, {
         x: frozenColumns > 0 ? xSplit - 0.5 : null,
         y: frozenRows > 0 ? ySplit - 0.5 : null,
       });
     }
     return bodyView;
+  }
+
+  private domMergeAnchorsNeedRefresh(
+    requests: readonly DomMergeAnchorRequest[],
+    refreshData: boolean,
+  ): boolean {
+    let signature = String(requests.length);
+    for (const request of requests) {
+      signature += `|${request.sheet}\u0000${request.row}`;
+      for (const col of request.cols) signature += `,${col}`;
+    }
+    const refresh = refreshData || signature !== this.domMergeAnchorSignature;
+    this.domMergeAnchorSignature = signature;
+    return refresh;
+  }
+
+  private loadDomMergeAnchorViews(requests: readonly DomMergeAnchorRequest[]): void {
+    this.cachedDomMergeAnchorViews.length = requests.length;
+    for (let slot = 0; slot < requests.length; slot++) {
+      const request = requests[slot]!;
+      this.options.datasource.ensureLoaded(request.row, request.row + 1);
+      const view = this.options.store.getVisibleWindow(
+        request.sheet,
+        { start: request.row, end: request.row + 1 },
+        request.cols,
+      );
+      let values = this.domMergeAnchorValuePools[slot];
+      if (!values || values.length !== view.values.length) {
+        values = new Array<CellScalar>(view.values.length);
+        this.domMergeAnchorValuePools[slot] = values;
+      }
+      for (let index = 0; index < values.length; index++)
+        values[index] = view.values[index] ?? null;
+      this.cachedDomMergeAnchorViews[slot] = { ...view, values };
+    }
+  }
+
+  private retainMainView(view: VisibleWindowView): VisibleWindowView {
+    if (this.mainViewValuePool.length !== view.values.length) {
+      this.mainViewValuePool = new Array<CellScalar>(view.values.length);
+    }
+    for (let index = 0; index < this.mainViewValuePool.length; index++) {
+      this.mainViewValuePool[index] = view.values[index] ?? null;
+    }
+    return { ...view, values: this.mainViewValuePool };
   }
 
   private retainPaneView(view: VisibleWindowView, slot: number): VisibleWindowView {

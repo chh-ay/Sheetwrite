@@ -36,6 +36,7 @@ function trackedRenderer(prefix: string, stats: RendererStats): CellRenderer {
     element.textContent = `${prefix}:${String(context.value ?? "")}`;
     element.dataset.width = String(context.w);
     element.dataset.height = String(context.h);
+    element.dataset.color = context.style.color ?? "";
   };
   return {
     dom(context) {
@@ -223,10 +224,44 @@ describe("retained DOM cell renderer overlay", () => {
     expect(host.querySelector(".sheetwrite-dom-cell")).toBeNull();
   });
 
-  it("retains one tall merged-cell node while its anchor scrolls beyond the window", () => {
+  it("preserves native button activation without changing grid selection", () => {
     const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
     const { workbook, data } = fixture();
-    workbook.sheets[0]!.merges = [{ r0: 2, c0: 1, r1: 15, c1: 2 }];
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: trackedRenderer("interactive", stats) },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 4 } });
+    const button = cell(host, 2, 1).querySelector("button");
+    if (!(button instanceof HTMLButtonElement)) throw new Error("expected renderer button");
+    let activations = 0;
+    button.addEventListener("click", () => {
+      activations += 1;
+    });
+
+    button.focus();
+    button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+    button.click();
+
+    expect(activations).toBe(1);
+    expect(document.activeElement).toBe(button);
+    expect(grid.getSelection()).toEqual({
+      kind: "cell",
+      addr: { sheet: "s1", row: 4, col: 4 },
+    });
+    grid.destroy();
+    expect(stats.live).toBe(0);
+  });
+
+  it("mounts and refreshes a tall merge anchor outside the visible row window", () => {
+    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
+    const { workbook, data } = fixture();
+    workbook.sheets[0]!.merges = [{ r0: 20, c0: 1, r1: 60, c1: 2 }];
     const host = document.createElement("div");
     document.body.appendChild(host);
     const grid = new GridImpl(host, {
@@ -237,20 +272,273 @@ describe("retained DOM cell renderer overlay", () => {
       config: { toolbar: false, contextMenu: false, find: false },
     });
 
-    const anchor = cell(host, 2, 1);
-    const node = anchor.querySelector("button");
-    scroller(host).scrollTop = 10 * 28;
+    expect(host.querySelector('.sheetwrite-dom-cell[data-row="20"][data-col="1"]')).toBeNull();
+    scroller(host).scrollTop = 35 * 28;
     grid.refresh();
 
-    expect(cell(host, 2, 1)).toBe(anchor);
-    expect(anchor.querySelector("button")).toBe(node);
+    const anchor = cell(host, 20, 1);
+    const node = anchor.querySelector("button");
+    expect(node?.textContent).toBe("tall:r20c1");
     expect(anchor.style.display).toBe("block");
-    expect(host.querySelector('.sheetwrite-dom-cell[data-row="10"][data-col="1"]')).toBeNull();
-    expect(host.querySelectorAll('.sheetwrite-dom-cell[data-row="2"][data-col="1"]')).toHaveLength(
+    expect(host.querySelector('.sheetwrite-dom-cell[data-row="35"][data-col="1"]')).toBeNull();
+
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 20, col: 1 },
+          value: { kind: "literal", value: "off-window-edit" },
+          style: { color: "#123456" },
+        },
+      ],
+    });
+    expect(cell(host, 20, 1)).toBe(anchor);
+    expect(anchor.querySelector("button")).toBe(node);
+    expect(node?.textContent).toBe("tall:off-window-edit");
+    expect(node?.dataset.color).toBe("#123456");
+    expect(host.querySelectorAll('.sheetwrite-dom-cell[data-row="20"][data-col="1"]')).toHaveLength(
       1,
     );
     grid.destroy();
     expect(stats.live).toBe(0);
+  });
+
+  it("keeps effective-style caches local to each frozen-pane style table", () => {
+    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
+    const { workbook, data } = fixture();
+    workbook.sheets[0]!.columns[1]!.cellStyle = { backgroundColor: "#ffffff" };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: trackedRenderer("styled", stats) },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "literal", value: "frozen" },
+          style: { color: "#aa0000" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 1 },
+          value: { kind: "literal", value: "body" },
+          style: { color: "#0000aa" },
+        },
+      ],
+    });
+
+    expect(cell(host, 0, 1).querySelector<HTMLElement>("button")?.dataset.color).toBe("#aa0000");
+    expect(cell(host, 1, 1).querySelector<HTMLElement>("button")?.dataset.color).toBe("#0000aa");
+    grid.destroy();
+    expect(stats.live).toBe(0);
+  });
+
+  it("preserves an update failure while exactly-once cleaning hostile destroy hooks", () => {
+    const { workbook, data } = fixture();
+    workbook.sheets[0]!.frozenRows = 0;
+    workbook.sheets[0]!.frozenCols = 0;
+    workbook.sheets[0]!.merges = [];
+    let failUpdate = false;
+    let destroys = 0;
+    const renderer: CellRenderer = {
+      dom() {
+        return document.createElement("button");
+      },
+      update() {
+        if (failUpdate) throw new Error("renderer update failed");
+      },
+      destroy() {
+        destroys += 1;
+        throw new Error("renderer destroy failed");
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: renderer },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    const mounted = host.querySelectorAll(".sheetwrite-dom-cell").length;
+    failUpdate = true;
+
+    expect(() =>
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 0, col: 0 },
+            value: { kind: "literal", value: "update-failure" },
+          },
+        ],
+      }),
+    ).toThrow("renderer update failed");
+    expect(destroys).toBe(mounted);
+    expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
+
+    grid.destroy();
+    expect(host.querySelector(".sheetwrite-dom-overlay")).toBeNull();
+  });
+
+  it("preserves a mount failure while cleaning every prior-frame entry", () => {
+    const { workbook, data } = fixture();
+    workbook.sheets[0]!.frozenRows = 0;
+    workbook.sheets[0]!.frozenCols = 0;
+    workbook.sheets[0]!.merges = [];
+    let failMount = false;
+    let destroys = 0;
+    const renderer: CellRenderer = {
+      dom() {
+        if (failMount) throw new Error("renderer dom failed");
+        return document.createElement("button");
+      },
+      update() {},
+      destroy() {
+        destroys += 1;
+        throw new Error("renderer destroy failed");
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: renderer },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    const mounted = host.querySelectorAll(".sheetwrite-dom-cell").length;
+    failMount = true;
+    scroller(host).scrollTop = 40 * 28;
+
+    expect(() => grid.refresh()).toThrow("renderer dom failed");
+    expect(destroys).toBe(mounted);
+    expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
+
+    grid.destroy();
+    expect(host.querySelector(".sheetwrite-dom-overlay")).toBeNull();
+  });
+
+  it("completes structural grid teardown when every renderer destroy hook throws", () => {
+    const { workbook, data } = fixture();
+    let destroys = 0;
+    const renderer: CellRenderer = {
+      dom() {
+        return document.createElement("button");
+      },
+      destroy() {
+        destroys += 1;
+        throw new Error("renderer destroy failed");
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: renderer },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    const mounted = host.querySelectorAll(".sheetwrite-dom-cell").length;
+
+    expect(() => grid.destroy()).toThrow("renderer destroy failed");
+    expect(destroys).toBe(mounted);
+    expect(host.querySelector(".sheetwrite-dom-overlay")).toBeNull();
+    expect(host.querySelector(".sheetwrite-viewport")).toBeNull();
+    expect(host.classList.contains("sheetwrite")).toBe(false);
+    expect(() => grid.destroy()).not.toThrow();
+    expect(destroys).toBe(mounted);
+  });
+
+  it("rejects one renderer node shared by two cells and releases its ownership", () => {
+    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
+    const { workbook, data } = fixture();
+    workbook.sheets[0]!.frozenRows = 0;
+    workbook.sheets[0]!.frozenCols = 0;
+    workbook.sheets[0]!.merges = [];
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: trackedRenderer("initial", stats) },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    const shared = document.createElement("button");
+    let sharedDestroys = 0;
+    const sharedRenderer: CellRenderer = {
+      dom() {
+        return shared;
+      },
+      destroy() {
+        sharedDestroys += 1;
+      },
+    };
+
+    expect(() => grid.defineCellRenderer("dom", sharedRenderer)).toThrow(
+      "CellRenderer.dom() must return a unique HTMLElement for each cell",
+    );
+    expect(sharedDestroys).toBe(1);
+    expect(shared.parentNode).toBeNull();
+    expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
+
+    let returnedShared = false;
+    grid.defineCellRenderer("dom", {
+      dom() {
+        if (!returnedShared) {
+          returnedShared = true;
+          return shared;
+        }
+        return document.createElement("button");
+      },
+    });
+    expect(shared.isConnected).toBe(true);
+    grid.destroy();
+    expect(shared.parentNode).toBeNull();
+  });
+
+  it("rejects a connected host node without reparenting or destroying it", () => {
+    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
+    const { workbook, data } = fixture();
+    const host = document.createElement("div");
+    const externalHost = document.createElement("div");
+    const external = document.createElement("button");
+    externalHost.appendChild(external);
+    document.body.append(host, externalHost);
+    const grid = new GridImpl(host, {
+      workbook,
+      data,
+      renderers: { dom: trackedRenderer("initial", stats) },
+      overscan: 0,
+      config: { toolbar: false, contextMenu: false, find: false },
+    });
+    let destroys = 0;
+
+    expect(() =>
+      grid.defineCellRenderer("dom", {
+        dom() {
+          return external;
+        },
+        destroy() {
+          destroys += 1;
+        },
+      }),
+    ).toThrow("CellRenderer.dom() must return a fresh detached HTMLElement");
+    expect(external.parentNode).toBe(externalHost);
+    expect(external.isConnected).toBe(true);
+    expect(destroys).toBe(0);
+    expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
+    grid.destroy();
   });
 
   it("refreshes legacy dom-only renderers on value changes without allocating on pure scroll", () => {

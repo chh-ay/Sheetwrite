@@ -12,6 +12,7 @@ interface FixtureStats {
   live: number;
   generation: number;
   nodes: number;
+  activations: number;
 }
 
 declare global {
@@ -19,6 +20,10 @@ declare global {
     __sheetwriteRendererFixture?: {
       stats(): FixtureStats;
       scroll(top: number, left: number): void;
+      select(row: number, col: number): void;
+      selection(): unknown;
+      editTall(value: string, color: string): void;
+      styleCollision(): void;
       edit(value: string): void;
       replace(): void;
       zoom(value: number): void;
@@ -28,6 +33,67 @@ declare global {
     };
   }
 }
+
+test("interactive DOM controls and off-window merge anchors preserve native behavior", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(FIXTURE_URL);
+  await expect(page.locator("#renderer-status")).toHaveAttribute("data-status", "ready", {
+    timeout: 20_000,
+  });
+
+  const merged = page.locator(`${CELL}[data-row="2"][data-col="1"] button`);
+  await page.evaluate(() => window.__sheetwriteRendererFixture?.select(4, 4));
+  await merged.click();
+  await expect(merged).toBeFocused();
+  expect(
+    (await page.evaluate(() => window.__sheetwriteRendererFixture?.stats()))?.activations,
+  ).toBe(1);
+  expect(await page.evaluate(() => window.__sheetwriteRendererFixture?.selection())).toEqual({
+    kind: "cell",
+    addr: { sheet: "s1", row: 4, col: 4 },
+  });
+  await merged.press("Enter");
+  expect(
+    (await page.evaluate(() => window.__sheetwriteRendererFixture?.stats()))?.activations,
+  ).toBe(2);
+  expect(await page.evaluate(() => window.__sheetwriteRendererFixture?.selection())).toEqual({
+    kind: "cell",
+    addr: { sheet: "s1", row: 4, col: 4 },
+  });
+
+  const tallCell = page.locator(`${CELL}[data-row="20"][data-col="1"]`);
+  await expect(tallCell).toHaveCount(0);
+  await page.evaluate(() => window.__sheetwriteRendererFixture?.scroll(35 * 28, 0));
+  await expect(tallCell).toBeVisible();
+  const tallButton = tallCell.locator("button");
+  await expect(tallButton).toHaveText("first:r20c1");
+  await tallButton.evaluate((element) => {
+    element.dataset.identity = "direct-tall-anchor";
+  });
+  await page.evaluate(() =>
+    window.__sheetwriteRendererFixture?.editTall("browser-off-window-edit", "#123456"),
+  );
+  await expect(tallButton).toHaveText("first:browser-off-window-edit");
+  await expect(tallButton).toHaveAttribute("data-color", "#123456");
+  await expect(tallButton).toHaveAttribute("data-identity", "direct-tall-anchor");
+
+  await page.evaluate(() => {
+    window.__sheetwriteRendererFixture?.scroll(0, 0);
+    window.__sheetwriteRendererFixture?.styleCollision();
+  });
+  await expect(page.locator(`${CELL}[data-row="0"][data-col="1"] button`)).toHaveAttribute(
+    "data-color",
+    "#aa0000",
+  );
+  await expect(page.locator(`${CELL}[data-row="1"][data-col="1"] button`)).toHaveAttribute(
+    "data-color",
+    "#0000aa",
+  );
+  expect(errors).toEqual([]);
+});
 
 test("DOM renderer lifecycle and absolute accessibility indices", async ({ page }) => {
   const errors: string[] = [];

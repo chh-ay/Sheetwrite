@@ -50,7 +50,7 @@ export interface CellPaintContext {
 /** Custom cell renderer hooks for the main-thread canvas or retained DOM overlay. */
 export interface CellRenderer {
   canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
-  /** Creates one element when a rendered cell enters the retained DOM window. */
+  /** Creates a fresh, detached element uniquely owned by one retained DOM cell. */
   dom?(c: CellPaintContext): HTMLElement;
   /** Updates a retained element after its value, style, theme, or geometry changes. */
   update?(element: HTMLElement, c: CellPaintContext): void;

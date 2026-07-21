@@ -2531,18 +2531,31 @@ export class GridImpl implements Grid {
     // Free the WASM CellStore only when we constructed it. A caller-provided
     // store is owned by the caller and must stay usable after the grid is gone.
     if (this.ownsStore) this.loadable?.dispose();
-    this.renderer.destroy();
-    this.domOverlay.destroy();
-    this.scroller.remove();
-    this.overlayPainter.destroy();
-    this.sheetTabs?.destroy();
-    this.tabBar?.remove();
-    this.toolbar?.destroy();
-    this.contextMenu?.destroy();
-    this.findBar?.destroy();
-    this.viewportEl.remove();
-    this.ariaMirror.destroy();
-    this.host.classList.remove("sheetwrite");
+    let failure: unknown;
+    let failed = false;
+    const cleanup = (operation: () => void): void => {
+      try {
+        operation();
+      } catch (error) {
+        if (!failed) {
+          failure = error;
+          failed = true;
+        }
+      }
+    };
+    cleanup(() => this.renderer.destroy());
+    cleanup(() => this.domOverlay.destroy());
+    cleanup(() => this.scroller.remove());
+    cleanup(() => this.overlayPainter.destroy());
+    cleanup(() => this.sheetTabs?.destroy());
+    cleanup(() => this.tabBar?.remove());
+    cleanup(() => this.toolbar?.destroy());
+    cleanup(() => this.contextMenu?.destroy());
+    cleanup(() => this.findBar?.destroy());
+    cleanup(() => this.viewportEl.remove());
+    cleanup(() => this.ariaMirror.destroy());
+    cleanup(() => this.host.classList.remove("sheetwrite"));
+    if (failed) throw failure;
   }
 }
 
