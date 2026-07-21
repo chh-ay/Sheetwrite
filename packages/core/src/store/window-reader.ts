@@ -13,6 +13,17 @@ const KIND_BOOL = 3;
 const EMPTY_COND_MATCHES = new Uint32Array(0);
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
+const UTF8_DECODER = new TextDecoder();
+
+export interface PersistedCellView {
+  readonly coordinates: Uint32Array;
+  readonly values: readonly CellScalar[];
+  readonly styles: readonly CellStyle[];
+  readonly formulaOffsets: Uint32Array;
+  readonly formulaSources: readonly string[];
+  readonly referenceOffsets: Uint32Array;
+  readonly referenceTargets: Uint32Array;
+}
 
 /** Owns packed-window decoding, caches, and reusable viewport scratch. */
 export class StoreWindowReader {
@@ -51,6 +62,117 @@ export class StoreWindowReader {
   ): SourceSnapshot | undefined {
     if (rows.length === 0 || cols.length === 0) return undefined;
     return this.wasm.captureSourcesForRows(this.handleOf(sheet), rows, this.colsU32For(cols));
+  }
+
+  capturePersistedCells(sheet: SheetId): PersistedCellView {
+    const packed = this.wasm.persistedCellData(this.handleOf(sheet));
+    const coordinates: number[] = [];
+    const values: CellScalar[] = [];
+    const styles: CellStyle[] = [];
+    const formulaOffsets: number[] = [];
+    const formulaSources: string[] = [];
+    const referenceOffsets: number[] = [];
+    const referenceTargets: number[] = [];
+    const stringIds: number[] = [];
+    const stringOffsets: number[] = [];
+    let cursor = 0;
+    while (cursor < packed.length) {
+      if (packed.length - cursor < 8) {
+        throw new Error("Sheetwrite: truncated persisted-cell projection");
+      }
+      const row = packed[cursor++]!;
+      const col = packed[cursor++]!;
+      const kind = packed[cursor++]!;
+      const number = packed[cursor++]!;
+      const styleId = packed[cursor++]!;
+      const stringId = packed[cursor++]!;
+      const sourceKind = packed[cursor++]!;
+      const sourceLength = packed[cursor++]!;
+      if (
+        !Number.isSafeInteger(row) ||
+        row < 0 ||
+        !Number.isSafeInteger(col) ||
+        col < 0 ||
+        !Number.isSafeInteger(kind) ||
+        kind < 0 ||
+        !Number.isSafeInteger(styleId) ||
+        styleId < 0 ||
+        !Number.isSafeInteger(sourceKind) ||
+        !Number.isSafeInteger(sourceLength) ||
+        sourceLength < 0
+      ) {
+        throw new Error("Sheetwrite: invalid persisted-cell projection");
+      }
+      const offset = values.length;
+      coordinates.push(row, col);
+      values.push(kind === KIND_NUMBER ? number : kind === KIND_BOOL ? number !== 0 : null);
+      styles.push(this.styles.get(styleId));
+      if (kind === KIND_STRING && stringId >= 0) {
+        if (!Number.isSafeInteger(stringId)) {
+          throw new Error("Sheetwrite: invalid persisted string id");
+        }
+        stringIds.push(stringId);
+        stringOffsets.push(offset);
+      }
+      if (sourceKind === 1) {
+        const wordCount = Math.ceil(sourceLength / 4);
+        if (cursor + wordCount > packed.length) {
+          throw new Error("Sheetwrite: truncated persisted formula source");
+        }
+        const bytes = new Uint8Array(sourceLength);
+        for (let wordIndex = 0; wordIndex < wordCount; wordIndex++) {
+          const word = packed[cursor++]!;
+          if (!Number.isSafeInteger(word) || word < 0 || word > 0xffff_ffff) {
+            throw new Error("Sheetwrite: invalid persisted formula source");
+          }
+          for (let byte = 0; byte < 4; byte++) {
+            const byteIndex = wordIndex * 4 + byte;
+            if (byteIndex < bytes.length) bytes[byteIndex] = (word >>> (byte * 8)) & 0xff;
+          }
+        }
+        formulaOffsets.push(offset);
+        formulaSources.push(UTF8_DECODER.decode(bytes));
+      } else if (sourceKind === 2) {
+        if (sourceLength !== 3 || cursor + 3 > packed.length) {
+          throw new Error("Sheetwrite: invalid persisted reference source");
+        }
+        const targetSheet = packed[cursor++]!;
+        const targetRow = packed[cursor++]!;
+        const targetCol = packed[cursor++]!;
+        if (
+          !Number.isSafeInteger(targetSheet) ||
+          targetSheet < 0 ||
+          !Number.isSafeInteger(targetRow) ||
+          targetRow < 0 ||
+          !Number.isSafeInteger(targetCol) ||
+          targetCol < 0
+        ) {
+          throw new Error("Sheetwrite: invalid persisted reference target");
+        }
+        referenceOffsets.push(offset);
+        referenceTargets.push(targetSheet, targetRow, targetCol);
+      } else if (sourceKind !== 0 || sourceLength !== 0) {
+        throw new Error("Sheetwrite: invalid persisted source kind");
+      }
+    }
+    if (stringIds.length > 0) {
+      const texts = this.wasm.poolStrings(Uint32Array.from(stringIds));
+      if (texts.length !== stringOffsets.length) {
+        throw new Error("Sheetwrite: invalid persisted string projection");
+      }
+      for (let index = 0; index < texts.length; index++) {
+        values[stringOffsets[index]!] = texts[index] ?? null;
+      }
+    }
+    return {
+      coordinates: Uint32Array.from(coordinates),
+      values,
+      styles,
+      formulaOffsets: Uint32Array.from(formulaOffsets),
+      formulaSources,
+      referenceOffsets: Uint32Array.from(referenceOffsets),
+      referenceTargets: Uint32Array.from(referenceTargets),
+    };
   }
 
   spillOwnerCoordinates(

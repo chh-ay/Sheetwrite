@@ -1493,6 +1493,81 @@ impl CellStore {
         true
     }
 
+    /// Sparse persisted-cell records. Each record starts with
+    /// `[row, col, kind, number, style, string_id, source_kind, source_length]`.
+    /// Formula UTF-8 is packed into little-endian u32 words; references append
+    /// one `[sheet, row, col]` triple. The allocation scales with serialized
+    /// cells and source bytes, never the logical sheet rectangle.
+    #[wasm_bindgen(js_name = persistedCellData)]
+    pub fn persisted_cell_data(&self, sheet: usize) -> Vec<f64> {
+        let Some(s) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        let persisted = s.persisted_coordinates();
+        let mut cells = Vec::with_capacity(persisted.len().saturating_mul(8));
+        for &(row, col) in &persisted {
+            let key = (row, col);
+            let index = s.idx(row as usize, col as usize);
+            let derived = s.spill_owner(key).is_some_and(|anchor| anchor != key);
+            let kind = if derived {
+                KIND_EMPTY
+            } else {
+                s.kind_at(index)
+            };
+            let string_id = if !derived && s.str_id_at(index) != NO_STRING {
+                f64::from(s.str_id_at(index))
+            } else {
+                -1.0
+            };
+            let source = s.formulas.get(&key);
+            let reference_target = source
+                .filter(|entry| entry.is_reference())
+                .and_then(|entry| entry.reference_target(sheet as u32));
+            let source_kind = if source.is_some_and(FormulaEntry::is_formula) {
+                1
+            } else if reference_target.is_some() {
+                2
+            } else {
+                0
+            };
+            let source_length = if source_kind == 1 {
+                source.map_or(0, |entry| entry.source.len())
+            } else if source_kind == 2 {
+                3
+            } else {
+                0
+            };
+            cells.extend_from_slice(&[
+                f64::from(row),
+                f64::from(col),
+                f64::from(kind),
+                if derived { 0.0 } else { s.num_at(index) },
+                f64::from(s.style_at(index)),
+                string_id,
+                f64::from(source_kind),
+                source_length as f64,
+            ]);
+            if source_kind == 1 {
+                if let Some(entry) = source {
+                    for chunk in entry.source.as_bytes().chunks(4) {
+                        let mut word = 0u32;
+                        for (shift, byte) in chunk.iter().enumerate() {
+                            word |= u32::from(*byte) << (shift * 8);
+                        }
+                        cells.push(f64::from(word));
+                    }
+                }
+            } else if let Some(target) = reference_target {
+                cells.extend_from_slice(&[
+                    f64::from(target.sheet),
+                    f64::from(target.row),
+                    f64::from(target.col),
+                ]);
+            }
+        }
+        cells
+    }
+
     /// Capture a dense rectangle into an opaque store-local history resource.
     #[wasm_bindgen(js_name = captureRange)]
     pub fn capture_range(

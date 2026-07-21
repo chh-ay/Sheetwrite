@@ -2606,6 +2606,7 @@ fn numeric_filter_not_equal_returns_matching_rows() {
 #[test]
 fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     let mut store = CellStore::new();
+    let _earlier_sheet = store.add_sheet(1, 1);
     let sheet = store.add_sheet(2, 2);
     store.set_sheet_name(sheet, "s1", "Sheet 1");
     assert_eq!(
@@ -2654,13 +2655,8 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     assert_eq!(reordered.formula_offsets(), vec![2]);
     assert_eq!(reordered.formula_sources(), vec!["=A1*3"]);
     assert_eq!(reordered.reference_offsets(), vec![1]);
-    assert_eq!(
-        reordered.reference_targets(),
-        vec![sheet as u32, 0, 1]
-    );
-    assert!(store
-        .capture_sources_for_rows(sheet, &[2], &[0])
-        .is_none());
+    assert_eq!(reordered.reference_targets(), vec![sheet as u32, 0, 1]);
+    assert!(store.capture_sources_for_rows(sheet, &[2], &[0]).is_none());
 
     assert_eq!(
         store.set_sparse_block(
@@ -2684,6 +2680,36 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     store.recompute_changed_sources();
     assert_close(number(&store, sheet, 0, 1), 12.0);
     assert_close(number(&store, sheet, 1, 0), 12.0);
+}
+
+#[test]
+fn persisted_cell_data_stays_sparse_at_one_billion_rows() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 1_000_000_000, 4096, 0, 16);
+    let source = "=\"雪😀\"";
+    store.set_formula(sheet, 999_999_999, 1, source, 7);
+
+    let data = store.persisted_cell_data(sheet);
+    assert_eq!(
+        &data[..8],
+        &[
+            999_999_999.0,
+            1.0,
+            f64::from(KIND_FORMULA),
+            0.0,
+            7.0,
+            -1.0,
+            1.0,
+            source.len() as f64,
+        ]
+    );
+    assert_eq!(data.len(), 8 + source.len().div_ceil(4));
+    let mut bytes = Vec::new();
+    for word in &data[8..] {
+        bytes.extend_from_slice(&(*word as u32).to_le_bytes());
+    }
+    bytes.truncate(source.len());
+    assert_eq!(String::from_utf8(bytes).unwrap(), source);
 }
 
 #[test]

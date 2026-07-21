@@ -16,6 +16,7 @@ import {
   type RuntimeResourceOperation,
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
+  type StoreMemoryBreakdown,
   type TransientResourcePeak,
 } from "../resource-accounting.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -73,7 +74,6 @@ import {
   uniqueColumnKeys,
   validConditionalRules,
   validMerge,
-  validNotes,
   validProtectedRanges,
   validSortAndFilters,
   validValidationRules,
@@ -97,7 +97,6 @@ const DEFAULT_PAGED_CHUNK_ROWS = 4_096;
 const DEFAULT_PAGED_CACHE_BYTES = 32 * 1024 * 1024;
 const DEFAULT_PAGED_DIRTY_CELL_LIMIT = 1_000_000;
 const MAX_PAGED_REFERENCE_SIMULATION_ENTRIES = 100_000;
-const EMPTY_U32 = new Uint32Array(0);
 
 /** Store-local compact history resource. Never serialize `resource`. */
 export interface CompactRangeHistory {
@@ -198,6 +197,9 @@ export class StoreDataEngine {
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
   private readonly spillBlockersDirty = new Set<SheetId>();
+  /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
+  private readonly authoritativeSnapshotSheets = new Set<SheetId>();
+  private snapshotAuthoritative = false;
   private readonly rangeMutationStats = {
     documentOperations: 0,
     jsPatchObjects: 0,
@@ -232,11 +234,7 @@ export class StoreDataEngine {
     this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, workbook, this.handles);
     this.windowReader = new StoreWindowReader(this.wasm, workbook, this.handles, this.styles);
-    this.snapshotCodec = new StoreSnapshotCodec(
-      workbook,
-      this.windowReader,
-      (sheet, rowCount, colCount) => this.captureSourceProjection(sheet, 0, 0, rowCount, colCount),
-    );
+    this.snapshotCodec = new StoreSnapshotCodec(workbook, this.windowReader, this.sheetIdsByHandle);
     for (const sheet of workbook.sheets) {
       const handle = this.allocateSheet(sheet.columns.length, sheet.rowCount);
       this.boundaryAccounting.record(
@@ -283,7 +281,7 @@ export class StoreDataEngine {
     phase: RuntimeResourcePhase,
     runtime?: RuntimeMemoryObservation,
   ): RuntimeResourceSnapshot {
-    let wasm;
+    let wasm: StoreMemoryBreakdown;
     if (this.disposed) {
       wasm = emptyStoreMemoryStats(this.committedBytesAfterDispose);
     } else {
@@ -533,7 +531,9 @@ export class StoreDataEngine {
   queryCapability(sheet: SheetId): QueryCapability {
     const meta = this.sheetMeta(sheet);
     const stats = this.getPagedStats(sheet);
-    if (!this.isPaged(sheet) || stats.fullyLoaded) return { status: "complete" };
+    if (!this.isPaged(sheet) || stats.fullyLoaded || this.authoritativeSnapshotSheets.has(sheet)) {
+      return { status: "complete" };
+    }
     return {
       status: "incomplete",
       loadedCells: stats.loadedCells,
@@ -724,9 +724,8 @@ export class StoreDataEngine {
       const existing = states.get(sheet);
       if (existing) return existing;
       if (!this.handles.has(sheet)) return undefined;
-      let state: PagedDirtyPreflightState;
       const meta = this.sheetMeta(sheet);
-      state = {
+      const state: PagedDirtyPreflightState = {
         handle: this.handleOf(sheet),
         rows: meta.rowCount,
         cols: meta.columns.length,
@@ -1128,7 +1127,6 @@ export class StoreDataEngine {
         ) {
           for (let rowOffset = 0; rowOffset < patch.block.rowCount; rowOffset++) {
             for (let colOffset = 0; colOffset < patch.block.colCount; colOffset++) {
-              const offset = rowOffset * patch.block.colCount + colOffset;
               setVirtualRef(
                 {
                   sheet: range.sheet,
@@ -2568,14 +2566,16 @@ export class StoreDataEngine {
       }
     }
     this.windowReader.conditionalRulesChanged(snapshot.id);
+    if (this.snapshotAuthoritative) this.authoritativeSnapshotSheets.add(snapshot.id);
     return true;
   }
 
-  private removeSheetSnapshot(sheetId: SheetId, changes: ChangeEvent["changes"] | null): boolean {
+  private removeSheetSnapshot(sheetId: SheetId, _changes: ChangeEvent["changes"] | null): boolean {
     const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheetId);
     if (index < 0 || this.workbook.sheets.length <= 1) return false;
     if (!this.removeSheetFormulaIdentity(sheetId)) return false;
     this.handles.delete(sheetId);
+    this.authoritativeSnapshotSheets.delete(sheetId);
     this.view.removeSheet(sheetId);
     this.windowReader.removeSheet(sheetId);
     this.workbook.sheets.splice(index, 1);
@@ -2933,6 +2933,8 @@ export class StoreDataEngine {
       this.wasm.endPageLoad();
     }
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
+    this.snapshotAuthoritative = true;
+    for (const sheet of snapshot.sheets) this.authoritativeSnapshotSheets.add(sheet.id);
     this.noteRangeMutationFfi();
     this.wasm.recomputeChanged();
   }
@@ -2947,6 +2949,7 @@ export class StoreDataEngine {
     this.windowReader.clear();
     this.styles.clear();
     this.handles.clear();
+    this.authoritativeSnapshotSheets.clear();
     this.wasm.free();
     this.disposed = true;
   }
@@ -3013,30 +3016,6 @@ function columnarScalar(
     return columnarScalar(unwrapped.value, type);
   }
   return typeof unwrapped === "string" ? parseCellLiteralInput(unwrapped, type) : unwrapped;
-}
-
-/** Allocation-free byte count matching wasm-bindgen's UTF-8 string copy. */
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index++) {
-    const code = value.charCodeAt(index);
-    if (code <= 0x7f) {
-      bytes += 1;
-    } else if (code <= 0x7ff) {
-      bytes += 2;
-    } else if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4;
-        index += 1;
-      } else {
-        bytes += 3;
-      }
-    } else {
-      bytes += 3;
-    }
-  }
-  return bytes;
 }
 
 function toNumber(value: DataCell | undefined): number {

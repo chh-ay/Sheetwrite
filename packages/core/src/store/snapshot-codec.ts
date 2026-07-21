@@ -4,7 +4,7 @@ import {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../document-protocol.js";
-import type { RangeSourceProjection } from "../reference.js";
+import { RangeSourceProjection } from "../reference.js";
 import type { CellValue } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { SheetSnapshot, SnapshotCell, Workbook, WorkbookSnapshot } from "../types/document.js";
@@ -62,11 +62,7 @@ export class StoreSnapshotCodec {
   constructor(
     private readonly workbook: Workbook,
     private readonly windowReader: StoreWindowReader,
-    private readonly captureSources: (
-      sheet: SheetId,
-      rowCount: number,
-      colCount: number,
-    ) => RangeSourceProjection | null,
+    private readonly sheetIdsByHandle: readonly SheetId[],
   ) {}
 
   encode(documentId: string | undefined, documentVersion: number | undefined): WorkbookSnapshot {
@@ -88,45 +84,33 @@ export class StoreSnapshotCodec {
             ] as const,
         );
 
-      const cols = sheet.columns.map((_, col) => col);
-      const window = this.windowReader.read(
-        sheet.id,
-        { start: 0, end: sheet.rowCount },
-        cols,
-        undefined,
-        false,
-      );
-      const sources =
-        sheet.rowCount === 0 || cols.length === 0
-          ? null
-          : this.captureSources(sheet.id, sheet.rowCount, cols.length);
-      const spillDerived = this.windowReader.spillDerivedMask(
-        sheet.id,
-        { start: 0, end: sheet.rowCount },
-        cols,
+      const persisted = this.windowReader.capturePersistedCells(sheet.id);
+      const sources = new RangeSourceProjection(
+        persisted.formulaOffsets,
+        persisted.formulaSources,
+        persisted.referenceOffsets,
+        persisted.referenceTargets,
+        this.sheetIdsByHandle,
       );
       const cells: SnapshotCell[] = [];
-      for (let row = 0; row < sheet.rowCount; row++) {
-        for (let col = 0; col < cols.length; col++) {
-          const index = row * cols.length + col;
-          const formula = sources?.formulaAt(index);
-          const target = sources?.referenceAt(index);
-          const style = window.styles[window.styleIds[index] ?? 0] ?? {};
-          const hasStyle = Object.keys(style).length > 0;
-          const resolved = spillDerived[index] === 1 ? null : (window.values[index] ?? null);
-          if (!formula && !target && resolved === null && !hasStyle) continue;
-          const value: CellValue = formula
-            ? { kind: "formula", src: formula }
-            : target
-              ? { kind: "ref", target: { ...target } }
-              : { kind: "literal", value: resolved };
-          cells.push({
-            rowOffset: row,
-            colOffset: col,
-            value,
-            ...(hasStyle ? { style: cloneJsonValue(style) } : {}),
-          });
-        }
+      for (let index = 0; index < persisted.values.length; index++) {
+        const row = persisted.coordinates[index * 2]!;
+        const col = persisted.coordinates[index * 2 + 1]!;
+        const formula = sources.formulaAt(index);
+        const target = sources.referenceAt(index);
+        const style = persisted.styles[index] ?? {};
+        const hasStyle = Object.keys(style).length > 0;
+        const value: CellValue = formula
+          ? { kind: "formula", src: formula }
+          : target
+            ? { kind: "ref", target: { ...target } }
+            : { kind: "literal", value: persisted.values[index] ?? null };
+        cells.push({
+          rowOffset: row,
+          colOffset: col,
+          value,
+          ...(hasStyle ? { style: cloneJsonValue(style) } : {}),
+        });
       }
 
       return {

@@ -103,6 +103,7 @@ export type RecomputingCellStore = CellStore & {
     oldIds: Uint32Array,
     newIds: Uint32Array,
   ): boolean;
+  persistedCellData(sheet: number): Float64Array;
   captureRange(
     sheet: number,
     r0: number,

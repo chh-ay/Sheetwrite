@@ -560,6 +560,28 @@ impl PagedStorage {
         }
     }
 
+    fn persisted_coordinates(&self) -> Vec<CellKey> {
+        let mut coordinates = Vec::new();
+        for (&(col, chunk_index), chunk) in &self.chunks {
+            for offset in 0..self.chunk_rows {
+                if !CellChunk::bit(&chunk.loaded, offset) {
+                    continue;
+                }
+                let row = chunk_index * self.chunk_rows + offset;
+                if self.dirty.contains_key(&(row, col))
+                    || (chunk.kind[offset] == KIND_EMPTY && chunk.style[offset] == 0)
+                {
+                    continue;
+                }
+                coordinates.push((row as u32, col as u32));
+            }
+        }
+        coordinates.extend(self.dirty.iter().filter_map(|(&(row, col), cell)| {
+            (cell.kind != KIND_EMPTY || cell.style != 0).then_some((row as u32, col as u32))
+        }));
+        coordinates
+    }
+
     fn entries(&self) -> Vec<StorageEntry> {
         let mut entries = Vec::with_capacity(self.loaded_cells());
         for (&(col, chunk_index), chunk) in &self.chunks {
@@ -860,6 +882,31 @@ impl SheetData {
 
     fn coordinates(&self, index: usize) -> (usize, usize) {
         (index % self.row_count, index / self.row_count)
+    }
+
+    pub(crate) fn persisted_coordinates(&self) -> Vec<CellKey> {
+        let mut coordinates = if let Some(paged) = &self.paged {
+            paged.persisted_coordinates()
+        } else {
+            let mut coordinates = Vec::new();
+            for index in 0..self.kind.len() {
+                if self.kind[index] == KIND_EMPTY && self.style[index] == 0 {
+                    continue;
+                }
+                let (row, col) = self.coordinates(index);
+                coordinates.push((row as u32, col as u32));
+            }
+            coordinates
+        };
+        coordinates.extend(self.formulas.keys().copied());
+        coordinates.sort_unstable();
+        coordinates.dedup();
+        coordinates.retain(|&(row, col)| {
+            self.spill_owner((row, col)).is_none_or(|anchor| {
+                anchor == (row, col) || self.style_at(self.idx(row as usize, col as usize)) != 0
+            })
+        });
+        coordinates
     }
 
     #[inline]
