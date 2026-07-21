@@ -2501,6 +2501,46 @@ it("keeps virtual sheet membership aligned when addSheet snapshots are semantica
   }
 });
 
+it("keeps lifecycle names aligned when rename collides with another sheet id", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, { storage: "paged" });
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "renameSheet", sheet: "s1", name: "s2" },
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s3",
+          name: "Sheet 1",
+          order: 2,
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [],
+        },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s3", row: 0, col: 0 },
+        value: { kind: "literal", value: "unsafe" },
+      },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 2 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
+    ["s1", "Sheet 1"],
+    ["s2", "Second"],
+  ]);
+  store.dispose();
+});
+
 it("retains last-sheet membership when removeSheet is a no-op", () => {
   const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
   const outcome = store.applyTransaction({

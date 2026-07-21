@@ -136,7 +136,9 @@ export function applySheetLifecycleOperation(
       !sheet ||
       !operation.name.trim() ||
       state.sheets.some(
-        (candidate) => candidate.id !== operation.sheet && candidate.name === operation.name,
+        (candidate) =>
+          candidate.id !== operation.sheet &&
+          (candidate.id === operation.name || candidate.name === operation.name),
       )
     ) {
       return false;
