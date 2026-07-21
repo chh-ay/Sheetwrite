@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import {
   DATASOURCE_PREFETCH_MAX_BYTES,
   DATASOURCE_PREFETCH_MAX_ROWS,
+  DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT,
   DatasourceController,
 } from "../src/datasource-controller.js";
 import { initSheetwrite } from "../src/grid.js";
@@ -447,7 +448,6 @@ describe("DatasourceController revision retention", () => {
   });
 
   it("preserves resident rows while refreshing a paged overlap and stays within cache budget", async () => {
-
     const cacheBytes = 63;
     const workbook = makeWorkbook(20);
     workbook.sheets[0]!.columns = workbook.sheets[0]!.columns.slice(0, 1);
@@ -498,6 +498,49 @@ describe("DatasourceController revision retention", () => {
     await flushRequest();
     expect(requested.at(-1)).toEqual([0, 1]);
     expect(store.getPagedStats("s1").allocatedBytes).toBeLessThanOrEqual(cacheBytes);
+
+    controller.destroy();
+    store.dispose();
+  });
+  it("bounds visible-wait samples without per-row trace growth", async () => {
+    const rowCount = DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT + 17;
+    const store = new SheetwriteStore(makeWorkbook(rowCount));
+    let now = 0;
+    const controller = new DatasourceController(
+      {
+        datasource: async (request) => {
+          now = 10;
+          return {
+            start: request.start,
+            rows: Array.from({ length: request.end - request.start }, (_, row) => ({
+              name: `row-${row}`,
+            })),
+          };
+        },
+        loadable: store,
+        activeSheet: () => "s1",
+        rowCount: () => rowCount,
+        revision: () => 0,
+        isCellNewerThan: () => false,
+        retainRevision: () => () => {},
+        onRowsLoaded: () => {},
+        onError: () => {},
+        now: () => now,
+      },
+      rowCount,
+    );
+
+    controller.updateViewport(0, rowCount);
+    await flushRequest();
+    expect(controller.getTelemetry().visibleWaitSamples).toBe(rowCount);
+    expect(
+      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.wait-samples"),
+    ).toMatchObject({
+      logicalBytes: 0,
+      allocatedBytes: 0,
+      entries: 1,
+      measurement: "entry-count-only",
+    });
 
     controller.destroy();
     store.dispose();

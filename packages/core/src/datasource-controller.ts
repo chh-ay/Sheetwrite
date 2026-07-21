@@ -9,7 +9,7 @@ export const DATASOURCE_PREFETCH_MAX_BYTES = 512 * 1024;
 export const DATASOURCE_PREFETCH_MAX_BANDS = 2;
 const LOGICAL_FRAME_MS = 16.7;
 const ESTIMATED_CELL_BYTES = 16;
-const MAX_RETAINED_VISIBLE_WAIT_BANDS = 4_096;
+export const DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT = 4_096;
 
 let datasourceClockForTest: (() => number) | undefined;
 
@@ -655,10 +655,10 @@ export class DatasourceController {
       },
       {
         owner: "js.datasource.wait-samples",
-        logicalBytes: 0,
-        allocatedBytes: 0,
-        entries: this.visibleWaitDurations.length,
-        measurement: "entry-count-only",
+        logicalBytes: this.visibleWaitSampleCount * Float64Array.BYTES_PER_ELEMENT,
+        allocatedBytes: this.visibleWaitDurations.byteLength,
+        entries: this.visibleWaitSampleCount,
+        measurement: "typed-array-byte-length",
       },
     ];
   }
@@ -1030,12 +1030,12 @@ export class DatasourceController {
           this.loaded.add(page.start, loadedEnd);
         }
         for (const sample of this.visibleWaitStarted.complete(page.start, loadedEnd, loadedAt)) {
-          if (this.visibleWaitDurations.length < MAX_RETAINED_VISIBLE_WAIT_BANDS) {
+          if (this.visibleWaitDurations.length < DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT) {
             this.visibleWaitDurations.push(sample);
           } else {
             this.visibleWaitDurations[this.visibleWaitSampleCursor] = sample;
             this.visibleWaitSampleCursor =
-              (this.visibleWaitSampleCursor + 1) % MAX_RETAINED_VISIBLE_WAIT_BANDS;
+              (this.visibleWaitSampleCursor + 1) % DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT;
           }
         }
         this.clearOwned(activeRequest);
