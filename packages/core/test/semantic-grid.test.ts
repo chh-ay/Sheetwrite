@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import type { CellEditor, CellEditorContext, Grid, Workbook } from "../src/types.js";
+import type { CellEditor, CellEditorContext, Column, Grid, Workbook } from "../src/types.js";
+import { CustomEditorController } from "../src/custom-editor.js";
 import { toCsv } from "../src/export.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -119,6 +120,46 @@ function activeEditorInput(host: HTMLElement): HTMLInputElement {
   const input = host.querySelector(".sheetwrite-custom-editor input");
   if (!(input instanceof HTMLInputElement)) throw new Error("custom editor input missing");
   return input;
+}
+
+const BORDER_SIDES = ["all", "top", "right", "bottom", "left"] as const;
+
+function styledEditorColumn(): Column {
+  const border = {
+    all: { color: "#111111", width: 1, style: "solid" as const },
+    top: { color: "#222222", width: 2, style: "dashed" as const },
+    right: { color: "#333333", width: 3, style: "dotted" as const },
+    bottom: { color: "#444444", width: 4, style: "solid" as const },
+    left: { color: "#555555", width: 5, style: "dashed" as const },
+  };
+  return {
+    key: "name",
+    header: "",
+    width: 160,
+    type: "text",
+    headerStyle: { backgroundColor: "#112233", border: structuredClone(border) },
+    cellStyle: { bold: true, border: structuredClone(border) },
+  };
+}
+
+function corruptEditorColumn(column: CellEditorContext["column"]): void {
+  Reflect.set(column, "key", "hijacked-key");
+  Reflect.set(column, "header", "Hijacked header");
+  if (column.headerStyle) column.headerStyle.backgroundColor = "#ff0000";
+  if (column.cellStyle) column.cellStyle.bold = false;
+  for (const style of [column.headerStyle, column.cellStyle]) {
+    for (const side of BORDER_SIDES) {
+      const edge = style?.border?.[side];
+      if (!edge) continue;
+      edge.color = "#ff00ff";
+      edge.width = 100;
+      edge.style = "dotted";
+    }
+    if (style?.border) {
+      Reflect.deleteProperty(style.border, "top");
+      style.border.left = { color: "#00ffff", width: 101, style: "solid" };
+    }
+  }
 }
 
 describe("semantic presentation contract", () => {
@@ -561,40 +602,82 @@ describe("custom editor canonical lifecycle", () => {
     store.dispose();
   });
 
+  it("snapshots columns independently at begin, update, and context exposure boundaries", () => {
+    const workbook = makeWorkbook(1);
+    const store = new SheetwriteStore(workbook, makeColumnarData(1));
+    const gridHost = mountHost();
+    const grid = new GridImpl(gridHost, { workbook }, store);
+    const editorHost = mountHost();
+    const controller = new CustomEditorController(editorHost);
+    const expectedColumn = styledEditorColumn();
+    const beginColumn = structuredClone(expectedColumn);
+    const contexts: CellEditorContext[] = [];
+    const editor: CellEditor = {
+      mount(root, context) {
+        contexts.push(context);
+        root.appendChild(document.createElement("input"));
+        return {
+          update(next) {
+            contexts.push(next);
+          },
+          reposition() {},
+          commit() {},
+          cancel() {},
+          destroy() {},
+        };
+      },
+    };
+    controller.begin({
+      editor,
+      grid,
+      address: { sheet: "s1", row: 0, col: 0 },
+      viewAddress: { sheet: "s1", row: 0, col: 0 },
+      column: beginColumn,
+      value: "Customer 0",
+      text: "Customer 0",
+      initialInput: undefined,
+      selectAll: true,
+      label: "Edit name, row 1",
+      rect: { x: 0, y: 0, width: 160, height: 24 },
+      onCommit() {},
+      onCancel() {},
+    });
+
+    corruptEditorColumn(beginColumn);
+    controller.update({ label: "After begin input mutation" });
+    expect(contexts.at(-1)?.column).toEqual(expectedColumn);
+
+    const exposedColumn = contexts.at(-1)?.column;
+    if (!exposedColumn) throw new Error("exposed editor column missing");
+    corruptEditorColumn(exposedColumn);
+    controller.update({ label: "After context mutation" });
+    expect(contexts.at(-1)?.column).toEqual(expectedColumn);
+
+    const updateColumn = structuredClone(expectedColumn);
+    controller.update({ column: updateColumn, label: "Updated column" });
+    expect(contexts.at(-1)?.column).toEqual(expectedColumn);
+    corruptEditorColumn(updateColumn);
+    controller.update({ label: "After update input mutation" });
+    expect(contexts.at(-1)?.column).toEqual(expectedColumn);
+    expect(contexts).toHaveLength(5);
+
+    controller.destroy();
+    grid.destroy();
+    store.dispose();
+    editorHost.remove();
+  });
+
   it("isolates mutable editor columns from workbook and render configuration", () => {
     const workbook = makeWorkbook(1);
     const sourceColumn = workbook.sheets[0]!.columns[0]!;
-    sourceColumn.header = "";
-    sourceColumn.editor = "hostile-column";
-    sourceColumn.headerStyle = {
-      backgroundColor: "#112233",
-      border: { top: { color: "#223344", width: 1, style: "solid" } },
-    };
-    sourceColumn.cellStyle = {
-      bold: true,
-      border: { all: { color: "#334455", width: 2, style: "dashed" } },
-    };
+    Object.assign(sourceColumn, styledEditorColumn(), { editor: "hostile-column" });
     const expectedColumn = structuredClone(sourceColumn);
     const store = new SheetwriteStore(workbook, makeColumnarData(1));
     const host = mountHost();
     const exposedColumns: CellEditorContext["column"][] = [];
     const corrupt = (column: CellEditorContext["column"]): void => {
       exposedColumns.push(column);
-      Reflect.set(column, "key", "hijacked");
-      if (column.headerStyle) {
-        column.headerStyle.backgroundColor = "#ff0000";
-        if (column.headerStyle.border?.top) {
-          column.headerStyle.border.top.color = "#ff1111";
-          column.headerStyle.border.top.width = 99;
-        }
-      }
-      if (column.cellStyle) {
-        column.cellStyle.bold = false;
-        if (column.cellStyle.border?.all) {
-          column.cellStyle.border.all.color = "#ff2222";
-          column.cellStyle.border.all.width = 100;
-        }
-      }
+      corruptEditorColumn(column);
     };
     const editor: CellEditor = {
       mount(root, context) {
