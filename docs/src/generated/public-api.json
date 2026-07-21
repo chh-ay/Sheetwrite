@@ -214,7 +214,7 @@
                 },
                 {
                   "name": "dom",
-                  "documentation": "Creates one element when a rendered cell enters the retained DOM window."
+                  "documentation": "Creates a fresh, detached element uniquely owned by one retained DOM cell."
                 },
                 {
                   "name": "update",

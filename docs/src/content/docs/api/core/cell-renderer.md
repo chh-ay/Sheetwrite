@@ -26,7 +26,7 @@ canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
 </details>
 
 <details class="api-member" id="cell-renderer-dom" data-pagefind-weight="1">
-<summary><code>dom</code> <span class="api-member-summary">Creates one element when a rendered cell enters the retained DOM window.</span></summary>
+<summary><code>dom</code> <span class="api-member-summary">Creates a fresh, detached element uniquely owned by one retained DOM cell.</span></summary>
 
 ```ts generated
 dom?(c: CellPaintContext): HTMLElement;
