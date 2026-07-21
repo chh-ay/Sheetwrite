@@ -248,12 +248,14 @@ editors?: Record<string, CellEditor>;
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-overscan" data-pagefind-weight="1">
-<summary><code>overscan</code> <span class="api-member-summary">Rows rendered above/below the viewport to absorb fast scrolls.</span></summary>
+<summary><code>overscan</code> <span class="api-member-summary">Extra row and visible-column positions painted on each viewport edge.</span></summary>
 
 ```ts generated
 overscan?: number;
 ```
 
+<p class="api-member-doc">Extra row and visible-column positions painted on each viewport edge.
+Defaults to 6; use 0 to disable the buffer.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-min-columns" data-pagefind-weight="1">

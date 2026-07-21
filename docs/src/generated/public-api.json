@@ -2795,7 +2795,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L81",
+              "source": "src/store.ts#L82",
               "jsDocTags": [],
               "documentation": "Stable public facade and the sole transaction, epoch, policy, and event barrier.",
               "memberDocs": [
@@ -2868,7 +2868,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L57",
+              "source": "src/store.ts#L58",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -4953,7 +4953,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L314",
+              "source": "../core/dist/types/grid.d.ts#L317",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -5003,7 +5003,7 @@
                 },
                 {
                   "name": "distinctValues",
-                  "documentation": "Distinct resolved values of a column (Rust scan), capped at `limit`\n(default 1000) — the data source for a filter-by-values UI."
+                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
                 },
                 {
                   "name": "exportSnapshot",
@@ -5127,7 +5127,7 @@
                 },
                 {
                   "name": "setOverscan",
-                  "documentation": "Live-update the render window overscan (rows/cols painted beyond the\nviewport); `undefined` restores the default."
+                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
                 },
                 {
                   "name": "setPresenceOverlays",
@@ -5585,7 +5585,7 @@
                 },
                 {
                   "name": "overscan",
-                  "documentation": "Rows rendered above/below the viewport to absorb fast scrolls."
+                  "documentation": "Extra row and visible-column positions painted on each viewport edge.\nDefaults to 6; use 0 to disable the buffer."
                 },
                 {
                   "name": "presentation",
@@ -5817,7 +5817,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L314",
+              "source": "../core/dist/types/grid.d.ts#L317",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -5867,7 +5867,7 @@
                 },
                 {
                   "name": "distinctValues",
-                  "documentation": "Distinct resolved values of a column (Rust scan), capped at `limit`\n(default 1000) — the data source for a filter-by-values UI."
+                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
                 },
                 {
                   "name": "exportSnapshot",
@@ -5991,7 +5991,7 @@
                 },
                 {
                   "name": "setOverscan",
-                  "documentation": "Live-update the render window overscan (rows/cols painted beyond the\nviewport); `undefined` restores the default."
+                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
                 },
                 {
                   "name": "setPresenceOverlays",
@@ -6673,7 +6673,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L314",
+              "source": "../core/dist/types/grid.d.ts#L317",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -6723,7 +6723,7 @@
                 },
                 {
                   "name": "distinctValues",
-                  "documentation": "Distinct resolved values of a column (Rust scan), capped at `limit`\n(default 1000) — the data source for a filter-by-values UI."
+                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
                 },
                 {
                   "name": "exportSnapshot",
@@ -6847,7 +6847,7 @@
                 },
                 {
                   "name": "setOverscan",
-                  "documentation": "Live-update the render window overscan (rows/cols painted beyond the\nviewport); `undefined` restores the default."
+                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
                 },
                 {
                   "name": "setPresenceOverlays",

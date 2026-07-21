@@ -9,7 +9,7 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L314</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L317</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>82</span>
@@ -270,12 +270,14 @@ getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
 </details>
 
 <details class="api-member" id="grid-distinct-values" data-pagefind-weight="1">
-<summary><code>distinctValues</code> <span class="api-member-summary">Distinct resolved values of a column (Rust scan), capped at limit (default 1000) — the data source for a filter-by-values UI.</span></summary>
+<summary><code>distinctValues</code> <span class="api-member-summary">Distinct resolved values of a column in first-seen order.</span></summary>
 
 ```ts generated
 distinctValues(col: number, limit?: number): CellScalar[];
 ```
 
+<p class="api-member-doc">Distinct resolved values of a column in first-seen order. Defaults to
+1,000 values for bounded filter menus; pass 0 to request an uncapped scan.</p>
 </details>
 
 <details class="api-member" id="grid-hide-rows" data-pagefind-weight="1">
@@ -621,7 +623,7 @@ getNote(addr: CellAddress): string | null;
 </details>
 
 <details class="api-member" id="grid-set-overscan" data-pagefind-weight="1">
-<summary><code>setOverscan</code> <span class="api-member-summary">Live-update the render window overscan (rows/cols painted beyond the viewport); undefined restores the default.</span></summary>
+<summary><code>setOverscan</code> <span class="api-member-summary">Live-update the render window overscan (row/column positions painted past each edge); undefined restores the default of 6.</span></summary>
 
 ```ts generated
 setOverscan(overscan?: number): void;
