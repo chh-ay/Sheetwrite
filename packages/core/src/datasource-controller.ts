@@ -667,6 +667,10 @@ export class DatasourceController {
   getResourceOwners(): ResourceOwnerBytes[] {
     const rowStateEntries =
       this.loaded.bandCount + this.owners.bandCount + this.visibleWaitStarted.bandCount;
+    const queuedDemandEntries =
+      this.durableDemand.bandCount +
+      (this.viewportDemand === null ? 0 : 1) +
+      this.speculativeDemand.length;
     return [
       {
         owner: "js.datasource.row-state",
@@ -679,7 +683,7 @@ export class DatasourceController {
         owner: "js.datasource.pending-requests",
         logicalBytes: 0,
         allocatedBytes: 0,
-        entries: this.requests.size + this.activeIds.size,
+        entries: this.requests.size + this.activeIds.size + queuedDemandEntries,
         measurement: "entry-count-only",
       },
       {
