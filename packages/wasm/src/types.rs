@@ -4,6 +4,7 @@ use crate::calc::{
     invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast, Func,
 };
 use std::rc::Rc;
+use crate::memory::MemoryOwnerStats;
 
 pub(crate) const KIND_EMPTY: u8 = 0;
 pub(crate) const KIND_NUMBER: u8 = 1;
@@ -332,6 +333,35 @@ impl FormulaEntry {
         self.reads = ReadSet::from_ast(ast, formula_sheet);
         true
     }
+
+    /// Heap allocations owned by this formula entry. The inline entry is
+    /// accounted by the formula hash-table bucket that stores it.
+    pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
+        out.add_payload(self.source.len(), self.source.capacity());
+        out.add_payload(
+            self.reads
+                .cells
+                .len()
+                .saturating_mul(std::mem::size_of::<AbsCellKey>()),
+            self.reads
+                .cells
+                .capacity()
+                .saturating_mul(std::mem::size_of::<AbsCellKey>()),
+        );
+        out.add_payload(
+            self.reads
+                .ranges
+                .len()
+                .saturating_mul(std::mem::size_of::<CellRange>()),
+            self.reads
+                .ranges
+                .capacity()
+                .saturating_mul(std::mem::size_of::<CellRange>()),
+        );
+        if let Some(ast) = &self.ast {
+            ast.heap_memory_stats(out);
+        }
+    }
 }
 
 pub(crate) fn cell_key(row: usize, col: usize) -> Option<CellKey> {
@@ -387,6 +417,16 @@ impl StringPool {
             len: s.len() as u32,
         });
         id
+    }
+}
+
+impl StringPool {
+    pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
+        let mut utf8 = MemoryOwnerStats::default();
+        utf8.add_vec::<u8>(self.bytes.len(), self.bytes.capacity());
+        let mut spans = MemoryOwnerStats::default();
+        spans.add_vec::<PoolSpan>(self.spans.len(), self.spans.capacity());
+        (utf8, spans)
     }
 }
 

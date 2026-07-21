@@ -6,6 +6,7 @@ use crate::sheet::SheetData;
 use crate::types::{
     AbsCellKey, CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT,
 };
+use crate::memory::MemoryOwnerStats;
 
 pub(crate) struct DepIndex {
     exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>>,
@@ -58,6 +59,35 @@ impl DepIndex {
             }
             matches.retain(|group| marks[*group] == current);
         }
+    }
+
+    pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
+        let mut nodes = MemoryOwnerStats::default();
+        let mut edges = MemoryOwnerStats::default();
+        nodes.add_hash_table::<AbsCellKey, Vec<AbsCellKey>>(
+            self.exact_dependents.len(),
+            self.exact_dependents.capacity(),
+        );
+        for dependents in self.exact_dependents.values() {
+            edges.add_vec::<AbsCellKey>(dependents.len(), dependents.capacity());
+        }
+
+        nodes.add_vec::<RangeGroup>(self.range_groups.len(), self.range_groups.capacity());
+        for group in &self.range_groups {
+            edges.add_vec::<AbsCellKey>(group.dependents.len(), group.dependents.capacity());
+        }
+        nodes.add_vec::<RangeSheetIndex>(self.range_sheets.len(), self.range_sheets.capacity());
+        for sheet in &self.range_sheets {
+            nodes.add_vec::<RangeInterval>(
+                sheet.row_intervals.len(),
+                sheet.row_intervals.capacity(),
+            );
+            nodes.add_vec::<RangeInterval>(
+                sheet.col_intervals.len(),
+                sheet.col_intervals.capacity(),
+            );
+        }
+        (nodes, edges)
     }
 }
 

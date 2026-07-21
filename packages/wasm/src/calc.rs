@@ -16,6 +16,8 @@
 //! The evaluator lives on `CellStore` (it needs cell access); this module is the
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
+use crate::memory::MemoryOwnerStats;
+
 /// Matches evaluator depth so parsing cannot admit an expression the engine cannot safely recurse.
 const PARSE_RECURSION_LIMIT: usize = 256;
 
@@ -149,6 +151,57 @@ pub enum Ast {
     Bin(Op, Box<Ast>, Box<Ast>),
     Cmp(CmpOp, Box<Ast>, Box<Ast>),
     Neg(Box<Ast>),
+}
+impl Ast {
+    /// Heap payload owned below an inline AST root. The root itself is already
+    /// included in its formula hash-table bucket.
+    pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
+        match self {
+            Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
+            Ast::NamedRange(value) => add_string_memory(&value.name, out),
+            Ast::SheetCell(sheet, ..) | Ast::SheetRange(sheet, ..) => {
+                add_string_memory(&sheet.name, out);
+            }
+            Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) => {
+                add_string_memory(&sheet.name, out);
+            }
+            Ast::Func(_, args) => add_ast_vec_memory(args, out),
+            Ast::UnknownFunc(name, args) => {
+                add_string_memory(name, out);
+                add_ast_vec_memory(args, out);
+            }
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+                add_boxed_ast_memory(left, out);
+                add_boxed_ast_memory(right, out);
+            }
+            Ast::Neg(inner) => add_boxed_ast_memory(inner, out),
+            Ast::Num(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Cell(..)
+            | Ast::Range(..)
+            | Ast::InvalidRef => {}
+        }
+    }
+}
+
+fn add_string_memory(value: &String, out: &mut MemoryOwnerStats) {
+    out.add_payload(value.len(), value.capacity());
+}
+
+fn add_ast_vec_memory(values: &Vec<Ast>, out: &mut MemoryOwnerStats) {
+    out.add_payload(
+        values.len().saturating_mul(std::mem::size_of::<Ast>()),
+        values.capacity().saturating_mul(std::mem::size_of::<Ast>()),
+    );
+    for value in values {
+        value.heap_memory_stats(out);
+    }
+}
+
+fn add_boxed_ast_memory(value: &Ast, out: &mut MemoryOwnerStats) {
+    out.add_payload(std::mem::size_of::<Ast>(), std::mem::size_of::<Ast>());
+    value.heap_memory_stats(out);
 }
 
 /// Parse column letters (A, B, ..., Z, AA, ...) to a 0-based column index.
