@@ -268,6 +268,91 @@ describe("snapshot persistence boundary", () => {
     expect(error.cause).toBeInstanceOf(SnapshotValidationError);
   });
 
+  it("hydrates multi-cell paged snapshots as clean baseline below the local dirty limit", () => {
+    const snapshot: WorkbookSnapshot = {
+      schemaVersion: 1,
+      workbook: { activeSheet: "s1" },
+      sheets: [
+        {
+          id: "s1",
+          name: "Sheet 1",
+          order: 0,
+          rowCount: 4,
+          columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
+          cells: [
+            {
+              startRow: 0,
+              startCol: 0,
+              rowCount: 3,
+              colCount: 1,
+              cells: [
+                {
+                  rowOffset: 0,
+                  colOffset: 0,
+                  value: { kind: "literal", value: 3 },
+                  style: { bold: true },
+                },
+                { rowOffset: 1, colOffset: 0, value: { kind: "formula", src: "=A1+1" } },
+                {
+                  rowOffset: 2,
+                  colOffset: 0,
+                  value: { kind: "ref", target: { sheet: "s1", row: 0, col: 0 } },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = createGridFromSnapshot(host, snapshot, {
+      datasourceStorage: { mode: "paged", chunkRows: 4, dirtyCellLimit: 1 },
+    });
+    const store = grid.store as SheetwriteStore;
+
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 })).toMatchObject({
+      resolved: 3,
+      style: { bold: true },
+    });
+    expect(store.getFormula({ sheet: "s1", row: 1, col: 0 })).toBe("=A1+1");
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(4);
+    expect(store.getRefTarget({ sheet: "s1", row: 2, col: 0 })).toEqual({
+      sheet: "s1",
+      row: 0,
+      col: 0,
+    });
+    expect(store.getPagedStats("s1")).toMatchObject({
+      loadedCells: 3,
+      dirtyCells: 0,
+    });
+    expect(store.getCellLoadState({ sheet: "s1", row: 0, col: 0 })).toBe("loaded-value");
+
+    const rejected = grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: 10 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 0 },
+          value: { kind: "literal", value: 20 },
+        },
+      ],
+    });
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ resource: "paged-dirty-cells", actual: 2, max: 1 }],
+    });
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(3);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(4);
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    grid.destroy();
+  });
+
   it("applies remote operations observably without local history", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);

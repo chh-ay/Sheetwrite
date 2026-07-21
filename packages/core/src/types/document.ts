@@ -228,7 +228,8 @@ export type MutationIssue =
         | "encoded-bytes"
         | "pending-commits"
         | "pending-operations"
-        | "pending-encoded-bytes";
+        | "pending-encoded-bytes"
+        | "paged-dirty-cells";
       /** Count or incrementally observed encoded bytes at rejection. */
       actual: number;
       /** Configured inclusive ceiling for the resource. */

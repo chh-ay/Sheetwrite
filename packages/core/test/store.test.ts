@@ -1864,6 +1864,79 @@ describe("paged datasource storage", () => {
     expect(store.searchCells("s1", "beta")).toEqual([addr(1, 0)]);
     store.dispose();
   });
+  it("rejects dirty-capacity overflow atomically before formula/ref bookkeeping or events", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1024,
+      dirtyCellLimit: 1,
+    });
+    let events = 0;
+    store.on("change", () => {
+      events += 1;
+    });
+
+    const rejected = store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=1+1" } },
+        { op: "set", addr: addr(1, 0), value: { kind: "ref", target: addr(2, 0) } },
+      ],
+    });
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 2, max: 1 }],
+    });
+    expect(store.getFormula(addr(0, 0))).toBeNull();
+    expect(store.getRefTarget(addr(1, 0))).toBeNull();
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    expect(events).toBe(0);
+
+    const applied = store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=1+1" } }],
+    });
+    expect(applied).toMatchObject({ status: "applied", epoch: 1 });
+    const secondRejected = store.applyTransaction({
+      patches: [{ op: "set", addr: addr(1, 0), value: { kind: "ref", target: addr(2, 0) } }],
+    });
+    expect(secondRejected).toMatchObject({ status: "rejected", epoch: 1 });
+    expect(store.getFormula(addr(0, 0))).toBe("=1+1");
+    expect(store.getRefTarget(addr(1, 0))).toBeNull();
+    expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+    expect(events).toBe(1);
+    store.dispose();
+  });
+
+  it("applies the post-policy subset when it fits the dirty-cell limit", () => {
+    const workbook = makeWorkbook(4);
+    workbook.sheets[0]!.validationRules = [
+      {
+        id: "amount-limit",
+        range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 3, col: 1 } },
+        condition: { kind: "number", min: 0, max: 10 },
+        policy: "reject",
+        allowBlank: false,
+      },
+    ];
+    const store = new SheetwriteStore(workbook, undefined, {
+      storage: "paged",
+      dirtyCellLimit: 1,
+      mutationPolicy: "partial",
+    });
+    const outcome = store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 20 } },
+        { op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=2+2" } },
+      ],
+    });
+    expect(outcome.status).toBe("applied");
+    expect(outcome.status === "applied" ? outcome.transaction.patches : []).toHaveLength(1);
+    expect(outcome.status === "applied" ? outcome.rejections : []).toHaveLength(1);
+    expect(store.getCellLoadState(addr(0, 1))).toBe("unloaded");
+    expect(store.getFormula(addr(0, 0))).toBe("=2+2");
+    expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+    store.dispose();
+  });
 });
 
 describe("validation, protection, and notes metadata", () => {

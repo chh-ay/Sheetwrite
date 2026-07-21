@@ -460,6 +460,13 @@ export class SheetwriteStore implements Store {
       }
     }
 
+    if (source === "local" || options.localReplay === true) {
+      const dirtyCapacityIssue = this.engine.pagedDirtyCapacityIssue(effectiveTx.patches);
+      if (dirtyCapacityIssue) {
+        return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
+      }
+    }
+
     const hasListeners = this.listeners.size > 0;
     const effects = this.engine.applyPatches(
       effectiveTx.patches,

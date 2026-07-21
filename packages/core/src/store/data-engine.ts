@@ -17,6 +17,7 @@ import type {
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
+  MutationIssue,
   MutationPolicyMode,
   NamedRangeSnapshot,
   PackedCellBlock,
@@ -321,6 +322,70 @@ export class StoreDataEngine {
       return this.wasm.isFullyLoaded(this.handleOf(sheet));
     }
     return true;
+  }
+
+  pagedDirtyCapacityIssue(patches: readonly DocumentOp[]): MutationIssue | null {
+    if (this.storageOptions.storage !== "paged") return null;
+    const limit = this.storageOptions.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT;
+    const candidates = new Map<SheetId, Set<number>>();
+    const add = (sheet: SheetId, row: number, col: number): void => {
+      const meta = this.sheetMeta(sheet);
+      if (row < 0 || col < 0 || row >= meta.rowCount || col >= meta.columns.length) return;
+      let cells = candidates.get(sheet);
+      if (!cells) {
+        cells = new Set();
+        candidates.set(sheet, cells);
+      }
+      cells.add(row * meta.columns.length + col);
+    };
+
+    for (const patch of patches) {
+      if (patch.op === "set") {
+        add(patch.addr.sheet, patch.addr.row, patch.addr.col);
+      } else if (patch.op === "setRange") {
+        const range = normalizedRange(patch.range);
+        for (const cell of patch.cells) {
+          add(range.sheet, range.start.row + cell.rowOffset, range.start.col + cell.colOffset);
+        }
+      } else if (patch.op === "setBlock") {
+        const range = normalizedRange(patch.range);
+        for (let row = 0; row < patch.block.rowCount; row++) {
+          for (let col = 0; col < patch.block.colCount; col++) {
+            add(range.sheet, range.start.row + row, range.start.col + col);
+          }
+        }
+      } else if (patch.op === "setRangeStyle" || patch.op === "clearRange") {
+        const range = normalizedRange(patch.range);
+        for (let row = range.start.row; row <= range.end.row; row++) {
+          for (let col = range.start.col; col <= range.end.col; col++) {
+            add(range.sheet, row, col);
+          }
+        }
+      }
+    }
+
+    for (const [sheet, cells] of candidates) {
+      const meta = this.sheetMeta(sheet);
+      const handle = this.handleOf(sheet);
+      let additional = 0;
+      for (const index of cells) {
+        const row = Math.floor(index / meta.columns.length);
+        const col = index % meta.columns.length;
+        if (this.wasm.cellState(handle, row, col) !== 3) additional += 1;
+      }
+      const actual = this.getPagedStats(sheet).dirtyCells + additional;
+      if (actual > limit) {
+        return {
+          kind: "resource-limit",
+          severity: "error",
+          resource: "paged-dirty-cells",
+          actual,
+          max: limit,
+          message: `Paged dirty cells exceed the ${limit} cell limit`,
+        };
+      }
+    }
+    return null;
   }
 
   private requireCompleteQuery(sheet: SheetId): void {
@@ -2127,76 +2192,81 @@ export class StoreDataEngine {
     const formulas: DocumentOp[] = [];
     const references: DocumentOp[] = [];
 
-    for (const sourceSheet of snapshot.sheets) {
-      const handle = this.handleOf(sourceSheet.id);
-      const bulkByColumn = new Map<number, Array<{ row: number; value: string | number }>>();
-      for (const block of sourceSheet.cells) {
-        for (const cell of block.cells) {
-          const addr = {
-            sheet: sourceSheet.id,
-            row: block.startRow + cell.rowOffset,
-            col: block.startCol + cell.colOffset,
-          };
-          const patch: DocumentOp = { op: "set", addr, value: cell.value, style: cell.style };
-          if (cell.value.kind === "formula") {
-            formulas.push(patch);
-          } else if (cell.value.kind === "ref") {
-            references.push(patch);
-          } else if (
-            cell.style === undefined &&
-            (typeof cell.value.value === "number" || typeof cell.value.value === "string")
-          ) {
-            const entries = bulkByColumn.get(addr.col) ?? [];
-            entries.push({ row: addr.row, value: cell.value.value });
-            bulkByColumn.set(addr.col, entries);
-          } else {
-            literalExceptions.push(patch);
+    this.wasm.beginPageLoad();
+    try {
+      for (const sourceSheet of snapshot.sheets) {
+        const handle = this.handleOf(sourceSheet.id);
+        const bulkByColumn = new Map<number, Array<{ row: number; value: string | number }>>();
+        for (const block of sourceSheet.cells) {
+          for (const cell of block.cells) {
+            const addr = {
+              sheet: sourceSheet.id,
+              row: block.startRow + cell.rowOffset,
+              col: block.startCol + cell.colOffset,
+            };
+            const patch: DocumentOp = { op: "set", addr, value: cell.value, style: cell.style };
+            if (cell.value.kind === "formula") {
+              formulas.push(patch);
+            } else if (cell.value.kind === "ref") {
+              references.push(patch);
+            } else if (
+              cell.style === undefined &&
+              (typeof cell.value.value === "number" || typeof cell.value.value === "string")
+            ) {
+              const entries = bulkByColumn.get(addr.col) ?? [];
+              entries.push({ row: addr.row, value: cell.value.value });
+              bulkByColumn.set(addr.col, entries);
+            } else {
+              literalExceptions.push(patch);
+            }
+          }
+        }
+
+        for (const [col, entries] of bulkByColumn) {
+          entries.sort((left, right) => left.row - right.row);
+          for (let index = 0; index < entries.length; ) {
+            const first = entries[index]!;
+            const kind = typeof first.value;
+            let end = index + 1;
+            while (
+              end < entries.length &&
+              entries[end]!.row === entries[end - 1]!.row + 1 &&
+              typeof entries[end]!.value === kind
+            ) {
+              end += 1;
+            }
+            const run = entries.slice(index, end);
+            if (kind === "number") {
+              this.wasm.setColumnNumbers(
+                handle,
+                col,
+                first.row,
+                Float64Array.from(run, (entry) => entry.value as number),
+                0,
+              );
+            } else {
+              const values = run.map((entry) => entry.value as string);
+              const lengths = Uint32Array.from(values, (value) => value.length);
+              this.wasm.setColumnStringsPacked(handle, col, first.row, values.join(""), lengths, 0);
+            }
+            index = end;
           }
         }
       }
 
-      for (const [col, entries] of bulkByColumn) {
-        entries.sort((left, right) => left.row - right.row);
-        for (let index = 0; index < entries.length; ) {
-          const first = entries[index]!;
-          const kind = typeof first.value;
-          let end = index + 1;
-          while (
-            end < entries.length &&
-            entries[end]!.row === entries[end - 1]!.row + 1 &&
-            typeof entries[end]!.value === kind
-          ) {
-            end += 1;
-          }
-          const run = entries.slice(index, end);
-          if (kind === "number") {
-            this.wasm.setColumnNumbers(
-              handle,
-              col,
-              first.row,
-              Float64Array.from(run, (entry) => entry.value as number),
-              0,
-            );
-          } else {
-            const values = run.map((entry) => entry.value as string);
-            const lengths = Uint32Array.from(values, (value) => value.length);
-            this.wasm.setColumnStringsPacked(handle, col, first.row, values.join(""), lengths, 0);
-          }
-          index = end;
-        }
+      for (const patch of literalExceptions) this.applyPatch(patch, null);
+      for (const patch of formulas) this.applyPatch(patch, null);
+      for (const patch of references) this.applyPatch(patch, null);
+      for (const sheet of this.workbook.sheets) {
+        const handle = this.handleOf(sheet.id);
+        this.windowReader.conditionalRulesChanged(sheet.id);
+        this.wasm.recompute(handle);
       }
-    }
-
-    for (const patch of literalExceptions) this.applyPatch(patch, null);
-    for (const patch of formulas) this.applyPatch(patch, null);
-    for (const patch of references) this.applyPatch(patch, null);
-    for (const sheet of this.workbook.sheets) {
-      const handle = this.handleOf(sheet.id);
-      this.windowReader.conditionalRulesChanged(sheet.id);
-      this.wasm.recompute(handle);
-    }
-    if (this.refs.hasRefs()) {
-      this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+      if (this.refs.hasRefs()) {
+        this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+      }
+    } finally {
+      this.wasm.endPageLoad();
     }
   }
 
