@@ -3,7 +3,7 @@
   "resourceSchemaVersion": 2,
   "mode": "full",
   "provenance": {
-    "commit": "c69ee2b3cb42caf53c01cf6a88b39852dadd9d54",
+    "commit": "9f77f0ca91b4344ebdc46ff8105f6b94bba6c4c4",
     "runtime": "Bun 1.3.14 linux/x64",
     "forcedGcCheckpoints": [
       "before",
@@ -15,7 +15,7 @@
     {
       "id": "dense-ingest",
       "operation": "ingest",
-      "durationMs": 4787.653716,
+      "durationMs": 4640.859488,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -168,9 +168,9 @@
           "jsOwners": [],
           "boundary": [],
           "runtime": {
-            "usedJSHeapSize": 9038236,
+            "usedJSHeapSize": 9021048,
             "arrayBufferBytes": 541262,
-            "externalBytes": 3868136,
+            "externalBytes": 3851741,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -493,9 +493,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 1741085089,
-            "arrayBufferBytes": 902383054,
-            "externalBytes": 1301411393,
+            "usedJSHeapSize": 1742722015,
+            "arrayBufferBytes": 541598,
+            "externalBytes": 557773839,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -818,9 +818,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 1902381736,
+            "usedJSHeapSize": 1742722015,
             "arrayBufferBytes": 459293598,
-            "externalBytes": 951555672,
+            "externalBytes": 951555025,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -1006,9 +1006,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 1732046853,
-            "arrayBufferBytes": 901841792,
-            "externalBytes": 1297543257,
+            "usedJSHeapSize": 1733700967,
+            "arrayBufferBytes": 336,
+            "externalBytes": 553922098,
             "browserBackingStoreBytes": null
           }
         },
@@ -1188,9 +1188,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 161296647,
-            "arrayBufferBytes": -443089456,
-            "externalBytes": -349855721,
+            "usedJSHeapSize": 0,
+            "arrayBufferBytes": 458752000,
+            "externalBytes": 393781186,
             "browserBackingStoreBytes": null
           }
         }
@@ -1201,7 +1201,7 @@
     {
       "id": "paged-startup",
       "operation": "startup",
-      "durationMs": 3.463351000000003,
+      "durationMs": 3.777491999999995,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -1354,9 +1354,9 @@
           "jsOwners": [],
           "boundary": [],
           "runtime": {
-            "usedJSHeapSize": 9062685,
+            "usedJSHeapSize": 9087425,
             "arrayBufferBytes": 541262,
-            "externalBytes": 3867915,
+            "externalBytes": 3882432,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -1679,9 +1679,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9062685,
+            "usedJSHeapSize": 9087425,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 5113211,
+            "externalBytes": 5127728,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -2004,9 +2004,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9062685,
+            "usedJSHeapSize": 9087425,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 5231092,
+            "externalBytes": 5246247,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -2376,7 +2376,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": 0,
-            "externalBytes": 117881,
+            "externalBytes": 118519,
             "browserBackingStoreBytes": null
           }
         }
@@ -2387,7 +2387,7 @@
     {
       "id": "first-page",
       "operation": "ingest",
-      "durationMs": 6.064926000000014,
+      "durationMs": 5.183332000000007,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -2704,9 +2704,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9081294,
+            "usedJSHeapSize": 9024482,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 5201467,
+            "externalBytes": 5186875,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -3029,9 +3029,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9081294,
+            "usedJSHeapSize": 9024482,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 5463611,
+            "externalBytes": 5449019,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -3354,9 +3354,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9081294,
+            "usedJSHeapSize": 9024482,
             "arrayBufferBytes": 1983278,
-            "externalBytes": 5878889,
+            "externalBytes": 5864381,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -3726,7 +3726,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": 262256,
-            "externalBytes": 415278,
+            "externalBytes": 415362,
             "browserBackingStoreBytes": null
           }
         }
@@ -3737,7 +3737,7 @@
     {
       "id": "deep-jump",
       "operation": "scroll",
-      "durationMs": 3.826168999999993,
+      "durationMs": 3.3807150000000092,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -4054,9 +4054,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 8898514,
+            "usedJSHeapSize": 9037829,
             "arrayBufferBytes": 541374,
-            "externalBytes": 4373530,
+            "externalBytes": 4388336,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -4379,9 +4379,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 8898514,
+            "usedJSHeapSize": 9037829,
             "arrayBufferBytes": 1983278,
-            "externalBytes": 5815434,
+            "externalBytes": 5830240,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -4704,9 +4704,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 8898514,
+            "usedJSHeapSize": 9037829,
             "arrayBufferBytes": 2310958,
-            "externalBytes": 6527414,
+            "externalBytes": 6543691,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -5076,7 +5076,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": 327680,
-            "externalBytes": 711980,
+            "externalBytes": 713451,
             "browserBackingStoreBytes": null
           }
         }
@@ -5087,7 +5087,7 @@
     {
       "id": "dirty-edit-clear",
       "operation": "dirty-clear",
-      "durationMs": 20.270410000000012,
+      "durationMs": 21.219100999999995,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -5404,9 +5404,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9008592,
+            "usedJSHeapSize": 9046586,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 5187792,
+            "externalBytes": 5187794,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -5729,9 +5729,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9008592,
+            "usedJSHeapSize": 9046586,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 5187792,
+            "externalBytes": 5187794,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -6054,9 +6054,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 48737187,
+            "usedJSHeapSize": 48016958,
             "arrayBufferBytes": 541486,
-            "externalBytes": 10276647,
+            "externalBytes": 10276324,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -6424,9 +6424,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 39728595,
+            "usedJSHeapSize": 38970372,
             "arrayBufferBytes": -1179536,
-            "externalBytes": 5088855,
+            "externalBytes": 5088530,
             "browserBackingStoreBytes": null
           }
         }
@@ -6437,7 +6437,7 @@
     {
       "id": "formula-recompute",
       "operation": "formula-recompute",
-      "durationMs": 45.72250500000007,
+      "durationMs": 32.973862,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -6754,9 +6754,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 62310759,
+            "usedJSHeapSize": 55052519,
             "arrayBufferBytes": 4670142,
-            "externalBytes": 12259132,
+            "externalBytes": 12274504,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -7079,9 +7079,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 62310759,
+            "usedJSHeapSize": 55052519,
             "arrayBufferBytes": 18236206,
-            "externalBytes": 35262380,
+            "externalBytes": 35277752,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -7404,9 +7404,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 62310759,
+            "usedJSHeapSize": 55052519,
             "arrayBufferBytes": 14107438,
-            "externalBytes": 31180863,
+            "externalBytes": 31196225,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -7776,7 +7776,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": -4128768,
-            "externalBytes": -4081517,
+            "externalBytes": -4081527,
             "browserBackingStoreBytes": null
           }
         }
@@ -7794,7 +7794,7 @@
     {
       "id": "exact-auto-fit",
       "operation": "auto-fit",
-      "durationMs": 40.67357000000004,
+      "durationMs": 43.55935100000005,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -8146,9 +8146,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 194813945,
+            "usedJSHeapSize": 194806773,
             "arrayBufferBytes": 40846014,
-            "externalBytes": 89816883,
+            "externalBytes": 89806355,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -8506,9 +8506,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 194813945,
+            "usedJSHeapSize": 194806773,
             "arrayBufferBytes": 40846014,
-            "externalBytes": 89816883,
+            "externalBytes": 89806355,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -8866,9 +8866,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 194813945,
+            "usedJSHeapSize": 194806773,
             "arrayBufferBytes": 40846014,
-            "externalBytes": 90547326,
+            "externalBytes": 90537492,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -9298,7 +9298,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": 0,
-            "externalBytes": 730443,
+            "externalBytes": 731137,
             "browserBackingStoreBytes": null
           }
         }
@@ -9309,7 +9309,7 @@
     {
       "id": "export",
       "operation": "export",
-      "durationMs": 155.86191000000002,
+      "durationMs": 166.98099399999995,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -9626,9 +9626,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 206107623,
+            "usedJSHeapSize": 206115843,
             "arrayBufferBytes": 541598,
-            "externalBytes": 46416746,
+            "externalBytes": 46425687,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -9951,9 +9951,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 124539479,
+            "usedJSHeapSize": 109376654,
             "arrayBufferBytes": 40846350,
-            "externalBytes": 98754295,
+            "externalBytes": 94323364,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -10276,9 +10276,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 124539479,
+            "usedJSHeapSize": 125240437,
             "arrayBufferBytes": 40846014,
-            "externalBytes": 87585267,
+            "externalBytes": 87591806,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -10464,9 +10464,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": -81568144,
+            "usedJSHeapSize": -96739189,
             "arrayBufferBytes": 40304752,
-            "externalBytes": 52337549,
+            "externalBytes": 47897677,
             "browserBackingStoreBytes": null
           }
         },
@@ -10646,9 +10646,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 0,
+            "usedJSHeapSize": 15863783,
             "arrayBufferBytes": -336,
-            "externalBytes": -11169028,
+            "externalBytes": -6731558,
             "browserBackingStoreBytes": null
           }
         }
@@ -10659,7 +10659,7 @@
     {
       "id": "snapshot",
       "operation": "snapshot",
-      "durationMs": 141.23776099999998,
+      "durationMs": 134.501977,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -10976,9 +10976,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 180950676,
+            "usedJSHeapSize": 210306085,
             "arrayBufferBytes": 541598,
-            "externalBytes": 46431527,
+            "externalBytes": 46425832,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -11301,9 +11301,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 142876476,
+            "usedJSHeapSize": 141966445,
             "arrayBufferBytes": 40846350,
-            "externalBytes": 99932140,
+            "externalBytes": 99926445,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -11626,9 +11626,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 142876476,
+            "usedJSHeapSize": 141966445,
             "arrayBufferBytes": 40846014,
-            "externalBytes": 88534813,
+            "externalBytes": 88529174,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -11814,7 +11814,7 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": -38074200,
+            "usedJSHeapSize": -68339640,
             "arrayBufferBytes": 40304752,
             "externalBytes": 53500613,
             "browserBackingStoreBytes": null
@@ -11998,7 +11998,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": -336,
-            "externalBytes": -11397327,
+            "externalBytes": -11397271,
             "browserBackingStoreBytes": null
           }
         }
@@ -12009,7 +12009,7 @@
     {
       "id": "sort-filter-refusal",
       "operation": "scroll",
-      "durationMs": 5.154290000000003,
+      "durationMs": 4.174664000000007,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -12361,9 +12361,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9074881,
+            "usedJSHeapSize": 9035233,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 22673391,
+            "externalBytes": 22700755,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -12721,9 +12721,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9074881,
+            "usedJSHeapSize": 9035233,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 22673391,
+            "externalBytes": 22700755,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -13081,9 +13081,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 9074881,
+            "usedJSHeapSize": 9035233,
             "arrayBufferBytes": 1721022,
-            "externalBytes": 22837858,
+            "externalBytes": 22836233,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -13513,7 +13513,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": 0,
-            "externalBytes": 164467,
+            "externalBytes": 135478,
             "browserBackingStoreBytes": null
           }
         }
@@ -13524,7 +13524,7 @@
     {
       "id": "teardown",
       "operation": "teardown",
-      "durationMs": 5.710163000000023,
+      "durationMs": 4.351373999999964,
       "phases": {
         "before": {
           "schemaVersion": 2,
@@ -13841,9 +13841,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 210426693,
+            "usedJSHeapSize": 210436392,
             "arrayBufferBytes": 541598,
-            "externalBytes": 46410952,
+            "externalBytes": 46425435,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -14166,9 +14166,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 210426693,
+            "usedJSHeapSize": 210436392,
             "arrayBufferBytes": 40846350,
-            "externalBytes": 86715704,
+            "externalBytes": 86730187,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -14427,9 +14427,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 210426693,
+            "usedJSHeapSize": 210436392,
             "arrayBufferBytes": 40846238,
-            "externalBytes": 86764440,
+            "externalBytes": 86778954,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -14688,9 +14688,9 @@
             }
           ],
           "runtime": {
-            "usedJSHeapSize": 210426693,
+            "usedJSHeapSize": 210436392,
             "arrayBufferBytes": 40846238,
-            "externalBytes": 86764440,
+            "externalBytes": 86778954,
             "browserBackingStoreBytes": null
           },
           "totals": {
@@ -15060,7 +15060,7 @@
           "runtime": {
             "usedJSHeapSize": 0,
             "arrayBufferBytes": -112,
-            "externalBytes": 48736,
+            "externalBytes": 48767,
             "browserBackingStoreBytes": null
           }
         }
@@ -15080,7 +15080,7 @@
       "before": 20971520,
       "after": 15010043,
       "timingBeforeMs": 1044.660382,
-      "timingAfterMs": 4787.653716,
+      "timingAfterMs": 4640.859488,
       "budgetBefore": 20971520,
       "budgetAfter": 16777216,
       "profileArtifact": null
