@@ -14,15 +14,14 @@ otherwise.
 
 ### Live handlers
 `handlers` is held **by reference**, not copied. Every event reads the
-object's *current* fields (`handlers.onGridChange?.(…)`), so a host swaps
-callbacks across renders by **mutating the fields of the same object** it
-passed in — never by replacing the object, which the controller would not
-see. This is what lets a framework feed fresh closures each render without
-tearing the grid down and rebuilding it.
+object's *current* fields (`handlers.onGridChange?.(…)`), so a host may swap
+callbacks without rebuilding the grid. Framework adapters must mutate the
+shared object only from their commit lifecycle; mutating it during render can
+expose callbacks from work that never commits.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L104</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L103</code></dd></div>
 </dl>
 
 ## Declaration

@@ -935,21 +935,21 @@ bun run --filter @sheetwrite/bench bench:formula
 <div class="evidence-available"><strong>Validated evidence.</strong> Package tarball and bundler-output sizes, gated by absolute budgets in CI.</div>
 
 <dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Captured</dt><dd>2026-07-19 10:35 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>848e46a0f350</code> clean worktree</dd></div>
+<div><dt>Captured</dt><dd>2026-07-21 18:04 UTC</dd></div>
+<div><dt>Commit</dt><dd><code>a37d73110d50</code> clean worktree</dd></div>
 <div><dt>Raw artifact</dt><dd><code>test-results/delivery-size/size-report.json</code></dd></div>
 </dl>
 
 | Package | Tarball | Unpacked |
 | --- | ---: | ---: |
-| `@sheetwrite/core` | 372.4 KiB | 1958.3 KiB |
-| `@sheetwrite/react` | 7.0 KiB | 22.0 KiB |
-| `@sheetwrite/svelte` | 5.2 KiB | 14.6 KiB |
-| `@sheetwrite/vue` | 8.6 KiB | 28.5 KiB |
-| `@sheetwrite/wasm` | 180.5 KiB | 490.4 KiB |
-| `@sheetwrite/xlsx` | 75.0 KiB | 366.1 KiB |
+| `@sheetwrite/core` | 384.2 KiB | 2034.2 KiB |
+| `@sheetwrite/react` | 7.7 KiB | 25.1 KiB |
+| `@sheetwrite/svelte` | 5.3 KiB | 15.2 KiB |
+| `@sheetwrite/vue` | 8.9 KiB | 30.2 KiB |
+| `@sheetwrite/wasm` | 180.4 KiB | 490.1 KiB |
+| `@sheetwrite/xlsx` | 75.1 KiB | 366.9 KiB |
 
-A minimal Vite app that renders a grid ships 85.6 KiB of gzipped JavaScript.
+A minimal Vite app that renders a grid ships 87.8 KiB of gzipped JavaScript.
 
 Reproduce with:
 
