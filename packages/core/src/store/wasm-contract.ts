@@ -1,14 +1,16 @@
-import type { CellStore, RangeSnapshot, WindowView } from "@sheetwrite/wasm";
+import type { CellStore, RangeSnapshot, SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
 /** Internal typed subset added by the generated WASM store at runtime. */
 export type RecomputingCellStore = CellStore & {
   recompute(sheet: number): void;
+  recomputeChanged(): void;
   setSheetName(sheet: number, id: string, name: string): void;
   renameSheet(sheet: number, id: string, name: string): boolean;
   removeSheet(sheet: number): boolean;
   isSheetAlive(sheet: number): boolean;
   insertCols(sheet: number, at: number, count: number): void;
   formulaSource(sheet: number, row: number, col: number): string | undefined;
+  referenceTarget(sheet: number, row: number, col: number): Uint32Array | undefined;
   setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
   recomputeVolatile(serial: number): void;
   setNamedRange(
@@ -50,7 +52,27 @@ export type RecomputingCellStore = CellStore & {
     numbers: Float64Array,
     texts: string[],
     styles: Uint32Array,
-  ): boolean;
+    formulaOffsets: Uint32Array,
+    formulaSources: string[],
+    referenceOffsets: Uint32Array,
+    referenceTargets: Uint32Array,
+  ): number;
+  setSparseBlock(
+    sheet: number,
+    startRow: number,
+    startCol: number,
+    rows: number,
+    cols: number,
+    offsets: Uint32Array,
+    kinds: Uint8Array,
+    numbers: Float64Array,
+    texts: string[],
+    styles: Uint32Array,
+    formulaOffsets: Uint32Array,
+    formulaSources: string[],
+    referenceOffsets: Uint32Array,
+    referenceTargets: Uint32Array,
+  ): number;
   clearRange(
     sheet: number,
     r0: number,
@@ -77,6 +99,13 @@ export type RecomputingCellStore = CellStore & {
     rows: number,
     cols: number,
   ): RangeSnapshot | undefined;
+  captureSources(
+    sheet: number,
+    r0: number,
+    c0: number,
+    rows: number,
+    cols: number,
+  ): SourceSnapshot | undefined;
   snapshotNumbers(snapshot: RangeSnapshot): Float64Array;
   snapshotTexts(snapshot: RangeSnapshot): string[];
   restoreRange(sheet: number, r0: number, c0: number, snapshot: RangeSnapshot): boolean;

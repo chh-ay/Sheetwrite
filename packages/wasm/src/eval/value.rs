@@ -25,6 +25,7 @@ pub(super) fn cached_formula_value(
             .map(Value::text)
             .unwrap_or(Value::Error(FormulaError::Ref)),
         FormulaValueKind::Bool => Value::Bool(sheet.num_at(index) != 0.0),
+        FormulaValueKind::Blank => Value::Blank,
     }
 }
 

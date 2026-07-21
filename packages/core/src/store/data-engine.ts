@@ -1,7 +1,11 @@
 import { CellStore, isLoaded, type RangeSnapshot } from "@sheetwrite/wasm";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { dateToSerial } from "../date-serial.js";
-import { cellKey, type LiteralLookup, parseCellKey, ReferenceGraph } from "../reference.js";
+import {
+  consumeSourceSnapshot,
+  type RangeSourceProjection,
+  referenceTargetFromPacked,
+} from "../reference.js";
 import {
   BoundaryResourceAccounting,
   createRuntimeResourceSnapshot,
@@ -176,8 +180,7 @@ export class StoreDataEngine {
   private readonly storageOptions: SheetwriteStoreOptions;
   private readonly handles = new Map<SheetId, number>();
   private readonly styles = new StyleDictionary();
-  private readonly refs = new ReferenceGraph((addr, value) => this.writeRefShadow(addr, value));
-  private readonly formulaSrc = new Map<string, string>();
+  private readonly sheetIdsByHandle: SheetId[] = [];
   private readonly view: StoreViewState;
   private readonly windowReader: StoreWindowReader;
   private readonly snapshotCodec: StoreSnapshotCodec;
@@ -215,8 +218,7 @@ export class StoreDataEngine {
     this.snapshotCodec = new StoreSnapshotCodec(
       workbook,
       this.windowReader,
-      this.formulaSrc,
-      this.refs,
+      (sheet, rowCount, colCount) => this.captureSourceProjection(sheet, 0, 0, rowCount, colCount),
     );
     for (const sheet of workbook.sheets) {
       const handle = this.allocateSheet(sheet.columns.length, sheet.rowCount);
@@ -228,6 +230,7 @@ export class StoreDataEngine {
       );
       this.wasm.setSheetName(handle, sheet.id, sheet.name);
       this.handles.set(sheet.id, handle);
+      this.sheetIdsByHandle[handle] = sheet.id;
     }
     for (const namedRange of workbook.namedRanges ?? []) {
       if (!this.syncNamedRange(namedRange)) {
@@ -396,6 +399,18 @@ export class StoreDataEngine {
     const handle = this.handles.get(sheet);
     if (handle === undefined) throw new Error(`unknown sheet: ${sheet}`);
     return handle;
+  }
+
+  private captureSourceProjection(
+    sheet: SheetId,
+    rowStart: number,
+    colStart: number,
+    rows: number,
+    cols: number,
+  ): RangeSourceProjection | null {
+    this.noteRangeMutationFfi();
+    const snapshot = this.wasm.captureSources(this.handleOf(sheet), rowStart, colStart, rows, cols);
+    return snapshot ? consumeSourceSnapshot(snapshot, this.sheetIdsByHandle) : null;
   }
 
   private namedRangeScope(scope: SheetId | undefined): number {
@@ -1076,33 +1091,6 @@ export class StoreDataEngine {
     if (capability.status === "incomplete") throw new IncompleteDataError(sheet, capability);
   }
 
-  /**
-   * Write a plain reference's resolved value into its WASM cell as a derived
-   * "shadow" literal, preserving the cell's style. Shadows keep the render
-   * window, sort/filter/search, and formula evaluation consistent with the
-   * displayed value without a JS overlay pass — the window stays transferable.
-   */
-  private writeRefShadow(addr: CellAddress, value: CellScalar): void {
-    const handle = this.handles.get(addr.sheet);
-    if (handle === undefined) return;
-
-    this.wasm.beginPageLoad();
-    try {
-      const style = this.wasm.styleIdAt(handle, addr.row, addr.col);
-      if (typeof value === "number") {
-        this.wasm.setNumber(handle, addr.row, addr.col, value, style);
-      } else if (typeof value === "boolean") {
-        this.wasm.setBool(handle, addr.row, addr.col, value, style);
-      } else if (typeof value === "string") {
-        this.wasm.setString(handle, addr.row, addr.col, value, style);
-      } else {
-        this.wasm.clearCell(handle, addr.row, addr.col, style);
-      }
-    } finally {
-      this.wasm.endPageLoad();
-    }
-  }
-
   private sheetMeta(sheet: SheetId) {
     const meta = this.workbook.sheets.find((s) => s.id === sheet);
     if (!meta) throw new Error(`unknown sheet: ${sheet}`);
@@ -1152,34 +1140,32 @@ export class StoreDataEngine {
     this.rangeMutationStats.historySnapshots += 1;
     this.rangeMutationStats.historySnapshotBytes += resource.byteLength();
 
-    const formulas: Array<[number, string]> = [];
-    for (const [key, source] of this.formulaSrc) {
-      const addr = parseCellKey(key);
-      if (
-        addr.sheet === range.sheet &&
-        addr.row >= range.start.row &&
-        addr.row <= range.end.row &&
-        addr.col >= range.start.col &&
-        addr.col <= range.end.col
-      ) {
-        formulas.push([(addr.row - range.start.row) * cols + addr.col - range.start.col, source]);
-      }
+    const formulaCoordinates = resource.formulaOffsets();
+    const formulaSources = resource.formulaSources();
+    const formulas: Array<[number, string]> = new Array(formulaSources.length);
+    for (let index = 0; index < formulaSources.length; index++) {
+      const coordinate = index * 2;
+      formulas[index] = [
+        formulaCoordinates[coordinate]! * cols + formulaCoordinates[coordinate + 1]!,
+        formulaSources[index]!,
+      ];
     }
 
-    const refs: Array<[number, CellAddress]> = [];
-    for (const [source, target] of this.refs.entries()) {
-      if (
-        source.sheet === range.sheet &&
-        source.row >= range.start.row &&
-        source.row <= range.end.row &&
-        source.col >= range.start.col &&
-        source.col <= range.end.col
-      ) {
-        refs.push([
-          (source.row - range.start.row) * cols + source.col - range.start.col,
-          { ...target },
-        ]);
+    const referenceCoordinates = resource.referenceOffsets();
+    const referenceTargets = resource.referenceTargets();
+    const refs: Array<[number, CellAddress]> = new Array(referenceCoordinates.length / 2);
+    for (let index = 0; index < refs.length; index++) {
+      const coordinate = index * 2;
+      const packedTarget = referenceTargets.subarray(index * 3, index * 3 + 3);
+      const target = referenceTargetFromPacked(packedTarget, this.sheetIdsByHandle);
+      if (!target) {
+        resource.free();
+        throw new Error("history snapshot contains an unknown reference target");
       }
+      refs[index] = [
+        referenceCoordinates[coordinate]! * cols + referenceCoordinates[coordinate + 1]!,
+        target,
+      ];
     }
 
     let disposed = false;
@@ -1196,8 +1182,6 @@ export class StoreDataEngine {
         const textsColumnMajor = this.wasm.snapshotTexts(resource);
         const stylesColumnMajor = resource.styleIds();
         const values: CellScalar[] = new Array(rows * cols);
-        const numbers = new Float64Array(rows * cols);
-        const texts: string[] = new Array(rows * cols);
         const styleIds: number[] = new Array(rows * cols);
         const styleTable: CellStyle[] = [];
         const styleLookup = new Map<number, number>();
@@ -1206,14 +1190,16 @@ export class StoreDataEngine {
             const source = col * rows + row;
             const offset = row * cols + col;
             const kind = kindsColumnMajor[source]!;
-            numbers[offset] = numbersColumnMajor[source]!;
-            texts[offset] = textsColumnMajor[source]!;
+            const number = numbersColumnMajor[source]!;
+            const text = textsColumnMajor[source]!;
             values[offset] =
               kind === KIND_NUMBER
-                ? numbers[offset]!
-                : kind === KIND_STRING
-                  ? texts[offset]!
-                  : null;
+                ? number
+                : kind === KIND_BOOL
+                  ? number !== 0
+                  : kind === KIND_STRING
+                    ? text
+                    : null;
             const storeStyleId = stylesColumnMajor[source]!;
             let tableId = styleLookup.get(storeStyleId);
             if (tableId === undefined) {
@@ -1260,20 +1246,20 @@ export class StoreDataEngine {
   }
 
   getCell(addr: CellAddress): ResolvedCell {
-    const raw = this.rawCell(addr);
-    const key = cellKey(addr);
-    if (this.refs.isRef(key)) return { resolved: this.refs.resolved(key), style: raw.style };
-    return raw;
+    return this.rawCell(addr);
   }
 
   /** The formula source at `addr`, or null if the cell isn't a formula. */
   getFormula(addr: CellAddress): string | null {
-    return this.formulaSrc.get(cellKey(addr)) ?? null;
+    return this.wasm.formulaSource(this.handleOf(addr.sheet), addr.row, addr.col) ?? null;
   }
 
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null {
-    return this.refs.targetOf(cellKey(addr));
+    return referenceTargetFromPacked(
+      this.wasm.referenceTarget(this.handleOf(addr.sheet), addr.row, addr.col),
+      this.sheetIdsByHandle,
+    );
   }
 
   recomputeVolatile(now: Date): void {
@@ -1445,33 +1431,6 @@ export class StoreDataEngine {
     );
   }
 
-  private clearHostValuesInRange(range: Range): void {
-    const bounds = normalizedRange(range);
-    for (const key of this.formulaSrc.keys()) {
-      const addr = parseCellKey(key);
-      if (
-        addr.sheet === bounds.sheet &&
-        addr.row >= bounds.start.row &&
-        addr.row <= bounds.end.row &&
-        addr.col >= bounds.start.col &&
-        addr.col <= bounds.end.col
-      ) {
-        this.formulaSrc.delete(key);
-      }
-    }
-    for (const [source] of this.refs.entries()) {
-      if (
-        source.sheet === bounds.sheet &&
-        source.row >= bounds.start.row &&
-        source.row <= bounds.end.row &&
-        source.col >= bounds.start.col &&
-        source.col <= bounds.end.col
-      ) {
-        this.refs.removeRef(cellKey(source));
-      }
-    }
-  }
-
   viewRowCount(sheet: SheetId): number {
     return this.view.viewRowCount(sheet);
   }
@@ -1489,6 +1448,136 @@ export class StoreDataEngine {
     meta.columns.push(...additions);
   }
 
+  private writePackedBlock(bounds: Range, block: PackedCellBlock): boolean {
+    const rows = bounds.end.row - bounds.start.row + 1;
+    const cols = bounds.end.col - bounds.start.col + 1;
+    const cellCount = rows * cols;
+    const kinds = new Uint8Array(cellCount);
+    const numbers = new Float64Array(cellCount);
+    const texts: string[] = new Array(cellCount);
+    const wasmStyles = new Uint32Array(cellCount);
+    const styleTable = block.styleTable ?? [];
+    for (let offset = 0; offset < cellCount; offset++) {
+      const value = block.values[offset]!;
+      if (value === null || value === undefined) {
+        texts[offset] = "";
+      } else if (typeof value === "number") {
+        kinds[offset] = KIND_NUMBER;
+        numbers[offset] = value;
+        texts[offset] = "";
+      } else if (typeof value === "boolean") {
+        kinds[offset] = KIND_BOOL;
+        numbers[offset] = value ? 1 : 0;
+        texts[offset] = "";
+      } else {
+        kinds[offset] = KIND_STRING;
+        texts[offset] = value;
+      }
+      wasmStyles[offset] = this.styles.intern(
+        block.styleIds === undefined ? undefined : styleTable[block.styleIds[offset]!],
+      );
+    }
+
+    const formulas = block.formulas ?? [];
+    const refs = block.refs ?? [];
+    const referenceTargets = new Uint32Array(refs.length * 3);
+    for (let index = 0; index < refs.length; index++) {
+      const target = refs[index]![1];
+      const targetHandle = this.handles.get(target.sheet);
+      if (targetHandle === undefined || !this.isCellInBounds(target)) return false;
+      const packed = index * 3;
+      referenceTargets[packed] = targetHandle;
+      referenceTargets[packed + 1] = target.row;
+      referenceTargets[packed + 2] = target.col;
+    }
+
+    this.noteRangeMutationFfi(cellCount);
+    return (
+      this.wasm.setBlock(
+        this.handleOf(bounds.sheet),
+        bounds.start.row,
+        bounds.start.col,
+        rows,
+        cols,
+        kinds,
+        numbers,
+        texts,
+        wasmStyles,
+        Uint32Array.from(formulas, ([offset]) => offset),
+        formulas.map(([, source]) => source),
+        Uint32Array.from(refs, ([offset]) => offset),
+        referenceTargets,
+      ) === 0
+    );
+  }
+
+  private writeSparseBlock(
+    bounds: Range,
+    cells: readonly { offset: number; value: CellValue; style?: CellStyle }[],
+  ): boolean {
+    const offsets = new Uint32Array(cells.length);
+    const kinds = new Uint8Array(cells.length);
+    const numbers = new Float64Array(cells.length);
+    const texts: string[] = new Array(cells.length);
+    const styles = new Uint32Array(cells.length);
+    const formulaOffsets: number[] = [];
+    const formulaSources: string[] = [];
+    const referenceOffsets: number[] = [];
+    const referenceTargets: number[] = [];
+    for (let index = 0; index < cells.length; index++) {
+      const cell = cells[index]!;
+      offsets[index] = cell.offset;
+      styles[index] = this.styles.intern(cell.style);
+      if (cell.value.kind === "formula") {
+        formulaOffsets.push(cell.offset);
+        formulaSources.push(cell.value.src);
+        texts[index] = "";
+      } else if (cell.value.kind === "ref") {
+        const targetHandle = this.handles.get(cell.value.target.sheet);
+        if (targetHandle === undefined || !this.isCellInBounds(cell.value.target)) return false;
+        referenceOffsets.push(cell.offset);
+        referenceTargets.push(targetHandle, cell.value.target.row, cell.value.target.col);
+        texts[index] = "";
+      } else {
+        const value = cell.value.value;
+        if (value === null) {
+          texts[index] = "";
+        } else if (typeof value === "number") {
+          kinds[index] = KIND_NUMBER;
+          numbers[index] = value;
+          texts[index] = "";
+        } else if (typeof value === "boolean") {
+          kinds[index] = KIND_BOOL;
+          numbers[index] = value ? 1 : 0;
+          texts[index] = "";
+        } else {
+          kinds[index] = KIND_STRING;
+          texts[index] = value;
+        }
+      }
+    }
+
+    this.noteRangeMutationFfi(cells.length);
+    return (
+      this.wasm.setSparseBlock(
+        this.handleOf(bounds.sheet),
+        bounds.start.row,
+        bounds.start.col,
+        bounds.end.row - bounds.start.row + 1,
+        bounds.end.col - bounds.start.col + 1,
+        offsets,
+        kinds,
+        numbers,
+        texts,
+        styles,
+        Uint32Array.from(formulaOffsets),
+        formulaSources,
+        Uint32Array.from(referenceOffsets),
+        Uint32Array.from(referenceTargets),
+      ) === 0
+    );
+  }
+
   /** Apply raw patches once; remote loads suppress paged dirty tracking. */
   applyPatches(
     patches: readonly DocumentOp[],
@@ -1499,42 +1588,12 @@ export class StoreDataEngine {
     const appliedPatches: DocumentOp[] = [];
     const tracksPagedRevision = !remoteLoad && this.storageOptions.storage === "paged";
     const storageRevision = tracksPagedRevision ? this.wasm.beginMutation() : 0n;
-    const touchedSheets = new Set<SheetId>();
-    let hasStructuralPatch = false;
 
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
       for (const patch of patches) {
         if (!this.applyPatch(patch, changes)) continue;
         appliedPatches.push(patch);
-        if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
-        else if (
-          patch.op === "setRange" ||
-          patch.op === "setBlock" ||
-          patch.op === "setRangeStyle" ||
-          patch.op === "clearRange"
-        ) {
-          touchedSheets.add(patch.range.sheet);
-        } else if (
-          patch.op !== "setNamedRange" &&
-          patch.op !== "removeNamedRange" &&
-          patch.op !== "removeSheet"
-        ) {
-          const sheet = patch.op === "addSheet" ? patch.sheet.id : patch.sheet;
-          touchedSheets.add(sheet);
-        }
-        if (
-          patch.op === "addRows" ||
-          patch.op === "removeRows" ||
-          patch.op === "moveRows" ||
-          patch.op === "addColumns" ||
-          patch.op === "removeColumns" ||
-          patch.op === "moveColumns" ||
-          patch.op === "addSheet" ||
-          patch.op === "removeSheet"
-        ) {
-          hasStructuralPatch = true;
-        }
       }
     } finally {
       if (remoteLoad) this.wasm.endPageLoad();
@@ -1545,21 +1604,8 @@ export class StoreDataEngine {
     this.rangeMutationStats.documentOperations += appliedPatches.length;
     this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
 
-    if (hasStructuralPatch) {
-      this.syncFormulaSources();
-      for (const sheet of this.workbook.sheets) {
-        this.noteRangeMutationFfi();
-        this.wasm.recompute(this.handleOf(sheet.id));
-      }
-    } else {
-      for (const sheet of touchedSheets) {
-        this.noteRangeMutationFfi();
-        this.wasm.recompute(this.handleOf(sheet));
-      }
-    }
-    if (this.refs.hasRefs()) {
-      this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
-    }
+    this.noteRangeMutationFfi();
+    this.wasm.recomputeChanged();
     return { appliedPatches, changes, storageRevision };
   }
 
@@ -1568,38 +1614,15 @@ export class StoreDataEngine {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
         const before = changes ? this.getCell(patch.addr) : null;
-        const styleId = this.styles.intern(patch.style);
-        const handle = this.handleOf(patch.addr.sheet);
-        const { row, col } = patch.addr;
-        if (patch.value.kind === "formula") {
-          const key = cellKey(patch.addr);
-          this.refs.removeRef(key);
-          this.formulaSrc.set(key, patch.value.src);
-          this.noteRangeMutationFfi();
-          this.wasm.setFormula(handle, row, col, patch.value.src, styleId);
-        } else if (patch.value.kind === "ref") {
-          const key = cellKey(patch.addr);
-          const literalAt: LiteralLookup = (a) => this.rawCell(a).resolved;
-          this.noteRangeMutationFfi();
-          this.wasm.clearCell(handle, row, col, styleId);
-          this.formulaSrc.delete(key);
-          this.refs.setRef(patch.addr, patch.value.target, literalAt);
-        } else {
-          const hasRefs = this.refs.hasRefs();
-          const hasFormulaSources = this.formulaSrc.size > 0;
-          const key = hasRefs || hasFormulaSources ? cellKey(patch.addr) : undefined;
-          if (key && hasRefs) this.refs.removeRef(key);
-          const value = patch.value.value;
-          this.noteRangeMutationFfi();
-          if (typeof value === "number") this.wasm.setNumber(handle, row, col, value, styleId);
-          else if (typeof value === "boolean") this.wasm.setBool(handle, row, col, value, styleId);
-          else if (typeof value === "string") this.wasm.setString(handle, row, col, value, styleId);
-          else this.wasm.clearCell(handle, row, col, styleId);
-          if (key && hasFormulaSources) this.formulaSrc.delete(key);
-          if (key && hasRefs) {
-            const literalAt: LiteralLookup = (a) => this.rawCell(a).resolved;
-            this.refs.onLiteralChanged(key, literalAt);
-          }
+        const bounds: Range = {
+          sheet: patch.addr.sheet,
+          start: { row: patch.addr.row, col: patch.addr.col },
+          end: { row: patch.addr.row, col: patch.addr.col },
+        };
+        if (
+          !this.writeSparseBlock(bounds, [{ offset: 0, value: patch.value, style: patch.style }])
+        ) {
+          return false;
         }
         if (changes && before) {
           changes.push({
@@ -1634,14 +1657,37 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        this.rangeMutationStats.jsPatchObjects += patch.cells.length;
-        for (const cell of patch.cells) {
-          const addr = {
+        const cols = bounds.end.col - bounds.start.col + 1;
+        const sparseCells = patch.cells.map((cell) => ({
+          offset: cell.rowOffset * cols + cell.colOffset,
+          value: cell.value,
+          style: cell.style,
+          addr: {
             sheet: bounds.sheet,
             row: bounds.start.row + cell.rowOffset,
             col: bounds.start.col + cell.colOffset,
-          };
-          this.applyPatch({ op: "set", addr, value: cell.value, style: cell.style }, changes);
+          },
+          before: changes
+            ? this.getCell({
+                sheet: bounds.sheet,
+                row: bounds.start.row + cell.rowOffset,
+                col: bounds.start.col + cell.colOffset,
+              })
+            : null,
+        }));
+        this.rangeMutationStats.jsPatchObjects += patch.cells.length;
+        if (!this.writeSparseBlock(bounds, sparseCells)) return false;
+        if (changes) {
+          for (const cell of sparseCells) {
+            if (!cell.before) continue;
+            changes.push({
+              addr: cell.addr,
+              oldValue: literalOf(cell.before.resolved),
+              newValue: cell.value,
+              oldStyle: cell.before.style,
+              newStyle: cell.style,
+            });
+          }
         }
         return true;
       }
@@ -1675,87 +1721,8 @@ export class StoreDataEngine {
           return false;
         }
 
-        const formulaByOffset = new Map(block.formulas ?? []);
-        const refByOffset = new Map(block.refs ?? []);
-        const kinds = new Uint8Array(cellCount);
-        const numbers = new Float64Array(cellCount);
-        const texts: string[] = new Array(cellCount);
-        const wasmStyles = new Uint32Array(cellCount);
-        for (let offset = 0; offset < cellCount; offset++) {
-          const value = block.values[offset]!;
-          if (formulaByOffset.has(offset) || refByOffset.has(offset) || value === null) {
-            kinds[offset] = 0;
-            texts[offset] = "";
-          } else if (typeof value === "number") {
-            kinds[offset] = KIND_NUMBER;
-            numbers[offset] = value;
-            texts[offset] = "";
-          } else if (typeof value === "boolean") {
-            kinds[offset] = KIND_BOOL;
-            numbers[offset] = value ? 1 : 0;
-            texts[offset] = "";
-          } else {
-            kinds[offset] = KIND_STRING;
-            texts[offset] = value;
-          }
-          wasmStyles[offset] = this.styles.intern(
-            styleIds === undefined ? undefined : styleTable[styleIds[offset]!],
-          );
-        }
-
-        this.clearHostValuesInRange(bounds);
         this.rangeMutationStats.jsPatchObjects += exceptions.length;
-        this.noteRangeMutationFfi(cellCount);
-        if (
-          !this.wasm.setBlock(
-            this.handleOf(bounds.sheet),
-            bounds.start.row,
-            bounds.start.col,
-            rows,
-            cols,
-            kinds,
-            numbers,
-            texts,
-            wasmStyles,
-          )
-        ) {
-          return false;
-        }
-        for (const [offset, source] of formulaByOffset) {
-          const rowOffset = Math.floor(offset / cols);
-          const colOffset = offset % cols;
-          this.applyPatch(
-            {
-              op: "set",
-              addr: {
-                sheet: bounds.sheet,
-                row: bounds.start.row + rowOffset,
-                col: bounds.start.col + colOffset,
-              },
-              value: { kind: "formula", src: source },
-              style: styleIds === undefined ? undefined : styleTable[styleIds[offset]!],
-            },
-            null,
-          );
-        }
-        for (const [offset, target] of refByOffset) {
-          const rowOffset = Math.floor(offset / cols);
-          const colOffset = offset % cols;
-          this.applyPatch(
-            {
-              op: "set",
-              addr: {
-                sheet: bounds.sheet,
-                row: bounds.start.row + rowOffset,
-                col: bounds.start.col + colOffset,
-              },
-              value: { kind: "ref", target },
-              style: styleIds === undefined ? undefined : styleTable[styleIds[offset]!],
-            },
-            null,
-          );
-        }
-        return true;
+        return this.writePackedBlock(bounds, block);
       }
       case "setRangeStyle": {
         const bounds = normalizedRange(patch.range);
@@ -1815,7 +1782,6 @@ export class StoreDataEngine {
         }
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
-        if (clearContents) this.clearHostValuesInRange(bounds);
         this.noteRangeMutationFfi();
         return this.wasm.clearRange(
           this.handleOf(bounds.sheet),
@@ -2132,14 +2098,6 @@ export class StoreDataEngine {
     }
   }
 
-  private valueAt(addr: CellAddress): CellValue {
-    const formula = this.getFormula(addr);
-    if (formula) return { kind: "formula", src: formula };
-    const target = this.getRefTarget(addr);
-    if (target) return { kind: "ref", target };
-    return { kind: "literal", value: this.getCell(addr).resolved };
-  }
-
   private snapshotCells(
     sheet: SheetId,
     rowStart: number,
@@ -2147,20 +2105,34 @@ export class StoreDataEngine {
     colStart: number,
     colEnd: number,
   ): Array<Extract<DocumentOp, { op: "set" }>> {
+    const rows = rowEnd - rowStart;
+    const cols = colEnd - colStart;
+    const sources = this.captureSourceProjection(sheet, rowStart, colStart, rows, cols);
+    const columns = Array.from({ length: cols }, (_, offset) => colStart + offset);
+    const window = this.windowReader.read(
+      sheet,
+      { start: rowStart, end: rowEnd },
+      columns,
+      undefined,
+      false,
+    );
     const patches: Array<Extract<DocumentOp, { op: "set" }>> = [];
     for (let row = rowStart; row < rowEnd; row++) {
       for (let col = colStart; col < colEnd; col++) {
         const addr = { sheet, row, col };
-        const cell = this.getCell(addr);
-        const value = this.valueAt(addr);
-        if (
-          value.kind === "literal" &&
-          value.value === null &&
-          Object.keys(cell.style).length === 0
-        ) {
+        const offset = (row - rowStart) * cols + col - colStart;
+        const style = window.styles[window.styleIds[offset] ?? 0] ?? {};
+        const formula = sources?.formulaAt(offset);
+        const target = sources?.referenceAt(offset);
+        const value: CellValue = formula
+          ? { kind: "formula", src: formula }
+          : target
+            ? { kind: "ref", target }
+            : { kind: "literal", value: window.values[offset] ?? null };
+        if (value.kind === "literal" && value.value === null && Object.keys(style).length === 0) {
           continue;
         }
-        patches.push({ op: "set", addr, value, style: cell.style });
+        patches.push({ op: "set", addr, value, style });
       }
     }
     return patches;
@@ -2212,14 +2184,27 @@ export class StoreDataEngine {
     ) {
       return false;
     }
-    for (const cell of cells) {
-      this.applyPatch(
+    if (
+      cells.length > 0 &&
+      !this.applyPatch(
         {
-          ...cell,
-          addr: { ...cell.addr, row: patch.to + (cell.addr.row - patch.from) },
+          op: "setRange",
+          range: {
+            sheet: patch.sheet,
+            start: { row: patch.to, col: 0 },
+            end: { row: patch.to + patch.count - 1, col: sheet.columns.length - 1 },
+          },
+          cells: cells.map((cell) => ({
+            rowOffset: cell.addr.row - patch.from,
+            colOffset: cell.addr.col,
+            value: cell.value,
+            style: cell.style,
+          })),
         },
         changes,
-      );
+      )
+    ) {
+      return false;
     }
     for (let offset = 0; offset < rowMeta.length; offset++) {
       const meta = rowMeta[offset];
@@ -2303,14 +2288,27 @@ export class StoreDataEngine {
     ) {
       return false;
     }
-    for (const cell of cells) {
-      this.applyPatch(
+    if (
+      cells.length > 0 &&
+      !this.applyPatch(
         {
-          ...cell,
-          addr: { ...cell.addr, col: patch.to + (cell.addr.col - patch.from) },
+          op: "setRange",
+          range: {
+            sheet: patch.sheet,
+            start: { row: 0, col: patch.to },
+            end: { row: sheet.rowCount - 1, col: patch.to + patch.count - 1 },
+          },
+          cells: cells.map((cell) => ({
+            rowOffset: cell.addr.row,
+            colOffset: cell.addr.col - patch.from,
+            value: cell.value,
+            style: cell.style,
+          })),
         },
         changes,
-      );
+      )
+    ) {
+      return false;
     }
     const moveCol = (col: number) => moveIndex(col, patch.from, patch.count, patch.to);
     sheet.validationRules = movedValidationRules
@@ -2356,6 +2354,7 @@ export class StoreDataEngine {
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
     this.wasm.setSheetName(handle, snapshot.id, snapshot.name);
     this.handles.set(snapshot.id, handle);
+    this.sheetIdsByHandle[handle] = snapshot.id;
     const sheet: Sheet = {
       id: snapshot.id,
       name: snapshot.name,
@@ -2381,24 +2380,24 @@ export class StoreDataEngine {
     }
     this.workbook.sheets.splice(snapshot.order, 0, sheet);
     for (const block of snapshot.cells) {
-      for (const cell of block.cells) {
-        if (
-          !this.applyPatch(
-            {
-              op: "set",
-              addr: {
-                sheet: snapshot.id,
-                row: block.startRow + cell.rowOffset,
-                col: block.startCol + cell.colOffset,
+      if (
+        !this.applyPatch(
+          {
+            op: "setRange",
+            range: {
+              sheet: snapshot.id,
+              start: { row: block.startRow, col: block.startCol },
+              end: {
+                row: block.startRow + block.rowCount - 1,
+                col: block.startCol + block.colCount - 1,
               },
-              value: cell.value,
-              style: cell.style,
             },
-            changes,
-          )
-        ) {
-          return false;
-        }
+            cells: block.cells,
+          },
+          changes,
+        )
+      ) {
+        return false;
       }
     }
     this.windowReader.conditionalRulesChanged(snapshot.id);
@@ -2409,21 +2408,6 @@ export class StoreDataEngine {
     const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheetId);
     if (index < 0 || this.workbook.sheets.length <= 1) return false;
     if (!this.removeSheetFormulaIdentity(sheetId)) return false;
-    for (const [source, target] of this.refs.entries()) {
-      if (source.sheet === sheetId) {
-        this.refs.removeRef(cellKey(source));
-      } else if (target.sheet === sheetId) {
-        this.applyPatch(
-          {
-            op: "set",
-            addr: source,
-            value: { kind: "literal", value: "#REF!" },
-            style: this.getCell(source).style,
-          },
-          changes,
-        );
-      }
-    }
     this.handles.delete(sheetId);
     this.view.removeSheet(sheetId);
     this.windowReader.removeSheet(sheetId);
@@ -2518,43 +2502,6 @@ export class StoreDataEngine {
       })
       .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
     this.view.rowsChanged(sheet);
-    this.rebaseFormulaSources(sheet, remap);
-
-    const literalAt: LiteralLookup = (addr) => this.rawCell(addr).resolved;
-    this.refs.rebaseRows(sheet, remap, literalAt);
-  }
-
-  private syncFormulaSources(): void {
-    if (this.formulaSrc.size === 0) return;
-
-    for (const [key] of this.formulaSrc) {
-      const addr = parseCellKey(key);
-      const source = this.wasm.formulaSource(this.handleOf(addr.sheet), addr.row, addr.col);
-      if (source === undefined) {
-        this.formulaSrc.delete(key);
-      } else {
-        this.formulaSrc.set(key, source);
-      }
-    }
-  }
-
-  private rebaseFormulaSources(sheet: SheetId, remap: (row: number) => number | null): void {
-    if (this.formulaSrc.size === 0) return;
-
-    const next = new Map<string, string>();
-    for (const [key, src] of this.formulaSrc) {
-      const addr = parseCellKey(key);
-      if (addr.sheet !== sheet) {
-        next.set(key, src);
-        continue;
-      }
-
-      const row = remap(addr.row);
-      if (row !== null) next.set(cellKey({ ...addr, row }), src);
-    }
-
-    this.formulaSrc.clear();
-    for (const [key, src] of next) this.formulaSrc.set(key, src);
   }
 
   private rebaseSheetCols(sheet: SheetId, remap: (col: number) => number | null): void {
@@ -2615,51 +2562,30 @@ export class StoreDataEngine {
       })
       .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
     this.view.columnsChanged(sheet);
-    this.rebaseFormulaSourceCols(sheet, remap);
-
-    const literalAt: LiteralLookup = (addr) => this.rawCell(addr).resolved;
-    this.refs.rebaseCols(sheet, remap, literalAt);
-  }
-
-  private rebaseFormulaSourceCols(sheet: SheetId, remap: (col: number) => number | null): void {
-    if (this.formulaSrc.size === 0) return;
-
-    const next = new Map<string, string>();
-    for (const [key, src] of this.formulaSrc) {
-      const addr = parseCellKey(key);
-      if (addr.sheet !== sheet) {
-        next.set(key, src);
-        continue;
-      }
-
-      const col = remap(addr.col);
-      if (col !== null) next.set(cellKey({ ...addr, col }), src);
-    }
-
-    this.formulaSrc.clear();
-    for (const [key, src] of next) this.formulaSrc.set(key, src);
   }
 
   private acknowledgedSetStillMatches(
     addr: CellAddress,
     value: CellValue,
     style: CellStyle | undefined,
+    sources?: RangeSourceProjection | null,
+    sourceOffset = 0,
   ): boolean {
     const current = this.getCell(addr);
     if (this.styles.intern(current.style) !== this.styles.intern(style)) return false;
-    const key = cellKey(addr);
-    if (value.kind === "formula") return this.formulaSrc.get(key) === value.src;
+    const formula =
+      sources === undefined ? this.getFormula(addr) : sources?.formulaAt(sourceOffset);
+    const target =
+      sources === undefined ? this.getRefTarget(addr) : sources?.referenceAt(sourceOffset);
+    if (value.kind === "formula") return formula === value.src;
     if (value.kind === "ref") {
-      const target = this.refs.targetOf(key);
       return (
         target?.sheet === value.target.sheet &&
         target.row === value.target.row &&
         target.col === value.target.col
       );
     }
-    return (
-      !this.formulaSrc.has(key) && !this.refs.isRef(key) && Object.is(current.resolved, value.value)
-    );
+    return formula == null && target == null && Object.is(current.resolved, value.value);
   }
 
   acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
@@ -2681,6 +2607,15 @@ export class StoreDataEngine {
         );
       } else if (operation.op === "setRange") {
         const range = normalizedRange(operation.range);
+        const rows = range.end.row - range.start.row + 1;
+        const cols = range.end.col - range.start.col + 1;
+        const sources = this.captureSourceProjection(
+          range.sheet,
+          range.start.row,
+          range.start.col,
+          rows,
+          cols,
+        );
         for (const cell of operation.cells) {
           const row = range.start.row + cell.rowOffset;
           const col = range.start.col + cell.colOffset;
@@ -2689,6 +2624,8 @@ export class StoreDataEngine {
               { sheet: range.sheet, row, col },
               cell.value,
               cell.style,
+              sources,
+              cell.rowOffset * cols + cell.colOffset,
             )
           ) {
             continue;
@@ -2726,7 +2663,6 @@ export class StoreDataEngine {
   renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
     const handle = this.handleOf(sheet);
     if (!this.wasm.renameSheet(handle, sheet, name)) return false;
-    this.syncFormulaSourcesFromWasm();
     return true;
   }
 
@@ -2734,22 +2670,10 @@ export class StoreDataEngine {
   removeSheetFormulaIdentity(sheet: SheetId): boolean {
     const handle = this.handleOf(sheet);
     if (!this.wasm.removeSheet(handle)) return false;
-    this.syncFormulaSourcesFromWasm();
     return true;
   }
 
-  private syncFormulaSourcesFromWasm(): void {
-    for (const key of [...this.formulaSrc.keys()]) {
-      const addr = parseCellKey(key);
-      const handle = this.handles.get(addr.sheet);
-      const source =
-        handle === undefined ? undefined : this.wasm.formulaSource(handle, addr.row, addr.col);
-      if (source === undefined) this.formulaSrc.delete(key);
-      else this.formulaSrc.set(key, source);
-    }
-  }
-
-  /** Bulk-load datasource rows into a sheet. Hydration emits nothing and never becomes dirty. */
+  /** Bulk-load one mixed datasource page in one Rust-owned source transaction. */
   loadRows(
     sheet: SheetId,
     start: number,
@@ -2757,139 +2681,91 @@ export class StoreDataEngine {
     protect?: (addr: CellAddress) => boolean,
   ): void {
     if (rows.length === 0) return;
-    const previousOperation = this.resourceOperation;
-    this.resourceOperation ??= "ingest";
-    this.boundaryAccounting.record("ingest", "js-to-wasm", 0, "scalar");
+    const meta = this.sheetMeta(sheet);
+    const rowCount = Math.min(rows.length, Math.max(0, meta.rowCount - start));
+    if (rowCount === 0) return;
+    const colCount = meta.columns.length;
+    const cells: Array<{ offset: number; value: CellValue; style?: CellStyle }> = [];
+    const address: CellAddress = { sheet, row: start, col: 0 };
+    for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
+      address.row = start + rowOffset;
+      const row = rows[rowOffset]!;
+      for (let col = 0; col < colCount; col++) {
+        address.col = col;
+        if (protect?.(address)) continue;
+        const column = meta.columns[col]!;
+        const dataCell = row[column.key];
+        const wrapped =
+          dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
+            ? dataCell
+            : undefined;
+        const source = dataCellValue(dataCell);
+        const value: CellValue =
+          source && typeof source === "object"
+            ? source
+            : {
+                kind: "literal",
+                value:
+                  column.type === "number" || column.type === "currency"
+                    ? toNumber(dataCell)
+                    : toText(dataCell),
+              };
+        cells.push({ offset: rowOffset * colCount + col, value, style: wrapped?.style });
+      }
+    }
+
+    const bounds: Range = {
+      sheet,
+      start: { row: start, col: 0 },
+      end: { row: start + rowCount - 1, col: colCount - 1 },
+    };
+    let accepted = false;
     this.wasm.beginPageLoad();
     try {
-      const handle = this.handleOf(sheet);
-      const columns = this.sheetMeta(sheet).columns;
-      const protectedByColumn: Uint32Array[] = Array.from(
-        { length: columns.length },
-        () => EMPTY_U32,
-      );
-      if (protect) {
-        const address: CellAddress = { sheet, row: start, col: 0 };
-        for (let col = 0; col < columns.length; col++) {
-          const offsets: number[] = [];
-          address.col = col;
-          for (let offset = 0; offset < rows.length; offset++) {
-            address.row = start + offset;
-            if (protect(address)) offsets.push(offset);
-          }
-          if (offsets.length > 0) protectedByColumn[col] = Uint32Array.from(offsets);
-        }
-      }
-
-      this.clearHydratedMetadata(handle, sheet, start, rows.length, protectedByColumn);
-      const exceptions: DocumentOp[] = [];
-      for (let col = 0; col < columns.length; col++) {
-        this.hydratePageColumn(
-          handle,
-          sheet,
-          columns[col]!,
-          col,
-          start,
-          rows,
-          protectedByColumn[col]!,
-          exceptions,
-        );
-      }
-
-      for (const patch of exceptions) this.applyPatch(patch, null);
-      this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-      this.wasm.recompute(handle);
-      if (this.refs.hasRefs()) {
-        this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
-      }
+      accepted = this.writeSparseBlock(bounds, cells);
     } finally {
       this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
       this.wasm.endPageLoad();
       this.resourceOperation = previousOperation;
     }
+    if (!accepted) throw new Error("datasource page contains invalid persisted sources");
+    this.noteRangeMutationFfi();
+    this.wasm.recomputeChanged();
   }
 
   hydrateSnapshot(snapshot: WorkbookSnapshot): void {
-    const literalExceptions: DocumentOp[] = [];
-    const formulas: DocumentOp[] = [];
-    const references: DocumentOp[] = [];
-
+    let accepted = true;
     this.wasm.beginPageLoad();
     try {
       for (const sourceSheet of snapshot.sheets) {
-        const handle = this.handleOf(sourceSheet.id);
-        const bulkByColumn = new Map<number, Array<{ row: number; value: string | number }>>();
         for (const block of sourceSheet.cells) {
-          for (const cell of block.cells) {
-            const addr = {
-              sheet: sourceSheet.id,
-              row: block.startRow + cell.rowOffset,
-              col: block.startCol + cell.colOffset,
-            };
-            const patch: DocumentOp = { op: "set", addr, value: cell.value, style: cell.style };
-            if (cell.value.kind === "formula") {
-              formulas.push(patch);
-            } else if (cell.value.kind === "ref") {
-              references.push(patch);
-            } else if (
-              cell.style === undefined &&
-              (typeof cell.value.value === "number" || typeof cell.value.value === "string")
-            ) {
-              const entries = bulkByColumn.get(addr.col) ?? [];
-              entries.push({ row: addr.row, value: cell.value.value });
-              bulkByColumn.set(addr.col, entries);
-            } else {
-              literalExceptions.push(patch);
-            }
+          const bounds: Range = {
+            sheet: sourceSheet.id,
+            start: { row: block.startRow, col: block.startCol },
+            end: {
+              row: block.startRow + block.rowCount - 1,
+              col: block.startCol + block.colCount - 1,
+            },
+          };
+          const cells = block.cells.map((cell) => ({
+            offset: cell.rowOffset * block.colCount + cell.colOffset,
+            value: cell.value,
+            style: cell.style,
+          }));
+          if (!this.writeSparseBlock(bounds, cells)) {
+            accepted = false;
+            break;
           }
         }
-
-        for (const [col, entries] of bulkByColumn) {
-          entries.sort((left, right) => left.row - right.row);
-          for (let index = 0; index < entries.length; ) {
-            const first = entries[index]!;
-            const kind = typeof first.value;
-            let end = index + 1;
-            while (
-              end < entries.length &&
-              entries[end]!.row === entries[end - 1]!.row + 1 &&
-              typeof entries[end]!.value === kind
-            ) {
-              end += 1;
-            }
-            const run = entries.slice(index, end);
-            if (kind === "number") {
-              this.wasm.setColumnNumbers(
-                handle,
-                col,
-                first.row,
-                Float64Array.from(run, (entry) => entry.value as number),
-                0,
-              );
-            } else {
-              const values = run.map((entry) => entry.value as string);
-              const lengths = Uint32Array.from(values, (value) => value.length);
-              this.wasm.setColumnStringsPacked(handle, col, first.row, values.join(""), lengths, 0);
-            }
-            index = end;
-          }
-        }
-      }
-
-      for (const patch of literalExceptions) this.applyPatch(patch, null);
-      for (const patch of formulas) this.applyPatch(patch, null);
-      for (const patch of references) this.applyPatch(patch, null);
-      for (const sheet of this.workbook.sheets) {
-        const handle = this.handleOf(sheet.id);
-        this.windowReader.conditionalRulesChanged(sheet.id);
-        this.wasm.recompute(handle);
-      }
-      if (this.refs.hasRefs()) {
-        this.refs.refreshAll((addr) => this.rawCell(addr).resolved);
+        if (!accepted) break;
+        this.windowReader.conditionalRulesChanged(sourceSheet.id);
       }
     } finally {
       this.wasm.endPageLoad();
     }
+    if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
+    this.noteRangeMutationFfi();
+    this.wasm.recomputeChanged();
   }
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
@@ -2908,306 +2784,49 @@ export class StoreDataEngine {
     this.disposed = true;
   }
 
-  private clearHydratedMetadata(
-    handle: number,
-    sheet: SheetId,
-    start: number,
-    rowCount: number,
-    protectedByColumn: readonly Uint32Array[],
-  ): void {
-    const end = start + rowCount;
-    let cellStateCalls = 0;
-    for (const key of this.formulaSrc.keys()) {
-      const address = parseCellKey(key);
-      if (
-        address.sheet !== sheet ||
-        address.row < start ||
-        address.row >= end ||
-        address.col >= protectedByColumn.length
-      ) {
-        continue;
-      }
-      const offset = address.row - start;
-      if (hasSortedOffset(protectedByColumn[address.col]!, offset)) continue;
-      cellStateCalls += 1;
-      if (this.wasm.cellState(handle, address.row, address.col) === 3) continue;
-      this.formulaSrc.delete(key);
-    }
-    for (const [address] of this.refs.entries()) {
-      if (
-        address.sheet !== sheet ||
-        address.row < start ||
-        address.row >= end ||
-        address.col >= protectedByColumn.length
-      ) {
-        continue;
-      }
-      const offset = address.row - start;
-      if (hasSortedOffset(protectedByColumn[address.col]!, offset)) continue;
-      cellStateCalls += 1;
-      if (this.wasm.cellState(handle, address.row, address.col) === 3) continue;
-      this.refs.removeRef(cellKey(address));
-    }
-    if (cellStateCalls > 0) {
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "ingest",
-        "js-to-wasm",
-        0,
-        "scalar",
-        cellStateCalls,
-      );
-    }
-  }
-
-  private hydratePageColumn(
-    handle: number,
-    sheet: SheetId,
-    column: Column,
-    col: number,
-    start: number,
-    rows: readonly RowData[],
-    protectedOffsets: Uint32Array,
-    exceptions: DocumentOp[],
-  ): void {
-    const key = column.key;
-    const numeric = column.type === "number" || column.type === "currency";
-    const numbers = numeric ? new Float64Array(rows.length) : undefined;
-    const texts = numeric ? undefined : new Array<string>(rows.length);
-    const utf16Lens = numeric ? undefined : new Uint32Array(rows.length);
-    let textBytes = 0;
-    let cellStateCalls = 0;
-
-    for (let offset = 0; offset < rows.length; offset++) {
-      const dataCell = rows[offset]![key];
-      if (numbers) {
-        numbers[offset] = toNumber(dataCell);
-      } else {
-        const text = toText(dataCell);
-        texts![offset] = text;
-        utf16Lens![offset] = text.length;
-        textBytes += utf8ByteLength(text);
-      }
-
-      const wrapped =
-        dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
-          ? dataCell
-          : undefined;
-      const value = dataCellValue(dataCell);
-      const exceptional =
-        wrapped?.style !== undefined ||
-        (value && typeof value === "object" && (value.kind === "formula" || value.kind === "ref"));
-      if (!exceptional || hasSortedOffset(protectedOffsets, offset)) continue;
-      cellStateCalls += 1;
-      if (this.wasm.cellState(handle, start + offset, col) === 3) continue;
-      const cellValue: CellValue =
-        value && typeof value === "object" ? value : { kind: "literal", value: value ?? null };
-      exceptions.push({
-        op: "set",
-        addr: { sheet, row: start + offset, col },
-        value: cellValue,
-        style: wrapped?.style,
-      });
-    }
-
-    if (cellStateCalls > 0) {
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "ingest",
-        "js-to-wasm",
-        0,
-        "scalar",
-        cellStateCalls,
-      );
-    }
-
-    if (numbers) {
-      const bytes = numbers.byteLength + protectedOffsets.byteLength;
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "ingest",
-        "js-to-wasm",
-        bytes,
-        "bulk",
-        1,
-        Math.max(numbers.byteLength, protectedOffsets.byteLength),
-      );
-      this.wasm.hydratePageNumbers(handle, col, start, numbers, 0, protectedOffsets);
-    } else {
-      const packedTexts = texts!.join("");
-      const bytes = textBytes + utf16Lens!.byteLength + protectedOffsets.byteLength;
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "ingest",
-        "js-to-wasm",
-        bytes,
-        "bulk",
-        1,
-        Math.max(textBytes, utf16Lens!.byteLength, protectedOffsets.byteLength),
-      );
-      this.wasm.hydratePageStringsPacked(
-        handle,
-        col,
-        start,
-        packedTexts,
-        utf16Lens!,
-        0,
-        protectedOffsets,
-      );
-    }
-  }
 
   private loadColumnar(sheet: SheetId, data: ColumnarData): void {
-    const handle = this.handleOf(sheet);
     const columns = this.sheetMeta(sheet).columns;
-    let loadedFormulas = false;
-    let scalarCalls = 0;
-    let scalarBytes = 0;
-    let largestScalarBytes = 0;
-    for (let c = 0; c < columns.length; c++) {
-      const column = columns[c]!;
-      const source = data.columns[column.key];
-      if (!source) continue;
-      const numericColumn =
-        column.type === "number" || column.type === "currency" || column.type === "date";
-      if (numericColumn) {
-        if (source instanceof Float64Array) {
-          const values = source.subarray(0, data.rowCount);
-          this.boundaryAccounting.record(
-            this.resourceOperation ?? "ingest",
-            "js-to-wasm",
-            values.byteLength,
-            "bulk",
-            1,
-            values.byteLength,
-          );
-          this.wasm.setColumnNumbers(handle, c, 0, values, 0);
-          continue;
-        }
-
-        const nums = new Float64Array(data.rowCount);
-        for (let r = 0; r < data.rowCount; r++) {
-          const value = columnarScalar(source[r], column.type);
-          nums[r] = typeof value === "number" ? value : Number.NaN;
-        }
-        this.boundaryAccounting.record(
-          this.resourceOperation ?? "ingest",
-          "js-to-wasm",
-          nums.byteLength,
-          "bulk",
-          1,
-          nums.byteLength,
-        );
-        this.wasm.setColumnNumbers(handle, c, 0, nums, 0);
-      } else {
-        const stringSource = stringArrayForRows(source, data.rowCount);
-        if (stringSource) {
-          this.loadPackedStrings(handle, c, stringSource);
+    const rowCount = Math.min(data.rowCount, this.sheetMeta(sheet).rowCount);
+    if (rowCount === 0 || columns.length === 0) return;
+    const colCount = columns.length;
+    const values: CellScalar[] = new Array(rowCount * colCount);
+    const formulas: Array<[number, string]> = [];
+    const refs: Array<[number, CellAddress]> = [];
+    for (let row = 0; row < rowCount; row++) {
+      for (let col = 0; col < colCount; col++) {
+        const offset = row * colCount + col;
+        const column = columns[col]!;
+        const source = data.columns[column.key];
+        const parsed = columnarScalar(source?.[row], column.type);
+        if (parsed && typeof parsed === "object") {
+          values[offset] = parsed.kind === "literal" ? parsed.value : null;
+          if (parsed.kind === "formula") formulas.push([offset, parsed.src]);
+          else if (parsed.kind === "ref") refs.push([offset, parsed.target]);
         } else {
-          const strs: string[] = new Array(data.rowCount);
-          for (let r = 0; r < data.rowCount; r++) strs[r] = toText(source[r]);
-          this.loadPackedStrings(handle, c, strs);
-        }
-      }
-
-      // Bulk columns carry homogeneous numeric/text values. Restore mixed
-      // booleans and inert text in numeric/date columns, clear canonical blanks,
-      // and land formulas individually so the engine tracks their sources.
-      for (let r = 0; r < data.rowCount; r++) {
-        const value = columnarScalar(source[r], column.type);
-        if (value && typeof value === "object") {
-          if (value.kind === "formula") {
-            this.formulaSrc.set(cellKey({ sheet, row: r, col: c }), value.src);
-            this.wasm.setFormula(handle, r, c, value.src, 0);
-            scalarCalls += 1;
-            const bytes = utf8ByteLength(value.src);
-            scalarBytes += bytes;
-            largestScalarBytes = Math.max(largestScalarBytes, bytes);
-            loadedFormulas = true;
-          }
-          continue;
-        }
-        if (typeof value === "boolean") {
-          this.wasm.setBool(handle, r, c, value, 0);
-          scalarCalls += 1;
-          scalarBytes += 1;
-          largestScalarBytes = Math.max(largestScalarBytes, 1);
-        } else if (numericColumn && typeof value === "string") {
-          this.wasm.setString(handle, r, c, value, 0);
-          scalarCalls += 1;
-          const bytes = utf8ByteLength(value);
-          scalarBytes += bytes;
-          largestScalarBytes = Math.max(largestScalarBytes, bytes);
-        } else if (value === null || value === undefined) {
-          this.wasm.clearCell(handle, r, c, 0);
-          scalarCalls += 1;
+          values[offset] = parsed ?? null;
         }
       }
     }
-
-    if (scalarCalls > 0) {
-      this.boundaryAccounting.record(
-        this.resourceOperation ?? "ingest",
-        "js-to-wasm",
-        scalarBytes,
-        "scalar",
-        scalarCalls,
-        largestScalarBytes,
-      );
+    const bounds: Range = {
+      sheet,
+      start: { row: 0, col: 0 },
+      end: { row: rowCount - 1, col: colCount - 1 },
+    };
+    if (
+      !this.writePackedBlock(bounds, {
+        rowCount,
+        colCount,
+        values,
+        formulas: formulas.length === 0 ? undefined : formulas,
+        refs: refs.length === 0 ? undefined : refs,
+      })
+    ) {
+      throw new Error("columnar import contains invalid persisted sources");
     }
-
-    this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-    this.wasm.compactStringStorage();
-
-    // Same barrier a transaction ends with: evaluate everything just ingested.
-    if (loadedFormulas) {
-      this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-      this.wasm.recompute(handle);
-    }
+    this.noteRangeMutationFfi();
+    this.wasm.recomputeChanged();
   }
-
-  /**
-   * Ship one text column as a single concatenated buffer plus per-row UTF-16
-   * lengths: one boundary string decode instead of one per row, which
-   * dominates text-column ingest cost at scale.
-   */
-  private loadPackedStrings(handle: number, col: number, values: readonly string[]): void {
-    const lens = new Uint32Array(values.length);
-    let textBytes = 0;
-    for (let r = 0; r < values.length; r++) {
-      lens[r] = values[r]!.length;
-      textBytes += utf8ByteLength(values[r]!);
-    }
-    const packed = values.join("");
-    this.boundaryAccounting.record(
-      this.resourceOperation ?? "ingest",
-      "js-to-wasm",
-      textBytes + lens.byteLength,
-      "bulk",
-      1,
-      Math.max(textBytes, lens.byteLength),
-    );
-    this.wasm.setColumnStringsPacked(handle, col, 0, packed, lens, 0);
-  }
-}
-
-function stringArrayForRows(
-  source: ArrayLike<CellScalar | CellValue>,
-  rowCount: number,
-): string[] | null {
-  if (!Array.isArray(source) || source.length < rowCount) return null;
-  for (let i = 0; i < rowCount; i++) {
-    if (typeof source[i] !== "string") return null;
-  }
-  return source.length === rowCount ? source : source.slice(0, rowCount);
-}
-
-function hasSortedOffset(offsets: Uint32Array, target: number): boolean {
-  let lo = 0;
-  let hi = offsets.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    const value = offsets[mid]!;
-    if (value < target) lo = mid + 1;
-    else hi = mid;
-  }
-  return offsets[lo] === target;
 }
 
 function dataCellValue(value: DataCell | undefined): CellScalar | CellValue | undefined {

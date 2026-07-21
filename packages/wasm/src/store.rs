@@ -1,6 +1,6 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
 
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
 
 use wasm_bindgen::prelude::*;
@@ -16,8 +16,8 @@ use crate::sheet::{
     SheetData, DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
 };
 use crate::types::{
-    cell_key, string_from_pool, FormulaEntry, FormulaError, FormulaValueKind, StringPool,
-    KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, FormulaValueKind,
+    StringPool, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
@@ -73,6 +73,47 @@ impl Hasher for IdentityHasher {
     }
 }
 
+/// Compact serializable projection of persisted derived-cell sources in one
+/// range. Offsets are row-major and sorted; reference targets are packed
+/// `[sheet_handle, row, col]` triples.
+#[wasm_bindgen]
+pub struct SourceSnapshot {
+    formula_offsets: Vec<u32>,
+    formula_sources: Vec<String>,
+    reference_offsets: Vec<u32>,
+    reference_targets: Vec<u32>,
+}
+
+#[wasm_bindgen]
+impl SourceSnapshot {
+    #[wasm_bindgen(js_name = formulaOffsets)]
+    pub fn formula_offsets(&self) -> Vec<u32> {
+        self.formula_offsets.clone()
+    }
+
+    #[wasm_bindgen(js_name = formulaSources)]
+    pub fn formula_sources(&self) -> Vec<String> {
+        self.formula_sources.clone()
+    }
+
+    #[wasm_bindgen(js_name = referenceOffsets)]
+    pub fn reference_offsets(&self) -> Vec<u32> {
+        self.reference_offsets.clone()
+    }
+
+    #[wasm_bindgen(js_name = referenceTargets)]
+    pub fn reference_targets(&self) -> Vec<u32> {
+        self.reference_targets.clone()
+    }
+
+    #[wasm_bindgen(js_name = byteLength)]
+    pub fn byte_length(&self) -> usize {
+        (self.formula_offsets.len() + self.reference_offsets.len()) * std::mem::size_of::<u32>()
+            + self.reference_targets.len() * std::mem::size_of::<u32>()
+            + self.formula_sources.iter().map(String::len).sum::<usize>()
+    }
+}
+
 /// Opaque, store-local history payload for one dense rectangular cell block.
 ///
 /// The host may retain this object in undo history, but it is deliberately not
@@ -90,14 +131,42 @@ pub struct RangeSnapshot {
 
 #[wasm_bindgen]
 impl RangeSnapshot {
+
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
-        let mut offsets = Vec::with_capacity(self.formulas.len() * 2);
-        for (row, col, _) in &self.formulas {
-            offsets.push(*row);
-            offsets.push(*col);
+        let mut offsets = Vec::new();
+        for (row, col, entry) in &self.formulas {
+            if entry.is_formula() {
+                offsets.push(*row);
+                offsets.push(*col);
+            }
         }
         offsets
+    }
+
+    #[wasm_bindgen(js_name = referenceOffsets)]
+    pub fn reference_offsets(&self) -> Vec<u32> {
+        let mut offsets = Vec::new();
+        for (row, col, entry) in &self.formulas {
+            if entry.is_reference() {
+                offsets.push(*row);
+                offsets.push(*col);
+            }
+        }
+        offsets
+    }
+
+    #[wasm_bindgen(js_name = referenceTargets)]
+    pub fn reference_targets(&self) -> Vec<u32> {
+        let mut targets = Vec::new();
+        for (_, _, entry) in &self.formulas {
+            if let Some(target) = entry.reference_target(0) {
+                targets.push(target.sheet);
+                targets.push(target.row);
+                targets.push(target.col);
+            }
+        }
+        targets
     }
 
     #[wasm_bindgen(js_name = kinds)]
@@ -118,7 +187,14 @@ impl RangeSnapshot {
             + self
                 .formulas
                 .iter()
-                .map(|(_, _, entry)| std::mem::size_of::<(u32, u32)>() + entry.source.len())
+                .map(|(_, _, entry)| {
+                    std::mem::size_of::<(u32, u32)>()
+                        + if entry.is_formula() {
+                            entry.source.len()
+                        } else {
+                            std::mem::size_of::<AbsCellKey>()
+                        }
+                })
                 .sum::<usize>()
     }
 
@@ -126,10 +202,16 @@ impl RangeSnapshot {
     pub fn formula_sources(&self) -> Vec<String> {
         self.formulas
             .iter()
+            .filter(|(_, _, entry)| entry.is_formula())
             .map(|(_, _, entry)| entry.source.clone())
             .collect()
     }
 }
+const BLOCK_OK: u32 = 0;
+const BLOCK_INVALID: u32 = 1;
+const BLOCK_SOURCE_INVALID: u32 = 2;
+const BLOCK_RESOURCE_LIMIT: u32 = 3;
+
 
 type InternMap = HashMap<u64, InternSlot, BuildHasherDefault<IdentityHasher>>;
 
@@ -756,9 +838,11 @@ impl CellStore {
             self.bump_formula_epoch();
         }
     }
-    /// Write one row-major typed block in a single boundary call. `kinds` uses
-    /// 0 empty / 1 number / 2 string; formulas and references are sparse host
-    /// exceptions applied after this literal bulk write.
+    /// Atomically write one row-major mixed literal/formula/reference block.
+    /// Formula/reference offsets are sparse row-major exceptions. Reference
+    /// targets are packed `[sheet_handle, row, col]` triples. The compact
+    /// status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
+    /// source metadata, and `3` paged dirty-capacity rejection.
     #[wasm_bindgen(js_name = setBlock)]
     pub fn set_block(
         &mut self,
@@ -771,65 +855,329 @@ impl CellStore {
         numbers: &[f64],
         texts: Vec<String>,
         styles: &[u32],
-    ) -> bool {
+        formula_offsets: &[u32],
+        formula_sources: Vec<String>,
+        reference_offsets: &[u32],
+        reference_targets: &[u32],
+    ) -> u32 {
         let Some(cell_count) = rows.checked_mul(cols) else {
-            return false;
+            return BLOCK_INVALID;
         };
         let dirty_revision = self.local_dirty_revision();
         let Some(existing) = self.sheets.get(sheet) else {
-            return false;
+            return BLOCK_INVALID;
         };
         if rows == 0
             || cols == 0
+            || cell_count > u32::MAX as usize
             || kinds.len() != cell_count
             || numbers.len() != cell_count
             || texts.len() != cell_count
             || styles.len() != cell_count
+            || formula_offsets.len() != formula_sources.len()
+            || reference_targets.len() != reference_offsets.len().saturating_mul(3)
             || start_row
                 .checked_add(rows)
                 .is_none_or(|end| end > existing.row_count)
+            || start_row > u32::MAX as usize
+            || rows - 1 > u32::MAX as usize - start_row
             || start_col
                 .checked_add(cols)
                 .is_none_or(|end| end > existing.n_cols)
-            || (dirty_revision.is_some()
-                && !existing.can_dirty_rect(start_row, start_col, rows, cols))
+            || start_col > u32::MAX as usize
+            || cols - 1 > u32::MAX as usize - start_col
         {
-            return false;
+            return BLOCK_INVALID;
+        }
+        if dirty_revision.is_some() && !existing.can_dirty_rect(start_row, start_col, rows, cols) {
+            return BLOCK_RESOURCE_LIMIT;
+        }
+
+        let mut source_kinds = vec![0u8; cell_count];
+        let mut seen_offsets = HashSet::with_capacity(
+            formula_offsets.len().saturating_add(reference_offsets.len()),
+        );
+        for &offset in formula_offsets {
+            let offset = offset as usize;
+            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
+                return BLOCK_SOURCE_INVALID;
+            }
+            source_kinds[offset] = 1;
+        }
+        for &offset in reference_offsets {
+            let offset = offset as usize;
+            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
+                return BLOCK_SOURCE_INVALID;
+            }
+            source_kinds[offset] = 2;
+        }
+
+        let mut prepared = Vec::with_capacity(seen_offsets.len());
+        for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
+            let offset = offset as usize;
+            let row = start_row + offset / cols;
+            let col = start_col + offset % cols;
+            let Some(key) = cell_key(row, col) else {
+                return BLOCK_SOURCE_INVALID;
+            };
+            prepared.push((key, self.parse_formula_entry(source, sheet as u32)));
+        }
+        for (index, &offset) in reference_offsets.iter().enumerate() {
+            let target_index = index * 3;
+            let target = AbsCellKey {
+                sheet: reference_targets[target_index],
+                row: reference_targets[target_index + 1],
+                col: reference_targets[target_index + 2],
+            };
+            let target_sheet = target.sheet as usize;
+            if !self
+                .sheet_alive
+                .get(target_sheet)
+                .copied()
+                .unwrap_or(false)
+                || !self.sheets[target_sheet]
+                    .contains_cell(target.row as usize, target.col as usize)
+            {
+                return BLOCK_SOURCE_INVALID;
+            }
+            let offset = offset as usize;
+            let row = start_row + offset / cols;
+            let col = start_col + offset % cols;
+            let Some(key) = cell_key(row, col) else {
+                return BLOCK_SOURCE_INVALID;
+            };
+            prepared.push((
+                key,
+                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
+            ));
+        }
+
+        if let Some(revision) = dirty_revision {
+            if !self.sheets[sheet].prepare_dirty_rect(
+                start_row,
+                start_col,
+                rows,
+                cols,
+                revision,
+            ) {
+                return BLOCK_RESOURCE_LIMIT;
+            }
         }
 
         let mut string_ids = vec![NO_STRING; cell_count];
         for (offset, text) in texts.iter().enumerate() {
-            if kinds[offset] == KIND_STRING {
+            if source_kinds[offset] == 0 && kinds[offset] == KIND_STRING {
                 string_ids[offset] = self.intern(text);
             }
         }
 
         let s = &mut self.sheets[sheet];
-        let mut removed_formula = false;
         for col_offset in 0..cols {
             let col = start_col + col_offset;
             for row_offset in 0..rows {
                 let row = start_row + row_offset;
                 let offset = row_offset * cols + col_offset;
-                let (kind, payload) = match kinds[offset] {
-                    KIND_NUMBER | KIND_BOOL => (kinds[offset], encode_num(numbers[offset])),
-                    KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
-                    _ => (KIND_EMPTY, 0),
+                let (kind, payload) = if source_kinds[offset] != 0 {
+                    (KIND_FORMULA, 0)
+                } else {
+                    match kinds[offset] {
+                        KIND_NUMBER | KIND_BOOL => (kinds[offset], encode_num(numbers[offset])),
+                        KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
+                        _ => (KIND_EMPTY, 0),
+                    }
                 };
-                if !s.write_cell(row, col, kind, payload, styles[offset], dirty_revision) {
-                    return false;
+                if !s.write_cell(
+                    row,
+                    col,
+                    kind,
+                    payload,
+                    styles[offset],
+                    dirty_revision,
+                ) {
+                    return BLOCK_RESOURCE_LIMIT;
                 }
                 if let Some(key) = cell_key(row, col) {
-                    removed_formula |= s.formulas.remove(&key).is_some();
+                    s.formulas.remove(&key);
                 }
             }
         }
+        for (key, entry) in prepared {
+            s.formulas.insert(key, entry);
+        }
         s.clear_dirty();
         s.all_dirty = true;
-        if removed_formula {
+        self.bump_formula_epoch();
+        BLOCK_OK
+    }
+
+    /// Write one sparse mixed transaction/page/snapshot block without
+    /// allocating by logical rectangle size. Inside `beginPageLoad`, dirty
+    /// paged cells are skipped; otherwise the whole sparse write is preflighted.
+    #[wasm_bindgen(js_name = setSparseBlock)]
+    pub fn set_sparse_block(
+        &mut self,
+        sheet: usize,
+        start_row: usize,
+        start_col: usize,
+        rows: usize,
+        cols: usize,
+        offsets: &[u32],
+        kinds: &[u8],
+        numbers: &[f64],
+        texts: Vec<String>,
+        styles: &[u32],
+        formula_offsets: &[u32],
+        formula_sources: Vec<String>,
+        reference_offsets: &[u32],
+        reference_targets: &[u32],
+    ) -> u32 {
+        let hydrating = self.loading_page > 0;
+        let dirty_revision = if hydrating {
+            None
+        } else {
+            self.local_dirty_revision()
+        };
+        let Some(cell_count) = rows.checked_mul(cols) else {
+            return BLOCK_INVALID;
+        };
+        let Some(existing) = self.sheets.get(sheet) else {
+            return BLOCK_INVALID;
+        };
+        if rows == 0
+            || cols == 0
+            || cell_count > u32::MAX as usize
+            || offsets.len() != kinds.len()
+            || offsets.len() != numbers.len()
+            || offsets.len() != texts.len()
+            || offsets.len() != styles.len()
+            || formula_offsets.len() != formula_sources.len()
+            || reference_targets.len() != reference_offsets.len().saturating_mul(3)
+            || start_row
+                .checked_add(rows)
+                .is_none_or(|end| end > existing.row_count)
+            || start_row > u32::MAX as usize
+            || rows - 1 > u32::MAX as usize - start_row
+            || start_col
+                .checked_add(cols)
+                .is_none_or(|end| end > existing.n_cols)
+            || start_col > u32::MAX as usize
+            || cols - 1 > u32::MAX as usize - start_col
+        {
+            return BLOCK_INVALID;
+        }
+
+        let mut destination_cells = Vec::with_capacity(offsets.len());
+        let mut entry_offsets = HashSet::with_capacity(offsets.len());
+        for &offset in offsets {
+            if offset as usize >= cell_count || !entry_offsets.insert(offset) {
+                return BLOCK_INVALID;
+            }
+            let offset = offset as usize;
+            destination_cells.push((start_row + offset / cols, start_col + offset % cols));
+        }
+        let mut source_offsets = HashSet::with_capacity(
+            formula_offsets.len().saturating_add(reference_offsets.len()),
+        );
+        for &offset in formula_offsets {
+            if !entry_offsets.contains(&offset) || !source_offsets.insert(offset) {
+                return BLOCK_SOURCE_INVALID;
+            }
+        }
+        for &offset in reference_offsets {
+            if !entry_offsets.contains(&offset) || !source_offsets.insert(offset) {
+                return BLOCK_SOURCE_INVALID;
+            }
+        }
+
+        let mut prepared_sources = HashMap::with_capacity(source_offsets.len());
+        for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
+            prepared_sources.insert(offset, self.parse_formula_entry(source, sheet as u32));
+        }
+        for (index, &offset) in reference_offsets.iter().enumerate() {
+            let target_index = index * 3;
+            let target = AbsCellKey {
+                sheet: reference_targets[target_index],
+                row: reference_targets[target_index + 1],
+                col: reference_targets[target_index + 2],
+            };
+            let target_sheet = target.sheet as usize;
+            if !self
+                .sheet_alive
+                .get(target_sheet)
+                .copied()
+                .unwrap_or(false)
+                || !self.sheets[target_sheet]
+                    .contains_cell(target.row as usize, target.col as usize)
+            {
+                return BLOCK_SOURCE_INVALID;
+            }
+            prepared_sources.insert(
+                offset,
+                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
+            );
+        }
+
+        if let Some(revision) = dirty_revision {
+            if !self.sheets[sheet].prepare_dirty_cells(&destination_cells, revision) {
+                return BLOCK_RESOURCE_LIMIT;
+            }
+        }
+
+        let mut string_ids = vec![NO_STRING; offsets.len()];
+        for (index, text) in texts.iter().enumerate() {
+            if !source_offsets.contains(&offsets[index]) && kinds[index] == KIND_STRING {
+                string_ids[index] = self.intern(text);
+            }
+        }
+
+        let mut wrote = false;
+        let mut changed_sources = false;
+        let data = &mut self.sheets[sheet];
+        for (index, &offset) in offsets.iter().enumerate() {
+            let offset_usize = offset as usize;
+            let row = start_row + offset_usize / cols;
+            let col = start_col + offset_usize % cols;
+            let Some(key) = cell_key(row, col) else {
+                return BLOCK_SOURCE_INVALID;
+            };
+            let source = prepared_sources.remove(&offset);
+            let (kind, payload) = if source.is_some() {
+                (KIND_FORMULA, 0)
+            } else {
+                match kinds[index] {
+                    KIND_NUMBER | KIND_BOOL => (kinds[index], encode_num(numbers[index])),
+                    KIND_STRING => (KIND_STRING, encode_str_id(string_ids[index])),
+                    _ => (KIND_EMPTY, 0),
+                }
+            };
+            let accepted = if hydrating {
+                data.hydrate_cell(row, col, kind, payload, styles[index])
+            } else {
+                data.write_cell(row, col, kind, payload, styles[index], dirty_revision)
+            };
+            if !accepted {
+                if hydrating {
+                    continue;
+                }
+                return BLOCK_RESOURCE_LIMIT;
+            }
+            wrote = true;
+            if !hydrating {
+                data.dirty_cells.insert(key);
+            }
+            changed_sources |= data.formulas.remove(&key).is_some();
+            if let Some(entry) = source {
+                data.formulas.insert(key, entry);
+                changed_sources = true;
+            }
+        }
+        if wrote && hydrating {
+            data.all_dirty = true;
+        }
+        if changed_sources {
             self.bump_formula_epoch();
         }
-        true
+        BLOCK_OK
     }
 
     /// Clear a rectangle while independently controlling contents and style.
@@ -922,6 +1270,66 @@ impl CellStore {
         let mut out: Vec<u32> = ids.into_keys().collect();
         out.sort_unstable();
         out
+    }
+
+    /// Capture only persisted formula/reference sources in a rectangle. The
+    /// returned opaque object is compact in source cardinality, not cell count.
+    #[wasm_bindgen(js_name = captureSources)]
+    pub fn capture_sources(
+        &self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Option<SourceSnapshot> {
+        let s = self.sheets.get(sheet)?;
+        let cell_count = rows.checked_mul(cols)?;
+        if rows == 0
+            || cols == 0
+            || cell_count > u32::MAX as usize
+            || r0.checked_add(rows).is_none_or(|end| end > s.row_count)
+            || c0.checked_add(cols).is_none_or(|end| end > s.n_cols)
+        {
+            return None;
+        }
+
+        let mut formulas = Vec::new();
+        let mut references = Vec::new();
+        for (&(row, col), entry) in &s.formulas {
+            let row = row as usize;
+            let col = col as usize;
+            if row < r0 || row >= r0 + rows || col < c0 || col >= c0 + cols {
+                continue;
+            }
+            let offset = ((row - r0) * cols + col - c0) as u32;
+            if entry.is_formula() {
+                formulas.push((offset, entry.source.clone()));
+            } else if let Some(target) = entry.reference_target(sheet as u32) {
+                references.push((offset, target));
+            }
+        }
+        formulas.sort_unstable_by_key(|(offset, _)| *offset);
+        references.sort_unstable_by_key(|(offset, _)| *offset);
+
+        let mut formula_offsets = Vec::with_capacity(formulas.len());
+        let mut formula_sources = Vec::with_capacity(formulas.len());
+        for (offset, source) in formulas {
+            formula_offsets.push(offset);
+            formula_sources.push(source);
+        }
+        let mut reference_offsets = Vec::with_capacity(references.len());
+        let mut reference_targets = Vec::with_capacity(references.len() * 3);
+        for (offset, target) in references {
+            reference_offsets.push(offset);
+            reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
+        }
+        Some(SourceSnapshot {
+            formula_offsets,
+            formula_sources,
+            reference_offsets,
+            reference_targets,
+        })
     }
 
     /// Remap styles over a rectangle using parallel old/new id tables.
@@ -1461,6 +1869,14 @@ impl CellStore {
                         };
                     }
                     FormulaValueKind::Number => {}
+                    FormulaValueKind::Blank => {
+                        return CellOut {
+                            kind: KIND_EMPTY,
+                            num: 0.0,
+                            string: None,
+                            style: s.style_at(i),
+                        };
+                    }
                 }
             }
         }
@@ -1623,7 +2039,19 @@ impl CellStore {
     pub fn formula_source(&self, sheet: usize, row: usize, col: usize) -> Option<String> {
         let key = cell_key(row, col)?;
         let entry = self.sheets.get(sheet)?.formulas.get(&key)?;
-        Some(entry.source.clone())
+        entry.is_formula().then(|| entry.source.clone())
+    }
+
+    #[wasm_bindgen(js_name = referenceTarget)]
+    pub fn reference_target(&self, sheet: usize, row: usize, col: usize) -> Option<Vec<u32>> {
+        let key = cell_key(row, col)?;
+        let target = self
+            .sheets
+            .get(sheet)?
+            .formulas
+            .get(&key)?
+            .reference_target(sheet as u32)?;
+        Some(vec![target.sheet, target.row, target.col])
     }
 
     #[wasm_bindgen(js_name = poolStrings)]
@@ -1648,6 +2076,13 @@ impl CellStore {
     #[wasm_bindgen(js_name = recompute)]
     pub fn recompute(&mut self, sheet: usize) {
         self.recompute_sheet(sheet);
+    }
+
+    /// Recompute the union of every dirty sheet once at the host transaction
+    /// barrier, including cross-sheet formula and plain-reference dependents.
+    #[wasm_bindgen(js_name = recomputeChanged)]
+    pub fn recompute_changed_sources(&mut self) {
+        self.recompute_changed();
     }
 }
 
@@ -1774,6 +2209,7 @@ impl CellStore {
             sheet.clear_dirty();
             sheet.all_dirty = true;
         }
+        self.drop_invalid_references();
         if self.rebase_named_rows(edited_sheet, at, delta) {
             self.refresh_named_formula_entries();
         }
@@ -1789,8 +2225,31 @@ impl CellStore {
             sheet.clear_dirty();
             sheet.all_dirty = true;
         }
+        self.drop_invalid_references();
         if self.rebase_named_cols(edited_sheet, at, delta) {
             self.refresh_named_formula_entries();
+        }
+    }
+
+    fn drop_invalid_references(&mut self) {
+        for (sheet_index, sheet) in self.sheets.iter_mut().enumerate() {
+            let invalid: Vec<_> = sheet
+                .formulas
+                .iter()
+                .filter_map(|(key, entry)| {
+                    (entry.is_reference()
+                        && entry.reference_target(sheet_index as u32).is_none())
+                    .then_some(*key)
+                })
+                .collect();
+            for key in invalid {
+                sheet.formulas.remove(&key);
+                let (row, col) = (key.0 as usize, key.1 as usize);
+                if sheet.contains_cell(row, col) {
+                    let style = sheet.style_at(sheet.idx(row, col));
+                    let _ = sheet.write_cell(row, col, KIND_EMPTY, 0, style, None);
+                }
+            }
         }
     }
 
@@ -1827,7 +2286,7 @@ impl CellStore {
         let ast = resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
             self.named_range(name, sheet)
         });
-        FormulaEntry::parsed(ast, formula_sheet)
+        FormulaEntry::parsed_source(ast, formula_sheet, source.to_string())
     }
 
     fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
@@ -1897,6 +2356,7 @@ impl CellStore {
             let sources: Vec<_> = self.sheets[formula_sheet]
                 .formulas
                 .iter()
+                .filter(|(_, entry)| entry.is_formula())
                 .map(|(key, entry)| (*key, entry.source.clone()))
                 .collect();
             let refreshed: Vec<_> = sources

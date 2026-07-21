@@ -229,6 +229,9 @@ pub(crate) fn fill_window_cell(
                         kind[dst] = KIND_STRING;
                         string_ids[dst] = sheet.str_id_at(src);
                     }
+                    Some(FormulaValueKind::Blank) => {
+                        kind[dst] = KIND_EMPTY;
+                    }
                     _ => {
                         kind[dst] = KIND_NUMBER;
                         num[dst] = sheet.num_at(src);

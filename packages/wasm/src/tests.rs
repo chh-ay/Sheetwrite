@@ -162,7 +162,7 @@ fn page_hydration_preserves_dirty_and_explicitly_protected_cells() {
     assert_close(number(&store, sheet, 0, 0), 10.0);
     assert_eq!(store.get_cell(sheet, 0, 0).style(), 7);
     assert_eq!(store.cell_state(sheet, 0, 0), 3);
-    assert_eq!(store.formula_source(sheet, 1, 0).as_deref(), Some("=(1+1)"));
+    assert_eq!(store.formula_source(sheet, 1, 0).as_deref(), Some("=1+1"));
     assert_eq!(store.get_cell(sheet, 1, 0).style(), 9);
     assert_eq!(store.cell_state(sheet, 1, 0), 2);
     assert_close(number(&store, sheet, 2, 0), 300.0);
@@ -1092,8 +1092,8 @@ fn public_api_bounds_checks_do_not_panic() {
         store.end_page_load();
 
         assert!(!store.is_paged(99));
-        assert_eq!(store.paged_stats(99), vec![0.0; 5]);
-        assert_eq!(store.paged_stats(sheet), vec![0.0, 0.0, 0.0, 0.0, 1.0]);
+        assert_eq!(store.paged_stats(99), vec![0.0; 6]);
+        assert_eq!(store.paged_stats(sheet), vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
         assert_eq!(store.cell_state(99, 0, 0), 0);
         assert_eq!(store.cell_state(sheet, 9, 9), 0);
         assert!(!store.is_fully_loaded(99));
@@ -1103,17 +1103,24 @@ fn public_api_bounds_checks_do_not_panic() {
         assert_eq!(store.col_count(99), 0);
         assert_eq!(store.style_id_at(99, 0, 0), 0);
         assert_eq!(store.style_id_at(sheet, 9, 9), 0);
-        assert!(!store.set_block(
-            99,
-            0,
-            0,
-            1,
-            1,
-            &[KIND_EMPTY],
-            &[0.0],
-            vec![String::new()],
-            &[0],
-        ));
+        assert_ne!(
+            store.set_block(
+                99,
+                0,
+                0,
+                1,
+                1,
+                &[KIND_EMPTY],
+                &[0.0],
+                vec![String::new()],
+                &[0],
+                &[],
+                Vec::new(),
+                &[],
+                &[],
+            ),
+            0
+        );
         assert!(!store.clear_range(99, 0, 0, 0, 0, true, true));
         assert!(store.range_style_ids(99, 0, 0, 0, 0).is_empty());
         assert!(!store.remap_range_styles(99, 0, 0, 0, 0, &[], &[]));
@@ -1991,24 +1998,31 @@ fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
 fn range_native_block_clear_and_style_remap_preserve_column_major_semantics() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 3);
-    assert!(store.set_block(
-        sheet,
-        0,
-        0,
-        3,
-        2,
-        &[1, 2, 0, 1, 2, 1],
-        &[1.0, 0.0, 0.0, 4.0, 0.0, 6.0],
-        vec![
-            String::new(),
-            "two".to_string(),
-            String::new(),
-            String::new(),
-            "five".to_string(),
-            String::new(),
-        ],
-        &[7, 8, 7, 8, 7, 8],
-    ));
+    assert_eq!(
+        store.set_block(
+            sheet,
+            0,
+            0,
+            3,
+            2,
+            &[1, 2, 0, 1, 2, 1],
+            &[1.0, 0.0, 0.0, 4.0, 0.0, 6.0],
+            vec![
+                String::new(),
+                "two".to_string(),
+                String::new(),
+                String::new(),
+                "five".to_string(),
+                String::new(),
+            ],
+            &[7, 8, 7, 8, 7, 8],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        0
+    );
 
     assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("two"));
@@ -2478,4 +2492,232 @@ fn numeric_filter_equal_returns_matching_rows() {
 #[test]
 fn numeric_filter_not_equal_returns_matching_rows() {
     assert_eq!(numeric_filter_rows(5), vec![0, 1, 3, 4]);
+}
+
+#[test]
+fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 2);
+    store.set_sheet_name(sheet, "s1", "Sheet 1");
+    assert_eq!(
+        store.set_block(
+            sheet,
+            0,
+            0,
+            2,
+            2,
+            &[KIND_NUMBER, KIND_EMPTY, KIND_EMPTY, KIND_STRING],
+            &[2.0, 0.0, 0.0, 0.0],
+            vec![
+                String::new(),
+                String::new(),
+                String::new(),
+                "tail".to_string(),
+            ],
+            &[1, 2, 3, 4],
+            &[1],
+            vec!["=A1*3".to_string()],
+            &[2],
+            &[sheet as u32, 0, 1],
+        ),
+        0
+    );
+    store.recompute_changed_sources();
+
+    assert_close(number(&store, sheet, 0, 1), 6.0);
+    assert_close(number(&store, sheet, 1, 0), 6.0);
+    assert_eq!(store.formula_source(sheet, 0, 1).as_deref(), Some("=A1*3"));
+    assert!(store.formula_source(sheet, 1, 0).is_none());
+    assert_eq!(
+        store.reference_target(sheet, 1, 0),
+        Some(vec![sheet as u32, 0, 1])
+    );
+
+    let sources = store.capture_sources(sheet, 0, 0, 2, 2).unwrap();
+    assert_eq!(sources.formula_offsets(), vec![1]);
+    assert_eq!(sources.formula_sources(), vec!["=A1*3"]);
+    assert_eq!(sources.reference_offsets(), vec![2]);
+    assert_eq!(
+        sources.reference_targets(),
+        vec![sheet as u32, 0, 1]
+    );
+
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            2,
+            2,
+            &[0],
+            &[KIND_NUMBER],
+            &[4.0],
+            vec![String::new()],
+            &[1],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        0
+    );
+    store.recompute_changed_sources();
+    assert_close(number(&store, sheet, 0, 1), 12.0);
+    assert_close(number(&store, sheet, 1, 0), 12.0);
+}
+
+#[test]
+fn mixed_block_rejection_is_atomic_and_keeps_one_source_authority() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 1);
+    store.set_sheet_name(sheet, "s1", "Sheet 1");
+    store.set_number(sheet, 0, 0, 7.0, 5);
+    store.set_formula(sheet, 0, 1, "=A1+1", 6);
+    store.recompute_changed_sources();
+
+    assert_eq!(
+        store.set_block(
+            sheet,
+            0,
+            0,
+            1,
+            2,
+            &[KIND_NUMBER, KIND_NUMBER],
+            &[100.0, 200.0],
+            vec![String::new(), String::new()],
+            &[9, 9],
+            &[0],
+            vec!["=1".to_string()],
+            &[0],
+            &[sheet as u32, 0, 1],
+        ),
+        2
+    );
+    assert_close(number(&store, sheet, 0, 0), 7.0);
+    assert_close(number(&store, sheet, 0, 1), 8.0);
+    assert_eq!(store.style_id_at(sheet, 0, 0), 5);
+    assert_eq!(store.formula_source(sheet, 0, 1).as_deref(), Some("=A1+1"));
+    let sources = store.capture_sources(sheet, 0, 0, 1, 2).unwrap();
+    assert_eq!(sources.formula_offsets(), vec![1]);
+    assert!(sources.reference_offsets().is_empty());
+}
+
+#[test]
+fn plain_reference_targets_follow_structural_edits_and_drop_on_target_delete() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 3);
+    store.set_sheet_name(sheet, "s1", "Sheet 1");
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            3,
+            2,
+            &[0, 5],
+            &[KIND_NUMBER, KIND_EMPTY],
+            &[9.0, 0.0],
+            vec![String::new(), String::new()],
+            &[0, 0],
+            &[],
+            Vec::new(),
+            &[5],
+            &[sheet as u32, 0, 0],
+        ),
+        0
+    );
+    store.recompute_changed_sources();
+    assert_close(number(&store, sheet, 2, 1), 9.0);
+
+    store.add_rows(sheet, 0, 1);
+    store.recompute_changed_sources();
+    assert_eq!(
+        store.reference_target(sheet, 3, 1),
+        Some(vec![sheet as u32, 1, 0])
+    );
+    assert_close(number(&store, sheet, 3, 1), 9.0);
+
+    store.remove_rows(sheet, 1, 1);
+    store.recompute_changed_sources();
+    assert!(store.reference_target(sheet, 2, 1).is_none());
+    assert_eq!(store.get_cell(sheet, 2, 1).kind(), KIND_EMPTY);
+}
+
+#[test]
+fn range_snapshot_round_trip_preserves_plain_reference_sources() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 2);
+    store.set_sheet_name(sheet, "s1", "Sheet 1");
+    assert_eq!(
+        store.set_block(
+            sheet,
+            0,
+            0,
+            2,
+            2,
+            &[KIND_NUMBER, KIND_EMPTY, KIND_EMPTY, KIND_EMPTY],
+            &[5.0, 0.0, 0.0, 0.0],
+            vec![String::new(); 4],
+            &[1, 2, 3, 4],
+            &[1],
+            vec!["=A1+2".to_string()],
+            &[2],
+            &[sheet as u32, 0, 1],
+        ),
+        0
+    );
+    store.recompute_changed_sources();
+    let snapshot = store.capture_range(sheet, 0, 0, 2, 2).unwrap();
+    assert_eq!(snapshot.formula_offsets(), vec![0, 1]);
+    assert_eq!(snapshot.reference_offsets(), vec![1, 0]);
+    assert_eq!(
+        snapshot.reference_targets(),
+        vec![sheet as u32, 0, 1]
+    );
+
+    assert!(store.clear_range(sheet, 0, 0, 1, 1, true, true));
+    assert!(store.restore_range(sheet, 0, 0, &snapshot));
+    store.recompute_changed_sources();
+    assert_eq!(store.formula_source(sheet, 0, 1).as_deref(), Some("=A1+2"));
+    assert_eq!(
+        store.reference_target(sheet, 1, 0),
+        Some(vec![sheet as u32, 0, 1])
+    );
+    assert_close(number(&store, sheet, 1, 0), 7.0);
+}
+
+#[test]
+fn million_row_source_snapshot_scales_with_source_cardinality() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 1_000_000, 128, 0, 32);
+    store.set_sheet_name(sheet, "large", "Large");
+    store.begin_page_load();
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            1_000_000,
+            2,
+            &[0, 1],
+            &[KIND_EMPTY, KIND_EMPTY],
+            &[0.0, 0.0],
+            vec![String::new(), String::new()],
+            &[0, 0],
+            &[0],
+            vec!["=1".to_string()],
+            &[1],
+            &[sheet as u32, 0, 0],
+        ),
+        0
+    );
+    store.end_page_load();
+    store.recompute_changed_sources();
+
+    let sources = store
+        .capture_sources(sheet, 0, 0, 1_000_000, 2)
+        .unwrap();
+    assert_eq!(sources.formula_offsets().len(), 1);
+    assert_eq!(sources.reference_offsets().len(), 1);
+    assert!(sources.byte_length() < 128);
 }

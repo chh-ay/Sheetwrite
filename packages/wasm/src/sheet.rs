@@ -309,6 +309,57 @@ impl PagedStorage {
         true
     }
 
+    fn prepare_dirty_rect(
+        &mut self,
+        r0: usize,
+        c0: usize,
+        rows: usize,
+        cols: usize,
+        revision: u64,
+    ) -> bool {
+        let additional = (c0..c0 + cols)
+            .flat_map(|col| (r0..r0 + rows).map(move |row| (row, col)))
+            .filter(|key| !self.dirty.contains_key(key))
+            .count();
+        if self.dirty.len().saturating_add(additional) > self.max_dirty_cells
+            || self.dirty.try_reserve(additional).is_err()
+        {
+            return false;
+        }
+        if !self.dirty_by_revision.contains_key(&revision)
+            && self.dirty_by_revision.try_reserve(1).is_err()
+        {
+            return false;
+        }
+        self.dirty_by_revision
+            .entry(revision)
+            .or_default()
+            .try_reserve(rows.saturating_mul(cols))
+            .is_ok()
+    }
+
+    fn prepare_dirty_cells(&mut self, cells: &[(usize, usize)], revision: u64) -> bool {
+        let additional = cells
+            .iter()
+            .filter(|key| !self.dirty.contains_key(key))
+            .count();
+        if self.dirty.len().saturating_add(additional) > self.max_dirty_cells
+            || self.dirty.try_reserve(additional).is_err()
+        {
+            return false;
+        }
+        if !self.dirty_by_revision.contains_key(&revision)
+            && self.dirty_by_revision.try_reserve(1).is_err()
+        {
+            return false;
+        }
+        self.dirty_by_revision
+            .entry(revision)
+            .or_default()
+            .try_reserve(cells.len())
+            .is_ok()
+    }
+
     fn reserve_revision_slot(&mut self, revision: u64, key: (usize, usize)) -> Option<usize> {
         if !self.dirty_by_revision.contains_key(&revision)
             && self.dirty_by_revision.try_reserve(1).is_err()
@@ -789,6 +840,29 @@ impl SheetData {
         self.paged
             .as_ref()
             .is_none_or(|paged| paged.can_dirty_rect(r0, c0, rows, cols))
+    }
+
+    pub(crate) fn prepare_dirty_rect(
+        &mut self,
+        r0: usize,
+        c0: usize,
+        rows: usize,
+        cols: usize,
+        revision: u64,
+    ) -> bool {
+        self.paged.as_mut().is_none_or(|paged| {
+            paged.prepare_dirty_rect(r0, c0, rows, cols, revision)
+        })
+    }
+
+    pub(crate) fn prepare_dirty_cells(
+        &mut self,
+        cells: &[(usize, usize)],
+        revision: u64,
+    ) -> bool {
+        self.paged
+            .as_mut()
+            .is_none_or(|paged| paged.prepare_dirty_cells(cells, revision))
     }
 
     pub(crate) fn write_cell(

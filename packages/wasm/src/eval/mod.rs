@@ -34,15 +34,31 @@ use value::{
 
 impl CellStore {
     pub(crate) fn recompute_sheet(&mut self, sheet: usize) {
-        let Some(s) = self.sheets.get(sheet) else {
-            return;
-        };
-        if s.dirty_cells.is_empty() && !s.all_dirty {
+        self.recompute_seed_sheets(&[sheet]);
+    }
+
+    pub(crate) fn recompute_changed(&mut self) {
+        let seeds: Vec<usize> = self
+            .sheets
+            .iter()
+            .enumerate()
+            .filter_map(|(sheet, data)| {
+                (!data.dirty_cells.is_empty() || data.all_dirty).then_some(sheet)
+            })
+            .collect();
+        self.recompute_seed_sheets(&seeds);
+    }
+
+    fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
+        if seeds.is_empty() {
             return;
         }
-
-        if self.sheets.iter().all(|s| s.formulas.is_empty()) {
-            self.sheets[sheet].clear_dirty();
+        if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
+            for &sheet in seeds {
+                if let Some(data) = self.sheets.get_mut(sheet) {
+                    data.clear_dirty();
+                }
+            }
             return;
         }
 
@@ -51,16 +67,22 @@ impl CellStore {
             None => true,
         };
         if dep_index_stale {
-            let index = build_dep_index(&self.sheets, self.formula_epoch);
-            self.dep_index = Some(index);
+            self.dep_index = Some(build_dep_index(&self.sheets, self.formula_epoch));
         }
         let Some(index) = self.dep_index.as_ref() else {
             return;
         };
 
-        let affected = collect_affected_formulas(&self.sheets, sheet, index);
+        let mut affected = HashSet::new();
+        for &sheet in seeds {
+            affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
+        }
         if affected.is_empty() {
-            self.sheets[sheet].clear_dirty();
+            for &sheet in seeds {
+                if let Some(data) = self.sheets.get_mut(sheet) {
+                    data.clear_dirty();
+                }
+            }
             return;
         }
 
@@ -75,24 +97,23 @@ impl CellStore {
             .iter()
             .filter_map(|key| memo.get(key).cloned().map(|result| (*key, result)))
             .collect();
-
         for (abs_key, result) in results {
             let interned = match &result {
                 Value::Text(text) => Some(self.intern(text)),
                 _ => None,
             };
             let sheet_index = abs_key.sheet as usize;
-            let Some(s) = self.sheets.get_mut(sheet_index) else {
+            let Some(data) = self.sheets.get_mut(sheet_index) else {
                 continue;
             };
             let (row, col) = abs_key.local();
             let (row, col) = (row as usize, col as usize);
-            if !s.contains_cell(row, col) {
+            if !data.contains_cell(row, col) {
                 continue;
             }
-            let i = s.idx(row, col);
+            let index = data.idx(row, col);
             {
-                let Some(entry) = s.formulas.get_mut(&abs_key.local()) else {
+                let Some(entry) = data.formulas.get_mut(&abs_key.local()) else {
                     continue;
                 };
                 match &result {
@@ -110,7 +131,11 @@ impl CellStore {
                     }
                     Value::Blank => {
                         entry.error = None;
-                        entry.value_kind = FormulaValueKind::Number;
+                        entry.value_kind = if entry.is_reference() {
+                            FormulaValueKind::Blank
+                        } else {
+                            FormulaValueKind::Number
+                        };
                     }
                     Value::Error(error) => {
                         entry.error = Some(*error);
@@ -119,16 +144,20 @@ impl CellStore {
                 }
             }
             match result {
-                Value::Number(value) => s.set_num(i, value),
+                Value::Number(value) => data.set_num(index, value),
                 Value::Text(_) => match interned {
-                    Some(id) => s.set_str(i, id),
-                    None => s.clear_payload(i),
+                    Some(id) => data.set_str(index, id),
+                    None => data.clear_payload(index),
                 },
-                Value::Bool(value) => s.set_num(i, f64::from(value)),
-                Value::Blank | Value::Error(_) => s.clear_payload(i),
+                Value::Bool(value) => data.set_num(index, f64::from(value)),
+                Value::Blank | Value::Error(_) => data.clear_payload(index),
             }
         }
-        self.sheets[sheet].clear_dirty();
+        for &sheet in seeds {
+            if let Some(data) = self.sheets.get_mut(sheet) {
+                data.clear_dirty();
+            }
+        }
     }
 
     pub(crate) fn eval_at(

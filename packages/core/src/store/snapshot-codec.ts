@@ -4,9 +4,9 @@ import {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../document-protocol.js";
-import { cellKey, type ReferenceGraph } from "../reference.js";
+import type { RangeSourceProjection } from "../reference.js";
 import type { CellValue } from "../types/cell.js";
-import type { CellAddress } from "../types/coordinates.js";
+import type { SheetId } from "../types/coordinates.js";
 import type { SheetSnapshot, SnapshotCell, Workbook, WorkbookSnapshot } from "../types/document.js";
 import type { StoreWindowReader } from "./window-reader.js";
 
@@ -62,15 +62,14 @@ export class StoreSnapshotCodec {
   constructor(
     private readonly workbook: Workbook,
     private readonly windowReader: StoreWindowReader,
-    private readonly formulaSources: ReadonlyMap<string, string>,
-    private readonly refs: ReferenceGraph,
+    private readonly captureSources: (
+      sheet: SheetId,
+      rowCount: number,
+      colCount: number,
+    ) => RangeSourceProjection | null,
   ) {}
 
   encode(documentId: string | undefined, documentVersion: number | undefined): WorkbookSnapshot {
-    const refTargets = new Map<string, CellAddress>();
-    for (const [source, target] of this.refs.entries()) {
-      refTargets.set(cellKey(source), target);
-    }
     const sheets: SheetSnapshot[] = this.workbook.sheets.map((sheet, order) => {
       const rowMetaRows = new Set<number>([
         ...(sheet.rowHeights?.keys() ?? []),
@@ -97,14 +96,16 @@ export class StoreSnapshotCodec {
         undefined,
         false,
       );
+      const sources =
+        sheet.rowCount === 0 || cols.length === 0
+          ? null
+          : this.captureSources(sheet.id, sheet.rowCount, cols.length);
       const cells: SnapshotCell[] = [];
       for (let row = 0; row < sheet.rowCount; row++) {
         for (let col = 0; col < cols.length; col++) {
           const index = row * cols.length + col;
-          const addr = { sheet: sheet.id, row, col };
-          const key = cellKey(addr);
-          const formula = this.formulaSources.get(key);
-          const target = refTargets.get(key);
+          const formula = sources?.formulaAt(index);
+          const target = sources?.referenceAt(index);
           const style = window.styles[window.styleIds[index] ?? 0] ?? {};
           const hasStyle = Object.keys(style).length > 0;
           const resolved = window.values[index] ?? null;

@@ -1576,7 +1576,7 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 
-  it("crosses the WASM boundary once per wide-page column plus rich exceptions", () => {
+  it("crosses the WASM boundary O(1) times for a wide mixed page without scalar calls", () => {
     const columnCount = 96;
     const rowCount = 256;
     const workbook = makeWorkbook(rowCount);
@@ -1592,26 +1592,37 @@ describe("paged datasource storage", () => {
     page[0]!.c0 = { kind: "formula", src: "=1+1" };
     page[1]!.c1 = { value: { kind: "literal", value: 7 }, style: { bold: true } };
 
+    const originalSparseBlock = CellStore.prototype.setSparseBlock;
+    const originalRecompute = CellStore.prototype.recomputeChanged;
     const originalNumbers = CellStore.prototype.hydratePageNumbers;
     const originalCellState = CellStore.prototype.cellState;
     const originalSetFormula = CellStore.prototype.setFormula;
     const originalSetNumber = CellStore.prototype.setNumber;
-    let columnCrossings = 0;
-    let exceptionCrossings = 0;
+    let blockCrossings = 0;
+    let recomputeCrossings = 0;
+    let scalarCrossings = 0;
+    CellStore.prototype.setSparseBlock = function (...args) {
+      blockCrossings += 1;
+      return originalSparseBlock.apply(this, args);
+    };
+    CellStore.prototype.recomputeChanged = function (...args) {
+      recomputeCrossings += 1;
+      return originalRecompute.apply(this, args);
+    };
     CellStore.prototype.hydratePageNumbers = function (...args) {
-      columnCrossings += 1;
+      scalarCrossings += 1;
       return originalNumbers.apply(this, args);
     };
     CellStore.prototype.cellState = function (...args) {
-      exceptionCrossings += 1;
+      scalarCrossings += 1;
       return originalCellState.apply(this, args);
     };
     CellStore.prototype.setFormula = function (...args) {
-      exceptionCrossings += 1;
+      scalarCrossings += 1;
       return originalSetFormula.apply(this, args);
     };
     CellStore.prototype.setNumber = function (...args) {
-      exceptionCrossings += 1;
+      scalarCrossings += 1;
       return originalSetNumber.apply(this, args);
     };
     const store = new SheetwriteStore(workbook, undefined, {
@@ -1625,8 +1636,9 @@ describe("paged datasource storage", () => {
         revisionAddresses.add(address);
         return false;
       });
-      expect(columnCrossings).toBe(columnCount);
-      expect(exceptionCrossings).toBe(4);
+      expect(blockCrossings).toBe(1);
+      expect(recomputeCrossings).toBe(1);
+      expect(scalarCrossings).toBe(0);
       expect(revisionAddresses.size).toBe(1);
       expect(store.getFormula(addr(0, 0))).toBe("=1+1");
       expect(store.getCell(addr(1, 1))).toMatchObject({
@@ -1634,6 +1646,8 @@ describe("paged datasource storage", () => {
         style: { bold: true },
       });
     } finally {
+      CellStore.prototype.setSparseBlock = originalSparseBlock;
+      CellStore.prototype.recomputeChanged = originalRecompute;
       CellStore.prototype.hydratePageNumbers = originalNumbers;
       CellStore.prototype.cellState = originalCellState;
       CellStore.prototype.setFormula = originalSetFormula;

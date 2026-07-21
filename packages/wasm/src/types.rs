@@ -2,6 +2,7 @@
 
 use crate::calc::{
     invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast, Func,
+    RefFlags, SheetRef,
 };
 use std::rc::Rc;
 use crate::memory::MemoryOwnerStats;
@@ -227,6 +228,7 @@ pub(crate) enum FormulaValueKind {
     Number,
     Text,
     Bool,
+    Blank,
 }
 
 fn ast_is_volatile(ast: &Ast) -> bool {
@@ -241,7 +243,15 @@ fn ast_is_volatile(ast: &Ast) -> bool {
     }
 }
 
-/// Stored formula metadata: parsed AST, precomputed read-set, and last error.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PersistedSourceKind {
+    Formula,
+    Reference,
+}
+
+/// Stored derived-cell metadata: parsed formulas and plain references share the
+/// same Rust-owned read-set/dependency graph, while retaining distinct
+/// persistence kinds at the ABI boundary.
 #[derive(Clone, Debug)]
 pub(crate) struct FormulaEntry {
     pub(crate) ast: Option<Ast>,
@@ -250,11 +260,16 @@ pub(crate) struct FormulaEntry {
     pub(crate) error: Option<FormulaError>,
     pub(crate) value_kind: FormulaValueKind,
     pub(crate) volatile: bool,
+    pub(crate) source_kind: PersistedSourceKind,
 }
 
 impl FormulaEntry {
     pub(crate) fn parsed(ast: Ast, sheet: u32) -> Self {
         let source = serialize(&ast);
+        Self::parsed_source(ast, sheet, source)
+    }
+
+    pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
         let reads = ReadSet::from_ast(&ast, sheet);
         let volatile = ast_is_volatile(&ast);
         Self {
@@ -264,6 +279,56 @@ impl FormulaEntry {
             error: None,
             value_kind: FormulaValueKind::Number,
             volatile,
+            source_kind: PersistedSourceKind::Formula,
+        }
+    }
+
+    pub(crate) fn reference(target: AbsCellKey, target_name: &str, formula_sheet: u32) -> Self {
+        let ast = Ast::AbsCell(
+            SheetRef {
+                handle: target.sheet,
+                name: target_name.to_string(),
+                quoted: false,
+            },
+            target.row,
+            target.col,
+            RefFlags::default(),
+        );
+        Self {
+            reads: ReadSet::from_ast(&ast, formula_sheet),
+            ast: Some(ast),
+            source: String::new(),
+            error: None,
+            value_kind: FormulaValueKind::Number,
+            volatile: false,
+            source_kind: PersistedSourceKind::Reference,
+        }
+    }
+
+    pub(crate) fn is_formula(&self) -> bool {
+        self.source_kind == PersistedSourceKind::Formula
+    }
+
+    pub(crate) fn is_reference(&self) -> bool {
+        self.source_kind == PersistedSourceKind::Reference
+    }
+
+    pub(crate) fn reference_target(&self, formula_sheet: u32) -> Option<AbsCellKey> {
+        if !self.is_reference() {
+            return None;
+        }
+        match self.ast.as_ref()? {
+            Ast::Cell(row, col, _) => Some(AbsCellKey {
+                sheet: formula_sheet,
+                row: *row,
+                col: *col,
+            }),
+            Ast::AbsCell(sheet, row, col, _) => Some(AbsCellKey {
+                sheet: sheet.handle,
+                row: *row,
+                col: *col,
+            }),
+            _ => None,
         }
     }
 
@@ -279,6 +344,7 @@ impl FormulaEntry {
             error: Some(error),
             value_kind: FormulaValueKind::Number,
             volatile: false,
+            source_kind: PersistedSourceKind::Formula,
         }
     }
 
