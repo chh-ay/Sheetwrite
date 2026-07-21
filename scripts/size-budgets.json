@@ -40,48 +40,48 @@
     },
     "bundler.next.coreInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 199628,
-      "maximum": 209610,
+      "baseline": 209702,
+      "maximum": 220188,
       "category": "browser-javascript",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.next.coreInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 236154,
-      "maximum": 247962,
+      "baseline": 249540,
+      "maximum": 262017,
       "category": "browser-javascript",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.next.coreInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 796866,
-      "maximum": 836710,
+      "baseline": 846003,
+      "maximum": 888304,
       "category": "browser-javascript",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.next.coreInitial.wasm.brotliBytes": {
       "unit": "bytes",
-      "baseline": 132973,
-      "maximum": 139622,
+      "baseline": 166737,
+      "maximum": 175074,
       "category": "browser-wasm",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.next.coreInitial.wasm.gzipBytes": {
       "unit": "bytes",
-      "baseline": 167229,
-      "maximum": 175591,
+      "baseline": 213808,
+      "maximum": 224499,
       "category": "browser-wasm",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.next.coreInitial.wasm.rawBytes": {
       "unit": "bytes",
-      "baseline": 411123,
-      "maximum": 431680,
+      "baseline": 540921,
+      "maximum": 567968,
       "category": "browser-wasm",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -136,48 +136,48 @@
     },
     "bundler.vite.coreInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 81289,
-      "maximum": 85354,
+      "baseline": 92029,
+      "maximum": 96631,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.coreInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 95089,
-      "maximum": 99844,
+      "baseline": 108511,
+      "maximum": 113937,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.coreInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 333615,
-      "maximum": 350296,
+      "baseline": 383391,
+      "maximum": 402561,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.coreInitial.wasm.brotliBytes": {
       "unit": "bytes",
-      "baseline": 132973,
-      "maximum": 139622,
+      "baseline": 166737,
+      "maximum": 175074,
       "category": "browser-wasm",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.coreInitial.wasm.gzipBytes": {
       "unit": "bytes",
-      "baseline": 167229,
-      "maximum": 175591,
+      "baseline": 213808,
+      "maximum": 224499,
       "category": "browser-wasm",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.coreInitial.wasm.rawBytes": {
       "unit": "bytes",
-      "baseline": 411123,
-      "maximum": 431680,
+      "baseline": 540921,
+      "maximum": 567968,
       "category": "browser-wasm",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -208,48 +208,48 @@
     },
     "bundler.vite.reactInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 134344,
-      "maximum": 141062,
+      "baseline": 145176,
+      "maximum": 152435,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.reactInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 156629,
-      "maximum": 164461,
+      "baseline": 170114,
+      "maximum": 178620,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.reactInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 527109,
-      "maximum": 553465,
+      "baseline": 577040,
+      "maximum": 605892,
       "category": "browser-javascript",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.reactInitial.wasm.brotliBytes": {
       "unit": "bytes",
-      "baseline": 132973,
-      "maximum": 139622,
+      "baseline": 166737,
+      "maximum": 175074,
       "category": "browser-wasm",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.reactInitial.wasm.gzipBytes": {
       "unit": "bytes",
-      "baseline": 167229,
-      "maximum": 175591,
+      "baseline": 213808,
+      "maximum": 224499,
       "category": "browser-wasm",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.reactInitial.wasm.rawBytes": {
       "unit": "bytes",
-      "baseline": 411123,
-      "maximum": 431680,
+      "baseline": 540921,
+      "maximum": 567968,
       "category": "browser-wasm",
       "owner": "vite:react-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -280,48 +280,48 @@
     },
     "bundler.vite.svelteInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 97199,
-      "maximum": 102059,
+      "baseline": 107887,
+      "maximum": 113282,
       "category": "browser-javascript",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.svelteInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 112573,
-      "maximum": 118202,
+      "baseline": 125996,
+      "maximum": 132296,
       "category": "browser-javascript",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.svelteInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 378624,
-      "maximum": 397556,
+      "baseline": 428400,
+      "maximum": 449820,
       "category": "browser-javascript",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.svelteInitial.wasm.brotliBytes": {
       "unit": "bytes",
-      "baseline": 132973,
-      "maximum": 139622,
+      "baseline": 166737,
+      "maximum": 175074,
       "category": "browser-wasm",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.svelteInitial.wasm.gzipBytes": {
       "unit": "bytes",
-      "baseline": 167229,
-      "maximum": 175591,
+      "baseline": 213808,
+      "maximum": 224499,
       "category": "browser-wasm",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.svelteInitial.wasm.rawBytes": {
       "unit": "bytes",
-      "baseline": 411123,
-      "maximum": 431680,
+      "baseline": 540921,
+      "maximum": 567968,
       "category": "browser-wasm",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -352,48 +352,48 @@
     },
     "bundler.vite.vueInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 106102,
-      "maximum": 111408,
+      "baseline": 116805,
+      "maximum": 122646,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.vueInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 122404,
-      "maximum": 128525,
+      "baseline": 135881,
+      "maximum": 142676,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.vueInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 403079,
-      "maximum": 423233,
+      "baseline": 453086,
+      "maximum": 475741,
       "category": "browser-javascript",
       "owner": "vite:vue-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.vueInitial.wasm.brotliBytes": {
       "unit": "bytes",
-      "baseline": 132973,
-      "maximum": 139622,
+      "baseline": 166737,
+      "maximum": 175074,
       "category": "browser-wasm",
       "owner": "vite:vue-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.vueInitial.wasm.gzipBytes": {
       "unit": "bytes",
-      "baseline": 167229,
-      "maximum": 175591,
+      "baseline": 213808,
+      "maximum": 224499,
       "category": "browser-wasm",
       "owner": "vite:vue-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.vueInitial.wasm.rawBytes": {
       "unit": "bytes",
-      "baseline": 411123,
-      "maximum": 431680,
+      "baseline": 540921,
+      "maximum": 567968,
       "category": "browser-wasm",
       "owner": "vite:vue-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -448,8 +448,8 @@
     },
     "bundler.vite.xlsxAsync.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 28996,
-      "maximum": 30446,
+      "baseline": 29041,
+      "maximum": 30494,
       "category": "browser-javascript",
       "owner": "vite:xlsx-async",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -472,8 +472,8 @@
     },
     "bundler.vite.xlsxLoaderInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 1068,
-      "maximum": 2092,
+      "baseline": 1066,
+      "maximum": 2090,
       "category": "browser-javascript",
       "owner": "vite:xlsx-loader-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -496,48 +496,48 @@
     },
     "bundler.webpack.coreInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 4584,
-      "maximum": 5608,
+      "baseline": 5146,
+      "maximum": 6170,
       "category": "browser-javascript",
       "owner": "webpack:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.webpack.coreInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 5210,
-      "maximum": 6234,
+      "baseline": 5925,
+      "maximum": 6949,
       "category": "browser-javascript",
       "owner": "webpack:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.webpack.coreInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 19313,
-      "maximum": 20337,
+      "baseline": 24035,
+      "maximum": 25237,
       "category": "browser-javascript",
       "owner": "webpack:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.webpack.coreInitial.wasm.brotliBytes": {
       "unit": "bytes",
-      "baseline": 132973,
-      "maximum": 139622,
+      "baseline": 166737,
+      "maximum": 175074,
       "category": "browser-wasm",
       "owner": "webpack:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.webpack.coreInitial.wasm.gzipBytes": {
       "unit": "bytes",
-      "baseline": 167229,
-      "maximum": 175591,
+      "baseline": 213808,
+      "maximum": 224499,
       "category": "browser-wasm",
       "owner": "webpack:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.webpack.coreInitial.wasm.rawBytes": {
       "unit": "bytes",
-      "baseline": 411123,
-      "maximum": 431680,
+      "baseline": 540921,
+      "maximum": 567968,
       "category": "browser-wasm",
       "owner": "webpack:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -568,8 +568,8 @@
     },
     "closure.core-xlsx.logicalBytes": {
       "unit": "bytes",
-      "baseline": 3851766,
-      "maximum": 4044355,
+      "baseline": 4217847,
+      "maximum": 4428740,
       "category": "install-closure",
       "owner": "core-xlsx",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -584,8 +584,8 @@
     },
     "closure.core.logicalBytes": {
       "unit": "bytes",
-      "baseline": 2679363,
-      "maximum": 2813332,
+      "baseline": 3045444,
+      "maximum": 3197717,
       "category": "install-closure",
       "owner": "core",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -608,8 +608,8 @@
     },
     "closure.react.logicalBytes": {
       "unit": "bytes",
-      "baseline": 2880118,
-      "maximum": 3024124,
+      "baseline": 3246849,
+      "maximum": 3409192,
       "category": "install-closure",
       "owner": "react",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -632,8 +632,8 @@
     },
     "closure.svelte.logicalBytes": {
       "unit": "bytes",
-      "baseline": 7730715,
-      "maximum": 8117251,
+      "baseline": 8096796,
+      "maximum": 8501636,
       "category": "install-closure",
       "owner": "svelte",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -656,8 +656,8 @@
     },
     "closure.vue.logicalBytes": {
       "unit": "bytes",
-      "baseline": 19568500,
-      "maximum": 20546925,
+      "baseline": 19936022,
+      "maximum": 20932824,
       "category": "install-closure",
       "owner": "vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -736,24 +736,24 @@
     },
     "package.@sheetwrite/core.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 254470,
-      "maximum": 267194,
+      "baseline": 274162,
+      "maximum": 287871,
       "category": "package-declarations",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/core.fileCount": {
       "unit": "count",
-      "baseline": 303,
-      "maximum": 305,
+      "baseline": 307,
+      "maximum": 309,
       "category": "package",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline with at most two additional files or packages."
     },
     "package.@sheetwrite/core.mapsBytes": {
       "unit": "bytes",
-      "baseline": 1056680,
-      "maximum": 1109514,
+      "baseline": 1154341,
+      "maximum": 1212059,
       "category": "package-maps",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -768,8 +768,8 @@
     },
     "package.@sheetwrite/core.runtimeJsBytes": {
       "unit": "bytes",
-      "baseline": 847657,
-      "maximum": 890040,
+      "baseline": 941203,
+      "maximum": 988264,
       "category": "package-runtime-js",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -784,16 +784,16 @@
     },
     "package.@sheetwrite/core.tarballBytes": {
       "unit": "bytes",
-      "baseline": 409746,
-      "maximum": 430234,
+      "baseline": 447638,
+      "maximum": 470020,
       "category": "package",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/core.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 2177525,
-      "maximum": 2286402,
+      "baseline": 2388424,
+      "maximum": 2507846,
       "category": "package",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -816,8 +816,8 @@
     },
     "package.@sheetwrite/react.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 3993,
-      "maximum": 5017,
+      "baseline": 4127,
+      "maximum": 5151,
       "category": "package-declarations",
       "owner": "@sheetwrite/react",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -832,8 +832,8 @@
     },
     "package.@sheetwrite/react.mapsBytes": {
       "unit": "bytes",
-      "baseline": 10258,
-      "maximum": 11282,
+      "baseline": 10519,
+      "maximum": 11543,
       "category": "package-maps",
       "owner": "@sheetwrite/react",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -848,8 +848,8 @@
     },
     "package.@sheetwrite/react.runtimeJsBytes": {
       "unit": "bytes",
-      "baseline": 9579,
-      "maximum": 10603,
+      "baseline": 9834,
+      "maximum": 10858,
       "category": "package-runtime-js",
       "owner": "@sheetwrite/react",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -864,16 +864,16 @@
     },
     "package.@sheetwrite/react.tarballBytes": {
       "unit": "bytes",
-      "baseline": 8598,
-      "maximum": 9622,
+      "baseline": 8745,
+      "maximum": 9769,
       "category": "package",
       "owner": "@sheetwrite/react",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/react.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 29151,
-      "maximum": 30609,
+      "baseline": 29801,
+      "maximum": 31292,
       "category": "package",
       "owner": "@sheetwrite/react",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -976,8 +976,8 @@
     },
     "package.@sheetwrite/vue.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 5707,
-      "maximum": 6731,
+      "baseline": 6164,
+      "maximum": 7188,
       "category": "package-declarations",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -992,8 +992,8 @@
     },
     "package.@sheetwrite/vue.mapsBytes": {
       "unit": "bytes",
-      "baseline": 11668,
-      "maximum": 12692,
+      "baseline": 12268,
+      "maximum": 13292,
       "category": "package-maps",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -1008,8 +1008,8 @@
     },
     "package.@sheetwrite/vue.runtimeJsBytes": {
       "unit": "bytes",
-      "baseline": 8842,
-      "maximum": 9866,
+      "baseline": 9226,
+      "maximum": 10250,
       "category": "package-runtime-js",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -1024,16 +1024,16 @@
     },
     "package.@sheetwrite/vue.tarballBytes": {
       "unit": "bytes",
-      "baseline": 9182,
-      "maximum": 10206,
+      "baseline": 9476,
+      "maximum": 10500,
       "category": "package",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/vue.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 31083,
-      "maximum": 32638,
+      "baseline": 32524,
+      "maximum": 34151,
       "category": "package",
       "owner": "@sheetwrite/vue",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -1056,8 +1056,8 @@
     },
     "package.@sheetwrite/wasm.declarationsBytes": {
       "unit": "bytes",
-      "baseline": 33620,
-      "maximum": 35301,
+      "baseline": 44316,
+      "maximum": 46532,
       "category": "package-declarations",
       "owner": "@sheetwrite/wasm",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -1088,8 +1088,8 @@
     },
     "package.@sheetwrite/wasm.runtimeJsBytes": {
       "unit": "bytes",
-      "baseline": 53782,
-      "maximum": 56472,
+      "baseline": 68470,
+      "maximum": 71894,
       "category": "package-runtime-js",
       "owner": "@sheetwrite/wasm",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -1104,24 +1104,24 @@
     },
     "package.@sheetwrite/wasm.tarballBytes": {
       "unit": "bytes",
-      "baseline": 184733,
-      "maximum": 193970,
+      "baseline": 234591,
+      "maximum": 246321,
       "category": "package",
       "owner": "@sheetwrite/wasm",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/wasm.unpackedBytes": {
       "unit": "bytes",
-      "baseline": 501838,
-      "maximum": 526930,
+      "baseline": 657020,
+      "maximum": 689871,
       "category": "package",
       "owner": "@sheetwrite/wasm",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/wasm.wasmBytes": {
       "unit": "bytes",
-      "baseline": 411123,
-      "maximum": 431680,
+      "baseline": 540921,
+      "maximum": 567968,
       "category": "package-wasm",
       "owner": "@sheetwrite/wasm",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
