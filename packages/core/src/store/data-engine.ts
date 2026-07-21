@@ -206,6 +206,13 @@ export class StoreDataEngine {
     if (!isLoaded()) {
       throw new Error("Sheetwrite: await initSheetwrite() before constructing SheetwriteStore");
     }
+    if (
+      options.referenceSimulationLimit !== undefined &&
+      (!Number.isSafeInteger(options.referenceSimulationLimit) ||
+        options.referenceSimulationLimit <= 0)
+    ) {
+      throw new Error("Sheetwrite: referenceSimulationLimit must be a positive safe integer");
+    }
     if (data && options.storage === "paged") {
       throw new Error("Sheetwrite: ColumnarData requires dense storage");
     }
@@ -549,12 +556,13 @@ export class StoreDataEngine {
     }
     let trackVirtualRefs = false;
     let referenceSimulationExceeded = false;
+    let referenceSimulationActual = this.refs.entryCount();
     let virtualRefs: Map<string, CellAddress> | null = null;
     const referenceSimulationIssue = (): MutationIssue => ({
       kind: "resource-limit",
       severity: "error",
       resource: "paged-reference-simulation",
-      actual: this.refs.entryCount(),
+      actual: referenceSimulationActual,
       max: referenceSimulationLimit,
       message: `Paged reference simulation exceeds the ${referenceSimulationLimit} entry limit`,
     });
@@ -562,6 +570,7 @@ export class StoreDataEngine {
       if (!trackVirtualRefs) return null;
       if (virtualRefs) return virtualRefs;
       if (this.refs.entryCount() > referenceSimulationLimit) {
+        referenceSimulationActual = this.refs.entryCount();
         referenceSimulationExceeded = true;
         return null;
       }
@@ -571,14 +580,26 @@ export class StoreDataEngine {
         this.rangeMutationStats.admissionReferenceEntriesScanned++;
         virtualRefs.set(cellKey(source), { ...target });
       }
+      if (virtualRefs.size > referenceSimulationLimit) {
+        referenceSimulationActual = virtualRefs.size;
+        referenceSimulationExceeded = true;
+        return null;
+      }
       return virtualRefs;
     };
     const setVirtualRef = (source: CellAddress, target: CellAddress | null): void => {
       const refs = materializeVirtualRefs();
       if (!refs) return;
       const key = cellKey(source);
-      refs.delete(key);
-      if (target) refs.set(key, { ...target });
+      const replaced = refs.delete(key);
+      if (target) {
+        if (!replaced && refs.size >= referenceSimulationLimit) {
+          referenceSimulationActual = refs.size + 1;
+          referenceSimulationExceeded = true;
+          return;
+        }
+        refs.set(key, { ...target });
+      }
     };
     const rebaseVirtualRefs = (
       sheet: SheetId,
@@ -606,6 +627,10 @@ export class StoreDataEngine {
         });
       }
       virtualRefs = rebased;
+      if (rebased.size > referenceSimulationLimit) {
+        referenceSimulationActual = rebased.size;
+        referenceSimulationExceeded = true;
+      }
     };
     const clearVirtualRefs = (
       sheet: SheetId,
@@ -820,6 +845,7 @@ export class StoreDataEngine {
                 },
                 cell.value.target,
               );
+              if (referenceSimulationExceeded) return referenceSimulationIssue();
             }
           }
         }
@@ -1004,6 +1030,7 @@ export class StoreDataEngine {
             col: range.start.col + cell.colOffset,
           };
           setVirtualRef(source, cell.value.kind === "ref" ? cell.value.target : null);
+          if (referenceSimulationExceeded) return referenceSimulationIssue();
         }
       } else if (patch.op === "setBlock") {
         const range = normalizedRange(patch.range);
@@ -1037,6 +1064,7 @@ export class StoreDataEngine {
                 },
                 null,
               );
+              if (referenceSimulationExceeded) return referenceSimulationIssue();
             }
           }
           for (const [offset, target] of patch.block.refs ?? []) {
@@ -1048,6 +1076,7 @@ export class StoreDataEngine {
               },
               target,
             );
+            if (referenceSimulationExceeded) return referenceSimulationIssue();
           }
         }
       } else if (patch.op === "setRangeStyle" || patch.op === "clearRange") {

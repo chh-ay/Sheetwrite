@@ -2571,6 +2571,119 @@ it("does not apply the ref simulation cap to an engine-skipped mutation", () => 
   store.dispose();
 });
 
+it("caps transaction-created refs before virtual retention grows past its limit", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "set",
+        addr: addr(0, 0),
+        value: { kind: "ref", target: addr(2, 1) },
+      },
+      {
+        op: "set",
+        addr: addr(1, 0),
+        value: { kind: "ref", target: addr(2, 1) },
+      },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [
+      {
+        kind: "resource-limit",
+        resource: "paged-reference-simulation",
+        actual: 2,
+        max: 1,
+      },
+    ],
+  });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 1,
+  });
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.dispose();
+});
+
+it("caps refs created by an added sheet before a later removal", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s2",
+          name: "Second",
+          order: 1,
+          rowCount: 2,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [
+            {
+              startRow: 0,
+              startCol: 0,
+              rowCount: 2,
+              colCount: 1,
+              cells: [
+                {
+                  rowOffset: 0,
+                  colOffset: 0,
+                  value: { kind: "ref", target: addr(0, 0) },
+                },
+                {
+                  rowOffset: 1,
+                  colOffset: 0,
+                  value: { kind: "ref", target: addr(1, 0) },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      { op: "removeSheet", sheet: "s1" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [
+      {
+        kind: "resource-limit",
+        resource: "paged-reference-simulation",
+        actual: 2,
+        max: 1,
+      },
+    ],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  store.dispose();
+});
+
+it("requires a positive safe reference simulation limit", () => {
+  for (const referenceSimulationLimit of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    expect(
+      () =>
+        new SheetwriteStore(makeWorkbook(4), undefined, {
+          storage: "paged",
+          referenceSimulationLimit,
+        }),
+    ).toThrow("referenceSimulationLimit must be a positive safe integer");
+  }
+});
+
 it("rebases clean refs before counting a later target-sheet removal", () => {
   const workbook = makeWorkbook(4);
   const second = structuredClone(workbook.sheets[0]!);
