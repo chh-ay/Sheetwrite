@@ -561,6 +561,83 @@ describe("custom editor canonical lifecycle", () => {
     store.dispose();
   });
 
+  it("isolates mutable editor columns from workbook and render configuration", () => {
+    const workbook = makeWorkbook(1);
+    const sourceColumn = workbook.sheets[0]!.columns[0]!;
+    sourceColumn.header = "";
+    sourceColumn.editor = "hostile-column";
+    sourceColumn.headerStyle = {
+      backgroundColor: "#112233",
+      border: { top: { color: "#223344", width: 1, style: "solid" } },
+    };
+    sourceColumn.cellStyle = {
+      bold: true,
+      border: { all: { color: "#334455", width: 2, style: "dashed" } },
+    };
+    const expectedColumn = structuredClone(sourceColumn);
+    const store = new SheetwriteStore(workbook, makeColumnarData(1));
+    const host = mountHost();
+    const exposedColumns: CellEditorContext["column"][] = [];
+    const corrupt = (column: CellEditorContext["column"]): void => {
+      exposedColumns.push(column);
+      Reflect.set(column, "key", "hijacked");
+      if (column.headerStyle) {
+        column.headerStyle.backgroundColor = "#ff0000";
+        if (column.headerStyle.border?.top) {
+          column.headerStyle.border.top.color = "#ff1111";
+          column.headerStyle.border.top.width = 99;
+        }
+      }
+      if (column.cellStyle) {
+        column.cellStyle.bold = false;
+        if (column.cellStyle.border?.all) {
+          column.cellStyle.border.all.color = "#ff2222";
+          column.cellStyle.border.all.width = 100;
+        }
+      }
+    };
+    const editor: CellEditor = {
+      mount(root, context) {
+        corrupt(context.column);
+        root.appendChild(document.createElement("input"));
+        return {
+          update(next) {
+            corrupt(next.column);
+          },
+          reposition() {},
+          commit() {},
+          cancel() {},
+          destroy() {},
+        };
+      },
+    };
+    const grid = new GridImpl(
+      host,
+      { workbook, presentation: "data-grid", editors: { "hostile-column": editor } },
+      store,
+    );
+
+    grid.beginEdit(0, 0);
+    expect(store.getWorkbook().sheets[0]!.columns[0]).toEqual(expectedColumn);
+    expect(headers(host)[0]).toBe("name");
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "literal", value: 9 },
+        },
+      ],
+    });
+    grid.refresh();
+
+    expect(exposedColumns).toHaveLength(2);
+    expect(exposedColumns[0]).not.toBe(exposedColumns[1]);
+    expect(store.getWorkbook().sheets[0]!.columns[0]).toEqual(expectedColumn);
+    expect(headers(host)[0]).toBe("name");
+    grid.destroy();
+    store.dispose();
+  });
   it("finishes cancel and Grid teardown when an editor destroy hook throws", () => {
     const reported: unknown[] = [];
     Object.defineProperty(globalThis, "reportError", {

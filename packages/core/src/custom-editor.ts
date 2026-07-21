@@ -22,6 +22,10 @@ function reportCustomEditorError(error: unknown): void {
   });
 }
 
+function snapshotColumn(column: Readonly<Column>): Column {
+  return structuredClone(column);
+}
+
 export interface CustomEditorState {
   grid: Grid;
   address: Readonly<CellAddress>;
@@ -95,6 +99,7 @@ export class CustomEditorController {
         ...options,
         address: { ...options.address },
         viewAddress: { ...options.viewAddress },
+        column: snapshotColumn(options.column),
       },
       rect: options.rect,
       onCommit: options.onCommit,
@@ -139,7 +144,11 @@ export class CustomEditorController {
   ): void {
     const active = this.active;
     if (!active?.instance) return;
-    active.state = { ...active.state, ...state };
+    active.state = {
+      ...active.state,
+      ...state,
+      column: state.column ? snapshotColumn(state.column) : active.state.column,
+    };
     active.wrapper.setAttribute("aria-label", active.state.label);
     active.instance.update(this.context(active));
   }
@@ -184,6 +193,7 @@ export class CustomEditorController {
       ...active.state,
       address: { ...active.state.address },
       viewAddress: { ...active.state.viewAddress },
+      column: snapshotColumn(active.state.column),
       signal: active.abort.signal,
       commit: (value, navigation = "none") => {
         if (this.active?.generation !== generation || active.abort.signal.aborted) return;
