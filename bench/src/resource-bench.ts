@@ -359,22 +359,16 @@ function sortFilterRefusal(): ResourceScenarioResult {
   Bun.gc(true);
   const before = gridSnapshot(grid, operation, "before");
   const started = performance.now();
+  grid.setSort([{ col: 0, ascending: true }]);
+  grid.setColumnFilter(0, { kind: "contains", text: "blocked" });
   let refusal = "";
   try {
-    grid.setSort([{ col: 0, ascending: true }]);
+    grid.exportSnapshot();
   } catch (error) {
     if (!(error instanceof IncompleteDataError)) throw error;
-    refusal = error.name;
+    refusal = `${error.name}:sort+filter`;
   }
-  if (!refusal) {
-    try {
-      grid.setColumnFilter(0, { kind: "contains", text: "blocked" });
-    } catch (error) {
-      if (!(error instanceof IncompleteDataError)) throw error;
-      refusal = error.name;
-    }
-  }
-  if (!refusal) throw new Error("incomplete sort/filter did not fail closed");
+  if (!refusal) throw new Error("incomplete sorted/filtered export did not fail closed");
   const peak = gridSnapshot(grid, operation, "peak");
   Bun.gc(true);
   const settled = gridSnapshot(grid, operation, "settled");
