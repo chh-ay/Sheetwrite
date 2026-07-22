@@ -264,7 +264,7 @@
   min-width: 0;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: var(--sw-demo-space-1);
-  padding: var(--sw-demo-space-3) var(--sw-demo-space-4);
+  padding: 1rem 1.25rem;
   border-top: 3px solid var(--sw-hub-accent);
   background: var(--sw-surface-1);
 }
@@ -301,9 +301,9 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--sw-demo-space-1);
+  gap: 0.5rem;
   overflow: hidden;
-  padding: var(--sw-demo-space-1) var(--sw-demo-space-3);
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--sw-demo-border);
   background: var(--sw-demo-panel);
   color: var(--sw-demo-fg);
