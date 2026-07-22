@@ -136,6 +136,30 @@ export {
   type RebaseConflictCode,
   rebaseDocumentOperations,
 } from "./rebase.js";
+export {
+  createRowBridge,
+  RowBridge,
+  rowBridgeTransactionId,
+  type RowBridgeCell,
+  type RowBridgeColumn,
+  type RowBridgeClearDelta,
+  type RowBridgeDelta,
+  type RowBridgeFillDelta,
+  type RowBridgeHandler,
+  type RowBridgeHostActionDelta,
+  type RowBridgeId,
+  type RowBridgeInsertContext,
+  type RowBridgeMetadataDelta,
+  type RowBridgeOptions,
+  type RowBridgePasteDelta,
+  type RowBridgeProjection,
+  type RowBridgeRangeDelta,
+  type RowBridgeReconciliationInput,
+  type RowBridgeReconciliationStatus,
+  type RowBridgeRowStructureDelta,
+  type RowBridgeTransaction,
+  type RowBridgeUnprojectableDelta,
+} from "./row-bridge.js";
 export { REF_CYCLE } from "./reference.js";
 export {
   assertRuntimeResourceSnapshot,
@@ -176,6 +200,11 @@ export {
   validWorkbookTable,
   workbookTableNameKey,
 } from "./workbook-table.js";
+export {
+  legacyFullWidthDataSource,
+  type LegacyRowLoader,
+  type LegacyRowPage,
+} from "./legacy-full-width-datasource.js";
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 export {
   DEFAULT_SYNC_COORDINATOR_LIMITS,
@@ -231,6 +260,8 @@ export type {
   ContextMenuItems,
   DataCell,
   DataSource,
+  DataSourceCapabilities,
+  DataSourceColumnBand,
   DataSourcePage,
   DataSourceRequest,
   DataSourceStorageOptions,
