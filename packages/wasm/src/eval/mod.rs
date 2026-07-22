@@ -3,10 +3,14 @@
 mod array;
 mod criteria;
 mod date;
+mod financial;
 mod dependency;
 mod functions;
+mod math;
 mod lookup;
 mod matrix;
+mod statistics;
+mod text;
 mod value;
 
 use std::cmp::Ordering;
@@ -904,20 +908,26 @@ impl CellStore {
                 {
                     return Value::Error(error);
                 }
-                continue;
+            } else {
+                let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
+                if let Value::Error(error) = value {
+                    return Value::Error(error);
+                }
+                let pushed = if treats_cell_as_reference(func)
+                    && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..))
+                {
+                    values.push_range(value)
+                } else {
+                    values.push_scalar(value)
+                };
+                if let Err(error) = pushed {
+                    return Value::Error(error);
+                }
             }
-
-            let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
-            if let Value::Error(error) = value {
+            if let Err(error) = values.finish_arg() {
                 return Value::Error(error);
             }
-            if treats_cell_as_reference(func) && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..)) {
-                if !matches!(value, Value::Blank) {
-                    values.push_range(value);
-                }
-            } else {
-                values.push_scalar(value);
-            }
+
         }
 
         apply_func(func, &values)
@@ -1448,14 +1458,15 @@ impl CellStore {
                     return Err(FormulaError::Loading);
                 }
                 let i = s.idx(row, col);
-                if s.kind_at(i) == KIND_EMPTY {
-                    continue;
-                }
-                let value = self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1);
+                let value = if s.kind_at(i) == KIND_EMPTY {
+                    Value::Blank
+                } else {
+                    self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
+                };
                 if let Value::Error(error) = value {
                     return Err(error);
                 }
-                values.push_range(value);
+                values.push_range(value)?;
             }
         }
 

@@ -1,6 +1,10 @@
 //! Excel serial date conversion, parsing, and formatting.
 
 use crate::types::FormulaError;
+use crate::calc::Func;
+use crate::types::{EvalResult, Value};
+
+use super::functions::{integer_arg, number_arg, require_arity, text_arg, FuncAccumulator};
 
 const UNIX_EPOCH_SERIAL: i64 = 25_569;
 
@@ -125,6 +129,61 @@ pub(super) fn format_date_serial(serial: f64, format: &str) -> Option<String> {
         "hh:mm:ss" => Some(format!("{hour:02}:{minute:02}:{second:02}")),
         _ => None,
     }
+}
+
+pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
+    let result = match func {
+        Func::Date => {
+            if let Err(error) = require_arity(values, 3, 3) {
+                Value::Error(error)
+            } else {
+                match (
+                    integer_arg(values, 0, None),
+                    integer_arg(values, 1, None),
+                    integer_arg(values, 2, None),
+                ) {
+                    (Ok(year), Ok(month), Ok(day)) => {
+                        date_serial(year, month, day).map_or_else(Value::Error, Value::number)
+                    }
+                    (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
+                        Value::Error(error)
+                    }
+                }
+            }
+        }
+        Func::DateValue => {
+            if let Err(error) = require_arity(values, 1, 1) {
+                Value::Error(error)
+            } else {
+                match text_arg(values, 0, None)
+                    .and_then(|text| parse_date_value(&text).ok_or(FormulaError::Value))
+                {
+                    Ok(serial) => Value::number(serial),
+                    Err(error) => Value::Error(error),
+                }
+            }
+        }
+        Func::Day | Func::Month | Func::Year => {
+            if let Err(error) = require_arity(values, 1, 1) {
+                Value::Error(error)
+            } else {
+                match number_arg(values, 0, None) {
+                    Ok(serial) => match date_parts(serial) {
+                        Some((year, month, day)) => Value::number(match func {
+                            Func::Day => day as f64,
+                            Func::Month => month as f64,
+                            Func::Year => year as f64,
+                            _ => unreachable!(),
+                        }),
+                        None => Value::Error(FormulaError::Num),
+                    },
+                    Err(error) => Value::Error(error),
+                }
+            }
+        }
+        _ => return None,
+    };
+    Some(result)
 }
 
 #[cfg(test)]

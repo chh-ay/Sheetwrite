@@ -457,10 +457,20 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, String> {
                 }
             }
             toks.push(Tok::Str(value));
-        } else if c.is_ascii_digit() || c == '.' {
+        } else if c.is_ascii_digit()
+            || (c == '.' && chars.get(i + 1).is_some_and(char::is_ascii_digit))
+        {
             let start = i;
-            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
-                i += 1;
+            let mut saw_decimal = false;
+            while i < chars.len() {
+                if chars[i].is_ascii_digit() {
+                    i += 1;
+                } else if chars[i] == '.' && !saw_decimal {
+                    saw_decimal = true;
+                    i += 1;
+                } else {
+                    break;
+                }
             }
             let s: String = chars[start..i].iter().collect();
             toks.push(Tok::Num(s.parse().map_err(|_| format!("bad number: {s}"))?));
