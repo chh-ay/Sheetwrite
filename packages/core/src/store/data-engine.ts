@@ -1899,6 +1899,7 @@ export class StoreDataEngine {
     patches: readonly DocumentOp[],
     remoteLoad: boolean,
     captureChanges: boolean,
+    captureDetailedChanges = false,
   ): StoreDataEngineEffects {
     const changes: ChangeEvent["changes"] | null = captureChanges ? [] : null;
     const appliedPatches: DocumentOp[] = [];
@@ -1910,7 +1911,7 @@ export class StoreDataEngine {
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
       for (const patch of patches) {
-        if (!this.applyPatch(patch, changes)) continue;
+        if (!this.applyPatch(patch, changes, captureDetailedChanges)) continue;
         appliedPatches.push(patch);
 
         if (patch.op === "set" || patch.op === "setNote") touchedSheets.add(patch.addr.sheet);
@@ -1961,7 +1962,11 @@ export class StoreDataEngine {
     return { appliedPatches, changes, storageRevision };
   }
 
-  private applyPatch(patch: DocumentOp, changes: ChangeEvent["changes"] | null): boolean {
+  private applyPatch(
+    patch: DocumentOp,
+    changes: ChangeEvent["changes"] | null,
+    captureDetailedChanges = false,
+  ): boolean {
     switch (patch.op) {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
@@ -2089,8 +2094,36 @@ export class StoreDataEngine {
         }
         if (this.rangeCutsSpill(bounds)) return false;
 
-        this.rangeMutationStats.jsPatchObjects += exceptions.length;
-        return this.writePackedBlock(bounds, block);
+        const beforeCells =
+          changes && captureDetailedChanges
+            ? Array.from({ length: cellCount }, (_, offset) => {
+                const row = bounds.start.row + Math.floor(offset / cols);
+                const col = bounds.start.col + (offset % cols);
+                return {
+                  addr: { sheet: bounds.sheet, row, col },
+                  before: this.getCell({ sheet: bounds.sheet, row, col }),
+                };
+              })
+            : null;
+        const applied = this.writePackedBlock(bounds, block);
+        if (!applied || !changes || !beforeCells) return applied;
+        const formulas = new Map(block.formulas ?? []);
+        const refs = new Map(block.refs ?? []);
+        for (let offset = 0; offset < beforeCells.length; offset += 1) {
+          const entry = beforeCells[offset]!;
+          const next: CellValue = formulas.has(offset)
+            ? { kind: "formula", src: formulas.get(offset)! }
+            : refs.has(offset)
+              ? { kind: "ref", target: refs.get(offset)! }
+              : { kind: "literal", value: block.values[offset]! };
+          changes.push({
+            addr: entry.addr,
+            oldValue: literalOf(entry.before.resolved),
+            newValue: next,
+            oldStyle: entry.before.style,
+          });
+        }
+        return applied;
       }
       case "setRangeStyle": {
         const bounds = normalizedRange(patch.range);
@@ -2151,8 +2184,26 @@ export class StoreDataEngine {
         if ((patch.contents ?? true) && this.rangeCutsSpill(bounds)) return false;
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
-        this.noteRangeMutationFfi();
-        return this.wasm.clearRange(
+        const beforeCells =
+          changes && captureDetailedChanges && clearContents
+            ? Array.from(
+                {
+                  length:
+                    (bounds.end.row - bounds.start.row + 1) *
+                    (bounds.end.col - bounds.start.col + 1),
+                },
+                (_, offset) => {
+                  const cols = bounds.end.col - bounds.start.col + 1;
+                  const row = bounds.start.row + Math.floor(offset / cols);
+                  const col = bounds.start.col + (offset % cols);
+                  return {
+                    addr: { sheet: bounds.sheet, row, col },
+                    before: this.getCell({ sheet: bounds.sheet, row, col }),
+                  };
+                },
+              )
+            : null;
+        const applied = this.wasm.clearRange(
           this.handleOf(bounds.sheet),
           bounds.start.row,
           bounds.start.col,
@@ -2161,6 +2212,17 @@ export class StoreDataEngine {
           clearContents,
           clearStyle,
         );
+        if (applied && changes && beforeCells) {
+          for (const entry of beforeCells) {
+            changes.push({
+              addr: entry.addr,
+              oldValue: literalOf(entry.before.resolved),
+              newValue: { kind: "literal", value: null },
+              oldStyle: entry.before.style,
+            });
+          }
+        }
+        return applied;
       }
       case "addRows": {
         const meta = this.sheetMeta(patch.sheet);

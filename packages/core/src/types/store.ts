@@ -197,6 +197,8 @@ export interface Store {
    */
   setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
+  /** Opt in to per-cell before/after capture for packed and clear operations. */
+  setDetailedChangeCapture?(enabled: boolean): void;
   /** Explicit partial-data state for paged datasource stores. */
   queryCapability?(sheet: SheetId): QueryCapability;
   /** Loaded/empty/local state; dense stores always return a loaded state. */

@@ -104,6 +104,7 @@ export class SheetwriteStore implements Store {
   private readonly engine: StoreDataEngine;
   private readonly listeners = new Set<ChangeListener>();
   private epoch = 0;
+  private detailedChangeCapture = false;
   private protectionResolver: ProtectionResolver | undefined;
   private mutationPolicy: MutationPolicyMode;
   private readonly policy: StoreMutationPolicy;
@@ -645,12 +646,12 @@ export class SheetwriteStore implements Store {
     ) {
       return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
     }
-
     const hasListeners = this.listeners.size > 0;
     const effects = this.engine.applyPatches(
       effectiveTx.patches,
       source === "remote" && options.localReplay !== true,
       hasListeners,
+      this.detailedChangeCapture,
     );
     if (effects.appliedPatches.length === 0) {
       return {
@@ -696,6 +697,10 @@ export class SheetwriteStore implements Store {
   on(_evt: "change", fn: ChangeListener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  setDetailedChangeCapture(enabled: boolean): void {
+    this.detailedChangeCapture = enabled;
   }
 
   acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
