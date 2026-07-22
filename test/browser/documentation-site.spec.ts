@@ -153,11 +153,115 @@ test("site root serves the product landing", async ({ page }) => {
   await expect(page).toHaveURL(docsUrl("start/installation/"));
 });
 
+test("landing engine CTA and shared header stay stable across scroll and reflow", async ({
+  page,
+}) => {
+  const wasmRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1568, height: 1027 });
+  await page.goto(siteUrl("/"));
+
+  const engineCallout = page.locator(".sw-landing-engine-slot");
+  await expect(
+    engineCallout.getByRole("heading", {
+      name: "Watch the Grid, the calculation engine, and your host agree.",
+    }),
+  ).toBeVisible();
+  await expect(
+    engineCallout.getByRole("link", { name: "Try the live engine view →" }),
+  ).toBeVisible();
+  await expect(engineCallout.locator('[role="status"]')).toHaveCount(0);
+  const initialCallout = await engineCallout.evaluate((section) => ({
+    height: section.getBoundingClientRect().height,
+    text: section.textContent,
+  }));
+  expect(
+    await engineCallout.evaluate((section) => section.getBoundingClientRect().top),
+  ).toBeGreaterThanOrEqual(await page.evaluate(() => window.innerHeight));
+  await page.evaluate(() => {
+    const callout = document.querySelector<HTMLElement>(".sw-landing-engine-slot");
+    if (!callout) throw new Error("landing engine callout is missing");
+    window.scrollTo(0, callout.offsetTop);
+  });
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect(engineCallout).toContainText("Watch the Grid");
+  expect(
+    await engineCallout.evaluate((section) => ({
+      height: section.getBoundingClientRect().height,
+      text: section.textContent,
+    })),
+  ).toEqual(initialCallout);
+
+  const scrolledHeader = await page.evaluate(() => {
+    const landing = document.querySelector<HTMLElement>(".sw-landing");
+    const topbar = document.querySelector<HTMLElement>(".sw-product-nav");
+    if (!landing || !topbar) throw new Error("landing chrome is missing");
+    return {
+      background: getComputedStyle(topbar).backgroundColor,
+      landingBackground: getComputedStyle(landing).backgroundColor,
+      top: topbar.getBoundingClientRect().top,
+    };
+  });
+  expect(scrolledHeader.top).toBe(0);
+  expect(scrolledHeader.background).toBe(scrolledHeader.landingBackground);
+
+  for (const viewport of [
+    { width: 1568, height: 1027 },
+    { width: 390, height: 844 },
+    { width: 320, height: 640 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const geometry = await page.evaluate(() => {
+      const topbar = document.querySelector<HTMLElement>(".sw-product-nav");
+      const hero = document.querySelector<HTMLElement>(".sw-hero");
+      const heading = document.querySelector<HTMLElement>(".sw-hero h1");
+      if (!topbar || !hero || !heading) throw new Error("landing header or hero is missing");
+      const topbarRect = topbar.getBoundingClientRect();
+      const heroRect = hero.getBoundingClientRect();
+      const headingRect = heading.getBoundingClientRect();
+      const childrenFit = Array.from(topbar.children).every((child) => {
+        const rect = child.getBoundingClientRect();
+        return rect.top >= topbarRect.top && rect.bottom <= topbarRect.bottom;
+      });
+      return {
+        childrenFit,
+        headingBottom: headingRect.bottom,
+        headingLeft: headingRect.left,
+        headingRight: headingRect.right,
+        headingTop: headingRect.top,
+        heroBottom: heroRect.bottom,
+        heroTop: heroRect.top,
+        pageWidth: document.documentElement.scrollWidth,
+        topbarBottom: topbarRect.bottom,
+        topbarLeft: topbarRect.left,
+        topbarRight: topbarRect.right,
+        topbarTop: topbarRect.top,
+      };
+    });
+    expect(geometry.pageWidth).toBe(viewport.width);
+    expect(geometry.topbarTop).toBe(0);
+    expect(geometry.topbarLeft).toBe(0);
+    expect(geometry.topbarRight).toBe(viewport.width);
+    expect(geometry.childrenFit).toBe(true);
+    expect(geometry.heroTop).toBeGreaterThanOrEqual(geometry.topbarBottom);
+    expect(geometry.headingTop).toBeGreaterThanOrEqual(geometry.heroTop);
+    expect(geometry.headingBottom).toBeLessThanOrEqual(geometry.heroBottom);
+    expect(geometry.headingLeft).toBeGreaterThanOrEqual(0);
+    expect(geometry.headingRight).toBeLessThanOrEqual(viewport.width);
+  }
+  expect(wasmRequests).toEqual([]);
+});
+
 test("landing choreography is bounded, replayable, and reduced-motion complete", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(siteUrl("/"));
+  await waitForHydration(page);
   const story = page.getByTestId("landing-product-story");
   await expect(story).toHaveAttribute("data-landing-phase", "resolve");
   const reduced = await story.evaluate((root) => ({

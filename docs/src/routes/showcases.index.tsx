@@ -41,9 +41,9 @@ type SceneOwnerId = (typeof SCENE_ORDER)[number];
 /** Concise launch copy, distilled from each checked owner's responsibility. */
 const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   performance: "Million-row paging with measured Worker and main-thread results.",
-  database: "IndexedDB snapshots, append-only commits, compaction, and reload recovery.",
-  interoperability: "XLSX and delimited exchange with fixtures and explicit fidelity warnings.",
-  collaboration: "Two clients proving sequencing, reconnects, conflicts, and recovery.",
+  database: "IndexedDB snapshots, commits, compaction, and reload recovery.",
+  interoperability: "XLSX and delimited exchange with fixture-backed fidelity warnings.",
+  collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
 };
 
 /** Accurate mount and runtime cues per first-party adapter. */
@@ -55,10 +55,10 @@ const FRAMEWORK_MOUNTS: Readonly<Record<string, { mount: string; pkg: string }>>
 };
 
 const FRAMEWORK_SUMMARY: Readonly<Record<string, string>> = {
-  vanilla: "Direct Grid lifecycle, renderer choice, and workbook operations.",
-  react: "Controlled analytics with queries, formulas, clipboard, and reset semantics.",
+  vanilla: "Direct lifecycle, renderer choice, and workbook operations.",
+  react: "Controlled analytics, formulas, clipboard, and reset semantics.",
   vue: "Validation, protection, notes, sheets, and host persistence.",
-  svelte: "Durable offline edits, reconnect drain, and collaborative activity.",
+  svelte: "Durable offline edits, reconnect drain, and activity state.",
 };
 
 type HubGroup = "all" | "data" | "workbook" | "collaboration" | "framework";
@@ -118,7 +118,7 @@ function PerformanceScene({ medianMs }: Readonly<{ medianMs?: number }>) {
           <i key={id} />
         ))}
       </span>
-      <span className="sw-hub-scene__caption">scroll · jump · edit · cache churn</span>
+      <span className="sw-hub-scene__caption">scroll · edit · cache</span>
     </span>
   );
 }
@@ -206,7 +206,7 @@ function CollaborationScene() {
           <code>ack 42</code>
         </span>
       </span>
-      <span className="sw-hub-scene__caption">two clients · one sequencer · convergence</span>
+      <span className="sw-hub-scene__caption">sequenced client edits</span>
     </span>
   );
 }
@@ -242,44 +242,7 @@ function ShowcaseHub() {
       <SiteTopbar active="showcases" />
       <main className="sw-hub" id="main-content">
         <header className="sw-hub__hero">
-          <div className="sw-hub__hero-copy">
-            <p className="sw-hub__eyebrow">Choose a product proof</p>
-            <h1>Every feature, live and tested.</h1>
-            <p className="sw-hub__lede">
-              Start with the job you need to prove. Each launcher opens its real editable example,
-              with one action to try and browser evidence beside it.
-            </p>
-          </div>
-          <div className="sw-hub__hero-notes">
-            <p className="sw-hub__inventory">
-              <strong>{CAPABILITY_INVENTORY.length} checked features</strong>
-              <span>Eight owning experiences · one authoritative route each</span>
-            </p>
-            <details className="sw-hub__internals">
-              <summary>Implementation and measurement notes</summary>
-              <div>
-                <p>
-                  The launcher initializes no Grid or WASM. Each destination owns its product
-                  runtime.
-                </p>
-                <p>
-                  <Link to="/showcases/engine/">Inspect the live engine</Link>
-                  {heroStats ? (
-                    <>
-                      {" "}
-                      or open the <Link to="/showcases/performance/">measured scale results</Link> (
-                      {heroStats.millionRowMedianMs} ms median interaction at 1,000,000 rows).
-                    </>
-                  ) : (
-                    <>
-                      {" "}
-                      or open the <Link to="/showcases/performance/">saved scale results</Link>.
-                    </>
-                  )}
-                </p>
-              </div>
-            </details>
-          </div>
+          <h1>Eight real experiences. Pick your proof.</h1>
         </header>
 
         <section aria-labelledby="hub-scenes" className="sw-hub__scenes">
@@ -312,14 +275,10 @@ function ShowcaseHub() {
             {visibleOwners.map((owner) => {
               const cue = FRAMEWORK_MOUNTS[owner.id];
               const isFramework = owner.kind === "framework";
-              const isFeatured = owner.id === "performance";
-              const featureCount = CAPABILITY_INVENTORY.filter(
-                (capability) => capability.primary === owner.id,
-              ).length;
               return (
                 <li data-owner={owner.id} key={owner.id}>
                   <Link
-                    className={`sw-hub-launch${isFramework ? " sw-hub-launch--framework" : ""}${isFeatured ? " sw-hub-launch--featured" : ""}`}
+                    className={`sw-hub-launch${isFramework ? " sw-hub-launch--framework" : ""}`}
                     data-owner={owner.id}
                     to={owner.href}
                   >
@@ -337,12 +296,7 @@ function ShowcaseHub() {
                     )}
                     <span className="sw-hub-launch__body">
                       <span className="sw-hub-launch__meta">
-                        <span>
-                          {isFeatured
-                            ? "Featured scale proof"
-                            : HUB_GROUPS.find((item) => item.id === ownerGroup(owner))?.label}
-                        </span>
-                        <span>{featureCount} checked</span>
+                        {HUB_GROUPS.find((item) => item.id === ownerGroup(owner))?.label}
                       </span>
                       <strong>{owner.label}</strong>
                       <span className="sw-hub-launch__summary">

@@ -20,53 +20,67 @@ function collectErrors(page: Page): BootErrors {
 
 test("hub launches every owning showcase without errors", async ({ page }) => {
   const errors = collectErrors(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 1568, height: 844 });
   await page.goto(siteUrl("/showcases/"));
+  await page.waitForLoadState("networkidle");
 
-  await expect(page.locator("main h1")).toHaveText("Every feature, live and tested.");
+  await expect(page.locator("main h1")).toHaveText("Eight real experiences. Pick your proof.");
   // The Showcases link is page-current on the hub itself.
   await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
 
-  // One asymmetric gallery contains exactly the four capability showcases and
-  // four framework integrations. At the acceptance viewport every launcher is
-  // already discoverable without scrolling.
+  // The capability owners occupy the first row and framework owners the
+  // second. All eight equal launchers fit the acceptance viewport.
   const launchers = page.locator(".sw-hub-scenes .sw-hub-launch");
   await expect(launchers).toHaveCount(8);
   await expect(launchers.first()).toHaveAttribute("data-owner", "performance");
-  const launcherViewportState = await launchers.evaluateAll((links) => ({
-    allWithinViewport: links.every((link) => {
+  const launcherGeometry = await launchers.evaluateAll((links) =>
+    links.map((link) => {
       const bounds = link.getBoundingClientRect();
-      return (
-        bounds.width > 0 &&
-        bounds.height > 0 &&
-        bounds.top >= 0 &&
-        bounds.bottom <= window.innerHeight
-      );
+      return {
+        bottom: Math.round(bounds.bottom),
+        height: Math.round(bounds.height),
+        top: Math.round(bounds.top),
+        width: Math.round(bounds.width),
+      };
     }),
-    count: links.length,
-  }));
-  expect(launcherViewportState).toEqual({ allWithinViewport: true, count: 8 });
+  );
+  expect(new Set(launcherGeometry.map(({ width }) => width)).size).toBe(1);
+  expect(new Set(launcherGeometry.map(({ height }) => height)).size).toBe(1);
+  expect(
+    [...new Set(launcherGeometry.map(({ top }) => top))].map(
+      (top) => launcherGeometry.filter((card) => card.top === top).length,
+    ),
+  ).toEqual([4, 4]);
+  expect(Math.max(...launcherGeometry.map(({ bottom }) => bottom))).toBeLessThanOrEqual(844);
+  expect(Math.max(...launcherGeometry.map(({ bottom }) => bottom))).toBeGreaterThanOrEqual(780);
+  const galleryWidth = await page
+    .locator(".sw-hub-scenes")
+    .evaluate((gallery) => Math.round(gallery.getBoundingClientRect().width));
+  expect(galleryWidth).toBeGreaterThanOrEqual(1568 - 96);
   const clippedLabels = await page
     .locator(
-      ".sw-hub-launch__meta span, .sw-hub-launch__body > strong, .sw-hub-framework-scene code, .sw-hub-framework-scene small",
+      ".sw-hub-scene__caption, .sw-hub-framework-scene > span, .sw-hub-framework-scene code, .sw-hub-framework-scene small, .sw-hub-launch__meta, .sw-hub-launch__body > strong, .sw-hub-launch__summary, .sw-hub__owner-count",
     )
     .evaluateAll((labels) =>
       labels
         .filter(
           (label) =>
-            label.scrollWidth > label.clientWidth || label.scrollHeight > label.clientHeight,
+            label.getClientRects().length > 0 &&
+            (label.scrollWidth > label.clientWidth || label.scrollHeight > label.clientHeight),
         )
         .map((label) => label.textContent?.trim()),
     );
   expect(clippedLabels).toEqual([]);
+  const bodyFontSizes = await page
+    .locator(".sw-hub-launch__body > strong, .sw-hub-launch__summary")
+    .evaluateAll((labels) =>
+      labels.map((label) => Number.parseFloat(getComputedStyle(label).fontSize)),
+    );
+  expect(Math.min(...bodyFontSizes)).toBeGreaterThanOrEqual(14);
 
   // The hub is a static launcher: previews do not eagerly mount a Grid or a
-  // renderer surface. The separate engine diagnostic remains on demand.
+  // renderer surface.
   await expect(page.locator('main [role="grid"], main canvas')).toHaveCount(0);
-  const internals = page.getByText("Implementation and measurement notes", { exact: true });
-  await expect(internals).toBeVisible();
-  await internals.click();
-  await expect(page.getByRole("link", { name: "Inspect the live engine" })).toBeVisible();
 
   // Selection, keyboard activation, and focus-visible treatment are explicit.
   const allFilter = page.getByRole("button", { name: "All", exact: true });
@@ -82,7 +96,7 @@ test("hub launches every owning showcase without errors", async ({ page }) => {
   });
   expect(focusStyle.outlineStyle).not.toBe("none");
   expect(focusStyle.outlineWidth).not.toBe("0px");
-  await dataFilter.click();
+  await dataFilter.press("Enter");
   await expect(dataFilter).toHaveAttribute("aria-pressed", "true");
   await expect(allFilter).toHaveAttribute("aria-pressed", "false");
   await expect(launchers).toHaveCount(2);
@@ -112,10 +126,102 @@ test("every owning showcase URL stays resolvable", async ({ request }) => {
   }
 });
 
+test("gallery geometry is equal, readable, and unclipped across themes", async ({
+  page,
+}, testInfo) => {
+  const errors = collectErrors(page);
+  const viewports = [
+    { columns: 4, height: 844, width: 1568 },
+    { columns: 4, height: 900, width: 1440 },
+    { columns: 2, height: 900, width: 1024 },
+    { columns: 1, height: 844, width: 390 },
+  ] as const;
+  const themes = ["dark", "light"] as const;
+  const contentSelector =
+    ".sw-hub-scene__caption, .sw-hub-framework-scene > span, .sw-hub-framework-scene code, .sw-hub-framework-scene small, .sw-hub-launch__meta, .sw-hub-launch__body > strong, .sw-hub-launch__summary, .sw-hub__owner-count";
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto(siteUrl("/showcases/"));
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+
+    for (const theme of themes) {
+      await page.evaluate((nextTheme) => {
+        document.documentElement.dataset.theme = nextTheme;
+      }, theme);
+      const geometry = await page.locator(".sw-hub-launch").evaluateAll((cards) =>
+        cards.map((card) => {
+          const bounds = card.getBoundingClientRect();
+          return {
+            bottom: Math.round(bounds.bottom),
+            height: Math.round(bounds.height),
+            top: Math.round(bounds.top),
+            width: Math.round(bounds.width),
+          };
+        }),
+      );
+      const firstCard = geometry[0];
+      expect(firstCard).toBeDefined();
+      expect(geometry).toHaveLength(8);
+      expect(geometry.every((card) => card.width === firstCard?.width)).toBe(true);
+      expect(geometry.every((card) => card.height === firstCard?.height)).toBe(true);
+      const rowTops = geometry
+        .map(({ top }) => top)
+        .filter((top, index, tops) => tops.indexOf(top) === index);
+      expect(rowTops).toHaveLength(8 / viewport.columns);
+      expect(
+        rowTops.every(
+          (top) => geometry.filter((card) => card.top === top).length === viewport.columns,
+        ),
+      ).toBe(true);
+      if (viewport.width >= 1440) {
+        expect(Math.max(...geometry.map(({ bottom }) => bottom))).toBeLessThanOrEqual(
+          viewport.height,
+        );
+        expect(Math.max(...geometry.map(({ bottom }) => bottom))).toBeGreaterThanOrEqual(
+          viewport.height - 64,
+        );
+        const galleryWidth = await page
+          .locator(".sw-hub-scenes")
+          .evaluate((gallery) => Math.round(gallery.getBoundingClientRect().width));
+        expect(galleryWidth).toBeGreaterThanOrEqual(viewport.width - 96);
+      }
+
+      const contentBounds = await page.locator(contentSelector).evaluateAll((elements) =>
+        elements
+          .filter((element) => element.getClientRects().length > 0)
+          .map((element) => ({
+            clipped:
+              element.scrollWidth > element.clientWidth ||
+              element.scrollHeight > element.clientHeight,
+            text: element.textContent?.trim(),
+          })),
+      );
+      expect(contentBounds.filter(({ clipped }) => clipped).map(({ text }) => text)).toEqual([]);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+
+      if (viewport.width !== 1440) {
+        await page.screenshot({
+          path: testInfo.outputPath(`hub-${viewport.width}-${theme}.png`),
+        });
+      }
+    }
+  }
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("hub stays accessible and usable on a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const errors = collectErrors(page);
   await page.goto(siteUrl("/showcases/"));
+  await page.waitForLoadState("networkidle");
 
   await expect(page.locator("main h1")).toBeVisible();
   const layout = await page.evaluate(() => ({
