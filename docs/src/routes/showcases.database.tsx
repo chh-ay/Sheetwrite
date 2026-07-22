@@ -5,7 +5,7 @@ import { ProofPage } from "../showcases/ProofPage.js";
 import proofStylesheet from "../styles/showcase-proofs.css?url";
 
 const description =
-  "A versioned workbook database over real browser IndexedDB: append-only commits, atomic base-version checks, idempotent retries, bounded tails, compaction, and reload recovery — with every read, write, and byte on a live gauge.";
+  "Edit a live ledger, watch its pending write land in IndexedDB, then reopen the same durable document. The journal shows each acknowledgement as it happens.";
 
 export const Route = createFileRoute("/showcases/database")({
   head: () => ({
@@ -51,7 +51,7 @@ function DatabaseProofRoute() {
         },
       ]}
       boundaryContract="PersistenceAdapter"
-      boundaryLede="This showcase runs the full persistence protocol against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours."
+      boundaryLede="This showcase runs the full save-and-reload flow against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours."
       description={description}
       eyebrow="CAPABILITY / DATABASE & DOCUMENT LIFECYCLE"
       facts={[
@@ -62,10 +62,10 @@ function DatabaseProofRoute() {
       ]}
       guideHref="/docs/guides/persistence/"
       guideLabel="Read the persistence guide"
-      prompt="Turn autosave off, make a few edits, then reload the page — the pending queue survives. Or force an external commit and watch conflict recovery rebase your work."
+      prompt="Edit an amount, pause autosave to inspect the durable pending write, save it, then reopen the session."
       slug="database"
       sourcePath="docs/src/showcases/showcase-database.ts"
-      title="A real database lifecycle, observable end to end."
+      title="Edit once. Reload the same durable document."
       verification={[
         {
           title: "Atomic sequencing",

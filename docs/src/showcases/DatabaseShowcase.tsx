@@ -31,7 +31,7 @@ type ConflictResponse = Extract<PersistenceCommitResponse, { status: "conflict" 
 
 interface LogEntry {
   id: number;
-  kind: "info" | "commit" | "warn" | "error";
+  kind: "info" | "pending" | "commit" | "warn" | "error";
   text: string;
 }
 
@@ -73,6 +73,10 @@ function wireSession(session: DatabaseSession, callbacks: SessionCallbacks): voi
           callbacks.onSyncState(event.state);
           break;
         case "pending":
+          callbacks.onLog(
+            "pending",
+            `Pending write ${event.mutation.clientMutationId} persisted to IndexedDB`,
+          );
           if (callbacks.autosave()) {
             void sync.flush().catch(() => {
               // Failures are surfaced through the "error" event below.
@@ -176,6 +180,7 @@ export default function DatabaseShowcase() {
   const [autosave, setAutosave] = useState(true);
   const [total, setTotal] = useState<string>("–");
   const [log, setLog] = useState<LogEntry[]>([]);
+  const [recoveryState, setRecoveryState] = useState("Opening IndexedDB…");
 
   const pushLog = useCallback((kind: LogEntry["kind"], text: string) => {
     logIdRef.current += 1;
@@ -227,7 +232,7 @@ export default function DatabaseShowcase() {
   }).current;
 
   const boot = useCallback(
-    async (announce: string | null) => {
+    async (announce: string | null, recovered: string) => {
       const host = hostRef.current;
       if (!host) return;
       setStatus("loading");
@@ -238,6 +243,7 @@ export default function DatabaseShowcase() {
         snapshotVersionRef.current = session.adapter.stats().snapshotVersion;
         setStatus("ready");
         setStatusDetail("Live against real IndexedDB");
+        setRecoveryState(recovered);
         readTotal();
         if (announce) pushLog("info", announce);
       } catch (error) {
@@ -250,7 +256,7 @@ export default function DatabaseShowcase() {
 
   useEffect(() => {
     let cancelled = false;
-    void boot(null).then(() => {
+    void boot(null, "Loaded from IndexedDB").then(() => {
       if (cancelled && sessionRef.current) {
         disposeSession(sessionRef.current);
         sessionRef.current = null;
@@ -345,6 +351,7 @@ export default function DatabaseShowcase() {
       sessionRef.current = null;
       await boot(
         "Session closed and reopened: committed state and the durable queue came back from IndexedDB",
+        "Reopened from IndexedDB",
       );
     });
 
@@ -449,75 +456,99 @@ export default function DatabaseShowcase() {
       }
       await deleteShowcaseDatabase(DOCUMENT_DATABASE);
       await deleteShowcaseDatabase(QUEUE_DATABASE);
-      await boot("Demo databases deleted; reseeded from the canonical ledger at v0");
+      await boot(
+        "Demo databases deleted; reseeded from the canonical ledger at v0",
+        "Reseeded in IndexedDB",
+      );
     });
 
   const activity = syncState?.activity ?? "hydrating";
   const pendingCount = syncState?.pendingCount ?? 0;
-  const counters: ReadonlyArray<{ id: string; label: string; value: string; queued?: boolean }> = [
-    { id: "dbx-version", label: "Head version", value: String(stats?.currentVersion ?? 0) },
+  const ready = status === "ready";
+  const diagnosticCounters: ReadonlyArray<{ id: string; label: string; value: string }> = [
     {
       id: "dbx-snapshot-version",
-      label: "Snapshot version",
+      label: "Snapshot revision",
       value: String(stats?.snapshotVersion ?? 0),
     },
     { id: "dbx-tail", label: "Tail records", value: String(stats?.tailLength ?? 0) },
-    {
-      id: "dbx-pending",
-      label: "Pending commits",
-      value: String(pendingCount),
-      queued: pendingCount > 0,
-    },
     { id: "dbx-reads", label: "IDB reads", value: String(stats?.reads ?? 0) },
     { id: "dbx-writes", label: "IDB writes", value: String(stats?.writes ?? 0) },
-    { id: "dbx-bytes", label: "Stored", value: stats ? formatBytes(stats.storedBytes) : "0 B" },
   ];
 
   return (
-    <section aria-label="IndexedDB persistence showcase" className="sw-dbx">
-      <div className="sw-dbx__stage">
-        <header className="sw-dbx__statusbar">
-          <p
-            className="sw-dbx__status"
-            data-activity={activity}
-            data-status={status}
-            data-testid="dbx-status"
-          >
-            {status === "ready" ? "Ready" : status === "error" ? "Error" : "Loading"}
-            <span className="sw-dbx__status-detail">{statusDetail}</span>
-          </p>
-          <div className="sw-dbx__readouts">
-            <span className="sw-dbx__chip" data-activity={activity}>
-              {activity}
-            </span>
-            <p className="sw-dbx__probe">
-              Ledger total <output data-testid="dbx-total">{total}</output>
-            </p>
-          </div>
-        </header>
-        <div
-          aria-label="Expedition ledger workbook"
-          className="sw-dbx__grid"
-          ref={hostRef}
-          role="application"
-        />
-        <div aria-label="Database controls" className="sw-dbx__controls" role="toolbar">
-          <fieldset aria-label="Commit controls" className="sw-dbx__control-group">
-            <span className="sw-dbx__group-label">Commit</span>
+    <section
+      aria-busy={status === "loading"}
+      aria-label="IndexedDB persistence showcase"
+      className="sw-dbx"
+      data-testid="dbx-instrument"
+    >
+      <header className="sw-dbx__statusbar">
+        <div className="sw-dbx__document-title">
+          <span>Durable workbook</span>
+          <h2>Expedition ledger</h2>
+        </div>
+        <p
+          className="sw-dbx__status"
+          data-activity={activity}
+          data-status={status}
+          data-testid="dbx-status"
+        >
+          {status === "ready" ? "Ready" : status === "error" ? "Error" : "Loading"}
+          <span className="sw-dbx__status-detail">{statusDetail}</span>
+        </p>
+        <p className="sw-dbx__probe">
+          Live total <output data-testid="dbx-total">{total}</output>
+        </p>
+      </header>
+
+      <dl aria-label="Authoritative durability state" className="sw-dbx__durability">
+        <div>
+          <dt>Revision</dt>
+          <dd data-testid="dbx-version">{stats?.currentVersion ?? 0}</dd>
+        </div>
+        <div>
+          <dt>Pending writes</dt>
+          <dd data-state={pendingCount > 0 ? "queued" : undefined} data-testid="dbx-pending">
+            {pendingCount}
+          </dd>
+        </div>
+        <div>
+          <dt>Reload state</dt>
+          <dd data-testid="dbx-reload">{recoveryState}</dd>
+        </div>
+        <div>
+          <dt>Allocated</dt>
+          <dd data-testid="dbx-bytes">{stats ? formatBytes(stats.storedBytes) : "0 B"}</dd>
+        </div>
+      </dl>
+
+      <div className="sw-dbx__challenge">
+        <p id="dbx-challenge-copy">
+          <strong>Edit an amount. Watch it become durable.</strong>
+          <span>
+            Pause autosave to hold a pending write, save it, then reopen the same document from
+            IndexedDB.
+          </span>
+        </p>
+        <div aria-label="Durability actions" className="sw-dbx__controls" role="group">
+          <div className="sw-dbx__primary-actions">
             <button
-              className="sw-dbx__button"
+              aria-label="Edit next amount by 1 — Commit sample edit"
+              aria-describedby="dbx-challenge-copy"
+              className="sw-dbx__button sw-dbx__primary-action"
               data-variant="primary"
+              disabled={!ready}
               onClick={commitSampleEdit}
               type="button"
             >
-              Commit sample edit
+              Edit amount +1
             </button>
-            <button className="sw-dbx__button" onClick={saveNow} type="button">
-              Save pending now
-            </button>
-            <label className="sw-dbx__switch">
+            <label className="sw-dbx__switch" data-state={autosave ? "on" : "paused"}>
               <input
+                aria-label="Autosave"
                 checked={autosave}
+                disabled={!ready}
                 onChange={(event) => {
                   autosaveRef.current = event.currentTarget.checked;
                   setAutosave(event.currentTarget.checked);
@@ -525,82 +556,61 @@ export default function DatabaseShowcase() {
                 }}
                 type="checkbox"
               />
-              Autosave
+              <span aria-hidden="true" className="sw-dbx__switch-track">
+                <span className="sw-dbx__switch-thumb" />
+              </span>
+              <span aria-hidden="true" className="sw-dbx__switch-copy">
+                <span>Autosave</span>
+                <span className="sw-dbx__switch-state">{autosave ? "On" : "Paused"}</span>
+              </span>
             </label>
-          </fieldset>
-          <fieldset aria-label="Failure injection" className="sw-dbx__control-group">
-            <span className="sw-dbx__group-label">Faults</span>
+          </div>
+          <div className="sw-dbx__session-actions">
             <button
+              aria-label="Save pending now"
               className="sw-dbx__button"
-              data-variant="quiet"
-              onClick={loseNextAck}
+              disabled={!ready}
+              onClick={saveNow}
               type="button"
             >
-              Lose next acknowledgement
+              Save pending
             </button>
             <button
+              aria-label="Close and reopen session"
               className="sw-dbx__button"
-              data-variant="quiet"
-              onClick={retryPending}
-              type="button"
-            >
-              Retry pending commit
-            </button>
-          </fieldset>
-          <fieldset aria-label="Session lifecycle" className="sw-dbx__control-group">
-            <span className="sw-dbx__group-label">Session</span>
-            <button
-              className="sw-dbx__button"
-              data-variant="quiet"
-              onClick={externalCommit}
-              type="button"
-            >
-              External writer commit
-            </button>
-            <button
-              className="sw-dbx__button"
-              data-variant="quiet"
+              disabled={!ready}
               onClick={simulateReload}
               type="button"
             >
-              Close and reopen session
+              Reopen session
             </button>
-            <button
-              className="sw-dbx__button"
-              data-variant="danger"
-              onClick={resetDemo}
-              type="button"
-            >
-              Reset demo data
-            </button>
-          </fieldset>
+          </div>
         </div>
       </div>
 
-      <aside className="sw-dbx__side">
-        <section aria-labelledby="dbx-counters-title" className="sw-dbx__panel">
-          <h3 id="dbx-counters-title">Live storage gauges</h3>
-          <dl className="sw-dbx__counters">
-            {counters.map((counter) => (
-              <div key={counter.id}>
-                <dt>{counter.label}</dt>
-                <dd data-state={counter.queued ? "queued" : undefined} data-testid={counter.id}>
-                  {counter.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <p className="sw-dbx__note">
-            Compaction folds the operation tail into one snapshot record after{" "}
-            {COMPACTION.maxTailRecords} tail records or {formatBytes(COMPACTION.maxTailBytes)}.
-          </p>
-        </section>
-        <section aria-labelledby="dbx-log-title" className="sw-dbx__panel">
-          <h3 id="dbx-log-title">Commit journal</h3>
+      <div className="sw-dbx__workspace">
+        <div
+          aria-label="Expedition ledger workbook"
+          className="sw-dbx__grid"
+          data-testid="dbx-grid"
+          ref={hostRef}
+          role="application"
+        />
+        <aside aria-labelledby="dbx-log-title" className="sw-dbx__journal">
+          <header>
+            <div>
+              <span>Adjacent evidence</span>
+              <h3 id="dbx-log-title">Commit journal</h3>
+            </div>
+            <span className="sw-dbx__chip" data-activity={activity}>
+              {activity}
+            </span>
+          </header>
           <ol aria-live="polite" className="sw-dbx__log" data-testid="dbx-log">
             {log.length === 0 ? (
               <li className="sw-dbx__log-empty">
-                Edit the grid or press “Commit sample edit” — every acknowledgement lands here.
+                Change an amount in the Grid. The durable write and acknowledgement will appear
+                here.
               </li>
             ) : (
               log.map((entry) => (
@@ -610,8 +620,81 @@ export default function DatabaseShowcase() {
               ))
             )}
           </ol>
-        </section>
-      </aside>
+        </aside>
+      </div>
+
+      <details className="sw-dbx__diagnostics" data-testid="dbx-diagnostics">
+        <summary>Failure lab &amp; storage diagnostics</summary>
+        <div className="sw-dbx__diagnostics-body">
+          <div className="sw-dbx__diagnostic-controls">
+            <fieldset className="sw-dbx__control-group">
+              <legend>Lost acknowledgement</legend>
+              <button
+                className="sw-dbx__button"
+                data-variant="quiet"
+                disabled={!ready}
+                onClick={loseNextAck}
+                type="button"
+              >
+                Lose next acknowledgement
+              </button>
+              <button
+                className="sw-dbx__button"
+                data-variant="quiet"
+                disabled={!ready}
+                onClick={retryPending}
+                type="button"
+              >
+                Retry pending commit
+              </button>
+            </fieldset>
+            <fieldset className="sw-dbx__control-group">
+              <legend>Conflict &amp; reset</legend>
+              <button
+                className="sw-dbx__button"
+                data-variant="quiet"
+                disabled={!ready}
+                onClick={externalCommit}
+                type="button"
+              >
+                External writer commit
+              </button>
+              <button
+                className="sw-dbx__button"
+                data-variant="danger"
+                disabled={!ready}
+                onClick={resetDemo}
+                type="button"
+              >
+                Reset demo data
+              </button>
+            </fieldset>
+          </div>
+          <section aria-labelledby="dbx-counters-title" className="sw-dbx__storage">
+            <h3 id="dbx-counters-title">Storage internals</h3>
+            <dl className="sw-dbx__counters">
+              {diagnosticCounters.map((counter) => (
+                <div key={counter.id}>
+                  <dt>{counter.label}</dt>
+                  <dd data-testid={counter.id}>{counter.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="sw-dbx__note">
+              Compaction folds the operation tail into snapshot revision after{" "}
+              {COMPACTION.maxTailRecords} tail records or {formatBytes(COMPACTION.maxTailBytes)}.
+            </p>
+          </section>
+          <section aria-labelledby="dbx-architecture-title" className="sw-dbx__architecture">
+            <h3 id="dbx-architecture-title">Architecture boundary</h3>
+            <p>
+              The Grid feeds a durable pending queue. The demo adapter sequences commits into
+              IndexedDB; your product supplies the same PersistenceAdapter contract over its own
+              database and transport.
+            </p>
+          </section>
+        </div>
+      </details>
     </section>
   );
 }

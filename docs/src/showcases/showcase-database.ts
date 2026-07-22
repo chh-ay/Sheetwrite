@@ -79,7 +79,6 @@ const encoder = new TextEncoder();
  */
 export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
   private readonly database: IDBDatabase;
-  private readonly documentId: string;
   private readonly maxTailRecords: number;
   private readonly maxTailBytes: number;
   private readonly maxConflictTailVersions: number;
@@ -89,12 +88,10 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
 
   private constructor(
     database: IDBDatabase,
-    documentId: string,
     options: ShowcaseDatabaseOptions,
     gauges: ShowcaseDatabaseStats,
   ) {
     this.database = database;
-    this.documentId = documentId;
     this.maxTailRecords = options.compaction?.maxTailRecords ?? DEFAULT_MAX_TAIL_RECORDS;
     this.maxTailBytes = options.compaction?.maxTailBytes ?? DEFAULT_MAX_TAIL_BYTES;
     this.maxConflictTailVersions =
@@ -155,7 +152,7 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
       snapshotVersion,
       tailLength: tail.length,
     };
-    return new ShowcaseIndexedDbAdapter(database, documentId, options, gauges);
+    return new ShowcaseIndexedDbAdapter(database, options, gauges);
   }
 
   stats(): ShowcaseDatabaseStats {
