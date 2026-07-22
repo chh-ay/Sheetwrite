@@ -12,6 +12,7 @@ import { siteUrl } from "./playwright.config.js";
 declare global {
   interface Window {
     __sheetwriteVueWorkbench?: { grid: Grid };
+    __sheetwriteVuePaintFonts?: string[];
   }
 }
 
@@ -198,8 +199,9 @@ test("boots the governed business workbook, paints, and stays accessible", async
 
   // Accessible names for every interactive surface.
   await expect(page.getByRole("toolbar", { name: "Workbench configuration" })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Host role" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Host role" })).toBeVisible();
   await expect(page.getByRole("toolbar", { name: "Spreadsheet formatting" })).toBeVisible();
+  await expect(page.locator("select")).toHaveCount(0);
   await expect(page.getByRole("tablist", { name: "Sheets" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Orders sheet" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Suppliers sheet" })).toBeVisible();
@@ -279,7 +281,7 @@ test("protected totals show rejection, role correction, and accepted mutation in
   await expect(page.getByTestId("pending-count")).toHaveText("0");
 
   await page.getByTestId("challenge-authorize").click();
-  await expect(page.getByRole("combobox", { name: "Host role" })).toHaveValue("finance-lead");
+  await expect(page.getByTestId("role-finance-lead")).toHaveAttribute("aria-pressed", "true");
   await expect(inspector).toContainText("override allowed (finance lead)");
   await expect(result).toHaveAttribute("data-state", "authorized");
 
@@ -413,9 +415,13 @@ test("@portability native tabs expose the complete accessible worksheet lifecycl
   await page.getByRole("button", { name: "Options for Sheet 3 sheet" }).click();
   await page.getByRole("menuitem", { name: "Hide Sheet 3 sheet" }).click();
   await expect(added).toHaveCount(0);
-  const unhide = page.getByRole("combobox", { name: "Unhide sheet" });
+  const unhide = page.getByLabel("Unhide sheet");
   await expect(unhide).toBeVisible();
-  await unhide.selectOption({ label: "Sheet 3" });
+  await unhide.click();
+  await page
+    .getByRole("group", { name: "Hidden sheets" })
+    .getByRole("button", { name: "Sheet 3" })
+    .click();
   await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
 
   await page.getByRole("tab", { name: "Sheet 3 sheet" }).click();
@@ -455,11 +461,16 @@ test("@portability native worksheet controls remain operable at 390×844", async
   const sheet3Options = page.getByRole("button", { name: "Options for Sheet 3 sheet" });
   await sheet3Options.focus();
   await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Rename Sheet 3 sheet" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   const hideSheet3 = page.getByRole("menuitem", { name: "Hide Sheet 3 sheet" });
   await expect(hideSheet3).toBeFocused();
   await page.keyboard.press("Space");
-  await page.getByRole("combobox", { name: "Unhide sheet" }).selectOption({ label: "Sheet 3" });
+  await page.getByLabel("Unhide sheet").click();
+  await page
+    .getByRole("group", { name: "Hidden sheets" })
+    .getByRole("button", { name: "Sheet 3" })
+    .click();
   await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
 
   const overflow = await page.locator(".sheetwrite-tabbar").evaluate((bar) => ({
@@ -478,10 +489,25 @@ test("@portability native worksheet controls remain operable at 390×844", async
 test("toolbar formatting commits live styles through the grid", async ({ page }) => {
   const errors = collectErrors(page);
   await openWorkbench(page);
+  await page.evaluate(() => {
+    window.__sheetwriteVuePaintFonts = [];
+    const canvas = document.querySelector<HTMLCanvasElement>(".sw-vuewb-grid canvas");
+    const context = canvas?.getContext("2d");
+    if (!context) throw new Error("Vue workbench canvas context unavailable");
+    const originalFillText = context.fillText.bind(context);
+    context.fillText = (text: string, x: number, y: number, maxWidth?: number): void => {
+      if (text === "Kampot Mills") window.__sheetwriteVuePaintFonts?.push(context.font);
+      if (maxWidth === undefined) originalFillText(text, x, y);
+      else originalFillText(text, x, y, maxWidth);
+    };
+  });
 
   await page.evaluate(() => {
     const grid = window.__sheetwriteVueWorkbench!.grid;
     grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 1 } });
+  });
+  await page.evaluate(() => {
+    window.__sheetwriteVuePaintFonts = [];
   });
   await page.getByRole("button", { name: "Bold", exact: true }).click();
   await expect
@@ -498,6 +524,56 @@ test("toolbar formatting commits live styles through the grid", async ({ page })
     .toBe(true);
   // Style commits are pending host work like any other document operation.
   await expect(page.getByTestId("pending-count")).toHaveText("1");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVuePaintFonts?.some(
+            (font) => /\bbold\b/.test(font) && !/\bbold\s+(?:[1-9]\d{0,2}|1000)\b/.test(font),
+          ) ?? false,
+      ),
+    )
+    .toBe(true);
+
+  await page.evaluate(() => {
+    window.__sheetwriteVuePaintFonts = [];
+  });
+  await page.getByRole("button", { name: "Italic", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueWorkbench!.grid.store.getCell({
+            sheet: "orders",
+            row: 1,
+            col: 1,
+          }).style.italic ?? false,
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVuePaintFonts?.some(
+            (font) =>
+              /\bitalic\s+bold\b/.test(font) && !/\bbold\s+(?:[1-9]\d{0,2}|1000)\b/.test(font),
+          ) ?? false,
+      ),
+    )
+    .toBe(true);
+  await expect(page.getByTestId("pending-count")).toHaveText("2");
+
+  const colorInput = page.locator(".sheetwrite-tb-fillColor");
+  await colorInput.evaluate((input: HTMLInputElement) => {
+    for (const color of ["#224466", "#668844", "#aa5533"]) {
+      input.value = color;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  });
+  await expect(page.getByTestId("pending-count")).toHaveText("2");
+  await colorInput.dispatchEvent("change");
+  await expect(page.getByTestId("pending-count")).toHaveText("3");
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);

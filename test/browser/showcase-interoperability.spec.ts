@@ -49,6 +49,13 @@ async function bootInterop(page: Page, url = ROUTE): Promise<void> {
     .toContain("Loaded:");
 }
 
+async function chooseFilter(page: Page, testId: string, label: string): Promise<void> {
+  const summary = page.getByTestId(testId);
+  await summary.click();
+  await summary.locator("..").getByRole("button", { name: label, exact: true }).click();
+  await expect(summary).toBeFocused();
+}
+
 async function openDisclosure(page: Page, testId: string): Promise<void> {
   const disclosure = page.getByTestId(testId);
   if ((await disclosure.getAttribute("open")) === null) {
@@ -122,10 +129,10 @@ test("live workbook and fidelity ledger lead the first desktop viewport", async 
   expect(workbenchGeometry.actionGap).toBeLessThanOrEqual(32);
   expect(workbenchGeometry.trailingGap).toBeLessThanOrEqual(2);
 
-  const statusColors = await ledger
+  const statusBorders = await ledger
     .locator(".sw-si-ledger__states > div")
-    .evaluateAll((rows) => rows.map((row) => getComputedStyle(row).borderLeftColor));
-  expect(new Set(statusColors).size).toBe(4);
+    .evaluateAll((rows) => rows.map((row) => getComputedStyle(row).borderLeftWidth));
+  expect(new Set(statusBorders)).toEqual(new Set(["0px"]));
   await expect(ledger).toContainText("Load → edit → compare");
   await expect(ledger).toContainText("Evaluated");
   await expect(ledger).toContainText("Preserved");
@@ -195,6 +202,7 @@ test("@portability compatibility results expose every truthful state from checke
 }) => {
   const errors = collectErrors(page);
   await bootInterop(page, `${ROUTE}?compatibility=producer.google-sheets`);
+  await expect(page.locator("select")).toHaveCount(0);
 
   const inventoryDetail = page.getByTestId("compatibility-detail");
   await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");
@@ -206,10 +214,12 @@ test("@portability compatibility results expose every truthful state from checke
   const boundaryStatus = inventoryDetail.locator(".sw-si-compat__mode > span");
   await expect(boundaryStatus).toHaveCount(1);
   await expect(boundaryStatus).toHaveText("Supported with warning");
-  await expect(page.locator(".sw-si-inventory .sw-si-compat__records button small")).toHaveCount(0);
+  expect(
+    await page.locator(".sw-si-inventory .sw-si-compat__record-status").count(),
+  ).toBeGreaterThan(0);
 
-  await page.getByTestId("inventory-behavior-filter").selectOption("all");
-  await page.getByTestId("inventory-status-filter").selectOption("supported");
+  await chooseFilter(page, "inventory-behavior-filter", "All behavior scopes");
+  await chooseFilter(page, "inventory-status-filter", "Supported");
   const evaluatedBoundary = page
     .locator('.sw-si-inventory button[data-status="supported"][data-result="evaluated"]')
     .first();
@@ -295,7 +305,7 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(page.getByTestId("compatibility-tolerance")).toHaveText("Exact type and value");
 
   // Excel-specific behavior exists, but no reviewed Excel result is attached.
-  await page.getByTestId("compatibility-behavior-filter").selectOption("excel");
+  await chooseFilter(page, "compatibility-behavior-filter", "Excel-specific behavior");
   await expect(detail).toHaveAttribute("data-behavior", "excel");
   await expect(detail).toHaveAttribute("data-status", /known-difference/u);
   await expect(page.getByTestId("known-difference")).toContainText("1900-02-29");
@@ -307,13 +317,13 @@ test("@portability compatibility results expose every truthful state from checke
 
   // The separate checked feature boundary records the Google-only scope and
   // still renders it as unavailable rather than claiming an executed result.
-  await page.getByTestId("inventory-status-filter").selectOption("all");
-  await page.getByTestId("inventory-behavior-filter").selectOption("google-sheets");
+  await chooseFilter(page, "inventory-status-filter", "All statuses");
+  await chooseFilter(page, "inventory-behavior-filter", "Google Sheets-specific behavior");
   await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");
   await expect(inventoryDetail).toContainText("missing bytes display unavailable status");
 
-  await page.getByTestId("inventory-behavior-filter").selectOption("all");
-  await page.getByTestId("inventory-status-filter").selectOption("unsupported");
+  await chooseFilter(page, "inventory-behavior-filter", "All behavior scopes");
+  await chooseFilter(page, "inventory-status-filter", "Unsupported");
   const unsupportedBoundary = page
     .locator('.sw-si-inventory button[data-status="unsupported"][data-result="unsupported"]')
     .first();
@@ -323,34 +333,34 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(unsupportedBadges).toHaveCount(1);
   await expect(unsupportedBadges).toHaveText("Unsupported · not claimed");
   // Known difference.
-  await page.getByTestId("compatibility-behavior-filter").selectOption("all");
-  await page.getByTestId("compatibility-status-filter").selectOption("known-difference");
+  await chooseFilter(page, "compatibility-behavior-filter", "All behavior scopes");
+  await chooseFilter(page, "compatibility-status-filter", "Known difference");
   await expect(detail).toHaveAttribute("data-status", /known-difference/u);
   await expect(page.getByTestId("known-difference")).toBeVisible();
 
   // Explicit unsupported nonclaim.
-  await page.getByTestId("compatibility-status-filter").selectOption("unsupported");
+  await chooseFilter(page, "compatibility-status-filter", "Unsupported / not claimed");
   await expect(detail).toHaveAttribute("data-status", /unsupported/u);
   await expect(detail).toContainText("excluded from the pass percentage");
 
   // Warning behavior, with a real workbook-operation preview from checked data.
-  await page.getByTestId("compatibility-status-filter").selectOption("warning");
+  await chooseFilter(page, "compatibility-status-filter", "Warning behavior");
   await expect(detail).toHaveAttribute("data-status", /warning/u);
   await expect(detail).toContainText("Warning behavior check");
   await expect(page.getByTestId("compatibility-workbook-preview")).toContainText('"warnings"');
 
   // Regression is a tested empty state: there are no reviewed external results,
   // therefore there can be no reviewed regression record.
-  await page.getByTestId("compatibility-status-filter").selectOption("regression");
+  await chooseFilter(page, "compatibility-status-filter", "Regression");
   await expect(page.getByTestId("compatibility-results-empty")).toContainText(
     "No reviewed regressions are recorded",
   );
   await expect(page.locator(".sw-si-results .sw-si-compat__records button")).toHaveCount(0);
 
   // Function/feature filtering and case selection work through the keyboard.
-  await page.getByTestId("compatibility-status-filter").selectOption("all");
+  await chooseFilter(page, "compatibility-status-filter", "All result states");
   const featureFilter = page.getByTestId("compatibility-feature-filter");
-  await featureFilter.selectOption("function:ABS");
+  await chooseFilter(page, "compatibility-feature-filter", "Function · ABS");
   const absResults = page.locator(".sw-si-results .sw-si-compat__records button");
   await expect(absResults).toHaveCount(1);
   await expect(absResults.first()).toContainText("ABS");
@@ -501,8 +511,8 @@ test("analytical workbook recalculates real precedents and clears resized spills
   await expect(rateScope).toContainText("assumptions!R2C4");
 
   const spillControl = page.getByTestId("interop-spill-input");
-  const spillFour = spillControl.getByRole("radio", { name: "4 periods" });
-  const spillSix = spillControl.getByRole("radio", { name: "6 periods" });
+  const spillFour = spillControl.getByRole("radio", { name: "4 rows" });
+  const spillSix = spillControl.getByRole("radio", { name: "6 rows" });
   await expect(spillFour).toBeChecked();
   await spillFour.focus();
   await page.keyboard.press("ArrowRight");
@@ -525,7 +535,7 @@ test("analytical workbook recalculates real precedents and clears resized spills
   await expect(rateScope).toHaveAttribute("data-changed-results", "Spill");
   await expect(rateScope).toContainText("assumptions!R5C2");
 
-  const spillThree = spillControl.getByRole("radio", { name: "3 periods" });
+  const spillThree = spillControl.getByRole("radio", { name: "3 rows" });
   await spillSix.focus();
   await page.keyboard.press("ArrowRight");
   await expect(spillThree).toBeChecked();

@@ -553,21 +553,19 @@ const App = defineComponent({
                 "aria-label": "Workbench configuration",
               },
               [
-                h("label", { class: "sw-vuewb-role" }, [
-                  h("span", "Acting as"),
-                  h(
-                    "select",
-                    {
-                      "data-testid": "role",
-                      "aria-label": "Host role",
-                      value: role.value,
-                      onChange: (event: Event) =>
-                        setRole((event.target as HTMLSelectElement).value as HostRole),
-                    },
-                    [
-                      h("option", { value: "reviewer" }, "Reviewer"),
-                      h("option", { value: "finance-lead" }, "Finance lead"),
-                    ],
+                h("fieldset", { class: "sw-vuewb-role", "aria-label": "Host role" }, [
+                  h("legend", "Acting as"),
+                  (["reviewer", "finance-lead"] as const).map((candidate) =>
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "aria-pressed": role.value === candidate,
+                        "data-testid": `role-${candidate}`,
+                        onClick: () => setRole(candidate),
+                      },
+                      candidate === "reviewer" ? "Reviewer" : "Finance lead",
+                    ),
                   ),
                 ]),
               ],

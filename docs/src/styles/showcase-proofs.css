@@ -23,63 +23,6 @@
   letter-spacing: 0.14em;
 }
 
-.sw-proofs-page__hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(15rem, 1fr);
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-items: end;
-  margin-bottom: clamp(1.75rem, 4vh, 2.75rem);
-}
-
-.sw-proofs-page__hero h1 {
-  margin: 0;
-  font-family: var(--sw-font-display);
-  font-size: clamp(1.9rem, 4.2vw, 3rem);
-  line-height: 1.08;
-  letter-spacing: -0.02em;
-  color: var(--sw-fg-strong);
-  text-wrap: balance;
-}
-
-.sw-proofs-page__lede {
-  margin: 1rem 0 0;
-  max-width: 44rem;
-  color: var(--sw-fg-muted);
-  font-size: 1.02rem;
-  line-height: 1.6;
-}
-
-.sw-proofs-page__facts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  margin: 0;
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-demo-radius-3);
-  overflow: hidden;
-  background: var(--sw-border);
-}
-
-.sw-proofs-page__facts > div {
-  padding: 0.8rem 0.95rem;
-  background: var(--sw-surface-1);
-}
-
-.sw-proofs-page__facts dt {
-  margin: 0 0 0.25rem;
-  color: var(--sw-fg-dim);
-  font-size: var(--sw-type-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.sw-proofs-page__facts dd {
-  margin: 0;
-  color: var(--sw-fg-strong);
-  font-size: var(--sw-type-sm);
-  font-weight: 600;
-}
-
 .sw-proofs-page__stage {
   border: 1px solid var(--sw-border);
   border-radius: var(--sw-demo-radius-3);
@@ -630,51 +573,6 @@
 }
 
 /* ---------- database showcase (.sw-dbx) ---------- */
-
-[data-proof="database"].sw-proofs-page {
-  padding-block-start: var(--sw-demo-space-4);
-}
-
-[data-proof="database"] .sw-proofs-page__hero {
-  grid-template-columns: 1fr;
-  gap: var(--sw-demo-space-3);
-  margin-bottom: var(--sw-demo-space-4);
-}
-
-[data-proof="database"] .sw-proofs-page__hero h1 {
-  font-size: clamp(1.75rem, 3vw, 2.4rem);
-}
-
-[data-proof="database"] .sw-proofs-page__lede {
-  margin-top: var(--sw-demo-space-2);
-  font-size: var(--sw-type-sm);
-  line-height: 1.5;
-}
-
-[data-proof="database"] .sw-proofs-page__facts {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  border: 0;
-  border-block: 1px solid var(--sw-border);
-  border-radius: 0;
-  overflow: visible;
-  background: transparent;
-}
-
-[data-proof="database"] .sw-proofs-page__facts > div {
-  min-width: 0;
-  padding: var(--sw-demo-space-3) var(--sw-demo-space-4);
-  background: transparent;
-}
-
-[data-proof="database"] .sw-proofs-page__facts > div + div {
-  border-inline-start: 1px solid var(--sw-border);
-}
-
-[data-proof="database"] .sw-proofs-page__facts dd {
-  font-size: clamp(var(--sw-type-sm), 1vw, var(--sw-type-base));
-  white-space: nowrap;
-}
 
 .sw-dbx {
   display: flex;
@@ -1388,34 +1286,7 @@
 
 /* ---------- responsive ---------- */
 
-@media (max-width: 64rem) {
-  [data-proof="database"] .sw-proofs-page__facts {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  [data-proof="database"] .sw-proofs-page__facts > div {
-    border-block-start: 1px solid var(--sw-border);
-  }
-
-  [data-proof="database"] .sw-proofs-page__facts > div + div {
-    border-inline-start: 0;
-  }
-
-  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(-n + 2) {
-    border-block-start: 0;
-  }
-
-  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(even) {
-    border-inline-start: 1px solid var(--sw-border);
-  }
-}
-
 @media (max-width: 60rem) {
-  .sw-proofs-page__hero {
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
   .sw-proofs-page__points ol {
     grid-template-columns: 1fr;
   }
@@ -1435,11 +1306,6 @@
     left: 0;
     border-left: 0;
     border-top: 1px dashed var(--sw-border-strong);
-  }
-
-  [data-proof="database"] .sw-proofs-page__hero {
-    grid-template-columns: 1fr;
-    gap: var(--sw-demo-space-3);
   }
 
   .sw-dbx__challenge {
@@ -1485,23 +1351,6 @@
 }
 
 @media (max-width: 44rem) {
-  [data-proof="database"].sw-proofs-page {
-    padding-block-start: var(--sw-demo-space-3);
-  }
-
-  [data-proof="database"] .sw-proofs-page__facts {
-    grid-template-columns: 1fr;
-  }
-
-  [data-proof="database"] .sw-proofs-page__facts > div,
-  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(even) {
-    border-inline-start: 0;
-  }
-
-  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(n + 2) {
-    border-block-start: 1px solid var(--sw-border);
-  }
-
   .sw-dbx__statusbar {
     align-items: flex-start;
   }

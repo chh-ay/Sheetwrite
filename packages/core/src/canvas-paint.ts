@@ -7,6 +7,9 @@ const CELL_PAD = 6;
 
 /** Pull the pixel size out of a CSS font shorthand ("12px sans-serif"). */
 const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
+const FONT_WEIGHT_TOKEN_RE = /^(?:normal|bold|bolder|lighter|[1-9]\d{0,2}|1000)$/;
+const FONT_STYLE_TOKEN_RE = /^(?:normal|italic|oblique)$/;
+const FONT_ANGLE_TOKEN_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$/;
 
 /** Shared empty style; skips a per-cell `{}` allocation on the render hot path. */
 const EMPTY_STYLE: CellStyle = {};
@@ -110,7 +113,31 @@ export function fontFor(
   const cached = cache?.get(key);
   if (cached !== undefined) return cached;
   const base = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
-  const font = `${style.italic ? "italic " : ""}${style.bold ? "bold " : ""}${base}`;
+  const sizeMatch = FONT_PX_RE.exec(base);
+  if (!sizeMatch || sizeMatch.index === undefined) return base;
+  const prefix = base.slice(0, sizeMatch.index).trim().split(/\s+/).filter(Boolean);
+  const themeWeight = prefix.find(
+    (token) => FONT_WEIGHT_TOKEN_RE.test(token) && token !== "normal",
+  );
+  const themeStyle = prefix.find((token) => FONT_STYLE_TOKEN_RE.test(token) && token !== "normal");
+  const themeStyleIndex = themeStyle === undefined ? -1 : prefix.indexOf(themeStyle);
+  const retainedPrefix = prefix.filter(
+    (token, index) =>
+      !FONT_WEIGHT_TOKEN_RE.test(token) &&
+      !FONT_STYLE_TOKEN_RE.test(token) &&
+      !(
+        style.italic &&
+        themeStyle === "oblique" &&
+        index === themeStyleIndex + 1 &&
+        FONT_ANGLE_TOKEN_RE.test(token)
+      ),
+  );
+  const font = [
+    ...(style.italic ? ["italic"] : themeStyle ? [themeStyle] : []),
+    ...retainedPrefix,
+    ...(style.bold ? ["bold"] : themeWeight && themeWeight !== "normal" ? [themeWeight] : []),
+    base.slice(sizeMatch.index),
+  ].join(" ");
   cache?.set(key, font);
   return font;
 }

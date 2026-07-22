@@ -18,8 +18,8 @@ import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.
 import type {
   CellScalar,
   ChangeEvent,
-  DataSourceRequest,
   DataSourcePage,
+  DataSourceRequest,
   DocumentOp,
   GridEvents,
   RowData,
@@ -804,6 +804,33 @@ describe("Grid editing (Layer 3)", () => {
     expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
     expect(colorInput.isConnected).toBe(false);
 
+    grid.destroy();
+    store.dispose();
+  });
+  it("commits a color picker value once when the picker closes", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    const commits: unknown[] = [];
+    const unsubscribe = grid.on("change", (event) => commits.push(event));
+    const colorInput = host.querySelector(".sheetwrite-tb-fillColor");
+    expect(colorInput).toBeInstanceOf(HTMLInputElement);
+    if (!(colorInput instanceof HTMLInputElement)) throw new Error("fill-color input not mounted");
+
+    for (const color of ["#113355", "#446688", "#aa5533"]) {
+      colorInput.value = color;
+      colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    expect(commits).toHaveLength(0);
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBeUndefined();
+
+    colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(commits).toHaveLength(1);
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBe("#aa5533");
+
+    unsubscribe();
     grid.destroy();
     store.dispose();
   });

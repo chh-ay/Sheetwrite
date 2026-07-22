@@ -149,16 +149,16 @@ test.describe("database proof", () => {
     expect(errors.page).toEqual([]);
   });
 
-  test("lays out the scenario facts as a readable responsive row", async ({ page }) => {
+  test("lays out the scenario facts as a readable 2 by 2 grid", async ({ page }) => {
     await page.goto(DATABASE_URL);
     await databaseReady(page);
-    const facts = page.locator(".sw-proofs-page__facts > div");
+    const facts = page.locator(".sw-capability-hero__facts > div");
     await expect(facts).toHaveCount(4);
 
     for (const viewport of [
-      { width: 1568, height: 1000, rows: 1 },
+      { width: 1568, height: 1000, rows: 2 },
       { width: 1024, height: 900, rows: 2 },
-      { width: 390, height: 844, rows: 4 },
+      { width: 390, height: 844, rows: 2 },
     ]) {
       await page.setViewportSize(viewport);
       const measurements = await facts.evaluateAll((elements) =>
@@ -168,13 +168,11 @@ test.describe("database proof", () => {
           return {
             top: Math.round(box.top),
             clipped: value ? value.scrollWidth > value.clientWidth + 1 : true,
-            whiteSpace: value ? getComputedStyle(value).whiteSpace : "",
           };
         }),
       );
       expect(new Set(measurements.map(({ top }) => top)).size).toBe(viewport.rows);
       expect(measurements.every(({ clipped }) => !clipped)).toBe(true);
-      expect(measurements.every(({ whiteSpace }) => whiteSpace === "nowrap")).toBe(true);
       await noHorizontalOverflow(page);
     }
   });

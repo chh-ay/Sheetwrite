@@ -4,8 +4,8 @@ import {
   bindEngineEvents,
   createEngineLiveDataSource,
   createEngineTrace,
-  type EngineEventInput,
   ENGINE_LIVE_SHEET,
+  type EngineEventInput,
   engineLiveRow,
 } from "../src/showcases/scenarios/engine-live.js";
 
@@ -33,8 +33,8 @@ describe("live engine event story", () => {
   it("records the exact deterministic request, Grid, drawing, and host order", async () => {
     const trace = createEngineTrace(20);
     const emit = (event: EngineEventInput) => trace.push(event);
-    const columns = [{ start: 2, end: 5, keys: ["planned", "actual", "difference"] }] as const;
-    const source = createEngineLiveDataSource(emit, undefined, 0);
+    const columns = [{ start: 2, end: 5, keys: ["actual", "forecast", "variance"] }] as const;
+    const source = createEngineLiveDataSource(emit);
     const page = await source.getRows({
       protocol: 2,
       sheet: ENGINE_LIVE_SHEET,
@@ -46,7 +46,7 @@ describe("live engine event story", () => {
     });
 
     expect(page.columns).toBe(columns);
-    expect(Object.keys(page.rows[0] ?? {})).toEqual(["planned", "actual", "difference"]);
+    expect(Object.keys(page.rows[0] ?? {})).toEqual(["actual", "forecast", "variance"]);
 
     const listeners = new Map<string, (payload: never) => void>();
     const grid = fakeGrid((event, listener) => listeners.set(event, listener));
@@ -84,14 +84,12 @@ describe("live engine event story", () => {
       "datasource-request",
       "datasource-result",
       "transaction-result",
-      "formula-update",
       "page-resource",
-      "visible-window",
       "renderer",
       "host-save",
       "page-resource",
     ]);
-    expect(trace.snapshot().map((event) => event.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(trace.snapshot().map((event) => event.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     bindings.dispose();
   });
 
@@ -113,9 +111,9 @@ describe("live engine event story", () => {
 
   it("builds formulas from the same paged row returned to the Grid", () => {
     expect(engineLiveRow(7)).toMatchObject({
-      week: 8,
-      difference: { kind: "formula", src: "=D8-C8" },
-      pace: { kind: "formula", src: "=IF(C8=0,0,D8/C8)" },
+      period: "FY26 W07",
+      variance: { kind: "formula", src: "=C8-D8" },
+      attainment: { kind: "formula", src: "=IF(D8=0,0,C8/D8)" },
     });
   });
 });

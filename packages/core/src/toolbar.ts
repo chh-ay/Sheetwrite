@@ -239,7 +239,7 @@ export function renderToolbarItems(
     input.className = `sheetwrite-tb-color sheetwrite-tb-${suffix}`;
     input.title = title;
     if (title) input.setAttribute("aria-label", title);
-    input.addEventListener("input", () => onPick(input.value));
+    input.addEventListener("change", () => onPick(input.value));
 
     bar.appendChild(input);
     return input;

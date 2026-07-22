@@ -335,11 +335,30 @@ describe("SheetTabs", () => {
     host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Remove Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Add sheet"]')!.click();
-    const unhide = host.querySelector<HTMLSelectElement>('[aria-label="Unhide sheet"]')!;
-    expect([...unhide.options].map((option) => option.textContent)).toEqual(["Unhide…", "Hidden"]);
+    const unhide = host.querySelector<HTMLElement>('[aria-label="Unhide sheet"]')!;
+    expect(unhide.textContent).toBe("Unhide…");
+    const hiddenChoices = host.querySelector<HTMLElement>(
+      '[role="group"][aria-label="Hidden sheets"]',
+    )!;
+    expect(
+      [...hiddenChoices.querySelectorAll("button")].map((button) => button.textContent),
+    ).toEqual(["Hidden"]);
+    expect(hiddenChoices.hidden).toBe(true);
+    unhide.click();
+    expect(unhide.getAttribute("aria-expanded")).toBe("true");
+    expect(hiddenChoices.hidden).toBe(false);
+    key(hiddenChoices.querySelector("button")!, "Escape");
+    expect(unhide.getAttribute("aria-expanded")).toBe("false");
+    expect(hiddenChoices.hidden).toBe(true);
+    expect(document.activeElement).toBe(unhide);
+    unhide.click();
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(unhide.getAttribute("aria-expanded")).toBe("false");
+    expect(hiddenChoices.hidden).toBe(true);
+    expect(document.activeElement).toBe(unhide);
+    unhide.click();
     expect(host.textContent).not.toContain("Secret");
-    unhide.value = "hidden";
-    unhide.dispatchEvent(new Event("change", { bubbles: true }));
+    hiddenChoices.querySelector("button")!.click();
 
     let active = tabButtons(host)[1]!;
     active.focus();
@@ -549,11 +568,12 @@ describe("SheetTabs", () => {
       ],
       "visible",
     );
-    let unhide = host.querySelector<HTMLSelectElement>('[aria-label="Unhide sheet"]')!;
-    unhide.value = "hidden";
-    unhide.dispatchEvent(new Event("change", { bubbles: true }));
+    let unhide = host.querySelector<HTMLElement>('[aria-label="Unhide sheet"]')!;
+    host
+      .querySelector<HTMLButtonElement>('[role="group"][aria-label="Hidden sheets"] button')!
+      .click();
 
-    unhide = host.querySelector<HTMLSelectElement>('[aria-label="Unhide sheet"]')!;
+    unhide = host.querySelector<HTMLElement>('[aria-label="Unhide sheet"]')!;
     const error = host.querySelector<HTMLElement>('[role="alert"]')!;
     expect(unhide.getAttribute("aria-invalid")).toBe("true");
     expect(unhide.getAttribute("aria-describedby")).toBe(error.id);

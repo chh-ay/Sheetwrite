@@ -332,6 +332,8 @@
    from the active Theme; positioning stays inline because the bar reserves
    layout height). Override any rule from host CSS to restyle. */
 .sheetwrite-tabbar {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -396,7 +398,7 @@
 .sheetwrite-tab-options-button:focus,
 .sheetwrite-tab-add:focus,
 .sheetwrite-tab-menu-item:focus,
-.sheetwrite-tab-unhide:focus {
+.sheetwrite-tab-unhide > button:focus {
   outline: none;
 }
 
@@ -407,7 +409,7 @@
 .sheetwrite-tab-options-button:focus-visible,
 .sheetwrite-tab-add:focus-visible,
 .sheetwrite-tab-menu-item:focus-visible,
-.sheetwrite-tab-unhide:focus-visible {
+.sheetwrite-tab-unhide > button:focus-visible {
   box-shadow: inset 0 0 0 1px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
 }
 
@@ -543,21 +545,74 @@
   box-shadow: inset 0 0 0 2px var(--sheetwrite-error-fg, #b3261e);
 }
 
-.sheetwrite-tab-unhide[aria-invalid="true"] {
-  outline-color: var(--sheetwrite-error-fg, #b3261e);
+.sheetwrite-tab-unhide > button[aria-invalid="true"] {
+  color: var(--sheetwrite-error-fg, #b3261e);
 }
 
 .sheetwrite-tab-unhide {
+  position: relative;
+  z-index: 7;
   flex: none;
-  height: calc(100% - 6px);
   align-self: center;
+  height: calc(100% - 6px);
+  color: var(--sheetwrite-tab-fg, #5f6368);
+  font: inherit;
+}
+
+.sheetwrite-tab-unhide > button {
+  box-sizing: border-box;
+  height: 100%;
   max-width: 10rem;
+  padding: 0.35rem 0.55rem;
   border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
   border-radius: 6px;
-  padding-inline: 0.45rem;
-  font: inherit;
   background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
-  color: var(--sheetwrite-tab-fg, #5f6368);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sheetwrite-tab-unhide-menu {
+  position: absolute;
+  z-index: 6;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: grid;
+  min-width: 10rem;
+  max-height: 14rem;
+  padding: 4px;
+  overflow: auto;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 6px;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
+  box-shadow: var(--sheetwrite-menu-shadow, 0 8px 24px rgb(60 64 67 / 20%));
+}
+
+.sheetwrite-tab-unhide-menu[popover] {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  margin: 0;
+}
+
+.sheetwrite-tab-unhide-menu[hidden] {
+  display: none;
+}
+
+.sheetwrite-tab-unhide-menu button {
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sheetwrite-tab-unhide-menu button:is(:hover, :focus-visible) {
+  background: var(--sheetwrite-menu-hover, #f1f3f4);
 }
 
 .sheetwrite-tab-error {

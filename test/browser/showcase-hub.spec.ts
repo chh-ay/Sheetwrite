@@ -251,3 +251,22 @@ test("hub stays accessible and usable on a mobile viewport", async ({ page }) =>
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
+
+test("all four capability routes share one 2 by 2 hero contract", async ({ page }) => {
+  await page.setViewportSize({ width: 1568, height: 900 });
+  for (const route of ["performance", "database", "interoperability", "collaboration"]) {
+    await page.goto(siteUrl(`/showcases/${route}/`));
+    const hero = page.locator(".sw-capability-hero");
+    await expect(hero).toHaveCount(1);
+    const facts = hero.locator(".sw-capability-hero__facts > div");
+    await expect(facts).toHaveCount(4);
+    const geometry = await facts.evaluateAll((items) =>
+      items.map((item) => {
+        const bounds = item.getBoundingClientRect();
+        return { left: Math.round(bounds.left), top: Math.round(bounds.top) };
+      }),
+    );
+    expect(new Set(geometry.map(({ left }) => left)).size, `${route} hero columns`).toBe(2);
+    expect(new Set(geometry.map(({ top }) => top)).size, `${route} hero rows`).toBe(2);
+  }
+});

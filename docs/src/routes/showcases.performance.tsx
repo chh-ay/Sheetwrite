@@ -19,6 +19,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { pageMeta } from "../lib/seo.js";
+import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import {
   attemptColumnScan,
   attemptFullCsvExport,
@@ -498,33 +499,32 @@ function PerformanceRoute() {
     <div className="sw-sp-frame">
       <SiteTopbar active="performance" />
       <main className="sw-sp-page" id="main-content">
-        <header className="sw-sp-hero">
-          <div>
-            <p className="sw-sp-eyebrow">LIVE SCALE PROOF</p>
-            <h1>One billion addresses. One bounded working set.</h1>
-            <p className="sw-sp-lede">
+        <CapabilityHero
+          description={
+            <>
               Drive a real {SCALE_ROWS.toLocaleString()} × {SCALE_COLUMNS.toLocaleString()}
               financial operations Grid. Jump deep, edit a cell, then scroll wide—the sheet only
               loads the rectangle you visit.
-            </p>
-          </div>
-          <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
-            {status}
-          </p>
-        </header>
+            </>
+          }
+          eyebrow="CAPABILITY / DATA & SCALE"
+          facts={[
+            { label: "Rows", value: SCALE_ROWS.toLocaleString() },
+            { label: "Columns", value: SCALE_COLUMNS.toLocaleString() },
+            { label: "Address space", value: "1 billion" },
+            { label: "Loading", value: "Requested tiles only" },
+          ]}
+          title="One billion addresses. One bounded working set."
+        />
 
         <section
-          aria-labelledby="scale-stage-title"
+          aria-label="Billion-address Grid workbench"
           className="sw-sp-section sw-sp-stage-section"
           id="million-rows"
         >
-          <div className="sw-sp-stage-heading">
-            <div>
-              <p className="sw-sp-kicker">Billion-address sheet / live grid</p>
-              <h2 id="scale-stage-title">Navigate the working set</h2>
-            </div>
-            <p>Jump deep vertically, then scrub or scroll horizontally across the same Grid.</p>
-          </div>
+          <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
+            {status}
+          </p>
 
           <div className="sw-sp-workbench" data-state={gridState}>
             <div className="sw-sp-stage-body">

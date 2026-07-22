@@ -25,24 +25,38 @@
 .sw-vuewb-role {
   display: inline-flex;
   flex: none;
-  gap: var(--sw-demo-space-2);
+  gap: var(--sw-demo-space-1);
   align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
   color: var(--sw-demo-muted);
   font: 600 var(--sw-type-xs) / 1 var(--sw-font-body);
 }
 
-.sw-vuewb-role select {
+.sw-vuewb-role legend {
+  float: left;
+  margin-right: var(--sw-demo-space-1);
+}
+
+.sw-vuewb-role button {
   min-height: 2rem;
   padding-inline: var(--sw-demo-space-2);
   border: 1px solid var(--sw-demo-border-strong);
   border-radius: var(--sw-demo-radius-1);
-  background: var(--sw-demo-surface);
-  color: var(--sw-demo-fg-strong);
+  background: transparent;
+  color: var(--sw-demo-muted);
   font: 650 var(--sw-type-xs) / 1 var(--sw-font-body);
   cursor: pointer;
 }
 
-.sw-vuewb-role select:focus-visible,
+.sw-vuewb-role button[aria-pressed="true"] {
+  border-color: var(--sw-demo-accent);
+  background: color-mix(in srgb, var(--sw-demo-accent) 16%, transparent);
+  color: var(--sw-demo-fg-strong);
+}
+
+.sw-vuewb-role button:focus-visible,
 .sw-vuewb-panel :is(button, input, textarea, summary):focus-visible {
   border-color: var(--sw-demo-accent);
   outline: 2px solid color-mix(in srgb, var(--sw-demo-accent) 56%, transparent);
@@ -705,7 +719,7 @@
     overflow: visible;
   }
 
-  .sw-vuewb-role > span {
+  .sw-vuewb-role legend {
     display: none;
   }
 

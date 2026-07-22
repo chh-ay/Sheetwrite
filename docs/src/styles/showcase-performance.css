@@ -28,41 +28,15 @@
   .sw-sp-page {
     width: min(var(--sw-sp-page-width), calc(100% - var(--sw-sp-space-6)));
     margin-inline: auto;
-    padding-block: var(--sw-sp-space-5) var(--sw-sp-space-8);
+    padding-block: clamp(2.5rem, 6vh, 4.5rem) var(--sw-sp-space-8);
   }
 
-  .sw-sp-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 0.75fr);
-    align-items: end;
-    gap: var(--sw-sp-space-6);
-    margin-bottom: var(--sw-sp-space-4);
-  }
-
-  .sw-sp-eyebrow,
   .sw-sp-kicker {
     margin: 0 0 var(--sw-sp-space-3);
     color: var(--sw-accent-strong);
     font: 650 var(--sw-type-xs) var(--sw-font-mono);
     letter-spacing: 0.12em;
     text-transform: uppercase;
-  }
-
-  .sw-sp-hero h1 {
-    max-width: 28ch;
-    margin: 0 0 var(--sw-sp-space-2);
-    color: var(--sw-fg-strong);
-    font: 640 clamp(1.8rem, 3vw, 3rem) / 1 var(--sw-font-display);
-    letter-spacing: -0.04em;
-    text-wrap: balance;
-  }
-
-  .sw-sp-lede {
-    max-width: 65ch;
-    margin: 0;
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-type-sm);
-    line-height: 1.55;
   }
 
   .sw-sp-status {
@@ -80,8 +54,7 @@
     scroll-margin-top: calc(var(--sw-header-height) + var(--sw-sp-space-6));
   }
 
-  .sw-sp-section > h2,
-  .sw-sp-stage-heading h2 {
+  .sw-sp-section > h2 {
     margin: 0 0 var(--sw-sp-space-3);
     color: var(--sw-fg-strong);
     font: 630 clamp(1.45rem, 3vw, 2.15rem) / 1.14 var(--sw-font-display);
@@ -142,29 +115,6 @@
 
   .sw-sp-stage-section {
     width: 100%;
-  }
-
-  .sw-sp-stage-heading {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: var(--sw-sp-space-4);
-    margin-bottom: var(--sw-sp-space-3);
-  }
-
-  .sw-sp-stage-heading .sw-sp-kicker,
-  .sw-sp-stage-heading h2,
-  .sw-sp-stage-heading > p {
-    margin-bottom: 0;
-  }
-
-  .sw-sp-stage-heading > p {
-    max-width: 28rem;
-    margin-top: 0;
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-type-xs);
-    line-height: 1.5;
-    text-align: right;
   }
 
   .sw-sp-render-switch,
@@ -1460,19 +1410,9 @@
       padding-block: var(--sw-sp-space-5) var(--sw-sp-space-7);
     }
 
-    .sw-sp-hero {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sw-sp-space-3);
-    }
-
-    .sw-sp-stage-heading,
     .sw-sp-stage-tools {
       align-items: stretch;
       flex-direction: column;
-    }
-
-    .sw-sp-stage-heading > p {
-      text-align: left;
     }
 
     .sw-sp-stage-body {
@@ -1553,10 +1493,6 @@
 
     .sw-sp-page {
       width: calc(100% - var(--sw-sp-space-4));
-    }
-
-    .sw-sp-hero h1 {
-      font-size: clamp(1.75rem, 10vw, 2.5rem);
     }
 
     .sw-sp-instrument {

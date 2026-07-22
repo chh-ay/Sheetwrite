@@ -97,6 +97,7 @@ export class SheetTabs {
   private editing: RenameState | null = null;
   private menuSheetId: SheetId | null = null;
   private feedback: LifecycleFeedback | null = null;
+  private unhideDismiss: (() => void) | null = null;
   private buttons: HTMLButtonElement[] = [];
   private buttonIds: SheetId[] = [];
   private moveIndexes: number[] = [];
@@ -188,6 +189,8 @@ export class SheetTabs {
     this.host.removeEventListener("keydown", this.onKeydown);
     this.host.removeEventListener("focusout", this.onFocusOut);
     this.removeMenuDismissListeners();
+    this.unhideDismiss?.();
+    this.unhideDismiss = null;
     this.host.replaceChildren();
     this.host.removeAttribute("role");
     this.host.removeAttribute("aria-label");
@@ -230,6 +233,8 @@ export class SheetTabs {
 
   private render(forceFocus = false): void {
     if (this.destroyed) return;
+    this.unhideDismiss?.();
+    this.unhideDismiss = null;
     const restoreFocus = forceFocus || this.host.contains(document.activeElement);
     const visible = this.visibleSheets();
     const hidden = this.hiddenSheets();
@@ -278,7 +283,7 @@ export class SheetTabs {
 
     if (!this.readOnly && this.onAdd) fragment.appendChild(this.createAddButton());
     if (!this.readOnly && this.onUnhide && hidden.length > 0) {
-      fragment.appendChild(this.createUnhideSelect(hidden));
+      fragment.appendChild(this.createUnhideMenu(hidden));
     }
     if (this.feedback) fragment.appendChild(this.createError(this.feedback));
 
@@ -548,32 +553,88 @@ export class SheetTabs {
     return button;
   }
 
-  private createUnhideSelect(hidden: readonly SheetTabRecord[]): HTMLSelectElement {
-    const select = document.createElement("select");
-    select.className = "sheetwrite-tab-unhide";
-    select.setAttribute("aria-label", "Unhide sheet");
-    select.setAttribute("aria-keyshortcuts", "Control+Shift+U");
+  private createUnhideMenu(hidden: readonly SheetTabRecord[]): HTMLElement {
+    const disclosure = document.createElement("div");
+    disclosure.className = "sheetwrite-tab-unhide";
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.textContent = "Unhide…";
+    trigger.setAttribute("aria-label", "Unhide sheet");
+    trigger.setAttribute("aria-keyshortcuts", "Control+Shift+U");
+    trigger.setAttribute("aria-expanded", "false");
     if (this.feedback && hidden.some((sheet) => sheet.id === this.feedback?.sheet)) {
-      select.setAttribute("aria-invalid", "true");
-      select.setAttribute("aria-describedby", this.errorId);
+      trigger.setAttribute("aria-invalid", "true");
+      trigger.setAttribute("aria-describedby", this.errorId);
     }
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Unhide…";
-    select.appendChild(placeholder);
-    for (const sheet of hidden) {
-      const option = document.createElement("option");
-      option.value = sheet.id;
-      option.textContent = sheet.name;
-      select.appendChild(option);
-    }
-    select.addEventListener("change", () => {
-      const id = select.value;
-      if (!id) return;
-      this.focusedId = id;
-      this.performLifecycle(id, () => this.onUnhide!(id));
+    const choices = document.createElement("div");
+    choices.className = "sheetwrite-tab-unhide-menu";
+    choices.setAttribute("popover", "manual");
+    choices.setAttribute("role", "group");
+    choices.setAttribute("aria-label", "Hidden sheets");
+    choices.hidden = true;
+    const close = (restoreFocus: boolean): void => {
+      if (typeof choices.hidePopover === "function") {
+        try {
+          choices.hidePopover();
+        } catch {
+          // The fallback path was open without placing the menu in the top layer.
+        }
+      }
+      choices.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      this.unhideDismiss?.();
+      this.unhideDismiss = null;
+      if (restoreFocus) trigger.focus();
+    };
+    const onOutsidePointer = (event: PointerEvent): void => {
+      if (event.target instanceof Node && !disclosure.contains(event.target)) {
+        close(disclosure.contains(document.activeElement));
+      }
+    };
+    trigger.addEventListener("click", () => {
+      if (!choices.hidden) {
+        close(true);
+        return;
+      }
+      choices.hidden = false;
+      if (typeof choices.showPopover === "function") {
+        choices.showPopover();
+        const triggerRect = trigger.getBoundingClientRect();
+        const choicesRect = choices.getBoundingClientRect();
+        choices.style.left = `${Math.max(
+          4,
+          Math.min(triggerRect.left, window.innerWidth - choicesRect.width - 4),
+        )}px`;
+        choices.style.top = `${Math.max(4, triggerRect.top - choicesRect.height - 4)}px`;
+      }
+      trigger.setAttribute("aria-expanded", "true");
+      document.addEventListener("pointerdown", onOutsidePointer, true);
+      this.unhideDismiss = () =>
+        document.removeEventListener("pointerdown", onOutsidePointer, true);
+      choices.querySelector("button")?.focus();
     });
-    return select;
+    disclosure.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || choices.hidden) return;
+      event.preventDefault();
+      event.stopPropagation();
+      close(true);
+    });
+    disclosure.addEventListener("focusout", (event) => {
+      if (event.relatedTarget instanceof Node && disclosure.contains(event.relatedTarget)) return;
+      close(false);
+    });
+    for (const sheet of hidden) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = sheet.name;
+      button.addEventListener("click", () => {
+        this.focusedId = sheet.id;
+        this.performLifecycle(sheet.id, () => this.onUnhide!(sheet.id));
+      });
+      choices.appendChild(button);
+    }
+    disclosure.append(trigger, choices);
+    return disclosure;
   }
 
   private createError(feedback: LifecycleFeedback): HTMLElement {
@@ -785,7 +846,7 @@ export class SheetTabs {
         this.performLifecycle(hidden[0]!.id, () => this.onUnhide!(hidden[0]!.id));
       } else if (hidden.length > 1) {
         event.preventDefault();
-        this.host.querySelector<HTMLSelectElement>(".sheetwrite-tab-unhide")?.focus();
+        this.host.querySelector<HTMLElement>(".sheetwrite-tab-unhide > button")?.focus();
       }
       return;
     }

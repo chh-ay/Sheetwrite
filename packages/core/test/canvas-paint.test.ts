@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   blitVerticalScroll,
+  fontFor,
   getMergeIndexResourceStatsForTest,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
@@ -189,6 +190,37 @@ const GEOMETRY_VIEWPORT: Viewport = {
   rowTops: Float64Array.from([0, 40, 50]),
   rowHeights: Float64Array.from([40, 10, 25]),
 };
+
+describe("fontFor", () => {
+  it("replaces an existing theme weight with valid bold and italic shorthands", () => {
+    const theme = makeTheme({ font: 'normal 450 13px "Inter Variable", sans-serif' });
+    expect(fontFor(theme, { bold: true })).toBe('bold 13px "Inter Variable", sans-serif');
+    expect(fontFor(theme, { italic: true })).toBe('italic 450 13px "Inter Variable", sans-serif');
+    expect(fontFor(theme, { bold: true, italic: true })).toBe(
+      'italic bold 13px "Inter Variable", sans-serif',
+    );
+  });
+
+  it("preserves a theme style while applying weight or size overrides", () => {
+    const theme = makeTheme({ font: 'italic 450 13px "Inter Variable", sans-serif' });
+    expect(fontFor(theme, { bold: true })).toBe('italic bold 13px "Inter Variable", sans-serif');
+    expect(fontFor(theme, { fontSize: 16 })).toBe('italic 450 16px "Inter Variable", sans-serif');
+  });
+
+  it("removes an oblique angle when italic replaces the theme style", () => {
+    const theme = makeTheme({ font: 'oblique 10deg 13px "Inter Variable", sans-serif' });
+    expect(fontFor(theme, { italic: true })).toBe('italic 13px "Inter Variable", sans-serif');
+    expect(fontFor(theme, { fontSize: 16 })).toBe(
+      'oblique 10deg 16px "Inter Variable", sans-serif',
+    );
+  });
+
+  it("keeps the plain hot path and applies a scaled custom size", () => {
+    const theme = makeTheme({ font: "12px sans-serif" });
+    expect(fontFor(theme, {})).toBe(theme.font);
+    expect(fontFor(theme, { italic: true, fontSize: 10 }, 1.5)).toBe("italic 15px sans-serif");
+  });
+});
 
 describe("paintFrame variable row heights", () => {
   it("positions a cell using the supplied per-row geometry", () => {

@@ -25,6 +25,7 @@ import compatibilityData from "../generated/compatibility.json";
 import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
 import { pageMeta } from "../lib/seo.js";
+import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import type {
   CompatibilityResultStatus,
   CompatibilityResults,
@@ -281,6 +282,55 @@ function formatSerialDate(value: number | null): string {
   return new Date(Date.UTC(1899, 11, 30) + Math.trunc(value) * 86_400_000)
     .toISOString()
     .slice(0, 10);
+}
+
+interface ChoiceOption {
+  value: string;
+  label: string;
+}
+
+function ChoiceMenu({
+  label,
+  value,
+  options,
+  testId,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly ChoiceOption[];
+  testId: string;
+  onChange: (value: string) => void;
+}) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const selected = options.find((option) => option.value === value) ?? options[0]!;
+  return (
+    <div className="sw-si-choice">
+      <span>{label}</span>
+      <details ref={detailsRef}>
+        <summary aria-label={`${label}: ${selected.label}`} data-testid={testId}>
+          {selected.label}
+        </summary>
+        <fieldset className="sw-si-choice__menu">
+          <legend className="sw-visually-hidden">{label}</legend>
+          {options.map((option) => (
+            <button
+              aria-pressed={option.value === value}
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                detailsRef.current?.removeAttribute("open");
+                detailsRef.current?.querySelector("summary")?.focus();
+              }}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </fieldset>
+      </details>
+    </div>
+  );
 }
 
 function InteroperabilityRoute() {
@@ -704,15 +754,23 @@ function InteroperabilityRoute() {
     <div className="sw-si-frame">
       <SiteTopbar active="interoperability" />
       <main className="sw-si-page" id="main-content">
-        <header className="sw-si-hero">
-          <p className="sw-si-eyebrow">WORKBOOK EXCHANGE / LIVE</p>
-          <h1>Open the workbook. Change it. Bring it back intact.</h1>
-          <p className="sw-si-lede">
-            A real editable Grid sits in the exchange path: load source bytes, make a change, then
-            export, re-import, and inspect the fidelity result beside the workbook.{" "}
-            <a href="/docs/guides/xlsx-export/">XLSX interchange guide →</a>
-          </p>
-        </header>
+        <CapabilityHero
+          description={
+            <>
+              A real editable Grid sits in the exchange path: load source bytes, make a change, then
+              export, re-import, and inspect the fidelity result beside the workbook.{" "}
+              <a href="/docs/guides/xlsx-export/">XLSX interchange guide →</a>
+            </>
+          }
+          eyebrow="CAPABILITY / SPREADSHEET INTEROPERABILITY"
+          facts={[
+            { label: "Formats", value: "XLSX · CSV · TSV" },
+            { label: "Editing", value: "Real Grid" },
+            { label: "Round trip", value: "Export · re-import" },
+            { label: "Evidence", value: "Checked fixtures" },
+          ]}
+          title="Open the workbook. Change it. Bring it back intact."
+        />
 
         <nav aria-label="Page sections" className="sw-si-sectionnav">
           <span aria-hidden="true" className="sw-si-sectionnav__progress">
@@ -734,21 +792,7 @@ function InteroperabilityRoute() {
           {status}
         </p>
 
-        <section aria-labelledby="xlsx-title" className="sw-si-section" id="xlsx">
-          <p className="sw-si-section-kicker">Live exchange desk</p>
-          <h2 id="xlsx-title">The workbook is the product surface.</h2>
-          <p>
-            Start with the loaded source, edit through the Grid or formula bar, then run one
-            export–re-import comparison. Detailed warnings and corpus evidence stay on demand.
-          </p>
-          <ul aria-label="Canonical document features" className="sw-si-facts">
-            <li>Orders + Invoice + Assumptions + Analysis</li>
-            <li>{INTEROP_EXPECTED.formulaCount} preserved formula sources</li>
-            <li>XLOOKUP · DATE · STDEV.S · SEQUENCE · LET · PMT · NPV · IRR</li>
-            <li>currency formats</li>
-            <li>merged footer</li>
-            <li>frozen header row</li>
-          </ul>
+        <section aria-label="Workbook exchange workbench" className="sw-si-section" id="xlsx">
           <div className="sw-si-workbench" data-ready={gridReady || undefined}>
             <p className="sw-si-workbench__label" data-testid="interop-source">
               <span>Source workbook</span>
@@ -874,7 +918,7 @@ function InteroperabilityRoute() {
                   data-testid="interop-spill-input"
                   disabled={!modelReadout}
                 >
-                  <legend>Spill periods</legend>
+                  <legend>Projection rows</legend>
                   <div className="sw-si-model__segments">
                     {[3, 4, 6].map((periods) => (
                       <label key={periods}>
@@ -888,7 +932,7 @@ function InteroperabilityRoute() {
                               4,
                               1,
                               Number(event.currentTarget.value),
-                              "Projection periods",
+                              "Projection rows",
                             )
                           }
                           type="radio"
@@ -896,7 +940,7 @@ function InteroperabilityRoute() {
                         />
                         <span>
                           {periods}
-                          <span className="sw-visually-hidden"> periods</span>
+                          <span className="sw-visually-hidden"> rows</span>
                         </span>
                       </label>
                     ))}
@@ -947,7 +991,7 @@ function InteroperabilityRoute() {
                   </dd>
                 </div>
                 <div>
-                  <dt>SEQUENCE spill</dt>
+                  <dt>SEQUENCE output</dt>
                   <dd data-testid="interop-model-spill">
                     {modelReadout
                       ? modelReadout.spill.filter((value) => value !== null).join(", ")
@@ -1174,60 +1218,51 @@ function InteroperabilityRoute() {
               </p>
               <fieldset className="sw-si-compat__filters">
                 <legend>Filter checked tests</legend>
-                <label>
-                  Function or feature
-                  <select
-                    data-testid="compatibility-feature-filter"
-                    onChange={(event) => {
-                      setResultFeature(event.currentTarget.value);
-                      setSelectedResultId(null);
-                    }}
-                    value={resultFeature}
-                  >
-                    <option value="all">All functions and features</option>
-                    {COMPATIBILITY_RESULTS.filterOptions.features.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Behavior
-                  <select
-                    data-testid="compatibility-behavior-filter"
-                    onChange={(event) => {
-                      setResultBehavior(event.currentTarget.value);
-                      setSelectedResultId(null);
-                    }}
-                    value={resultBehavior}
-                  >
-                    <option value="all">All behavior scopes</option>
-                    {COMPATIBILITY_RESULTS.filterOptions.behaviors.map((behavior) => (
-                      <option key={behavior} value={behavior}>
-                        {BEHAVIOR_LABELS[behavior]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Result status
-                  <select
-                    data-testid="compatibility-status-filter"
-                    onChange={(event) => {
-                      setResultStatus(event.currentTarget.value as ResultFilter);
-                      setSelectedResultId(null);
-                    }}
-                    value={resultStatus}
-                  >
-                    <option value="all">All result states</option>
-                    {COMPATIBILITY_RESULTS.filterOptions.statuses.map((entryStatus) => (
-                      <option key={entryStatus} value={entryStatus}>
-                        {RESULT_STATUS_LABELS[entryStatus]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <ChoiceMenu
+                  label="Function or feature"
+                  onChange={(value) => {
+                    setResultFeature(value);
+                    setSelectedResultId(null);
+                  }}
+                  options={[
+                    { value: "all", label: "All functions and features" },
+                    ...COMPATIBILITY_RESULTS.filterOptions.features,
+                  ]}
+                  testId="compatibility-feature-filter"
+                  value={resultFeature}
+                />
+                <ChoiceMenu
+                  label="Behavior"
+                  onChange={(value) => {
+                    setResultBehavior(value);
+                    setSelectedResultId(null);
+                  }}
+                  options={[
+                    { value: "all", label: "All behavior scopes" },
+                    ...COMPATIBILITY_RESULTS.filterOptions.behaviors.map((behavior) => ({
+                      value: behavior,
+                      label: BEHAVIOR_LABELS[behavior] ?? behavior,
+                    })),
+                  ]}
+                  testId="compatibility-behavior-filter"
+                  value={resultBehavior}
+                />
+                <ChoiceMenu
+                  label="Result status"
+                  onChange={(value) => {
+                    setResultStatus(value as ResultFilter);
+                    setSelectedResultId(null);
+                  }}
+                  options={[
+                    { value: "all", label: "All result states" },
+                    ...COMPATIBILITY_RESULTS.filterOptions.statuses.map((entryStatus) => ({
+                      value: entryStatus,
+                      label: RESULT_STATUS_LABELS[entryStatus],
+                    })),
+                  ]}
+                  testId="compatibility-status-filter"
+                  value={resultStatus}
+                />
                 <span aria-live="polite" className="sw-si-compat__count">
                   {visibleResults.length}/{COMPATIBILITY_RESULTS.testSet.publishedExamples} examples
                 </span>
@@ -1557,53 +1592,45 @@ function InteroperabilityRoute() {
               </p>
               <fieldset className="sw-si-compat__filters sw-si-compat__filters--inventory">
                 <legend>Filter feature boundary records</legend>
-                <label>
-                  Status
-                  <select
-                    data-testid="inventory-status-filter"
-                    onChange={(event) =>
-                      setCompatibilityStatus(event.currentTarget.value as CompatibilityFilter)
-                    }
-                    value={compatibilityStatus}
-                  >
-                    <option value="all">All statuses</option>
-                    {Object.entries(INVENTORY_STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Feature area
-                  <select
-                    data-testid="inventory-area-filter"
-                    onChange={(event) => setCompatibilityArea(event.currentTarget.value)}
-                    value={compatibilityArea}
-                  >
-                    <option value="all">All feature areas</option>
-                    {COMPATIBILITY_AREAS.map((area) => (
-                      <option key={area} value={area}>
-                        {area.replaceAll("-", " ")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Behavior
-                  <select
-                    data-testid="inventory-behavior-filter"
-                    onChange={(event) => setCompatibilityDialect(event.currentTarget.value)}
-                    value={compatibilityDialect}
-                  >
-                    <option value="all">All behavior scopes</option>
-                    {COMPATIBILITY_DIALECTS.map((behavior) => (
-                      <option key={behavior} value={behavior}>
-                        {BEHAVIOR_LABELS[behavior]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <ChoiceMenu
+                  label="Status"
+                  onChange={(value) => setCompatibilityStatus(value as CompatibilityFilter)}
+                  options={[
+                    { value: "all", label: "All statuses" },
+                    ...Object.entries(INVENTORY_STATUS_LABELS).map(([value, label]) => ({
+                      value,
+                      label,
+                    })),
+                  ]}
+                  testId="inventory-status-filter"
+                  value={compatibilityStatus}
+                />
+                <ChoiceMenu
+                  label="Feature area"
+                  onChange={setCompatibilityArea}
+                  options={[
+                    { value: "all", label: "All feature areas" },
+                    ...COMPATIBILITY_AREAS.map((area) => ({
+                      value: area,
+                      label: area.replaceAll("-", " "),
+                    })),
+                  ]}
+                  testId="inventory-area-filter"
+                  value={compatibilityArea}
+                />
+                <ChoiceMenu
+                  label="Behavior"
+                  onChange={setCompatibilityDialect}
+                  options={[
+                    { value: "all", label: "All behavior scopes" },
+                    ...COMPATIBILITY_DIALECTS.map((behavior) => ({
+                      value: behavior,
+                      label: BEHAVIOR_LABELS[behavior] ?? behavior,
+                    })),
+                  ]}
+                  testId="inventory-behavior-filter"
+                  value={compatibilityDialect}
+                />
                 <span aria-live="polite" className="sw-si-compat__count">
                   {visibleCompatibility.length}/{compatibilityData.records.length} records
                 </span>
