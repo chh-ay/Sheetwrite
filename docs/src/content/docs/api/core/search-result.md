@@ -9,7 +9,7 @@ Ordered matches and active index produced by a grid search.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L349</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L350</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

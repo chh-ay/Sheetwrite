@@ -379,3 +379,53 @@
 .sheetwrite-tab-close:hover {
   color: var(--sheetwrite-tab-active-fg, #1a73e8);
 }
+
+.sheetwrite-tab-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: stretch;
+  height: 100%;
+  margin-inline-start: -4px;
+}
+
+.sheetwrite-tab-actions .sheetwrite-tab-close {
+  min-width: 28px;
+  margin-inline-start: 0;
+  padding: 0 5px;
+}
+
+.sheetwrite-tab-input {
+  min-width: 8rem;
+  max-width: min(16rem, 45vw);
+  cursor: text;
+  outline: 2px solid var(--sheetwrite-tab-active-fg, #1a73e8);
+  outline-offset: -2px;
+}
+
+.sheetwrite-tab-input[aria-invalid="true"],
+.sheetwrite-tab-unhide[aria-invalid="true"] {
+  outline-color: var(--sheetwrite-error-fg, #b3261e);
+}
+
+.sheetwrite-tab-unhide {
+  flex: none;
+  height: calc(100% - 4px);
+  align-self: center;
+  max-width: 10rem;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 4px;
+  font: inherit;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-tab-fg, #5f6368);
+}
+
+.sheetwrite-tab-error {
+  flex: none;
+  align-self: center;
+  max-width: min(18rem, 50vw);
+  overflow: hidden;
+  color: var(--sheetwrite-error-fg, #b3261e);
+  font-size: 0.85em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -5,7 +5,9 @@ use std::hash::{BuildHasherDefault, Hash, Hasher};
 
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{parse, resolve_named_ranges, resolve_sheet_refs, shift_range, NamedRangeRef};
+use crate::calc::{
+    parse, resolve_named_ranges, resolve_sheet_refs, sheet_name_key, shift_range, NamedRangeRef,
+};
 use crate::eval::DepIndex;
 use crate::memory::{
     StoreMemoryStats, DEPENDENCY_EDGES, DEPENDENCY_NODES, SHEET_INDEXES_METADATA, STRING_INDEX,
@@ -221,6 +223,7 @@ pub struct CellStore {
     pub(crate) sheet_names: Vec<String>,
     pub(crate) sheet_alive: Vec<bool>,
     pub(crate) sheet_lookup: HashMap<String, usize>,
+    pub(crate) sheet_ids: HashMap<String, usize>,
     pub(crate) strings: StringPool,
     pub(crate) string_lookup: InternMap,
     pub(crate) formula_epoch: u64,
@@ -242,6 +245,7 @@ impl CellStore {
             sheet_names: Vec::new(),
             sheet_alive: Vec::new(),
             sheet_lookup: HashMap::new(),
+            sheet_ids: HashMap::new(),
             strings: StringPool::new(),
             string_lookup: InternMap::default(),
             formula_epoch: 0,
@@ -535,25 +539,23 @@ impl CellStore {
             return;
         }
 
+        self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_string();
-        self.sheet_lookup.insert(id.to_string(), sheet);
-        self.sheet_lookup.insert(name.to_string(), sheet);
+        self.sheet_ids.insert(id.to_string(), sheet);
+        self.sheet_lookup.insert(sheet_name_key(name), sheet);
     }
 
     /// Rename a live stable sheet handle and rewrite every resolved formula AST reference.
     #[wasm_bindgen(js_name = renameSheet)]
     pub fn rename_sheet(&mut self, sheet: usize, id: &str, name: &str) -> bool {
-        if id.is_empty()
-            || name.is_empty()
+        let name_key = sheet_name_key(name);
+        if name.is_empty()
             || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+            || self.sheet_ids.get(id) != Some(&sheet)
             || self
                 .sheet_lookup
-                .get(id)
-                .is_some_and(|existing| *existing != sheet)
-            || self
-                .sheet_lookup
-                .get(name)
+                .get(&name_key)
                 .is_some_and(|existing| *existing != sheet)
         {
             return false;
@@ -576,8 +578,7 @@ impl CellStore {
         }
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_string();
-        self.sheet_lookup.insert(id.to_string(), sheet);
-        self.sheet_lookup.insert(name.to_string(), sheet);
+        self.sheet_lookup.insert(name_key, sheet);
         self.bump_formula_epoch();
         for formula_sheet in affected {
             self.recompute(formula_sheet);
@@ -612,6 +613,7 @@ impl CellStore {
             definition.sheet != sheet as u32 && *scope != Some(sheet as u32)
         });
         let removed_names = self.named_ranges.len() != before_names;
+        self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet].clear();
         self.sheets[sheet] = SheetData::new(0, 0);
@@ -2481,6 +2483,10 @@ impl CellStore {
             metadata.add_payload(name.len(), name.capacity());
         }
         metadata.add_vec::<bool>(self.sheet_alive.len(), self.sheet_alive.capacity());
+        metadata.add_hash_table::<String, usize>(self.sheet_ids.len(), self.sheet_ids.capacity());
+        for id in self.sheet_ids.keys() {
+            metadata.add_payload(id.len(), id.capacity());
+        }
         metadata
             .add_hash_table::<String, usize>(self.sheet_lookup.len(), self.sheet_lookup.capacity());
         for name in self.sheet_lookup.keys() {
@@ -2630,7 +2636,10 @@ impl CellStore {
             Err(_) => return FormulaEntry::parse_error(source),
         };
         let ast = match resolve_sheet_refs(ast, &|name| {
-            self.sheet_lookup.get(name).map(|&index| index as u32)
+            self.sheet_ids
+                .get(name)
+                .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
+                .map(|&index| index as u32)
         }) {
             Ok(ast) => ast,
             Err(_) => return FormulaEntry::error(source, FormulaError::Ref),

@@ -41,6 +41,7 @@ import type {
   MutationPolicyMode,
   ProtectionResolver,
   RowGroup,
+  SheetLifecycleIssueCode,
   SortKey,
   Workbook,
   WorkbookSnapshot,
@@ -74,6 +75,18 @@ export interface SheetwriteStoreOptions extends StoreDataEngineOptions {
 }
 
 type ChangeListener = (event: ChangeEvent) => void;
+const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
+  blank: "Sheet name cannot be blank",
+  "too-long": "Sheet name exceeds 31 UTF-16 code units",
+  "forbidden-character": "Sheet name contains a forbidden character",
+  "edge-apostrophe": "Sheet name cannot begin or end with an apostrophe",
+  duplicate: "Sheet name duplicates another sheet case-insensitively",
+  "duplicate-sheet-id": "Sheet ID already exists",
+  "sheet-not-found": "Sheet does not exist",
+  "invalid-sheet": "Sheet snapshot is invalid",
+  "invalid-position": "Sheet position is out of bounds",
+  "last-visible-sheet": "Workbook must retain at least one visible sheet",
+};
 
 function isSnapshotAllocationFailure(error: unknown): boolean {
   if (error instanceof SnapshotResourceError || error instanceof RangeError) return true;
@@ -492,28 +505,46 @@ export class SheetwriteStore implements Store {
         };
       }
       const operation = tx.patches[operationIndex]!;
+      const lifecycle = applySheetLifecycleOperation(sheetLifecycle, operation);
+      if (lifecycle && !lifecycle.ok) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "sheet-lifecycle",
+              severity: "error",
+              code: lifecycle.code,
+              sheet:
+                operation.op === "addSheet"
+                  ? operation.sheet.id
+                  : (patchSheetId(operation) ?? undefined),
+              operationIndex,
+              message: SHEET_LIFECYCLE_MESSAGES[lifecycle.code],
+            },
+          ],
+        };
+      }
       const requiredSheets: SheetId[] = [];
       if (operation.op === "addSheet") {
-        if (applySheetLifecycleOperation(sheetLifecycle, operation)) {
-          for (const block of operation.sheet.cells) {
-            for (const cell of block.cells) {
-              if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
-            }
+        for (const block of operation.sheet.cells) {
+          for (const cell of block.cells) {
+            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
           }
-          for (const rule of operation.sheet.conditionalFormats ?? []) {
-            requiredSheets.push(rule.range.sheet);
-          }
-          for (const rule of operation.sheet.validationRules ?? []) {
-            requiredSheets.push(rule.range.sheet);
-          }
-          for (const entry of operation.sheet.protectedRanges ?? []) {
-            requiredSheets.push(entry.range.sheet);
-          }
-          for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
         }
+        for (const rule of operation.sheet.conditionalFormats ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const rule of operation.sheet.validationRules ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const entry of operation.sheet.protectedRanges ?? []) {
+          requiredSheets.push(entry.range.sheet);
+        }
+        for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
       } else {
         const primarySheet = patchSheetId(operation);
-        if (primarySheet !== null) requiredSheets.push(primarySheet);
+        if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
         if (operation.op === "set" && operation.value.kind === "ref") {
           requiredSheets.push(operation.value.target.sheet);
         } else if (operation.op === "setRange") {
@@ -555,9 +586,6 @@ export class SheetwriteStore implements Store {
             },
           ],
         };
-      }
-      if (operation.op !== "addSheet") {
-        applySheetLifecycleOperation(sheetLifecycle, operation);
       }
     }
     const options =

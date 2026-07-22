@@ -8,9 +8,10 @@
 
 import { DEFAULT_THEME } from "../grid.js";
 import { createGridController, type GridController } from "../grid-controller.js";
+import { sheetNameKey } from "../sheet-name.js";
 import { SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
-import type { Grid, GridConfig, GridEvents, GridOptions, ToolbarItem } from "../types/grid.js";
+import type { Grid, GridConfig, GridOptions, ToolbarItem } from "../types/grid.js";
 import type { Theme } from "../types/render.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import { seedWidgetTheme } from "../widget-theme.js";
@@ -51,10 +52,10 @@ function shellGridConfig(config: GridConfig | undefined): GridConfig {
 
 /**
  * Mount a complete spreadsheet shell into `host`: toolbar row, formula row
- * (name box + formula bar), the grid, and a bottom row with sheet tabs (multi-
- * sheet workbooks only) and a selection status. The host must have a real
- * size; the shell fills it. Returns the shell handle; `destroy` tears down
- * every piece, the grid, and the shell DOM, and is safe to call twice.
+ * (name box + formula bar), the grid, and a bottom row with sheet tabs and a
+ * selection status. The host must have a real size; the shell fills it. Returns
+ * the shell handle; `destroy` tears down every piece, the grid, and the shell
+ * DOM, and is safe to call twice.
  */
 export function createSpreadsheetShell(
   host: HTMLElement,
@@ -120,24 +121,55 @@ export function createSpreadsheetShell(
   formulaRow.appendChild(fx);
   const formulaBar = createFormulaBar(formulaRow, grid, { focusGrid });
   pieces.push(formulaBar);
-  formulaBar.setReadOnly(options.grid.readOnly ?? false);
+  let readOnly = options.grid.readOnly ?? false;
+  formulaBar.setReadOnly(readOnly);
 
-  // Sheet tabs only for multi-sheet workbooks; activation is by sheet id.
-  const sheets = grid.store.getWorkbook().sheets;
+  let tabsEnabled = options.grid.config?.tabs !== false;
+  let tabHost: HTMLDivElement | null = null;
   let tabs: SheetTabs | null = null;
-  const unsubscribes: Array<() => void> = [];
-  if (sheets.length > 1) {
-    const tabHost = document.createElement("div");
+  const nextSheetName = (): string => {
+    const names = new Set(grid.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
+    let suffix = grid.store.getWorkbook().sheets.length + 1;
+    while (names.has(sheetNameKey(`Sheet ${suffix}`))) suffix++;
+    return `Sheet ${suffix}`;
+  };
+  const createTabs = (): void => {
+    if (!tabsEnabled || tabs) return;
+    tabHost = document.createElement("div");
     tabHost.className = "sheetwrite-shell-tabs";
-    bottomRow.appendChild(tabHost);
-    tabs = new SheetTabs(tabHost, { onActivate: (id) => grid.setActiveSheet(id) });
-    tabs.update(sheets, grid.getActiveSheet());
-    unsubscribes.push(
-      grid.on("active-sheet", (event: GridEvents["active-sheet"]) => {
-        tabs?.update(grid.store.getWorkbook().sheets, event.sheet);
-      }),
-    );
-  }
+    bottomRow.prepend(tabHost);
+    tabs = new SheetTabs(tabHost, {
+      onActivate: (id) => grid.setActiveSheet(id),
+      onAdd: () => {
+        const result = grid.addSheet({ name: nextSheetName() });
+        if (result.status === "applied") grid.setActiveSheet(result.sheet);
+        return result;
+      },
+      onRemove: (id) => grid.removeSheet(id),
+      onRename: (id, name) => grid.renameSheet(id, name),
+      onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
+      onHide: (id) => grid.setSheetVisibility(id, "hidden"),
+      onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
+    });
+    tabs.setReadOnly(readOnly);
+  };
+  const refreshTabs = (): void => {
+    if (!tabsEnabled) {
+      tabs?.destroy();
+      tabs = null;
+      tabHost?.remove();
+      tabHost = null;
+      return;
+    }
+    createTabs();
+    tabs?.update(grid.store.getWorkbook().sheets, grid.getActiveSheet());
+  };
+  refreshTabs();
+
+  const unsubscribes: Array<() => void> = [
+    grid.on("active-sheet", () => refreshTabs()),
+    grid.on("change", () => refreshTabs()),
+  ];
   pieces.push(createSelectionStatus(bottomRow, grid));
 
   let destroyed = false;
@@ -151,13 +183,17 @@ export function createSpreadsheetShell(
       controller.setTheme(theme);
     },
 
-    setReadOnly(readOnly: boolean) {
-      controller.setReadOnly(readOnly);
-      formulaBar.setReadOnly(readOnly);
+    setReadOnly(nextReadOnly: boolean) {
+      readOnly = nextReadOnly;
+      controller.setReadOnly(nextReadOnly);
+      formulaBar.setReadOnly(nextReadOnly);
+      tabs?.setReadOnly(nextReadOnly);
     },
 
     setGridConfig(config: GridConfig | undefined) {
+      tabsEnabled = config?.tabs !== false;
       controller.setConfig(shellGridConfig(config));
+      refreshTabs();
     },
 
     setActiveSheet(id: SheetId) {

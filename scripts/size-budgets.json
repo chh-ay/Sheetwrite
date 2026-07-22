@@ -32,8 +32,8 @@
     },
     "bundler.next.coreInitial.css.rawBytes": {
       "unit": "bytes",
-      "baseline": 7503,
-      "maximum": 8527,
+      "baseline": 8544,
+      "maximum": 9568,
       "category": "browser-css",
       "owner": "next:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -136,24 +136,24 @@
     },
     "bundler.vite.coreInitial.javascript.brotliBytes": {
       "unit": "bytes",
-      "baseline": 92029,
-      "maximum": 96631,
+      "baseline": 96928,
+      "maximum": 101775,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.coreInitial.javascript.gzipBytes": {
       "unit": "bytes",
-      "baseline": 108511,
-      "maximum": 113937,
+      "baseline": 114519,
+      "maximum": 120245,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "bundler.vite.coreInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 383391,
-      "maximum": 402561,
+      "baseline": 405364,
+      "maximum": 425633,
       "category": "browser-javascript",
       "owner": "vite:core-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -296,8 +296,8 @@
     },
     "bundler.vite.svelteInitial.javascript.rawBytes": {
       "unit": "bytes",
-      "baseline": 428400,
-      "maximum": 449820,
+      "baseline": 450373,
+      "maximum": 472892,
       "category": "browser-javascript",
       "owner": "vite:svelte-initial",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -720,16 +720,16 @@
     },
     "css.styles.rawBytes": {
       "unit": "bytes",
-      "baseline": 10626,
-      "maximum": 11650,
+      "baseline": 11788,
+      "maximum": 12812,
       "category": "browser-css",
       "owner": "@sheetwrite/core/styles.css",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
     },
     "package.@sheetwrite/core.cssBytes": {
       "unit": "bytes",
-      "baseline": 13583,
-      "maximum": 14607,
+      "baseline": 14745,
+      "maximum": 15769,
       "category": "package-css",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline plus the larger of five percent or 1 KiB."
@@ -744,8 +744,8 @@
     },
     "package.@sheetwrite/core.fileCount": {
       "unit": "count",
-      "baseline": 307,
-      "maximum": 309,
+      "baseline": 311,
+      "maximum": 313,
       "category": "package",
       "owner": "@sheetwrite/core",
       "rationale": "Approved clean baseline with at most two additional files or packages."

@@ -13,7 +13,13 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { colToA1, dateToSerial, labelToCol } from "@sheetwrite/core";
+import {
+  colToA1,
+  dateToSerial,
+  labelToCol,
+  sheetNameKey,
+  validateSheetName,
+} from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import {
@@ -27,7 +33,6 @@ import { type ParsedCellStyle, ParsedStyles } from "./styles.js";
 import {
   assertXmlRoot,
   decodeXstring,
-  isValidXlsxWorksheetName,
   type XmlElement,
   xmlAttribute,
   xmlBoolean,
@@ -1098,9 +1103,7 @@ function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnap
   for (const sheet of snapshot.sheets) {
     const meta =
       metadata.sheets.find(
-        (candidate) =>
-          candidate.name.normalize("NFC").toLowerCase() ===
-          sheet.name.normalize("NFC").toLowerCase(),
+        (candidate) => sheetNameKey(candidate.name) === sheetNameKey(sheet.name),
       ) ?? metadata.sheets.find((candidate) => candidate.order === sheet.order);
     if (!meta || sheet.cells.length === 0) continue;
     const cells = sheet.cells[0]!.cells;
@@ -1247,7 +1250,7 @@ function externalNamedRanges(
       continue;
     }
     const sheetName = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
-    const sheet = sheetIds.get(sheetName.normalize("NFC").toLowerCase());
+    const sheet = sheetIds.get(sheetNameKey(sheetName));
     if (!sheet) continue;
     const parsed = parseRange(match[3]!);
     const localSheetId = xmlAttribute(definition, "localSheetId");
@@ -1255,7 +1258,7 @@ function externalNamedRanges(
     ranges.push({
       name,
       ...(Number.isInteger(scopeIndex) && sheets[scopeIndex!]
-        ? { scope: sheetIds.get(sheets[scopeIndex!]!.name.normalize("NFC").toLowerCase()) }
+        ? { scope: sheetIds.get(sheetNameKey(sheets[scopeIndex!]!.name)) }
         : {}),
       range: {
         sheet,
@@ -1311,17 +1314,21 @@ export function readWorkbook(
   const sheetCollection = xmlChild(workbookRoot, "sheets");
   if (!sheetCollection) return readerFailure("workbook has no sheet collection");
   const references: WorkbookSheetReference[] = [];
-  const foldedSheetNames = new Set<string>();
+  const sheetNames: string[] = [];
   for (const element of xmlChildren(sheetCollection, "sheet")) {
     const rawName = xmlAttribute(element, "name");
     const relationshipId = xmlAttribute(element, "id");
-    if (!rawName || !relationshipId) return readerFailure("worksheet declaration is incomplete");
-    const name = decodeXstring(rawName);
-    const foldedName = name.normalize("NFC").toLowerCase();
-    if (!isValidXlsxWorksheetName(name) || foldedSheetNames.has(foldedName)) {
-      return readerFailure(`worksheet name ${JSON.stringify(name)} is unsafe or duplicated`);
+    if (rawName === undefined || !relationshipId) {
+      return readerFailure("worksheet declaration is incomplete");
     }
-    foldedSheetNames.add(foldedName);
+    const validatedName = validateSheetName(decodeXstring(rawName), sheetNames);
+    if (!validatedName.ok) {
+      return readerFailure(
+        `worksheet name ${JSON.stringify(validatedName.name)} is unsafe or duplicated (${validatedName.code})`,
+      );
+    }
+    const name = validatedName.name;
+    sheetNames.push(name);
     const relationship = packageFile.relationship(workbookPart, relationshipId);
     if (!relationshipTypeMatches(relationship.type, "worksheet")) {
       return readerFailure(`relationship ${relationshipId} is not a worksheet`);
@@ -1361,6 +1368,13 @@ export function readWorkbook(
   assertResource(context, "maxSheets", sourceSheets.length);
   if (sourceSheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX workbook has no worksheets");
+  if (
+    sourceReferences.every(
+      (reference) => reference.state === "hidden" || reference.state === "veryHidden",
+    )
+  ) {
+    return readerFailure("workbook requires at least one visible worksheet");
+  }
   let sourceCellCount = 0;
   for (const source of sourceSheets) {
     sourceCellCount += source.cells.length;
@@ -1372,9 +1386,7 @@ export function readWorkbook(
   for (let order = 0; order < sourceSheets.length; order++) {
     const source = sourceSheets[order]!;
     const exactMeta = metadata?.sheets.find(
-      (candidate) =>
-        candidate.name.normalize("NFC").toLowerCase() ===
-        source.name.normalize("NFC").toLowerCase(),
+      (candidate) => sheetNameKey(candidate.name) === sheetNameKey(source.name),
     );
     const ordinalMeta = metadata?.sheets.find((candidate) => candidate.order === order);
     const meta = exactMeta ?? ordinalMeta;
@@ -1387,7 +1399,7 @@ export function readWorkbook(
     }
     const id = meta?.id ?? uniqueSheetId(source.name, order, usedIds);
     usedIds.add(id);
-    sheetIds.set(source.name.normalize("NFC").toLowerCase(), id);
+    sheetIds.set(sheetNameKey(source.name), id);
     const columnCount = Math.max(1, source.columnCount, meta?.columns.length ?? 0);
     assertResource(context, "maxColumnsPerSheet", columnCount);
     const columns: Column[] = [];
@@ -1549,9 +1561,20 @@ export function readWorkbook(
     "workbookView",
   );
   const activeTab = Number(xmlAttribute(workbookViews.at(-1) ?? workbookRoot, "activeTab") ?? 0);
-  const activeSheet =
-    sheets[Number.isInteger(activeTab) ? Math.min(Math.max(activeTab, 0), sheets.length - 1) : 0]!
-      .id;
+  const requestedReference =
+    Number.isInteger(activeTab) && activeTab >= 0 && activeTab < references.length
+      ? references[activeTab]
+      : undefined;
+  const requestedActive = requestedReference ? sourceReferences.indexOf(requestedReference) : -1;
+  const activeIndex =
+    requestedActive >= 0 &&
+    sourceReferences[requestedActive]!.state !== "hidden" &&
+    sourceReferences[requestedActive]!.state !== "veryHidden"
+      ? requestedActive
+      : sourceReferences.findIndex(
+          (reference) => reference.state !== "hidden" && reference.state !== "veryHidden",
+        );
+  const activeSheet = sheets[activeIndex]!.id;
   const nativeNamedRanges = externalNamedRanges(workbookRoot, sheetIds, sourceReferences, context);
   const namedRanges = xmlChild(workbookRoot, "definedNames")
     ? nativeNamedRanges

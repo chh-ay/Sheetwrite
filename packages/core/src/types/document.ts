@@ -1,6 +1,7 @@
 // Workbook, view, validation, protection, snapshot, and operation contracts.
 // No runtime values live here.
 
+import type { SheetNameIssueCode } from "../sheet-name.js";
 import type { CellScalar, CellStyle, CellValue, Column, ConditionalFormatRule } from "./cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 
@@ -200,6 +201,15 @@ export interface ProtectionRequest {
 /** Host-owned client UX permission callback for protected mutations. */
 export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny";
 
+/** Stable lifecycle rejection codes suitable for inline sheet-management UI. */
+export type SheetLifecycleIssueCode =
+  | SheetNameIssueCode
+  | "duplicate-sheet-id"
+  | "sheet-not-found"
+  | "invalid-sheet"
+  | "invalid-position"
+  | "last-visible-sheet";
+
 /** Structured warning or rejection produced while applying an operation. */
 export type MutationIssue =
   | {
@@ -241,6 +251,14 @@ export type MutationIssue =
       actual: number;
       /** Configured inclusive ceiling for the resource. */
       max: number;
+      message: string;
+    }
+  | {
+      kind: "sheet-lifecycle";
+      severity: "error";
+      code: SheetLifecycleIssueCode;
+      sheet?: SheetId;
+      operationIndex: number;
       message: string;
     };
 
@@ -338,6 +356,7 @@ export type DocumentOp =
   | { op: "removeSheet"; sheet: SheetId }
   | { op: "renameSheet"; sheet: SheetId; name: string }
   | { op: "moveSheet"; sheet: SheetId; to: number }
+  | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility }
   | {
       op: "setSheetMeta";
       sheet: SheetId;

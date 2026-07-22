@@ -1628,6 +1628,14 @@ export function validateDocumentOperationShape(
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "to", path, errors);
       break;
+    case "setSheetVisibility": {
+      validateOperationSheetId(operation, path, errors);
+      const visibility = ownValue(operation, "visibility");
+      if (visibility !== "visible" && visibility !== "hidden" && visibility !== "veryHidden") {
+        invalid(errors, `${path}.visibility`, "Sheet visibility is invalid");
+      }
+      break;
+    }
     case "setSheetMeta": {
       validateOperationSheetId(operation, path, errors);
       const patchPath = `${path}.patch`;
@@ -2376,6 +2384,7 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "removeSheet":
     case "renameSheet":
     case "moveSheet":
+    case "setSheetVisibility":
     case "setSheetMeta":
     case "setValidationRule":
     case "removeValidationRule":

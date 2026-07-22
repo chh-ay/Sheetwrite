@@ -38,6 +38,7 @@ const OPERATION_TARGET_SOURCE = {
   removeSheet: "sheet",
   renameSheet: "sheet",
   moveSheet: "sheet",
+  setSheetVisibility: "sheet",
   setSheetMeta: "sheet",
   setValidationRule: "sheet",
   removeValidationRule: "sheet",

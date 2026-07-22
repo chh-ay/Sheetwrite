@@ -4,6 +4,7 @@ import { installDatasourceClockForTest } from "@sheetwrite/core/testing";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import "@sheetwrite/core/styles.css";
+import type { RendererPrefetchRepetition, RendererPrefetchReport } from "../lib/prefetch-report.js";
 
 const FRAME_MS = 16.7;
 const SOURCE_LATENCY_MS = 90;
@@ -14,43 +15,6 @@ const CACHE_BYTES = 12 * 1024;
 const COLUMN_COUNT = 6;
 const REQUEST_MULTIPLIER_LIMIT = 3;
 const ACTIVE_REQUEST_LIMIT = 6;
-
-export interface RendererPrefetchRepetition {
-  repetition: number;
-  residencyRatio: number;
-  p95VisibleWaitMs: number;
-  measuredFrames: number;
-  residentFrames: number;
-  requests: number;
-  requestedRows: number;
-  rowsServed: number;
-  bytesServed: number;
-  requestedRowMultiplier: number;
-  servedByteMultiplier: number;
-  reversalAborts: number;
-  jumpAborts: number;
-  cacheAllocatedBytes: number;
-  cacheChunks: number;
-  peakActiveRequests: number;
-  jumpVisibleResidentBeforeResponse: boolean;
-  jumpVisibleResidentAfterResponse: boolean;
-}
-
-export interface RendererPrefetchReport {
-  policy: {
-    sourceLatencyMs: number;
-    frameMs: number;
-    viewportRows: number;
-    velocityWindowsPerFrame: number;
-    requestMultiplierLimit: number;
-    activeRequestLimit: number;
-    cacheBytes: number;
-    devicePixelRatio: number;
-  };
-  repetitions: RendererPrefetchRepetition[];
-  medianResidencyRatio: number;
-  medianP95VisibleWaitMs: number;
-}
 
 declare global {
   interface Window {

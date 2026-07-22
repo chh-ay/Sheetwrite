@@ -9,7 +9,7 @@ Selection movement applied after a successful editor commit.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/editor.d.ts#L6</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/editor.d.ts#L5</code></dd></div>
 </dl>
 
 ## Declaration

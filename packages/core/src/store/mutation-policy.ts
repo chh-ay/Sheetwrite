@@ -217,7 +217,8 @@ export class StoreMutationPolicy {
       case "moveColumns":
       case "removeSheet":
       case "renameSheet":
-      case "moveSheet": {
+      case "moveSheet":
+      case "setSheetVisibility": {
         const sheet = this.sheet(patch.sheet);
         if (!sheet || sheet.rowCount === 0 || sheet.columns.length === 0) return [];
         return [fullSheetRange(sheet)];

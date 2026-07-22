@@ -9,7 +9,7 @@ Local operation and protected-range context supplied to the host policy.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L194</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L195</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

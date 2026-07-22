@@ -1108,6 +1108,70 @@ fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles(
 }
 
 #[test]
+fn rename_sheet_resolves_case_variants_and_enforces_canonical_name_uniqueness() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(1, 2);
+    let other = store.add_sheet(1, 1);
+    let summary = store.add_sheet(3, 1);
+    store.set_sheet_name(source, "source-id", "Sales");
+    store.set_sheet_name(other, "other-id", "Budget");
+    store.set_sheet_name(summary, "summary-id", "Summary");
+    store.set_number(source, 0, 0, 4.0, 0);
+    store.set_number(source, 1, 0, 6.0, 0);
+    store.set_formula(summary, 0, 0, "=sAlEs!A1+1", 0);
+    store.set_formula(summary, 0, 1, "='SaLeS'!A1+2", 0);
+    store.set_formula(summary, 0, 2, "=SUM(sAlEs!A1:SaLeS!A2)", 0);
+    store.recompute(summary);
+
+    assert_close(number(&store, summary, 0, 0), 5.0);
+    assert_close(number(&store, summary, 0, 1), 6.0);
+    assert_close(number(&store, summary, 0, 2), 10.0);
+    assert!(!store.rename_sheet(other, "other-id", "sALES"));
+    assert!(!store.rename_sheet(source, "other-id", "Revenue"));
+
+    assert!(store.rename_sheet(source, "source-id", "Revenue 2026"));
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("=('Revenue 2026'!A1+1)")
+    );
+    assert_eq!(
+        store.formula_source(summary, 0, 1).as_deref(),
+        Some("=('Revenue 2026'!A1+2)")
+    );
+    assert_eq!(
+        store.formula_source(summary, 0, 2).as_deref(),
+        Some("=SUM('Revenue 2026'!A1:A2)")
+    );
+    assert_close(number(&store, summary, 0, 0), 5.0);
+    assert_close(number(&store, summary, 0, 1), 6.0);
+    assert_close(number(&store, summary, 0, 2), 10.0);
+}
+
+#[test]
+fn rename_sheet_keeps_resolved_handle_identity_when_old_name_is_reused_after_reorder() {
+    let mut store = CellStore::new();
+    let original = store.add_sheet(1, 1);
+    let replacement = store.add_sheet(1, 1);
+    let summary = store.add_sheet(1, 1);
+    store.set_sheet_name(original, "original-id", "Original");
+    store.set_sheet_name(replacement, "replacement-id", "Replacement");
+    store.set_sheet_name(summary, "summary-id", "Summary");
+    store.set_number(original, 0, 0, 7.0, 0);
+    store.set_number(replacement, 0, 0, 19.0, 0);
+    store.set_formula(summary, 0, 0, "=original!A1", 0);
+    store.recompute(summary);
+
+    // Workbook order is owned outside the WASM store; changing it does not renumber handles.
+    assert!(store.rename_sheet(original, "original-id", "Current"));
+    assert!(store.rename_sheet(replacement, "replacement-id", "Original"));
+    assert_eq!(
+        store.formula_source(summary, 0, 0).as_deref(),
+        Some("=Current!A1")
+    );
+    assert_close(number(&store, summary, 0, 0), 7.0);
+}
+
+#[test]
 fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencies() {
     let mut store = CellStore::new();
     let source = store.add_sheet(1, 2);

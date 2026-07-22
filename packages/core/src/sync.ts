@@ -1465,6 +1465,7 @@ const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   removeSheet: true,
   renameSheet: true,
   moveSheet: true,
+  setSheetVisibility: true,
   setSheetMeta: true,
   setValidationRule: true,
   removeValidationRule: true,

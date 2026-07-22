@@ -319,7 +319,7 @@ const App = defineComponent({
     function addArchiveSheet(): void {
       const grid = gridOf();
       if (!grid || sheets.value.some((sheet) => sheet.id === ARCHIVE_SHEET_ID)) return;
-      const id = grid.addSheet({
+      const result = grid.addSheet({
         id: ARCHIVE_SHEET_ID,
         name: "Archive FY25",
         rowCount: 20,
@@ -328,7 +328,7 @@ const App = defineComponent({
           { key: "closed", header: "Closed", width: 140, type: "text" },
         ],
       });
-      grid.setActiveSheet(id);
+      if (result.status === "applied") grid.setActiveSheet(result.sheet);
     }
 
     function openSuppliers(): void {

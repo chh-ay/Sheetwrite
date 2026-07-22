@@ -129,6 +129,12 @@ export {
   WASM_MEMORY_OWNERS,
   type WasmMemoryOwner,
 } from "./resource-accounting.js";
+export {
+  type SheetNameIssueCode,
+  type SheetNameValidationResult,
+  sheetNameKey,
+  validateSheetName,
+} from "./sheet-name.js";
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 export {
   DEFAULT_SYNC_COORDINATOR_LIMITS,
@@ -230,6 +236,8 @@ export type {
   Selection,
   Sheet,
   SheetId,
+  SheetLifecycleIssueCode,
+  SheetLifecycleResult,
   SheetSnapshot,
   SheetVisibility,
   SnapshotCell,

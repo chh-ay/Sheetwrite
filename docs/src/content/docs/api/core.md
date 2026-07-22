@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>238</dd></div>
+<div><dt>Exports</dt><dd>244</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -35,7 +35,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>XlsxResourceError</code></span><span class="api-symbol-card__desc">Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>41</span>
+### Functions <span class="api-count" data-pagefind-ignore>43</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/assert-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Reject overlap, negative values, and attempts to fold runtime observations into owner totals.</span></a>
@@ -72,11 +72,13 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/set-xlsx-table-export-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>setXlsxTableExportBackend</code></span><span class="api-symbol-card__desc">Registers the optional table XLSX export implementation used by core.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/set-xlsx-table-import-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>setXlsxTableImportBackend</code></span><span class="api-symbol-card__desc">Registers the optional table XLSX import implementation used by core.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/set-xlsx-workbook-backend/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>setXlsxWorkbookBackend</code></span><span class="api-symbol-card__desc">Registers the optional workbook XLSX implementation used by core.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheet-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>sheetNameKey</code></span><span class="api-symbol-card__desc">NFC and locale-independent Unicode lowercase key used for worksheet-name identity.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/shift-a1-refs/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>shiftA1Refs</code></span><span class="api-symbol-card__desc">Shift relative A1 references in a formula by (dRow, dCol) — used when a formula is filled into other cells.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/to-csv/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>toCsv</code></span><span class="api-symbol-card__desc">Export the current visible CSV view (UTF-8 BOM, CRLF): visible columns and view-ordered rows surviving sort, filter, hidden-row, and group state.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/to-tsv/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>toTsv</code></span><span class="api-symbol-card__desc">Export a canonical data-space range as clipboard-compatible TSV (CRLF, no BOM).</span></a>
 <a class="api-symbol-card" href="/docs/api/core/to-xlsx-table/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>toXlsxTable</code></span><span class="api-symbol-card__desc">Exports a table model through the registered optional XLSX backend.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/to-xlsx-workbook/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>toXlsxWorkbook</code></span><span class="api-symbol-card__desc">Formula-preserving, multi-sheet workbook export through the optional XLSX backend.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/validate-sheet-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>validateSheetName</code></span><span class="api-symbol-card__desc">Validate and canonicalize a SpreadsheetML worksheet name.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/validate-transaction-resources/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>validateTransactionResources</code></span><span class="api-symbol-card__desc">Incrementally validate the operation count and exact encoded payload size without constructing a JSON string.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/validate-workbook-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>validateWorkbookSnapshot</code></span><span class="api-symbol-card__desc">Validate and canonically order a schema-1 snapshot without hydrating runtime state.</span></a>
 </div>
@@ -198,7 +200,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>57</span>
+### Types <span class="api-count" data-pagefind-ignore>61</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -244,6 +246,10 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/runtime-resource-phase/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>RuntimeResourcePhase</code></span><span class="api-symbol-card__desc">Measurement point within one resource-accounted operation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/selection/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>Selection</code></span><span class="api-symbol-card__desc">Current cell, range, row, column, or multi-range selection.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-id/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetId</code></span><span class="api-symbol-card__desc">Stable identifier used to address a workbook sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheet-lifecycle-issue-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetLifecycleIssueCode</code></span><span class="api-symbol-card__desc">Stable lifecycle rejection codes suitable for inline sheet-management UI.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheet-lifecycle-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetLifecycleResult</code></span><span class="api-symbol-card__desc">Actionable transaction outcome for a stable sheet lifecycle target.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheet-name-issue-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetNameIssueCode</code></span><span class="api-symbol-card__desc">Stable reason codes returned by worksheet-name validation.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheet-name-validation-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetNameValidationResult</code></span><span class="api-symbol-card__desc">Successful canonical name or an actionable validation failure.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-visibility/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetVisibility</code></span><span class="api-symbol-card__desc">Native worksheet visibility preserved across workbook snapshots and tab rendering.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SnapshotGridOptions</code></span><span class="api-symbol-card__desc">Grid creation options accepted when hydrating a validated snapshot.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-storage-mode/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SnapshotStorageMode</code></span><span class="api-symbol-card__desc">Allocation mode used when enforcing snapshot construction capacity.</span></a>

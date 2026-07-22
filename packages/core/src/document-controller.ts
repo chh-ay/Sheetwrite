@@ -389,6 +389,18 @@ export class DocumentController {
           .sheets.findIndex((sheet) => sheet.id === patch.sheet);
         return from < 0 ? [] : [{ op: "moveSheet", sheet: patch.sheet, to: from }];
       }
+      case "setSheetVisibility": {
+        const sheet = this.sheetById(patch.sheet);
+        return sheet
+          ? [
+              {
+                op: "setSheetVisibility",
+                sheet: patch.sheet,
+                visibility: sheet.visibility ?? "visible",
+              },
+            ]
+          : [];
+      }
       case "setSheetMeta": {
         const sheet = this.sheetById(patch.sheet);
         if (!sheet) return [];

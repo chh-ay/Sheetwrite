@@ -12,7 +12,7 @@ Columnar workbook storage, query, transaction, and subscription contract.
 <div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L120</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -41,6 +41,15 @@ NOT for the render hot path — renderers use `getVisibleWindow`.</p>
 
 ```ts generated
 getFormula(addr: CellAddress): string | null;
+```
+
+</details>
+
+<details class="api-member" id="store-get-spill-anchor" data-pagefind-weight="1">
+<summary><code>getSpillAnchor</code> <span class="api-member-summary">Owning dynamic-array formula cell, or null when addr is not spilled.</span></summary>
+
+```ts generated
+getSpillAnchor(addr: CellAddress): CellAddress | null;
 ```
 
 </details>
@@ -197,6 +206,7 @@ export interface Store {
   getWorkbook(): Workbook;
   getCell(addr: CellAddress): ResolvedCell;
   getFormula(addr: CellAddress): string | null;
+  getSpillAnchor(addr: CellAddress): CellAddress | null;
   getRefTarget(addr: CellAddress): CellAddress | null;
   recalculateVolatile(now?: Date): void;
   getVisibleWindow(

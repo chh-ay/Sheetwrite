@@ -19,6 +19,7 @@ import {
   type StoreMemoryBreakdown,
   type TransientResourcePeak,
 } from "../resource-accounting.js";
+import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import type {
   CellFormat,
@@ -77,6 +78,7 @@ import {
   validProtectedRanges,
   validSortAndFilters,
   validValidationRules,
+  visibleSheetNeighbor,
 } from "./ranges.js";
 import { StoreSnapshotCodec } from "./snapshot-codec.js";
 import { StoreViewState } from "./view-state.js";
@@ -593,8 +595,8 @@ export class StoreDataEngine {
     const sheetLifecycle = createSheetLifecycleState(this.workbook.sheets);
     const referenceLifecycle = createSheetLifecycleState(this.workbook.sheets);
     const applicableRemove = patches.map((patch) => {
-      const applied = applySheetLifecycleOperation(referenceLifecycle, patch);
-      return patch.op === "removeSheet" && applied === true;
+      const lifecycle = applySheetLifecycleOperation(referenceLifecycle, patch);
+      return patch.op === "removeSheet" && lifecycle?.ok === true;
     });
     const removeAfter = new Array<boolean>(patches.length);
     let laterRemove = false;
@@ -879,7 +881,7 @@ export class StoreDataEngine {
       const patch = patches[operationIndex]!;
       trackVirtualRefs = removeAfter[operationIndex] ?? false;
       if (patch.op === "addSheet") {
-        if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
+        if (applySheetLifecycleOperation(sheetLifecycle, patch)?.ok !== true) continue;
         const snapshot = patch.sheet;
         const state: PagedDirtyPreflightState = {
           handle: null,
@@ -917,7 +919,7 @@ export class StoreDataEngine {
         continue;
       }
       if (patch.op === "removeSheet") {
-        if (!applySheetLifecycleOperation(sheetLifecycle, patch)) continue;
+        if (applySheetLifecycleOperation(sheetLifecycle, patch)?.ok !== true) continue;
         if (referenceSimulationExceeded) return referenceSimulationIssue();
         if (!trackVirtualRefs && virtualRefs === null) {
           this.noteRangeMutationFfi();
@@ -960,7 +962,11 @@ export class StoreDataEngine {
         states.delete(patch.sheet);
         continue;
       }
-      if (patch.op === "renameSheet" || patch.op === "moveSheet") {
+      if (
+        patch.op === "renameSheet" ||
+        patch.op === "moveSheet" ||
+        patch.op === "setSheetVisibility"
+      ) {
         applySheetLifecycleOperation(sheetLifecycle, patch);
         continue;
       }
@@ -2155,9 +2161,15 @@ export class StoreDataEngine {
         return this.removeSheetSnapshot(patch.sheet, changes);
       case "renameSheet": {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
-        if (!sheet || !patch.name.trim()) return false;
-        if (!this.renameSheetFormulaIdentity(patch.sheet, patch.name)) return false;
-        sheet.name = patch.name;
+        if (!sheet) return false;
+        const name = validateSheetName(
+          patch.name,
+          this.workbook.sheets
+            .filter((candidate) => candidate.id !== patch.sheet)
+            .map((candidate) => candidate.name),
+        );
+        if (!name.ok || !this.renameSheetFormulaIdentity(patch.sheet, name.name)) return false;
+        sheet.name = name.name;
         return true;
       }
       case "moveSheet": {
@@ -2166,6 +2178,35 @@ export class StoreDataEngine {
           return false;
         const [sheet] = this.workbook.sheets.splice(from, 1);
         this.workbook.sheets.splice(patch.to, 0, sheet!);
+        return true;
+      }
+      case "setSheetVisibility": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        if (!sheet) return false;
+        const previous = sheet.visibility ?? "visible";
+        if (previous === patch.visibility) return false;
+        if (
+          previous === "visible" &&
+          patch.visibility !== "visible" &&
+          this.workbook.sheets.filter(
+            (candidate) => (candidate.visibility ?? "visible") === "visible",
+          ).length <= 1
+        ) {
+          return false;
+        }
+        const fallback =
+          this.workbook.activeSheet === patch.sheet && patch.visibility !== "visible"
+            ? visibleSheetNeighbor(this.workbook.sheets, patch.sheet)
+            : null;
+        if (
+          this.workbook.activeSheet === patch.sheet &&
+          patch.visibility !== "visible" &&
+          !fallback
+        ) {
+          return false;
+        }
+        sheet.visibility = patch.visibility;
+        if (fallback) this.workbook.activeSheet = fallback;
         return true;
       }
       case "setSheetMeta": {
@@ -2515,14 +2556,19 @@ export class StoreDataEngine {
     changes: ChangeEvent["changes"] | null,
   ): boolean {
     if (!canAddSheetSnapshot(snapshot, this.workbook.sheets)) return false;
+    const name = validateSheetName(
+      snapshot.name,
+      this.workbook.sheets.map((sheet) => sheet.name),
+    );
+    if (!name.ok) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
-    this.wasm.setSheetName(handle, snapshot.id, snapshot.name);
+    this.wasm.setSheetName(handle, snapshot.id, name.name);
     this.handles.set(snapshot.id, handle);
     this.sheetIdsByHandle[handle] = snapshot.id;
     const sheet: Sheet = {
       id: snapshot.id,
-      name: snapshot.name,
+      name: name.name,
       visibility: snapshot.visibility,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns.map((column) => ({ ...column })),
@@ -2573,16 +2619,26 @@ export class StoreDataEngine {
   private removeSheetSnapshot(sheetId: SheetId, _changes: ChangeEvent["changes"] | null): boolean {
     const index = this.workbook.sheets.findIndex((sheet) => sheet.id === sheetId);
     if (index < 0 || this.workbook.sheets.length <= 1) return false;
+    const removed = this.workbook.sheets[index]!;
+    if (
+      (removed.visibility ?? "visible") === "visible" &&
+      this.workbook.sheets.filter((sheet) => (sheet.visibility ?? "visible") === "visible")
+        .length <= 1
+    ) {
+      return false;
+    }
+    const fallback =
+      this.workbook.activeSheet === sheetId
+        ? visibleSheetNeighbor(this.workbook.sheets, sheetId)
+        : null;
+    if (this.workbook.activeSheet === sheetId && !fallback) return false;
     if (!this.removeSheetFormulaIdentity(sheetId)) return false;
     this.handles.delete(sheetId);
     this.authoritativeSnapshotSheets.delete(sheetId);
     this.view.removeSheet(sheetId);
     this.windowReader.removeSheet(sheetId);
     this.workbook.sheets.splice(index, 1);
-    if (this.workbook.activeSheet === sheetId) {
-      this.workbook.activeSheet =
-        this.workbook.sheets[Math.min(index, this.workbook.sheets.length - 1)]!.id;
-    }
+    if (fallback) this.workbook.activeSheet = fallback;
     this.workbook.namedRanges = this.workbook.namedRanges?.filter(
       (range) => range.range.sheet !== sheetId && range.scope !== sheetId,
     );

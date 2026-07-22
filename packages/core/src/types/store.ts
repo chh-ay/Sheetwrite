@@ -126,6 +126,8 @@ export interface Store {
   getCell(addr: CellAddress): ResolvedCell;
   /** Formula source at `addr`, or null when the cell is not a formula. */
   getFormula(addr: CellAddress): string | null;
+  /** Owning dynamic-array formula cell, or null when `addr` is not spilled. */
+  getSpillAnchor(addr: CellAddress): CellAddress | null;
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null;
   /**

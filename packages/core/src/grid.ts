@@ -38,7 +38,9 @@ import {
 } from "./resource-accounting.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
+import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
+import { visibleSheetNeighbor } from "./store/ranges.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
@@ -71,6 +73,7 @@ import type {
   RowGroup,
   Sheet,
   SheetSnapshot,
+  SheetVisibility,
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
@@ -88,6 +91,7 @@ import type {
   ReplaceResult,
   SearchOptions,
   SearchResult,
+  SheetLifecycleResult,
 } from "./types/grid.js";
 import type { CellRenderer, Renderer, Theme } from "./types/render.js";
 import type { Store, VisibleWindowView } from "./types/store.js";
@@ -421,6 +425,8 @@ export class GridImpl implements Grid {
   private activeSheet: SheetId;
   /** Memoized active `Sheet` object; invalidated on store change / tab switch. */
   private activeSheetCache: Sheet | null = null;
+  /** Pre-change worksheet state retained for deterministic session fallback through remote batches. */
+  private sessionSheets: Array<{ id: SheetId; visibility?: SheetVisibility }> = [];
   private readonly virtualColumnTargets = new Map<SheetId, number>();
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
@@ -483,12 +489,20 @@ export class GridImpl implements Grid {
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
     this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(host), ...opts.theme };
-    this.activeSheet = opts.workbook.activeSheet;
+    const requestedActive = opts.workbook.activeSheet;
+    const requestedSheet = workbook.sheets.find((sheet) => sheet.id === requestedActive);
+    this.activeSheet =
+      requestedSheet && (requestedSheet.visibility ?? "visible") === "visible"
+        ? requestedActive
+        : (visibleSheetNeighbor(workbook.sheets, requestedActive) ??
+          workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
+          requestedActive);
+    this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
     this.theme = this.withAdaptiveGutter(
       this.baseTheme,
       workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
     );
-    this.tabBarHeight = opts.config?.tabs !== false && opts.workbook.sheets.length > 1 ? 28 : 0;
+    this.tabBarHeight = opts.config?.tabs !== false ? 28 : 0;
     this.document = new DocumentController({
       store: this.store,
       loadable: this.loadable,
@@ -794,6 +808,8 @@ export class GridImpl implements Grid {
       let shouldApplyLayout = false;
       let sheetsChanged = false;
       let shouldResetDatasource = false;
+      const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
+      let sessionActive = this.activeSheet;
       for (const patch of event.transaction.patches) {
         if (
           (patch.op === "addRows" ||
@@ -831,17 +847,53 @@ export class GridImpl implements Grid {
           patch.op === "addSheet" ||
           patch.op === "removeSheet" ||
           patch.op === "renameSheet" ||
-          patch.op === "moveSheet"
+          patch.op === "moveSheet" ||
+          patch.op === "setSheetVisibility"
         ) {
           sheetsChanged = true;
         }
+        if (patch.op === "addSheet") {
+          sessionSheets.splice(patch.sheet.order, 0, {
+            id: patch.sheet.id,
+            visibility: patch.sheet.visibility,
+          });
+        } else if (patch.op === "removeSheet") {
+          const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
+          if (index >= 0) {
+            sessionSheets.splice(index, 1);
+            if (sessionActive === patch.sheet) {
+              sessionActive =
+                visibleSheetNeighbor(sessionSheets, patch.sheet, index) ?? sessionActive;
+            }
+          }
+        } else if (patch.op === "moveSheet") {
+          const index = sessionSheets.findIndex((sheet) => sheet.id === patch.sheet);
+          if (index >= 0) {
+            const [sheet] = sessionSheets.splice(index, 1);
+            sessionSheets.splice(patch.to, 0, sheet!);
+          }
+        } else if (patch.op === "setSheetVisibility") {
+          const sheet = sessionSheets.find((candidate) => candidate.id === patch.sheet);
+          if (sheet) {
+            sheet.visibility = patch.visibility;
+            if (sessionActive === patch.sheet && patch.visibility !== "visible") {
+              sessionActive = visibleSheetNeighbor(sessionSheets, patch.sheet) ?? sessionActive;
+            }
+          }
+        }
       }
+      const sheets = this.store.getWorkbook().sheets;
+      const reconciled = sheets.find((sheet) => sheet.id === sessionActive);
+      if (!reconciled || (reconciled.visibility ?? "visible") !== "visible") {
+        sessionActive =
+          sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
+          sessionActive;
+      }
+      if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
+      this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
       if (shouldResetDatasource) {
         this.datasourceController.reset(this.sheet().rowCount);
         this.mutationRevisions.clear();
-      }
-      if (!this.sheetById(this.activeSheet)) {
-        this.setActiveSheet(this.store.getWorkbook().activeSheet);
       }
       if (shouldRebuildRows) this.rebuildIndex();
       if (shouldRebuildColumns) this.rebuildColumnIndex();
@@ -937,6 +989,13 @@ export class GridImpl implements Grid {
     return this.viewportEl.clientHeight;
   }
 
+  private nextDefaultSheetName(): string {
+    const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
+    let number = this.store.getWorkbook().sheets.length + 1;
+    while (names.has(sheetNameKey(`Sheet ${number}`))) number += 1;
+    return `Sheet ${number}`;
+  }
+
   private buildTabBar(): void {
     const bar = document.createElement("div");
     bar.className = "sheetwrite-tabbar";
@@ -953,17 +1012,16 @@ export class GridImpl implements Grid {
     this.sheetTabs = new SheetTabs(bar, {
       onActivate: (id) => this.setActiveSheet(id),
       onAdd: () => {
-        const id = this.addSheet({ name: `Sheet ${this.store.getWorkbook().sheets.length + 1}` });
-        if (this.sheetById(id)) this.setActiveSheet(id);
+        const result = this.addSheet({ name: this.nextDefaultSheetName() });
+        if (result.status === "applied") this.setActiveSheet(result.sheet);
+        return result;
       },
       onRemove: (id) => this.removeSheet(id),
-      onRename: (id) => {
-        const sheet = this.sheetById(id);
-        if (!sheet) return;
-        const name = globalThis.prompt?.("Rename sheet", sheet.name)?.trim();
-        if (name) this.renameSheet(id, name);
-      },
+      onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
+      onHide: (id) => this.setSheetVisibility(id, "hidden"),
+      onUnhide: (id) => this.setSheetVisibility(id, "visible"),
+      readOnly: this.readOnly,
     });
     this.syncTabBarTheme();
     this.renderTabs();
@@ -1915,8 +1973,9 @@ export class GridImpl implements Grid {
   }
 
   setActiveSheet(id: SheetId): void {
-    if (id === this.activeSheet) return;
-    if (!this.store.getWorkbook().sheets.some((sheet) => sheet.id === id)) return;
+    const target = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
+    if (!target || (target.visibility ?? "visible") !== "visible" || id === this.activeSheet)
+      return;
 
     this.editor.cancel();
     this.validationEditor.cancel();
@@ -2047,6 +2106,7 @@ export class GridImpl implements Grid {
     if (readOnly === this.readOnly) return;
 
     this.readOnly = readOnly;
+    this.sheetTabs?.setReadOnly(readOnly);
     if (readOnly) {
       this.cancelAutoFit();
       this.editor.cancel();
@@ -2102,8 +2162,7 @@ export class GridImpl implements Grid {
     this.sheetTabs = null;
     this.tabBar?.remove();
     this.tabBar = null;
-    this.tabBarHeight =
-      config?.tabs !== false && this.store.getWorkbook().sheets.length > 1 ? 28 : 0;
+    this.tabBarHeight = config?.tabs !== false ? 28 : 0;
     if (this.tabBarHeight > 0) this.buildTabBar();
 
     this.viewportEl.style.top = `${this.toolbarHeight}px`;
@@ -2132,7 +2191,11 @@ export class GridImpl implements Grid {
     if (!snapshot) {
       throw new Error("Sheetwrite: the injected Store does not support snapshot export");
     }
-    return snapshot;
+    if (snapshot.workbook.activeSheet === this.activeSheet) return snapshot;
+    return {
+      ...snapshot,
+      workbook: { ...snapshot.workbook, activeSheet: this.activeSheet },
+    };
   }
 
   applyRemoteOperations(
@@ -2263,8 +2326,7 @@ export class GridImpl implements Grid {
     );
   }
 
-  addSheet(input: AddSheetInput): SheetId {
-    if (this.readOnly) return this.activeSheet;
+  addSheet(input: AddSheetInput): SheetLifecycleResult {
     const used = new Set(this.store.getWorkbook().sheets.map((sheet) => sheet.id));
     let id = input.id?.trim() || "sheet";
     let suffix = 2;
@@ -2272,28 +2334,53 @@ export class GridImpl implements Grid {
     const columns = input.columns?.map((column) => ({ ...column })) ?? [
       { key: "a", header: "A", width: DEFAULT_COL_WIDTH, type: "text" as const },
     ];
+    const name = validateSheetName(
+      input.name,
+      this.store.getWorkbook().sheets.map((sheet) => sheet.name),
+    );
     const snapshot: SheetSnapshot = {
       id,
-      name: input.name,
+      name: name.name,
       order: this.store.getWorkbook().sheets.length,
       rowCount: input.rowCount ?? 100,
       columns,
       cells: [],
     };
-    this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
-    return id;
+    const result = this.document.commit([{ op: "addSheet", sheet: snapshot }], "structure");
+    return { ...result, sheet: id };
   }
 
-  removeSheet(id: SheetId): void {
-    this.document.commit([{ op: "removeSheet", sheet: id }], "structure");
+  removeSheet(id: SheetId): SheetLifecycleResult {
+    const result = this.document.commit([{ op: "removeSheet", sheet: id }], "structure");
+    return { ...result, sheet: id };
   }
 
-  renameSheet(id: SheetId, name: string): void {
-    this.document.commit([{ op: "renameSheet", sheet: id, name }], "structure");
+  renameSheet(id: SheetId, name: string): SheetLifecycleResult {
+    const validation = validateSheetName(
+      name,
+      this.store
+        .getWorkbook()
+        .sheets.filter((sheet) => sheet.id !== id)
+        .map((sheet) => sheet.name),
+    );
+    const result = this.document.commit(
+      [{ op: "renameSheet", sheet: id, name: validation.name }],
+      "structure",
+    );
+    return { ...result, sheet: id };
   }
 
-  moveSheet(id: SheetId, toIndex: number): void {
-    this.document.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
+  moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult {
+    const result = this.document.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
+    return { ...result, sheet: id };
+  }
+
+  setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult {
+    const result = this.document.commit(
+      [{ op: "setSheetVisibility", sheet: id, visibility }],
+      "structure",
+    );
+    return { ...result, sheet: id };
   }
 
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void {

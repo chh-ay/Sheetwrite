@@ -9,7 +9,7 @@ Retained lifecycle returned by a custom editor's `mount` method.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/editor.ts#L40</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/editor.ts#L39</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

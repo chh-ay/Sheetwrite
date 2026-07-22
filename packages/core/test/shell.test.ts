@@ -372,7 +372,7 @@ describe("createSpreadsheetShell", () => {
 
     // Tab activation switches by id and notifies the tabs via active-sheet.
     const tabButtons = [
-      ...host.querySelectorAll<HTMLButtonElement>(".sheetwrite-shell-tabs button"),
+      ...host.querySelectorAll<HTMLButtonElement>(".sheetwrite-shell-tabs [role='tab']"),
     ];
     tabButtons[1]!.click();
     expect(shell.grid.getActiveSheet()).toBe("s2");
@@ -380,6 +380,71 @@ describe("createSpreadsheetShell", () => {
     shell.destroy();
     shell.destroy(); // idempotent
     expect(host.querySelector(".sheetwrite-shell")).toBeNull();
+  });
+
+  it("keeps a configured one-sheet tab strip coherent through remote lifecycle changes", () => {
+    const host = mountHost();
+    const shell = createSpreadsheetShell(host, {
+      grid: { workbook: makeWorkbook(10), data: makeColumnarData(10) },
+    });
+
+    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(1);
+    expect(host.querySelector(".sheetwrite-shell-tabs")?.textContent).toContain("Sheet 1");
+
+    const second = {
+      id: "s2",
+      name: "Remote",
+      order: 1,
+      rowCount: 5,
+      columns: [{ key: "note", header: "Note", width: 200, type: "text" as const }],
+      cells: [],
+    };
+    expect(shell.grid.applyRemoteOperations([{ op: "addSheet", sheet: second }]).status).toBe(
+      "applied",
+    );
+    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(2);
+    expect(host.querySelector(".sheetwrite-shell-tabs")?.textContent).toContain("Remote");
+
+    expect(
+      shell.grid.applyRemoteOperations([{ op: "renameSheet", sheet: "s2", name: "Renamed" }])
+        .status,
+    ).toBe("applied");
+    expect(host.querySelector(".sheetwrite-shell-tabs")?.textContent).toContain("Renamed");
+
+    shell.grid.setActiveSheet("s2");
+    expect(shell.grid.applyRemoteOperations([{ op: "removeSheet", sheet: "s2" }]).status).toBe(
+      "applied",
+    );
+    expect(shell.grid.getActiveSheet()).toBe("s1");
+    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(1);
+
+    shell.destroy();
+  });
+
+  it("honors live tabs false configuration without creating a second primitive", () => {
+    const host = mountHost();
+    const shell = createSpreadsheetShell(host, {
+      grid: {
+        workbook: makeWorkbook(10),
+        data: makeColumnarData(10),
+        config: { tabs: false },
+      },
+    });
+
+    expect(host.querySelector(".sheetwrite-shell-tabs")).toBeNull();
+    shell.setGridConfig({ tabs: true });
+    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(1);
+    const add = host.querySelector<HTMLButtonElement>(
+      ".sheetwrite-shell-tabs [aria-label='Add sheet']",
+    );
+    if (!add) throw new Error("expected one-sheet Add action");
+    add.click();
+    expect(shell.grid.store.getWorkbook().sheets).toHaveLength(2);
+    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(2);
+    shell.setGridConfig({ tabs: false });
+    expect(host.querySelector(".sheetwrite-shell-tabs")).toBeNull();
+
+    shell.destroy();
   });
 
   it("keeps read-only and config wrappers coherent with the shell chrome", () => {

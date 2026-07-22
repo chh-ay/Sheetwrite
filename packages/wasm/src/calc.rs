@@ -703,7 +703,7 @@ impl Parser {
         if let Some(Tok::Colon) = self.peek() {
             self.pos += 1;
             let (end_sheet, r1, c1, end_flags) = self.sheet_range_end(&sheet_name)?;
-            if end_sheet != sheet_name {
+            if sheet_name_key(&end_sheet) != sheet_name_key(&sheet_name) {
                 return Err("cross-sheet ranges must stay on one sheet".into());
             }
             let (r0, c0, r1, c1, range_flags) = normalize_range(row, col, flags, r1, c1, end_flags);
@@ -733,6 +733,10 @@ impl Parser {
         let (row, col, flags) = parse_a1(&first).ok_or_else(|| format!("bad cell ref: {first}"))?;
         Ok((sheet_name.to_string(), row, col, flags))
     }
+}
+
+pub(crate) fn sheet_name_key(name: &str) -> String {
+    name.chars().flat_map(char::to_lowercase).collect()
 }
 
 /// Parse a formula source (with or without a leading `=`) into an AST.

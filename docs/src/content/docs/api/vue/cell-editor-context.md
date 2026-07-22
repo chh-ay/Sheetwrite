@@ -11,7 +11,7 @@ row/column. Async work must use `signal` so reset, cancel, and unmount abort it.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/editor.d.ts#L19</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/editor.d.ts#L18</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>12</span>

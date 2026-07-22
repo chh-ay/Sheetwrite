@@ -9,10 +9,10 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L318</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L322</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>83</span>
+## Members <span class="api-count" data-pagefind-ignore>84</span>
 
 <div class="api-member-list">
 
@@ -524,19 +524,19 @@ removeColumns(at: number, count?: number): void;
 </details>
 
 <details class="api-member" id="grid-add-sheet" data-pagefind-weight="1">
-<summary><code>addSheet</code> <span class="api-member-summary">Add a sheet with a stable ID and make it available to the tab bar.</span></summary>
+<summary><code>addSheet</code> <span class="api-member-summary">Add a sheet with a stable ID and return its actionable transaction outcome.</span></summary>
 
 ```ts generated
-addSheet(input: AddSheetInput): SheetId;
+addSheet(input: AddSheetInput): SheetLifecycleResult;
 ```
 
 </details>
 
 <details class="api-member" id="grid-remove-sheet" data-pagefind-weight="1">
-<summary><code>removeSheet</code> <span class="api-member-summary">Remove a sheet; at least one sheet always remains.</span></summary>
+<summary><code>removeSheet</code> <span class="api-member-summary">Remove a sheet while preserving at least one visible worksheet.</span></summary>
 
 ```ts generated
-removeSheet(id: SheetId): void;
+removeSheet(id: SheetId): SheetLifecycleResult;
 ```
 
 </details>
@@ -545,7 +545,7 @@ removeSheet(id: SheetId): void;
 <summary><code>renameSheet</code></summary>
 
 ```ts generated
-renameSheet(id: SheetId, name: string): void;
+renameSheet(id: SheetId, name: string): SheetLifecycleResult;
 ```
 
 </details>
@@ -554,7 +554,16 @@ renameSheet(id: SheetId, name: string): void;
 <summary><code>moveSheet</code></summary>
 
 ```ts generated
-moveSheet(id: SheetId, toIndex: number): void;
+moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-set-sheet-visibility" data-pagefind-weight="1">
+<summary><code>setSheetVisibility</code> <span class="api-member-summary">Set host-visible worksheet state; stock UI never offers veryHidden.</span></summary>
+
+```ts generated
+setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
 ```
 
 </details>
@@ -874,10 +883,14 @@ export interface Grid {
   removeRows(at: number, count?: number): void;
   insertColumns(at: number, count?: number): void;
   removeColumns(at: number, count?: number): void;
-  addSheet(input: AddSheetInput): SheetId;
-  removeSheet(id: SheetId): void;
-  renameSheet(id: SheetId, name: string): void;
-  moveSheet(id: SheetId, toIndex: number): void;
+  addSheet(input: AddSheetInput): SheetLifecycleResult;
+  removeSheet(id: SheetId): SheetLifecycleResult;
+  renameSheet(id: SheetId, name: string): SheetLifecycleResult;
+  moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+  setSheetVisibility(
+    id: SheetId,
+    visibility: SheetVisibility,
+  ): SheetLifecycleResult;
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
   removeValidationRule(id: string): ApplyTransactionResult;

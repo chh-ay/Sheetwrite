@@ -1,3 +1,4 @@
+import { validateSheetName } from "../sheet-name.js";
 import type { Column, ConditionalFormatRule } from "../types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type {
@@ -6,7 +7,9 @@ import type {
   DocumentOp,
   ProtectedRange,
   Sheet,
+  SheetLifecycleIssueCode,
   SheetSnapshot,
+  SheetVisibility,
   SortKey,
 } from "../types/document.js";
 
@@ -26,36 +29,78 @@ export function uniqueColumnKeys(columns: readonly Column[]): boolean {
   }
   return true;
 }
+
 export interface SheetLifecycleState {
-  readonly sheets: Array<{ id: SheetId; name: string }>;
+  readonly sheets: Array<{
+    id: SheetId;
+    name: string;
+    visibility: SheetVisibility;
+  }>;
 }
 
+export type SheetLifecycleOperationResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: SheetLifecycleIssueCode };
+
 export function createSheetLifecycleState(
-  sheets: readonly { id: SheetId; name: string }[],
+  sheets: readonly { id: SheetId; name: string; visibility?: SheetVisibility }[],
 ): SheetLifecycleState {
-  return { sheets: sheets.map(({ id, name }) => ({ id, name })) };
+  return {
+    sheets: sheets.map(({ id, name, visibility }) => ({
+      id,
+      name,
+      visibility: visibility ?? "visible",
+    })),
+  };
 }
-export function canAddSheetSnapshot(
+
+/** Right visible neighbor, then left; `removedIndex` retains ordering after removal. */
+export function visibleSheetNeighbor(
+  sheets: readonly { id: SheetId; visibility?: SheetVisibility }[],
+  source: SheetId,
+  removedIndex?: number,
+): SheetId | null {
+  const sourceIndex = sheets.findIndex((sheet) => sheet.id === source);
+  const rightStart =
+    sourceIndex >= 0
+      ? sourceIndex + 1
+      : Math.max(0, Math.min(removedIndex ?? sheets.length, sheets.length));
+  for (let index = rightStart; index < sheets.length; index++) {
+    const sheet = sheets[index]!;
+    if ((sheet.visibility ?? "visible") === "visible") return sheet.id;
+  }
+  const leftStart =
+    sourceIndex >= 0 ? sourceIndex - 1 : Math.min(rightStart - 1, sheets.length - 1);
+  for (let index = leftStart; index >= 0; index--) {
+    const sheet = sheets[index]!;
+    if ((sheet.visibility ?? "visible") === "visible") return sheet.id;
+  }
+  return null;
+}
+
+function addSheetSnapshotIssue(
   snapshot: SheetSnapshot,
   existing: readonly { id: SheetId; name: string }[],
-): boolean {
+): SheetLifecycleIssueCode | null {
+  if (!snapshot.id) return "invalid-sheet";
+  if (existing.some((sheet) => sheet.id === snapshot.id)) return "duplicate-sheet-id";
+  const name = validateSheetName(
+    snapshot.name,
+    existing.map((sheet) => sheet.name),
+  );
+  if (!name.ok) return name.code;
+  if (!integerAt(snapshot.order) || snapshot.order > existing.length) return "invalid-position";
   if (
-    !snapshot.id ||
-    existing.some((sheet) => sheet.id === snapshot.id) ||
-    !integerAt(snapshot.order) ||
-    snapshot.order > existing.length ||
     !integerAt(snapshot.rowCount) ||
     snapshot.columns.length === 0 ||
-    !uniqueColumnKeys(snapshot.columns) ||
-    !snapshot.name.trim() ||
-    existing.some((sheet) => sheet.name === snapshot.name)
+    !uniqueColumnKeys(snapshot.columns)
   ) {
-    return false;
+    return "invalid-sheet";
   }
   const merges = snapshot.merges?.map(normalizeMerge) ?? [];
   const candidate: Sheet = {
     id: snapshot.id,
-    name: snapshot.name,
+    name: name.name,
     visibility: snapshot.visibility,
     rowCount: snapshot.rowCount,
     columns: snapshot.columns,
@@ -67,7 +112,7 @@ export function canAddSheetSnapshot(
     sortKeys: snapshot.sortKeys,
     filters: snapshot.filters,
   };
-  return !(
+  if (
     (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
     (snapshot.frozenCols !== undefined && snapshot.frozenCols > snapshot.columns.length) ||
     merges.some((merge) => !validMerge(candidate, merge) || mergeCrossesFreeze(candidate, merge)) ||
@@ -108,54 +153,87 @@ export function canAddSheetSnapshot(
             cell.colOffset >= block.colCount,
         ),
     )
-  );
+  ) {
+    return "invalid-sheet";
+  }
+  return null;
 }
 
-/** Simulates the sheet-array effects of one operation using the engine's exact success predicates. */
+export function canAddSheetSnapshot(
+  snapshot: SheetSnapshot,
+  existing: readonly { id: SheetId; name: string }[],
+): boolean {
+  return addSheetSnapshotIssue(snapshot, existing) === null;
+}
+
+/** Simulates and validates a serializable worksheet lifecycle operation. */
 export function applySheetLifecycleOperation(
   state: SheetLifecycleState,
   operation: DocumentOp,
-): boolean | null {
+): SheetLifecycleOperationResult | null {
   if (operation.op === "addSheet") {
-    if (!canAddSheetSnapshot(operation.sheet, state.sheets)) return false;
+    const issue = addSheetSnapshotIssue(operation.sheet, state.sheets);
+    if (issue) return { ok: false, code: issue };
+    const name = validateSheetName(
+      operation.sheet.name,
+      state.sheets.map((sheet) => sheet.name),
+    );
+    if (!name.ok) return { ok: false, code: name.code };
     state.sheets.splice(operation.sheet.order, 0, {
       id: operation.sheet.id,
-      name: operation.sheet.name,
+      name: name.name,
+      visibility: operation.sheet.visibility ?? "visible",
     });
-    return true;
+    return { ok: true };
   }
   if (operation.op === "removeSheet") {
     const index = state.sheets.findIndex((sheet) => sheet.id === operation.sheet);
-    if (index < 0 || state.sheets.length <= 1) return false;
+    if (index < 0) return { ok: false, code: "sheet-not-found" };
+    if (
+      state.sheets.length <= 1 ||
+      (state.sheets[index]!.visibility === "visible" &&
+        state.sheets.filter((sheet) => sheet.visibility === "visible").length <= 1)
+    ) {
+      return { ok: false, code: "last-visible-sheet" };
+    }
     state.sheets.splice(index, 1);
-    return true;
+    return { ok: true };
   }
   if (operation.op === "renameSheet") {
     const sheet = state.sheets.find((candidate) => candidate.id === operation.sheet);
-    if (
-      !sheet ||
-      !operation.name.trim() ||
-      state.sheets.some(
-        (candidate) =>
-          candidate.id !== operation.sheet &&
-          (candidate.name === operation.sheet ||
-            candidate.id === operation.name ||
-            candidate.name === operation.name),
-      )
-    ) {
-      return false;
-    }
-    sheet.name = operation.name;
-    return true;
+    if (!sheet) return { ok: false, code: "sheet-not-found" };
+    const name = validateSheetName(
+      operation.name,
+      state.sheets
+        .filter((candidate) => candidate.id !== operation.sheet)
+        .map((candidate) => candidate.name),
+    );
+    if (!name.ok) return { ok: false, code: name.code };
+    sheet.name = name.name;
+    return { ok: true };
   }
   if (operation.op === "moveSheet") {
     const from = state.sheets.findIndex((sheet) => sheet.id === operation.sheet);
-    if (from < 0 || !integerAt(operation.to) || operation.to >= state.sheets.length) {
-      return false;
+    if (from < 0) return { ok: false, code: "sheet-not-found" };
+    if (!integerAt(operation.to) || operation.to >= state.sheets.length) {
+      return { ok: false, code: "invalid-position" };
     }
     const [sheet] = state.sheets.splice(from, 1);
     state.sheets.splice(operation.to, 0, sheet!);
-    return true;
+    return { ok: true };
+  }
+  if (operation.op === "setSheetVisibility") {
+    const sheet = state.sheets.find((candidate) => candidate.id === operation.sheet);
+    if (!sheet) return { ok: false, code: "sheet-not-found" };
+    if (
+      sheet.visibility === "visible" &&
+      operation.visibility !== "visible" &&
+      state.sheets.filter((candidate) => candidate.visibility === "visible").length <= 1
+    ) {
+      return { ok: false, code: "last-visible-sheet" };
+    }
+    sheet.visibility = operation.visibility;
+    return { ok: true };
   }
   return null;
 }

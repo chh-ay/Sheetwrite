@@ -9,10 +9,10 @@ Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L321</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L339</code></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>27</span>
+## Variants <span class="api-count" data-pagefind-ignore>28</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -196,6 +196,17 @@ Exhaustive serializable operation union for workbook mutations.
 
 ```ts generated
 { op: "moveSheet"; sheet: SheetId; to: number }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setSheetVisibility";
+  sheet: SheetId;
+  visibility: SheetVisibility;
+}
 ```
 
 </div>
@@ -387,6 +398,11 @@ export type DocumentOp =
       op: "moveSheet";
       sheet: SheetId;
       to: number;
+    }
+  | {
+      op: "setSheetVisibility";
+      sheet: SheetId;
+      visibility: SheetVisibility;
     }
   | {
       op: "setSheetMeta";

@@ -321,6 +321,92 @@ test("workbook and sheet operations stay reactive through the public API", async
   expect(errors.console).toEqual([]);
 });
 
+test("@portability native tabs expose the complete accessible worksheet lifecycle", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openWorkbench(page);
+
+  const orders = page.getByRole("tab", { name: "Orders sheet" });
+  await orders.dblclick();
+  const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
+  await editor.fill("Suppliers");
+  await editor.press("Enter");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(editor).toBeFocused();
+  await expect(page.getByTestId("pending-count")).toHaveText("0");
+
+  await editor.fill("Purchase orders");
+  await editor.press("Enter");
+  await expect(page.getByRole("tab", { name: "Purchase orders sheet" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add sheet" }).click();
+  const added = page.getByRole("tab", { name: "Sheet 3 sheet" });
+  await expect(added).toBeVisible();
+  await expect(added).toHaveAttribute("aria-selected", "true");
+
+  await page.getByRole("button", { name: "Move Sheet 3 sheet left" }).click();
+  expect(
+    await page.evaluate(() =>
+      window.__sheetwriteVueWorkbench!.grid.store.getWorkbook().sheets.map((sheet) => sheet.name),
+    ),
+  ).toEqual(["Purchase orders", "Sheet 3", "Suppliers"]);
+
+  await page.getByRole("button", { name: "Hide Sheet 3 sheet" }).click();
+  await expect(added).toHaveCount(0);
+  const unhide = page.getByRole("combobox", { name: "Unhide sheet" });
+  await expect(unhide).toBeVisible();
+  await unhide.selectOption({ label: "Sheet 3" });
+  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Sheet 3 sheet" }).click();
+  await page.getByRole("button", { name: "Remove Sheet 3 sheet" }).click();
+  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Suppliers sheet" }).click();
+  expect(
+    await page.evaluate(
+      () => window.__sheetwriteVueWorkbench!.grid.exportSnapshot().workbook.activeSheet,
+    ),
+  ).toBe("suppliers");
+  await expect(page.getByTestId("pending-count")).toHaveText("6");
+  await page.getByTestId("sync").click();
+  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v6");
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("@portability native worksheet controls remain operable at 390×844", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = collectErrors(page);
+  await openWorkbench(page);
+
+  await page.getByRole("button", { name: "Rename Orders sheet" }).click();
+  const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
+  await editor.fill("Enterprise purchase orders");
+  await editor.press("Enter");
+  await expect(page.getByRole("tab", { name: "Enterprise purchase orders sheet" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add sheet" }).click();
+  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
+  await page.getByRole("button", { name: "Hide Sheet 3 sheet" }).click();
+  await page.getByRole("combobox", { name: "Unhide sheet" }).selectOption({ label: "Sheet 3" });
+  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
+
+  const overflow = await page.locator(".sheetwrite-tabbar").evaluate((bar) => ({
+    clientWidth: bar.clientWidth,
+    scrollWidth: bar.scrollWidth,
+    documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  }));
+  expect(overflow.clientWidth).toBeGreaterThan(0);
+  expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth);
+  expect(overflow.documentOverflow).toBe(false);
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("toolbar formatting commits live styles through the grid", async ({ page }) => {
   const errors = collectErrors(page);
   await openWorkbench(page);

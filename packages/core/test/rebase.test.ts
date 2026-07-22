@@ -39,6 +39,7 @@ const OP_CONFLICT_FAMILY = {
   removeSheet: "sheet",
   renameSheet: "sheet",
   moveSheet: "sheet",
+  setSheetVisibility: "sheet",
   setSheetMeta: "sheet",
   setValidationRule: "range",
   removeValidationRule: "range",

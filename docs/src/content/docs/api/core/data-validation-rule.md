@@ -9,7 +9,7 @@ One stable, range-scoped data-entry rule. Blank cells are allowed unless disable
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L142</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L143</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

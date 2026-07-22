@@ -40,6 +40,7 @@ import type {
   ProtectedRange,
   ProtectionResolver,
   RowGroup,
+  SheetVisibility,
   SortKey,
   Workbook,
   WorkbookSnapshot,
@@ -379,6 +380,9 @@ export interface CellInputSnapshot {
   readonly format: CellFormat;
 }
 
+/** Actionable transaction outcome for a stable sheet lifecycle target. */
+export type SheetLifecycleResult = ApplyTransactionResult & { readonly sheet: SheetId };
+
 /** Payload map for events emitted by a Grid. */
 export interface GridEvents {
   change: ChangeEvent;
@@ -545,12 +549,14 @@ export interface Grid {
   removeRows(at: number, count?: number): void;
   insertColumns(at: number, count?: number): void;
   removeColumns(at: number, count?: number): void;
-  /** Add a sheet with a stable ID and make it available to the tab bar. */
-  addSheet(input: AddSheetInput): SheetId;
-  /** Remove a sheet; at least one sheet always remains. */
-  removeSheet(id: SheetId): void;
-  renameSheet(id: SheetId, name: string): void;
-  moveSheet(id: SheetId, toIndex: number): void;
+  /** Add a sheet with a stable ID and return its actionable transaction outcome. */
+  addSheet(input: AddSheetInput): SheetLifecycleResult;
+  /** Remove a sheet while preserving at least one visible worksheet. */
+  removeSheet(id: SheetId): SheetLifecycleResult;
+  renameSheet(id: SheetId, name: string): SheetLifecycleResult;
+  moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+  /** Set host-visible worksheet state; stock UI never offers `veryHidden`. */
+  setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
   removeValidationRule(id: string): ApplyTransactionResult;

@@ -294,6 +294,7 @@ function transformDirectTarget(
     case "removeSheet":
     case "renameSheet":
     case "moveSheet":
+    case "setSheetVisibility":
     case "removeValidationRule":
     case "removeProtectedRange":
     case "removeNamedRange":
@@ -497,6 +498,24 @@ function lifecycleConflict(local: DocumentOp, remote: DocumentOp): TransformFail
       code: "sheet-lifecycle",
       message: "Concurrent sheet moves have ambiguous ordering intent",
     };
+  }
+  if (remote.op === "setSheetVisibility") {
+    if (local.op === "removeSheet" && local.sheet === remote.sheet) {
+      return {
+        code: "sheet-lifecycle",
+        message: "Concurrent sheet removal conflicts with a pending visibility change",
+      };
+    }
+    if (
+      local.op === "setSheetVisibility" &&
+      local.sheet === remote.sheet &&
+      local.visibility !== remote.visibility
+    ) {
+      return {
+        code: "sheet-lifecycle",
+        message: "Concurrent sheet visibility changes have conflicting intent",
+      };
+    }
   }
   return null;
 }

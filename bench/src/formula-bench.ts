@@ -467,6 +467,7 @@ function spillFilterResizeFixture(count: number): TimedFixture {
     0,
     0,
     numericColumn(count, (row) => row),
+    0,
   );
   for (let row = 0; row < count; row++) {
     store.setBool(sheet, row, 1, row + 1 < count, 0);

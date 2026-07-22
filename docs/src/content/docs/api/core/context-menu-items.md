@@ -9,7 +9,7 @@ Static rows or a context-aware factory evaluated each time the menu opens.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L225</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L226</code></dd></div>
 </dl>
 
 ## Declaration

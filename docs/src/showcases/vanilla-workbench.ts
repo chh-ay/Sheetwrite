@@ -356,7 +356,7 @@ export function addSummarySheet(grid: Grid): SheetId {
     return SUMMARY_SHEET;
   }
 
-  const id = grid.addSheet({
+  const result = grid.addSheet({
     id: SUMMARY_SHEET,
     name: "Summary",
     rowCount: 4,
@@ -365,6 +365,10 @@ export function addSummarySheet(grid: Grid): SheetId {
       { key: "value", header: "Value", width: 170, type: "currency", numberFormat: "$#,##0.00" },
     ],
   });
+  if (result.status !== "applied") {
+    throw new Error(`Unable to add the summary sheet (${result.status})`);
+  }
+  const id = result.sheet;
 
   // One undoable commit: labels plus cross-sheet aggregate formulas.
   const range = `${ENGINE_SHEET_REF}!F1:F${ENGINE_ROWS}`;

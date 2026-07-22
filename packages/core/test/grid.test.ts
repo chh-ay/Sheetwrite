@@ -38,6 +38,7 @@ function makeFakeStore(
       throw new Error("Store.getCell must not be called in the render hot path");
     },
     getFormula: () => null,
+    getSpillAnchor: () => null,
     getRefTarget: () => null,
     recalculateVolatile: () => {},
     getVisibleWindow: (sheet, rows, cols) => {
@@ -1825,7 +1826,7 @@ describe("transactional document metadata", () => {
     grid.on("change", (event) => events.push(event));
 
     const notes = grid.addSheet({ id: "notes", name: "Notes", rowCount: 3 });
-    expect(notes).toBe("notes");
+    expect(notes.sheet).toBe("notes");
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
     expect(events.at(-1)?.transaction.patches[0]?.op).toBe("addSheet");
     grid.undo();

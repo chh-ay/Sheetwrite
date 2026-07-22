@@ -6,7 +6,7 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { colToA1 } from "@sheetwrite/core";
+import { colToA1, sheetNameKey, validateSheetName } from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import {
@@ -17,7 +17,7 @@ import {
   type XlsxCodecContext,
 } from "./resources.js";
 import { StylesRegistry } from "./styles.js";
-import { encodeXstring, escapeXml, isValidXlsxWorksheetName, XmlBuffer } from "./xml.js";
+import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
 import { writeZip } from "./zip.js";
 
 const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -104,26 +104,30 @@ function metadataSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
 }
 
 function metadataSheetName(snapshot: WorkbookSnapshot): string {
-  const names = new Set(snapshot.sheets.map((sheet) => sheet.name.normalize("NFC").toLowerCase()));
+  const names = new Set(snapshot.sheets.map((sheet) => sheetNameKey(sheet.name)));
   let name = META_STEM;
   let suffix = 2;
-  while (names.has(name.normalize("NFC").toLowerCase())) {
+  while (names.has(sheetNameKey(name))) {
     name = `${META_STEM.slice(0, 27)}_${suffix++}`;
   }
   return name;
 }
 
 function validateNames(snapshot: WorkbookSnapshot): void {
-  const names = new Set<string>();
+  const names: string[] = [];
   for (const sheet of snapshot.sheets) {
-    const folded = sheet.name.normalize("NFC").toLowerCase();
-    if (names.has(folded)) {
-      throw new RangeError(`Sheetwrite: duplicate case-insensitive XLSX sheet name: ${sheet.name}`);
+    const validated = validateSheetName(sheet.name, names);
+    if (!validated.ok) {
+      const prefix =
+        validated.code === "duplicate"
+          ? "duplicate case-insensitive XLSX sheet name"
+          : "invalid XLSX sheet name";
+      throw new RangeError(`Sheetwrite: ${prefix}: ${sheet.name} (${validated.code})`);
     }
-    if (!isValidXlsxWorksheetName(sheet.name)) {
-      throw new RangeError(`Sheetwrite: invalid XLSX sheet name: ${sheet.name}`);
+    if (validated.name !== sheet.name) {
+      throw new RangeError(`Sheetwrite: non-canonical NFC XLSX sheet name: ${sheet.name}`);
     }
-    names.add(folded);
+    names.push(validated.name);
   }
   if (
     snapshot.sheets.every(
@@ -643,6 +647,9 @@ function workbookXml(
 /** Write a deterministic, bounded OOXML workbook package. */
 export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecContext): Uint8Array {
   preflightSnapshot(snapshot, context);
+  if (snapshot.sheets.length === 0)
+    throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
+  validateNames(snapshot);
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(
@@ -650,9 +657,6 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
     );
   }
   snapshot = checked.value;
-  if (snapshot.sheets.length === 0)
-    throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
-  validateNames(snapshot);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
   const metadataName = metadataSheetName(snapshot);
   const styles = new StylesRegistry(context);

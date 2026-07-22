@@ -55,10 +55,10 @@ async function bootWorkbench(page: Page): Promise<void> {
 
 async function assertPresenceGeometry(page: Page): Promise<void> {
   await page.evaluate(
-    ([row, col]) => {
+    ({ row, col }) => {
       window.__sheetwriteSvelteGrid?.scrollToCell({ sheet: "dispatch", row, col });
     },
-    [COLLEAGUE_ROW, CREW_COL],
+    { row: COLLEAGUE_ROW, col: CREW_COL },
   );
   const range = page.locator('[data-sheetwrite-presence="hq-ops"]').first();
   const label = page.locator('[data-sheetwrite-presence-label="hq-ops"]');
