@@ -22,10 +22,10 @@ Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperativ
 function Sheetwrite(
   this: void,
   internals: ComponentInternals,
-  props: SheetwriteProps<Record<string, CellScalar>>,
+  props: any,
 ): {
   $on?(type: string, callback: (e: any) => void): () => void;
-  $set?(props: Partial<SheetwriteProps<Record<string, CellScalar>>>): void;
+  $set?(props: any): void;
 }
 ```
 

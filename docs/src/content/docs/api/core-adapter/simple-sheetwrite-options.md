@@ -9,7 +9,7 @@ Framework-neutral simple columns, rows, sizing, and grid options.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L206</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L208</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

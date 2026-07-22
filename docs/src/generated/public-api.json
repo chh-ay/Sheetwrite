@@ -1899,7 +1899,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L179",
+              "source": "src/errors.ts#L182",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -4532,7 +4532,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L168",
+              "source": "src/adapter.ts#L170",
               "jsDocTags": [],
               "documentation": "Applies live-updatable adapter option changes to an existing Grid.",
               "memberDocs": []
@@ -4558,7 +4558,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L221",
+              "source": "src/adapter.ts#L223",
               "jsDocTags": [],
               "documentation": "Converts simple columns and row objects into canonical workbook and columnar input.",
               "memberDocs": []
@@ -4570,7 +4570,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L181",
+              "source": "src/adapter.ts#L183",
               "jsDocTags": [],
               "documentation": "Default pixel width assigned to simple adapter columns.",
               "memberDocs": []
@@ -4582,7 +4582,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L145",
+              "source": "src/adapter.ts#L147",
               "jsDocTags": [],
               "documentation": "Extracts advanced GridOptions from framework adapter props.",
               "memberDocs": []
@@ -4594,7 +4594,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L154",
+              "source": "src/adapter.ts#L156",
               "jsDocTags": [],
               "documentation": "Returns the first reset-sensitive adapter input that changed, if any.",
               "memberDocs": []
@@ -4606,7 +4606,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L34",
+              "source": "src/adapter.ts#L36",
               "jsDocTags": [],
               "documentation": "Classification of adapter options as live-updatable or reset-sensitive.",
               "memberDocs": []
@@ -4618,7 +4618,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L70",
+              "source": "src/adapter.ts#L72",
               "jsDocTags": [],
               "documentation": "Framework-neutral readiness, change, and error callbacks shared by adapters.",
               "memberDocs": [
@@ -4789,7 +4789,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L60",
+              "source": "src/adapter.ts#L62",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
               "memberDocs": [
@@ -4814,7 +4814,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L57",
+              "source": "src/adapter.ts#L59",
               "jsDocTags": [],
               "documentation": "Reason an adapter published a ready Grid generation.",
               "memberDocs": []
@@ -4826,7 +4826,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L55",
+              "source": "src/adapter.ts#L57",
               "jsDocTags": [],
               "documentation": "Reset-sensitive input change that requires an adapter to replace its Grid.",
               "memberDocs": []
@@ -4838,7 +4838,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L110",
+              "source": "src/adapter.ts#L112",
               "jsDocTags": [],
               "documentation": "Explicit width and height accepted by framework adapters.",
               "memberDocs": []
@@ -4850,7 +4850,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L131",
+              "source": "src/adapter.ts#L133",
               "jsDocTags": [],
               "documentation": "Converts adapter size props into a host element style object.",
               "memberDocs": []
@@ -4862,7 +4862,7 @@
               "owners": [
                 "src/errors.ts"
               ],
-              "source": "src/errors.ts#L179",
+              "source": "src/errors.ts#L182",
               "jsDocTags": [],
               "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
@@ -4874,7 +4874,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L125",
+              "source": "src/adapter.ts#L127",
               "jsDocTags": [],
               "documentation": "Optional width and height accepted by advanced framework adapters.",
               "memberDocs": []
@@ -4970,7 +4970,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L102",
+              "source": "src/adapter.ts#L104",
               "jsDocTags": [],
               "documentation": "Optional explicit WASM source and initialization error callback for adapters.",
               "memberDocs": [
@@ -4991,7 +4991,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L184",
+              "source": "src/adapter.ts#L186",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -5040,7 +5040,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L213",
+              "source": "src/adapter.ts#L215",
               "jsDocTags": [],
               "documentation": "Normalized workbook and columnar data produced from simple adapter props.",
               "memberDocs": [
@@ -5057,7 +5057,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L206",
+              "source": "src/adapter.ts#L208",
               "jsDocTags": [],
               "documentation": "Framework-neutral simple columns, rows, sizing, and grid options.",
               "memberDocs": []
@@ -5480,392 +5480,93 @@
           "exports": [
             {
               "name": "CellEditor",
-              "kind": "interface",
-              "signature": "export interface CellEditor { mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L48",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Framework-neutral named editor definition registered through `GridOptions.editors`.",
-              "memberDocs": [
-                {
-                  "name": "mount",
-                  "documentation": "Mount one editor instance into the supplied retained wrapper."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorContext",
-              "kind": "interface",
-              "signature": "export interface CellEditorContext { readonly grid: Grid; readonly address: Readonly<CellAddress>; readonly viewAddress: Readonly<CellAddress>; readonly column: Readonly<Column>; readonly value: CellScalar; readonly text: string; readonly initialInput: string | undefined; readonly selectAll: boolean; readonly label: string; readonly signal: AbortSignal; commit(value: string, navigation?: CellEditorNavigation): void; cancel(): void; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L18",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Immutable state and guarded completion callbacks for one mounted editor.\n`address` is the canonical data address; `viewAddress` is the current visual\nrow/column. Async work must use `signal` so reset, cancel, and unmount abort it.",
-              "memberDocs": [
-                {
-                  "name": "cancel",
-                  "documentation": "Cancel without mutating and return focus to the Grid."
-                },
-                {
-                  "name": "commit",
-                  "documentation": "Commit text through the Grid parser, policy, history, and collaboration path."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorInstance",
-              "kind": "interface",
-              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | void | Promise<string | void>; cancel(): void; destroy(): void; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L35",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Retained lifecycle returned by a custom editor's `mount` method.",
-              "memberDocs": [
-                {
-                  "name": "cancel",
-                  "documentation": "Called for Escape or replacement before teardown."
-                },
-                {
-                  "name": "commit",
-                  "documentation": "Called for Enter/Tab. Return text (or a promise for it) to use the canonical commit path."
-                },
-                {
-                  "name": "destroy",
-                  "documentation": "Release every DOM node, listener, subscription, and framework subtree."
-                },
-                {
-                  "name": "reposition",
-                  "documentation": "Reposition editor-owned popovers after the core wrapper has moved."
-                },
-                {
-                  "name": "update",
-                  "documentation": "Refresh external value/context while the same cell remains owned."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorNavigation",
-              "kind": "type",
-              "signature": "export type CellEditorNavigation = \"down\" | \"right\" | \"left\" | \"none\";",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L5",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Selection movement applied after a successful editor commit.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "CellScalar",
-              "kind": "type",
-              "signature": "export type CellScalar = string | number | boolean | null;",
-              "owners": [
-                "../core/dist/types/cell.d.ts"
-              ],
-              "source": "../core/dist/types/cell.d.ts#L71",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "A scalar that can be displayed directly.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "Grid",
-              "kind": "interface",
-              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): void; sortByMulti(keys: readonly SortKey[]): void; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; destroy(): void; }",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L323",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
-              "memberDocs": [
-                {
-                  "name": "actions",
-                  "documentation": "Imperative action surface for binding custom toolbars/menus."
-                },
-                {
-                  "name": "addSheet",
-                  "documentation": "Add a sheet with a stable ID and return its actionable transaction outcome."
-                },
-                {
-                  "name": "aggregate",
-                  "documentation": "Column aggregate over the active sheet's data."
-                },
-                {
-                  "name": "applyRemoteOperations",
-                  "documentation": "Apply host-supplied operations without undo history or outgoing dirty state.\nThe resulting change event has `source: \"remote\"`."
-                },
-                {
-                  "name": "applyTransaction",
-                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy."
-                },
-                {
-                  "name": "autoFitColumns",
-                  "documentation": "Explicitly resize columns from a bulk worksheet read."
-                },
-                {
-                  "name": "autoFitRows",
-                  "documentation": "Explicitly resize rows to fit wrapped content; never runs during paint."
-                },
-                {
-                  "name": "beginEdit",
-                  "documentation": "Open the cell editor at a view cell, optionally seeding text / selecting all."
-                },
-                {
-                  "name": "clearSearch",
-                  "documentation": "Clear the current search and its highlights."
-                },
-                {
-                  "name": "clearView",
-                  "documentation": "Clear any active sort/filter view."
-                },
-                {
-                  "name": "dataEdge",
-                  "documentation": "Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the\nmoved axis (row for vertical moves, col for horizontal), or null when the\nstore is not columnar. Under an active sort/filter view, `row` is a view\nposition and vertical moves return view positions. For hosts building\ntheir own keymaps (`config.keyboard`)."
-                },
-                {
-                  "name": "distinctValues",
-                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
-                },
-                {
-                  "name": "exportSnapshot",
-                  "documentation": "Deterministically export the complete authoritative workbook document."
-                },
-                {
-                  "name": "filterBy",
-                  "documentation": "Filter the displayed rows to those whose column text contains `needle`."
-                },
-                {
-                  "name": "findNext",
-                  "documentation": "Move the active match to the next match and scroll it into view."
-                },
-                {
-                  "name": "findPrev",
-                  "documentation": "Move the active match to the previous match and scroll it into view."
-                },
-                {
-                  "name": "getActiveSheet",
-                  "documentation": "Id of the currently visible sheet."
-                },
-                {
-                  "name": "getCellAtPoint",
-                  "documentation": "Resolve browser viewport coordinates to an active-sheet cell for host-owned\nmenus and interactions. Returns null outside the cell body."
-                },
-                {
-                  "name": "getCellInput",
-                  "documentation": "Editable snapshot of the cell at a view position on the active sheet, or\nnull when out of bounds. See {@link CellInputSnapshot}."
-                },
-                {
-                  "name": "getColumnFilters",
-                  "documentation": "Active column filters on the active sheet, keyed by column index."
-                },
-                {
-                  "name": "getCommandState",
-                  "documentation": "Query undo/redo availability and formatting active/mixed/disabled state."
-                },
-                {
-                  "name": "getEffectiveTheme",
-                  "documentation": "The effective (post-zoom) theme the renderer is currently painting with."
-                },
-                {
-                  "name": "getRuntimeResourceSnapshot",
-                  "documentation": "Versioned coarse runtime ownership snapshot, including datasource state."
-                },
-                {
-                  "name": "groupRows",
-                  "documentation": "Define a collapsible row group over a data-row range (end-inclusive)."
-                },
-                {
-                  "name": "hiddenColumns",
-                  "documentation": "Currently hidden columns on the active sheet."
-                },
-                {
-                  "name": "hiddenRows",
-                  "documentation": "Currently hidden data rows on the active sheet."
-                },
-                {
-                  "name": "hideColumns",
-                  "documentation": "Hide columns through one bulk-safe metadata transaction."
-                },
-                {
-                  "name": "hideRows",
-                  "documentation": "Hide the given data rows (composes with filters/sort)."
-                },
-                {
-                  "name": "highlightCells",
-                  "documentation": "Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color."
-                },
-                {
-                  "name": "redo",
-                  "documentation": "Redo the last undone cell edit."
-                },
-                {
-                  "name": "removeSheet",
-                  "documentation": "Remove a sheet while preserving at least one visible worksheet."
-                },
-                {
-                  "name": "rendererKind",
-                  "documentation": "Which renderer is actually active: `\"worker\"` when the OffscreenCanvas\nworker constructed successfully, `\"canvas\"` otherwise (including after a\n`renderer-fallback`)."
-                },
-                {
-                  "name": "replaceAll",
-                  "documentation": "Replace every current match in a single undoable transaction (one\n`undo()` restores them all), then re-scan. Formula/ref cells are skipped\nand not counted. No-op when read-only."
-                },
-                {
-                  "name": "replaceCurrent",
-                  "documentation": "Replace the active match with `replacement`, then advance to the next match\n(re-scanning against the new data). Only literal text/number cells are\neligible; formula and ref cells are skipped (formula source is never\nrewritten). Honors the active {@link SearchOptions} (matchCase; `wholeCell`\nswaps the entire cell). The write flows through the grid's commit path as\none undoable step. No-op when read-only or when there is no active match."
-                },
-                {
-                  "name": "replaceTheme",
-                  "documentation": "Option-level replacement: re-run construction-time resolution\n(`DEFAULT_THEME < CSS custom properties < theme`) with the new partial.\n`undefined` restores the CSS-variable/default resolution. Adapters call\nthis for their declarative `theme` prop; imperative patching stays on\n{@link setTheme}."
-                },
-                {
-                  "name": "rowGroups",
-                  "documentation": "Row groups on the active sheet."
-                },
-                {
-                  "name": "search",
-                  "documentation": "Find cells matching `query`; highlights matches, emits `search`, returns the result."
-                },
-                {
-                  "name": "setColumnFilter",
-                  "documentation": "Set or clear (null) one column's filter. All column filters AND together\nand compose with the active sort and hidden rows."
-                },
-                {
-                  "name": "setColumnWidth",
-                  "documentation": "Set one column's width via an undoable `setColumn` patch."
-                },
-                {
-                  "name": "setConfig",
-                  "documentation": "Reconfigure built-in chrome and keyboard handling without replacing the\nGrid or clearing selection/history. Construction-bound GridOptions are not\naccepted here."
-                },
-                {
-                  "name": "setFrozen",
-                  "documentation": "Pin the first `rows` view rows and `cols` columns; they stay visible while\nthe body scrolls (0 = unfreeze that axis). Persisted on the active sheet."
-                },
-                {
-                  "name": "setGroupCollapsed",
-                  "documentation": "Collapse/expand a row group; collapsing hides its rows."
-                },
-                {
-                  "name": "setMinColumns",
-                  "documentation": "Live-update the minimum rendered column count. Increasing the minimum\nsilently extends presentation padding; `undefined` restores the default."
-                },
-                {
-                  "name": "setOverscan",
-                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
-                },
-                {
-                  "name": "setPresenceOverlays",
-                  "documentation": "Replace ephemeral remote-presence overlays; null clears every collaborator."
-                },
-                {
-                  "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
-                },
-                {
-                  "name": "setRowHeight",
-                  "documentation": "Set one row's persistent display height through document history."
-                },
-                {
-                  "name": "setSheetVisibility",
-                  "documentation": "Set host-visible worksheet state; stock UI never offers `veryHidden`."
-                },
-                {
-                  "name": "setSort",
-                  "documentation": "Persisted multi-key sort of the active sheet."
-                },
-                {
-                  "name": "setTheme",
-                  "documentation": "Imperative patch: merge `theme` into the accumulated base theme."
-                },
-                {
-                  "name": "setZoom",
-                  "documentation": "Content zoom factor (0.5–2): scales row/column geometry and fonts."
-                },
-                {
-                  "name": "showColumns",
-                  "documentation": "Show columns through one bulk-safe metadata transaction."
-                },
-                {
-                  "name": "showRows",
-                  "documentation": "Show the given data rows again, or every hidden row when omitted."
-                },
-                {
-                  "name": "sortBy",
-                  "documentation": "Sort the displayed rows by a column (does not mutate stored data)."
-                },
-                {
-                  "name": "sortByMulti",
-                  "documentation": "Multi-key sort of the displayed rows (first key primary; stable)."
-                },
-                {
-                  "name": "styleRange",
-                  "documentation": "Merge `style` into every cell of `range` (null clears cell styles) as one\nundoable transaction. Styles land in the store and paint in the canvas —\nunlike {@link highlightCells}, which draws a translucent overlay above it."
-                },
-                {
-                  "name": "undo",
-                  "documentation": "Undo the last recorded cell edit."
-                },
-                {
-                  "name": "ungroupRows",
-                  "documentation": "Remove a row group (rows become visible if the group was collapsed)."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "GridCommandName",
-              "kind": "type",
-              "signature": "export type GridCommandName = Exclude<ToolbarActionName, \"separator\">;",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L69",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Built-in command names accepted by state queries and change events.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "GridCommandState",
-              "kind": "interface",
-              "signature": "export interface GridCommandState { readonly disabled: boolean; readonly activity: \"inactive\" | \"active\" | \"mixed\"; }",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L71",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Observable availability and selection-derived activity for one command.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "GridReadyEvent",
-              "kind": "interface",
-              "signature": "export interface GridReadyEvent { grid: Grid; generation: number; reason: GridReadyReason; }",
-              "owners": [
-                "../core/dist/adapter.d.ts"
-              ],
-              "source": "../core/dist/adapter.d.ts#L31",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Grid handle, generation, and reason published after adapter initialization.",
-              "memberDocs": [
-                {
-                  "name": "generation",
-                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
-                },
-                {
-                  "name": "grid",
-                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
-                },
-                {
-                  "name": "reason",
-                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "Sheetwrite",
@@ -5894,7 +5595,7 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps { onMutationRejected?: GridAdapterEventHandlers[\"onMutationRejected\"]; onRendererFallback?: GridAdapterEventHandlers[\"onRendererFallback\"]; onDatasourceError?: GridAdapterEventHandlers[\"onDatasourceError\"]; onExportError?: GridAdapterEventHandlers[\"onExportError\"]; onReady?: GridAdapterEventHandlers[\"onReady\"]; className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; workbook: Workbook; data?: ColumnarData; datasource?: DataSource; datasourceStorage?: DataSourceStorageOptions; renderer?: \"canvas\" | \"worker\"; workerUrl?: string | URL; presentation?: GridPresentation; theme?: Partial<Theme>; readOnly?: boolean; protectionResolver?: ProtectionResolver; mutationPolicy?: MutationPolicyMode; transactionResourceLimits?: Partial<TransactionResourceLimits>; renderers?: Record<string, CellRenderer>; editors?: Record<string, CellEditor>; overscan?: number; minColumns?: number; config?: GridConfig; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onInitializationError?: (error: SheetwriteError) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "signature": "export interface SheetwriteGridProps extends GridOptions, GridAdapterEventHandlers, SheetwriteInitializationProps { onMutationRejected?: GridAdapterEventHandlers[\"onMutationRejected\"]; onRendererFallback?: GridAdapterEventHandlers[\"onRendererFallback\"]; onDatasourceError?: GridAdapterEventHandlers[\"onDatasourceError\"]; onExportError?: GridAdapterEventHandlers[\"onExportError\"]; onReady?: GridAdapterEventHandlers[\"onReady\"]; className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; }",
               "owners": [
                 "src/index.tsx"
               ],
@@ -5903,236 +5604,8 @@
               "documentation": "Advanced framework adapter props for workbook data or datasource ownership.",
               "memberDocs": [
                 {
-                  "name": "aria-activedescendant",
-                  "documentation": "Identifies the currently active element when DOM focus is on a composite widget, textbox, group, or application."
-                },
-                {
-                  "name": "aria-atomic",
-                  "documentation": "Indicates whether assistive technologies will present all, or only parts of, the changed region based on the change notifications defined by the aria-relevant attribute."
-                },
-                {
-                  "name": "aria-autocomplete",
-                  "documentation": "Indicates whether inputting text could trigger display of one or more predictions of the user's intended value for an input and specifies how predictions would be\npresented if they are made."
-                },
-                {
-                  "name": "aria-braillelabel",
-                  "documentation": "Defines a string value that labels the current element, which is intended to be converted into Braille."
-                },
-                {
-                  "name": "aria-brailleroledescription",
-                  "documentation": "Defines a human-readable, author-localized abbreviated description for the role of an element, which is intended to be converted into Braille."
-                },
-                {
-                  "name": "aria-checked",
-                  "documentation": "Indicates the current \"checked\" state of checkboxes, radio buttons, and other widgets."
-                },
-                {
-                  "name": "aria-colcount",
-                  "documentation": "Defines the total number of columns in a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-colindex",
-                  "documentation": "Defines an element's column index or position with respect to the total number of columns within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-colindextext",
-                  "documentation": "Defines a human readable text alternative of aria-colindex."
-                },
-                {
-                  "name": "aria-colspan",
-                  "documentation": "Defines the number of columns spanned by a cell or gridcell within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-controls",
-                  "documentation": "Identifies the element (or elements) whose contents or presence are controlled by the current element."
-                },
-                {
-                  "name": "aria-current",
-                  "documentation": "Indicates the element that represents the current item within a container or set of related elements."
-                },
-                {
-                  "name": "aria-describedby",
-                  "documentation": "Identifies the element (or elements) that describes the object."
-                },
-                {
-                  "name": "aria-description",
-                  "documentation": "Defines a string value that describes or annotates the current element."
-                },
-                {
-                  "name": "aria-details",
-                  "documentation": "Identifies the element that provides a detailed, extended description for the object."
-                },
-                {
-                  "name": "aria-disabled",
-                  "documentation": "Indicates that the element is perceivable but disabled, so it is not editable or otherwise operable."
-                },
-                {
-                  "name": "aria-dropeffect",
-                  "documentation": "Indicates what functions can be performed when a dragged object is released on the drop target."
-                },
-                {
-                  "name": "aria-errormessage",
-                  "documentation": "Identifies the element that provides an error message for the object."
-                },
-                {
-                  "name": "aria-expanded",
-                  "documentation": "Indicates whether the element, or another grouping element it controls, is currently expanded or collapsed."
-                },
-                {
-                  "name": "aria-flowto",
-                  "documentation": "Identifies the next element (or elements) in an alternate reading order of content which, at the user's discretion,\nallows assistive technology to override the general default of reading in document source order."
-                },
-                {
-                  "name": "aria-grabbed",
-                  "documentation": "Indicates an element's \"grabbed\" state in a drag-and-drop operation."
-                },
-                {
-                  "name": "aria-haspopup",
-                  "documentation": "Indicates the availability and type of interactive popup element, such as menu or dialog, that can be triggered by an element."
-                },
-                {
-                  "name": "aria-hidden",
-                  "documentation": "Indicates whether the element is exposed to an accessibility API."
-                },
-                {
-                  "name": "aria-invalid",
-                  "documentation": "Indicates the entered value does not conform to the format expected by the application."
-                },
-                {
-                  "name": "aria-keyshortcuts",
-                  "documentation": "Indicates keyboard shortcuts that an author has implemented to activate or give focus to an element."
-                },
-                {
-                  "name": "aria-label",
-                  "documentation": "Defines a string value that labels the current element."
-                },
-                {
-                  "name": "aria-labelledby",
-                  "documentation": "Identifies the element (or elements) that labels the current element."
-                },
-                {
-                  "name": "aria-level",
-                  "documentation": "Defines the hierarchical level of an element within a structure."
-                },
-                {
-                  "name": "aria-live",
-                  "documentation": "Indicates that an element will be updated, and describes the types of updates the user agents, assistive technologies, and user can expect from the live region."
-                },
-                {
-                  "name": "aria-modal",
-                  "documentation": "Indicates whether an element is modal when displayed."
-                },
-                {
-                  "name": "aria-multiline",
-                  "documentation": "Indicates whether a text box accepts multiple lines of input or only a single line."
-                },
-                {
-                  "name": "aria-multiselectable",
-                  "documentation": "Indicates that the user may select more than one item from the current selectable descendants."
-                },
-                {
-                  "name": "aria-orientation",
-                  "documentation": "Indicates whether the element's orientation is horizontal, vertical, or unknown/ambiguous."
-                },
-                {
-                  "name": "aria-owns",
-                  "documentation": "Identifies an element (or elements) in order to define a visual, functional, or contextual parent/child relationship\nbetween DOM elements where the DOM hierarchy cannot be used to represent the relationship."
-                },
-                {
-                  "name": "aria-placeholder",
-                  "documentation": "Defines a short hint (a word or short phrase) intended to aid the user with data entry when the control has no value.\nA hint could be a sample value or a brief description of the expected format."
-                },
-                {
-                  "name": "aria-posinset",
-                  "documentation": "Defines an element's number or position in the current set of listitems or treeitems. Not required if all elements in the set are present in the DOM."
-                },
-                {
-                  "name": "aria-pressed",
-                  "documentation": "Indicates the current \"pressed\" state of toggle buttons."
-                },
-                {
-                  "name": "aria-readonly",
-                  "documentation": "Indicates that the element is not editable, but is otherwise operable."
-                },
-                {
-                  "name": "aria-relevant",
-                  "documentation": "Indicates what notifications the user agent will trigger when the accessibility tree within a live region is modified."
-                },
-                {
-                  "name": "aria-required",
-                  "documentation": "Indicates that user input is required on the element before a form may be submitted."
-                },
-                {
-                  "name": "aria-roledescription",
-                  "documentation": "Defines a human-readable, author-localized description for the role of an element."
-                },
-                {
-                  "name": "aria-rowcount",
-                  "documentation": "Defines the total number of rows in a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-rowindex",
-                  "documentation": "Defines an element's row index or position with respect to the total number of rows within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-rowindextext",
-                  "documentation": "Defines a human readable text alternative of aria-rowindex."
-                },
-                {
-                  "name": "aria-rowspan",
-                  "documentation": "Defines the number of rows spanned by a cell or gridcell within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-selected",
-                  "documentation": "Indicates the current \"selected\" state of various widgets."
-                },
-                {
-                  "name": "aria-setsize",
-                  "documentation": "Defines the number of items in the current set of listitems or treeitems. Not required if all elements in the set are present in the DOM."
-                },
-                {
-                  "name": "aria-sort",
-                  "documentation": "Indicates if items in a table or grid are sorted in ascending or descending order."
-                },
-                {
-                  "name": "aria-valuemax",
-                  "documentation": "Defines the maximum allowed value for a range widget."
-                },
-                {
-                  "name": "aria-valuemin",
-                  "documentation": "Defines the minimum allowed value for a range widget."
-                },
-                {
-                  "name": "aria-valuenow",
-                  "documentation": "Defines the current value for a range widget."
-                },
-                {
-                  "name": "aria-valuetext",
-                  "documentation": "Defines the human readable text alternative of aria-valuenow for a range widget."
-                },
-                {
                   "name": "className",
                   "documentation": "Additional class appended to the required `sheetwrite` host class."
-                },
-                {
-                  "name": "config",
-                  "documentation": "Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false."
-                },
-                {
-                  "name": "data",
-                  "documentation": "Eager column-major values loaded into `workbook.activeSheet`; use instead of `datasource`."
-                },
-                {
-                  "name": "datasource",
-                  "documentation": "Lazy row provider requested for visible windows; use instead of eager `data`."
-                },
-                {
-                  "name": "datasourceStorage",
-                  "documentation": "Allocation and cache policy for datasource-backed cell storage."
-                },
-                {
-                  "name": "editors",
-                  "documentation": "Named custom editors resolved from each column's `editor` field."
                 },
                 {
                   "name": "fallback",
@@ -6147,52 +5620,12 @@
                   "documentation": "Host height in CSS pixels for numbers or any CSS length string."
                 },
                 {
-                  "name": "inputMode",
-                  "documentation": "Hints at the type of data that might be entered by the user while editing the element or its contents"
-                },
-                {
-                  "name": "is",
-                  "documentation": "Specify that a standard HTML element should behave like a defined custom built-in element"
-                },
-                {
-                  "name": "minColumns",
-                  "documentation": "Render at least this many columns (empty padding columns past the data, like a spreadsheet)."
-                },
-                {
-                  "name": "mutationPolicy",
-                  "documentation": "Atomic rejects the transaction; partial skips denied operation objects."
-                },
-                {
-                  "name": "onActiveSheetChange",
-                  "documentation": "Fires after the visible sheet changes."
-                },
-                {
-                  "name": "onCommandStateChange",
-                  "documentation": "Receives observable undo/redo and formatting command state."
-                },
-                {
                   "name": "onDatasourceError",
                   "documentation": "Receives failed datasource requests and their errors."
                 },
                 {
-                  "name": "onEditBegin",
-                  "documentation": "Fires when cell editing begins."
-                },
-                {
-                  "name": "onEditCommit",
-                  "documentation": "Fires after an edit commits its parsed cell value."
-                },
-                {
                   "name": "onExportError",
                   "documentation": "Receives failures from built-in XLSX export actions."
-                },
-                {
-                  "name": "onGridChange",
-                  "documentation": "Receives every committed Grid change, including its applied transaction."
-                },
-                {
-                  "name": "onInitializationError",
-                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
                 },
                 {
                   "name": "onMutationRejected",
@@ -6207,64 +5640,8 @@
                   "documentation": "Fires when worker rendering falls back to the main-thread canvas renderer."
                 },
                 {
-                  "name": "onSearch",
-                  "documentation": "Receives refreshed search matches and active-match index."
-                },
-                {
-                  "name": "onSelectionChange",
-                  "documentation": "Receives the current selection, or `null` after it is cleared."
-                },
-                {
-                  "name": "onViewportChange",
-                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
-                },
-                {
-                  "name": "overscan",
-                  "documentation": "Extra row and visible-column positions painted on each viewport edge.\nDefaults to 6; use 0 to disable the buffer."
-                },
-                {
-                  "name": "presentation",
-                  "documentation": "Header presentation. Spreadsheet mode (default) paints positional A/B/C\nlabels; data-grid mode paints each column's semantic `header`. Cell\naddressing, row indices, clipboard values, formulas, and exports are\nunchanged in both modes."
-                },
-                {
-                  "name": "protectionResolver",
-                  "documentation": "Host-owned client UX permission check. Servers must independently authorize\nevery submitted operation; this resolver is not an authentication boundary."
-                },
-                {
-                  "name": "readOnly",
-                  "documentation": "Disables mutating interactions while preserving navigation and selection."
-                },
-                {
-                  "name": "renderer",
-                  "documentation": "Paint backend; defaults to main-thread `canvas` and falls back there if a worker fails."
-                },
-                {
-                  "name": "renderers",
-                  "documentation": "Custom cell renderers registered up front; also see `Grid.defineCellRenderer`."
-                },
-                {
                   "name": "style",
                   "documentation": "Host styles merged before adapter sizing styles."
-                },
-                {
-                  "name": "theme",
-                  "documentation": "Overrides merged over the default theme and host CSS custom properties."
-                },
-                {
-                  "name": "transactionResourceLimits",
-                  "documentation": "Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation."
-                },
-                {
-                  "name": "wasmSource",
-                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
-                },
-                {
-                  "name": "workbook",
-                  "documentation": "Live workbook schema adopted by the store and updated by document operations."
-                },
-                {
-                  "name": "workerUrl",
-                  "documentation": "URL of the worker renderer module (`renderer: \"worker\"`), as served to the\nBROWSER — the platform `Worker` constructor does not consult package\nexports, so a bare specifier like `new URL(\"@sheetwrite/core/worker\",\nimport.meta.url)` is NOT reliable. Either copy\n`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL\nstring (works everywhere), or use your bundler's dependency-worker import\nif it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker\ncan't be constructed, the grid falls back to the main-thread canvas\nrenderer and emits `renderer-fallback` once."
                 }
               ]
             },
@@ -6282,52 +5659,13 @@
             },
             {
               "name": "SimpleColumn",
-              "kind": "interface",
-              "signature": "export interface SimpleColumn<Row extends Record<string, CellScalar>> { key: keyof Row & string; title: string; width?: number; type?: CellFormat; numberFormat?: string; headerStyle?: CellStyle; editor?: string; cellStyle?: CellStyle; visible?: boolean; }",
-              "owners": [
-                "../core/dist/adapter.d.ts"
-              ],
-              "source": "../core/dist/adapter.d.ts#L105",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Column definition accepted by the adapters’ simple row-object API.",
-              "memberDocs": [
-                {
-                  "name": "cellStyle",
-                  "documentation": "Base style merged beneath cell-specific styles."
-                },
-                {
-                  "name": "editor",
-                  "documentation": "Name of a custom editor registered through `GridOptions.editors`."
-                },
-                {
-                  "name": "headerStyle",
-                  "documentation": "Style applied to the painted column header."
-                },
-                {
-                  "name": "key",
-                  "documentation": "Non-empty row-object key, unique within the column list."
-                },
-                {
-                  "name": "numberFormat",
-                  "documentation": "Excel number-format code used for number, date, or currency display."
-                },
-                {
-                  "name": "title",
-                  "documentation": "Semantic title painted in data-grid mode and written by table exports."
-                },
-                {
-                  "name": "type",
-                  "documentation": "Input and formatting type; defaults to `text`."
-                },
-                {
-                  "name": "visible",
-                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
-                },
-                {
-                  "name": "width",
-                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             }
           ]
         },
@@ -6352,397 +5690,98 @@
           "exports": [
             {
               "name": "CellEditor",
-              "kind": "interface",
-              "signature": "export interface CellEditor { mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L48",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Framework-neutral named editor definition registered through `GridOptions.editors`.",
-              "memberDocs": [
-                {
-                  "name": "mount",
-                  "documentation": "Mount one editor instance into the supplied retained wrapper."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorContext",
-              "kind": "interface",
-              "signature": "export interface CellEditorContext { readonly grid: Grid; readonly address: Readonly<CellAddress>; readonly viewAddress: Readonly<CellAddress>; readonly column: Readonly<Column>; readonly value: CellScalar; readonly text: string; readonly initialInput: string | undefined; readonly selectAll: boolean; readonly label: string; readonly signal: AbortSignal; commit(value: string, navigation?: CellEditorNavigation): void; cancel(): void; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L18",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Immutable state and guarded completion callbacks for one mounted editor.\n`address` is the canonical data address; `viewAddress` is the current visual\nrow/column. Async work must use `signal` so reset, cancel, and unmount abort it.",
-              "memberDocs": [
-                {
-                  "name": "cancel",
-                  "documentation": "Cancel without mutating and return focus to the Grid."
-                },
-                {
-                  "name": "commit",
-                  "documentation": "Commit text through the Grid parser, policy, history, and collaboration path."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorInstance",
-              "kind": "interface",
-              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | void | Promise<string | void>; cancel(): void; destroy(): void; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L35",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Retained lifecycle returned by a custom editor's `mount` method.",
-              "memberDocs": [
-                {
-                  "name": "cancel",
-                  "documentation": "Called for Escape or replacement before teardown."
-                },
-                {
-                  "name": "commit",
-                  "documentation": "Called for Enter/Tab. Return text (or a promise for it) to use the canonical commit path."
-                },
-                {
-                  "name": "destroy",
-                  "documentation": "Release every DOM node, listener, subscription, and framework subtree."
-                },
-                {
-                  "name": "reposition",
-                  "documentation": "Reposition editor-owned popovers after the core wrapper has moved."
-                },
-                {
-                  "name": "update",
-                  "documentation": "Refresh external value/context while the same cell remains owned."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorNavigation",
-              "kind": "type",
-              "signature": "export type CellEditorNavigation = \"down\" | \"right\" | \"left\" | \"none\";",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L5",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Selection movement applied after a successful editor commit.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "CellScalar",
-              "kind": "type",
-              "signature": "export type CellScalar = string | number | boolean | null;",
-              "owners": [
-                "../core/dist/types/cell.d.ts"
-              ],
-              "source": "../core/dist/types/cell.d.ts#L71",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "A scalar that can be displayed directly.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "Grid",
-              "kind": "interface",
-              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): void; sortByMulti(keys: readonly SortKey[]): void; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; destroy(): void; }",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L323",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
-              "memberDocs": [
-                {
-                  "name": "actions",
-                  "documentation": "Imperative action surface for binding custom toolbars/menus."
-                },
-                {
-                  "name": "addSheet",
-                  "documentation": "Add a sheet with a stable ID and return its actionable transaction outcome."
-                },
-                {
-                  "name": "aggregate",
-                  "documentation": "Column aggregate over the active sheet's data."
-                },
-                {
-                  "name": "applyRemoteOperations",
-                  "documentation": "Apply host-supplied operations without undo history or outgoing dirty state.\nThe resulting change event has `source: \"remote\"`."
-                },
-                {
-                  "name": "applyTransaction",
-                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy."
-                },
-                {
-                  "name": "autoFitColumns",
-                  "documentation": "Explicitly resize columns from a bulk worksheet read."
-                },
-                {
-                  "name": "autoFitRows",
-                  "documentation": "Explicitly resize rows to fit wrapped content; never runs during paint."
-                },
-                {
-                  "name": "beginEdit",
-                  "documentation": "Open the cell editor at a view cell, optionally seeding text / selecting all."
-                },
-                {
-                  "name": "clearSearch",
-                  "documentation": "Clear the current search and its highlights."
-                },
-                {
-                  "name": "clearView",
-                  "documentation": "Clear any active sort/filter view."
-                },
-                {
-                  "name": "dataEdge",
-                  "documentation": "Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the\nmoved axis (row for vertical moves, col for horizontal), or null when the\nstore is not columnar. Under an active sort/filter view, `row` is a view\nposition and vertical moves return view positions. For hosts building\ntheir own keymaps (`config.keyboard`)."
-                },
-                {
-                  "name": "distinctValues",
-                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
-                },
-                {
-                  "name": "exportSnapshot",
-                  "documentation": "Deterministically export the complete authoritative workbook document."
-                },
-                {
-                  "name": "filterBy",
-                  "documentation": "Filter the displayed rows to those whose column text contains `needle`."
-                },
-                {
-                  "name": "findNext",
-                  "documentation": "Move the active match to the next match and scroll it into view."
-                },
-                {
-                  "name": "findPrev",
-                  "documentation": "Move the active match to the previous match and scroll it into view."
-                },
-                {
-                  "name": "getActiveSheet",
-                  "documentation": "Id of the currently visible sheet."
-                },
-                {
-                  "name": "getCellAtPoint",
-                  "documentation": "Resolve browser viewport coordinates to an active-sheet cell for host-owned\nmenus and interactions. Returns null outside the cell body."
-                },
-                {
-                  "name": "getCellInput",
-                  "documentation": "Editable snapshot of the cell at a view position on the active sheet, or\nnull when out of bounds. See {@link CellInputSnapshot}."
-                },
-                {
-                  "name": "getColumnFilters",
-                  "documentation": "Active column filters on the active sheet, keyed by column index."
-                },
-                {
-                  "name": "getCommandState",
-                  "documentation": "Query undo/redo availability and formatting active/mixed/disabled state."
-                },
-                {
-                  "name": "getEffectiveTheme",
-                  "documentation": "The effective (post-zoom) theme the renderer is currently painting with."
-                },
-                {
-                  "name": "getRuntimeResourceSnapshot",
-                  "documentation": "Versioned coarse runtime ownership snapshot, including datasource state."
-                },
-                {
-                  "name": "groupRows",
-                  "documentation": "Define a collapsible row group over a data-row range (end-inclusive)."
-                },
-                {
-                  "name": "hiddenColumns",
-                  "documentation": "Currently hidden columns on the active sheet."
-                },
-                {
-                  "name": "hiddenRows",
-                  "documentation": "Currently hidden data rows on the active sheet."
-                },
-                {
-                  "name": "hideColumns",
-                  "documentation": "Hide columns through one bulk-safe metadata transaction."
-                },
-                {
-                  "name": "hideRows",
-                  "documentation": "Hide the given data rows (composes with filters/sort)."
-                },
-                {
-                  "name": "highlightCells",
-                  "documentation": "Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color."
-                },
-                {
-                  "name": "redo",
-                  "documentation": "Redo the last undone cell edit."
-                },
-                {
-                  "name": "removeSheet",
-                  "documentation": "Remove a sheet while preserving at least one visible worksheet."
-                },
-                {
-                  "name": "rendererKind",
-                  "documentation": "Which renderer is actually active: `\"worker\"` when the OffscreenCanvas\nworker constructed successfully, `\"canvas\"` otherwise (including after a\n`renderer-fallback`)."
-                },
-                {
-                  "name": "replaceAll",
-                  "documentation": "Replace every current match in a single undoable transaction (one\n`undo()` restores them all), then re-scan. Formula/ref cells are skipped\nand not counted. No-op when read-only."
-                },
-                {
-                  "name": "replaceCurrent",
-                  "documentation": "Replace the active match with `replacement`, then advance to the next match\n(re-scanning against the new data). Only literal text/number cells are\neligible; formula and ref cells are skipped (formula source is never\nrewritten). Honors the active {@link SearchOptions} (matchCase; `wholeCell`\nswaps the entire cell). The write flows through the grid's commit path as\none undoable step. No-op when read-only or when there is no active match."
-                },
-                {
-                  "name": "replaceTheme",
-                  "documentation": "Option-level replacement: re-run construction-time resolution\n(`DEFAULT_THEME < CSS custom properties < theme`) with the new partial.\n`undefined` restores the CSS-variable/default resolution. Adapters call\nthis for their declarative `theme` prop; imperative patching stays on\n{@link setTheme}."
-                },
-                {
-                  "name": "rowGroups",
-                  "documentation": "Row groups on the active sheet."
-                },
-                {
-                  "name": "search",
-                  "documentation": "Find cells matching `query`; highlights matches, emits `search`, returns the result."
-                },
-                {
-                  "name": "setColumnFilter",
-                  "documentation": "Set or clear (null) one column's filter. All column filters AND together\nand compose with the active sort and hidden rows."
-                },
-                {
-                  "name": "setColumnWidth",
-                  "documentation": "Set one column's width via an undoable `setColumn` patch."
-                },
-                {
-                  "name": "setConfig",
-                  "documentation": "Reconfigure built-in chrome and keyboard handling without replacing the\nGrid or clearing selection/history. Construction-bound GridOptions are not\naccepted here."
-                },
-                {
-                  "name": "setFrozen",
-                  "documentation": "Pin the first `rows` view rows and `cols` columns; they stay visible while\nthe body scrolls (0 = unfreeze that axis). Persisted on the active sheet."
-                },
-                {
-                  "name": "setGroupCollapsed",
-                  "documentation": "Collapse/expand a row group; collapsing hides its rows."
-                },
-                {
-                  "name": "setMinColumns",
-                  "documentation": "Live-update the minimum rendered column count. Increasing the minimum\nsilently extends presentation padding; `undefined` restores the default."
-                },
-                {
-                  "name": "setOverscan",
-                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
-                },
-                {
-                  "name": "setPresenceOverlays",
-                  "documentation": "Replace ephemeral remote-presence overlays; null clears every collaborator."
-                },
-                {
-                  "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
-                },
-                {
-                  "name": "setRowHeight",
-                  "documentation": "Set one row's persistent display height through document history."
-                },
-                {
-                  "name": "setSheetVisibility",
-                  "documentation": "Set host-visible worksheet state; stock UI never offers `veryHidden`."
-                },
-                {
-                  "name": "setSort",
-                  "documentation": "Persisted multi-key sort of the active sheet."
-                },
-                {
-                  "name": "setTheme",
-                  "documentation": "Imperative patch: merge `theme` into the accumulated base theme."
-                },
-                {
-                  "name": "setZoom",
-                  "documentation": "Content zoom factor (0.5–2): scales row/column geometry and fonts."
-                },
-                {
-                  "name": "showColumns",
-                  "documentation": "Show columns through one bulk-safe metadata transaction."
-                },
-                {
-                  "name": "showRows",
-                  "documentation": "Show the given data rows again, or every hidden row when omitted."
-                },
-                {
-                  "name": "sortBy",
-                  "documentation": "Sort the displayed rows by a column (does not mutate stored data)."
-                },
-                {
-                  "name": "sortByMulti",
-                  "documentation": "Multi-key sort of the displayed rows (first key primary; stable)."
-                },
-                {
-                  "name": "styleRange",
-                  "documentation": "Merge `style` into every cell of `range` (null clears cell styles) as one\nundoable transaction. Styles land in the store and paint in the canvas —\nunlike {@link highlightCells}, which draws a translucent overlay above it."
-                },
-                {
-                  "name": "undo",
-                  "documentation": "Undo the last recorded cell edit."
-                },
-                {
-                  "name": "ungroupRows",
-                  "documentation": "Remove a row group (rows become visible if the group was collapsed)."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "GridCommandName",
-              "kind": "type",
-              "signature": "export type GridCommandName = Exclude<ToolbarActionName, \"separator\">;",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L69",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Built-in command names accepted by state queries and change events.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "GridCommandState",
-              "kind": "interface",
-              "signature": "export interface GridCommandState { readonly disabled: boolean; readonly activity: \"inactive\" | \"active\" | \"mixed\"; }",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L71",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Observable availability and selection-derived activity for one command.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "GridReadyEvent",
-              "kind": "interface",
-              "signature": "export interface GridReadyEvent { grid: Grid; generation: number; reason: GridReadyReason; }",
-              "owners": [
-                "../core/dist/adapter.d.ts"
-              ],
-              "source": "../core/dist/adapter.d.ts#L31",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Grid handle, generation, and reason published after adapter initialization.",
-              "memberDocs": [
-                {
-                  "name": "generation",
-                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
-                },
-                {
-                  "name": "grid",
-                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
-                },
-                {
-                  "name": "reason",
-                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "Sheetwrite",
               "kind": "variable",
-              "signature": "(this: void, internals: ComponentInternals, props: SheetwriteProps<Record<string, CellScalar>>): { $on?(type: string, callback: (e: any) => void): () => void; $set?(props: Partial<SheetwriteProps<Record<string, CellScalar>>>): void; }",
+              "signature": "(this: void, internals: ComponentInternals, props: any): { $on?(type: string, callback: (e: any) => void): () => void; $set?(props: any): void; }",
               "owners": [
                 "src/Sheetwrite.svelte.d.ts"
               ],
@@ -6766,7 +5805,7 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; presentation?: GridOptions[\"presentation\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; editors?: GridOptions[\"editors\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: SheetwriteError) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\">, GridAdapterEventHandlers, SheetwriteInitializationProps { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; presentation?: GridOptions[\"presentation\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; editors?: GridOptions[\"editors\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; }",
               "owners": [
                 "src/props.ts"
               ],
@@ -6774,210 +5813,6 @@
               "jsDocTags": [],
               "documentation": "Advanced framework adapter props for workbook data or datasource ownership.",
               "memberDocs": [
-                {
-                  "name": "aria-activedescendant",
-                  "documentation": "Identifies the currently active element when DOM focus is on a composite widget, textbox, group, or application."
-                },
-                {
-                  "name": "aria-atomic",
-                  "documentation": "Indicates whether assistive technologies will present all, or only parts of, the changed region based on the change notifications defined by the aria-relevant attribute."
-                },
-                {
-                  "name": "aria-autocomplete",
-                  "documentation": "Indicates whether inputting text could trigger display of one or more predictions of the user's intended value for an input and specifies how predictions would be\npresented if they are made."
-                },
-                {
-                  "name": "aria-busy",
-                  "documentation": "Indicates an element is being modified and that assistive technologies MAY want to wait until the modifications are complete before exposing them to the user."
-                },
-                {
-                  "name": "aria-checked",
-                  "documentation": "Indicates the current \"checked\" state of checkboxes, radio buttons, and other widgets."
-                },
-                {
-                  "name": "aria-colcount",
-                  "documentation": "Defines the total number of columns in a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-colindex",
-                  "documentation": "Defines an element's column index or position with respect to the total number of columns within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-colspan",
-                  "documentation": "Defines the number of columns spanned by a cell or gridcell within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-controls",
-                  "documentation": "Identifies the element (or elements) whose contents or presence are controlled by the current element."
-                },
-                {
-                  "name": "aria-current",
-                  "documentation": "Indicates the element that represents the current item within a container or set of related elements."
-                },
-                {
-                  "name": "aria-describedby",
-                  "documentation": "Identifies the element (or elements) that describes the object."
-                },
-                {
-                  "name": "aria-details",
-                  "documentation": "Identifies the element that provides a detailed, extended description for the object."
-                },
-                {
-                  "name": "aria-disabled",
-                  "documentation": "Indicates that the element is perceivable but disabled, so it is not editable or otherwise operable."
-                },
-                {
-                  "name": "aria-dropeffect",
-                  "documentation": "Indicates what functions can be performed when a dragged object is released on the drop target."
-                },
-                {
-                  "name": "aria-errormessage",
-                  "documentation": "Identifies the element that provides an error message for the object."
-                },
-                {
-                  "name": "aria-expanded",
-                  "documentation": "Indicates whether the element, or another grouping element it controls, is currently expanded or collapsed."
-                },
-                {
-                  "name": "aria-flowto",
-                  "documentation": "Identifies the next element (or elements) in an alternate reading order of content which, at the user's discretion,\nallows assistive technology to override the general default of reading in document source order."
-                },
-                {
-                  "name": "aria-grabbed",
-                  "documentation": "Indicates an element's \"grabbed\" state in a drag-and-drop operation."
-                },
-                {
-                  "name": "aria-haspopup",
-                  "documentation": "Indicates the availability and type of interactive popup element, such as menu or dialog, that can be triggered by an element."
-                },
-                {
-                  "name": "aria-hidden",
-                  "documentation": "Indicates whether the element is exposed to an accessibility API."
-                },
-                {
-                  "name": "aria-invalid",
-                  "documentation": "Indicates the entered value does not conform to the format expected by the application."
-                },
-                {
-                  "name": "aria-keyshortcuts",
-                  "documentation": "Indicates keyboard shortcuts that an author has implemented to activate or give focus to an element."
-                },
-                {
-                  "name": "aria-label",
-                  "documentation": "Defines a string value that labels the current element."
-                },
-                {
-                  "name": "aria-labelledby",
-                  "documentation": "Identifies the element (or elements) that labels the current element."
-                },
-                {
-                  "name": "aria-level",
-                  "documentation": "Defines the hierarchical level of an element within a structure."
-                },
-                {
-                  "name": "aria-live",
-                  "documentation": "Indicates that an element will be updated, and describes the types of updates the user agents, assistive technologies, and user can expect from the live region."
-                },
-                {
-                  "name": "aria-modal",
-                  "documentation": "Indicates whether an element is modal when displayed."
-                },
-                {
-                  "name": "aria-multiline",
-                  "documentation": "Indicates whether a text box accepts multiple lines of input or only a single line."
-                },
-                {
-                  "name": "aria-multiselectable",
-                  "documentation": "Indicates that the user may select more than one item from the current selectable descendants."
-                },
-                {
-                  "name": "aria-orientation",
-                  "documentation": "Indicates whether the element's orientation is horizontal, vertical, or unknown/ambiguous."
-                },
-                {
-                  "name": "aria-owns",
-                  "documentation": "Identifies an element (or elements) in order to define a visual, functional, or contextual parent/child relationship\nbetween DOM elements where the DOM hierarchy cannot be used to represent the relationship."
-                },
-                {
-                  "name": "aria-placeholder",
-                  "documentation": "Defines a short hint (a word or short phrase) intended to aid the user with data entry when the control has no value.\nA hint could be a sample value or a brief description of the expected format."
-                },
-                {
-                  "name": "aria-posinset",
-                  "documentation": "Defines an element's number or position in the current set of listitems or treeitems. Not required if all elements in the set are present in the DOM."
-                },
-                {
-                  "name": "aria-pressed",
-                  "documentation": "Indicates the current \"pressed\" state of toggle buttons."
-                },
-                {
-                  "name": "aria-readonly",
-                  "documentation": "Indicates that the element is not editable, but is otherwise operable."
-                },
-                {
-                  "name": "aria-relevant",
-                  "documentation": "Indicates what notifications the user agent will trigger when the accessibility tree within a live region is modified."
-                },
-                {
-                  "name": "aria-required",
-                  "documentation": "Indicates that user input is required on the element before a form may be submitted."
-                },
-                {
-                  "name": "aria-roledescription",
-                  "documentation": "Defines a human-readable, author-localized description for the role of an element."
-                },
-                {
-                  "name": "aria-rowcount",
-                  "documentation": "Defines the total number of rows in a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-rowindex",
-                  "documentation": "Defines an element's row index or position with respect to the total number of rows within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-rowspan",
-                  "documentation": "Defines the number of rows spanned by a cell or gridcell within a table, grid, or treegrid."
-                },
-                {
-                  "name": "aria-selected",
-                  "documentation": "Indicates the current \"selected\" state of various widgets."
-                },
-                {
-                  "name": "aria-setsize",
-                  "documentation": "Defines the number of items in the current set of listitems or treeitems. Not required if all elements in the set are present in the DOM."
-                },
-                {
-                  "name": "aria-sort",
-                  "documentation": "Indicates if items in a table or grid are sorted in ascending or descending order."
-                },
-                {
-                  "name": "aria-valuemax",
-                  "documentation": "Defines the maximum allowed value for a range widget."
-                },
-                {
-                  "name": "aria-valuemin",
-                  "documentation": "Defines the minimum allowed value for a range widget."
-                },
-                {
-                  "name": "aria-valuenow",
-                  "documentation": "Defines the current value for a range widget."
-                },
-                {
-                  "name": "aria-valuetext",
-                  "documentation": "Defines the human readable text alternative of aria-valuenow for a range widget."
-                },
-                {
-                  "name": "bind:innerHTML",
-                  "documentation": "Elements with the contenteditable attribute support `innerHTML`, `textContent` and `innerText` bindings."
-                },
-                {
-                  "name": "bind:innerText",
-                  "documentation": "Elements with the contenteditable attribute support `innerHTML`, `textContent` and `innerText` bindings."
-                },
-                {
-                  "name": "bind:textContent",
-                  "documentation": "Elements with the contenteditable attribute support `innerHTML`, `textContent` and `innerText` bindings."
-                },
                 {
                   "name": "config",
                   "documentation": "Built-in UI control configuration."
@@ -7015,76 +5850,12 @@
                   "documentation": "Host height as pixels or a CSS length."
                 },
                 {
-                  "name": "inputmode",
-                  "documentation": "Hints at the type of data that might be entered by the user while editing the element or its contents"
-                },
-                {
-                  "name": "is",
-                  "documentation": "Specify that a standard HTML element should behave like a defined custom built-in element"
-                },
-                {
                   "name": "minColumns",
                   "documentation": "Minimum column count with padding."
                 },
                 {
                   "name": "mutationPolicy",
                   "documentation": "Atomic or partial denial policy."
-                },
-                {
-                  "name": "onActiveSheetChange",
-                  "documentation": "Fires after the visible sheet changes."
-                },
-                {
-                  "name": "onCommandStateChange",
-                  "documentation": "Receives observable undo/redo and formatting command state."
-                },
-                {
-                  "name": "onDatasourceError",
-                  "documentation": "Receives failed datasource requests and their errors."
-                },
-                {
-                  "name": "onEditBegin",
-                  "documentation": "Fires when cell editing begins."
-                },
-                {
-                  "name": "onEditCommit",
-                  "documentation": "Fires after an edit commits its parsed cell value."
-                },
-                {
-                  "name": "onExportError",
-                  "documentation": "Receives failures from built-in XLSX export actions."
-                },
-                {
-                  "name": "onGridChange",
-                  "documentation": "Receives every committed Grid change, including its applied transaction."
-                },
-                {
-                  "name": "onInitializationError",
-                  "documentation": "Receives a WASM initialization failure while the adapter remains mounted."
-                },
-                {
-                  "name": "onMutationRejected",
-                  "documentation": "Receives structured issues when a Grid mutation is rejected."
-                },
-                {
-                  "name": "onReady",
-                  "documentation": "Fires after the adapter publishes a ready Grid generation."
-                },
-                {
-                  "name": "onRendererFallback",
-                  "documentation": "Fires when worker rendering falls back to the main-thread canvas renderer."
-                },
-                {
-                  "name": "onSearch",
-                  "documentation": "Receives refreshed search matches and active-match index."
-                },
-                {
-                  "name": "onSelectionChange",
-                  "documentation": "Receives the current selection, or `null` after it is cleared."
-                },
-                {
-                  "name": "onViewportChange",
-                  "documentation": "Receives visible row bounds and vertical scroll offset after scrolling."
                 },
                 {
                   "name": "overscan",
@@ -7119,10 +5890,6 @@
                   "documentation": "Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation."
                 },
                 {
-                  "name": "wasmSource",
-                  "documentation": "Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins."
-                },
-                {
                   "name": "workbook",
                   "documentation": "Live workbook schema adopted by the Grid."
                 },
@@ -7146,52 +5913,13 @@
             },
             {
               "name": "SimpleColumn",
-              "kind": "interface",
-              "signature": "export interface SimpleColumn<Row extends Record<string, CellScalar>> { key: keyof Row & string; title: string; width?: number; type?: CellFormat; numberFormat?: string; headerStyle?: CellStyle; editor?: string; cellStyle?: CellStyle; visible?: boolean; }",
-              "owners": [
-                "../core/dist/adapter.d.ts"
-              ],
-              "source": "../core/dist/adapter.d.ts#L105",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Column definition accepted by the adapters’ simple row-object API.",
-              "memberDocs": [
-                {
-                  "name": "cellStyle",
-                  "documentation": "Base style merged beneath cell-specific styles."
-                },
-                {
-                  "name": "editor",
-                  "documentation": "Name of a custom editor registered through `GridOptions.editors`."
-                },
-                {
-                  "name": "headerStyle",
-                  "documentation": "Style applied to the painted column header."
-                },
-                {
-                  "name": "key",
-                  "documentation": "Non-empty row-object key, unique within the column list."
-                },
-                {
-                  "name": "numberFormat",
-                  "documentation": "Excel number-format code used for number, date, or currency display."
-                },
-                {
-                  "name": "title",
-                  "documentation": "Semantic title painted in data-grid mode and written by table exports."
-                },
-                {
-                  "name": "type",
-                  "documentation": "Input and formatting type; defaults to `text`."
-                },
-                {
-                  "name": "visible",
-                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
-                },
-                {
-                  "name": "width",
-                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             }
           ]
         },
@@ -7216,392 +5944,93 @@
           "exports": [
             {
               "name": "CellEditor",
-              "kind": "interface",
-              "signature": "export interface CellEditor { mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L48",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Framework-neutral named editor definition registered through `GridOptions.editors`.",
-              "memberDocs": [
-                {
-                  "name": "mount",
-                  "documentation": "Mount one editor instance into the supplied retained wrapper."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorContext",
-              "kind": "interface",
-              "signature": "export interface CellEditorContext { readonly grid: Grid; readonly address: Readonly<CellAddress>; readonly viewAddress: Readonly<CellAddress>; readonly column: Readonly<Column>; readonly value: CellScalar; readonly text: string; readonly initialInput: string | undefined; readonly selectAll: boolean; readonly label: string; readonly signal: AbortSignal; commit(value: string, navigation?: CellEditorNavigation): void; cancel(): void; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L18",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Immutable state and guarded completion callbacks for one mounted editor.\n`address` is the canonical data address; `viewAddress` is the current visual\nrow/column. Async work must use `signal` so reset, cancel, and unmount abort it.",
-              "memberDocs": [
-                {
-                  "name": "cancel",
-                  "documentation": "Cancel without mutating and return focus to the Grid."
-                },
-                {
-                  "name": "commit",
-                  "documentation": "Commit text through the Grid parser, policy, history, and collaboration path."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorInstance",
-              "kind": "interface",
-              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | void | Promise<string | void>; cancel(): void; destroy(): void; }",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L35",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Retained lifecycle returned by a custom editor's `mount` method.",
-              "memberDocs": [
-                {
-                  "name": "cancel",
-                  "documentation": "Called for Escape or replacement before teardown."
-                },
-                {
-                  "name": "commit",
-                  "documentation": "Called for Enter/Tab. Return text (or a promise for it) to use the canonical commit path."
-                },
-                {
-                  "name": "destroy",
-                  "documentation": "Release every DOM node, listener, subscription, and framework subtree."
-                },
-                {
-                  "name": "reposition",
-                  "documentation": "Reposition editor-owned popovers after the core wrapper has moved."
-                },
-                {
-                  "name": "update",
-                  "documentation": "Refresh external value/context while the same cell remains owned."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "CellEditorNavigation",
-              "kind": "type",
-              "signature": "export type CellEditorNavigation = \"down\" | \"right\" | \"left\" | \"none\";",
-              "owners": [
-                "../core/dist/types/editor.d.ts"
-              ],
-              "source": "../core/dist/types/editor.d.ts#L5",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Selection movement applied after a successful editor commit.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "CellScalar",
-              "kind": "type",
-              "signature": "export type CellScalar = string | number | boolean | null;",
-              "owners": [
-                "../core/dist/types/cell.d.ts"
-              ],
-              "source": "../core/dist/types/cell.d.ts#L71",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "A scalar that can be displayed directly.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "Grid",
-              "kind": "interface",
-              "signature": "export interface Grid { readonly store: Store; readonly actions: GridActions; getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot; getCommandState(command: GridCommandName): GridCommandState; setActiveSheet(id: SheetId): void; scrollToCell(addr: CellAddress): void; getCellAtPoint(clientX: number, clientY: number): CellAddress | null; getActiveSheet(): SheetId; getCellInput(row: number, col: number): CellInputSnapshot | null; getSelection(): Selection | null; setSelection(sel: Selection | null): void; setTheme(theme: Partial<Theme>): void; replaceTheme(theme: Partial<Theme> | undefined): void; getEffectiveTheme(): Theme; setReadOnly(readOnly: boolean): void; setConfig(config: GridConfig | undefined): void; applyTransaction(transaction: GridTransaction): ApplyTransactionResult; exportSnapshot(): WorkbookSnapshot; applyRemoteOperations(operations: readonly DocumentOp[], options?: RemoteOperationOptions): ApplyTransactionResult; defineCellRenderer(name: string, renderer: CellRenderer): void; aggregate(col: number, op: AggregateOp): number; sortBy(col: number, ascending?: boolean): void; sortByMulti(keys: readonly SortKey[]): void; filterBy(col: number, needle: string): void; setColumnFilter(col: number, filter: ColumnFilter | null): void; setSort(keys: readonly SortKey[]): ApplyTransactionResult; getColumnFilters(): ReadonlyMap<number, ColumnFilter>; distinctValues(col: number, limit?: number): CellScalar[]; hideRows(rows: readonly number[]): void; showRows(rows?: readonly number[]): void; hiddenRows(): readonly number[]; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; hiddenColumns(): readonly number[]; groupRows(start: number, end: number): void; ungroupRows(start: number, end: number): void; setGroupCollapsed(start: number, collapsed: boolean): void; rowGroups(): readonly RowGroup[]; clearView(): void; undo(): void; redo(): void; exportCsv(filename: string): void; exportXlsx(filename: string): Promise<void>; search(query: string, opts?: SearchOptions): SearchResult; findNext(): SearchResult; findPrev(): SearchResult; clearSearch(): void; replaceCurrent(replacement: string): SearchResult; replaceAll(replacement: string): ReplaceResult; insertRows(at: number, count?: number): void; removeRows(at: number, count?: number): void; insertColumns(at: number, count?: number): void; removeColumns(at: number, count?: number): void; addSheet(input: AddSheetInput): SheetLifecycleResult; removeSheet(id: SheetId): SheetLifecycleResult; renameSheet(id: SheetId, name: string): SheetLifecycleResult; moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult; setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult; setConditionalFormats(rules: readonly ConditionalFormatRule[]): void; setValidationRule(rule: DataValidationRule): ApplyTransactionResult; removeValidationRule(id: string): ApplyTransactionResult; setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult; removeProtectedRange(id: string): ApplyTransactionResult; setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void; setNote(addr: CellAddress, text: string | null): ApplyTransactionResult; getNote(addr: CellAddress): string | null; setOverscan(overscan?: number): void; setMinColumns(minColumns?: number): void; highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void; setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void; styleRange(range: Range, style: Partial<CellStyle> | null): void; beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void; dataEdge(row: number, col: number, dRow: number, dCol: number): number | null; setRowHeight(row: number, height: number): void; setColumnWidth(col: number, width: number): void; autoFitRows(range?: Range): void; autoFitColumns(cols?: readonly number[]): void; setFrozen(rows: number, cols?: number): void; setZoom(zoom: number): void; getZoom(): number; rendererKind(): \"canvas\" | \"worker\"; on<E extends keyof GridEvents>(evt: E, fn: (e: GridEvents[E]) => void): () => void; refresh(): void; destroy(): void; }",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L323",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
-              "memberDocs": [
-                {
-                  "name": "actions",
-                  "documentation": "Imperative action surface for binding custom toolbars/menus."
-                },
-                {
-                  "name": "addSheet",
-                  "documentation": "Add a sheet with a stable ID and return its actionable transaction outcome."
-                },
-                {
-                  "name": "aggregate",
-                  "documentation": "Column aggregate over the active sheet's data."
-                },
-                {
-                  "name": "applyRemoteOperations",
-                  "documentation": "Apply host-supplied operations without undo history or outgoing dirty state.\nThe resulting change event has `source: \"remote\"`."
-                },
-                {
-                  "name": "applyTransaction",
-                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy."
-                },
-                {
-                  "name": "autoFitColumns",
-                  "documentation": "Explicitly resize columns from a bulk worksheet read."
-                },
-                {
-                  "name": "autoFitRows",
-                  "documentation": "Explicitly resize rows to fit wrapped content; never runs during paint."
-                },
-                {
-                  "name": "beginEdit",
-                  "documentation": "Open the cell editor at a view cell, optionally seeding text / selecting all."
-                },
-                {
-                  "name": "clearSearch",
-                  "documentation": "Clear the current search and its highlights."
-                },
-                {
-                  "name": "clearView",
-                  "documentation": "Clear any active sort/filter view."
-                },
-                {
-                  "name": "dataEdge",
-                  "documentation": "Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the\nmoved axis (row for vertical moves, col for horizontal), or null when the\nstore is not columnar. Under an active sort/filter view, `row` is a view\nposition and vertical moves return view positions. For hosts building\ntheir own keymaps (`config.keyboard`)."
-                },
-                {
-                  "name": "distinctValues",
-                  "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
-                },
-                {
-                  "name": "exportSnapshot",
-                  "documentation": "Deterministically export the complete authoritative workbook document."
-                },
-                {
-                  "name": "filterBy",
-                  "documentation": "Filter the displayed rows to those whose column text contains `needle`."
-                },
-                {
-                  "name": "findNext",
-                  "documentation": "Move the active match to the next match and scroll it into view."
-                },
-                {
-                  "name": "findPrev",
-                  "documentation": "Move the active match to the previous match and scroll it into view."
-                },
-                {
-                  "name": "getActiveSheet",
-                  "documentation": "Id of the currently visible sheet."
-                },
-                {
-                  "name": "getCellAtPoint",
-                  "documentation": "Resolve browser viewport coordinates to an active-sheet cell for host-owned\nmenus and interactions. Returns null outside the cell body."
-                },
-                {
-                  "name": "getCellInput",
-                  "documentation": "Editable snapshot of the cell at a view position on the active sheet, or\nnull when out of bounds. See {@link CellInputSnapshot}."
-                },
-                {
-                  "name": "getColumnFilters",
-                  "documentation": "Active column filters on the active sheet, keyed by column index."
-                },
-                {
-                  "name": "getCommandState",
-                  "documentation": "Query undo/redo availability and formatting active/mixed/disabled state."
-                },
-                {
-                  "name": "getEffectiveTheme",
-                  "documentation": "The effective (post-zoom) theme the renderer is currently painting with."
-                },
-                {
-                  "name": "getRuntimeResourceSnapshot",
-                  "documentation": "Versioned coarse runtime ownership snapshot, including datasource state."
-                },
-                {
-                  "name": "groupRows",
-                  "documentation": "Define a collapsible row group over a data-row range (end-inclusive)."
-                },
-                {
-                  "name": "hiddenColumns",
-                  "documentation": "Currently hidden columns on the active sheet."
-                },
-                {
-                  "name": "hiddenRows",
-                  "documentation": "Currently hidden data rows on the active sheet."
-                },
-                {
-                  "name": "hideColumns",
-                  "documentation": "Hide columns through one bulk-safe metadata transaction."
-                },
-                {
-                  "name": "hideRows",
-                  "documentation": "Hide the given data rows (composes with filters/sort)."
-                },
-                {
-                  "name": "highlightCells",
-                  "documentation": "Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color."
-                },
-                {
-                  "name": "redo",
-                  "documentation": "Redo the last undone cell edit."
-                },
-                {
-                  "name": "removeSheet",
-                  "documentation": "Remove a sheet while preserving at least one visible worksheet."
-                },
-                {
-                  "name": "rendererKind",
-                  "documentation": "Which renderer is actually active: `\"worker\"` when the OffscreenCanvas\nworker constructed successfully, `\"canvas\"` otherwise (including after a\n`renderer-fallback`)."
-                },
-                {
-                  "name": "replaceAll",
-                  "documentation": "Replace every current match in a single undoable transaction (one\n`undo()` restores them all), then re-scan. Formula/ref cells are skipped\nand not counted. No-op when read-only."
-                },
-                {
-                  "name": "replaceCurrent",
-                  "documentation": "Replace the active match with `replacement`, then advance to the next match\n(re-scanning against the new data). Only literal text/number cells are\neligible; formula and ref cells are skipped (formula source is never\nrewritten). Honors the active {@link SearchOptions} (matchCase; `wholeCell`\nswaps the entire cell). The write flows through the grid's commit path as\none undoable step. No-op when read-only or when there is no active match."
-                },
-                {
-                  "name": "replaceTheme",
-                  "documentation": "Option-level replacement: re-run construction-time resolution\n(`DEFAULT_THEME < CSS custom properties < theme`) with the new partial.\n`undefined` restores the CSS-variable/default resolution. Adapters call\nthis for their declarative `theme` prop; imperative patching stays on\n{@link setTheme}."
-                },
-                {
-                  "name": "rowGroups",
-                  "documentation": "Row groups on the active sheet."
-                },
-                {
-                  "name": "search",
-                  "documentation": "Find cells matching `query`; highlights matches, emits `search`, returns the result."
-                },
-                {
-                  "name": "setColumnFilter",
-                  "documentation": "Set or clear (null) one column's filter. All column filters AND together\nand compose with the active sort and hidden rows."
-                },
-                {
-                  "name": "setColumnWidth",
-                  "documentation": "Set one column's width via an undoable `setColumn` patch."
-                },
-                {
-                  "name": "setConfig",
-                  "documentation": "Reconfigure built-in chrome and keyboard handling without replacing the\nGrid or clearing selection/history. Construction-bound GridOptions are not\naccepted here."
-                },
-                {
-                  "name": "setFrozen",
-                  "documentation": "Pin the first `rows` view rows and `cols` columns; they stay visible while\nthe body scrolls (0 = unfreeze that axis). Persisted on the active sheet."
-                },
-                {
-                  "name": "setGroupCollapsed",
-                  "documentation": "Collapse/expand a row group; collapsing hides its rows."
-                },
-                {
-                  "name": "setMinColumns",
-                  "documentation": "Live-update the minimum rendered column count. Increasing the minimum\nsilently extends presentation padding; `undefined` restores the default."
-                },
-                {
-                  "name": "setOverscan",
-                  "documentation": "Live-update the render window overscan (row/column positions painted past\neach edge); `undefined` restores the default of 6."
-                },
-                {
-                  "name": "setPresenceOverlays",
-                  "documentation": "Replace ephemeral remote-presence overlays; null clears every collaborator."
-                },
-                {
-                  "name": "setReadOnly",
-                  "documentation": "Update editability without replacing the Grid or clearing session state."
-                },
-                {
-                  "name": "setRowHeight",
-                  "documentation": "Set one row's persistent display height through document history."
-                },
-                {
-                  "name": "setSheetVisibility",
-                  "documentation": "Set host-visible worksheet state; stock UI never offers `veryHidden`."
-                },
-                {
-                  "name": "setSort",
-                  "documentation": "Persisted multi-key sort of the active sheet."
-                },
-                {
-                  "name": "setTheme",
-                  "documentation": "Imperative patch: merge `theme` into the accumulated base theme."
-                },
-                {
-                  "name": "setZoom",
-                  "documentation": "Content zoom factor (0.5–2): scales row/column geometry and fonts."
-                },
-                {
-                  "name": "showColumns",
-                  "documentation": "Show columns through one bulk-safe metadata transaction."
-                },
-                {
-                  "name": "showRows",
-                  "documentation": "Show the given data rows again, or every hidden row when omitted."
-                },
-                {
-                  "name": "sortBy",
-                  "documentation": "Sort the displayed rows by a column (does not mutate stored data)."
-                },
-                {
-                  "name": "sortByMulti",
-                  "documentation": "Multi-key sort of the displayed rows (first key primary; stable)."
-                },
-                {
-                  "name": "styleRange",
-                  "documentation": "Merge `style` into every cell of `range` (null clears cell styles) as one\nundoable transaction. Styles land in the store and paint in the canvas —\nunlike {@link highlightCells}, which draws a translucent overlay above it."
-                },
-                {
-                  "name": "undo",
-                  "documentation": "Undo the last recorded cell edit."
-                },
-                {
-                  "name": "ungroupRows",
-                  "documentation": "Remove a row group (rows become visible if the group was collapsed)."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "GridCommandName",
-              "kind": "type",
-              "signature": "export type GridCommandName = Exclude<ToolbarActionName, \"separator\">;",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L69",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Built-in command names accepted by state queries and change events.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "GridCommandState",
-              "kind": "interface",
-              "signature": "export interface GridCommandState { readonly disabled: boolean; readonly activity: \"inactive\" | \"active\" | \"mixed\"; }",
-              "owners": [
-                "../core/dist/types/grid.d.ts"
-              ],
-              "source": "../core/dist/types/grid.d.ts#L71",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Observable availability and selection-derived activity for one command.",
+              "documentation": "",
               "memberDocs": []
             },
             {
               "name": "GridReadyEvent",
-              "kind": "interface",
-              "signature": "export interface GridReadyEvent { grid: Grid; generation: number; reason: GridReadyReason; }",
-              "owners": [
-                "../core/dist/adapter.d.ts"
-              ],
-              "source": "../core/dist/adapter.d.ts#L31",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Grid handle, generation, and reason published after adapter initialization.",
-              "memberDocs": [
-                {
-                  "name": "generation",
-                  "documentation": "One-based adapter generation, incremented whenever a Grid is replaced."
-                },
-                {
-                  "name": "grid",
-                  "documentation": "Live handle just published by the adapter; replaced on the next reset generation."
-                },
-                {
-                  "name": "reason",
-                  "documentation": "Whether readiness followed first initialization, an input reset, or a renderer reset."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             },
             {
               "name": "Sheetwrite",
@@ -7913,52 +6342,13 @@
             },
             {
               "name": "SimpleColumn",
-              "kind": "interface",
-              "signature": "export interface SimpleColumn<Row extends Record<string, CellScalar>> { key: keyof Row & string; title: string; width?: number; type?: CellFormat; numberFormat?: string; headerStyle?: CellStyle; editor?: string; cellStyle?: CellStyle; visible?: boolean; }",
-              "owners": [
-                "../core/dist/adapter.d.ts"
-              ],
-              "source": "../core/dist/adapter.d.ts#L105",
+              "kind": "symbol",
+              "signature": "unknown",
+              "owners": [],
+              "source": "",
               "jsDocTags": [],
-              "documentation": "Column definition accepted by the adapters’ simple row-object API.",
-              "memberDocs": [
-                {
-                  "name": "cellStyle",
-                  "documentation": "Base style merged beneath cell-specific styles."
-                },
-                {
-                  "name": "editor",
-                  "documentation": "Name of a custom editor registered through `GridOptions.editors`."
-                },
-                {
-                  "name": "headerStyle",
-                  "documentation": "Style applied to the painted column header."
-                },
-                {
-                  "name": "key",
-                  "documentation": "Non-empty row-object key, unique within the column list."
-                },
-                {
-                  "name": "numberFormat",
-                  "documentation": "Excel number-format code used for number, date, or currency display."
-                },
-                {
-                  "name": "title",
-                  "documentation": "Semantic title painted in data-grid mode and written by table exports."
-                },
-                {
-                  "name": "type",
-                  "documentation": "Input and formatting type; defaults to `text`."
-                },
-                {
-                  "name": "visible",
-                  "documentation": "Set to `false` to exclude the column from the live view and table exports."
-                },
-                {
-                  "name": "width",
-                  "documentation": "Unzoomed width in CSS pixels; defaults to 120."
-                }
-              ]
+              "documentation": "",
+              "memberDocs": []
             }
           ]
         },

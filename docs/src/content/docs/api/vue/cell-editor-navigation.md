@@ -1,15 +1,15 @@
 ---
 title: "CellEditorNavigation | @sheetwrite/vue"
-description: "Selection movement applied after a successful editor commit."
+description: "Source summary unavailable; docs:check rejects this omission."
 ---
 <!-- api-export:@sheetwrite/vue|.|CellEditorNavigation -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="type">type</span></div>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/vue/">@sheetwrite/vue</a><span class="api-status" data-kind="symbol">symbol</span></div>
 
-Selection movement applied after a successful editor commit.
+Source summary unavailable; docs:check rejects this omission.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/editor.d.ts#L5</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue</code></dd></div>
 </dl>
 
 ## Declaration
@@ -17,7 +17,7 @@ Selection movement applied after a successful editor commit.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-export type CellEditorNavigation = "down" | "right" | "left" | "none";
+const CellEditorNavigation: unknown
 ```
 
 </div>

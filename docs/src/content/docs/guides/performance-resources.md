@@ -830,118 +830,6 @@ bun run --filter @sheetwrite/bench bench:data
 
 ## Formula engine benchmark
 
-<div class="evidence-available"><strong>Validated evidence.</strong> 26 recalculation workloads across dependency shapes; every workload passed the protocol's safety ceilings.</div>
-
-<dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Captured</dt><dd>2026-07-16 22:06 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>c85226578c40</code> clean worktree</dd></div>
-<div><dt>Raw artifact</dt><dd><code>bench/results/formula-results.json</code></dd></div>
-</dl>
-
-<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:6">
-<div class="bench-viz__scale"><span class="bench-viz__lead">workload</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
-<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.001</span><span class="bench-ruler__tick" style="left:16.67%">0.01</span><span class="bench-ruler__tick" style="left:33.33%">0.1</span><span class="bench-ruler__tick" style="left:50.00%">1</span><span class="bench-ruler__tick" style="left:66.67%">10</span><span class="bench-ruler__tick" style="left:83.33%">100</span><span class="bench-ruler__tick" style="left:100.00%">1 s</span></span><span class="bench-bar__value"></span></div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>criteria-range-edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:61.51%"></i><i class="bench-bar__fill" style="width:61.30%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4.76 ms</b><b class="bench-num" data-stat="p95">4.91 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>cross-sheet-range-edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:55.39%"></i><i class="bench-bar__fill" style="width:54.91%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.97 ms</b><b class="bench-num" data-stat="p95">2.11 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>cycles</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:58.90%"></i><i class="bench-bar__fill" style="width:54.82%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.95 ms</b><b class="bench-num" data-stat="p95">3.42 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>diamond-edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">32 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:35.01%"></i><i class="bench-bar__fill" style="width:34.47%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.12 ms</b><b class="bench-num" data-stat="p95">0.13 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>distinct-range-edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:21.67%"></i><i class="bench-bar__fill" style="width:19.83%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.02 ms</b><b class="bench-num" data-stat="p95">0.02 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>error-propagation</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:48.95%"></i><i class="bench-bar__fill" style="width:48.41%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.80 ms</b><b class="bench-num" data-stat="p95">0.86 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>independent-first-recompute</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:57.97%"></i><i class="bench-bar__fill" style="width:55.73%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2.21 ms</b><b class="bench-num" data-stat="p95">3.01 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">10,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:67.60%"></i><i class="bench-bar__fill" style="width:67.08%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">10.6 ms</b><b class="bench-num" data-stat="p95">11.4 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:86.96%"></i><i class="bench-bar__fill" style="width:86.77%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">160.7 ms</b><b class="bench-num" data-stat="p95">165.0 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>independent-parse-load</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:58.48%"></i><i class="bench-bar__fill" style="width:57.69%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2.89 ms</b><b class="bench-num" data-stat="p95">3.23 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">10,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:68.51%"></i><i class="bench-bar__fill" style="width:66.71%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">10.1 ms</b><b class="bench-num" data-stat="p95">12.9 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:83.68%"></i><i class="bench-bar__fill" style="width:82.72%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">91.9 ms</b><b class="bench-num" data-stat="p95">105.0 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>linear-chain</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">8 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:24.59%"></i><i class="bench-bar__fill" style="width:22.94%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.02 ms</b><b class="bench-num" data-stat="p95">0.03 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">16 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:27.24%"></i><i class="bench-bar__fill" style="width:26.34%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.04 ms</b><b class="bench-num" data-stat="p95">0.04 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">32 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:30.98%"></i><i class="bench-bar__fill" style="width:29.97%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.06 ms</b><b class="bench-num" data-stat="p95">0.07 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">64 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:34.34%"></i><i class="bench-bar__fill" style="width:33.96%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.11 ms</b><b class="bench-num" data-stat="p95">0.11 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>lookup-range-edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:63.33%"></i><i class="bench-bar__fill" style="width:61.90%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">5.18 ms</b><b class="bench-num" data-stat="p95">6.30 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>removed-sheet-ref</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:49.59%"></i><i class="bench-bar__fill" style="width:46.85%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.65 ms</b><b class="bench-num" data-stat="p95">0.95 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>shared-range-edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:59.22%"></i><i class="bench-bar__fill" style="width:58.19%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3.10 ms</b><b class="bench-num" data-stat="p95">3.58 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>topology-remove-add</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">10,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:67.79%"></i><i class="bench-bar__fill" style="width:67.64%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">11.4 ms</b><b class="bench-num" data-stat="p95">11.7 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>wide-fan-out-edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:49.65%"></i><i class="bench-bar__fill" style="width:47.16%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.68 ms</b><b class="bench-num" data-stat="p95">0.95 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100,000 cells</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.43%"></i><i class="bench-bar__fill" style="width:84.31%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">114.5 ms</b><b class="bench-num" data-stat="p95">116.4 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>scalar-edit-affects</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">0 affected</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:7.50%"></i><i class="bench-bar__fill" style="width:7.24%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3 µs</b><b class="bench-num" data-stat="p95">3 µs</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1 affected</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:10.69%"></i><i class="bench-bar__fill" style="width:9.84%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4 µs</b><b class="bench-num" data-stat="p95">4 µs</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 affected</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:46.18%"></i><i class="bench-bar__fill" style="width:45.89%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.57 ms</b><b class="bench-num" data-stat="p95">0.59 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100,000 affected</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.48%"></i><i class="bench-bar__fill" style="width:84.01%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">109.8 ms</b><b class="bench-num" data-stat="p95">117.1 ms</b></span></div>
-</div>
-</figure>
-
-<details class="bench-method" data-pagefind-ignore>
-<summary>Methodology - what each workload does</summary>
-<div class="bench-method__body">
-<p>Each workload builds a fresh WASM cell-store of the named dependency shape and times the recalculation from one action - usually a single edit. Sizes are formula-cell counts; bright = median, faded = p95.</p>
-<dl>
-<div><dt><code>linear-chain</code></dt><dd>A chain A1 -> A2 -> ... -> AN; editing the head recomputes the full depth.</dd></div>
-<div><dt><code>wide-fan-out-edit</code></dt><dd>One scalar feeds N dependent formulas; edit the scalar.</dd></div>
-<div><dt><code>diamond-edit</code></dt><dd>Fan-out that reconverges (diamond graph); edit the apex.</dd></div>
-<div><dt><code>shared-range-edit</code></dt><dd>N formulas aggregate one shared range; edit one cell inside it.</dd></div>
-<div><dt><code>distinct-range-edit</code></dt><dd>Each formula owns its own range; one edit recomputes only its owner.</dd></div>
-<div><dt><code>cross-sheet-range-edit</code></dt><dd>Summary-sheet formulas range over another sheet; edit the source.</dd></div>
-<div><dt><code>scalar-edit-affects-N</code></dt><dd>One scalar edit invalidating exactly N dependents; N=0 touches an unrelated cell, so it prices pure dependency lookup.</dd></div>
-<div><dt><code>topology-remove-add</code></dt><dd>Remove and re-add rows so the dependency graph itself changes shape.</dd></div>
-<div><dt><code>cycles</code></dt><dd>Introduce a reference cycle; detection and cycle-error propagation.</dd></div>
-<div><dt><code>removed-sheet-ref</code></dt><dd>Formulas referencing a deleted sheet must all degrade to reference errors.</dd></div>
-<div><dt><code>error-propagation</code></dt><dd>An error value (=1/0) flows through every dependent.</dd></div>
-<div><dt><code>criteria-range-edit</code></dt><dd>Criteria-style aggregation (SUMIF shape) over 100k cells; edit inside the criteria range.</dd></div>
-<div><dt><code>lookup-range-edit</code></dt><dd>Lookup-shape formulas over 100k cells; edit inside the looked-up range.</dd></div>
-</dl>
-</div>
-</details>
-
-Reproduce with:
-
-```sh verify title="Formula engine evidence"
-bun run --filter @sheetwrite/bench bench:formula
-```
-
 ## Delivery size
 
 ## Pending local evidence
@@ -950,4 +838,5 @@ These protocols have no validated artifact in this environment yet, so no number
 
 | Artifact | Status | Reproduce with |
 | --- | --- | --- |
+| `bench/results/formula-results.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run --filter @sheetwrite/bench bench:formula` |
 | `test-results/delivery-size/size-report.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run size:report` |

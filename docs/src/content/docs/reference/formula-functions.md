@@ -467,8 +467,8 @@ Return shape: `scalar`.
 | Argument | Required | Default | Accepts | Repetition |
 | --- | --- | --- | --- | --- |
 | `text` | yes | none | `scalar`, `reference` | `once` |
-| `decimalSeparator` | no | locale | `scalar`, `reference` | `once` |
-| `groupSeparator` | no | locale | `scalar`, `reference` | `once` |
+| `decimalSeparator` | no | . | `scalar`, `reference` | `once` |
+| `groupSeparator` | no | , | `scalar`, `reference` | `once` |
 
 ### Signature: date-three
 
@@ -950,7 +950,7 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | shape | scalar: accepted<br />range: contextual<br />array: contextual<br />broadcast: function-defined<br />result: scalar |
 | coercion | blank: zero<br />text: number-if-parseable<br />boolean: number<br />error: propagate |
 | text | case: insensitive<br />wildcard: literal |
-| environment | locale: locale-aware<br />dateSystem: excel-1900 |
+| environment | locale: invariant<br />dateSystem: excel-1900 |
 | numeric | tolerance: binary64<br />domain: bounded<br />iteration: kind: none<br />maximum: none |
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |

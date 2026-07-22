@@ -108,6 +108,29 @@ const MUTATIONS: MutationCase[] = [
     expectedIssue: ".default: required field",
   },
   {
+    name: "pins NUMBERVALUE invariant separators",
+    mutate: (contract) => {
+      const profile = contract.signatureProfiles["number-value"];
+      const argumentsList = profile?.arguments;
+      if (Array.isArray(argumentsList)) {
+        const decimal = argumentsList.find(
+          (argument) => (argument as Record<string, unknown>).name === "decimalSeparator",
+        ) as Record<string, unknown> | undefined;
+        if (decimal) decimal.default = "locale";
+      }
+    },
+    expectedIssue: "number-value.decimalSeparator: expected invariant default",
+  },
+  {
+    name: "pins date-time invariant locale",
+    mutate: (contract) => {
+      const profile = contract.semanticsProfiles["date-time"];
+      const environment = profile?.environment as Record<string, unknown> | undefined;
+      if (environment) environment.locale = "locale-aware";
+    },
+    expectedIssue: "date-time.environment.locale: expected invariant",
+  },
+  {
     name: "rejects unknown semantics fields",
     mutate: (contract) => {
       const semantics = contract.semanticsProfiles.scalar;
