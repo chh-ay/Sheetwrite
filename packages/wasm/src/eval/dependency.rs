@@ -2,7 +2,6 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::calc::Ast;
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
