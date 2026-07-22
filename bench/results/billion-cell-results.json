@@ -6,7 +6,7 @@
     "version": "1.3.14",
     "platform": "linux",
     "architecture": "x64",
-    "initializationMs": 6.8718889999999995,
+    "initializationMs": 4.987855000000003,
     "heapBeforeStartupBytes": 1307068,
     "heapAfterStartupBytes": 1307068
   },
@@ -120,7 +120,7 @@
     {
       "id": "startup",
       "status": "completed",
-      "wallTimeMs": 2.2078320000000033,
+      "wallTimeMs": 1.8758960000000044,
       "operationCount": 1,
       "crossings": {
         "datasourceRequests": 0,
@@ -145,7 +145,7 @@
         "wasmCommittedBytes": 1179648,
         "jsHeapUsedBytes": 1307068,
         "arrayBufferBytes": 1862944,
-        "externalBytes": 3309861,
+        "externalBytes": 3309858,
         "controllerLoadedBands": 0,
         "controllerOwnedBands": 0,
         "controllerVisibleWaitingRows": 0
@@ -162,7 +162,7 @@
     {
       "id": "visible-tile",
       "status": "blocked",
-      "wallTimeMs": 1.2975449999999995,
+      "wallTimeMs": 1.065373000000001,
       "operationCount": 1,
       "crossings": {
         "datasourceRequests": 2,
@@ -187,7 +187,7 @@
         "wasmCommittedBytes": 1179648,
         "jsHeapUsedBytes": 1307068,
         "arrayBufferBytes": 1862944,
-        "externalBytes": 3309861,
+        "externalBytes": 3309858,
         "controllerLoadedBands": 0,
         "controllerOwnedBands": 2,
         "controllerVisibleWaitingRows": 120
@@ -232,7 +232,7 @@
         "wasmCommittedBytes": 1179648,
         "jsHeapUsedBytes": 1307068,
         "arrayBufferBytes": 1862944,
-        "externalBytes": 3309861,
+        "externalBytes": 3309858,
         "controllerLoadedBands": 0,
         "controllerOwnedBands": 2,
         "controllerVisibleWaitingRows": 120
@@ -276,7 +276,7 @@
         "wasmCommittedBytes": 1179648,
         "jsHeapUsedBytes": 1307068,
         "arrayBufferBytes": 1862944,
-        "externalBytes": 3309861,
+        "externalBytes": 3309858,
         "controllerLoadedBands": 0,
         "controllerOwnedBands": 2,
         "controllerVisibleWaitingRows": 120
@@ -318,7 +318,7 @@
         "wasmCommittedBytes": 1179648,
         "jsHeapUsedBytes": 1307068,
         "arrayBufferBytes": 1862944,
-        "externalBytes": 3309861,
+        "externalBytes": 3309858,
         "controllerLoadedBands": 0,
         "controllerOwnedBands": 2,
         "controllerVisibleWaitingRows": 120
