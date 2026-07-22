@@ -146,13 +146,13 @@
   gap: var(--sw-demo-space-3);
   align-items: center;
   justify-content: space-between;
-  margin: var(--sw-demo-space-4) 0 var(--sw-demo-space-5);
+  margin: clamp(2rem, 4vh, 3rem) 0;
 }
 
 .sw-hub__filters {
   display: flex;
   min-width: 0;
-  gap: var(--sw-demo-space-1);
+  gap: var(--sw-demo-space-2);
   align-items: center;
   margin: 0;
   padding: 0;
@@ -161,7 +161,7 @@
 
 .sw-hub__filters legend {
   float: left;
-  margin-right: var(--sw-demo-space-1);
+  margin-right: var(--sw-demo-space-3);
   color: var(--sw-fg-dim);
   font: 600 var(--sw-type-xs) / 1 var(--sw-font-mono);
   letter-spacing: 0.08em;
@@ -207,7 +207,7 @@
 .sw-hub-scenes {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--sw-demo-space-3);
+  gap: clamp(1.25rem, 2vw, 2rem);
   margin: 0;
   padding: 0;
   list-style: none;
