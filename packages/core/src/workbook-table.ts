@@ -88,7 +88,10 @@ function validColumn(
   ids: Set<string>,
   limits: Readonly<WorkbookTableResourceLimits>,
 ): boolean {
-  if (!validId(column.id, limits) || ids.has(column.id)) return false;
+  const idKey = workbookTableNameKey(column.id);
+  if (!validId(column.id, limits) || column.id !== column.id.normalize("NFC") || ids.has(idKey)) {
+    return false;
+  }
   if (
     column.name.length === 0 ||
     column.name.length > limits.maxNameLength ||
@@ -104,7 +107,7 @@ function validColumn(
   if (column.totalsRowLabel !== undefined && column.totalsRowLabel.length > limits.maxNameLength) {
     return false;
   }
-  ids.add(column.id);
+  ids.add(idKey);
   names.add(key);
   return true;
 }
@@ -195,24 +198,29 @@ export function validWorkbookTable(
 export function assertWorkbookTables(
   sheets: readonly Sheet[],
   limits: Readonly<WorkbookTableResourceLimits> = DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  reservedNames: readonly string[] = [],
 ): void {
-  const tables = sheets.flatMap((sheet) => sheet.tables ?? []);
-  if (tables.length > limits.maxTables) {
+  const tableCount = sheets.reduce((count, sheet) => count + (sheet.tables?.length ?? 0), 0);
+  if (tableCount > limits.maxTables) {
     throw new SheetwriteError(
       "resource-limit",
       "snapshot-allocate",
-      `Sheetwrite: workbook table limit is ${limits.maxTables}; observed ${tables.length}`,
-      { context: { resource: "tables", limit: limits.maxTables, actual: tables.length } },
+      `Sheetwrite: workbook table limit is ${limits.maxTables}; observed ${tableCount}`,
+      { context: { resource: "tables", limit: limits.maxTables, actual: tableCount } },
     );
   }
+  const reserved = new Set(reservedNames.map(workbookTableNameKey));
   const accepted: WorkbookTable[] = [];
   for (const sheet of sheets) {
     for (const table of sheet.tables ?? []) {
-      if (!validWorkbookTable(table, sheet, accepted, limits)) {
+      if (
+        reserved.has(workbookTableNameKey(table.name)) ||
+        !validWorkbookTable(table, sheet, accepted, limits)
+      ) {
         throw new SheetwriteError(
           "invalid-snapshot",
           "snapshot-allocate",
-          `Sheetwrite: invalid workbook table ${table.id || "<empty>"}`,
+          `Sheetwrite: invalid or namespace-conflicting workbook table ${table.id || "<empty>"}`,
           { context: { tableId: table.id, sheet: sheet.id } },
         );
       }

@@ -67,6 +67,18 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "SheetId",
     ],
   },
+  table: {
+    source: "packages/core/src/types/table.ts",
+    dependencies: ["coordinates"],
+    exports: [
+      "WorkbookTable",
+      "WorkbookTableColumn",
+      "WorkbookTableId",
+      "WorkbookTablePatch",
+      "WorkbookTableStyle",
+      "WorkbookTableUnsupportedFeature",
+    ],
+  },
   cell: {
     source: "packages/core/src/types/cell.ts",
     dependencies: ["coordinates"],
@@ -85,7 +97,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "coordinates"],
+    dependencies: ["cell", "coordinates", "table"],
     exports: [
       "AddSheetInput",
       "CellBlock",

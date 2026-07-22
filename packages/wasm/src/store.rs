@@ -218,13 +218,18 @@ const BLOCK_RESOURCE_LIMIT: u32 = 3;
 
 const MAX_TABLES: usize = 1_024;
 const MAX_TABLE_COLUMNS: usize = 16_384;
-const MAX_TABLE_NAME_BYTES: usize = 1_020;
-const MAX_TABLE_ID_BYTES: usize = 512;
+const MAX_TABLE_NAME_BYTES: usize = 255;
+const MAX_TABLE_ID_BYTES: usize = 128;
+
+pub(crate) fn workbook_name_key(value: &str) -> String {
+    value.to_uppercase()
+}
 
 #[derive(Clone, Debug)]
 struct TableColumnDefinition {
     id: String,
     name: String,
+    col: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -258,7 +263,6 @@ pub struct CellStore {
     loading_page: usize,
     named_ranges: HashMap<(Option<u32>, String), NamedRangeRef>,
     tables: HashMap<String, TableDefinition>,
-    table_names: HashMap<String, String>,
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
@@ -286,7 +290,6 @@ impl CellStore {
             volatile_serial: 0.0,
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
             tables: HashMap::new(),
-            table_names: HashMap::new(),
         }
     }
 
@@ -644,16 +647,14 @@ impl CellStore {
             definition.sheet != sheet as u32 && *scope != Some(sheet as u32)
         });
         let removed_names = self.named_ranges.len() != before_names;
-        let removed_table_ids: Vec<_> = self
+        let removed_table_keys: Vec<_> = self
             .tables
-            .values()
-            .filter(|table| table.sheet == sheet as u32)
-            .map(|table| table.id.clone())
+            .iter()
+            .filter(|(_, table)| table.sheet == sheet as u32)
+            .map(|(key, _)| key.clone())
             .collect();
-        for id in &removed_table_ids {
-            if let Some(table) = self.tables.remove(id) {
-                self.table_names.remove(&table.name.to_uppercase());
-            }
+        for key in &removed_table_keys {
+            self.tables.remove(key);
         }
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
@@ -661,7 +662,7 @@ impl CellStore {
         self.sheets[sheet] = SheetData::new(0, 0);
         self.sheet_alive[sheet] = false;
         self.bump_formula_epoch();
-        if removed_names || !removed_table_ids.is_empty() {
+        if removed_names || !removed_table_keys.is_empty() {
             self.refresh_named_formula_entries();
             self.recompute_all_sheets();
         } else {
@@ -2180,6 +2181,10 @@ impl CellStore {
         row_end: usize,
         col_end: usize,
     ) -> bool {
+        let name_key = workbook_name_key(name);
+        if self.tables.contains_key(&name_key) {
+            return false;
+        }
         let parsed_name = parse(name).ok();
         if name.is_empty()
             || !matches!(parsed_name, Some(crate::calc::Ast::Name(_)))
@@ -2209,8 +2214,7 @@ impl CellStore {
             row_end: row_end as u32,
             col_end: col_end as u32,
         };
-        self.named_ranges
-            .insert((scope, name.to_ascii_uppercase()), definition);
+        self.named_ranges.insert((scope, name_key), definition);
         self.refresh_named_formula_entries();
         self.recompute_all_sheets();
         true
@@ -2221,7 +2225,7 @@ impl CellStore {
         let scope = if scope < 0 { None } else { Some(scope as u32) };
         if self
             .named_ranges
-            .remove(&(scope, name.to_ascii_uppercase()))
+            .remove(&(scope, workbook_name_key(name)))
             .is_none()
         {
             return false;
@@ -2246,7 +2250,11 @@ impl CellStore {
         column_ids: Vec<String>,
         column_names: Vec<String>,
     ) -> bool {
-        let is_new = !self.tables.contains_key(id);
+        let existing_key = self
+            .tables
+            .iter()
+            .find_map(|(key, table)| (table.id == id).then(|| key.clone()));
+        let is_new = existing_key.is_none();
         if (is_new && self.tables.len() >= MAX_TABLES)
             || id.is_empty()
             || id.encode_utf16().count() > MAX_TABLE_ID_BYTES
@@ -2266,26 +2274,35 @@ impl CellStore {
         {
             return false;
         }
-        let name_key = name.to_uppercase();
+        let name_key = workbook_name_key(name);
         if self
-            .table_names
+            .named_ranges
+            .keys()
+            .any(|(_, existing_name)| existing_name == &name_key)
+        {
+            return false;
+        }
+        if self
+            .tables
             .get(&name_key)
-            .is_some_and(|existing| existing != id)
+            .is_some_and(|table| table.id != id)
         {
             return false;
         }
         let mut ids = HashSet::with_capacity(column_ids.len());
         let mut names = HashSet::with_capacity(column_names.len());
         let mut columns = Vec::with_capacity(column_ids.len());
-        for (column_id, column_name) in column_ids.into_iter().zip(column_names) {
-            let column_key = column_name.to_uppercase();
+        for (column_index, (column_id, column_name)) in
+            column_ids.into_iter().zip(column_names).enumerate()
+        {
+            let column_key = workbook_name_key(&column_name);
             if column_id.is_empty()
                 || column_id.encode_utf16().count() > MAX_TABLE_ID_BYTES
                 || column_name.is_empty()
                 || column_name.encode_utf16().count() > MAX_TABLE_NAME_BYTES
                 || column_name.contains(['[', ']', ','])
                 || column_name.starts_with(['@', '#'])
-                || !ids.insert(column_id.clone())
+                || !ids.insert(workbook_name_key(&column_id))
                 || !names.insert(column_key)
             {
                 return false;
@@ -2293,6 +2310,7 @@ impl CellStore {
             columns.push(TableColumnDefinition {
                 id: column_id,
                 name: column_name,
+                col: col_start as u32 + column_index as u32,
             });
         }
         let definition = TableDefinition {
@@ -2317,12 +2335,11 @@ impl CellStore {
         }) {
             return false;
         }
-        if let Some(previous) = self.tables.get(id) {
-            self.table_names.remove(&previous.name.to_uppercase());
+        if let Some(previous_key) = existing_key {
             self.rewrite_table_formula_entries(id, Some(&definition));
+            self.tables.remove(&previous_key);
         }
-        self.table_names.insert(name_key, id.to_string());
-        self.tables.insert(id.to_string(), definition);
+        self.tables.insert(name_key, definition);
         self.refresh_formula_entries();
         self.recompute_all_sheets();
         true
@@ -2330,10 +2347,14 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = removeTable)]
     pub fn remove_table(&mut self, id: &str) -> bool {
-        let Some(definition) = self.tables.remove(id) else {
+        let Some(key) = self
+            .tables
+            .iter()
+            .find_map(|(key, table)| (table.id == id).then(|| key.clone()))
+        else {
             return false;
         };
-        self.table_names.remove(&definition.name.to_uppercase());
+        self.tables.remove(&key);
         self.rewrite_table_formula_entries(id, None);
         self.refresh_formula_entries();
         self.recompute_all_sheets();
@@ -2753,6 +2774,7 @@ impl CellStore {
             sheet.all_dirty = true;
         }
         self.drop_invalid_references();
+        self.rebase_table_rows(edited_sheet, at, delta);
         if self.rebase_named_rows(edited_sheet, at, delta) {
             self.refresh_named_formula_entries();
         }
@@ -2769,6 +2791,7 @@ impl CellStore {
             sheet.all_dirty = true;
         }
         self.drop_invalid_references();
+        self.rebase_table_cols(edited_sheet, at, delta);
         if self.rebase_named_cols(edited_sheet, at, delta) {
             self.refresh_named_formula_entries();
         }
@@ -2844,7 +2867,7 @@ fn refresh_structured_reference(
         sheet: table.sheet,
         row_start,
         row_end,
-        col: table.col_start + column_index as u32,
+        col: column.col,
         section: reference.section,
         qualified: reference.qualified,
     })
@@ -2852,7 +2875,7 @@ fn refresh_structured_reference(
 
 impl CellStore {
     fn named_range(&self, name: &str, formula_sheet: u32) -> Option<NamedRangeRef> {
-        let normalized = name.to_ascii_uppercase();
+        let normalized = workbook_name_key(name);
         self.named_ranges
             .get(&(Some(formula_sheet), normalized.clone()))
             .or_else(|| self.named_ranges.get(&(None, normalized)))
@@ -2867,8 +2890,7 @@ impl CellStore {
         formula_col: u32,
     ) -> Option<&TableDefinition> {
         if let Some(name) = &reference.table_name {
-            let id = self.table_names.get(&name.to_uppercase())?;
-            return self.tables.get(id);
+            return self.tables.get(&workbook_name_key(name));
         }
         let mut matches = self.tables.values().filter(|table| {
             table.sheet == formula_sheet
@@ -2897,11 +2919,11 @@ impl CellStore {
             formula_row,
             formula_col,
         )?;
-        let column_key = reference.column_name.to_uppercase();
+        let column_key = workbook_name_key(&reference.column_name);
         let column_index = table
             .columns
             .iter()
-            .position(|column| column.name.to_uppercase() == column_key)?;
+            .position(|column| workbook_name_key(&column.name) == column_key)?;
         let column = &table.columns[column_index];
         let (row_start, row_end) = match reference.section {
             TableSection::Headers if table.header_row => (table.row_start, table.row_start),
@@ -2937,7 +2959,7 @@ impl CellStore {
             sheet: table.sheet,
             row_start,
             row_end,
-            col: table.col_start + column_index as u32,
+            col: column.col,
             section: reference.section,
             qualified: reference.table_name.is_some(),
         })
@@ -3043,6 +3065,57 @@ impl CellStore {
             self.named_ranges.remove(&key);
         }
         changed
+    }
+
+    fn rebase_table_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) {
+        let removed: Vec<_> = self
+            .tables
+            .iter_mut()
+            .filter_map(|(id, table)| {
+                if table.sheet != edited_sheet {
+                    return None;
+                }
+                if let Some((start, end)) = shift_range(table.row_start, table.row_end, at, delta) {
+                    table.row_start = start;
+                    table.row_end = end;
+                    None
+                } else {
+                    Some(id.clone())
+                }
+            })
+            .collect();
+        for id in removed {
+            self.tables.remove(&id);
+        }
+    }
+
+    fn rebase_table_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
+        let removed: Vec<_> = self
+            .tables
+            .iter_mut()
+            .filter_map(|(id, table)| {
+                if table.sheet != edited_sheet {
+                    return None;
+                }
+                let Some((start, end)) = shift_range(table.col_start, table.col_end, at, delta)
+                else {
+                    return Some(id.clone());
+                };
+                table.col_start = start;
+                table.col_end = end;
+                table.columns.retain_mut(|column| {
+                    let Some((col, _)) = shift_range(column.col, column.col, at, delta) else {
+                        return false;
+                    };
+                    column.col = col;
+                    true
+                });
+                table.columns.is_empty().then(|| id.clone())
+            })
+            .collect();
+        for id in removed {
+            self.tables.remove(&id);
+        }
     }
 
     fn recompute_all_sheets(&mut self) {

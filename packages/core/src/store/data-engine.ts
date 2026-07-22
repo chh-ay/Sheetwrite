@@ -26,6 +26,7 @@ import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validWorkbookTable,
+  workbookTableNameKey,
 } from "../workbook-table.js";
 import type {
   CellFormat,
@@ -243,7 +244,11 @@ export class StoreDataEngine {
     if (data && options.storage === "paged") {
       throw new Error("Sheetwrite: ColumnarData requires dense storage");
     }
-    assertWorkbookTables(workbook.sheets);
+    assertWorkbookTables(
+      workbook.sheets,
+      DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+      (workbook.namedRanges ?? []).map((range) => range.name),
+    );
     this.workbook = workbook;
     this.storageOptions = options;
     this.wasm = new CellStore() as RecomputingCellStore;
@@ -525,32 +530,36 @@ export class StoreDataEngine {
     table: WorkbookTable,
     columns: readonly Column[],
   ): WorkbookTableColumn[] {
-    const ids = new Set(table.columns.map((column) => column.id));
-    const names = new Set(
-      table.columns.map((column) => column.name.normalize("NFC").toUpperCase()),
-    );
+    const ids = new Set(table.columns.map((column) => workbookTableNameKey(column.id)));
+    const names = new Set(table.columns.map((column) => workbookTableNameKey(column.name)));
     return columns.map((column, index) => {
       const fallback = `Column${table.columns.length + index + 1}`;
-      const rawId = column.key || fallback;
+      const rawId = (column.key || fallback).normalize("NFC");
       let id = rawId.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength);
-      for (let suffix = 2; ids.has(id); suffix++) {
+      for (let suffix = 2; ids.has(workbookTableNameKey(id)); suffix++) {
         const marker = `_${suffix}`;
         id = `${rawId.slice(
           0,
           DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength - marker.length,
         )}${marker}`;
       }
-      ids.add(id);
-      const rawName = (column.header || fallback).normalize("NFC");
+      ids.add(workbookTableNameKey(id));
+      const normalizedHeader = (column.header || fallback).normalize("NFC");
+      const rawName =
+        /[[\],]/u.test(normalizedHeader) ||
+        normalizedHeader.startsWith("@") ||
+        normalizedHeader.startsWith("#")
+          ? fallback
+          : normalizedHeader;
       let name = rawName.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength);
-      for (let suffix = 2; names.has(name.toUpperCase()); suffix++) {
+      for (let suffix = 2; names.has(workbookTableNameKey(name)); suffix++) {
         const marker = `_${suffix}`;
         name = `${rawName.slice(
           0,
           DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength - marker.length,
         )}${marker}`;
       }
-      names.add(name.toUpperCase());
+      names.add(workbookTableNameKey(name));
       return { id, name };
     });
   }
