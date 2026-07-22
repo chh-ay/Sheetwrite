@@ -19,8 +19,8 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::Right => left_right(values, true),
         Func::Mid => mid(values),
         Func::Concat | Func::Concatenate => concat(values),
-        Func::Upper => unary_text(values, |text| bounded_text(text.to_uppercase())),
-        Func::Lower => unary_text(values, |text| bounded_text(text.to_lowercase())),
+        Func::Upper => unary_text(values, |text| change_case(text, true)),
+        Func::Lower => unary_text(values, |text| change_case(text, false)),
         Func::Trim => unary_text(values, |text| {
             let mut output = String::new();
             for (index, part) in text.split_whitespace().enumerate() {
@@ -48,9 +48,7 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::Find => find_search(values, true),
         Func::Search => find_search(values, false),
         Func::Value => value(values),
-        Func::Clean => unary_text(values, |text| {
-            bounded_text(text.chars().filter(|ch| !matches!(*ch as u32, 0..=31)).collect())
-        }),
+        Func::Clean => unary_text(values, clean_text),
         Func::Rept => repeat(values),
         Func::Char => character(values, false),
         Func::Code | Func::Unicode => code(values),
@@ -106,6 +104,38 @@ fn checked_push_character(output: &mut String, character: char) -> Result<(), Fo
     output.try_reserve(additional).map_err(|_| FormulaError::Num)?;
     output.push(character);
     Ok(())
+}
+
+fn change_case(text: String, uppercase: bool) -> Result<Value, FormulaError> {
+    let mut output = String::new();
+    output
+        .try_reserve(text.len().min(MAX_TEXT_OUTPUT_BYTES))
+        .map_err(|_| FormulaError::Num)?;
+    for character in text.chars() {
+        if uppercase {
+            for transformed in character.to_uppercase() {
+                checked_push_character(&mut output, transformed)?;
+            }
+        } else {
+            for transformed in character.to_lowercase() {
+                checked_push_character(&mut output, transformed)?;
+            }
+        }
+    }
+    Ok(Value::text(output))
+}
+
+fn clean_text(text: String) -> Result<Value, FormulaError> {
+    let mut output = String::new();
+    output
+        .try_reserve(text.len().min(MAX_TEXT_OUTPUT_BYTES))
+        .map_err(|_| FormulaError::Num)?;
+    for character in text.chars() {
+        if !matches!(character as u32, 0..=31) {
+            checked_push_character(&mut output, character)?;
+        }
+    }
+    Ok(Value::text(output))
 }
 
 fn count_arg(values: &FuncAccumulator, index: usize, default: Option<i64>) -> Result<usize, FormulaError> {
@@ -643,7 +673,7 @@ fn parse_number(text: &str, decimal: &str, group: &str) -> Result<f64, FormulaEr
 #[cfg(test)]
 mod tests {
     use super::{
-        apply, literal_find, MAX_SEARCH_STEPS, MAX_TEXT_OUTPUT_BYTES,
+        apply, clean_text, literal_find, MAX_SEARCH_STEPS, MAX_TEXT_OUTPUT_BYTES,
     };
     use crate::calc::Func;
     use crate::types::{FormulaError, Value};
@@ -931,6 +961,18 @@ mod tests {
             let character = evaluate(Func::UniChar, vec![Value::number(code as f64)]);
             assert_number(evaluate(Func::Unicode, vec![character]), code as f64);
         }
+        assert_eq!(
+            clean_text("a".repeat(MAX_TEXT_OUTPUT_BYTES + 1)),
+            Err(FormulaError::Num)
+        );
+        assert_eq!(
+            evaluate(Func::Upper, vec![Value::text("straße")]),
+            Value::text("STRASSE")
+        );
+        assert_eq!(
+            evaluate(Func::Lower, vec![Value::text("İ")]),
+            Value::text("i\u{307}")
+        );
     }
 
     #[test]
