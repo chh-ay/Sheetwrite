@@ -7,6 +7,7 @@ import type {
   WorkbookTableUnsupportedFeature,
 } from "./types/table.js";
 
+/** Resource ceilings for canonical workbook-table metadata and identifiers. */
 export interface WorkbookTableResourceLimits {
   maxTables: number;
   maxColumnsPerTable: number;
@@ -27,6 +28,7 @@ export const DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS: Readonly<WorkbookTableResou
     maxUnsupportedFeaturesPerTable: 16,
   });
 
+/** Stable reason code returned when a workbook table name is rejected. */
 export type WorkbookTableNameIssueCode =
   | "empty"
   | "too-long"
@@ -34,6 +36,7 @@ export type WorkbookTableNameIssueCode =
   | "cell-reference"
   | "duplicate";
 
+/** Result of validating and NFC-normalizing a workbook table name. */
 export type WorkbookTableNameValidationResult =
   | { ok: true; name: string }
   | { ok: false; code: WorkbookTableNameIssueCode };
