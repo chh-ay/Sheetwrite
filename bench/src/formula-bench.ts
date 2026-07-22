@@ -1671,7 +1671,7 @@ function markdown(result: CompleteFormulaBenchmarkResult): string {
 
 async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void> {
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
-  let baseline: FormulaBenchmarkResult | undefined;
+  let baseline: CompleteFormulaBenchmarkResult | undefined;
   if (!preliminary) {
     const rawBaseline = readFileSync(
       new URL("../results/formula-results.json", import.meta.url),
@@ -1683,8 +1683,9 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
         `formula baseline artifact exceeded the ${FORMULA_ARTIFACT_MAX_BYTES} byte safety ceiling: ${baselineBytes}`,
       );
     }
-    baseline = JSON.parse(rawBaseline) as FormulaBenchmarkResult;
-    validateFormulaBenchmark(baseline, mode);
+    const parsedBaseline = JSON.parse(rawBaseline) as FormulaBenchmarkResult;
+    validateFormulaBenchmark(parsedBaseline, mode);
+    baseline = parsedBaseline;
   }
 
   initSync({ module: readFileSync(WASM_PATH) });
