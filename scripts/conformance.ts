@@ -68,18 +68,18 @@ async function main(): Promise<void> {
   if (command === "generate") {
     const manifest = await writeConformanceEvidence();
     console.log(
-      `Conformance corpus generated: formula=${manifest.counts.formula} mutation=${manifest.counts.mutation} workbook=${manifest.counts.workbook} sha256=${manifest.corpusSha256}`,
+      `Compatibility test set generated: formulas=${manifest.counts.formula} workbook changes=${manifest.counts.mutation} workbook examples=${manifest.counts.workbook} file hash=${manifest.corpusSha256}`,
     );
     return;
   }
   if (command === "roundtrip-libreoffice") {
     const artifact = await captureLibreOfficeWorkbookRoundtrips(process.argv[3]);
     console.log(
-      `LibreOffice workbook roundtrips: status=${artifact.status} chains=${artifact.chains.length} producer=${artifact.producerVersion}`,
+      `LibreOffice save-and-open checks: status=${artifact.status} checks=${artifact.chains.length} LibreOffice=${artifact.producerVersion}`,
     );
     if (artifact.status !== "pass") {
       throw new Error(
-        `Workbook conformance PARTIAL: ${artifact.chains
+        `Workbook compatibility is PARTIAL: ${artifact.chains
           .filter((chain) => chain.status !== "pass")
           .map((chain) => `${chain.id} (${chain.differences.length} differences)`)
           .join(", ")}`,
@@ -90,7 +90,7 @@ async function main(): Promise<void> {
   const corpus = await loadCorpus(process.argv[3]);
   if (command === "validate") {
     console.log(
-      `Conformance corpus valid: protocol=${corpus.protocol} cases=${corpus.cases.length} sha256=${sha256(corpus)}`,
+      `Compatibility test set valid: version=${corpus.protocol} tests=${corpus.cases.length} file hash=${sha256(corpus)}`,
     );
     return;
   }
@@ -98,11 +98,11 @@ async function main(): Promise<void> {
     const result = await runOffline(corpus);
     if (result.status === "blocked") {
       throw new Error(
-        `Conformance compatibility BLOCKED: checked=${result.checked} reviewed=${result.reviewed} missing-reviewed=${result.deferred} unsupported-nonclaims=${result.unsupported.length}; local checks passed but producer compatibility is not claimed`,
+        `Compatibility release check BLOCKED: tests=${result.checked} reviewed app results=${result.reviewed} missing app results=${result.deferred} unsupported tests=${result.unsupported.length}; Sheetwrite's local checks passed, but Excel and Google Sheets compatibility is not claimed`,
       );
     }
     console.log(
-      `Offline conformance verified: checked=${result.checked} reviewed=${result.reviewed} unsupported=${result.unsupported.length}`,
+      `Compatibility checks passed: tests=${result.checked} reviewed app results=${result.reviewed} unsupported tests=${result.unsupported.length}`,
     );
     return;
   }
@@ -114,7 +114,7 @@ async function main(): Promise<void> {
     console.log(await captureGoogle(corpus));
     return;
   }
-  throw new Error(`Unknown conformance command: ${command}`);
+  throw new Error(`Unknown compatibility command: ${command}`);
 }
 
 if (import.meta.main) await main();

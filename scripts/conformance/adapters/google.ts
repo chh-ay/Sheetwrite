@@ -439,7 +439,7 @@ export async function captureGoogle(corpus: ConformanceCorpus): Promise<string> 
   const producerVersion = process.env.SHEETWRITE_GOOGLE_PRODUCER_VERSION;
   if (!token || !producerVersion) {
     throw new Error(
-      "Conformance compatibility BLOCKED: Google Sheets oracle requires a protected OAuth token and exact producer version",
+      "Compatibility check BLOCKED: Google Sheets needs a protected OAuth token and exact app version",
     );
   }
   return captureGoogleWithDependencies(corpus, {

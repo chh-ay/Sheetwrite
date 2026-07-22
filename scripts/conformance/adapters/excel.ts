@@ -70,7 +70,7 @@ export async function captureExcel(corpus: ConformanceCorpus): Promise<string> {
   const producerVersion = process.env.SHEETWRITE_EXCEL_PRODUCER_VERSION;
   if (!endpoint || !token || !producerVersion) {
     throw new Error(
-      "Conformance compatibility BLOCKED: Excel oracle requires a protected endpoint/token and exact producer version",
+      "Compatibility check BLOCKED: Excel needs a protected service URL, access token, and exact app version",
     );
   }
   const script = await readFile("scripts/conformance-excel-office-script.ts", "utf8");

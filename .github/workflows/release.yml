@@ -75,6 +75,10 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Install compatibility check dependencies
+        run: bun install --frozen-lockfile
+      - name: Verify fresh compatibility results
+        run: bun run compatibility:check
       - name: Download canonical artifacts from successful CI
         env:
           GH_TOKEN: ${{ github.token }}

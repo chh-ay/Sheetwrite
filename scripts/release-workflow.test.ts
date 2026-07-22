@@ -140,6 +140,7 @@ describe("CI-completion package release workflow", () => {
     expect(commands).toContain("canonical-release-artifacts");
     expect(commands).toContain("scripts/release-publish.ts");
     expect(commands).toContain("scripts/release-github.ts");
+    expect(commands).toContain("bun run compatibility:check");
     expect(commands).not.toMatch(
       /verify:ci|verify:release-quality|test:coverage|test:browser|release:prepare|release-verify\.ts|install-wasm-pack|browser:install/,
     );
