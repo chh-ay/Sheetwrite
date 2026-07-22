@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { CONTROLLED_SAMPLING_FINGERPRINT } from "./check.js";
 import {
   buildControlledBaseline,
@@ -119,7 +120,13 @@ export async function generateBaseline(args: readonly string[]): Promise<string>
   }
 
   if (!existsSync(rawPath)) throw new Error(`raw controlled artifact does not exist: ${rawPath}`);
-  const artifact = parseRenderArtifact(JSON.parse(readFileSync(rawPath, "utf8")) as unknown);
+  const rawBytes = readFileSync(rawPath);
+  const rawArtifact = relative(REPOSITORY_ROOT, rawPath);
+  if (rawArtifact === ".." || rawArtifact.startsWith("../")) {
+    throw new Error("raw controlled artifact must be stored inside the repository");
+  }
+  const rawSha256 = createHash("sha256").update(rawBytes).digest("hex");
+  const artifact = parseRenderArtifact(JSON.parse(rawBytes.toString("utf8")) as unknown);
   if (artifact.metadata.dirty && !diagnostic) {
     throw new Error("raw controlled artifact was recorded from a dirty tree");
   }
@@ -142,7 +149,8 @@ export async function generateBaseline(args: readonly string[]): Promise<string>
     artifact,
     harness,
     runnerFromArtifact(artifact, powerMode, concurrency),
-    rawPath,
+    rawArtifact,
+    rawSha256,
   );
   await Bun.write(targetPath, stableBaselineJson(baseline));
   if (!writeBaseline && existsSync(approvedPath)) {

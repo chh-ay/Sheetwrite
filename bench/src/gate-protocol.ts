@@ -169,18 +169,9 @@ const REPOSITORY_ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url))
 
 export const HARNESS_SOURCE_FILES = [
   "bench/package.json",
-  "bench/src/check.ts",
-  "bench/src/controlled-baseline.ts",
-  "bench/src/data-bench.ts",
   "bench/src/dataset.ts",
   "bench/src/dom-setup.ts",
-  "bench/src/formula-bench.ts",
-  "bench/src/formula-dataset.ts",
-  "bench/src/gate-protocol.ts",
-  "bench/src/generate-baseline.ts",
   "bench/src/handsontable-runtime.ts",
-  "bench/src/paged-bench.ts",
-  "bench/src/range-bench.ts",
   "bench/src/render-bench.html",
   "bench/src/render-bench.ts",
   "bench/src/render-driver.ts",
@@ -188,7 +179,6 @@ export const HARNESS_SOURCE_FILES = [
   "bench/src/render-protocol.ts",
   "bench/src/render-scenarios.ts",
   "bench/src/stats.ts",
-  "bench/src/verify.ts",
   "bun.lock",
 ] as const;
 
@@ -207,7 +197,7 @@ export function computeHarnessFingerprint(
   }
   const protocol = `performance=${PERFORMANCE_GATE_PROTOCOL_VERSION};render=${RENDER_PROTOCOL_VERSION}`;
   const dataset = `seed=0x${DEFAULT_SEED.toString(16)};schema=id,date,customer,city,amount`;
-  const schema = "typed-render-artifact-v1;controlled-baseline-v1";
+  const schema = "typed-render-artifact-v1;controlled-baseline-v2";
   const payload = JSON.stringify({ protocol, matrix, dataset, sampling, schema, sources });
   return { digest: sha256(payload), protocol, matrix, dataset, sampling, schema, sources };
 }

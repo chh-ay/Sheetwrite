@@ -151,6 +151,26 @@ describe("contributor and CI toolchain contract", () => {
     expect(commands).toContain("test:browser");
   });
 
+  it("requires a full matched comparison on the pinned performance runner", () => {
+    const jobs = parsedWorkflow.jobs ?? {};
+    const controlled = jobs["controlled-performance"];
+    expect(controlled?.["runs-on"]).toBe("sheetwrite-perf-i9-12900h-cachyos");
+    expect(controlled?.needs).toBe("artifact-build");
+    const commands = controlled?.steps?.flatMap((step) => (step.run ? [step.run] : [])).join("\n");
+    expect(commands).toContain("--rounds 10");
+    expect(commands).toContain("src/check.ts");
+    expect(commands).toContain("--power-mode balanced");
+    expect(commands).toContain("--concurrency 1");
+    expect(commands).not.toContain("--report-only");
+    expect(commands).not.toContain("bench:verify");
+    const upload = controlled?.steps?.find((step) =>
+      step.uses?.startsWith("actions/upload-artifact@"),
+    );
+    expect(upload?.if).toBe("always()");
+    expect(upload?.with?.path).toContain("render-fresh.json");
+    expect(JSON.stringify(jobs.required)).toContain("controlled-performance");
+  });
+
   it("gates the exact docs artifact without weakening Required CI", () => {
     const jobs = parsedWorkflow.jobs ?? {};
     const preflight = jobs.preflight;

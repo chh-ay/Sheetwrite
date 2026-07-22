@@ -386,6 +386,54 @@ function assertRepetition(result: PrefetchTraceRepetition): void {
   }
 }
 
+export function validateDatasourcePrefetchReport(value: PrefetchBenchmarkReport): void {
+  if (
+    value.policy.sourceLatencyMs !== SOURCE_LATENCY_MS ||
+    value.policy.frameMs !== FRAME_MS ||
+    value.policy.viewportRows !== VIEWPORT_ROWS ||
+    value.policy.lookaheadRowsLimit !== DATASOURCE_PREFETCH_MAX_ROWS ||
+    value.policy.lookaheadBytesLimit !== DATASOURCE_PREFETCH_MAX_BYTES ||
+    value.policy.requestMultiplierLimit !== REQUEST_MULTIPLIER_LIMIT ||
+    value.policy.activeRequestLimit !== DATASOURCE_MAX_ACTIVE_REQUESTS ||
+    value.policy.cacheBytes !== CACHE_BYTES
+  ) {
+    throw new Error("Datasource prefetch report policy changed");
+  }
+  if (value.repetitions.length !== REPETITIONS) {
+    throw new Error(`Datasource prefetch report requires ${REPETITIONS} repetitions`);
+  }
+  for (const [index, repetition] of value.repetitions.entries()) {
+    if (repetition.repetition !== index + 1) {
+      throw new Error("Datasource prefetch repetition identity is incomplete");
+    }
+    assertRepetition(repetition);
+  }
+  const residency = value.repetitions.map((result) => result.residencyRatio);
+  const waits = value.repetitions.map((result) => result.p95VisibleWaitMs);
+  for (const [field, observed, expected] of [
+    ["medianResidencyRatio", value.medianResidencyRatio, percentile(residency, 0.5)],
+    ["p95ResidencyRatio", value.p95ResidencyRatio, percentile(residency, 0.95)],
+    ["medianP95VisibleWaitMs", value.medianP95VisibleWaitMs, percentile(waits, 0.5)],
+    ["p95VisibleWaitMs", value.p95VisibleWaitMs, percentile(waits, 0.95)],
+  ] as const) {
+    if (observed !== expected) {
+      throw new Error(`Datasource prefetch ${field} does not match raw repetitions`);
+    }
+  }
+  const sparse = value.sparseBookkeeping;
+  if (
+    sparse.logicalRows !== 1_000_000_000 ||
+    sparse.visibleRows !== VIEWPORT_ROWS ||
+    sparse.loadedBands !== 0 ||
+    sparse.ownedBands !== 0 ||
+    sparse.visibleWaitingBands !== 1 ||
+    sparse.visibleWaitingRows !== VIEWPORT_ROWS ||
+    sparse.modeledNumericPayloadBytes > 128
+  ) {
+    throw new Error("Datasource prefetch sparse bookkeeping evidence is invalid");
+  }
+}
+
 function sparseBookkeepingEvidence(): SparseDatasourceBookkeepingEvidence {
   const logicalRows = 1_000_000_000;
   const visibleStart = 900_000_000;
@@ -458,9 +506,7 @@ export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmar
     medianP95VisibleWaitMs: percentile(waits, 0.5),
     p95VisibleWaitMs: percentile(waits, 0.95),
   };
-  if (report.medianResidencyRatio < 0.95 || report.medianP95VisibleWaitMs >= FRAME_MS) {
-    throw new Error("Datasource prefetch median gate failed");
-  }
+  validateDatasourcePrefetchReport(report);
   return report;
 }
 

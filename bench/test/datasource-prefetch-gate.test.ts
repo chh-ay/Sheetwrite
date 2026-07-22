@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { runDatasourcePrefetchBenchmark } from "../src/datasource-prefetch-bench.js";
+import {
+  runDatasourcePrefetchBenchmark,
+  validateDatasourcePrefetchReport,
+} from "../src/datasource-prefetch-bench.js";
 
 describe("directional datasource prefetch gate", () => {
   it("keeps every logical-clock repetition resident, bounded, and cancellable", async () => {
@@ -36,5 +39,21 @@ describe("directional datasource prefetch gate", () => {
       expect(repetition.jumpVisibleResidentBeforeResponse).toBe(false);
       expect(repetition.jumpVisibleResidentAfterResponse).toBe(true);
     }
+  });
+  it("rejects missing raw repetitions and summaries not derived from them", async () => {
+    const report = await runDatasourcePrefetchBenchmark();
+    const missing = {
+      ...structuredClone(report),
+      repetitions: structuredClone(report.repetitions).slice(1),
+    };
+    expect(() => validateDatasourcePrefetchReport(missing)).toThrow("requires 5 repetitions");
+
+    const mismatched = {
+      ...structuredClone(report),
+      medianP95VisibleWaitMs: report.medianP95VisibleWaitMs + 1,
+    };
+    expect(() => validateDatasourcePrefetchReport(mismatched)).toThrow(
+      "does not match raw repetitions",
+    );
   });
 });

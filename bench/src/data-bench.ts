@@ -60,11 +60,11 @@ import {
   MATRIX_IDS,
   PERFORMANCE_GATE_PROTOCOL_VERSION,
   validateExactMatrix,
-  validateStat,
+  validateRawStat,
 } from "./gate-protocol.js";
 import { createHandsontable } from "./handsontable-runtime.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
-import { forceGc, type MeasureOptions, measure, mib, ms, type Stat, summarize } from "./stats.js";
+import { collect, forceGc, type MeasureOptions, mib, ms, type Stat, summarize } from "./stats.js";
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -133,7 +133,16 @@ function plan(workload: Workload, rows: number): IterationPlan {
       return { warmup: 20, iters: 200 };
   }
 }
-function perOperation(stat: Stat, batch: number): Stat {
+export interface DataStat extends Stat {
+  readonly samples: readonly number[];
+}
+
+function measure(fn: () => void, opts: MeasureOptions): DataStat {
+  const samples = collect(fn, opts);
+  return { ...summarize(samples), samples };
+}
+
+function perOperation(stat: DataStat, batch: number): DataStat {
   return {
     median: stat.median / batch,
     p95: stat.p95 / batch,
@@ -142,10 +151,11 @@ function perOperation(stat: Stat, batch: number): Stat {
     min: stat.min / batch,
     max: stat.max / batch,
     iters: stat.iters,
+    samples: stat.samples.map((sample) => sample / batch),
   };
 }
 
-function measureBatched(fn: () => void, opts: MeasureOptions, batch: number): Stat {
+function measureBatched(fn: () => void, opts: MeasureOptions, batch: number): DataStat {
   return perOperation(
     measure(() => {
       for (let i = 0; i < batch; i++) fn();
@@ -175,7 +185,7 @@ export interface QueryResourceMetrics {
 /** Timed workloads for one engine at one row count. */
 export interface TimedEngineResult {
   readonly rows: number;
-  readonly stats: Record<Workload, Stat>;
+  readonly stats: Record<Workload, DataStat>;
   readonly notes: Partial<Record<Workload, string>>;
   readonly queryResources: QueryResourceMetrics | null;
 }
@@ -266,7 +276,8 @@ export function validateDataBenchmark(
       for (const workload of WORKLOADS) {
         const key = dataMatrixKey(engine, rows, workload);
         const stat = row.stats[workload];
-        validateStat(stat, `${key}.stat`);
+        if (!Array.isArray(stat.samples)) throw new Error(`${key}.samples are missing`);
+        validateRawStat(stat.samples, stat, key);
         if (stat.p95 >= 30_000) {
           throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
         }
@@ -373,7 +384,7 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
 
 function benchSheetwrite(ds: ColumnarDataset, columnar: SheetwriteColumnar): TimedEngineResult {
   const rows = ds.rowCount;
-  const stats = {} as Record<Workload, Stat>;
+  const stats = {} as Record<Workload, DataStat>;
 
   // (a) ingest — a fresh store per timed iteration loads all columns into WASM.
   let storeSink: SheetwriteStore | undefined;
@@ -559,16 +570,16 @@ function container(): HTMLElement {
 
 function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
   const rows = ds.rowCount;
-  const stats = {} as Record<Workload, Stat>;
+  const stats = {} as Record<Workload, DataStat>;
   const notes: Partial<Record<Workload, string>> = {};
   const host = container();
 
-  const guard = (workload: Workload, run: () => Stat): Stat => {
+  const guard = (workload: Workload, run: () => DataStat): DataStat => {
     try {
       return run();
     } catch (err) {
       notes[workload] = `headless limitation: ${(err as Error).message}`;
-      return summarize([]);
+      return { ...summarize([]), samples: [] };
     }
   };
 
@@ -858,6 +869,72 @@ function memoryTable(sw: Map<number, EngineResult>): string {
   }
   return lines.join("\n");
 }
+export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string {
+  validateDataBenchmark(result, "full");
+  const sw = new Map(
+    Object.entries(result.sheetwrite).map(([rows, value]) => [Number(rows), value] as const),
+  );
+  const hot = new Map(
+    Object.entries(result.handsontable).map(([rows, value]) => [Number(rows), value] as const),
+  );
+  const out: string[] = [];
+  out.push("## Headless data-layer results");
+  out.push("");
+  out.push(
+    `Bun ${result.meta.bun} · ${result.meta.platform}/${result.meta.arch} · seeded dataset (id/date/customer/city/amount) · ` +
+      `median (p95) over warmed-up iterations · lower is better.`,
+  );
+  out.push("");
+  out.push("### Head-to-head (both engines, headless)");
+  out.push("");
+  out.push(
+    "Both grids run identical workloads at 1k/10k — the sizes Handsontable completes headlessly (it renders every row without a layout engine).",
+  );
+  out.push("");
+  for (const workload of WORKLOADS) {
+    out.push(headToHeadTable(workload, sw, hot));
+    out.push("");
+  }
+  out.push("### Sheetwrite data-engine scaling (1k → 1M) — median (p95) ms");
+  out.push("");
+  out.push(
+    "Handsontable is omitted at 100k–1M (headless render-all infeasible); the at-scale comparison is the browser render benchmark.",
+  );
+  out.push("");
+  out.push(scalingTable(sw));
+  out.push("");
+  out.push("### Memory");
+  out.push("");
+  out.push(
+    "Sheetwrite's exact data footprint — the WASM linear-memory growth for a single ingest, sampled in a clean isolated process. The whole columnar store (id/date/customer/city/amount) lives here; JS-side retained state is O(columns + unique styles + active view), never O(cells).",
+  );
+  out.push("");
+  out.push(memoryTable(sw));
+  out.push("");
+  out.push("**Notes**");
+  const noteSet = new Set<string>();
+  for (const rows of HANDSONTABLE_ROWS) {
+    const row = hot.get(rows);
+    if (!row) continue;
+    for (const workload of WORKLOADS) {
+      const note = row.notes[workload];
+      if (note && !noteSet.has(note)) {
+        noteSet.add(note);
+        out.push(`- Handsontable ${workload}: ${note}`);
+      }
+    }
+  }
+  out.push(
+    "- Handsontable headless ceiling: a single 100k construct measured ~26 s (renders ~131k `<tr>`s); it cannot virtualize without browser layout, so 100k–1M are measured in the browser bench instead.",
+  );
+  out.push(
+    "- Sheetwrite memory is the WASM `memory.buffer` byteLength delta (exact). bun's `process.heapUsed` conflates the WASM ArrayBuffer with the JS heap, so it is not used here.",
+  );
+  out.push(
+    "- Handsontable's representative memory is captured in the browser render benchmark; its headless heap is dominated by the non-virtualized all-rows DOM (≈141 MiB at 1k, ≈1.2 GiB at 10k under happy-dom) and is not comparable.",
+  );
+  return `${out.join("\n")}\n`;
+}
 
 export async function runSheetwriteDataBench(
   rowsList: readonly number[] = SHEETWRITE_ROWS,
@@ -926,72 +1003,15 @@ async function runFullBench(): Promise<void> {
     hot.set(rows, { ...timed, memory });
   }
 
-  // ── Markdown report to stdout (paste-ready for the README) ──
-  const out: string[] = [];
-  out.push("## Headless data-layer results");
-  out.push("");
-  out.push(
-    `Bun ${Bun.version} · ${process.platform}/${process.arch} · seeded dataset (id/date/customer/city/amount) · ` +
-      `median (p95) over warmed-up iterations · lower is better.`,
-  );
-  out.push("");
-  out.push("### Head-to-head (both engines, headless)");
-  out.push("");
-  out.push(
-    "Both grids run identical workloads at 1k/10k — the sizes Handsontable completes headlessly (it renders every row without a layout engine).",
-  );
-  out.push("");
-  for (const workload of WORKLOADS) {
-    out.push(headToHeadTable(workload, sw, hot));
-    out.push("");
-  }
-  out.push("### Sheetwrite data-engine scaling (1k → 1M) — median (p95) ms");
-  out.push("");
-  out.push(
-    "Handsontable is omitted at 100k–1M (headless render-all infeasible); the at-scale comparison is the browser render benchmark.",
-  );
-  out.push("");
-  out.push(scalingTable(sw));
-  out.push("");
-  out.push("### Memory");
-  out.push("");
-  out.push(
-    "Sheetwrite's exact data footprint — the WASM linear-memory growth for a single ingest, sampled in a clean isolated process. The whole columnar store (id/date/customer/city/amount) lives here; JS-side retained state is O(columns + unique styles + active view), never O(cells).",
-  );
-  out.push("");
-  out.push(memoryTable(sw));
-  out.push("");
-  out.push("**Notes**");
-  const noteSet = new Set<string>();
-  for (const rows of HANDSONTABLE_ROWS) {
-    const r = hot.get(rows);
-    if (!r) continue;
-    for (const workload of WORKLOADS) {
-      const note = r.notes[workload];
-      if (note && !noteSet.has(note)) {
-        noteSet.add(note);
-        out.push(`- Handsontable ${workload}: ${note}`);
-      }
-    }
-  }
-  out.push(
-    "- Handsontable headless ceiling: a single 100k construct measured ~26 s (renders ~131k `<tr>`s); it cannot virtualize without browser layout, so 100k–1M are measured in the browser bench instead.",
-  );
-  out.push(
-    "- Sheetwrite memory is the WASM `memory.buffer` byteLength delta (exact). bun's `process.heapUsed` conflates the WASM ArrayBuffer with the JS heap, so it is not used here.",
-  );
-  out.push(
-    "- Handsontable's representative memory is captured in the browser render benchmark; its headless heap is dominated by the non-virtualized all-rows DOM (≈141 MiB at 1k, ≈1.2 GiB at 10k under happy-dom) and is not comparable.",
-  );
-
-  const report = out.join("\n");
-  console.log(report);
-
   const result = dataResult("full", sw, hot);
   validateDataBenchmark(result, "full");
-  const json = JSON.stringify(result, null, 2);
-  await Bun.write(new URL("../results/data-results.json", import.meta.url).pathname, json);
-  await Bun.write(new URL("../results/data-results.md", import.meta.url).pathname, `${report}\n`);
+  const report = renderDataBenchmarkMarkdown(result);
+  console.log(report.trimEnd());
+  await Bun.write(
+    new URL("../results/data-results.json", import.meta.url).pathname,
+    `${JSON.stringify(result, null, 2)}\n`,
+  );
+  await Bun.write(new URL("../results/data-results.md", import.meta.url).pathname, report);
   process.stderr.write("\n✔ wrote results/data-results.json and results/data-results.md\n");
 }
 

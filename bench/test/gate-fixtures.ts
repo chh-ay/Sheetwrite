@@ -32,7 +32,7 @@ export const TEST_HARNESS: HarnessFingerprint = {
   matrix: "render-full-v1",
   dataset: "seed=test;schema=test",
   sampling: "measured=3;warmup=1;minimum-sample-ms=100;order-seed=test",
-  schema: "typed-render-artifact-v1;controlled-baseline-v1",
+  schema: "typed-render-artifact-v1;controlled-baseline-v2",
   sources: { "bench/src/render-protocol.ts": "sha256:source" },
 };
 
