@@ -22,13 +22,13 @@ import {
   type CompatibilityRecord,
 } from "../docs/src/showcases/compatibility.js";
 import {
-  collectCompatibilityIssues,
-  collectMissingCompatibilityFiles,
-} from "../docs/src/showcases/compatibility-validation.js";
-import {
   buildCompatibilityResults,
   type CompatibilityResults,
 } from "../docs/src/showcases/compatibility-results.js";
+import {
+  collectCompatibilityIssues,
+  collectMissingCompatibilityFiles,
+} from "../docs/src/showcases/compatibility-validation.js";
 import {
   compareReviewedObservation,
   loadCorpus,
@@ -1533,19 +1533,20 @@ async function renderEvidencePage(): Promise<string> {
     ).trimEnd(),
     "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.",
     "",
-    "## Runtime resource ownership",
+    "## Matched regression gate",
     "",
-    "The performance showcase at `/showcases/performance#resource-ownership` renders the public [`RuntimeResourceSnapshot`](/docs/api/core/runtime-resource-snapshot/) protocol directly. It keeps exclusive-owner logical bytes, allocated capacity, WASM committed pages, and independent browser runtime observations in separate buckets; committed pages are never summed into live payload. Bulk-edit before/settled deltas use [`diffRuntimeResourcePhases`](/docs/api/core/diff-runtime-resource-phases/) and omit unchanged owners.",
+    "The release gate does not treat a competitor comparison or a smoke ceiling as regression evidence. On the controlled performance runner it captures ten fresh matched rounds, retains every raw sample, and compares the fresh artifact with the committed baseline. Any unapproved slowdown fails the required CI job.",
     "",
-    "The UI and this reference share [`RUNTIME_RESOURCE_SCHEMA_VERSION`](/docs/api/core/runtime-resource-schema-version/). Detailed peak phases remain in the validated benchmark artifact rather than being presented as measurements from the visitor's browser.",
-    "",
-    "Reproduce and validate the full owner/operation matrix with:",
-    "",
-    '```sh verify title="Runtime resource evidence"',
-    "bun run --filter @sheetwrite/bench bench:resource",
+    '```sh verify title="Zero-regression benchmark"',
+    "bun run --filter @sheetwrite/bench bench:render:prepare",
+    "cd bench",
+    "bun run src/render-driver.ts --rounds 10 --output results/render-fresh.json --markdown-output results/render-fresh.md",
+    "bun run src/check.ts --baseline results/render-baseline.json --fresh results/render-fresh.json --power-mode balanced --concurrency 1",
     "```",
     "",
-    "## Render benchmark: Sheetwrite vs Handsontable",
+    "A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.",
+    "",
+    "## Render benchmark",
     "",
   ];
   if ("evidence" in scale) {
@@ -1579,6 +1580,20 @@ async function renderEvidencePage(): Promise<string> {
   } else {
     pending.push(scale);
   }
+  lines.push(
+    "## Runtime resource ownership",
+    "",
+    "The performance showcase at `/showcases/performance#resource-ownership` renders the public [`RuntimeResourceSnapshot`](/docs/api/core/runtime-resource-snapshot/) protocol directly. It keeps exclusive-owner logical bytes, allocated capacity, WASM committed pages, and independent browser runtime observations in separate buckets; committed pages are never summed into live payload. Bulk-edit before/settled deltas use [`diffRuntimeResourcePhases`](/docs/api/core/diff-runtime-resource-phases/) and omit unchanged owners.",
+    "",
+    "The UI and this reference share [`RUNTIME_RESOURCE_SCHEMA_VERSION`](/docs/api/core/runtime-resource-schema-version/). Detailed peak phases remain in the validated benchmark artifact rather than being presented as measurements from the visitor's browser.",
+    "",
+    "Reproduce and validate the full owner/operation matrix with:",
+    "",
+    '```sh verify title="Runtime resource evidence"',
+    "bun run --filter @sheetwrite/bench bench:resource",
+    "```",
+    "",
+  );
   lines.push("## Data engine benchmark", "");
   if ("evidence" in data) {
     const { evidence, source } = data;
