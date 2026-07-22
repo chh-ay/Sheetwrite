@@ -37,6 +37,8 @@ export interface SheetwriteGridProps
   mutationPolicy?: GridOptions["mutationPolicy"];
   /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
+  /** Controls link activation: emit an event, also navigate internally, or disable it. */
+  hyperlinkActivation?: GridOptions["hyperlinkActivation"];
   /** Named custom cell renderers. */
   renderers?: GridOptions["renderers"];
   /** Named custom cell editors. */

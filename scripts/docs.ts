@@ -25,6 +25,16 @@ import {
   collectCompatibilityIssues,
   collectMissingCompatibilityFiles,
 } from "../docs/src/showcases/compatibility-validation.js";
+import {
+  buildCompatibilityResults,
+  type CompatibilityResults,
+} from "../docs/src/showcases/compatibility-results.js";
+import {
+  compareReviewedObservation,
+  loadCorpus,
+  readConformanceManifest,
+  runOffline,
+} from "./conformance.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
   type ApiEntryPoint,
@@ -112,6 +122,7 @@ export const ADAPTER_DOC_CONTRACT = {
     "protectionResolver",
     "mutationPolicy",
     "transactionResourceLimits",
+    "hyperlinkActivation",
     "theme",
     "readOnly",
     "config",
@@ -274,6 +285,28 @@ async function exists(path: string): Promise<boolean> {
 
 function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+let compatibilityResultsPromise: Promise<CompatibilityResults> | undefined;
+
+function compatibilityResults(): Promise<CompatibilityResults> {
+  compatibilityResultsPromise ??= (async () => {
+    const [corpus, manifest, packageJson] = await Promise.all([
+      loadCorpus(),
+      readConformanceManifest(),
+      readFile(join(repositoryRoot, "packages/core/package.json"), "utf8").then(
+        (content) => JSON.parse(content) as { version: string },
+      ),
+    ]);
+    const offline = await runOffline(corpus);
+    return buildCompatibilityResults({
+      corpus,
+      manifest,
+      offline,
+      libraryVersion: packageJson.version,
+      compareObservation: compareReviewedObservation,
+    });
+  })();
+  return compatibilityResultsPromise;
 }
 
 export function entrySlug(packageName: string, subpath: string): string {
@@ -1783,46 +1816,51 @@ export function renderCompatibilityMatrix(
 ): string {
   const lines = [
     "---",
-    'title: "Executable compatibility matrix"',
-    'description: "Evidence-linked formula, workbook, clipboard, and XLSX compatibility boundaries."',
+    'title: "Detailed compatibility results"',
+    'description: "Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits."',
     "---",
     "",
-    "# Executable compatibility matrix",
+    "# Detailed compatibility results",
     "",
-    "This matrix is generated from a typed, fail-closed inventory. It describes only the checked corpus and declared semantics; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.",
+    "This page is generated from checked examples and evidence records. It states only what each named result proves; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.",
     "",
-    "Result modes distinguish **evaluated** formulas/structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.",
+    "Result labels distinguish **evaluated** formulas or structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.",
     "",
-    "| Feature | Area | Dialect | Status | Result | Import | Export | Known boundary | Evidence |",
+    "| Feature | Area | Behavior scope | Status | Result | Import | Export | Known boundary | Evidence |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...records.map((record) => {
-      const evidence = record.fixtureIds.map((id) => `\`${id}\``).join("<br />");
+      const evidence = `${record.fixtureIds.length} checked evidence ${record.fixtureIds.length === 1 ? "record" : "records"}`;
       return `| [${compatibilityCell(record.label)}](/showcases/interoperability/?compatibility=${encodeURIComponent(record.id)}) | \`${record.area}\` | \`${record.dialect}\` | **${record.status}** | ${record.resultMode} | ${compatibilityCell(record.importBehavior)} | ${compatibilityCell(record.exportBehavior)} | ${compatibilityCell(record.divergence)} | ${evidence} |`;
     }),
     "",
     "## Warning boundaries",
     "",
-    "| Record | Warning code | Meaning |",
+    "| Feature | Warning code | Meaning |",
     "| --- | --- | --- |",
     ...records
       .filter((record) => record.warningCode !== null)
       .map(
         (record) =>
-          `| \`${record.id}\` | \`${record.warningCode}\` | ${compatibilityCell(record.semantics)} |`,
+          `| ${compatibilityCell(record.label)} | \`${record.warningCode}\` | ${compatibilityCell(record.semantics)} |`,
       ),
     "",
-    "## Fixture and provenance ledger",
+    "<details>",
+    "<summary>Technical evidence file details and checksums</summary>",
     "",
-    "| Fixture ID | Kind | Producer/version | Provenance | Digest | Expected normalized state | Expected warnings |",
+    "| Test file ID | Kind | Tested app/version | Source notes | SHA-256 | Expected checked result | Expected warnings |",
     "| --- | --- | --- | --- | --- | --- | --- |",
     ...fixtures.map(
       (fixture) =>
-        `| \`${fixture.id}\` | \`${fixture.kind}\` | ${compatibilityCell(`${fixture.producer} ${fixture.producerVersion}`)} | ${compatibilityCell(fixture.provenance)} | ${fixture.sha256 ? `\`${fixture.sha256}\`` : "source-controlled test/manifest"} | ${compatibilityCell(fixture.expected.join("; "))} | ${compatibilityCell(fixture.expectedWarnings.join("; ") || "none")} |`,
+        `| \`${fixture.id}\` | \`${fixture.kind}\` | ${compatibilityCell(`${fixture.producer} ${fixture.producerVersion}`)} | ${compatibilityCell(fixture.provenance)} | ${fixture.sha256 ? `\`${fixture.sha256}\`` : "source-controlled test or manifest"} | ${compatibilityCell(fixture.expected.join("; "))} | ${compatibilityCell(fixture.expectedWarnings.join("; ") || "none")} |`,
     ),
     "",
-    "## Sources",
+    "</details>",
     "",
-    ...records.map((record) => `- \`${record.id}\`: ${compatibilitySource(record.source)}`),
+    "## Exact sources",
+    "",
+    ...records.map(
+      (record) => `- ${compatibilityCell(record.label)}: ${compatibilitySource(record.source)}`,
+    ),
     "",
   ];
   return `${lines.join("\n").trimEnd()}\n`;
@@ -1859,7 +1897,10 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     ...(await collectCompatibilityDigestIssues()),
   ];
   if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
-  const formulaInventory = await loadFormulaContractInventory(repositoryRoot);
+  const [formulaInventory, publishedCompatibilityResults] = await Promise.all([
+    loadFormulaContractInventory(repositoryRoot),
+    compatibilityResults(),
+  ]);
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
@@ -1938,6 +1979,10 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
         })),
         fixtures: COMPATIBILITY_FIXTURES.map(({ path: _path, ...fixture }) => fixture),
       }),
+    },
+    {
+      path: join(generatedDataRoot, "compatibility-results.json"),
+      content: stableJson(publishedCompatibilityResults),
     },
     {
       path: join(contentRoot, "guides/performance-resources.md"),

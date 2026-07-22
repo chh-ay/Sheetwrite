@@ -6,18 +6,20 @@ import {
   initSheetwrite,
   isSheetwriteReady,
 } from "@sheetwrite/core";
-import {
   createGridController,
   createSimpleGridInput,
+  createSimpleRowBridge,
   type GridAdapterEventHandlers,
   type GridController,
   type GridReadyReason,
   type GridSizeProps,
   getGridResetReason,
   gridSizeStyle,
+  type RowBridge,
+  type RowBridgeHandler,
+  type RowBridgeId,
   type SheetwriteInitializationProps,
   type SimpleColumn,
-} from "@sheetwrite/core/adapter";
 import {
   type CSSProperties,
   type ForwardedRef,
@@ -126,6 +128,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       protectionResolver,
       mutationPolicy,
       transactionResourceLimits,
+      hyperlinkActivation,
       renderers,
       editors,
       overscan,
@@ -255,6 +258,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         protectionResolver,
         mutationPolicy,
         transactionResourceLimits,
+        hyperlinkActivation,
         ...liveOptionsRef.current,
       };
       const previousOptions = previousOptionsRef.current;
@@ -342,6 +346,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       protectionResolver,
       mutationPolicy,
       transactionResourceLimits,
+      hyperlinkActivation,
       renderers,
       editors,
     ]);

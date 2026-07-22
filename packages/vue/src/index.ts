@@ -74,6 +74,8 @@ export interface SheetwriteGridProps {
   mutationPolicy?: GridOptions["mutationPolicy"];
   /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
+  /** Controls link activation: emit an event, also navigate internally, or disable it. */
+  hyperlinkActivation?: GridOptions["hyperlinkActivation"];
   /** Named custom renderers registered when the Grid is created. */
   renderers?: Record<string, CellRenderer>;
   /** Named custom editors registered when the Grid is created. */
@@ -191,6 +193,11 @@ const gridProps = {
     type: Object as PropType<GridOptions["transactionResourceLimits"]>,
     default: undefined,
   },
+  /** Controls link activation: emit an event, also navigate internally, or disable it. */
+  hyperlinkActivation: {
+    type: String as PropType<GridOptions["hyperlinkActivation"]>,
+    default: undefined,
+  },
   /** Named custom renderers registered when the Grid is created. */
   renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
   /** Named custom editors registered when the Grid is created. */
@@ -272,6 +279,7 @@ const SheetwriteGridComponent = defineComponent({
         protectionResolver: props.protectionResolver,
         mutationPolicy: props.mutationPolicy,
         transactionResourceLimits: props.transactionResourceLimits,
+        hyperlinkActivation: props.hyperlinkActivation,
         renderers: props.renderers,
         editors: props.editors,
         overscan: props.overscan,
@@ -349,6 +357,7 @@ const SheetwriteGridComponent = defineComponent({
         props.protectionResolver,
         props.mutationPolicy,
         props.transactionResourceLimits,
+        props.hyperlinkActivation,
         props.renderers,
         props.editors,
       ],
