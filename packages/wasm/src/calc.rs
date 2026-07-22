@@ -1890,4 +1890,16 @@ mod tests {
             )
         );
     }
+    #[test]
+    fn dotted_function_names_and_leading_decimal_round_trip() {
+        let dotted = parse("=MODE.SNGL(.5)").expect("dotted function should parse");
+        assert_eq!(
+            dotted,
+            Ast::Func(Func::ModeSngl, vec![Ast::Num(0.5)])
+        );
+        assert_eq!(parse(&serialize(&dotted)), Ok(dotted));
+        assert_eq!(parse("=.5"), Ok(Ast::Num(0.5)));
+        let unknown = parse("=X.TEST(1)").expect("unknown dotted function should preserve");
+        assert_eq!(parse(&serialize(&unknown)), Ok(unknown));
+    }
 }
