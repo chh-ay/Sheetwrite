@@ -1,13 +1,22 @@
 import { verifyCaptureArtifacts } from "./capture.js";
 import { compareResults, compareReviewedObservation } from "./compare.js";
 import { runSheetwriteCase } from "./adapters/sheetwrite.js";
+import { readConformanceManifest, readFormulaInventory } from "./generate.js";
 import { validateCorpus } from "./schema.js";
 import type { ConformanceCorpus, OfflineConformanceResult } from "./types.js";
 
 export async function runOffline(corpus: ConformanceCorpus): Promise<OfflineConformanceResult> {
-  const artifacts = await verifyCaptureArtifacts(corpus);
-  const corpusIssues = [...artifacts.issues, ...validateCorpus(corpus, artifacts.verified)];
+  const [artifacts, manifest, inventory] = await Promise.all([
+    verifyCaptureArtifacts(corpus),
+    readConformanceManifest(),
+    readFormulaInventory(),
+  ]);
+  const corpusIssues = [
+    ...artifacts.issues,
+    ...validateCorpus(corpus, manifest, inventory, artifacts.verified),
+  ];
   if (corpusIssues.length > 0) throw new Error(corpusIssues.join("\n"));
+  const localCanaries = corpus.cases.filter((entry) => entry.localCanary === true).length;
 
   const failures: string[] = [];
   const warnings: string[] = [];
@@ -50,6 +59,7 @@ export async function runOffline(corpus: ConformanceCorpus): Promise<OfflineConf
   return {
     status: deferred === 0 && unsupported.length === 0 ? "verified" : "blocked",
     checked,
+    localCanaries,
     reviewed,
     deferred,
     warnings,

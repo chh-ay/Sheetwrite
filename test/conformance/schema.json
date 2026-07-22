@@ -1,17 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sheetwrite.vercel.app/schemas/conformance-v1.json",
-  "title": "Sheetwrite neutral conformance corpus",
+  "title": "Sheetwrite original-evidence conformance corpus",
   "type": "object",
   "required": ["protocol", "license", "cases"],
   "additionalProperties": false,
   "properties": {
     "protocol": { "const": 1 },
     "license": { "type": "string", "minLength": 1 },
-    "cases": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/case" }
-    }
+    "cases": { "type": "array", "items": { "$ref": "#/$defs/case" } }
   },
   "$defs": {
     "scalar": { "type": ["null", "boolean", "number", "string"] },
@@ -33,7 +30,7 @@
           ]
         },
         "value": {},
-        "error": { "type": "string" },
+        "error": { "type": "string", "minLength": 1 },
         "rows": { "type": "integer", "minimum": 1 },
         "columns": { "type": "integer", "minimum": 1 },
         "displayedText": { "type": "string" },
@@ -82,6 +79,51 @@
         }
       ]
     },
+    "source": {
+      "type": "object",
+      "required": ["title", "section", "url", "sha256", "license", "authorship"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "section": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "license": { "type": "string", "minLength": 1 },
+        "authorship": { "enum": ["original", "spec-derived", "producer-observation"] },
+        "notice": { "type": "string" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["kind", "basis", "oracle"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["property", "metamorphic", "pinned-observation"] },
+        "basis": {
+          "enum": ["documented-semantics", "property-invariant", "producer-observation"]
+        },
+        "oracle": { "type": "string", "minLength": 1 }
+      }
+    },
+    "caseTolerance": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "exact" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["absolute", "relative", "ulp"] },
+            "value": { "type": "number", "minimum": 0 }
+          }
+        }
+      ]
+    },
     "observation": {
       "type": "object",
       "required": ["producer", "producerVersion", "capturedAt", "status"],
@@ -110,28 +152,42 @@
     },
     "case": {
       "type": "object",
-      "required": ["id", "area", "dialect", "source", "kind", "expected", "observations"],
+      "required": [
+        "id",
+        "area",
+        "dialect",
+        "category",
+        "family",
+        "kind",
+        "source",
+        "evidence",
+        "tolerance",
+        "expected",
+        "observations"
+      ],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]+$" },
         "area": { "enum": ["formula", "mutation", "workbook", "xlsx"] },
+        "feature": { "type": "string", "minLength": 1 },
         "dialect": { "enum": ["shared", "excel", "google-sheets", "openformula"] },
-        "kind": { "enum": ["formula", "workbook"] },
-        "source": {
+        "category": {
+          "enum": ["normal", "empty", "mixed", "error", "boundary", "range-array", "mutation"]
+        },
+        "family": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["formula", "mutation", "workbook"] },
+        "subject": {
           "type": "object",
-          "required": ["title", "section", "license", "authorship"],
+          "required": ["kind", "name"],
           "additionalProperties": false,
           "properties": {
-            "title": { "type": "string", "minLength": 1 },
-            "section": { "type": "string", "minLength": 1 },
-            "url": { "type": "string", "format": "uri" },
-            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-            "license": { "type": "string", "minLength": 1 },
-            "authorship": { "enum": ["original", "spec-derived", "producer-observation"] },
-            "notice": { "type": "string" }
-          },
-          "dependentRequired": { "url": ["sha256"] }
+            "kind": { "enum": ["function", "operator"] },
+            "name": { "type": "string", "minLength": 1 }
+          }
         },
+        "source": { "$ref": "#/$defs/source" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "tolerance": { "$ref": "#/$defs/caseTolerance" },
         "inputs": {
           "type": "array",
           "items": {
@@ -147,26 +203,44 @@
         "numberFormat": { "type": "string", "minLength": 1 },
         "formula": { "type": "string", "pattern": "^=" },
         "target": { "type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$" },
-        "operations": { "type": "array", "items": { "type": "object" } },
+        "operations": { "type": "array", "minItems": 1, "items": { "type": "object" } },
         "expected": { "$ref": "#/$defs/result" },
         "observations": { "type": "array", "items": { "$ref": "#/$defs/observation" } },
-        "knownDivergence": { "type": "string" },
-        "unsupported": { "type": "boolean" }
+        "knownDivergence": {
+          "type": "object",
+          "required": ["reason", "producers", "alternate"],
+          "additionalProperties": false,
+          "properties": {
+            "reason": { "type": "string", "minLength": 1 },
+            "producers": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["excel-desktop", "excel-web", "google-sheets", "libreoffice"]
+              }
+            },
+            "alternate": { "$ref": "#/$defs/result" }
+          }
+        },
+        "unsupported": { "type": "boolean" },
+        "localCanary": { "const": true }
       },
       "allOf": [
         {
           "if": { "properties": { "kind": { "const": "formula" } } },
-          "then": { "required": ["inputs", "formula", "target"] }
+          "then": { "required": ["subject", "inputs", "formula", "target"] }
         },
         {
-          "if": { "properties": { "kind": { "const": "workbook" } } },
-          "then": { "required": ["operations"] }
+          "if": { "properties": { "kind": { "enum": ["mutation", "workbook"] } } },
+          "then": { "required": ["feature", "operations"] }
         },
         {
-          "if": {
-            "properties": { "unsupported": { "const": true } },
-            "required": ["unsupported"]
-          },
+          "if": { "properties": { "kind": { "const": "mutation" } } },
+          "then": { "properties": { "category": { "const": "mutation" } } }
+        },
+        {
+          "if": { "properties": { "unsupported": { "const": true } }, "required": ["unsupported"] },
           "then": {
             "properties": {
               "expected": {

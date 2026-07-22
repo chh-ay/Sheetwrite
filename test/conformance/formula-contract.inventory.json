@@ -12,6 +12,10 @@
     "microsoft-excel-functions": {
       "title": "Excel functions (by category)",
       "link": "https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb"
+    },
+    "microsoft-excel-operators": {
+      "title": "Calculation operators and precedence in Excel",
+      "link": "https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a"
     }
   },
   "families": {
@@ -55,7 +59,16 @@
       "source": "microsoft-excel-functions",
       "section": "Statistical functions"
     },
-    "text": { "title": "Text", "source": "microsoft-excel-functions", "section": "Text functions" }
+    "text": {
+      "title": "Text",
+      "source": "microsoft-excel-functions",
+      "section": "Text functions"
+    },
+    "operator": {
+      "title": "Formula operators",
+      "source": "microsoft-excel-operators",
+      "section": "Types of operators"
+    }
   },
   "signatureProfiles": {
     "zero": { "arguments": [], "returns": "scalar" },
@@ -3861,6 +3874,158 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "version": 1
+    }
+  ],
+  "operators": [
+    {
+      "canonical": "add",
+      "token": "+",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "subtract",
+      "token": "-",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "multiply",
+      "token": "*",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "divide",
+      "token": "/",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "power",
+      "token": "^",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "concatenate",
+      "token": "&",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Text concatenation operator",
+      "version": 1
+    },
+    {
+      "canonical": "equal",
+      "token": "=",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "not-equal",
+      "token": "<>",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "less-than",
+      "token": "<",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "less-than-or-equal",
+      "token": "<=",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "greater-than",
+      "token": ">",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "greater-than-or-equal",
+      "token": ">=",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "percent",
+      "token": "%",
+      "fixity": "postfix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "unary-plus",
+      "token": "+",
+      "fixity": "prefix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "unary-minus",
+      "token": "-",
+      "fixity": "prefix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
       "version": 1
     }
   ]

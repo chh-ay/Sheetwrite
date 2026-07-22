@@ -1,6 +1,7 @@
 import { captureExcel } from "./conformance/adapters/excel.js";
 import { captureGoogle } from "./conformance/adapters/google.js";
 import { loadCorpus } from "./conformance/corpus.js";
+import { writeConformanceEvidence } from "./conformance/generate.js";
 import { sha256 } from "./conformance/normalize.js";
 import { runOffline } from "./conformance/offline.js";
 
@@ -15,18 +16,49 @@ export type {
   KnownDivergence,
   OfflineConformanceResult,
   ResultType,
+  CaseTolerance,
+  ConformanceManifest,
+  EvidenceDescriptor,
+  FormulaInventory,
+  FormulaSubject,
+  SemanticCategory,
 } from "./conformance/types.js";
 export { runSheetwriteCase } from "./conformance/adapters/sheetwrite.js";
 export { validateExcelCapture } from "./conformance/adapters/excel.js";
+export {
+  captureGoogleWithDependencies,
+  validateGoogleCaptureArtifact,
+  MAX_GOOGLE_CASES_PER_WORKBOOK,
+  MAX_GOOGLE_ARRAY_ENVELOPE_CELLS,
+} from "./conformance/adapters/google.js";
+export type {
+  GoogleCaptureDependencies,
+  GoogleWorkbookManifest,
+} from "./conformance/adapters/google.js";
 export { verifyCaptureArtifacts } from "./conformance/capture.js";
 export { compareResults, compareReviewedObservation } from "./conformance/compare.js";
 export { loadCorpus } from "./conformance/corpus.js";
+export {
+  generateConformanceEvidence,
+  readConformanceManifest,
+  readFormulaInventory,
+  supportedInventorySubjects,
+  supportedNamesChecksum,
+  writeConformanceEvidence,
+} from "./conformance/generate.js";
 export { canonicalJson, sha256, sha256Bytes } from "./conformance/normalize.js";
 export { runOffline } from "./conformance/offline.js";
 export { validateCorpus, validateResult } from "./conformance/schema.js";
 
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "validate";
+  if (command === "generate") {
+    const manifest = await writeConformanceEvidence();
+    console.log(
+      `Conformance corpus generated: formula=${manifest.counts.formula} mutation=${manifest.counts.mutation} workbook=${manifest.counts.workbook} sha256=${manifest.corpusSha256}`,
+    );
+    return;
+  }
   const corpus = await loadCorpus(process.argv[3]);
   if (command === "validate") {
     console.log(

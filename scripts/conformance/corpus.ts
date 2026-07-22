@@ -1,4 +1,10 @@
 import { verifyCaptureArtifacts } from "./capture.js";
+import {
+  MANIFEST_PATH,
+  INVENTORY_PATH,
+  readConformanceManifest,
+  readFormulaInventory,
+} from "./generate.js";
 import { isObject } from "./normalize.js";
 import { readCorpusJson, SHA256_PATTERN, validateCorpus } from "./schema.js";
 import type { ConformanceCorpus } from "./types.js";
@@ -24,12 +30,24 @@ function declaredArtifactHashes(value: unknown): Set<string> {
 export async function loadCorpus(
   path = "test/conformance/corpus.json",
 ): Promise<ConformanceCorpus> {
-  const value = await readCorpusJson(path);
-  const structuralIssues = validateCorpus(value, declaredArtifactHashes(value));
+  const [value, manifest, inventory] = await Promise.all([
+    readCorpusJson(path),
+    readConformanceManifest(MANIFEST_PATH),
+    readFormulaInventory(INVENTORY_PATH),
+  ]);
+  const structuralIssues = validateCorpus(
+    value,
+    manifest,
+    inventory,
+    declaredArtifactHashes(value),
+  );
   if (structuralIssues.length > 0) throw new Error(structuralIssues.join("\n"));
   const corpus = value as ConformanceCorpus;
   const artifacts = await verifyCaptureArtifacts(corpus);
-  const issues = [...artifacts.issues, ...validateCorpus(corpus, artifacts.verified)];
+  const issues = [
+    ...artifacts.issues,
+    ...validateCorpus(corpus, manifest, inventory, artifacts.verified),
+  ];
   if (issues.length > 0) throw new Error(issues.join("\n"));
   return corpus;
 }
