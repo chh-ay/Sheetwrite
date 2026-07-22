@@ -70,7 +70,7 @@ describe("FORMULA_FUNCTIONS catalog", () => {
     );
     if (!parserTable?.[1]) throw new Error("calc.rs parser function table not found");
 
-    const engineFunctions = [...parserTable[1].matchAll(/"([A-Z][A-Z0-9]*)"/g)].map(
+    const engineFunctions = [...parserTable[1].matchAll(/"([A-Z][A-Z0-9.]*)"/g)].map(
       (match) => match[1]!,
     );
 
@@ -82,14 +82,16 @@ describe("FORMULA_FUNCTIONS catalog", () => {
 });
 
 describe("functionTokenAt", () => {
-  it("returns the trailing letter run ending at the caret", () => {
+  it("returns the trailing identifier run ending at the caret", () => {
     expect(functionTokenAt("=SU", 3)).toBe("SU");
     expect(functionTokenAt("=1+co", 5)).toBe("co");
     expect(functionTokenAt("=SUM(A", 6)).toBe("A");
+    expect(functionTokenAt("=MODE.S", 7)).toBe("MODE.S");
   });
 
-  it("returns null when the caret is not right after a letter", () => {
-    expect(functionTokenAt("=SUM(A1:B2)+C3", 14)).toBeNull();
+  it("rejects tokens that do not begin with an identifier letter", () => {
+    expect(functionTokenAt("=SUM(A1:B2)+C3", 14)).toBe("C3");
+    expect(functionTokenAt("=.5", 3)).toBeNull();
     expect(functionTokenAt("=SUM(", 5)).toBeNull();
     expect(functionTokenAt("=", 1)).toBeNull();
   });
@@ -127,19 +129,50 @@ describe("FormulaAssist autocomplete", () => {
     assist.attach(ta, THEME);
 
     expect(assist.isOpen).toBe(true);
-    expect(itemsOf(host)).toEqual(["SUM", "SUMIF", "SUMIFS"]);
+    expect(itemsOf(host)).toEqual([
+      "SUM",
+      "SUMIF",
+      "SUMIFS",
+      "SUBTOTAL",
+      "SUBSTITUTE",
+      "SUMPRODUCT",
+    ]);
 
     ta.value = "=CO";
     ta.setSelectionRange(3, 3);
     assist.update();
     expect(itemsOf(host)).toEqual([
-      "CONCAT",
-      "CONCATENATE",
+      "CODE",
       "COUNT",
+      "COLUMN",
+      "CONCAT",
+      "CORREL",
       "COUNTA",
+      "COLUMNS",
       "COUNTIF",
       "COUNTIFS",
+      "COUNTBLANK",
+      "CONCATENATE",
+      "COVARIANCE.P",
+      "COVARIANCE.S",
     ]);
+  });
+
+  it("completes dotted parser names without treating leading decimals as names", () => {
+    const { host, ta } = mountTextarea();
+    const assist = new FormulaAssist(host, noopDeps());
+
+    ta.value = "=MODE.";
+    ta.setSelectionRange(6, 6);
+    assist.attach(ta, THEME);
+    expect(itemsOf(host)).toEqual(["MODE.SNGL"]);
+    expect(assist.handleKeyDown(keydown("Enter"))).toBe(true);
+    expect(ta.value).toBe("=MODE.SNGL(");
+
+    ta.value = "=.5";
+    ta.setSelectionRange(3, 3);
+    assist.update();
+    expect(assist.isOpen).toBe(false);
   });
 
   it("stays closed when the text is not a formula", () => {
@@ -188,17 +221,17 @@ describe("FormulaAssist autocomplete", () => {
     ta.value = "=CO";
     ta.setSelectionRange(3, 3);
     assist.attach(ta, THEME);
-    expect(selectedItem(host)).toBe("CONCAT");
+    expect(selectedItem(host)).toBe("CODE");
 
     expect(assist.handleKeyDown(keydown("ArrowDown"))).toBe(true);
-    expect(selectedItem(host)).toBe("CONCATENATE");
+    expect(selectedItem(host)).toBe("COUNT");
 
     expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true);
     expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true); // wraps to last
-    expect(selectedItem(host)).toBe("COUNTIFS");
+    expect(selectedItem(host)).toBe("COVARIANCE.S");
 
     assist.handleKeyDown(keydown("Enter"));
-    expect(ta.value).toBe("=COUNTIFS(");
+    expect(ta.value).toBe("=COVARIANCE.S(");
   });
 
   it("ignores Arrow keys when the popup is closed (returns false)", () => {
@@ -331,7 +364,14 @@ describe("EditController with assist deps", () => {
     ta.setSelectionRange(3, 3);
     ta.dispatchEvent(new Event("input"));
     expect(host.querySelector(".sheetwrite-assist")).not.toBeNull();
-    expect(itemsOf(host)).toEqual(["SUM", "SUMIF", "SUMIFS"]);
+    expect(itemsOf(host)).toEqual([
+      "SUM",
+      "SUMIF",
+      "SUMIFS",
+      "SUBTOTAL",
+      "SUBSTITUTE",
+      "SUMPRODUCT",
+    ]);
   });
 
   it("first Escape closes the popup, second cancels the edit and clears highlights", () => {

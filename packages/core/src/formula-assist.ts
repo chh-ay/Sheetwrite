@@ -336,7 +336,11 @@ export class FormulaAssist {
     }
 
     const upper = token.toUpperCase();
-    const matches = FORMULA_FUNCTIONS.filter((fn) => fn.startsWith(upper));
+    const matches = FORMULA_FUNCTIONS.filter((fn) => fn.startsWith(upper)).sort((left, right) => {
+      const lengthOrder = left.length - right.length;
+      if (lengthOrder !== 0) return lengthOrder;
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
     if (matches.length === 0) {
       this.close();
       return;
