@@ -73,6 +73,18 @@
   --sw-demo-radius-2: 0.5rem;
   --sw-demo-radius-3: 0.75rem;
   --sw-demo-transition: 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  --sw-state-resolved: var(--sw-accent);
+  --sw-state-requested: #2563eb;
+  --sw-state-pending: #b45309;
+  --sw-state-cached: var(--sw-fg-dim);
+  --sw-window-radius: 0.85rem;
+  --sw-motion-fast: 120ms;
+  --sw-motion-base: 240ms;
+  --sw-motion-slow: 480ms;
+  --sw-motion-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --sw-motion-decelerate: cubic-bezier(0.16, 1, 0.3, 1);
+  --sw-motion-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --sw-motion-stagger: 60ms;
 }
 
 :root[data-theme="dark"] {
@@ -96,4 +108,15 @@
   --sw-type-name: #7dd3fc;
   --sw-type-string: #6ee7b7;
   --sw-type-number: #fbbf24;
+  --sw-state-requested: #60a5fa;
+  --sw-state-pending: #fbbf24;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sw-motion-fast: 0ms;
+    --sw-motion-base: 0ms;
+    --sw-motion-slow: 0ms;
+    --sw-motion-stagger: 0ms;
+  }
 }

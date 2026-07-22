@@ -79,15 +79,25 @@ test("sidebar marks only the nearest documentation route as current", async ({ p
 
 test("site root serves the product landing", async ({ page }) => {
   const errors = collectErrors(page);
+  const wasmRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
+  });
   const response = await page.goto(siteUrl("/"));
   expect(response?.ok()).toBe(true);
   // Semantic contract: exactly one H1, and no live grid runtime on the landing.
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
-  await expect(page).toHaveTitle("Sheetwrite — TypeScript spreadsheet and data grid");
+  const productStory = page.getByTestId("landing-product-story");
+  await expect(productStory).toBeVisible();
+  await expect(productStory).toHaveAttribute("data-landing-phase", "resolve", { timeout: 10_000 });
+  await expect(productStory.getByText("Illustrative product view")).toBeVisible();
+  await expect(productStory.getByText(/static Sheetwrite composition/i)).toBeVisible();
+  expect(wasmRequests).toEqual([]);
+  await expect(page).toHaveTitle("Sheetwrite — Web spreadsheet library powered by Rust/WASM");
   await expect(page.locator('meta[name="description"]')).toHaveAttribute(
     "content",
-    "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters. Get started.",
+    "A fast, editable web spreadsheet and data-grid library with a TypeScript API and Rust/WASM engine. React, Vue, Svelte, and vanilla adapters included.",
   );
   await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
     "content",
@@ -125,6 +135,80 @@ test("site root serves the product landing", async ({ page }) => {
   await page.goBack();
   await page.getByRole("link", { name: "Get started" }).click();
   await expect(page).toHaveURL(docsUrl("start/installation/"));
+});
+
+test("landing choreography is bounded, replayable, and reduced-motion complete", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(siteUrl("/"));
+  const story = page.getByTestId("landing-product-story");
+  await expect(story).toHaveAttribute("data-landing-phase", "resolve");
+  const reduced = await story.evaluate((root) => ({
+    resolved: root.style.getPropertyValue("--sw-landing-resolved"),
+    running: root
+      .getAnimations({ subtree: true })
+      .filter((animation) => animation.playState === "running").length,
+    nodes: root.querySelectorAll("*").length,
+  }));
+  expect(reduced.resolved).toBe("1");
+  expect(reduced.running).toBe(0);
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const box = await story.boundingBox();
+  if (!box) throw new Error("landing product story has no bounds");
+  await page.mouse.move(box.x + box.width * 0.78, box.y + box.height * 0.28);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-x"))),
+    )
+    .toBeGreaterThan(76);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-x"))),
+    )
+    .toBeLessThan(80);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-y"))),
+    )
+    .toBeGreaterThan(26);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-y"))),
+    )
+    .toBeLessThan(30);
+  await story.getByRole("button", { name: "Replay visual explanation" }).click();
+  await expect(story).toHaveAttribute("data-landing-phase", /enter|select/);
+  await expect(story).toHaveAttribute("data-landing-running", "true");
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(story).toHaveAttribute("data-landing-running", "false");
+  await story.scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute("data-landing-running", "true");
+  expect(await story.locator("*").count()).toBe(reduced.nodes);
+  await page.goto(docsUrl("start/installation/"));
+  await expect(story).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () =>
+        document.getAnimations().filter((animation) => animation.playState === "running").length,
+    ),
+  ).toBe(0);
+});
+
+test.describe("landing coarse pointer", () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  test("landing remains operable without hover", async ({ page }) => {
+    await page.goto(siteUrl("/"));
+    const story = page.getByTestId("landing-product-story");
+    await expect(story.getByRole("button", { name: "Replay visual explanation" })).toBeVisible();
+    await story.getByRole("button", { name: "Replay visual explanation" }).click();
+    await expect(story).toHaveAttribute("data-landing-phase", /enter|select/);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
 });
 
 test.describe("documentation site", () => {
@@ -542,9 +626,16 @@ test.describe("documentation site", () => {
     expect(darkSurface.panel).not.toBe(darkSurface.signature);
   });
 
-  for (const width of [347, 700, 1568] as const) {
+  for (const [width, height] of [
+    [347, 855],
+    [700, 900],
+    // Equivalent CSS reflow boundary for 200% browser zoom on a 1440×1000 viewport.
+    [720, 500],
+    [1_280, 900],
+    [1_568, 1_000],
+  ] as const) {
     test(`documentation landing remains aligned at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 855 });
+      await page.setViewportSize({ width, height });
       await page.goto(siteUrl());
       await expect(page.locator("main h1")).toHaveCount(1);
       await expect(

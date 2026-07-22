@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { InstallCommand } from "../components/InstallCommand.js";
+import { LandingSpreadsheet } from "../components/LandingSpreadsheet.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
@@ -139,6 +140,11 @@ function Landing() {
               Vanilla, React, Vue, and Svelte adapters. Your application owns the document, the
               persistence, and the chrome — the engine owns the speed.
             </p>
+          </div>
+          <div className="sw-hero-proof">
+            <LandingSpreadsheet />
+          </div>
+          <div className="sw-hero__conversion">
             <div className="sw-hero-actions">
               <a className="sw-cta" href="/docs/start/installation/">
                 Get started
@@ -150,54 +156,28 @@ function Landing() {
             <div className="sw-hero-install">
               <InstallCommand packageName="@sheetwrite/core" />
             </div>
-          </div>
-          <div className="sw-hero-proof">
-            <div className="sw-hero-panel" data-hero-panel>
-              <header className="sw-hero-panel__bar">
+            {evidence ? (
+              <dl className="sw-hero-facts" aria-label="Measured product evidence">
                 <div>
-                  <strong>sheetwrite</strong>
-                  <span>runtime contract</span>
+                  <dt>{evidence.heroStats.millionRowMedianMs} ms</dt>
+                  <dd>median interaction at one million rows</dd>
                 </div>
-                <span>MIT</span>
-              </header>
-              <dl className="sw-hero-manifest">
                 <div>
-                  <dt>document</dt>
+                  <dt>{evidence.heroStats.millionRowHeapMb} MB</dt>
+                  <dd>renderer heap in the same capture</dd>
+                </div>
+                <div>
+                  <dt>4</dt>
+                  <dd>first-party framework mounts</dd>
+                </div>
+                <div className="sw-hero-facts__provenance">
+                  <dt>Evidence</dt>
                   <dd>
-                    owned by your application — lifecycle, persistence, and product UI stay in your
-                    codebase
+                    Protocol <code>{evidence.capture.commit.slice(0, 7)}</code>
                   </dd>
-                </div>
-                <div>
-                  <dt>engine</dt>
-                  <dd>Rust/WASM columnar core — formulas, query scans, packed render windows</dd>
-                </div>
-                <div>
-                  <dt>rows</dt>
-                  <dd>
-                    <strong>1,000,000</strong> paged through a Worker host, with measured evidence
-                  </dd>
-                </div>
-                <div>
-                  <dt>sync</dt>
-                  <dd>durable IndexedDB commits and one shared collaboration protocol</dd>
-                </div>
-                <div>
-                  <dt>xlsx</dt>
-                  <dd>
-                    optional — <code>@sheetwrite/xlsx</code> workbook and table backends
-                  </dd>
-                </div>
-                <div>
-                  <dt>adapters</dt>
-                  <dd>first-party Vanilla, React, Vue, and Svelte</dd>
                 </div>
               </dl>
-              <footer className="sw-hero-panel__foot">
-                <span>TypeScript · Rust</span>
-                <span>every line has a live showcase below</span>
-              </footer>
-            </div>
+            ) : null}
           </div>
         </section>
 
