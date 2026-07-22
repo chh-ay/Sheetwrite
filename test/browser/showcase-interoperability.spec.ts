@@ -49,6 +49,93 @@ async function bootInterop(page: Page, url = ROUTE): Promise<void> {
     .toContain("Loaded:");
 }
 
+async function openDisclosure(page: Page, testId: string): Promise<void> {
+  const disclosure = page.getByTestId(testId);
+  if ((await disclosure.getAttribute("open")) === null) {
+    await disclosure.locator(":scope > summary").click();
+  }
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
+test("live workbook and fidelity ledger lead the first desktop viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const errors = collectErrors(page);
+  await bootInterop(page);
+
+  const workbook = page.locator("#xlsx");
+  const grid = page.getByLabel("Interoperability workbench grid");
+  const ledger = page.getByTestId("interop-fidelity-ledger");
+  const evidence = page.getByTestId("interop-compatibility-disclosure");
+
+  await expect(grid).toBeVisible();
+  await expect(ledger).toBeVisible();
+  await expect(evidence).not.toHaveAttribute("open", "");
+  expect(
+    await page.evaluate(() => {
+      const live = document.querySelector("#xlsx");
+      const contract = document.querySelector("#contract");
+      return Boolean(
+        live &&
+          contract &&
+          live.compareDocumentPosition(contract) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    }),
+  ).toBe(true);
+
+  const [workbookBox, gridBox, ledgerBox] = await Promise.all([
+    workbook.boundingBox(),
+    grid.boundingBox(),
+    ledger.boundingBox(),
+  ]);
+  expect(workbookBox).not.toBeNull();
+  expect(gridBox).not.toBeNull();
+  expect(ledgerBox).not.toBeNull();
+  expect(gridBox!.y).toBeLessThan(900);
+  expect(gridBox!.height * gridBox!.width).toBeGreaterThan(ledgerBox!.height * ledgerBox!.width);
+
+  const workbenchGeometry = await page.locator(".sw-si-workbench").evaluate((workbench) => {
+    const stage = workbench.querySelector(".sw-si-stage");
+    const actions = workbench.querySelector(".sw-si-actions");
+    const ledgerPanel = workbench.querySelector(".sw-si-ledger");
+    const model = workbench.querySelector(".sw-si-model");
+    if (!stage || !actions || !ledgerPanel || !model) {
+      throw new Error("workbench geometry targets are missing");
+    }
+    const workbenchBox = workbench.getBoundingClientRect();
+    const stageBox = stage.getBoundingClientRect();
+    const actionsBox = actions.getBoundingClientRect();
+    const ledgerPanelBox = ledgerPanel.getBoundingClientRect();
+    const modelBox = model.getBoundingClientRect();
+    return {
+      actionGap: actionsBox.top - stageBox.bottom,
+      ledgerHeight: ledgerPanelBox.height,
+      stageHeight: stageBox.height,
+      trailingGap: workbenchBox.bottom - modelBox.bottom,
+    };
+  });
+  expect(workbenchGeometry.stageHeight).toBeGreaterThanOrEqual(384);
+  expect(workbenchGeometry.stageHeight).toBeLessThanOrEqual(449);
+  expect(
+    Math.abs(workbenchGeometry.ledgerHeight - workbenchGeometry.stageHeight),
+  ).toBeLessThanOrEqual(1);
+  expect(workbenchGeometry.actionGap).toBeGreaterThanOrEqual(-1);
+  expect(workbenchGeometry.actionGap).toBeLessThanOrEqual(32);
+  expect(workbenchGeometry.trailingGap).toBeLessThanOrEqual(2);
+
+  const statusColors = await ledger
+    .locator(".sw-si-ledger__states > div")
+    .evaluateAll((rows) => rows.map((row) => getComputedStyle(row).borderLeftColor));
+  expect(new Set(statusColors).size).toBe(4);
+  await expect(ledger).toContainText("Load → edit → compare");
+  await expect(ledger).toContainText("Evaluated");
+  await expect(ledger).toContainText("Preserved");
+  await expect(ledger).toContainText("Warnings");
+  await expect(ledger).toContainText("Unsupported boundary");
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("interoperability page boots, verifies fixture checksums in-browser, and probes the package boundary", async ({
   page,
 }) => {
@@ -61,6 +148,10 @@ test("interoperability page boots, verifies fixture checksums in-browser, and pr
   await expect(page.getByTestId("interop-isolation-error")).toContainText(
     "XLSX backend not registered",
   );
+  await openDisclosure(page, "interop-isolation-disclosure");
+  const exactBoundaryError = page.locator(".sw-si-isolation__exact code");
+  await expect(exactBoundaryError).toBeVisible();
+  await expect(exactBoundaryError).toContainText("XLSX backend not registered");
 
   // Committed fixture bytes are hashed with WebCrypto and compared to the
   // manifest digests — provenance proven live, for every fixture.
@@ -71,6 +162,15 @@ test("interoperability page boots, verifies fixture checksums in-browser, and pr
         message: `${id} checksum never verified`,
       })
       .toBe("verified");
+  }
+
+  await openDisclosure(page, "interop-fixtures-disclosure");
+  const fixtureRows = page.locator(".sw-si-fixtures > .sw-si-fixture");
+  await expect(fixtureRows).toHaveCount(POSITIVE_FIXTURE_IDS.length);
+  for (const row of await fixtureRows.all()) {
+    await expect(row.locator(".sw-si-fixture__source")).toBeVisible();
+    await expect(row.locator(".sw-si-fixture__proof")).toBeVisible();
+    await expect(row.locator(".sw-si-fixture__action .sw-si-btn")).toBeVisible();
   }
 
   // External workbook metadata is not an executed result. Excel and Google
@@ -103,6 +203,21 @@ test("@portability compatibility results expose every truthful state from checke
   );
   await expect(inventoryDetail).toContainText("Open the checked source");
 
+  const boundaryStatus = inventoryDetail.locator(".sw-si-compat__mode > span");
+  await expect(boundaryStatus).toHaveCount(1);
+  await expect(boundaryStatus).toHaveText("Supported with warning");
+  await expect(page.locator(".sw-si-inventory .sw-si-compat__records button small")).toHaveCount(0);
+
+  await page.getByTestId("inventory-behavior-filter").selectOption("all");
+  await page.getByTestId("inventory-status-filter").selectOption("supported");
+  const evaluatedBoundary = page
+    .locator('.sw-si-inventory button[data-status="supported"][data-result="evaluated"]')
+    .first();
+  await evaluatedBoundary.click();
+  await expect(boundaryStatus).toHaveCount(1);
+  await expect(boundaryStatus).toHaveText("Supported · Evaluated");
+  await expect(evaluatedBoundary).toHaveAccessibleName(/Supported · Evaluated/u);
+
   const summary = page.getByTestId("compatibility-results-summary");
   await expect(summary).toContainText("2,350");
   await expect(summary).toContainText("2,000");
@@ -130,6 +245,51 @@ test("@portability compatibility results expose every truthful state from checke
     "no reviewed result file is attached",
   );
 
+  const appRows = detail.locator(".sw-si-results__apps > ul > li");
+  await expect(appRows.first()).toHaveAttribute("data-testid", "app-result-sheetwrite");
+  await expect(appRows).toHaveCount(4);
+  await expect(page.getByTestId("app-result-excel-web")).toHaveCount(0);
+  const localResult = page.getByTestId("app-result-sheetwrite");
+  await expect(localResult).toHaveAttribute("data-state", "local-pass");
+  await expect(localResult).toContainText("Local check passed");
+  await expect(page.getByTestId("app-result-sheetwrite-capture")).toBeVisible();
+
+  const splitGeometry = await page.evaluate(() => {
+    const measure = (selector: string) => {
+      const shell = document.querySelector(selector);
+      const records = shell?.querySelector(".sw-si-compat__records");
+      const detailPanel = shell?.querySelector(".sw-si-compat__detail");
+      if (!(shell instanceof HTMLElement) || !(records instanceof HTMLElement)) {
+        throw new Error(`missing compatibility split: ${selector}`);
+      }
+      if (!(detailPanel instanceof HTMLElement)) {
+        throw new Error(`missing compatibility detail: ${selector}`);
+      }
+      return {
+        shellHeight: shell.clientHeight,
+        recordsHeight: records.clientHeight,
+        detailHeight: detailPanel.clientHeight,
+        detailScrollHeight: detailPanel.scrollHeight,
+      };
+    };
+    return {
+      viewportHeight: window.innerHeight,
+      results: measure(".sw-si-results"),
+      inventory: measure(".sw-si-inventory"),
+    };
+  });
+  expect(splitGeometry.results.shellHeight).toBeLessThan(splitGeometry.viewportHeight);
+  expect(splitGeometry.inventory.shellHeight).toBeLessThan(splitGeometry.viewportHeight);
+  expect(
+    Math.abs(splitGeometry.results.recordsHeight - splitGeometry.results.detailHeight),
+  ).toBeLessThanOrEqual(1);
+  expect(splitGeometry.results.detailScrollHeight).toBeGreaterThan(
+    splitGeometry.results.detailHeight,
+  );
+  expect(
+    Math.abs(splitGeometry.inventory.recordsHeight - splitGeometry.inventory.detailHeight),
+  ).toBeLessThanOrEqual(1);
+
   // The checked set currently carries exact tolerance only. Exercise that
   // truthful comparison boundary rather than inventing a numeric tolerance.
   await expect(page.getByTestId("compatibility-tolerance")).toHaveText("Exact type and value");
@@ -139,14 +299,29 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(detail).toHaveAttribute("data-behavior", "excel");
   await expect(detail).toHaveAttribute("data-status", /known-difference/u);
   await expect(page.getByTestId("known-difference")).toContainText("1900-02-29");
+  await expect(page.getByTestId("known-difference")).toContainText("Microsoft Excel desktop");
+  await expect(page.getByTestId("known-difference")).not.toContainText(
+    "Microsoft Excel for the web",
+  );
   await expect(page.getByTestId("app-result-excel-desktop")).toContainText("Result unavailable");
 
   // The separate checked feature boundary records the Google-only scope and
   // still renders it as unavailable rather than claiming an executed result.
+  await page.getByTestId("inventory-status-filter").selectOption("all");
   await page.getByTestId("inventory-behavior-filter").selectOption("google-sheets");
   await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");
   await expect(inventoryDetail).toContainText("missing bytes display unavailable status");
 
+  await page.getByTestId("inventory-behavior-filter").selectOption("all");
+  await page.getByTestId("inventory-status-filter").selectOption("unsupported");
+  const unsupportedBoundary = page
+    .locator('.sw-si-inventory button[data-status="unsupported"][data-result="unsupported"]')
+    .first();
+  await expect(unsupportedBoundary).toBeVisible();
+  await unsupportedBoundary.click();
+  const unsupportedBadges = inventoryDetail.locator(".sw-si-compat__mode > span");
+  await expect(unsupportedBadges).toHaveCount(1);
+  await expect(unsupportedBadges).toHaveText("Unsupported · not claimed");
   // Known difference.
   await page.getByTestId("compatibility-behavior-filter").selectOption("all");
   await page.getByTestId("compatibility-status-filter").selectOption("known-difference");
@@ -272,7 +447,16 @@ test("analytical workbook recalculates real precedents and clears resized spills
     "No new Excel or Google Sheets result",
   );
 
-  await page.getByTestId("interop-rate-input").selectOption("0.09");
+  const rateControl = page.getByTestId("interop-rate-input");
+  const rateSix = rateControl.getByRole("radio", { name: "6.0%" });
+  const rateNine = rateControl.getByRole("radio", { name: "9.0%" });
+  await expect(rateSix).toBeChecked();
+  await rateSix.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(rateNine).toBeChecked();
+  expect(
+    await rateNine.evaluate((radio) => getComputedStyle(radio.nextElementSibling!).outlineWidth),
+  ).toBe("1px");
   await expect
     .poll(() =>
       page.evaluate(
@@ -316,7 +500,13 @@ test("analytical workbook recalculates real precedents and clears resized spills
   await expect(rateScope).toHaveAttribute("data-changed-results", "Payment,NPV,LET");
   await expect(rateScope).toContainText("assumptions!R2C4");
 
-  await page.getByTestId("interop-spill-input").selectOption("6");
+  const spillControl = page.getByTestId("interop-spill-input");
+  const spillFour = spillControl.getByRole("radio", { name: "4 periods" });
+  const spillSix = spillControl.getByRole("radio", { name: "6 periods" });
+  await expect(spillFour).toBeChecked();
+  await spillFour.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(spillSix).toBeChecked();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -335,7 +525,10 @@ test("analytical workbook recalculates real precedents and clears resized spills
   await expect(rateScope).toHaveAttribute("data-changed-results", "Spill");
   await expect(rateScope).toContainText("assumptions!R5C2");
 
-  await page.getByTestId("interop-spill-input").selectOption("3");
+  const spillThree = spillControl.getByRole("radio", { name: "3 periods" });
+  await spillSix.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(spillThree).toBeChecked();
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -403,6 +596,7 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
   const errors = collectErrors(page);
   await bootInterop(page);
 
+  await openDisclosure(page, "interop-fixtures-disclosure");
   const load = page.locator('[data-testid="fixture-libreoffice-rich-load"]');
   await expect(load).toBeEnabled({ timeout: 20_000 });
   await load.click();
@@ -459,6 +653,8 @@ test("hostile packages, aborted signals, and resource ceilings are rejected with
   const errors = collectErrors(page);
   await bootInterop(page);
 
+  await openDisclosure(page, "interop-limits-disclosure");
+
   await page.click('[data-testid="interop-hostile-run"]');
   for (const id of HOSTILE_FIXTURE_IDS) {
     await expect
@@ -497,6 +693,8 @@ test("CSV export neutralizes injection payloads and pasted CSV rebuilds the work
 }) => {
   const errors = collectErrors(page);
   await bootInterop(page);
+
+  await openDisclosure(page, "interop-delimited-disclosure");
 
   await page.click('[data-testid="interop-csv-export"]');
   const proof = page.locator('[data-testid="interop-injection-proof"]');
