@@ -7,8 +7,14 @@ import {
   parseTsv,
   toTsv,
 } from "./clipboard.js";
+import {
+  cloneCellHyperlink,
+  createHyperlinkId,
+  sanitizeCellHyperlink,
+  MAX_HYPERLINKS_PER_SHEET,
+} from "./hyperlink.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
-import type { CellScalar, CellStyle, CellValue } from "./types/cell.js";
+import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, PackedCellBlock, Sheet } from "./types/document.js";
 import type { ClipboardOutcome } from "./types/grid.js";
@@ -91,10 +97,11 @@ function clipboardHtml(snapshot: ClipboardSnapshot): string {
 
 function clipboardJson(snapshot: ClipboardSnapshot, token: string): string {
   return JSON.stringify({
-    version: 2,
+    version: 3,
     token,
     anchor: snapshot.anchor,
     cells: snapshot.cells,
+    hyperlinks: snapshot.hyperlinks,
     tsv: snapshot.tsv,
     cut: snapshot.cut,
   });
@@ -107,11 +114,12 @@ function parseClipboardJson(text: string): ClipboardEnvelope | null {
       token?: unknown;
       anchor?: { row?: unknown; col?: unknown };
       cells?: unknown;
+      hyperlinks?: unknown;
       tsv?: unknown;
       cut?: unknown;
     };
     if (
-      value.version !== 2 ||
+      value.version !== 3 ||
       typeof value.token !== "string" ||
       value.token.length < 16 ||
       value.token.length > 256 ||
@@ -119,6 +127,8 @@ function parseClipboardJson(text: string): ClipboardEnvelope | null {
       !Number.isSafeInteger(value.anchor.row) ||
       !Number.isSafeInteger(value.anchor.col) ||
       !Array.isArray(value.cells) ||
+      !Array.isArray(value.hyperlinks) ||
+      value.hyperlinks.length > MAX_HYPERLINKS_PER_SHEET ||
       typeof value.tsv !== "string" ||
       typeof value.cut !== "boolean"
     ) {
@@ -157,12 +167,19 @@ function parseClipboardJson(text: string): ClipboardEnvelope | null {
       }
       cells.push(row);
     }
+    const hyperlinks: CellHyperlink[] = [];
+    for (const input of value.hyperlinks) {
+      const hyperlink = sanitizeCellHyperlink(input);
+      if (!hyperlink) return null;
+      hyperlinks.push(hyperlink);
+    }
 
     return {
       token: value.token,
       snapshot: {
         anchor: { row: value.anchor.row as number, col: value.anchor.col as number },
         cells,
+        hyperlinks,
         tsv: value.tsv,
         cut: value.cut,
       },
@@ -519,10 +536,35 @@ export class ClipboardController {
   // ── Rich paste ─────────────────────────────────────────────────────────────
 
   private pasteInternal(snapshot: ClipboardSnapshot, focus: CellRef, valuesOnly: boolean): void {
-    // Copy shifts every relative ref by the block's rigid displacement; cut does
-    // not shift (and clears its source at cut time).
-    const dRow = snapshot.cut ? 0 : this.deps.toDataRow(focus.row) - snapshot.anchor.row;
-    const dCol = snapshot.cut ? 0 : focus.col - snapshot.anchor.col;
+    // Copy shifts every relative formula ref by the block's rigid displacement;
+    // cut keeps formula source verbatim. Hyperlink source ranges always move to
+    // the paste destination, while stable internal targets remain unchanged.
+    const targetAnchorRow = this.deps.toDataRow(focus.row);
+    const sourceDeltaRow = targetAnchorRow - snapshot.anchor.row;
+    const sourceDeltaCol = focus.col - snapshot.anchor.col;
+    const formulaRowDelta = snapshot.cut ? 0 : sourceDeltaRow;
+    const formulaColDelta = snapshot.cut ? 0 : sourceDeltaCol;
+    const hyperlinkPatches: DocumentOp[] = valuesOnly
+      ? []
+      : snapshot.hyperlinks.map((source) => ({
+          op: "setHyperlink" as const,
+          sheet: this.deps.activeSheet(),
+          hyperlink: {
+            ...cloneCellHyperlink(source),
+            id: snapshot.cut ? source.id : createHyperlinkId(),
+            range: {
+              sheet: this.deps.activeSheet(),
+              start: {
+                row: source.range.start.row + sourceDeltaRow,
+                col: source.range.start.col + sourceDeltaCol,
+              },
+              end: {
+                row: source.range.end.row + sourceDeltaRow,
+                col: source.range.end.col + sourceDeltaCol,
+              },
+            },
+          },
+        }));
 
     this.commitBlock(
       focus,
@@ -531,8 +573,12 @@ export class ClipboardController {
       (r, c): CellWrite => {
         const cell = snapshot.cells[r]![c]!;
         if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
-        return { value: shiftValue(cell.value, dRow, dCol), style: cell.style };
+        return {
+          value: shiftValue(cell.value, formulaRowDelta, formulaColDelta),
+          style: cell.style,
+        };
       },
+      hyperlinkPatches,
     );
   }
 
@@ -629,6 +675,7 @@ export class ClipboardController {
     height: number,
     widthAt: (r: number) => number,
     cellAt: (r: number, c: number, targetCol: number) => CellWrite | null,
+    extraPatches: DocumentOp[] = [],
   ): void {
     const activeSheet = this.deps.activeSheet();
     const rowLimit = this.deps.store.viewRowCount(activeSheet);
@@ -714,6 +761,7 @@ export class ClipboardController {
               },
               block,
             },
+            ...extraPatches,
           ],
           "paste",
         );
@@ -742,7 +790,7 @@ export class ClipboardController {
         });
       }
     }
-    this.deps.commit(patches, "paste");
+    this.deps.commit([...patches, ...extraPatches], "paste");
   }
 
   /**
@@ -804,6 +852,28 @@ export class ClipboardController {
         },
       });
     }
+    const hyperlinks = rangeClear
+      ? (this.deps.sheet().hyperlinks ?? [])
+          .filter((hyperlink) => {
+            const r0 = Math.min(hyperlink.range.start.row, hyperlink.range.end.row);
+            const r1 = Math.max(hyperlink.range.start.row, hyperlink.range.end.row);
+            const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
+            const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
+            return (
+              hyperlink.range.sheet === activeSheet &&
+              r0 >= firstDataRow &&
+              r1 <= firstDataRow + rect.r1 - rect.r0 &&
+              c0 >= rect.c0 &&
+              c1 <= rect.c1
+            );
+          })
+          .map(cloneCellHyperlink)
+      : [];
+    if (cut) {
+      for (const hyperlink of hyperlinks) {
+        clearPatches.push({ op: "removeHyperlink", sheet: activeSheet, id: hyperlink.id });
+      }
+    }
     for (let r = rect.r0; r <= rect.r1; r++) {
       const cellLine: ClipboardCell[] = [];
       const valueLine: CellScalar[] = [];
@@ -860,6 +930,6 @@ export class ClipboardController {
     }
 
     const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
-    return { anchor, cells, tsv: toTsv(values), cut, clearPatches };
+    return { anchor, cells, hyperlinks, tsv: toTsv(values), cut, clearPatches };
   }
 }

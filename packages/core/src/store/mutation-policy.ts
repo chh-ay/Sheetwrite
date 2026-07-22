@@ -185,6 +185,14 @@ export class StoreMutationPolicy {
             end: { row: patch.merge.r1, col: patch.merge.c1 },
           },
         ];
+      case "setHyperlink":
+        return [normalizedRange(patch.hyperlink.range)];
+      case "removeHyperlink": {
+        const hyperlink = this.sheet(patch.sheet)?.hyperlinks?.find(
+          (candidate) => candidate.id === patch.id,
+        );
+        return hyperlink ? [normalizedRange(hyperlink.range)] : [];
+      }
       case "setValidationRule":
         return [normalizedRange(patch.rule.range)];
       case "setColumn": {

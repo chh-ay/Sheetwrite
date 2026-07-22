@@ -7,6 +7,10 @@ export {
 } from "./cell-input.js";
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 export {
+  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
+  MAX_CONDITIONAL_FORMAT_RULES,
+} from "./conditional-format.js";
+export {
   type CommentAdapter,
   type CommentAnchor,
   type CommentAuthorRef,
@@ -74,6 +78,22 @@ export {
   type SheetwriteErrorOptions,
 } from "./errors.js";
 export {
+  cloneCellHyperlink,
+  createHyperlinkId,
+  hyperlinkAt,
+  isSafeExternalHyperlink,
+  isValidCellHyperlink,
+  isValidHyperlinkId,
+  MAX_HYPERLINK_DISPLAY_LENGTH,
+  MAX_HYPERLINK_ID_LENGTH,
+  MAX_HYPERLINK_TARGET_LENGTH,
+  MAX_HYPERLINKS_PER_SHEET,
+  resolveHyperlinkTarget,
+  sanitizeCellHyperlink,
+  sanitizeHyperlinkStyle,
+  type ResolvedHyperlinkTarget,
+} from "./hyperlink.js";
+export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   downloadBytes,
   fromCsv,
@@ -127,7 +147,6 @@ export {
   diffRuntimeResourcePhases,
   emptyStoreMemoryStats,
   observeRuntimeMemory,
-  type ResourceOwnerBytes,
   RUNTIME_RESOURCE_SCHEMA_VERSION,
   type RuntimeMemoryObservation,
   type RuntimeResourceOperation,
@@ -191,6 +210,7 @@ export type {
   CellEditorNavigation,
   CellEditorRect,
   CellFormat,
+  CellHyperlink,
   CellInputSnapshot,
   CellLoadState,
   CellNote,
@@ -229,6 +249,7 @@ export type {
   GridPresentation,
   GridTransaction,
   HighlightRange,
+  HyperlinkTarget,
   MergeRange,
   MutationIssue,
   MutationPolicyMode,
@@ -262,6 +283,7 @@ export type {
   SheetLifecycleResult,
   SheetSnapshot,
   SheetVisibility,
+  ResourceOwnerBytes,
   SnapshotCell,
   SortKey,
   Store,

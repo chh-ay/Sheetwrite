@@ -3,7 +3,20 @@ import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validWorkbookTable,
+  workbookTableNameKey,
 } from "./workbook-table.js";
+import {
+  cloneCellHyperlink,
+  isSafeExternalHyperlink,
+  isValidCellHyperlink,
+  isValidHyperlinkId,
+  MAX_HYPERLINK_DISPLAY_LENGTH,
+  MAX_HYPERLINKS_PER_SHEET,
+} from "./hyperlink.js";
+import {
+  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
+  MAX_CONDITIONAL_FORMAT_RULES,
+} from "./conditional-format.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
   DocumentOp,
@@ -270,6 +283,7 @@ const SHEET_METADATA_ARRAY_KEYS = [
   "rowMeta",
   "merges",
   "conditionalFormats",
+  "hyperlinks",
   "validationRules",
   "protectedRanges",
   "notes",
@@ -686,7 +700,27 @@ export function assertWorkbookAllocationLimits(
   if (workbook.sheets.length > limits.maxSheets) {
     throw new SnapshotResourceError("maxSheets", limits.maxSheets, workbook.sheets.length);
   }
-  assertWorkbookTables(workbook.sheets);
+  assertWorkbookTables(
+    workbook.sheets,
+    DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+    (workbook.namedRanges ?? []).map((range) => range.name),
+  );
+  for (const sheet of workbook.sheets) {
+    if ((sheet.hyperlinks?.length ?? 0) > MAX_HYPERLINKS_PER_SHEET) {
+      throw new SnapshotResourceError(
+        "maxMetadataEntries",
+        MAX_HYPERLINKS_PER_SHEET,
+        sheet.hyperlinks!.length,
+      );
+    }
+    if ((sheet.conditionalFormats?.length ?? 0) > MAX_CONDITIONAL_FORMAT_RULES) {
+      throw new SnapshotResourceError(
+        "maxMetadataEntries",
+        MAX_CONDITIONAL_FORMAT_RULES,
+        sheet.conditionalFormats!.length,
+      );
+    }
+  }
 
   let denseCells = 0;
   let metadataEntries = workbook.namedRanges?.length ?? 0;
@@ -732,6 +766,7 @@ export function assertWorkbookAllocationLimits(
       (sheet.hiddenRows?.size ?? 0) +
       (sheet.merges?.length ?? 0) +
       (sheet.conditionalFormats?.length ?? 0) +
+      (sheet.hyperlinks?.length ?? 0) +
       (sheet.validationRules?.length ?? 0) +
       (sheet.protectedRanges?.length ?? 0) +
       (sheet.notes?.length ?? 0) +
@@ -987,8 +1022,83 @@ function validateConditionalPredicate(
   } else if (kind === "contains") {
     requireString(predicate, "text", path, errors);
     optionalBoolean(predicate, "matchCase", path, errors);
+  } else if (kind === "formula") {
+    const source = ownValue(predicate, "source");
+    if (
+      typeof source !== "string" ||
+      !source.startsWith("=") ||
+      source.length > MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH
+    ) {
+      invalid(
+        errors,
+        `${path}.source`,
+        `Conditional formula source must start with = and contain at most ${MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH} characters`,
+        "resource-limit",
+      );
+    }
   } else {
     invalid(errors, `${path}.kind`, "Conditional format predicate kind is invalid");
+  }
+}
+
+function validateHyperlinkShape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const hyperlink = recordAt(value, path, errors);
+  if (!hyperlink) return;
+  const id = ownValue(hyperlink, "id");
+  if (typeof id === "string" && !isValidHyperlinkId(id)) {
+    invalid(
+      errors,
+      `${path}.id`,
+      "Hyperlink ID must be non-empty, trimmed, control-free, and contain at most 128 characters",
+      "resource-limit",
+    );
+  }
+  requireString(hyperlink, "id", path, errors, true);
+  validateRangeShape(ownValue(hyperlink, "range"), `${path}.range`, errors);
+  const display = ownValue(hyperlink, "display");
+  if (
+    display !== undefined &&
+    (typeof display !== "string" || display.length > MAX_HYPERLINK_DISPLAY_LENGTH)
+  ) {
+    invalid(
+      errors,
+      `${path}.display`,
+      `Hyperlink display text must contain at most ${MAX_HYPERLINK_DISPLAY_LENGTH} characters`,
+      "resource-limit",
+    );
+  }
+  const style = ownValue(hyperlink, "style");
+  if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
+  const targetPath = `${path}.target`;
+  const target = recordAt(ownValue(hyperlink, "target"), targetPath, errors);
+  if (!target) return;
+  const kind = ownValue(target, "kind");
+  if (kind === "external") {
+    const url = ownValue(target, "url");
+    if (typeof url !== "string" || !isSafeExternalHyperlink(url)) {
+      invalid(
+        errors,
+        `${targetPath}.url`,
+        "Hyperlink external target must be an absolute HTTPS or mailto URL",
+        "invalid-value",
+      );
+    }
+  } else if (kind === "internal") {
+    validateRangeShape(ownValue(target, "range"), `${targetPath}.range`, errors);
+  } else {
+    invalid(errors, `${targetPath}.kind`, "Hyperlink target kind is invalid");
+  }
+  if (!isValidCellHyperlink(value)) {
+    invalid(
+      errors,
+      path,
+      "Hyperlink metadata contains an unsafe, unbounded, or unsupported field",
+      "invalid-value",
+    );
   }
 }
 
@@ -1298,8 +1408,28 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
       requireNonNegativeInteger(merge, key, mergePath, errors);
     }
   });
+  const hyperlinks = optionalArray(sheet, "hyperlinks", path, errors);
+  if (hyperlinks && hyperlinks.length > MAX_HYPERLINKS_PER_SHEET) {
+    invalid(
+      errors,
+      `${path}.hyperlinks`,
+      `Hyperlink limit ${MAX_HYPERLINKS_PER_SHEET} exceeded`,
+      "resource-limit",
+    );
+  }
+  hyperlinks?.forEach((entry, index) => {
+    validateHyperlinkShape(entry, `${path}.hyperlinks[${index}]`, errors);
+  });
 
   const conditionalFormats = optionalArray(sheet, "conditionalFormats", path, errors);
+  if (conditionalFormats && conditionalFormats.length > MAX_CONDITIONAL_FORMAT_RULES) {
+    invalid(
+      errors,
+      `${path}.conditionalFormats`,
+      `Conditional-format rule limit ${MAX_CONDITIONAL_FORMAT_RULES} exceeded`,
+      "resource-limit",
+    );
+  }
   conditionalFormats?.forEach((entry, index) => {
     const formatPath = `${path}.conditionalFormats[${index}]`;
     const format = recordAt(entry, formatPath, errors);
@@ -1307,6 +1437,7 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     validateRangeShape(ownValue(format, "range"), `${formatPath}.range`, errors);
     validateConditionalPredicate(ownValue(format, "when"), `${formatPath}.when`, errors);
     validateCellStyle(ownValue(format, "style"), `${formatPath}.style`, errors);
+    optionalBoolean(format, "stopIfTrue", formatPath, errors);
   });
 
   const validationRules = optionalArray(sheet, "validationRules", path, errors);
@@ -1500,7 +1631,8 @@ function validateOperationNamedRange(
   const name = requireString(namedRange, "name", path, errors, true);
   if (
     name !== undefined &&
-    (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ||
+    (name !== name.normalize("NFC") ||
+      !/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name) ||
       /^[A-Za-z]+\d+$/.test(name) ||
       /^(TRUE|FALSE)$/i.test(name))
   ) {
@@ -1835,6 +1967,14 @@ export function validateDocumentOperationShape(
       }
       break;
     }
+    case "setHyperlink":
+      validateOperationSheetId(operation, path, errors);
+      validateHyperlinkShape(ownValue(operation, "hyperlink"), `${path}.hyperlink`, errors);
+      break;
+    case "removeHyperlink":
+      validateOperationSheetId(operation, path, errors);
+      requireString(operation, "id", path, errors, true);
+      break;
     case "setValidationRule":
       validateOperationSheetId(operation, path, errors);
       validateOperationValidationRule(ownValue(operation, "rule"), `${path}.rule`, errors);
@@ -2110,7 +2250,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       const name = requireString(namedRange, "name", namedPath, errors, true);
       if (
         name !== undefined &&
-        (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ||
+        (name !== name.normalize("NFC") ||
+          !/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name) ||
           /^[A-Za-z]+\d+$/.test(name) ||
           /^(TRUE|FALSE)$/i.test(name))
       ) {
@@ -2261,6 +2402,28 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         );
       }
     }
+    const hyperlinkIds = new Set<string>();
+    for (let index = 0; index < (sheet.hyperlinks?.length ?? 0); index++) {
+      const hyperlink = sheet.hyperlinks![index]!;
+      const hyperlinkPath = `${path}.hyperlinks[${index}]`;
+      if (hyperlinkIds.has(hyperlink.id)) {
+        invalid(
+          errors,
+          `${hyperlinkPath}.id`,
+          "Hyperlink IDs must be unique within a sheet",
+          "duplicate-id",
+        );
+      }
+      hyperlinkIds.add(hyperlink.id);
+      if (hyperlink.range.sheet !== sheet.id || !rangeInSheet(hyperlink.range, sheet)) {
+        invalid(
+          errors,
+          `${hyperlinkPath}.range`,
+          "Hyperlink source range lies outside its sheet",
+          "out-of-bounds",
+        );
+      }
+    }
 
     const validationIds = new Set<string>();
     for (let index = 0; index < (sheet.validationRules?.length ?? 0); index++) {
@@ -2390,6 +2553,14 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const normalizedSheet: SheetSnapshot = {
       ...sheet,
       merges: merges.length > 0 ? merges : undefined,
+      conditionalFormats: sheet.conditionalFormats
+        ? sheet.conditionalFormats.map((rule) => structuredClone(rule))
+        : undefined,
+      hyperlinks: sheet.hyperlinks
+        ? [...sheet.hyperlinks]
+            .sort((left, right) => left.id.localeCompare(right.id))
+            .map(cloneCellHyperlink)
+        : undefined,
       validationRules: sheet.validationRules
         ? [...sheet.validationRules].sort((a, b) => a.id.localeCompare(b.id))
         : undefined,
@@ -2414,6 +2585,8 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       })),
     };
     if (normalizedSheet.merges === undefined) delete normalizedSheet.merges;
+    if (normalizedSheet.conditionalFormats === undefined) delete normalizedSheet.conditionalFormats;
+    if (normalizedSheet.hyperlinks === undefined) delete normalizedSheet.hyperlinks;
     if (normalizedSheet.validationRules === undefined) delete normalizedSheet.validationRules;
     if (normalizedSheet.protectedRanges === undefined) delete normalizedSheet.protectedRanges;
     if (normalizedSheet.notes === undefined) delete normalizedSheet.notes;
@@ -2452,13 +2625,47 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         }
       }
     }
+    for (let linkIndex = 0; linkIndex < (sheet.hyperlinks?.length ?? 0); linkIndex++) {
+      const hyperlink = sheet.hyperlinks![linkIndex]!;
+      if (hyperlink.target.kind !== "internal") continue;
+      const target = hyperlink.target.range;
+      const targetSheet = sheetById.get(target.sheet);
+      const targetPath = `sheets[${sheetIndex}].hyperlinks[${linkIndex}].target.range`;
+      if (!targetSheet) {
+        invalid(
+          errors,
+          targetPath,
+          "Internal hyperlink target sheet must exist",
+          "missing-reference",
+        );
+      } else if (!rangeInSheet(target, targetSheet)) {
+        invalid(
+          errors,
+          targetPath,
+          "Internal hyperlink target lies outside the sheet",
+          "out-of-bounds",
+        );
+      }
+    }
   }
 
   const namedRangeIds = new Set<string>();
   for (let index = 0; index < (validated.workbook.namedRanges?.length ?? 0); index++) {
     const namedRange = validated.workbook.namedRanges![index]!;
     const namedPath = `workbook.namedRanges[${index}]`;
-    const id = `${namedRange.scope ?? ""}\u0000${namedRange.name.toUpperCase()}`;
+    const id = `${namedRange.scope ?? ""}\u0000${workbookTableNameKey(namedRange.name)}`;
+    if (
+      acceptedTables.some(
+        (table) => workbookTableNameKey(table.name) === workbookTableNameKey(namedRange.name),
+      )
+    ) {
+      invalid(
+        errors,
+        `${namedPath}.name`,
+        "Named range name conflicts with a workbook table name",
+        "duplicate-id",
+      );
+    }
     if (namedRangeIds.has(id)) {
       invalid(
         errors,
@@ -2564,6 +2771,8 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "setSheetMeta":
     case "setValidationRule":
     case "removeValidationRule":
+    case "setHyperlink":
+    case "removeHyperlink":
     case "setProtectedRange":
     case "removeProtectedRange":
     case "updateTable":

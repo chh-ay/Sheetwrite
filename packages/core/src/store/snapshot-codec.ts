@@ -45,6 +45,7 @@ export function decodeWorkbookSnapshot(
         hiddenRows: hiddenRows.size > 0 ? hiddenRows : undefined,
         merges: cloneJsonValue(source.merges),
         conditionalFormats: cloneJsonValue(source.conditionalFormats),
+        hyperlinks: cloneJsonValue(source.hyperlinks),
         validationRules: cloneJsonValue(source.validationRules),
         protectedRanges: cloneJsonValue(source.protectedRanges),
         notes: cloneJsonValue(source.notes),
@@ -128,6 +129,7 @@ export class StoreSnapshotCodec {
         ...(sheet.conditionalFormats?.length
           ? { conditionalFormats: cloneJsonValue(sheet.conditionalFormats) }
           : {}),
+        ...(sheet.hyperlinks?.length ? { hyperlinks: cloneJsonValue(sheet.hyperlinks) } : {}),
         ...(sheet.validationRules?.length
           ? { validationRules: cloneJsonValue(sheet.validationRules) }
           : {}),

@@ -80,6 +80,8 @@ export interface InputControllerDeps {
   clearSelection: () => void;
   emitSelection: () => void;
   scrollToCell: (addr: CellAddress) => void;
+  /** Ctrl/Meta-click host-safe hyperlink activation. */
+  activateHyperlink: (addr: CellAddress) => boolean;
   scheduleRender: () => void;
   undo: () => void;
   redo: () => void;
@@ -225,6 +227,19 @@ export class InputController {
 
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
+    if (
+      !isTouch &&
+      additive &&
+      !e.shiftKey &&
+      this.deps.activateHyperlink({
+        sheet: this.deps.activeSheet(),
+        row: this.deps.toDataRow(cell.row),
+        col: cell.col,
+      })
+    ) {
+      e.preventDefault();
+      return;
+    }
 
     const selection = this.deps.selection();
 

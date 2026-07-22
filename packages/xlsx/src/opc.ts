@@ -1,6 +1,7 @@
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 import {
   assertXmlRoot,
+  escapeXml,
   parseXml,
   XmlBuffer,
   type XmlElement,
@@ -100,7 +101,7 @@ function parseRelationships(
       return opcFailure(`duplicate relationship id ${id} in ${relationshipsPart(sourcePart)}`);
     ids.add(id);
     const external = xmlAttribute(element, "TargetMode") === "External";
-    if (external) {
+    if (external && !relationshipTypeMatches(type, "hyperlink")) {
       emitWarning(context, {
         code: "external-relationship",
         message: `External relationship ${id} was not followed`,
@@ -242,7 +243,9 @@ export function contentTypesXml(
 }
 
 export function relationshipsXml(
-  relationships: readonly Pick<OpcRelationship, "id" | "type" | "target">[],
+  relationships: readonly (Pick<OpcRelationship, "id" | "type" | "target"> & {
+    readonly external?: boolean;
+  })[],
   context: XlsxCodecContext,
 ): Uint8Array {
   const xml = new XmlBuffer(context);
@@ -252,7 +255,7 @@ export function relationshipsXml(
   );
   for (const relationship of relationships) {
     xml.append(
-      `<Relationship Id="${relationship.id}" Type="${relationship.type}" Target="${relationship.target}"/>`,
+      `<Relationship Id="${escapeXml(relationship.id)}" Type="${escapeXml(relationship.type)}" Target="${escapeXml(relationship.target)}"${relationship.external ? ' TargetMode="External"' : ""}/>`,
     );
   }
   xml.append("</Relationships>");

@@ -3,6 +3,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use crate::calc::Ast;
 use crate::memory::{
     StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
     PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
@@ -11,8 +12,8 @@ use crate::memory::{
 use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, NO_STRING};
 
 /// One conditional-format predicate, mirroring the host's rule kinds. String
-/// needles for case-insensitive `Contains` are pre-lowercased at rule-set time
-/// so the per-cell match never allocates.
+/// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
+/// formula ASTs are parsed once and translated from their stored anchor per cell.
 pub(crate) enum CondPred {
     GtNum(f64),
     LtNum(f64),
@@ -20,6 +21,11 @@ pub(crate) enum CondPred {
     EqStr(String),
     EqEmpty,
     Contains { needle: String, match_case: bool },
+    Formula {
+        ast: Ast,
+        anchor_row: u32,
+        anchor_col: u32,
+    },
 }
 
 /// One conditional-format rule: a normalized cell rectangle plus a predicate.
@@ -32,6 +38,7 @@ pub(crate) struct CondRule {
     pub(crate) r1: u32,
     pub(crate) c1: u32,
     pub(crate) pred: CondPred,
+    pub(crate) stop_if_true: bool,
 }
 
 // ── NaN-boxed cell payload ───────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { ResourceOwnerBytes } from "./resource-accounting.js";
+import type { ResourceOwnerBytes } from "./types/store.js";
 import type { SheetwriteStore } from "./store.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type { DataSourcePage, DataSourceRequest } from "./types/data.js";

@@ -1,13 +1,16 @@
 //! Bulk render-window assembly: one boundary crossing per visible window.
 
+use std::collections::{HashMap, HashSet};
+
 use wasm_bindgen::prelude::*;
 
+use crate::calc::translate_relative_refs;
 use crate::query::matches_needle;
 use crate::sheet::{formula_error_at, CondPred, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, FormulaError, FormulaValueKind, StringPool, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
-    KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, AbsCellKey, EvalResult, FormulaError, FormulaValueKind, StringPool, Value, KIND_BOOL,
+    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 #[wasm_bindgen]
@@ -72,8 +75,8 @@ impl CellStore {
 
         let row_start_u = row_start as u32;
         let cond_matches = cond_matches_for_window(
-            s,
-            &self.strings,
+            self,
+            sheet,
             |ri| row_start_u + ri as u32,
             n_rows,
             cols,
@@ -150,8 +153,8 @@ impl CellStore {
         }
 
         let cond_matches = cond_matches_for_window(
-            s,
-            &self.strings,
+            self,
+            sheet,
             |ri| rows.get(ri).copied().unwrap_or(u32::MAX),
             n_rows,
             cols,
@@ -276,8 +279,8 @@ pub(crate) fn local_error_index(
 /// otherwise re-derive in JS — including formula results and error sentinels.
 #[allow(clippy::too_many_arguments)]
 fn cond_matches_for_window<F: Fn(usize) -> u32>(
-    sheet: &SheetData,
-    pool: &StringPool,
+    store: &CellStore,
+    sheet_index: usize,
     data_row_at: F,
     n_rows: usize,
     cols: &[u32],
@@ -287,12 +290,17 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
     str_local: &[i32],
     local_strings: &[String],
 ) -> Vec<u32> {
+    let Some(sheet) = store.sheets.get(sheet_index) else {
+        return Vec::new();
+    };
     if sheet.cond_rules.is_empty() || n_rows == 0 || cols.is_empty() {
         return Vec::new();
     }
 
     let n_cols = cols.len();
     let mut matches = vec![0u32; n_rows * n_cols];
+    let mut memo: HashMap<AbsCellKey, EvalResult> = HashMap::new();
+    let mut visiting: HashSet<AbsCellKey> = HashSet::new();
     for ri in 0..n_rows {
         let data_row = data_row_at(ri);
         for (cj, &col) in cols.iter().enumerate() {
@@ -303,14 +311,50 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                 if !covered {
                     continue;
                 }
-                let hit = cond_pred_matches(
-                    &rule.pred,
-                    kind[dst],
-                    num[dst],
-                    cell_text(string_ids[dst], str_local[dst], pool, local_strings),
-                );
+                let hit = match &rule.pred {
+                    CondPred::Formula {
+                        ast,
+                        anchor_row,
+                        anchor_col,
+                    } => {
+                        let mut translated = ast.clone();
+                        translate_relative_refs(
+                            &mut translated,
+                            i64::from(data_row) - i64::from(*anchor_row),
+                            i64::from(col) - i64::from(*anchor_col),
+                        );
+                        memo.clear();
+                        visiting.clear();
+                        match store.eval_conditional_ast(
+                            &translated,
+                            sheet_index,
+                            data_row,
+                            col,
+                            &mut memo,
+                            &mut visiting,
+                        ) {
+                            Value::Bool(value) => value,
+                            Value::Number(value) => value != 0.0,
+                            _ => false,
+                        }
+                    }
+                    predicate => cond_pred_matches(
+                        predicate,
+                        kind[dst],
+                        num[dst],
+                        cell_text(
+                            string_ids[dst],
+                            str_local[dst],
+                            &store.strings,
+                            local_strings,
+                        ),
+                    ),
+                };
                 if hit {
                     matches[dst] |= 1 << bit;
+                    if rule.stop_if_true {
+                        break;
+                    }
                 }
             }
         }
@@ -331,6 +375,7 @@ fn cond_pred_matches(pred: &CondPred, kind: u8, num: f64, text: Option<&str>) ->
             }
             text.is_some_and(|hay| matches_needle(hay, needle, !match_case, false))
         }
+        CondPred::Formula { .. } => false,
     }
 }
 

@@ -1,7 +1,6 @@
 // Workbook, view, validation, protection, snapshot, and operation contracts.
 // No runtime values live here.
 
-import type { SheetNameIssueCode } from "../sheet-name.js";
 import type {
   CellHyperlink,
   CellScalar,
@@ -12,6 +11,28 @@ import type {
 } from "./cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
 import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
+
+/** Stable reason codes returned by worksheet-name validation. */
+export type SheetNameIssueCode =
+  | "blank"
+  | "too-long"
+  | "forbidden-character"
+  | "edge-apostrophe"
+  | "duplicate";
+
+/** Successful canonical name or an actionable validation failure. */
+export type SheetNameValidationResult =
+  | {
+      readonly ok: true;
+      readonly name: string;
+      readonly key: string;
+    }
+  | {
+      readonly ok: false;
+      readonly code: SheetNameIssueCode;
+      readonly name: string;
+      readonly key: string;
+    };
 
 /** Native worksheet visibility preserved across workbook snapshots and tab rendering. */
 export type SheetVisibility = "visible" | "hidden" | "veryHidden";

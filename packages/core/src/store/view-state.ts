@@ -1,7 +1,7 @@
-import type { ResourceOwnerBytes } from "../resource-accounting.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/document.js";
+import type { ResourceOwnerBytes } from "../types/store.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
 const EMPTY_U32 = new Uint32Array(0);

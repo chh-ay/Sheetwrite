@@ -645,10 +645,18 @@ describe("pinned external XLSX behavioral vectors", () => {
       { onWarning: capture.onWarning },
     );
     expect(imported.sheets[0]!.notes?.[0]?.text).toBe("resolved parent");
-    expect(capture.warnings.map((warning) => warning.code)).toEqual([
-      "external-relationship",
-      "hyperlink",
+    expect(imported.sheets[0]!.hyperlinks).toEqual([
+      {
+        id: "xlsx-hyperlink-1-1",
+        range: {
+          sheet: imported.sheets[0]!.id,
+          start: { row: 0, col: 0 },
+          end: { row: 0, col: 0 },
+        },
+        target: { kind: "external", url: "https://invalid.example/never-fetch" },
+      },
     ]);
+    expect(capture.warnings).toEqual([]);
   });
 
   it("ports cases 40-41: rejects malformed or missing XML and ignores declared unknown extensions", async () => {

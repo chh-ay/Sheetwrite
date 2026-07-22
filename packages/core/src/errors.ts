@@ -46,6 +46,7 @@ export const SHEETWRITE_ERROR_CODES = [
   "sync-storage-failed",
   "incomplete-data",
   "xlsx-invalid-options",
+  "unsafe-hyperlink",
 ] as const;
 
 /** Exhaustive stable discriminator for consumer-visible Sheetwrite failures. */
@@ -74,6 +75,7 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "revision",
   "comments",
   "query",
+  "hyperlink-activate",
 ] as const;
 
 /** Exhaustive stable operation discriminator for consumer-visible failures. */

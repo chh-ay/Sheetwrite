@@ -17,6 +17,22 @@ import type {
   TransactionApplicationOptions,
 } from "./transaction.js";
 
+/** Retained logical payload and allocated capacity attributed to one exclusive owner. */
+export interface ResourceOwnerBytes {
+  readonly owner: string;
+  /** Bytes containing live logical payload. Never includes runtime observations. */
+  readonly logicalBytes: number;
+  /** Container capacity owned exclusively by this owner. */
+  readonly allocatedBytes: number;
+  readonly entries: number;
+  readonly measurement:
+    | "exact-capacity"
+    | "hash-capacity-v1"
+    | "typed-array-byte-length"
+    | "utf16-upper-bound"
+    | "entry-count-only";
+}
+
 /**
  * One rectangular window of resolved cells, returned by `Store.getVisibleWindow`
  * in a single call. The renderer paints from this view and MUST NOT call

@@ -25,6 +25,7 @@ import { EditController, type EditNavigate } from "./editor.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
+import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
@@ -47,6 +48,7 @@ import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import { beginGridTransactionAdmission } from "./transaction-admission.js";
 import type {
+  CellHyperlink,
   CellScalar,
   CellStyle,
   CellValue,
@@ -78,8 +80,9 @@ import type {
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
-import type { CellEditor, CellEditorRect } from "./types/editor.js";
 import type {
+  CellEditor,
+  CellEditorRect,
   CellInputSnapshot,
   Grid,
   GridActions,
@@ -391,6 +394,7 @@ export class GridImpl implements Grid {
   private findBar: FindBar | null = null;
   private config: GridConfig | undefined;
   private readonly presentation: GridPresentation;
+  private readonly hyperlinkActivation: "event-only" | "internal-navigation" | "disabled";
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
   private readonly onContextMenu = (e: MouseEvent): void => {
@@ -421,6 +425,7 @@ export class GridImpl implements Grid {
     search: new Set(),
     "command-state-change": new Set(),
     "active-sheet": new Set(),
+    "hyperlink-activate": new Set(),
     "renderer-fallback": new Set(),
     "datasource-error": new Set(),
     "mutation-rejected": new Set(),
@@ -469,6 +474,14 @@ export class GridImpl implements Grid {
     );
     this.host = host;
     this.presentation = opts.presentation ?? "spreadsheet";
+    this.hyperlinkActivation =
+      opts.hyperlinkActivation === undefined
+        ? "event-only"
+        : opts.hyperlinkActivation === "event-only" ||
+            opts.hyperlinkActivation === "internal-navigation" ||
+            opts.hyperlinkActivation === "disabled"
+          ? opts.hyperlinkActivation
+          : "disabled";
     const workbook = opts.workbook;
     if (!(store instanceof SheetwriteStore)) {
       assertWorkbookAllocationLimits(workbook, {
@@ -727,6 +740,13 @@ export class GridImpl implements Grid {
       clearSelection: () => this.clearSelection(),
       emitSelection: () => this.emitSelection(),
       scrollToCell: (addr) => this.scrollToCell(addr),
+      activateHyperlink: (addr) => {
+        try {
+          return this.activateHyperlink(addr);
+        } catch {
+          return false;
+        }
+      },
       scheduleRender: () => this.scheduleRender(),
       undo: () => this.undo(),
       redo: () => this.redo(),
@@ -2414,6 +2434,51 @@ export class GridImpl implements Grid {
       ],
       "style",
     );
+  }
+
+  setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult {
+    const sanitized = sanitizeCellHyperlink(hyperlink);
+    const candidate: CellHyperlink = sanitized ?? {
+      id: "",
+      range: {
+        sheet: this.activeSheet,
+        start: { row: 0, col: 0 },
+        end: { row: 0, col: 0 },
+      },
+      target: { kind: "external", url: "unsafe:" },
+    };
+    return this.document.commit(
+      [
+        {
+          op: "setHyperlink",
+          sheet: this.activeSheet,
+          hyperlink: candidate,
+        },
+      ],
+      "api",
+    );
+  }
+
+  removeHyperlink(id: string): ApplyTransactionResult {
+    return this.document.commit([{ op: "removeHyperlink", sheet: this.activeSheet, id }], "api");
+  }
+
+  getHyperlink(addr: CellAddress): CellHyperlink | null {
+    return hyperlinkAt(this.store.getWorkbook(), addr);
+  }
+
+  activateHyperlink(addr: CellAddress): boolean {
+    if (this.hyperlinkActivation === "disabled") return false;
+    const hyperlink = hyperlinkAt(this.store.getWorkbook(), addr);
+    if (!hyperlink) return false;
+    const target = resolveHyperlinkTarget(this.store.getWorkbook(), hyperlink.target);
+    for (const listener of this.listeners["hyperlink-activate"]) {
+      listener({ address: { ...addr }, hyperlink, target });
+    }
+    if (target.kind === "internal" && this.hyperlinkActivation === "internal-navigation") {
+      this.scrollToCell(target.address);
+    }
+    return true;
   }
 
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult {

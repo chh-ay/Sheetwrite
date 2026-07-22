@@ -9,6 +9,7 @@ import {
   materializeHistoryAction,
   UndoManager,
 } from "./history.js";
+import { cloneCellHyperlink } from "./hyperlink.js";
 import type { SheetwriteStore } from "./store.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
 import type { CellValue, Column } from "./types/cell.js";
@@ -457,7 +458,7 @@ export class DocumentController {
               conditionalFormats:
                 patch.patch.conditionalFormats === undefined
                   ? undefined
-                  : (sheet.conditionalFormats?.map((rule) => ({ ...rule })) ?? []),
+                  : structuredClone(sheet.conditionalFormats ?? []),
               rowGroups:
                 patch.patch.rowGroups === undefined
                   ? undefined
@@ -473,6 +474,22 @@ export class DocumentController {
             },
           },
         ];
+      }
+      case "setHyperlink": {
+        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
+          (hyperlink) => hyperlink.id === patch.hyperlink.id,
+        );
+        return previous
+          ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
+          : [{ op: "removeHyperlink", sheet: patch.sheet, id: patch.hyperlink.id }];
+      }
+      case "removeHyperlink": {
+        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
+          (hyperlink) => hyperlink.id === patch.id,
+        );
+        return previous
+          ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
+          : [];
       }
       case "setValidationRule": {
         const previous = this.sheetById(patch.sheet)?.validationRules?.find(
@@ -709,6 +726,7 @@ export class DocumentController {
       rowMeta,
       merges: sheet.merges?.map((candidate) => ({ ...candidate })),
       conditionalFormats: sheet.conditionalFormats?.map((rule) => ({ ...rule })),
+      hyperlinks: sheet.hyperlinks?.map(cloneCellHyperlink),
       validationRules: structuredClone(sheet.validationRules),
       protectedRanges: structuredClone(sheet.protectedRanges),
       notes: structuredClone(sheet.notes),
@@ -741,6 +759,15 @@ export class DocumentController {
           if (this.options.store.getFormula(addr) || this.options.store.getRefTarget(addr)) {
             patches.push(this.snapshotCell(addr));
           }
+        }
+      }
+      for (const hyperlink of sheet.hyperlinks ?? []) {
+        if (hyperlink.target.kind === "internal" && hyperlink.target.range.sheet === removedSheet) {
+          patches.push({
+            op: "setHyperlink",
+            sheet: sheet.id,
+            hyperlink: cloneCellHyperlink(hyperlink),
+          });
         }
       }
     }

@@ -1,7 +1,14 @@
 import { CellStore, isLoaded, type RangeSnapshot } from "@sheetwrite/wasm";
+import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
+import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
 import { SheetwriteError } from "../errors.js";
+import {
+  cloneCellHyperlink,
+  sanitizeCellHyperlink,
+  MAX_HYPERLINKS_PER_SHEET,
+} from "../hyperlink.js";
 import {
   consumeSourceSnapshot,
   type RangeSourceProjection,
@@ -12,7 +19,6 @@ import {
   createRuntimeResourceSnapshot,
   decodeStoreMemoryStats,
   emptyStoreMemoryStats,
-  type ResourceOwnerBytes,
   type RuntimeMemoryObservation,
   type RuntimeResourceOperation,
   type RuntimeResourcePhase,
@@ -20,6 +26,11 @@ import {
   type StoreMemoryBreakdown,
   type TransientResourcePeak,
 } from "../resource-accounting.js";
+import {
+  applySheetLifecycleOperation,
+  canAddSheetSnapshot,
+  createSheetLifecycleState,
+} from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import {
@@ -29,6 +40,7 @@ import {
   workbookTableNameKey,
 } from "../workbook-table.js";
 import type {
+  CellHyperlink,
   CellFormat,
   CellScalar,
   CellStyle,
@@ -61,13 +73,11 @@ import type {
   PagedStoreStats,
   QueryCapability,
   ResolvedCell,
+  ResourceOwnerBytes,
   VisibleWindowView,
 } from "../types/store.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import {
-  applySheetLifecycleOperation,
-  canAddSheetSnapshot,
-  createSheetLifecycleState,
   integerAt,
   mergeCrossesFreeze,
   mergesOverlap,
@@ -81,7 +91,6 @@ import {
   remapSpan,
   sameMerge,
   uniqueColumnKeys,
-  validConditionalRules,
   validMerge,
   validProtectedRanges,
   validSortAndFilters,
@@ -146,6 +155,84 @@ export interface SheetwriteStoreOptions {
   referenceSimulationLimit?: number;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
+}
+
+function rebaseHyperlinkAxis(
+  hyperlink: CellHyperlink,
+  editedSheet: SheetId,
+  axis: "row" | "column",
+  remap: (index: number) => number | null,
+): CellHyperlink | null {
+  const rebaseRange = (range: Range): Range | null => {
+    if (range.sheet !== editedSheet) return range;
+    const span =
+      axis === "row"
+        ? remapSpan(range.start.row, range.end.row, remap)
+        : remapSpan(range.start.col, range.end.col, remap);
+    if (!span) return null;
+    return axis === "row"
+      ? {
+          ...range,
+          start: { ...range.start, row: span[0] },
+          end: { ...range.end, row: span[1] },
+        }
+      : {
+          ...range,
+          start: { ...range.start, col: span[0] },
+          end: { ...range.end, col: span[1] },
+        };
+  };
+  const range = rebaseRange(hyperlink.range);
+  if (!range) return null;
+  if (hyperlink.target.kind === "external") {
+    return range === hyperlink.range ? hyperlink : { ...hyperlink, range };
+  }
+  const targetRange = rebaseRange(hyperlink.target.range);
+  if (!targetRange) return null;
+  return {
+    ...hyperlink,
+    range,
+    target:
+      targetRange === hyperlink.target.range
+        ? hyperlink.target
+        : { kind: "internal", range: targetRange },
+  };
+}
+function rebaseConditionalFormatAxis(
+  rule: ConditionalFormatRule,
+  editedSheet: SheetId,
+  axis: "row" | "column",
+  remap: (index: number) => number | null,
+): ConditionalFormatRule | null {
+  if (rule.range.sheet !== editedSheet) return rule;
+  const span =
+    axis === "row"
+      ? remapSpan(rule.range.start.row, rule.range.end.row, remap)
+      : remapSpan(rule.range.start.col, rule.range.end.col, remap);
+  if (!span) return null;
+  const range =
+    axis === "row"
+      ? {
+          ...rule.range,
+          start: { ...rule.range.start, row: span[0] },
+          end: { ...rule.range.end, row: span[1] },
+        }
+      : {
+          ...rule.range,
+          start: { ...rule.range.start, col: span[0] },
+          end: { ...rule.range.end, col: span[1] },
+        };
+  return {
+    ...rule,
+    range,
+    when:
+      rule.when.kind === "formula"
+        ? {
+            ...rule.when,
+            source: remapFormulaA1Refs(rule.when.source, axis, remap),
+          }
+        : rule.when,
+  };
 }
 
 /** Error thrown when an operation requires datasource cells that are not loaded. */
@@ -588,7 +675,10 @@ export class StoreDataEngine {
     name: string,
     scope: SheetId | undefined,
   ): boolean {
-    return namedRange.name.toUpperCase() === name.toUpperCase() && namedRange.scope === scope;
+    return (
+      workbookTableNameKey(namedRange.name) === workbookTableNameKey(name) &&
+      namedRange.scope === scope
+    );
   }
 
   private allocateSheet(columns: number, rows: number): number {
@@ -2156,6 +2246,48 @@ export class StoreDataEngine {
         this.view.metadataChanged(patch.sheet);
         return true;
       }
+      case "setHyperlink": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const hyperlink = sanitizeCellHyperlink(patch.hyperlink);
+        if (!hyperlink || hyperlink.range.sheet !== patch.sheet) return false;
+        const source = hyperlink.range;
+        if (source.end.row >= sheet.rowCount || source.end.col >= sheet.columns.length) {
+          return false;
+        }
+        if (hyperlink.target.kind === "internal") {
+          const target = hyperlink.target.range;
+          const targetSheet = this.workbook.sheets.find(
+            (candidate) => candidate.id === target.sheet,
+          );
+          if (
+            !targetSheet ||
+            target.end.row >= targetSheet.rowCount ||
+            target.end.col >= targetSheet.columns.length
+          ) {
+            return false;
+          }
+        }
+        const links = sheet.hyperlinks ?? [];
+        const index = links.findIndex((candidate) => candidate.id === hyperlink.id);
+        if (index < 0) {
+          if (links.length >= MAX_HYPERLINKS_PER_SHEET) return false;
+          sheet.hyperlinks = [...links, hyperlink];
+        } else {
+          const next = [...links];
+          next[index] = hyperlink;
+          sheet.hyperlinks = next;
+        }
+        this.view.metadataChanged(patch.sheet);
+        return true;
+      }
+      case "removeHyperlink": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const links = sheet.hyperlinks ?? [];
+        if (!links.some((hyperlink) => hyperlink.id === patch.id)) return false;
+        sheet.hyperlinks = links.filter((hyperlink) => hyperlink.id !== patch.id);
+        this.view.metadataChanged(patch.sheet);
+        return true;
+      }
       case "setValidationRule": {
         const sheet = this.sheetMeta(patch.sheet);
         const rule = {
@@ -2312,13 +2444,20 @@ export class StoreDataEngine {
           (candidate) => candidate.id === patch.table.range.sheet,
         );
         if (!sheet) return false;
-        const existing = this.workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
+        const tableCount = this.workbook.sheets.reduce(
+          (count, candidate) => count + (candidate.tables?.length ?? 0),
+          0,
+        );
         if (
-          existing.length >= DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables ||
-          !validWorkbookTable(patch.table, sheet, existing)
+          tableCount >= DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables ||
+          (this.workbook.namedRanges ?? []).some(
+            (range) => workbookTableNameKey(range.name) === workbookTableNameKey(patch.table.name),
+          )
         ) {
           return false;
         }
+        const existing = this.workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
+        if (!validWorkbookTable(patch.table, sheet, existing)) return false;
         const table = structuredClone(patch.table);
         if (!this.syncTable(table)) return false;
         sheet.tables = [...(sheet.tables ?? []), table];
@@ -2343,6 +2482,13 @@ export class StoreDataEngine {
         const existing = this.workbook.sheets.flatMap((candidateSheet) =>
           (candidateSheet.tables ?? []).filter((table) => table.id !== current.id),
         );
+        if (
+          (this.workbook.namedRanges ?? []).some(
+            (range) => workbookTableNameKey(range.name) === workbookTableNameKey(candidate.name),
+          )
+        ) {
+          return false;
+        }
         if (!validWorkbookTable(candidate, sheet, existing)) return false;
         const next = structuredClone(candidate);
         if (next.style === undefined) delete next.style;
@@ -2393,6 +2539,7 @@ export class StoreDataEngine {
         if (patch.patch.frozenRows !== undefined) sheet.frozenRows = patch.patch.frozenRows;
         if (patch.patch.frozenCols !== undefined) sheet.frozenCols = patch.patch.frozenCols;
         if (patch.patch.conditionalFormats !== undefined) {
+          patch.patch.conditionalFormats = structuredClone(patch.patch.conditionalFormats);
           sheet.conditionalFormats = patch.patch.conditionalFormats;
           this.windowReader.conditionalRulesChanged(patch.sheet);
         }
@@ -2415,6 +2562,16 @@ export class StoreDataEngine {
         return true;
       }
       case "setNamedRange": {
+        if (
+          this.workbook.sheets.some((sheet) =>
+            (sheet.tables ?? []).some(
+              (table) =>
+                workbookTableNameKey(table.name) === workbookTableNameKey(patch.namedRange.name),
+            ),
+          )
+        ) {
+          return false;
+        }
         if (
           !this.workbook.sheets.some((sheet) => sheet.id === patch.namedRange.range.sheet) ||
           (patch.namedRange.scope !== undefined &&
@@ -2515,6 +2672,10 @@ export class StoreDataEngine {
     const movedValidationRules = cloneJsonValue(sheet.validationRules) ?? [];
     const movedProtectedRanges = cloneJsonValue(sheet.protectedRanges) ?? [];
     const movedNotes = cloneJsonValue(sheet.notes) ?? [];
+    const movedConditionalFormats = structuredClone(sheet.conditionalFormats ?? []);
+    const movedHyperlinks = this.workbook.sheets.map(
+      (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
+    );
     const cells = this.snapshotCells(
       patch.sheet,
       patch.from,
@@ -2582,6 +2743,17 @@ export class StoreDataEngine {
       ...note,
       addr: { ...note.addr, row: moveRow(note.addr.row) },
     }));
+    sheet.conditionalFormats = movedConditionalFormats
+      .map((rule) => rebaseConditionalFormatAxis(rule, patch.sheet, "row", moveRow))
+      .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    for (const [ownerId, hyperlinks] of movedHyperlinks) {
+      const owner = this.workbook.sheets.find((candidate) => candidate.id === ownerId);
+      if (!owner) continue;
+      owner.hyperlinks = hyperlinks
+        .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "row", moveRow))
+        .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
+    }
+    this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.row, original.range.end.row, (row) =>
         moveIndex(row, patch.from, patch.count, patch.to),
@@ -2627,6 +2799,10 @@ export class StoreDataEngine {
     const movedValidationRules = cloneJsonValue(sheet.validationRules) ?? [];
     const movedProtectedRanges = cloneJsonValue(sheet.protectedRanges) ?? [];
     const movedNotes = cloneJsonValue(sheet.notes) ?? [];
+    const movedConditionalFormats = structuredClone(sheet.conditionalFormats ?? []);
+    const movedHyperlinks = this.workbook.sheets.map(
+      (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
+    );
     const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
     const cells = this.snapshotCells(
       patch.sheet,
@@ -2677,6 +2853,17 @@ export class StoreDataEngine {
       ...note,
       addr: { ...note.addr, col: moveCol(note.addr.col) },
     }));
+    sheet.conditionalFormats = movedConditionalFormats
+      .map((rule) => rebaseConditionalFormatAxis(rule, patch.sheet, "column", moveCol))
+      .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    for (const [ownerId, hyperlinks] of movedHyperlinks) {
+      const owner = this.workbook.sheets.find((candidate) => candidate.id === ownerId);
+      if (!owner) continue;
+      owner.hyperlinks = hyperlinks
+        .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "column", moveCol))
+        .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
+    }
+    this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.col, original.range.end.col, (col) =>
         moveIndex(col, patch.from, patch.count, patch.to),
@@ -2722,6 +2909,7 @@ export class StoreDataEngine {
       frozenCols: snapshot.frozenCols,
       merges,
       conditionalFormats: snapshot.conditionalFormats?.map((rule) => ({ ...rule })),
+      hyperlinks: snapshot.hyperlinks?.map(cloneCellHyperlink),
       validationRules: cloneJsonValue(snapshot.validationRules),
       protectedRanges: cloneJsonValue(snapshot.protectedRanges),
       notes: cloneJsonValue(snapshot.notes),
@@ -2733,7 +2921,11 @@ export class StoreDataEngine {
       hiddenRows: new Set(),
     };
     try {
-      assertWorkbookTables([...this.workbook.sheets, sheet]);
+      assertWorkbookTables(
+        [...this.workbook.sheets, sheet],
+        DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+        (this.workbook.namedRanges ?? []).map((range) => range.name),
+      );
     } catch {
       return false;
     }
@@ -2801,6 +2993,12 @@ export class StoreDataEngine {
     this.workbook.namedRanges = this.workbook.namedRanges?.filter(
       (range) => range.range.sheet !== sheetId && range.scope !== sheetId,
     );
+    for (const owner of this.workbook.sheets) {
+      owner.hyperlinks = owner.hyperlinks?.filter(
+        (hyperlink) =>
+          hyperlink.target.kind !== "internal" || hyperlink.target.range.sheet !== sheetId,
+      );
+    }
     return true;
   }
 
@@ -2850,6 +3048,27 @@ export class StoreDataEngine {
           : null;
       })
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    for (const owner of this.workbook.sheets) {
+      owner.hyperlinks = owner.hyperlinks
+        ?.map((hyperlink) => rebaseHyperlinkAxis(hyperlink, sheet, "row", remap))
+        .filter(
+          (hyperlink): hyperlink is NonNullable<Sheet["hyperlinks"]>[number] => hyperlink !== null,
+        );
+    }
+    if (meta.conditionalFormats?.some((rule) => rule.when.kind === "formula")) {
+      meta.conditionalFormats = meta.conditionalFormats.map((rule) =>
+        rule.when.kind === "formula"
+          ? {
+              ...rule,
+              when: {
+                ...rule.when,
+                source: remapFormulaA1Refs(rule.when.source, "row", remap),
+              },
+            }
+          : rule,
+      );
+    }
+    this.windowReader.conditionalRulesChanged(sheet);
     meta.validationRules = meta.validationRules
       ?.map((rule) => rebaseRangeRows(rule, sheet, remap))
       .filter((rule): rule is DataValidationRule => rule !== null);
@@ -2933,6 +3152,27 @@ export class StoreDataEngine {
           : null;
       })
       .filter((rule): rule is ConditionalFormatRule => rule !== null);
+    for (const owner of this.workbook.sheets) {
+      owner.hyperlinks = owner.hyperlinks
+        ?.map((hyperlink) => rebaseHyperlinkAxis(hyperlink, sheet, "column", remap))
+        .filter(
+          (hyperlink): hyperlink is NonNullable<Sheet["hyperlinks"]>[number] => hyperlink !== null,
+        );
+    }
+    if (meta.conditionalFormats?.some((rule) => rule.when.kind === "formula")) {
+      meta.conditionalFormats = meta.conditionalFormats.map((rule) =>
+        rule.when.kind === "formula"
+          ? {
+              ...rule,
+              when: {
+                ...rule.when,
+                source: remapFormulaA1Refs(rule.when.source, "column", remap),
+              },
+            }
+          : rule,
+      );
+    }
+    this.windowReader.conditionalRulesChanged(sheet);
     meta.validationRules = meta.validationRules
       ?.map((rule) => rebaseRangeCols(rule, sheet, remap))
       .filter((rule): rule is DataValidationRule => rule !== null);

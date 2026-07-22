@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "../src/a1.js";
+import {
+  cellA1,
+  colToA1,
+  labelToCol,
+  rangeA1,
+  remapFormulaA1Refs,
+  shiftA1Refs,
+} from "../src/a1.js";
 
 describe("A1 column labels", () => {
   it("converts indices to labels across the 26-wrap boundary", () => {
@@ -50,5 +57,18 @@ describe("shiftA1Refs", () => {
 
   it("is a no-op when both deltas are zero", () => {
     expect(shiftA1Refs("=A1+$B$2", 0, 0)).toBe("=A1+$B$2");
+  });
+});
+
+describe("remapFormulaA1Refs", () => {
+  it("moves absolute and relative identities while leaving qualified targets alone", () => {
+    const insertRow = (row: number) => (row < 1 ? row : row + 2);
+    expect(remapFormulaA1Refs("=A1+$B$2+Other!C3", "row", insertRow)).toBe("=A1+$B$4+Other!C3");
+  });
+
+  it("turns deleted scalar references into #REF!", () => {
+    const removeColumn = (column: number) =>
+      column === 1 ? null : column > 1 ? column - 1 : column;
+    expect(remapFormulaA1Refs("=A1+B1+C1", "column", removeColumn)).toBe("=A1+#REF!+B1");
   });
 });

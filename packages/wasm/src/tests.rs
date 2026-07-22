@@ -2041,6 +2041,32 @@ fn conditional_format_window_masks_cover_predicates_bounds_and_row_order() {
 }
 
 #[test]
+fn conditional_formula_rules_shift_relative_refs_stop_and_follow_dependency_edits() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 3);
+    for (row, value) in [1.0, 4.0, 6.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+    store.set_number(sheet, 0, 1, 3.0, 0);
+    store.set_conditional_rules(
+        sheet,
+        &[6, 6],
+        &[0, 2, 2, 2, 0, 2, 2, 2],
+        &[0.0, 0.0],
+        vec!["=A1>$B$1".to_string(), "=TRUE".to_string()],
+        &[2, 0],
+    );
+
+    let mut initial = store.get_window(sheet, 0, 3, &[2]);
+    assert_eq!(initial.take_cond_matches(), vec![2, 1, 1]);
+
+    store.set_number(sheet, 1, 0, 2.0, 0);
+    store.recompute(sheet);
+    let mut changed_dependency = store.get_window(sheet, 0, 3, &[2]);
+    assert_eq!(changed_dependency.take_cond_matches(), vec![2, 2, 1]);
+}
+
+#[test]
 fn multi_query_entry_points_preserve_order_filters_distinctness_and_edges() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 5);

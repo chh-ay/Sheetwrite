@@ -10,6 +10,7 @@ import type {
   CellStyle,
   CellValue,
   DocumentOp,
+  Sheet,
   Store,
 } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
@@ -194,6 +195,7 @@ class FakeClipboardItem {
 interface Harness {
   controller: ClipboardController;
   store: FakeStore;
+  sheet: Sheet;
   selection: SelectionModel;
   /** CommitReasons the controller passed to `deps.commit`, in order. */
   commitReasons: string[];
@@ -255,12 +257,27 @@ function makeHarness(
     commit: (patches, reason) => {
       commitReasons.push(reason);
       store.apply(patches);
+      for (const patch of patches) {
+        if (patch.op === "setHyperlink") {
+          const links = sheet.hyperlinks ?? [];
+          const index = links.findIndex((candidate) => candidate.id === patch.hyperlink.id);
+          if (index < 0) sheet.hyperlinks = [...links, structuredClone(patch.hyperlink)];
+          else {
+            const next = [...links];
+            next[index] = structuredClone(patch.hyperlink);
+            sheet.hyperlinks = next;
+          }
+        } else if (patch.op === "removeHyperlink") {
+          sheet.hyperlinks = sheet.hyperlinks?.filter((candidate) => candidate.id !== patch.id);
+        }
+      }
     },
   });
 
   return {
     controller,
     store,
+    sheet,
     selection,
     commitReasons,
     select: (row, col) => selection.selectCell(row, col),
@@ -384,6 +401,30 @@ describe("ClipboardController", () => {
     h.select(6, 0);
     await h.controller.pasteValues();
     expect(h.store.getCell({ sheet: "s1", row: 6, col: 0 }).style).toEqual({});
+  });
+
+  it("copies bounded hyperlink metadata with a new stable identity and translated range", async () => {
+    h.sheet.hyperlinks = [
+      {
+        id: "source-link",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        target: { kind: "external", url: "https://example.com/report" },
+        display: "Report",
+        style: { color: "#123456", underline: true },
+      },
+    ];
+    h.select(0, 0);
+    await h.controller.copy();
+    h.select(2, 0);
+    await h.controller.paste();
+    expect(h.sheet.hyperlinks).toHaveLength(2);
+    expect(h.sheet.hyperlinks![1]).toMatchObject({
+      range: { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 2, col: 0 } },
+      target: { kind: "external", url: "https://example.com/report" },
+      display: "Report",
+      style: { color: "#123456", underline: true },
+    });
+    expect(h.sheet.hyperlinks![1]!.id).not.toBe("source-link");
   });
 
   it("external TSV paste parses literals per column type", async () => {
@@ -732,7 +773,7 @@ describe("ClipboardController", () => {
       [`web ${SHEETWRITE_CLIPBOARD_MIME}`]: new Blob(
         [
           JSON.stringify({
-            version: 2,
+            version: 3,
             token: "attacker-controlled",
             anchor: { row: 0, col: 0 },
             cells: [
@@ -744,6 +785,7 @@ describe("ClipboardController", () => {
                 },
               ],
             ],
+            hyperlinks: [],
             tsv: "0",
             cut: false,
           }),
@@ -803,7 +845,7 @@ describe("ClipboardController", () => {
       [SHEETWRITE_CLIPBOARD_MIME]: new Blob(
         [
           JSON.stringify({
-            version: 2,
+            version: 3,
             token: "untrusted-token-value",
             anchor: { row: 0, col: 0 },
             cells: [
@@ -815,6 +857,7 @@ describe("ClipboardController", () => {
                 },
               ],
             ],
+            hyperlinks: [],
             tsv: "7",
             cut: false,
           }),

@@ -558,26 +558,26 @@ describe("workbook OOXML fidelity", () => {
     });
     expect(warnings).toEqual([
       {
-        code: "external-relationship",
-        message: "External relationship rId1 was not followed",
-        part: "xl/worksheets/sheet1.xml",
-      },
-      {
         code: "rich-text",
         message: "Rich text formatting was flattened",
         part: "xl/sharedStrings.xml",
-      },
-      {
-        code: "hyperlink",
-        message: "Hyperlink target was dropped; display text was preserved",
-        sheet: "External",
-        cell: "A1",
       },
     ]);
     expect(imported.sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
       kind: "literal",
       value: "rich text",
     });
+    expect(imported.sheets[0]!.hyperlinks).toEqual([
+      {
+        id: "xlsx-hyperlink-1-1",
+        range: {
+          sheet: imported.sheets[0]!.id,
+          start: { row: 0, col: 0 },
+          end: { row: 0, col: 0 },
+        },
+        target: { kind: "external", url: "https://sheetwrite.example" },
+      },
+    ]);
     expect(imported.sheets[0]!.validationRules?.[0]).toMatchObject({
       condition: { kind: "number", min: 0, max: 10 },
       policy: "reject",

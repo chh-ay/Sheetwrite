@@ -1,10 +1,9 @@
 import type { SourceSnapshot } from "@sheetwrite/wasm";
-import type { ResourceOwnerBytes } from "../resource-accounting.js";
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { Workbook } from "../types/document.js";
-import type { VisibleWindowView } from "../types/store.js";
+import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.js";
 
 const KIND_NUMBER = 1;
@@ -13,6 +12,7 @@ const KIND_BOOL = 3;
 const EMPTY_COND_MATCHES = new Uint32Array(0);
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
+const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
 const UTF8_DECODER = new TextDecoder();
 
 export interface PersistedCellView {
@@ -311,6 +311,7 @@ export class StoreWindowReader {
     }
 
     const windowStyles = this.stylesFrom(styleDict);
+    this.mergeHyperlinkStyles(sheet, rows, cols, order, styleIds, windowStyles);
     if (condMatches.length > 0) {
       this.mergeCondMatches(sheet, condMatches, styleIds, windowStyles);
     }
@@ -422,7 +423,9 @@ export class StoreWindowReader {
 
   private syncConditionalRules(sheet: SheetId, handle: number): number {
     const rules = this.sheetMeta(sheet).conditionalFormats ?? [];
-    const packable = rules.filter((rule) => rule.range.sheet === sheet).slice(0, 32);
+    const packable = rules
+      .filter((rule) => rule.range.sheet === sheet)
+      .slice(0, CONDITIONAL_MASK_BITS);
     const signature = conditionalRulesSignature(packable);
     if (this.condRulesSynced.get(sheet) === signature) {
       this.conditionalRuleInputBytes = 0;
@@ -461,11 +464,15 @@ export class StoreWindowReader {
         } else {
           kinds[i] = 4;
         }
-      } else {
+      } else if (when.kind === "contains") {
         kinds[i] = 5;
         strs[i] = when.text;
         flags[i] = when.matchCase ? 1 : 0;
+      } else {
+        kinds[i] = 6;
+        strs[i] = when.source;
       }
+      if (rule.stopIfTrue) flags[i] = (flags[i] ?? 0) | 2;
     }
     const stringBytes = strs.reduce((bytes, value) => bytes + utf8ByteLength(value), 0);
     this.conditionalRuleInputBytes =
@@ -479,6 +486,52 @@ export class StoreWindowReader {
     );
     this.wasm.setConditionalRules(handle, kinds, bounds, nums, strs, flags);
     return (packable.length > 0 ? 1 : 0) | 2;
+  }
+
+  private mergeHyperlinkStyles(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+    order: Uint32Array | undefined,
+    styleIds: Uint32Array,
+    styles: CellStyle[],
+  ): void {
+    const hyperlinks = this.sheetMeta(sheet).hyperlinks ?? [];
+    if (hyperlinks.length === 0 || cols.length === 0 || rows.end <= rows.start) return;
+    const colPositions = new Map<number, number>();
+    for (let index = 0; index < cols.length; index++) colPositions.set(cols[index]!, index);
+    const mergedIds = new Map<string, number>();
+    const rowCount = Math.min(rows.end - rows.start, Math.floor(styleIds.length / cols.length));
+    for (const hyperlink of hyperlinks) {
+      if (hyperlink.range.sheet !== sheet) continue;
+      const r0 = Math.min(hyperlink.range.start.row, hyperlink.range.end.row);
+      const r1 = Math.max(hyperlink.range.start.row, hyperlink.range.end.row);
+      const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
+      const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
+      const linkStyle: CellStyle = {
+        color: "#0563C1",
+        underline: true,
+        ...hyperlink.style,
+      };
+      const styleKey = JSON.stringify(linkStyle);
+      for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+        const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
+        if (dataRow < r0 || dataRow > r1) continue;
+        for (const [col, colIndex] of colPositions) {
+          if (col < c0 || col > c1) continue;
+          const offset = rowIndex * cols.length + colIndex;
+          const base = styleIds[offset]!;
+          const key = `${base}:${styleKey}`;
+          let merged = mergedIds.get(key);
+          if (merged === undefined) {
+            merged = styles.length;
+            styles.push({ ...(styles[base] ?? {}), ...linkStyle });
+            mergedIds.set(key, merged);
+          }
+          styleIds[offset] = merged;
+        }
+      }
+    }
   }
 
   private mergeCondMatches(
@@ -501,8 +554,8 @@ export class StoreWindowReader {
       let local = mergedIds.get(comboKey);
       if (local === undefined) {
         let merged = styles[base] ?? {};
-        for (let bit = 0, mask = fullMask; mask !== 0; bit++, mask >>>= 1) {
-          if (mask & 1) merged = { ...merged, ...rules[bit]?.style };
+        for (let bit = Math.min(rules.length, CONDITIONAL_MASK_BITS) - 1; bit >= 0; bit--) {
+          if ((fullMask & (1 << bit)) !== 0) merged = { ...merged, ...rules[bit]?.style };
         }
         local = styles.length;
         styles.push(merged);
@@ -532,7 +585,7 @@ function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): str
     const c0 = Math.min(rule.range.start.col, rule.range.end.col);
     const r1 = Math.max(rule.range.start.row, rule.range.end.row);
     const c1 = Math.max(rule.range.start.col, rule.range.end.col);
-    signature += `|${r0},${c0},${r1},${c1}`;
+    signature += `|${r0},${c0},${r1},${c1}|stop:${rule.stopIfTrue ? 1 : 0}`;
 
     const when = rule.when;
     if (when.kind === "greaterThan" || when.kind === "lessThan") {
@@ -541,8 +594,10 @@ function conditionalRulesSignature(rules: readonly ConditionalFormatRule[]): str
       const value = when.value;
       signature +=
         typeof value === "string" ? `|equal:s${value.length}:${value}` : `|equal:${value}`;
-    } else {
+    } else if (when.kind === "contains") {
       signature += `|contains:${when.matchCase ? 1 : 0}:${when.text.length}:${when.text}`;
+    } else {
+      signature += `|formula:${when.source.length}:${when.source}`;
     }
   }
   return signature;

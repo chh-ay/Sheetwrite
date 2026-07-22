@@ -4,7 +4,7 @@ import {
   encodeDelimitedText,
   parseDelimitedText,
 } from "./delimited-text.js";
-import type { CellScalar, CellStyle, CellValue } from "./types/cell.js";
+import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 
 // Values beginning with any of these are neutralized on paste so a pasted
 // "=cmd|..." or "+...", "-...", "@..." can't become an executable formula.
@@ -68,6 +68,8 @@ export interface ClipboardSnapshot {
   anchor: { row: number; col: number };
   /** Row-major copied cells in the source's view order. */
   cells: ClipboardCell[][];
+  /** Fully-contained source hyperlinks; source ranges retain stable data coordinates. */
+  hyperlinks: CellHyperlink[];
   /** The exact TSV written to the system clipboard; the paste-time identity check. */
   tsv: string;
   /** True when produced by cut: formulas paste verbatim (Sheets shifts on copy, not cut). */

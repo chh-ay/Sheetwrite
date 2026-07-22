@@ -47,18 +47,39 @@ export interface CellStyle {
   border?: CellBorders;
 }
 
+/** Browser-safe external target or stable workbook-internal range target. */
+export type HyperlinkTarget =
+  | { kind: "external"; url: string }
+  | { kind: "internal"; range: Range };
+
+/** Bounded serializable hyperlink metadata applied to one cell or range. */
+export interface CellHyperlink {
+  /** Stable identity used by operations, history, and collaboration rebase. */
+  id: string;
+  range: Range;
+  target: HyperlinkTarget;
+  /** Optional accessible/OOXML display label; cell values remain authoritative. */
+  display?: string;
+  /** Optional override merged over the deterministic blue/underline link style. */
+  style?: CellStyle;
+}
+
 /** Predicate used to decide whether a conditional format applies. */
 export type ConditionalFormatPredicate =
   | { kind: "greaterThan"; value: number }
   | { kind: "lessThan"; value: number }
   | { kind: "equal"; value: CellScalar }
-  | { kind: "contains"; text: string; matchCase?: boolean };
+  | { kind: "contains"; text: string; matchCase?: boolean }
+  /** Boolean formula anchored at the rule range's top-left; relative A1 refs shift per cell. */
+  | { kind: "formula"; source: string };
 
 /** Ordered condition and style applied to a cell range. */
 export interface ConditionalFormatRule {
   range: Range;
   when: ConditionalFormatPredicate;
   style: CellStyle;
+  /** Stop evaluating lower-precedence rules for a cell when this rule matches. */
+  stopIfTrue?: boolean;
 }
 
 /**

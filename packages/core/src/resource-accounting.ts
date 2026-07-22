@@ -1,3 +1,6 @@
+import type { ResourceOwnerBytes } from "./types/store.js";
+export type { ResourceOwnerBytes } from "./types/store.js";
+
 /** Stable protocol for runtime ownership and operation-cost reports. */
 export const RUNTIME_RESOURCE_SCHEMA_VERSION = 2 as const;
 /** Flat WASM store-memory protocol version; decoders reject any mismatch. */
@@ -49,22 +52,6 @@ export type RuntimeResourcePhase = "before" | "peak" | "settled" | "after-destro
 export type BoundaryDirection = "js-to-wasm" | "wasm-to-js";
 /** Whether a measured boundary crossing transfers one scalar or a packed batch. */
 export type BoundaryTransferKind = "bulk" | "scalar";
-
-/** Retained logical payload and allocated capacity attributed to one exclusive owner. */
-export interface ResourceOwnerBytes {
-  readonly owner: string;
-  /** Bytes containing live logical payload. Never includes runtime observations. */
-  readonly logicalBytes: number;
-  /** Container capacity owned exclusively by this owner. */
-  readonly allocatedBytes: number;
-  readonly entries: number;
-  readonly measurement:
-    | "exact-capacity"
-    | "hash-capacity-v1"
-    | "typed-array-byte-length"
-    | "utf16-upper-bound"
-    | "entry-count-only";
-}
 
 /** Decoded, fail-closed retained-memory ownership report from the WASM store. */
 export interface StoreMemoryBreakdown {

@@ -46,6 +46,7 @@ export const GRID_OPTION_POLICY = {
   protectionResolver: "reset",
   mutationPolicy: "reset",
   transactionResourceLimits: "reset",
+  hyperlinkActivation: "reset",
   theme: "live",
   readOnly: "live",
   config: "live",

@@ -1,4 +1,4 @@
-import type { ResourceOwnerBytes } from "./resource-accounting.js";
+import type { ResourceOwnerBytes } from "./types/store.js";
 import type { CellStyle } from "./types/cell.js";
 
 const EMPTY: CellStyle = {};

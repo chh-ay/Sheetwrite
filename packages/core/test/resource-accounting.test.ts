@@ -5,13 +5,13 @@ import {
   createRuntimeResourceSnapshot,
   decodeStoreMemoryStats,
   diffRuntimeResourcePhases,
-  type ResourceOwnerBytes,
   RUNTIME_RESOURCE_SCHEMA_VERSION,
   type RuntimeResourceSnapshot,
   STORE_MEMORY_HASH_ESTIMATE_VERSION,
   STORE_MEMORY_PROTOCOL_VERSION,
   WASM_MEMORY_OWNERS,
 } from "../src/resource-accounting.js";
+import type { ResourceOwnerBytes } from "../src/types/store.js";
 
 function encodedStoreMemory(
   overrides: Partial<Record<(typeof WASM_MEMORY_OWNERS)[number], [number, number, number]>> = {},

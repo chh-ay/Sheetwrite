@@ -15,6 +15,7 @@ import type {
   RuntimeResourceSnapshot,
   TransientResourcePeak,
 } from "./resource-accounting.js";
+import { applySheetLifecycleOperation, createSheetLifecycleState } from "./sheet-lifecycle.js";
 import {
   type CompactRangeHistory,
   IncompleteDataError,
@@ -23,11 +24,7 @@ import {
   type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
-import {
-  applySheetLifecycleOperation,
-  createSheetLifecycleState,
-  patchSheetId,
-} from "./store/ranges.js";
+import { patchSheetId } from "./store/ranges.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -535,6 +532,12 @@ export class SheetwriteStore implements Store {
         for (const rule of operation.sheet.conditionalFormats ?? []) {
           requiredSheets.push(rule.range.sheet);
         }
+        for (const hyperlink of operation.sheet.hyperlinks ?? []) {
+          requiredSheets.push(hyperlink.range.sheet);
+          if (hyperlink.target.kind === "internal") {
+            requiredSheets.push(hyperlink.target.range.sheet);
+          }
+        }
         for (const rule of operation.sheet.validationRules ?? []) {
           requiredSheets.push(rule.range.sheet);
         }
@@ -560,6 +563,11 @@ export class SheetwriteStore implements Store {
           }
         } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
           requiredSheets.push(operation.scope);
+        } else if (operation.op === "setHyperlink") {
+          requiredSheets.push(operation.hyperlink.range.sheet);
+          if (operation.hyperlink.target.kind === "internal") {
+            requiredSheets.push(operation.hyperlink.target.range.sheet);
+          }
         } else if (operation.op === "setValidationRule") {
           requiredSheets.push(operation.rule.range.sheet);
         } else if (operation.op === "setProtectedRange") {

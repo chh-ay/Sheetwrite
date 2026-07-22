@@ -9,13 +9,16 @@ import type {
   RuntimeResourceSnapshot,
 } from "../resource-accounting.js";
 import type {
+  CellHyperlink,
   CellAlign,
   CellFormat,
   CellScalar,
   CellStyle,
   CellValue,
+  Column,
   ConditionalFormatRule,
 } from "./cell.js";
+import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -46,7 +49,6 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "./document.js";
-import type { CellEditor } from "./editor.js";
 import type { CellRenderer, Theme } from "./render.js";
 import type { Store } from "./store.js";
 import type {
@@ -56,6 +58,47 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./transaction.js";
+
+/** Selection movement applied after a successful editor commit. */
+export type CellEditorNavigation = "down" | "right" | "left" | "none";
+
+/** Viewport-relative geometry of the cell currently owned by an editor. */
+export interface CellEditorRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Immutable state and guarded completion callbacks for one mounted editor. */
+export interface CellEditorContext {
+  readonly grid: Grid;
+  readonly address: Readonly<CellAddress>;
+  readonly viewAddress: Readonly<CellAddress>;
+  readonly column: Readonly<Column>;
+  readonly value: CellScalar;
+  readonly text: string;
+  readonly initialInput: string | undefined;
+  readonly selectAll: boolean;
+  readonly label: string;
+  readonly signal: AbortSignal;
+  commit(value: string, navigation?: CellEditorNavigation): void;
+  cancel(): void;
+}
+
+/** Retained lifecycle returned by a custom editor's mount method. */
+export interface CellEditorInstance {
+  update(context: CellEditorContext): void;
+  reposition(rect: CellEditorRect): void;
+  commit(navigation: CellEditorNavigation): string | void | Promise<string | void>;
+  cancel(): void;
+  destroy(): void;
+}
+
+/** Framework-neutral named editor definition registered through GridOptions.editors. */
+export interface CellEditor {
+  mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance;
+}
 
 /**
  * How a clipboard action ended. Permission failures are OUTCOMES, not
@@ -312,6 +355,12 @@ export interface GridOptions {
   /** Disables mutating interactions while preserving navigation and selection. */
   readOnly?: boolean;
   /**
+   * Hyperlink activation never opens a browser URL. `event-only` (default)
+   * emits a safe resolved target; `internal-navigation` additionally moves to
+   * stable internal destinations; `disabled` rejects every activation request.
+   */
+  hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
+  /**
    * Host-owned client UX permission check. Servers must independently authorize
    * every submitted operation; this resolver is not an authentication boundary.
    */
@@ -384,6 +433,13 @@ export interface CellInputSnapshot {
 /** Actionable transaction outcome for a stable sheet lifecycle target. */
 export type SheetLifecycleResult = ApplyTransactionResult & { readonly sheet: SheetId };
 
+/** Host-safe activation payload emitted only after final target validation. */
+export interface HyperlinkActivationEvent {
+  readonly address: CellAddress;
+  readonly hyperlink: CellHyperlink;
+  readonly target: ResolvedHyperlinkTarget;
+}
+
 /** Payload map for events emitted by a Grid. */
 export interface GridEvents {
   change: ChangeEvent;
@@ -397,6 +453,7 @@ export interface GridEvents {
   "mutation-rejected": { issues: MutationIssue[] };
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
+  "hyperlink-activate": HyperlinkActivationEvent;
   /**
    * Emitted once when the worker renderer could not be constructed and the
    * grid fell back to the main-thread canvas renderer.
@@ -562,6 +619,14 @@ export interface Grid {
   /** Set host-visible worksheet state; stock UI never offers `veryHidden`. */
   setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+  setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult;
+  removeHyperlink(id: string): ApplyTransactionResult;
+  getHyperlink(addr: CellAddress): CellHyperlink | null;
+  /**
+   * Validate and emit a host-owned activation event. External targets are never
+   * opened by Sheetwrite; internal navigation occurs only under the explicit policy.
+   */
+  activateHyperlink(addr: CellAddress): boolean;
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;

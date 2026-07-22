@@ -1,3 +1,4 @@
+import { remapFormulaA1Refs } from "./a1.js";
 import type { CellValue } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
@@ -257,6 +258,21 @@ function transformDirectTarget(
         };
       }
       return null;
+    case "setHyperlink": {
+      const source = transformRange(operation.hyperlink.range, change);
+      if (!source && operation.hyperlink.range.sheet === change.sheet) {
+        return overlappingStructure(operation.op);
+      }
+      if (source) operation.hyperlink.range = source;
+      if (operation.hyperlink.target.kind === "internal") {
+        const target = transformRange(operation.hyperlink.target.range, change);
+        if (!target && operation.hyperlink.target.range.sheet === change.sheet) {
+          return overlappingStructure(operation.op);
+        }
+        if (target) operation.hyperlink.target.range = target;
+      }
+      return null;
+    }
     case "setValidationRule": {
       const mapped = transformRange(operation.rule.range, change);
       if (!mapped && operation.rule.range.sheet === change.sheet) {
@@ -299,12 +315,28 @@ function transformDirectTarget(
       return null;
     }
     case "setSheetMeta":
-      if (operation.sheet === change.sheet) {
+      if (operation.sheet !== change.sheet) return null;
+      if (
+        Object.keys(operation.patch).length !== 1 ||
+        !Object.hasOwn(operation.patch, "conditionalFormats")
+      ) {
         return {
           code: "unsupported-structural",
-          message:
-            "Row groups, filters, and conditional formatting require metadata-aware structural rebase",
+          message: "Only conditional formats support metadata-aware structural rebase",
         };
+      }
+      if (operation.patch.conditionalFormats !== undefined) {
+        for (const rule of operation.patch.conditionalFormats) {
+          const originalSheet = rule.range.sheet;
+          const mapped = transformRange(rule.range, change);
+          if (!mapped && originalSheet === change.sheet) return overlappingStructure(operation.op);
+          if (mapped) rule.range = mapped;
+          if (originalSheet === change.sheet && rule.when.kind === "formula") {
+            rule.when.source = remapFormulaA1Refs(rule.when.source, change.axis, (index) =>
+              transformIndex(index, change),
+            );
+          }
+        }
       }
       return null;
     case "addSheet":
@@ -313,6 +345,7 @@ function transformDirectTarget(
     case "moveSheet":
     case "setSheetVisibility":
     case "removeValidationRule":
+    case "removeHyperlink":
     case "removeProtectedRange":
     case "removeNamedRange":
     case "removeTable":
@@ -631,6 +664,8 @@ function mutationRanges(operation: DocumentOp): Range[] {
           end: { row: operation.merge.r1, col: operation.merge.c1 },
         },
       ];
+    case "setHyperlink":
+      return [operation.hyperlink.range];
     case "setValidationRule":
       return [operation.rule.range];
     case "setProtectedRange":
@@ -652,6 +687,9 @@ function operationIdentity(operation: DocumentOp): string {
       return `column:${operation.sheet}:${operation.col}`;
     case "setRowMeta":
       return `row:${operation.sheet}:${operation.row}`;
+    case "setHyperlink":
+    case "removeHyperlink":
+      return `hyperlink:${operation.sheet}:${operation.op === "setHyperlink" ? operation.hyperlink.id : operation.id}`;
     case "setValidationRule":
     case "removeValidationRule":
       return `validation:${operation.sheet}:${operation.op === "setValidationRule" ? operation.rule.id : operation.id}`;

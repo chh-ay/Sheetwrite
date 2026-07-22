@@ -6,8 +6,8 @@ import type {
   CellEditorInstance,
   CellEditorNavigation,
   CellEditorRect,
-} from "./types/editor.js";
-import type { Grid } from "./types/grid.js";
+  Grid,
+} from "./types/grid.js";
 
 const NO_EDITOR_ERROR = Symbol("no-editor-error");
 
