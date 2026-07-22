@@ -34,20 +34,20 @@ actual: number;
 
 </details>
 
-<details class="api-member" id="snapshot-resource-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
-
-```ts generated
-code: "resource-limit";
-```
-
-</details>
-
 <details class="api-member" id="snapshot-resource-error-limit" data-pagefind-weight="1">
 <summary><code>limit</code></summary>
 
 ```ts generated
 limit: number;
+```
+
+</details>
+
+<details class="api-member" id="snapshot-resource-error-name" data-pagefind-weight="1">
+<summary><code>name</code></summary>
+
+```ts generated
+name: "SnapshotResourceError";
 ```
 
 </details>
@@ -68,7 +68,7 @@ resource: keyof SnapshotResourceLimits
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class SnapshotResourceError extends RangeError {
+class SnapshotResourceError extends SheetwriteError {
   constructor(
     resource: keyof SnapshotResourceLimits,
     limit: number,
@@ -76,8 +76,8 @@ class SnapshotResourceError extends RangeError {
     options?: ErrorOptions,
   );
   actual: number;
-  code: "resource-limit";
   limit: number;
+  name: "SnapshotResourceError";
   resource: keyof SnapshotResourceLimits;
 }
 ```

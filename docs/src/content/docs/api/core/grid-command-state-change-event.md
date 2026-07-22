@@ -9,7 +9,7 @@ Complete command-state snapshot emitted whenever availability or activity can ch
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L150</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L151</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

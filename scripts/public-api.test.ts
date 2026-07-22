@@ -208,6 +208,28 @@ describe("public API policy", () => {
       ),
     ).toBe(true);
   });
+  it("rejects untyped error payloads and direct built-in Error subclasses", async () => {
+    const root = await fixture(
+      `${canonicalDeclarations}
+/** Untyped operational failure. */
+export interface OperationalFailure { error: unknown; }
+/** Non-canonical public exception. */
+export class LegacyFailure extends RangeError {}`,
+    );
+    const { issues } = await analyzePublicApi(root);
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        code: "unstable-error-contract",
+        symbol: "OperationalFailure",
+      }),
+    );
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        code: "unstable-error-contract",
+        symbol: "LegacyFailure",
+      }),
+    );
+  });
 
   it("rejects a forbidden compatibility alias", async () => {
     const root = await fixture(`${canonicalDeclarations}\nexport type Patch = DocumentOp;\n`);

@@ -9,7 +9,7 @@ Observable availability and selection-derived activity for one command.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L144</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L145</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

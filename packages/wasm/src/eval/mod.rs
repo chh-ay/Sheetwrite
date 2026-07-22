@@ -738,6 +738,114 @@ impl CellStore {
             };
         }
 
+        if func == Func::IfNa {
+            if args.len() != 2 {
+                return Value::Error(FormulaError::Value);
+            }
+            let value = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
+            return if value == Value::Error(FormulaError::Na) {
+                self.eval_ast(&args[1], sheet, affected, memo, visiting, depth + 1)
+            } else {
+                value
+            };
+        }
+
+        if func == Func::Ifs {
+            if args.len() < 2 || args.len() % 2 != 0 {
+                return Value::Error(FormulaError::Value);
+            }
+            for pair in args.chunks_exact(2) {
+                let condition = self.eval_ast(&pair[0], sheet, affected, memo, visiting, depth + 1);
+                match bool_from_value(&condition) {
+                    Ok(true) => {
+                        return self.eval_ast(&pair[1], sheet, affected, memo, visiting, depth + 1);
+                    }
+                    Ok(false) => {}
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            return Value::Error(FormulaError::Na);
+        }
+
+        if func == Func::Switch {
+            if args.len() < 3 {
+                return Value::Error(FormulaError::Value);
+            }
+            let expression = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
+            if let Value::Error(error) = expression {
+                return Value::Error(error);
+            }
+            let pairs_end = if args.len() % 2 == 0 {
+                args.len() - 1
+            } else {
+                args.len()
+            };
+            for pair in args[1..pairs_end].chunks_exact(2) {
+                let case = self.eval_ast(&pair[0], sheet, affected, memo, visiting, depth + 1);
+                match compare_values(&expression, &case) {
+                    Ok(Ordering::Equal) => {
+                        return self.eval_ast(&pair[1], sheet, affected, memo, visiting, depth + 1);
+                    }
+                    Ok(_) => {}
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            return if pairs_end < args.len() {
+                self.eval_ast(&args[pairs_end], sheet, affected, memo, visiting, depth + 1)
+            } else {
+                Value::Error(FormulaError::Na)
+            };
+        }
+
+        if matches!(
+            func,
+            Func::IsBlank
+                | Func::IsNumber
+                | Func::IsText
+                | Func::IsLogical
+                | Func::IsError
+                | Func::IsErr
+                | Func::IsNa
+                | Func::Type
+                | Func::N
+                | Func::T
+        ) {
+            if args.len() != 1 {
+                return Value::Error(FormulaError::Value);
+            }
+            let value = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
+            return match func {
+                Func::IsBlank => Value::Bool(matches!(value, Value::Blank)),
+                Func::IsNumber => Value::Bool(matches!(value, Value::Number(_))),
+                Func::IsText => Value::Bool(matches!(value, Value::Text(_))),
+                Func::IsLogical => Value::Bool(matches!(value, Value::Bool(_))),
+                Func::IsError => Value::Bool(matches!(value, Value::Error(_))),
+                Func::IsErr => Value::Bool(matches!(
+                    value,
+                    Value::Error(error) if error != FormulaError::Na
+                )),
+                Func::IsNa => Value::Bool(value == Value::Error(FormulaError::Na)),
+                Func::Type => Value::number(match value {
+                    Value::Number(_) | Value::Blank => 1.0,
+                    Value::Text(_) => 2.0,
+                    Value::Bool(_) => 4.0,
+                    Value::Error(_) => 16.0,
+                }),
+                Func::N => match value {
+                    Value::Number(value) => Value::number(value),
+                    Value::Bool(value) => Value::number(if value { 1.0 } else { 0.0 }),
+                    Value::Error(error) => Value::Error(error),
+                    Value::Text(_) | Value::Blank => Value::Number(0.0),
+                },
+                Func::T => match value {
+                    Value::Text(value) => Value::Text(value),
+                    Value::Error(error) => Value::Error(error),
+                    Value::Number(_) | Value::Bool(_) | Value::Blank => Value::text(""),
+                },
+                _ => unreachable!(),
+            };
+        }
+
         if matches!(func, Func::Today | Func::Now) {
             if !args.is_empty() {
                 return Value::Error(FormulaError::Value);

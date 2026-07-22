@@ -9,10 +9,10 @@ Stable resource-limit failure surfaced before an XLSX codec allocates unsafe dat
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L279</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L278</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>6</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -34,15 +34,6 @@ actual: number;
 
 </details>
 
-<details class="api-member" id="xlsx-resource-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
-
-```ts generated
-code: "XLSX_RESOURCE_LIMIT";
-```
-
-</details>
-
 <details class="api-member" id="xlsx-resource-error-limit" data-pagefind-weight="1">
 <summary><code>limit</code></summary>
 
@@ -52,11 +43,11 @@ limit: number;
 
 </details>
 
-<details class="api-member" id="xlsx-resource-error-operation" data-pagefind-weight="1">
-<summary><code>operation</code></summary>
+<details class="api-member" id="xlsx-resource-error-name" data-pagefind-weight="1">
+<summary><code>name</code></summary>
 
 ```ts generated
-operation: "import" | "export";
+name: "XlsxResourceError";
 ```
 
 </details>
@@ -77,7 +68,7 @@ resource: keyof XlsxResourceLimits
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class XlsxResourceError extends RangeError {
+class XlsxResourceError extends SheetwriteError {
   constructor(
     resource: keyof XlsxResourceLimits,
     limit: number,
@@ -85,9 +76,8 @@ class XlsxResourceError extends RangeError {
     operation: "import" | "export",
   );
   actual: number;
-  code: "XLSX_RESOURCE_LIMIT";
   limit: number;
-  operation: "import" | "export";
+  name: "XlsxResourceError";
   resource: keyof XlsxResourceLimits;
 }
 ```

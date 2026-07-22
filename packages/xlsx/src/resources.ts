@@ -1,6 +1,8 @@
 import {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   validateWorkbookSnapshot,
+  isSheetwriteError,
+  SheetwriteError,
   XlsxResourceError,
   type XlsxResourceLimits,
   type XlsxWorkbookOptions,
@@ -15,15 +17,22 @@ export interface XlsxCodecContext {
 
 const RESOURCE_KEYS = Object.keys(DEFAULT_XLSX_RESOURCE_LIMITS) as (keyof XlsxResourceLimits)[];
 
-function positiveLimit(name: keyof XlsxResourceLimits, value: number): number {
+function positiveLimit(
+  operation: "import" | "export",
+  name: keyof XlsxResourceLimits,
+  value: number,
+): number {
   const integerOnly = name !== "maxCompressionRatio";
   if (
     !Number.isFinite(value) ||
     value <= 0 ||
     (integerOnly ? !Number.isSafeInteger(value) : false)
   ) {
-    throw new RangeError(
+    throw new SheetwriteError(
+      "xlsx-invalid-options",
+      `xlsx-${operation}`,
       `Sheetwrite: XLSX ${name} must be ${integerOnly ? "a positive integer" : "positive"}`,
+      { context: { format: "xlsx", resource: name } },
     );
   }
   return value;
@@ -38,7 +47,12 @@ export function createCodecContext(
   if (overrides) {
     for (const key of Object.keys(overrides)) {
       if (!RESOURCE_KEYS.includes(key as keyof XlsxResourceLimits) || key === "maxCells") {
-        throw new TypeError(`Sheetwrite: unknown XLSX resource limit ${key}`);
+        throw new SheetwriteError(
+          "xlsx-invalid-options",
+          `xlsx-${operation}`,
+          `Sheetwrite: unknown XLSX resource limit ${key}`,
+          { context: { format: "xlsx", resource: key } },
+        );
       }
     }
   }
@@ -46,18 +60,47 @@ export function createCodecContext(
   for (const key of RESOURCE_KEYS) {
     if (key === "maxCells") continue;
     const value = overrides?.[key];
-    if (value !== undefined) limits[key] = positiveLimit(key, value);
+    if (value !== undefined) limits[key] = positiveLimit(operation, key, value);
   }
   if (options?.maxCells !== undefined) {
-    limits.maxCells = positiveLimit("maxCells", options.maxCells);
+    limits.maxCells = positiveLimit(operation, "maxCells", options.maxCells);
   }
-  checkAbort(options);
-  return { operation, limits: Object.freeze(limits), options };
+  const context = { operation, limits: Object.freeze(limits), options };
+  checkAbort(context);
+  return context;
+}
+/** Normalize direct optional-package backend failures into the shared core envelope. */
+export function xlsxFailure(
+  error: unknown,
+  operation: "import" | "export",
+  backend: string,
+): SheetwriteError {
+  if (error instanceof SheetwriteError) return error;
+  if (isSheetwriteError(error)) {
+    return new SheetwriteError(error.code, error.operation, error.message, {
+      cause: error,
+      context: error.context,
+      retryable: error.retryable,
+    });
+  }
+  return new SheetwriteError(
+    operation === "import" ? "xlsx-import-failed" : "export-failed",
+    `xlsx-${operation}`,
+    error instanceof Error ? error.message : `Sheetwrite XLSX ${operation} failed`,
+    { cause: error, context: { format: "xlsx", backend } },
+  );
 }
 
-export function checkAbort(options: XlsxWorkbookOptions | undefined): void {
-  if (!options?.signal?.aborted) return;
-  throw options.signal.reason ?? new DOMException("XLSX operation aborted", "AbortError");
+export function checkAbort(context: XlsxCodecContext): void {
+  const signal = context.options?.signal;
+  if (!signal?.aborted) return;
+  const cause = signal.reason ?? new DOMException("XLSX operation aborted", "AbortError");
+  throw new SheetwriteError(
+    "aborted",
+    `xlsx-${context.operation}`,
+    cause instanceof Error ? cause.message : `Sheetwrite XLSX ${context.operation} aborted`,
+    { cause, context: { format: "xlsx" } },
+  );
 }
 
 export function assertResource(

@@ -446,7 +446,7 @@ function writeSheet(
     );
     for (const cell of (byRow.get(row) ?? []).sort((left, right) => left.col - right.col)) {
       processed += 1;
-      if ((processed & 4_095) === 0) checkAbort(context.options);
+      if ((processed & 4_095) === 0) checkAbort(context);
       xml.append(cellXml(snapshot, sheet, cell, styles, context));
     }
     xml.append("</row>");
@@ -667,7 +667,7 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
   ];
   const workbookRelationships = [];
   for (let index = 0; index < ordered.length; index++) {
-    checkAbort(context.options);
+    checkAbort(context);
     const number = index + 1;
     const part = `xl/worksheets/sheet${number}.xml`;
     const result = writeSheet(snapshot, ordered[index]!, styles, context, number);

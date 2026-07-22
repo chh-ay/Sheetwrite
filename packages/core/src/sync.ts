@@ -3,7 +3,13 @@ import {
   validateDocumentOperationShape,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
-import { boundedJsonByteLength, JsonByteLengthError } from "./json-byte-length.js";
+import {
+  boundedJsonByteLength,
+  JsonByteLengthError,
+  normalizeSheetwriteError,
+  SheetwriteError,
+  type SheetwriteErrorContext,
+} from "./errors.js";
 import {
   type GridTransactionAdmissionDecision,
   registerGridTransactionAdmission,
@@ -170,24 +176,22 @@ export type SyncProtocolErrorCode =
   | "remote-operations-rejected";
 
 /** Typed rejection of malformed or resource-exhausting synchronization input. */
-export class SyncProtocolError extends Error {
+export class SyncProtocolError extends SheetwriteError {
   override readonly name = "SyncProtocolError";
 
-  constructor(
-    readonly code: SyncProtocolErrorCode,
-    message: string,
-  ) {
-    super(message);
+  constructor(code: SyncProtocolErrorCode, message: string) {
+    super(code, "synchronize", message);
   }
 }
 
 /** Typed local transaction rejection produced when the durable queue cannot reserve capacity. */
-export class SyncPendingCapacityError extends RangeError {
+export class SyncPendingCapacityError extends SheetwriteError {
   override readonly name = "SyncPendingCapacityError";
-  readonly code = "pending-capacity";
 
   constructor(readonly issue: Extract<MutationIssue, { kind: "resource-limit" }>) {
-    super(issue.message);
+    super("pending-capacity", "synchronize", issue.message, {
+      context: { resource: issue.resource, limit: issue.max, actual: issue.actual },
+    });
   }
 }
 
@@ -235,10 +239,17 @@ export type SyncCoordinatorEvent =
       snapshot?: WorkbookSnapshot;
     }
   | { type: "reloaded"; serverVersion: number; pending: readonly SyncMutationRecord[] }
-  | { type: "storage-error"; error: unknown; clientMutationId?: string }
-  | { type: "error"; error: unknown; clientMutationId?: string };
+  | { type: "storage-error"; error: SheetwriteError; clientMutationId?: string }
+  | { type: "error"; error: SheetwriteError; clientMutationId?: string };
 
 type SyncListener = (event: SyncCoordinatorEvent) => void;
+function syncFailure(error: unknown, context?: SheetwriteErrorContext): SheetwriteError {
+  return normalizeSheetwriteError(error, "sync-failed", "synchronize", context);
+}
+
+function syncStorageFailure(error: unknown, context?: SheetwriteErrorContext): SheetwriteError {
+  return normalizeSheetwriteError(error, "sync-storage-failed", "synchronize", context);
+}
 
 let nextMutation = 1;
 
@@ -300,10 +311,11 @@ export class SyncCoordinator {
       ? Promise.resolve()
           .then(() => this.restorePending())
           .catch((error: unknown) => {
-            this.hydrationError = error;
+            const failure = syncStorageFailure(error, { action: "hydrate" });
+            this.hydrationError = failure;
             this.hydrating = false;
             this.emitState();
-            this.emit({ type: "storage-error", error });
+            this.emit({ type: "storage-error", error: failure });
           })
       : Promise.resolve();
     if (this.hydrating) {
@@ -418,8 +430,9 @@ export class SyncCoordinator {
       cleanup();
       this.connection = "error";
       this.emitState();
-      this.emit({ type: "error", error });
-      throw error;
+      const failure = syncFailure(error, { action: "subscribe" });
+      this.emit({ type: "error", error: failure });
+      throw failure;
     }
   }
 
@@ -502,11 +515,12 @@ export class SyncCoordinator {
     } catch (error) {
       const current = this.records.get(clientMutationId);
       if (current?.status === "sending") current.status = "pending";
+      const failure = syncFailure(error, { action: "send", clientMutationId });
       if (!this.destroyed) {
         this.emitState();
-        this.emit({ type: "error", error, clientMutationId });
+        this.emit({ type: "error", error: failure, clientMutationId });
       }
-      throw error;
+      throw failure;
     } finally {
       if (this.activeSends.get(clientMutationId) === controller) {
         this.activeSends.delete(clientMutationId);
@@ -541,7 +555,10 @@ export class SyncCoordinator {
       if (!record) {
         this.emit({
           type: "error",
-          error: new Error("Sheetwrite sync conflict did not identify a pending mutation"),
+          error: syncFailure(
+            new Error("Sheetwrite sync conflict did not identify a pending mutation"),
+            { action: "process-response", ...(id ? { clientMutationId: id } : {}) },
+          ),
           ...(id ? { clientMutationId: id } : {}),
         });
         return;
@@ -566,7 +583,10 @@ export class SyncCoordinator {
       if (!this.acknowledged.has(id)) {
         this.emit({
           type: "error",
-          error: new Error(`Sheetwrite sync response references unknown mutation ${id}`),
+          error: syncFailure(
+            new Error(`Sheetwrite sync response references unknown mutation ${id}`),
+            { action: "process-response", clientMutationId: id },
+          ),
           clientMutationId: id,
         });
       }
@@ -603,11 +623,15 @@ export class SyncCoordinator {
       try {
         await storage.remove(record.documentId, id);
       } catch (error) {
+        const failure = syncStorageFailure(error, {
+          action: "remove-pending",
+          clientMutationId: id,
+        });
         if (!this.destroyed) {
           this.emitState();
-          this.emit({ type: "storage-error", error, clientMutationId: id });
+          this.emit({ type: "storage-error", error: failure, clientMutationId: id });
         }
-        throw error;
+        throw failure;
       }
     }
     if (this.records.get(id) !== record) return;
@@ -727,8 +751,9 @@ export class SyncCoordinator {
           replacements,
         );
       } catch (error) {
-        if (!this.destroyed) this.emit({ type: "storage-error", error });
-        throw error;
+        const failure = syncStorageFailure(error, { action: "replace-pending" });
+        if (!this.destroyed) this.emit({ type: "storage-error", error: failure });
+        throw failure;
       }
     }
     if (this.destroyed) return;
@@ -857,8 +882,9 @@ export class SyncCoordinator {
     } catch (error) {
       reservation.status = "cancelled";
       this.drainLocalReservations();
-      this.emit({ type: "error", error });
-      throw error;
+      const failure = syncFailure(error, { action: "reserve-local" });
+      this.emit({ type: "error", error: failure });
+      throw failure;
     }
 
     return {
@@ -1099,10 +1125,18 @@ export class SyncCoordinator {
       this.emit({ type: "pending", mutation: cloneRecord(record) });
     } catch (error) {
       if (this.destroyed) return;
+      const failure = syncStorageFailure(error, {
+        action: "persist-pending",
+        clientMutationId: record.clientMutationId,
+      });
       record.status = "storage-error";
-      this.storageErrors.set(record.clientMutationId, error);
+      this.storageErrors.set(record.clientMutationId, failure);
       this.emitState();
-      this.emit({ type: "storage-error", error, clientMutationId: record.clientMutationId });
+      this.emit({
+        type: "storage-error",
+        error: failure,
+        clientMutationId: record.clientMutationId,
+      });
     }
   }
 
@@ -1366,7 +1400,10 @@ export class SyncCoordinator {
     if (signal.aborted || this.destroyed) return;
     this.connection = "error";
     this.emitState();
-    this.emit({ type: "error", error });
+    this.emit({
+      type: "error",
+      error: syncFailure(error, { action: "receive-remote" }),
+    });
   }
 
   private activity(): SyncActivityState {

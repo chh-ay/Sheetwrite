@@ -9,7 +9,7 @@ Text, DOM node, or node factory used as toolbar icon content.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L155</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L156</code></dd></div>
 </dl>
 
 ## Declaration

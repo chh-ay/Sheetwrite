@@ -9,10 +9,10 @@ Typed rejection of malformed or resource-exhausting synchronization input.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L173</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L179</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
@@ -21,15 +21,6 @@ Typed rejection of malformed or resource-exhausting synchronization input.
 
 ```ts generated
 constructor(code: SyncProtocolErrorCode, message: string);
-```
-
-</details>
-
-<details class="api-member" id="sync-protocol-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
-
-```ts generated
-code: SyncProtocolErrorCode;
 ```
 
 </details>
@@ -50,9 +41,8 @@ name: "SyncProtocolError"
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class SyncProtocolError extends Error {
+class SyncProtocolError extends SheetwriteError {
   constructor(code: SyncProtocolErrorCode, message: string);
-  code: SyncProtocolErrorCode;
   name: "SyncProtocolError";
 }
 ```

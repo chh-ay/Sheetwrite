@@ -1,6 +1,7 @@
 import { CellStore, isLoaded, type RangeSnapshot } from "@sheetwrite/wasm";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { dateToSerial } from "../date-serial.js";
+import { SheetwriteError } from "../errors.js";
 import {
   consumeSourceSnapshot,
   type RangeSourceProjection,
@@ -141,12 +142,18 @@ export interface SheetwriteStoreOptions {
 }
 
 /** Error thrown when an operation requires datasource cells that are not loaded. */
-export class IncompleteDataError extends Error {
+export class IncompleteDataError extends SheetwriteError {
+  override readonly name = "IncompleteDataError";
   readonly capability: Extract<QueryCapability, { status: "incomplete" }>;
 
   constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete" }>) {
-    super(`Sheetwrite: ${sheet} has unloaded datasource cells`);
-    this.name = "IncompleteDataError";
+    super("incomplete-data", "query", `Sheetwrite: ${sheet} has unloaded datasource cells`, {
+      context: {
+        sheet,
+        loadedCells: capability.loadedCells,
+        totalCells: capability.totalCells,
+      },
+    });
     this.capability = capability;
   }
 }

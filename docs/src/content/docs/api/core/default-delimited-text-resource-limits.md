@@ -10,7 +10,7 @@ bound allocation while sheet-compatible dimensions remain independently valid.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L29</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L30</code></dd></div>
 </dl>
 
 ## Declaration

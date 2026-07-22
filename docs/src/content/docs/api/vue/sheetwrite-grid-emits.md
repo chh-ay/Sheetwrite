@@ -9,7 +9,7 @@ Event payloads emitted by the Vue components, keyed by template event name.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L106</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L107</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>14</span>
@@ -137,7 +137,7 @@ ready: GridReadyEvent;
 <summary><code>initialization-error</code> <span class="api-member-summary">WASM initialization failed while the component stayed mounted.</span></summary>
 
 ```ts generated
-"initialization-error": unknown;
+"initialization-error": SheetwriteError;
 ```
 
 </details>
@@ -163,7 +163,7 @@ export interface SheetwriteGridEmits {
   "datasource-error": GridEvents["datasource-error"];
   "export-error": GridEvents["export-error"];
   ready: GridReadyEvent;
-  "initialization-error": unknown;
+  "initialization-error": SheetwriteError;
 }
 ```
 

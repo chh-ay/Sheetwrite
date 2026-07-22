@@ -9,7 +9,7 @@ Default canvas theme used before CSS and explicit theme overrides.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L250</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L251</code></dd></div>
 </dl>
 
 ## Declaration

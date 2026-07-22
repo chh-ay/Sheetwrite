@@ -9,7 +9,7 @@ Exports a table model through the registered optional XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L315</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L324</code></dd></div>
 </dl>
 
 ## Declaration

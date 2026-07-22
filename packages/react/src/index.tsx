@@ -2,6 +2,7 @@ import {
   type CellScalar,
   type Grid,
   type GridOptions,
+  type SheetwriteError,
   initSheetwrite,
   isSheetwriteReady,
 } from "@sheetwrite/core";
@@ -225,7 +226,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
           initializedRef.current = true;
           setInitializationState("ready");
         },
-        (error: unknown) => {
+        (error: SheetwriteError) => {
           if (!current || !mountedRef.current) return;
           initializedRef.current = false;
           setInitializationState("error");

@@ -9,10 +9,10 @@ Stable invalid-option failure for a delimited-text resource ceiling.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L68</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L71</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -21,15 +21,6 @@ Stable invalid-option failure for a delimited-text resource ceiling.
 
 ```ts generated
 constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);
-```
-
-</details>
-
-<details class="api-member" id="delimited-text-options-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
-
-```ts generated
-code: "DELIMITED_TEXT_INVALID_LIMIT";
 ```
 
 </details>
@@ -68,9 +59,8 @@ value: unknown
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class DelimitedTextOptionsError extends TypeError {
+class DelimitedTextOptionsError extends SheetwriteError {
   constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);
-  code: "DELIMITED_TEXT_INVALID_LIMIT";
   name: "DelimitedTextOptionsError";
   resource: keyof DelimitedTextResourceLimits;
   value: unknown;

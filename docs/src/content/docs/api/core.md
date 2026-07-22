@@ -8,14 +8,14 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>244</dd></div>
+<div><dt>Exports</dt><dd>254</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
 
 ## Exported symbols
 
-### Classes <span class="api-count" data-pagefind-ignore>15</span>
+### Classes <span class="api-count" data-pagefind-ignore>16</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/comment-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CommentCoordinator</code></span><span class="api-symbol-card__desc">Transport/auth-neutral comment state with server-owned author and timestamp fields.</span></a>
@@ -26,6 +26,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/persistence-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>PersistenceError</code></span><span class="api-symbol-card__desc">Typed failure raised by persistence and synchronization flows.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>PresenceCoordinator</code></span><span class="api-symbol-card__desc">Ephemeral presence lifecycle; it never calls a document mutation API.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/revision-coordinator/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>RevisionCoordinator</code></span><span class="api-symbol-card__desc">Coordinates listing and restoring host-owned workbook revisions.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SheetwriteError</code></span><span class="api-symbol-card__desc">Canonical envelope for thrown and callback-delivered Sheetwrite failures.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-store/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SheetwriteStore</code></span><span class="api-symbol-card__desc">Stable public facade and the sole transaction, epoch, policy, and event barrier.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SnapshotResourceError</code></span><span class="api-symbol-card__desc">Stable resource failure raised by direct workbook construction paths.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-validation-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SnapshotValidationError</code></span><span class="api-symbol-card__desc">Path-qualified schema failure found while validating an untrusted snapshot.</span></a>
@@ -35,7 +36,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>XlsxResourceError</code></span><span class="api-symbol-card__desc">Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>43</span>
+### Functions <span class="api-count" data-pagefind-ignore>44</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/assert-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Reject overlap, negative values, and attempts to fold runtime observations into owner totals.</span></a>
@@ -56,6 +57,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/from-xlsx-table/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>fromXlsxTable</code></span><span class="api-symbol-card__desc">Parse the first sheet of .xlsx bytes into ColumnarData.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/from-xlsx-workbook/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>fromXlsxWorkbook</code></span><span class="api-symbol-card__desc">Formula-preserving, multi-sheet workbook import through the optional XLSX backend.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/init-sheetwrite/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSheetwrite</code></span><span class="api-symbol-card__desc">Load the WASM data engine once.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/is-sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSheetwriteError</code></span><span class="api-symbol-card__desc">Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/is-sheetwrite-ready/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSheetwriteReady</code></span><span class="api-symbol-card__desc">Whether initSheetwrite has completed — the single readiness source.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/label-to-col/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>labelToCol</code></span><span class="api-symbol-card__desc">A1 column label → 0-based column index (inverse of colToA1).</span></a>
 <a class="api-symbol-card" href="/docs/api/core/observe-runtime-memory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>observeRuntimeMemory</code></span><span class="api-symbol-card__desc">Observe runtime memory buckets available in the current JS host without fabricating missing data.</span></a>
@@ -83,7 +85,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/validate-workbook-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>validateWorkbookSnapshot</code></span><span class="api-symbol-card__desc">Validate and canonically order a schema-1 snapshot without hydrating runtime state.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>112</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>114</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -168,6 +170,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/search-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SearchResult</code></span><span class="api-symbol-card__desc">Ordered matches and active index produced by a grid search.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Sheet</code></span><span class="api-symbol-card__desc">Workbook sheet schema used when creating a live grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetSnapshot</code></span><span class="api-symbol-card__desc">Serializable complete state for one workbook sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-envelope/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteErrorEnvelope</code></span><span class="api-symbol-card__desc">Structural form preserved across realms and JSON serialization.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteErrorOptions</code></span><span class="api-symbol-card__desc">Optional cause, diagnostic context, and boundary-known retryability.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-store-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteStoreOptions</code></span><span class="api-symbol-card__desc">Storage layout plus snapshot and transaction resource ceilings for one store.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-cell/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SnapshotCell</code></span><span class="api-symbol-card__desc">Serializable cell value and optional style inside a snapshot block.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SnapshotResourceLimits</code></span><span class="api-symbol-card__desc">Resource ceilings applied before snapshot normalization or store allocation.</span></a>
@@ -200,7 +204,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>61</span>
+### Types <span class="api-count" data-pagefind-ignore>65</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -251,6 +255,10 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/sheet-name-issue-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetNameIssueCode</code></span><span class="api-symbol-card__desc">Stable reason codes returned by worksheet-name validation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-name-validation-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetNameValidationResult</code></span><span class="api-symbol-card__desc">Successful canonical name or an actionable validation failure.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-visibility/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetVisibility</code></span><span class="api-symbol-card__desc">Native worksheet visibility preserved across workbook snapshots and tab rendering.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteErrorCode</code></span><span class="api-symbol-card__desc">Exhaustive stable discriminator for consumer-visible Sheetwrite failures.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-context/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteErrorContext</code></span><span class="api-symbol-card__desc">Stable, serialization-safe diagnostic context.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-context-value/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteErrorContextValue</code></span><span class="api-symbol-card__desc">JSON-safe values accepted in a public failure context.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-operation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteErrorOperation</code></span><span class="api-symbol-card__desc">Exhaustive stable operation discriminator for consumer-visible failures.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SnapshotGridOptions</code></span><span class="api-symbol-card__desc">Grid creation options accepted when hydrating a validated snapshot.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-storage-mode/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SnapshotStorageMode</code></span><span class="api-symbol-card__desc">Allocation mode used when enforcing snapshot construction capacity.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sync-activity-state/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncActivityState</code></span><span class="api-symbol-card__desc">Current persistence activity reported by a sync coordinator.</span></a>
@@ -266,7 +274,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/wasm-memory-owner/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>WasmMemoryOwner</code></span><span class="api-symbol-card__desc">One retained-memory owner reported by the WASM cell store.</span></a>
 </div>
 
-### Variables <span class="api-count" data-pagefind-ignore>13</span>
+### Variables <span class="api-count" data-pagefind-ignore>15</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/default-delimited-text-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS</code></span><span class="api-symbol-card__desc">Synchronous operations return one in-memory string, so byte/cell ceilings bound allocation while sheet-compatible dimensions remain independently valid.</span></a>
@@ -278,6 +286,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/ref-cycle/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>REF_CYCLE</code></span><span class="api-symbol-card__desc">Sentinel shown for a reference that participates in a cycle.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/runtime-resource-schema-version/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>RUNTIME_RESOURCE_SCHEMA_VERSION</code></span><span class="api-symbol-card__desc">Stable protocol for runtime ownership and operation-cost reports.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-clipboard-mime/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SHEETWRITE_CLIPBOARD_MIME</code></span><span class="api-symbol-card__desc">Private-format MIME type used for rich Sheetwrite clipboard payloads.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-codes/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SHEETWRITE_ERROR_CODES</code></span><span class="api-symbol-card__desc">Stable public failure codes.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-operations/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SHEETWRITE_ERROR_OPERATIONS</code></span><span class="api-symbol-card__desc">Stable operations at which a consumer-visible failure can surface.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/store-memory-hash-estimate-version/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>STORE_MEMORY_HASH_ESTIMATE_VERSION</code></span><span class="api-symbol-card__desc">Version of the deterministic hash-table capacity estimate used by store owners.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/store-memory-protocol-version/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>STORE_MEMORY_PROTOCOL_VERSION</code></span><span class="api-symbol-card__desc">Flat WASM store-memory protocol version; decoders reject any mismatch.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/wasm-memory-owners/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>WASM_MEMORY_OWNERS</code></span><span class="api-symbol-card__desc">Stable ordered owner list encoded by the WASM store-memory protocol.</span></a>

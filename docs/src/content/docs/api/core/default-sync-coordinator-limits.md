@@ -10,7 +10,7 @@ buffers, acknowledgement memory, and the offline pending queue independently.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L133</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L139</code></dd></div>
 </dl>
 
 ## Declaration

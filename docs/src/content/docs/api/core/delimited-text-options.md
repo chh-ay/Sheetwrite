@@ -9,7 +9,7 @@ Optional resource ceilings for an in-memory delimited-text operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L20</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L21</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 import { SnapshotResourceError, validateTransactionResources } from "../src/document-protocol.js";
+import { SheetwriteError } from "../src/errors.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
@@ -20,6 +21,7 @@ import type {
   ChangeEvent,
   DataSourceRequest,
   DocumentOp,
+  GridEvents,
   RowData,
   Store,
   Workbook,
@@ -354,7 +356,7 @@ describe("Grid editing (Layer 3)", () => {
         },
       },
     });
-    const errors: unknown[] = [];
+    const errors: SheetwriteError[] = [];
     grid.on("datasource-error", (event) => errors.push(event.error));
     const initialRequests = requests;
 
@@ -363,7 +365,14 @@ describe("Grid editing (Layer 3)", () => {
     grid.refresh();
 
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors.every((error) => error instanceof RangeError)).toBe(true);
+    expect(
+      errors.every(
+        (error) =>
+          error.code === "datasource-request-failed" &&
+          error.operation === "datasource-request" &&
+          error.cause instanceof RangeError,
+      ),
+    ).toBe(true);
     expect(requests).toBeGreaterThan(initialRequests);
     grid.destroy();
   });
@@ -1266,7 +1275,11 @@ describe("Grid.setMinColumns", () => {
     );
     setXlsxTableExportBackend(backend);
     try {
-      await expect(grid.exportXlsx("fake.xlsx")).rejects.toBe(expected);
+      await expect(grid.exportXlsx("fake.xlsx")).rejects.toMatchObject({
+        code: "export-failed",
+        operation: "xlsx-export",
+        cause: expected,
+      });
       expect(receivedWorkbook).toBe(store.getWorkbook());
       expect(receivedStore).toBe(store);
       expect(actionErrors).toEqual([]);
@@ -1292,21 +1305,28 @@ describe("Grid.setMinColumns", () => {
       store,
     );
     const expected = new Error("built-in XLSX failure");
-    const events: Array<{ format: "xlsx"; error: unknown }> = [];
-    grid.on("export-error", (event) => events.push(event));
+    const events: Array<GridEvents["export-error"]> = [];
+    let nextEvent = Promise.withResolvers<void>();
+    grid.on("export-error", (event) => {
+      events.push(event);
+      nextEvent.resolve();
+    });
     setXlsxTableExportBackend(null as never);
     grid.actions.exportXlsx();
-    await Promise.resolve();
-    await Promise.resolve();
+    await nextEvent.promise;
     expect(events).toHaveLength(1);
-    expect(events[0]?.format).toBe("xlsx");
-    const missingBackendError = events[0]?.error;
-    expect(missingBackendError).toBeInstanceOf(Error);
-    if (!(missingBackendError instanceof Error)) throw new Error("Expected XLSX backend error");
-    expect(missingBackendError.message).toContain(
+    expect(events[0]).toMatchObject({
+      format: "xlsx",
+      error: {
+        code: "optional-backend-unavailable",
+        operation: "xlsx-export",
+      },
+    });
+    expect(events[0]!.error.message).toContain(
       "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
     );
     events.length = 0;
+    nextEvent = Promise.withResolvers<void>();
     setXlsxTableExportBackend({
       name: "rejecting-built-in-export",
       toXlsxTable: async () => {
@@ -1316,10 +1336,15 @@ describe("Grid.setMinColumns", () => {
 
     try {
       host.querySelector<HTMLButtonElement>('[title="Export XLSX"]')!.click();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(events).toEqual([{ format: "xlsx", error: expected }]);
+      await nextEvent.promise;
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        format: "xlsx",
+        error: { code: "export-failed", operation: "xlsx-export" },
+      });
+      expect(events[0]!.error.cause).toBe(expected);
 
+      nextEvent = Promise.withResolvers<void>();
       const viewport = host.querySelector<HTMLElement>(".sheetwrite-scroller")!;
       viewport.dispatchEvent(
         new MouseEvent("contextmenu", {
@@ -1329,12 +1354,15 @@ describe("Grid.setMinColumns", () => {
         }),
       );
       host.querySelector<HTMLElement>(".sheetwrite-context-menu-item")!.click();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(events).toEqual([
-        { format: "xlsx", error: expected },
-        { format: "xlsx", error: expected },
-      ]);
+      await nextEvent.promise;
+      expect(events).toHaveLength(2);
+      for (const event of events) {
+        expect(event.error).toMatchObject({
+          code: "export-failed",
+          operation: "xlsx-export",
+        });
+        expect(event.error.cause).toBe(expected);
+      }
     } finally {
       setXlsxTableExportBackend(null as never);
       grid.destroy();
@@ -1376,7 +1404,11 @@ describe("Grid.setMinColumns", () => {
     try {
       expect(store.queryCapability("s1").status).toBe("complete");
       expect(store.queryCapability("inactive").status).toBe("incomplete");
-      await expect(grid.exportXlsx("active.xlsx")).rejects.toBe(reachedBackend);
+      await expect(grid.exportXlsx("active.xlsx")).rejects.toMatchObject({
+        code: "export-failed",
+        operation: "xlsx-export",
+        cause: reachedBackend,
+      });
 
       grid.setActiveSheet("inactive");
       await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(

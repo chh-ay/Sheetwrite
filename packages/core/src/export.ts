@@ -7,6 +7,7 @@ import {
   parseDelimitedText,
   resolveDelimitedTextResourceLimits,
 } from "./delimited-text.js";
+import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { IncompleteDataError } from "./store.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { Range } from "./types/coordinates.js";
@@ -127,8 +128,6 @@ export function toTsv(range: Range, store: Store, options: DelimitedTextOptions 
 
   return encodeDelimitedText(rows(), "\t", options, { operation: "export" });
 }
-
-// ── CSV / TSV import ─────────────────────────────────────────────────────────
 
 /**
  * Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,
@@ -276,17 +275,21 @@ export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object
 });
 
 /** Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data. */
-export class XlsxResourceError extends RangeError {
-  readonly code = "XLSX_RESOURCE_LIMIT";
+export class XlsxResourceError extends SheetwriteError {
+  override readonly name = "XlsxResourceError";
 
   constructor(
     readonly resource: keyof XlsxResourceLimits,
     readonly limit: number,
     readonly actual: number,
-    readonly operation: "import" | "export",
+    operation: "import" | "export",
   ) {
-    super(`Sheetwrite: XLSX ${operation} ${resource} limit is ${limit}; observed ${actual}`);
-    this.name = "XlsxResourceError";
+    super(
+      "xlsx-resource-limit",
+      `xlsx-${operation}`,
+      `Sheetwrite: XLSX ${operation} ${resource} limit is ${limit}; observed ${actual}`,
+      { context: { format: "xlsx", resource, limit, actual } },
+    );
   }
 }
 
@@ -305,20 +308,34 @@ export function setXlsxTableExportBackend(next: XlsxTableExportBackend): void {
   tableExportBackend = next;
 }
 
-function missingXlsxBackend(functionName: string): Error {
-  return new Error(
+function missingXlsxBackend(
+  functionName: string,
+  operation: "xlsx-import" | "xlsx-export",
+): SheetwriteError {
+  return new SheetwriteError(
+    "optional-backend-unavailable",
+    operation,
     `Sheetwrite: XLSX backend not registered. Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling ${functionName}.`,
+    { context: { backend: "xlsx", functionName }, retryable: false },
   );
 }
 
 /** Exports a table model through the registered optional XLSX backend. */
-export function toXlsxTable(
+export async function toXlsxTable(
   workbook: Workbook,
   store: Store,
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  if (!tableExportBackend) throw missingXlsxBackend("toXlsxTable");
-  return tableExportBackend.toXlsxTable(workbook, store, options);
+  const backend = tableExportBackend;
+  if (!backend) throw missingXlsxBackend("toXlsxTable", "xlsx-export");
+  try {
+    return await backend.toXlsxTable(workbook, store, options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+      backend: backend.name,
+      functionName: "toXlsxTable",
+    });
+  }
 }
 
 // ── xlsx import ──────────────────────────────────────────────────────────────
@@ -349,12 +366,20 @@ export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
  * Numbers stay numbers, date cells use the date-serial convention, strings are
  * verbatim, and empty cells become `null`.
  */
-export function fromXlsxTable(
+export async function fromXlsxTable(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,
 ): Promise<ColumnarData> {
-  if (!tableImportBackend) throw missingXlsxBackend("fromXlsxTable");
-  return tableImportBackend.fromXlsxTable(data, options);
+  const backend = tableImportBackend;
+  if (!backend) throw missingXlsxBackend("fromXlsxTable", "xlsx-import");
+  try {
+    return await backend.fromXlsxTable(data, options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+      backend: backend.name,
+      functionName: "fromXlsxTable",
+    });
+  }
 }
 
 // ── Workbook-level XLSX round-trip ───────────────────────────────────────────
@@ -413,19 +438,35 @@ function workbookSnapshotOf(
 }
 
 /** Formula-preserving, multi-sheet workbook export through the optional XLSX backend. */
-export function toXlsxWorkbook(
+export async function toXlsxWorkbook(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  if (!workbookBackend) throw missingXlsxBackend("toXlsxWorkbook");
-  return workbookBackend.toXlsxWorkbook(workbookSnapshotOf(input), options);
+  const backend = workbookBackend;
+  if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
+  try {
+    return await backend.toXlsxWorkbook(workbookSnapshotOf(input), options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+      backend: backend.name,
+      functionName: "toXlsxWorkbook",
+    });
+  }
 }
 
 /** Formula-preserving, multi-sheet workbook import through the optional XLSX backend. */
-export function fromXlsxWorkbook(
+export async function fromXlsxWorkbook(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
-  if (!workbookBackend) throw missingXlsxBackend("fromXlsxWorkbook");
-  return workbookBackend.fromXlsxWorkbook(data, options);
+  const backend = workbookBackend;
+  if (!backend) throw missingXlsxBackend("fromXlsxWorkbook", "xlsx-import");
+  try {
+    return await backend.fromXlsxWorkbook(data, options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+      backend: backend.name,
+      functionName: "fromXlsxWorkbook",
+    });
+  }
 }

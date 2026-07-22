@@ -965,19 +965,22 @@ function parseSheet(
   );
   for (const relationship of relationships) {
     if (
-      ["drawing", "image", "table", "pivotTable", "externalLink", "threadedComment"].some((kind) =>
+      ["comments", "vmlDrawing", "hyperlink"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
       )
     ) {
-      emitWarning(context, {
-        code: relationshipTypeMatches(relationship.type, "externalLink")
-          ? "external-relationship"
-          : "unsupported-feature",
-        message: `Unsupported worksheet relationship ${relationship.type.slice(relationship.type.lastIndexOf("/") + 1)} was dropped`,
-        sheet: reference.name,
-        part: relationship.target,
-      });
+      continue;
     }
+    if (relationship.external) continue;
+    const kind = relationship.type.slice(relationship.type.lastIndexOf("/") + 1);
+    emitWarning(context, {
+      code: relationshipTypeMatches(relationship.type, "externalLink")
+        ? "external-relationship"
+        : "unsupported-feature",
+      message: `Unsupported worksheet relationship ${kind} was dropped`,
+      sheet: reference.name,
+      part: relationship.target,
+    });
   }
   const hyperlinks = xmlChild(root, "hyperlinks");
   if (hyperlinks) {
@@ -1251,15 +1254,34 @@ function externalNamedRanges(
     }
     const sheetName = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
     const sheet = sheetIds.get(sheetNameKey(sheetName));
-    if (!sheet) continue;
-    const parsed = parseRange(match[3]!);
+    if (!sheet) {
+      emitWarning(context, {
+        code: "unsupported-feature",
+        message: `Defined name ${name} referenced missing worksheet ${sheetName} and was dropped`,
+      });
+      continue;
+    }
     const localSheetId = xmlAttribute(definition, "localSheetId");
-    const scopeIndex = localSheetId === undefined ? undefined : Number(localSheetId);
+    let scope: string | undefined;
+    if (localSheetId !== undefined) {
+      const scopeIndex = /^\d+$/.test(localSheetId) ? Number(localSheetId) : Number.NaN;
+      const scopeSheet =
+        Number.isSafeInteger(scopeIndex) && scopeIndex >= 0 ? sheets[scopeIndex] : undefined;
+      scope = scopeSheet ? sheetIds.get(sheetNameKey(scopeSheet.name)) : undefined;
+      if (!scope) {
+        emitWarning(context, {
+          code: "unsupported-feature",
+          message: `Defined name ${name} had invalid localSheetId ${localSheetId} and was dropped`,
+        });
+        continue;
+      }
+    }
+    const parsed = parseRange(match[3]!);
+    assertResource(context, "maxRowsPerSheet", parsed.r1 + 1);
+    assertResource(context, "maxColumnsPerSheet", parsed.c1 + 1);
     ranges.push({
       name,
-      ...(Number.isInteger(scopeIndex) && sheets[scopeIndex!]
-        ? { scope: sheetIds.get(sheetNameKey(sheets[scopeIndex!]!.name)) }
-        : {}),
+      ...(scope ? { scope } : {}),
       range: {
         sheet,
         start: { row: parsed.r0, col: parsed.c0 },
@@ -1295,10 +1317,24 @@ export function readWorkbook(
     (relationship) => relationshipTypeMatches(relationship.type, "theme") && !relationship.external,
   )?.target;
   for (const relationship of workbookRelationships) {
+    if (
+      ["worksheet", "styles", "sharedStrings", "theme", "vbaProject"].some((kind) =>
+        relationshipTypeMatches(relationship.type, kind),
+      )
+    ) {
+      continue;
+    }
     if (relationshipTypeMatches(relationship.type, "externalLink")) {
       emitWarning(context, {
         code: "external-relationship",
         message: "External-link workbook graph was dropped",
+        part: relationship.target,
+      });
+    } else if (!relationship.external) {
+      const kind = relationship.type.slice(relationship.type.lastIndexOf("/") + 1);
+      emitWarning(context, {
+        code: "unsupported-feature",
+        message: `Unsupported workbook relationship ${kind} was dropped`,
         part: relationship.target,
       });
     }
@@ -1350,7 +1386,7 @@ export function readWorkbook(
   assertResource(context, "maxSheets", references.length - Math.min(1, metadataCandidates));
   const usage: ReaderResourceUsage = { cells: 0, merges: 0 };
   const parsedSheets = references.map((reference) => {
-    checkAbort(context.options);
+    checkAbort(context);
     return parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904);
   });
   let metadata: WorkbookSnapshot | null = null;
@@ -1579,6 +1615,33 @@ export function readWorkbook(
   const namedRanges = xmlChild(workbookRoot, "definedNames")
     ? nativeNamedRanges
     : metadata?.workbook.namedRanges;
+  for (const namedRange of namedRanges ?? []) {
+    const sheet = sheets.find((candidate) => candidate.id === namedRange.range.sheet);
+    if (!sheet) continue;
+    sheet.rowCount = Math.max(sheet.rowCount, namedRange.range.end.row + 1);
+    if (sheet.columns.length <= namedRange.range.end.col) {
+      const keys = new Set(sheet.columns.map((column) => column.key));
+      while (sheet.columns.length <= namedRange.range.end.col) {
+        const col = sheet.columns.length;
+        const stem = `column${col + 1}`;
+        let key = stem;
+        let suffix = 2;
+        while (keys.has(key)) key = `${stem}_${suffix++}`;
+        keys.add(key);
+        sheet.columns.push({
+          key,
+          header: colToA1(col),
+          width: 75,
+          type: "text",
+        });
+      }
+    }
+    const block = sheet.cells[0];
+    if (block) {
+      block.rowCount = Math.max(block.rowCount, sheet.rowCount);
+      block.colCount = Math.max(block.colCount, sheet.columns.length);
+    }
+  }
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),

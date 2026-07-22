@@ -9,7 +9,7 @@ Controls which ephemeral collaborator details may be transmitted.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L31</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L32</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

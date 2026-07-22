@@ -9,7 +9,7 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L59</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L70</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>14</span>
@@ -137,7 +137,7 @@ onReady?: (event: GridReadyEvent) => void;
 <summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 
 ```ts generated
-onInitializationError?: (error: unknown) => void;
+onInitializationError?: (error: SheetwriteError) => void;
 ```
 
 </details>
@@ -163,7 +163,7 @@ export interface GridAdapterEventHandlers {
   onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
   onExportError?: (event: GridEvents["export-error"]) => void;
   onReady?: (event: GridReadyEvent) => void;
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
 }
 ```
 

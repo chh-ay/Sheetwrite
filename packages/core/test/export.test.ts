@@ -113,16 +113,16 @@ describe("export", () => {
     );
   });
 
-  it("reports the exact optional package remedy when no XLSX backend is registered", () => {
+  it("reports the exact optional package remedy when no XLSX backend is registered", async () => {
     const store = new SheetwriteStore(workbook());
     setXlsxTableExportBackend(null as never);
     setXlsxTableImportBackend(null as never);
     setXlsxWorkbookBackend(null as never);
 
-    expect(() => toXlsxTable(store.getWorkbook(), store)).toThrow(
+    await expect(toXlsxTable(store.getWorkbook(), store)).rejects.toThrow(
       "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
     );
-    expect(() => fromXlsxTable(new Uint8Array())).toThrow(
+    await expect(fromXlsxTable(new Uint8Array())).rejects.toThrow(
       "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling fromXlsxTable.",
     );
     const snapshot: WorkbookSnapshot = {
@@ -130,10 +130,10 @@ describe("export", () => {
       workbook: { activeSheet: "s" },
       sheets: [],
     };
-    expect(() => toXlsxWorkbook(snapshot)).toThrow(
+    await expect(toXlsxWorkbook(snapshot)).rejects.toThrow(
       "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxWorkbook.",
     );
-    expect(() => fromXlsxWorkbook(new Uint8Array())).toThrow(
+    await expect(fromXlsxWorkbook(new Uint8Array())).rejects.toThrow(
       "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling fromXlsxWorkbook.",
     );
     store.dispose();
@@ -141,13 +141,13 @@ describe("export", () => {
 
   it("reports typed XLSX resource-limit details", () => {
     const error = new XlsxResourceError("maxInputBytes", 32, 33, "import");
-    expect(error).toBeInstanceOf(RangeError);
+    expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("XlsxResourceError");
-    expect(error.code).toBe("XLSX_RESOURCE_LIMIT");
+    expect(error.code).toBe("xlsx-resource-limit");
     expect(error.resource).toBe("maxInputBytes");
     expect(error.limit).toBe(32);
     expect(error.actual).toBe(33);
-    expect(error.operation).toBe("import");
+    expect(error.operation).toBe("xlsx-import");
     expect(error.message).toBe("Sheetwrite: XLSX import maxInputBytes limit is 32; observed 33");
   });
 
@@ -590,7 +590,7 @@ describe("export", () => {
       resource: "maxInputBytes",
       limit: 4,
       actual: 5,
-      operation: "parse",
+      operation: "delimited-parse",
     });
     expect(() => parseCsv("ééx", { resourceLimits: { maxFieldBytes: 4 } })).toThrow(
       DelimitedTextResourceError,

@@ -8,14 +8,20 @@ description: "API reference for @sheetwrite/core/adapter."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/adapter.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>20</dd></div>
+<div><dt>Exports</dt><dd>28</dd></div>
 </dl>
 
 Source entry: `packages/core/src/adapter.ts`
 
 ## Exported symbols
 
-### Functions <span class="api-count" data-pagefind-ignore>6</span>
+### Classes <span class="api-count" data-pagefind-ignore>1</span>
+
+<div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SheetwriteError</code></span><span class="api-symbol-card__desc">Canonical envelope for thrown and callback-delivered Sheetwrite failures.</span></a>
+</div>
+
+### Functions <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-adapter/apply-changed-live-grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>applyChangedLiveGridOptions</code></span><span class="api-symbol-card__desc">Applies live-updatable adapter option changes to an existing Grid.</span></a>
@@ -24,9 +30,10 @@ Source entry: `packages/core/src/adapter.ts`
 <a class="api-symbol-card" href="/docs/api/core-adapter/extract-grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>extractGridOptions</code></span><span class="api-symbol-card__desc">Extracts advanced GridOptions from framework adapter props.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/get-grid-reset-reason/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>getGridResetReason</code></span><span class="api-symbol-card__desc">Returns the first reset-sensitive adapter input that changed, if any.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-size-style/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>gridSizeStyle</code></span><span class="api-symbol-card__desc">Converts adapter size props into a host element style object.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/is-sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSheetwriteError</code></span><span class="api-symbol-card__desc">Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>9</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>10</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-adapter-event-handlers/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridAdapterEventHandlers</code></span><span class="api-symbol-card__desc">Framework-neutral readiness, change, and error callbacks shared by adapters.</span></a>
@@ -34,23 +41,29 @@ Source entry: `packages/core/src/adapter.ts`
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-controller-handlers/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridControllerHandlers</code></span><span class="api-symbol-card__desc">Event callbacks a host (a framework adapter, or any plain app) hangs off a grid's lifecycle.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-ready-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridReadyEvent</code></span><span class="api-symbol-card__desc">Grid handle, generation, and reason published after adapter initialization.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/optional-grid-size-props/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>OptionalGridSizeProps</code></span><span class="api-symbol-card__desc">Optional width and height accepted by advanced framework adapters.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error-envelope/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteErrorEnvelope</code></span><span class="api-symbol-card__desc">Structural form preserved across realms and JSON serialization.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-initialization-props/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteInitializationProps</code></span><span class="api-symbol-card__desc">Optional explicit WASM source and initialization error callback for adapters.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/simple-column/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SimpleColumn</code></span><span class="api-symbol-card__desc">Column definition accepted by the adapters’ simple row-object API.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/simple-grid-input/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SimpleGridInput</code></span><span class="api-symbol-card__desc">Normalized workbook and columnar data produced from simple adapter props.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/simple-sheetwrite-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SimpleSheetwriteOptions</code></span><span class="api-symbol-card__desc">Framework-neutral simple columns, rows, sizing, and grid options.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>3</span>
+### Types <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-ready-reason/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridReadyReason</code></span><span class="api-symbol-card__desc">Reason an adapter published a ready Grid generation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-reset-reason/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridResetReason</code></span><span class="api-symbol-card__desc">Reset-sensitive input change that requires an adapter to replace its Grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-size-props/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridSizeProps</code></span><span class="api-symbol-card__desc">Explicit width and height accepted by framework adapters.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteErrorCode</code></span><span class="api-symbol-card__desc">Exhaustive stable discriminator for consumer-visible Sheetwrite failures.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error-context/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteErrorContext</code></span><span class="api-symbol-card__desc">Stable, serialization-safe diagnostic context.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error-operation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SheetwriteErrorOperation</code></span><span class="api-symbol-card__desc">Exhaustive stable operation discriminator for consumer-visible failures.</span></a>
 </div>
 
-### Variables <span class="api-count" data-pagefind-ignore>2</span>
+### Variables <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-adapter/default-simple-column-width/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_SIMPLE_COLUMN_WIDTH</code></span><span class="api-symbol-card__desc">Default pixel width assigned to simple adapter columns.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-option-policy/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>GRID_OPTION_POLICY</code></span><span class="api-symbol-card__desc">Classification of adapter options as live-updatable or reset-sensitive.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error-codes/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SHEETWRITE_ERROR_CODES</code></span><span class="api-symbol-card__desc">Stable public failure codes.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error-operations/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SHEETWRITE_ERROR_OPERATIONS</code></span><span class="api-symbol-card__desc">Stable operations at which a consumer-visible failure can surface.</span></a>
 </div>

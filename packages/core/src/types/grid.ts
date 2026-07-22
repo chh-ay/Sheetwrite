@@ -1,6 +1,7 @@
 // Grid configuration, events, actions, search, and imperative API contracts.
 // No runtime values live here.
 
+import type { SheetwriteError } from "../errors.js";
 import type {
   RuntimeMemoryObservation,
   RuntimeResourceOperation,
@@ -400,10 +401,13 @@ export interface GridEvents {
    * Emitted once when the worker renderer could not be constructed and the
    * grid fell back to the main-thread canvas renderer.
    */
-  "renderer-fallback": { requested: "worker"; error: unknown };
-  "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: unknown };
+  "renderer-fallback": { requested: "worker"; error: SheetwriteError };
+  "datasource-error": {
+    request: Omit<DataSourceRequest, "signal">;
+    error: SheetwriteError;
+  };
   /** Built-in toolbar/context-menu export failed after its action was dispatched. */
-  "export-error": { format: "xlsx"; error: unknown };
+  "export-error": { format: "xlsx"; error: SheetwriteError };
 }
 
 /** Imperative grid handle for document commands, events, rendering, and teardown. */

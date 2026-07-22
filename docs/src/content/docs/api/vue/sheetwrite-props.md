@@ -9,7 +9,7 @@ Simple Vue adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L95</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L96</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

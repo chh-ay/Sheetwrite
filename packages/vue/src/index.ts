@@ -11,6 +11,7 @@ import {
   initSheetwrite,
   isSheetwriteReady,
   type Selection,
+  type SheetwriteError,
   type Theme,
   type Workbook,
 } from "@sheetwrite/core";
@@ -131,7 +132,7 @@ export interface SheetwriteGridEmits {
   /** The adapter published a ready Grid generation. */
   ready: GridReadyEvent;
   /** WASM initialization failed while the component stayed mounted. */
-  "initialization-error": unknown;
+  "initialization-error": SheetwriteError;
 }
 
 /**
@@ -225,7 +226,7 @@ const gridEmits = {
   "datasource-error": (_event: GridEvents["datasource-error"]) => true,
   "export-error": (_event: GridEvents["export-error"]) => true,
   ready: (_event: GridReadyEvent) => true,
-  "initialization-error": (_error: unknown) => true,
+  "initialization-error": (_error: SheetwriteError) => true,
 };
 
 const SheetwriteGridComponent = defineComponent({
@@ -314,7 +315,9 @@ const SheetwriteGridComponent = defineComponent({
           await createCurrentGrid();
         }
       } catch (error) {
-        if (mounted && token === initializationToken) emit("initialization-error", error);
+        if (mounted && token === initializationToken) {
+          emit("initialization-error", error as SheetwriteError);
+        }
       }
     }
 

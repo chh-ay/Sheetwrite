@@ -1,3 +1,4 @@
+import { SheetwriteError } from "./errors.js";
 /** Resource ceilings shared by synchronous CSV and TSV parsing and encoding. */
 export interface DelimitedTextResourceLimits {
   /** Input string size in UTF-8 bytes; defaults to 32 MiB. */
@@ -48,32 +49,44 @@ export const DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS: Readonly<DelimitedTextResou
 export type DelimitedTextOperation = "parse" | "import" | "encode" | "export";
 
 /** Stable resource-limit failure raised before the next oversized parse or encode allocation. */
-export class DelimitedTextResourceError extends RangeError {
+export class DelimitedTextResourceError extends SheetwriteError {
   override readonly name = "DelimitedTextResourceError";
-  readonly code = "DELIMITED_TEXT_RESOURCE_LIMIT";
 
   constructor(
     readonly resource: keyof DelimitedTextResourceLimits,
     readonly limit: number,
     readonly actual: number,
-    readonly operation: DelimitedTextOperation,
+    operation: DelimitedTextOperation,
   ) {
     super(
+      "delimited-text-resource-limit",
+      `delimited-${operation}`,
       `Sheetwrite: delimited-text ${operation} ${resource} limit is ${limit}; observed ${actual}`,
+      { context: { format: "delimited-text", resource, limit, actual } },
     );
   }
 }
 
 /** Stable invalid-option failure for a delimited-text resource ceiling. */
-export class DelimitedTextOptionsError extends TypeError {
+export class DelimitedTextOptionsError extends SheetwriteError {
   override readonly name = "DelimitedTextOptionsError";
-  readonly code = "DELIMITED_TEXT_INVALID_LIMIT";
 
   constructor(
     readonly resource: keyof DelimitedTextResourceLimits,
     readonly value: unknown,
   ) {
-    super(`Sheetwrite: delimited-text ${resource} must be a positive safe integer`);
+    super(
+      "delimited-text-invalid-limit",
+      "delimited-options",
+      `Sheetwrite: delimited-text ${resource} must be a positive safe integer`,
+      {
+        context: {
+          format: "delimited-text",
+          resource,
+          value: typeof value === "number" && Number.isFinite(value) ? value : String(value),
+        },
+      },
+    );
   }
 }
 

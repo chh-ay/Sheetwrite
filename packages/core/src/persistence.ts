@@ -1,3 +1,4 @@
+import { SheetwriteError } from "./errors.js";
 import {
   SnapshotResourceError,
   type SnapshotResourceLimits,
@@ -30,14 +31,11 @@ export type PersistenceErrorCode =
   | "commit-rejected";
 
 /** Typed failure raised by persistence and synchronization flows. */
-export class PersistenceError extends Error {
-  constructor(
-    readonly code: PersistenceErrorCode,
-    message: string,
-    options?: ErrorOptions,
-  ) {
-    super(message, options);
-    this.name = "PersistenceError";
+export class PersistenceError extends SheetwriteError {
+  override readonly name = "PersistenceError";
+
+  constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions) {
+    super(code, "persistence", message, { cause: options?.cause });
   }
 }
 

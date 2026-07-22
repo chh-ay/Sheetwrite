@@ -9,7 +9,7 @@ Shared options passed to every registered table and workbook XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L382</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L407</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

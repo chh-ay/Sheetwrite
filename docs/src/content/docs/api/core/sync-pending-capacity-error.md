@@ -9,10 +9,10 @@ Typed local transaction rejection produced when the durable queue cannot reserve
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L185</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L188</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -21,15 +21,6 @@ Typed local transaction rejection produced when the durable queue cannot reserve
 
 ```ts generated
 constructor(issue: Extract<MutationIssue, { kind: "resource-limit"; }>);
-```
-
-</details>
-
-<details class="api-member" id="sync-pending-capacity-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
-
-```ts generated
-code: "pending-capacity";
 ```
 
 </details>
@@ -59,7 +50,7 @@ name: "SyncPendingCapacityError"
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class SyncPendingCapacityError extends RangeError {
+class SyncPendingCapacityError extends SheetwriteError {
   constructor(
     issue: Extract<
       MutationIssue,
@@ -68,7 +59,6 @@ class SyncPendingCapacityError extends RangeError {
       }
     >,
   );
-  code: "pending-capacity";
   issue: {
     kind: "resource-limit";
     severity: "error";

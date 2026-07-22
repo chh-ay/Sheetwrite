@@ -1,3 +1,4 @@
+import { normalizeSheetwriteError, type SheetwriteError } from "./errors.js";
 import { createGridFromSnapshot, type SnapshotGridOptions } from "./persistence.js";
 import type { PresenceOverlay, Range, Selection } from "./types/coordinates.js";
 import type { Sheet, WorkbookSnapshot } from "./types/document.js";
@@ -55,7 +56,7 @@ export type PresenceCoordinatorEvent =
   | { type: "published"; message: PresenceMessage }
   | { type: "updated"; actorId: string }
   | { type: "expired"; actorId: string }
-  | { type: "error"; error: unknown };
+  | { type: "error"; error: SheetwriteError };
 
 type PresenceListener = (event: PresenceCoordinatorEvent) => void;
 
@@ -148,7 +149,14 @@ export class PresenceCoordinator {
       await this.transport.publish(clonePresenceMessage(message), this.abortController.signal);
       if (!this.destroyed) this.emit({ type: "published", message: clonePresenceMessage(message) });
     } catch (error) {
-      if (!this.destroyed) this.emit({ type: "error", error });
+      if (!this.destroyed) {
+        this.emit({
+          type: "error",
+          error: normalizeSheetwriteError(error, "presence-failed", "presence", {
+            action: "publish",
+          }),
+        });
+      }
     }
   }
 
@@ -279,7 +287,7 @@ export interface RevisionCoordinatorOptions {
 export type RevisionCoordinatorEvent =
   | { type: "restored"; targetVersion: number; version: number }
   | { type: "conflict"; targetVersion: number; currentVersion: number }
-  | { type: "error"; error: unknown };
+  | { type: "error"; error: SheetwriteError };
 
 type RevisionListener = (event: RevisionCoordinatorEvent) => void;
 
@@ -305,8 +313,16 @@ export class RevisionCoordinator {
     return () => this.listeners.delete(listener);
   }
 
-  list(): Promise<readonly RevisionSummary[]> {
-    return this.adapter.listRevisions(this.options.documentId, this.abortController.signal);
+  async list(): Promise<readonly RevisionSummary[]> {
+    try {
+      return await this.adapter.listRevisions(this.options.documentId, this.abortController.signal);
+    } catch (error) {
+      const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
+        action: "list",
+      });
+      this.emit({ type: "error", error: failure });
+      throw failure;
+    }
   }
 
   async preview(
@@ -314,13 +330,22 @@ export class RevisionCoordinator {
     version: number,
     options: SnapshotGridOptions = {},
   ): Promise<Grid> {
-    const input = await this.adapter.loadRevision(
-      this.options.documentId,
-      version,
-      this.abortController.signal,
-    );
-    const snapshot = this.options.migrateSnapshot ? this.options.migrateSnapshot(input) : input;
-    return createGridFromSnapshot(host, snapshot, { ...options, readOnly: true });
+    try {
+      const input = await this.adapter.loadRevision(
+        this.options.documentId,
+        version,
+        this.abortController.signal,
+      );
+      const snapshot = this.options.migrateSnapshot ? this.options.migrateSnapshot(input) : input;
+      return createGridFromSnapshot(host, snapshot, { ...options, readOnly: true });
+    } catch (error) {
+      const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
+        action: "preview",
+        version,
+      });
+      this.emit({ type: "error", error: failure });
+      throw failure;
+    }
   }
 
   async restore(targetVersion: number, clientMutationId: string): Promise<RevisionRestoreResponse> {
@@ -347,8 +372,12 @@ export class RevisionCoordinator {
       }
       return response;
     } catch (error) {
-      this.emit({ type: "error", error });
-      throw error;
+      const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
+        action: "restore",
+        targetVersion,
+      });
+      this.emit({ type: "error", error: failure });
+      throw failure;
     }
   }
 
@@ -463,7 +492,7 @@ export type CommentCoordinatorEvent =
   | { type: "changed"; version: number; thread: CommentThread }
   | { type: "conflict"; currentVersion: number }
   | { type: "gap"; expectedVersion: number; receivedVersion: number }
-  | { type: "error"; error: unknown };
+  | { type: "error"; error: SheetwriteError };
 
 type CommentListener = (event: CommentCoordinatorEvent) => void;
 
@@ -523,8 +552,11 @@ export class CommentCoordinator {
       this.emit({ type: "loaded", version: this.version, threads });
       return threads;
     } catch (error) {
-      if (!this.destroyed) this.emit({ type: "error", error });
-      throw error;
+      const failure = normalizeSheetwriteError(error, "comment-failed", "comments", {
+        action: "load",
+      });
+      if (!this.destroyed) this.emit({ type: "error", error: failure });
+      throw failure;
     }
   }
 
@@ -595,8 +627,12 @@ export class CommentCoordinator {
       }
       return response;
     } catch (error) {
-      if (!this.destroyed) this.emit({ type: "error", error });
-      throw error;
+      const failure = normalizeSheetwriteError(error, "comment-failed", "comments", {
+        action: "mutate",
+        mutation: mutation.kind,
+      });
+      if (!this.destroyed) this.emit({ type: "error", error: failure });
+      throw failure;
     }
   }
 
@@ -626,7 +662,12 @@ export class CommentCoordinator {
       this.version = event.version;
       this.emit({ type: "changed", version: event.version, thread: cloneCommentThread(thread) });
     } catch (error) {
-      this.emit({ type: "error", error });
+      this.emit({
+        type: "error",
+        error: normalizeSheetwriteError(error, "comment-failed", "comments", {
+          action: "receive",
+        }),
+      });
     }
   }
 

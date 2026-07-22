@@ -53,6 +53,7 @@ export interface ApiIssue {
     | "manifest-drift"
     | "unclassified-entry"
     | "wrong-owner"
+    | "unstable-error-contract"
     | "unresolved-entry";
   message: string;
   package?: string;
@@ -552,6 +553,25 @@ function resolvedSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
   return current;
 }
 
+function unstableErrorContract(apiExport: ApiExport): string | null {
+  if (
+    /\berror\??:\s*(?:unknown|Error)\b/.test(apiExport.signature) ||
+    /\(\s*_?error:\s*(?:unknown|Error)\b/.test(apiExport.signature)
+  ) {
+    return `${apiExport.name} exposes an untyped error boundary; use SheetwriteError`;
+  }
+  if (
+    apiExport.kind === "class" &&
+    apiExport.name !== "SheetwriteError" &&
+    /\bextends (?:Error|RangeError|TypeError|AggregateError|EvalError|ReferenceError|SyntaxError|URIError|DOMException)\b/.test(
+      apiExport.signature,
+    )
+  ) {
+    return `${apiExport.name} extends Error directly; public failures must extend SheetwriteError`;
+  }
+  return null;
+}
+
 function analyzeEntry(
   packageName: string,
   packageRoot: string,
@@ -577,6 +597,7 @@ function analyzeEntry(
     strict: true,
     target: ts.ScriptTarget.ES2022,
   });
+
   const sourceFile = program.getSourceFile(entry.source);
   if (sourceFile === undefined) {
     issues.push({
@@ -704,6 +725,16 @@ function analyzeEntry(
       issues.push({
         code: "missing-documentation",
         message: `${packageName} ${entry.subpath} export ${apiExport.name} has no source JSDoc summary`,
+        package: packageName,
+        entryPoint: entry.subpath,
+        symbol: apiExport.name,
+      });
+    }
+    const errorContractIssue = unstableErrorContract(apiExport);
+    if (entry.classification === "supported" && errorContractIssue !== null) {
+      issues.push({
+        code: "unstable-error-contract",
+        message: `${packageName} ${entry.subpath} export ${errorContractIssue}`,
         package: packageName,
         entryPoint: entry.subpath,
         symbol: apiExport.name,

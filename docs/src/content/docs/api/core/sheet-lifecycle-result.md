@@ -9,7 +9,7 @@ Actionable transaction outcome for a stable sheet lifecycle target.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L384</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L385</code></dd></div>
 </dl>
 
 ## Declaration

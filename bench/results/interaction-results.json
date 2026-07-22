@@ -1,0 +1,70 @@
+{
+  "protocolVersion": 1,
+  "matrixId": "interaction-full-v1",
+  "capturedAt": "2026-07-22T03:02:46Z",
+  "source": {
+    "commit": "77c41983b53f09c393c6f8b82a4033283c0f9830",
+    "workingTree": true,
+    "runtime": "Bun 1.3.14 on Linux x64",
+    "browser": "Chrome 140.0.7339.127 via Playwright 1.61.1",
+    "cpu": "12th Gen Intel Core i9-12900H",
+    "samples": 5,
+    "warmup": "none; each cold-route sample used a new browser context",
+    "correctness": "first real feed cell resolved to 1 before each cold sample completed"
+  },
+  "directionalPrefetch": {
+    "sourceLatencyMs": 90,
+    "frameBudgetMs": 16.7,
+    "residencyRatioSamples": [1, 1, 1, 1, 1],
+    "p95VisibleWaitMsSamples": [0, 0, 0, 0, 0],
+    "requestedRowMultiplierSamples": [1.1162790697674418, 1.1162790697674418, 1.1162790697674418, 1.1162790697674418, 1.1162790697674418],
+    "medianResidencyRatio": 1,
+    "medianP95VisibleWaitMs": 0
+  },
+  "viewIndex": {
+    "rows": 1000000,
+    "lookupsPerRun": 524288,
+    "baseline": {
+      "lookupMedianNsSamples": [37.88488769531501, 39.244018554689816, 44.43444824218934, 45.83947753906622, 44.521118164060624],
+      "lookupP95NsSamples": [45.98823242187404, 54.03151855468516, 101.12755126953121, 62.81248779296663, 83.76065673827702],
+      "retainedBytes": 67125641,
+      "coldBuildMs": 109.215509
+    },
+    "packed": {
+      "lookupMedianNsSamples": [25.080932617187276, 29.146606445313097, 25.03100585937463, 31.878540039062454, 32.43225097656309],
+      "lookupP95NsSamples": [45.79450683593725, 73.24847412109399, 66.49718017578127, 68.38371582031252, 81.93341064453101],
+      "retainedBytes": 4043043,
+      "backingBytes": 4000000,
+      "coldBuildMs": 4.693290000000001
+    },
+    "medianLookupImprovementRatio": 0.3440538231407775,
+    "p95LookupRegressionRatio": 0.08869618483682662,
+    "retainedHeapReductionRatio": 0.9397690220939566
+  },
+  "sparseDirty": {
+    "baseline100Bytes": 5427200,
+    "dirty100Bytes": 5679,
+    "dirty10000Bytes": 718911,
+    "dirty100ReductionRatio": 0.9989536040683962,
+    "dirty100CleanChunks": 0,
+    "dirty10000CleanChunks": 0
+  },
+  "coldRoute": {
+    "route": "/showcases/performance/",
+    "before": {
+      "usableMsSamples": [291.3, 351.2, 242.3, 265.5, 250.1],
+      "sheetwriteLongTaskMsSamples": [64.2, 65.8, 56.4, 65, 63.9],
+      "dominantOwner": "eager 100,000-row revenue scenario imported only for four theme fields"
+    },
+    "after": {
+      "usableMsSamples": [231.5, 216.6, 201.3, 215.8, 186.6],
+      "sheetwriteLongTaskMsSamples": [0, 0, 0, 0, 0],
+      "routeCpuMsSamples": [9.209, 9.037, 9.064, 8.057, 7.202],
+      "gridBuildCpuMsSamples": [6.859, 6.268, 6.241, 5.343, 6.407],
+      "reportedUnattributedLongTaskMsSamples": [54, 54, 0, 0, 0]
+    },
+    "medianUsableImprovementRatio": 0.1871939736346515,
+    "sheetwriteLongTaskCeilingMs": 50,
+    "sheetwriteLongTaskGatePassed": true
+  }
+}

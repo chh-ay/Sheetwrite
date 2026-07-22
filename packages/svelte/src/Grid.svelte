@@ -1,5 +1,10 @@
 <script lang="ts">
-import { initSheetwrite, isSheetwriteReady, type GridOptions } from "@sheetwrite/core";
+import {
+  initSheetwrite,
+  isSheetwriteReady,
+  type GridOptions,
+  type SheetwriteError,
+} from "@sheetwrite/core";
 import {
   createGridController,
   getGridResetReason,
@@ -160,7 +165,7 @@ $effect(() => {
   lastRequestedOptions = requestedOptions;
   const token = ++initializationToken;
   if (sourceOnlyChange) {
-    void initSheetwrite(resetInputs.wasmSource).catch((error: unknown) => {
+    void initSheetwrite(resetInputs.wasmSource).catch((error: SheetwriteError) => {
       if (!disposed && token === initializationToken) {
         untrack(() => onInitializationError?.(error));
       }
@@ -182,7 +187,7 @@ $effect(() => {
     } catch (error) {
       if (disposed || token !== initializationToken) return;
       loading = true;
-      untrack(() => onInitializationError?.(error));
+      untrack(() => onInitializationError?.(error as SheetwriteError));
     }
   })();
 });

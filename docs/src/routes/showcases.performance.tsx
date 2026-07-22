@@ -26,6 +26,7 @@ import {
   FEED_SHEET,
   type FullExportAttempt,
   formatBytes,
+  INTERACTION_EVIDENCE,
   measureBulkMutation,
   PAGE_LATENCY_MS,
   PAGED_EVIDENCE,
@@ -114,6 +115,7 @@ function PerformanceRoute() {
   const [exportAttempt, setExportAttempt] = useState<FullExportAttempt | null>(null);
   const [scan, setScan] = useState<ScanAttempt | null>(null);
   const [resourceDelta, setResourceDelta] = useState<RuntimeResourcePhaseDelta | null>(null);
+  const [evidencePeriod, setEvidencePeriod] = useState<"before" | "after">("after");
 
   // One grid generation per renderer choice — the paint backend is
   // construction-bound, exactly as in a host application.
@@ -309,6 +311,11 @@ function PerformanceRoute() {
     resourceDelta?.owners.filter(
       (owner) => owner.logicalBytes !== 0 || owner.allocatedBytes !== 0 || owner.entries !== 0,
     ) ?? [];
+  const interactionEvidence = INTERACTION_EVIDENCE[evidencePeriod];
+  const unattributedColdTasks = INTERACTION_EVIDENCE.coldUnattributedLongTaskMs.filter(
+    (duration) => duration > 0,
+  );
+  const maxUnattributedColdTask = Math.max(...unattributedColdTasks, 0);
 
   return (
     <div className="sw-sp-frame">
@@ -959,6 +966,79 @@ function PerformanceRoute() {
                 </tbody>
               </table>
             </div>
+          </div>
+          <h3>Measured interaction gains</h3>
+          <div className="sw-sp-evidence" data-testid="scale-evidence-interaction">
+            <p className="sw-sp-provenance" data-testid="scale-evidence-interaction-provenance">
+              Source <code>{INTERACTION_EVIDENCE.source}</code> — {INTERACTION_EVIDENCE.protocol},{" "}
+              {INTERACTION_EVIDENCE.capture.samples} samples on{" "}
+              {INTERACTION_EVIDENCE.capture.browser}, {INTERACTION_EVIDENCE.capture.cpu},{" "}
+              {INTERACTION_EVIDENCE.capture.runtime}; {INTERACTION_EVIDENCE.capture.warmup}, commit{" "}
+              <code>{INTERACTION_EVIDENCE.capture.commit.slice(0, 10)}</code>.
+            </p>
+            <fieldset className="sw-sp-seg">
+              <legend className="sw-visually-hidden">Interaction evidence period</legend>
+              {(["before", "after"] as const).map((period) => (
+                <button
+                  aria-pressed={evidencePeriod === period}
+                  key={period}
+                  onClick={() => setEvidencePeriod(period)}
+                  type="button"
+                >
+                  {period === "before" ? "Before" : "After"}
+                </button>
+              ))}
+            </fieldset>
+            <div className="sw-sp-tablewrap">
+              <table className="sw-sp-table">
+                <caption>
+                  {evidencePeriod === "before" ? "Baseline" : "Current"} values from the same
+                  checked interaction matrix.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Journey</th>
+                    <th scope="col">Selected value</th>
+                    <th scope="col">Measured gain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">1M-row sorted/filtered lookup median</th>
+                    <td data-testid="scale-evidence-lookup">
+                      {interactionEvidence.lookupMedianNs.toFixed(2)} ns
+                    </td>
+                    <td>{(INTERACTION_EVIDENCE.gains.lookup * 100).toFixed(2)}%</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">1M-row inverse-index retained bytes</th>
+                    <td>{formatBytes(interactionEvidence.viewIndexBytes)}</td>
+                    <td>{(INTERACTION_EVIDENCE.gains.heap * 100).toFixed(2)}%</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">100 distant dirty cells</th>
+                    <td>{formatBytes(interactionEvidence.dirty100Bytes)}</td>
+                    <td>{(INTERACTION_EVIDENCE.gains.sparse * 100).toFixed(2)}%</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Sheetwrite-owned cold long task median</th>
+                    <td data-testid="scale-evidence-cold">
+                      {interactionEvidence.coldOwnedLongTaskMs.toFixed(1)} ms
+                    </td>
+                    <td>all five current samples ≤ 50 ms</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="sw-sp-note">
+              The controlled 90 ms source achieved{" "}
+              {(INTERACTION_EVIDENCE.prefetch.medianResidencyRatio * 100).toFixed(0)}% median
+              visible residency and{" "}
+              {INTERACTION_EVIDENCE.prefetch.medianP95VisibleWaitMs.toFixed(1)} ms visible-wait p95.{" "}
+              {unattributedColdTasks.length} current cold samples still contained unattributed
+              browser/runtime tasks, at most {maxUnattributedColdTask.toFixed(0)} ms; they remain
+              reported and are not relabeled as Sheetwrite work.
+            </p>
           </div>
           {COMPARISON_EVIDENCE.available && (
             <>

@@ -593,7 +593,11 @@ describe("bounded and corrupt XLSX inputs", () => {
         throw new Error(`Expected ${file} to fail`);
       } catch (error) {
         expect(error).toBeInstanceOf(XlsxResourceError);
-        expect(error).toMatchObject({ code: "XLSX_RESOURCE_LIMIT", resource, operation: "import" });
+        expect(error).toMatchObject({
+          code: "xlsx-resource-limit",
+          resource,
+          operation: "xlsx-import",
+        });
       }
     }
   });

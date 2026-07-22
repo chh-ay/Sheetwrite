@@ -172,7 +172,7 @@ export function parseXml(bytes: Uint8Array, part: string, context: XlsxCodecCont
   };
 
   while (cursor < xml.length) {
-    if ((elementCount & 4_095) === 0) checkAbort(context.options);
+    if ((elementCount & 4_095) === 0) checkAbort(context);
     const open = xml.indexOf("<", cursor);
     if (open < 0) {
       appendText(xml.slice(cursor));
@@ -359,7 +359,7 @@ export class XmlBuffer {
   }
 
   finish(): Uint8Array {
-    checkAbort(this.context.options);
+    checkAbort(this.context);
     return ENCODER.encode(this.#parts.join(""));
   }
 }

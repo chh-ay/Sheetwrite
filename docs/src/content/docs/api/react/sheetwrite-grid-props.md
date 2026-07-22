@@ -9,7 +9,7 @@ Advanced framework adapter props for workbook data or datasource ownership.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L67</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L68</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>37</span>
@@ -352,7 +352,7 @@ onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
 <summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 
 ```ts generated
-onInitializationError?: (error: unknown) => void;
+onInitializationError?: (error: SheetwriteError) => void;
 ```
 
 </details>
@@ -409,7 +409,7 @@ export interface SheetwriteGridProps {
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
   onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 }
 ```

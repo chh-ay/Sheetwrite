@@ -1,4 +1,4 @@
-import { boundedJsonByteLength, JsonByteLengthError } from "./json-byte-length.js";
+import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import type { PendingCommitLoadOptions, PendingCommitStorage } from "./sync.js";
 import type { PendingCommit } from "./types/transaction.js";
 
@@ -19,14 +19,15 @@ export type IndexedDbPendingCommitStorageErrorCode =
   | "limit";
 
 /** Typed IndexedDB failure raised by durable pending-commit storage. */
-export class IndexedDbPendingCommitStorageError extends Error {
+export class IndexedDbPendingCommitStorageError extends SheetwriteError {
+  override readonly name = "IndexedDbPendingCommitStorageError";
+
   constructor(
-    readonly code: IndexedDbPendingCommitStorageErrorCode,
+    code: IndexedDbPendingCommitStorageErrorCode,
     message: string,
     options?: ErrorOptions,
   ) {
-    super(message, options);
-    this.name = "IndexedDbPendingCommitStorageError";
+    super(code, "pending-storage", message, { cause: options?.cause });
   }
 }
 

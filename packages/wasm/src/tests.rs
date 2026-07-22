@@ -784,6 +784,55 @@ fn date_time_functions_use_excel_serials_and_controlled_volatile_inputs() {
 }
 
 #[test]
+fn information_and_control_functions_preserve_types_errors_and_lazy_branches() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(24, 1);
+    let formulas = [
+        "=ISBLANK(A1)",
+        "=ISNUMBER(1)",
+        "=ISTEXT(\"x\")",
+        "=ISLOGICAL(TRUE)",
+        "=ISERROR(1/0)",
+        "=ISERR(NA())",
+        "=ISNA(NA())",
+        "=TYPE(\"x\")",
+        "=TYPE(1/0)",
+        "=N(TRUE)",
+        "=T(\"kept\")",
+        "=T(7)",
+        "=IFNA(NA(),7)",
+        "=IFNA(2,1/0)",
+        "=IFS(FALSE,1/0,TRUE,8)",
+        "=SWITCH(2,1,1/0,2,9,1/0)",
+        "=XOR(TRUE,FALSE,TRUE)",
+        "=TRUE()",
+        "=FALSE()",
+    ];
+    for (col, source) in formulas.into_iter().enumerate() {
+        store.set_formula(sheet, 0, col + 1, source, 0);
+    }
+    store.recompute(sheet);
+
+    for col in [1, 2, 3, 4, 5, 7, 18] {
+        assert_eq!(store.get_cell(sheet, 0, col).kind(), KIND_BOOL);
+        assert_close(number(&store, sheet, 0, col), 1.0);
+    }
+    for col in [6, 17, 19] {
+        assert_eq!(store.get_cell(sheet, 0, col).kind(), KIND_BOOL);
+        assert_close(number(&store, sheet, 0, col), 0.0);
+    }
+    assert_close(number(&store, sheet, 0, 8), 2.0);
+    assert_close(number(&store, sheet, 0, 9), 16.0);
+    assert_close(number(&store, sheet, 0, 10), 1.0);
+    assert_eq!(string(&store, sheet, 0, 11).as_deref(), Some("kept"));
+    assert_eq!(string(&store, sheet, 0, 12).as_deref(), Some(""));
+    assert_close(number(&store, sheet, 0, 13), 7.0);
+    assert_close(number(&store, sheet, 0, 14), 2.0);
+    assert_close(number(&store, sheet, 0, 15), 8.0);
+    assert_close(number(&store, sheet, 0, 16), 9.0);
+}
+
+#[test]
 fn criteria_families_apply_wildcards_shapes_and_error_semantics() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(13, 7);

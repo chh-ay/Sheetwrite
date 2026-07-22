@@ -1,0 +1,146 @@
+{
+  "protocol": 1,
+  "license": "MIT; original vectors derived independently from cited public specifications",
+  "cases": [
+    {
+      "id": "canary.arithmetic.1-plus-1",
+      "area": "formula",
+      "dialect": "shared",
+      "kind": "formula",
+      "source": {
+        "title": "ECMA-376",
+        "section": "18.17 formulas",
+        "license": "Specification-derived test metadata",
+        "authorship": "spec-derived"
+      },
+      "inputs": [],
+      "formula": "=1+1",
+      "target": "A1",
+      "expected": { "type": "number", "value": 2 },
+      "observations": []
+    },
+    {
+      "id": "canary.date.serial-60",
+      "area": "formula",
+      "dialect": "excel",
+      "kind": "formula",
+      "source": {
+        "title": "Microsoft formula compatibility behavior",
+        "section": "1900 date system serial 60",
+        "license": "Original observation vector",
+        "authorship": "original"
+      },
+      "inputs": [],
+      "formula": "=60",
+      "numberFormat": "yyyy-mm-dd",
+      "target": "B1",
+      "expected": { "type": "number", "value": 60, "displayedText": "1900-02-28" },
+      "knownDivergence": "Specification-derived expectation pending versioned oracle capture: Excel's synthetic serial 60 displays as 1900-02-29; JavaScript-date renderers use the documented 1900-02-28 fallback while preserving raw serial 60.",
+      "observations": []
+    },
+    {
+      "id": "canary.if.lazy-error-branch",
+      "area": "formula",
+      "dialect": "shared",
+      "kind": "formula",
+      "source": {
+        "title": "OpenFormula",
+        "section": "IF lazy branch evaluation",
+        "license": "Specification-derived test metadata",
+        "authorship": "spec-derived"
+      },
+      "inputs": [],
+      "formula": "=IF(FALSE,1/0,7)",
+      "target": "A1",
+      "expected": { "type": "number", "value": 7 },
+      "observations": []
+    },
+    {
+      "id": "canary.criteria.wildcard",
+      "area": "formula",
+      "dialect": "shared",
+      "kind": "formula",
+      "source": {
+        "title": "OpenFormula",
+        "section": "COUNTIF wildcard criteria",
+        "license": "Specification-derived test metadata",
+        "authorship": "spec-derived"
+      },
+      "inputs": [{ "cell": "A1", "value": "alpha" }, { "cell": "A2", "value": "beta" }],
+      "formula": "=COUNTIF(A1:A2,\"a*\")",
+      "target": "B1",
+      "expected": { "type": "number", "value": 1 },
+      "observations": []
+    },
+    {
+      "id": "canary.lookup.not-found",
+      "area": "formula",
+      "dialect": "shared",
+      "kind": "formula",
+      "source": {
+        "title": "OpenFormula",
+        "section": "VLOOKUP exact-match miss",
+        "license": "Specification-derived test metadata",
+        "authorship": "spec-derived"
+      },
+      "inputs": [
+        { "cell": "A1", "value": "a" },
+        { "cell": "B1", "value": 1 },
+        { "cell": "A2", "value": "b" },
+        { "cell": "B2", "value": 2 }
+      ],
+      "formula": "=VLOOKUP(\"z\",A1:B2,2,FALSE)",
+      "target": "C1",
+      "expected": { "type": "error", "error": "#N/A" },
+      "observations": []
+    },
+    {
+      "id": "canary.spill.obstruction",
+      "area": "formula",
+      "dialect": "shared",
+      "kind": "formula",
+      "source": {
+        "title": "Dynamic array interoperability",
+        "section": "blocked spill",
+        "license": "Original observation vector",
+        "authorship": "original"
+      },
+      "inputs": [
+        { "cell": "A1", "value": 1 },
+        { "cell": "A2", "value": 2 },
+        { "cell": "B1", "value": true },
+        { "cell": "B2", "value": true },
+        { "cell": "C2", "value": "blocker" }
+      ],
+      "formula": "=FILTER(A1:A2,B1:B2)",
+      "target": "C1",
+      "expected": { "type": "error", "error": "#SPILL!" },
+      "observations": []
+    },
+    {
+      "id": "canary.workbook.roundtrip",
+      "area": "workbook",
+      "dialect": "shared",
+      "kind": "workbook",
+      "source": {
+        "title": "Workbook interoperability",
+        "section": "one-sheet roundtrip",
+        "license": "Original observation vector",
+        "authorship": "original"
+      },
+      "operations": [
+        { "op": "create-sheet", "name": "Canary" },
+        { "op": "set", "cell": "A1", "value": 2 }
+      ],
+      "expected": {
+        "type": "workbook",
+        "value": {
+          "activeSheet": "Canary",
+          "sheetCount": 1,
+          "sheets": [{ "name": "Canary", "visibility": "visible", "cells": { "A1": 2 } }]
+        }
+      },
+      "observations": []
+    }
+  ]
+}

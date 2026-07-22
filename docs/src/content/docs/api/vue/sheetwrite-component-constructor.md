@@ -11,7 +11,7 @@ surface reachable through a template ref.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L142</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L143</code></dd></div>
 </dl>
 
 ## Declaration

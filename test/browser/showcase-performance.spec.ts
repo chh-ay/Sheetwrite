@@ -5,6 +5,17 @@ import { siteUrl } from "./playwright.config.js";
 declare global {
   interface Window {
     __sheetwriteScaleGrid?: Grid;
+    __sheetwriteColdLongTasks?: Array<{
+      startTime: number;
+      duration: number;
+      name: string;
+      attribution: string[];
+    }>;
+    __sheetwriteColdFrames?: Array<{
+      startTime: number;
+      duration: number;
+      scripts: Array<{ sourceURL: string; duration: number; invoker: string }>;
+    }>;
   }
 }
 
@@ -47,6 +58,113 @@ async function bootScale(page: Page): Promise<void> {
     })
     .toBeGreaterThan(0);
 }
+
+test("cold production route has no pre-usable task over 50 ms", async ({ browser }) => {
+  const samples: Array<{
+    usableMs: number;
+    longTasks: NonNullable<Window["__sheetwriteColdLongTasks"]>;
+    frames: NonNullable<Window["__sheetwriteColdFrames"]>;
+    cpu: Array<{ functionName: string; url: string; durationMs: number }>;
+  }> = [];
+  for (let repetition = 0; repetition < 5; repetition += 1) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const session = await context.newCDPSession(page);
+    await session.send("Profiler.enable");
+    await session.send("Profiler.start");
+    await page.addInitScript(() => {
+      window.__sheetwriteColdLongTasks = [];
+      window.__sheetwriteColdFrames = [];
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const attribution =
+            "attribution" in entry && Array.isArray(entry.attribution)
+              ? entry.attribution.map((item: { containerSrc?: string }) => item.containerSrc ?? "")
+              : [];
+          window.__sheetwriteColdLongTasks!.push({
+            startTime: entry.startTime,
+            duration: entry.duration,
+            name: entry.name,
+            attribution,
+          });
+        }
+      }).observe({ type: "longtask", buffered: true });
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const frame = entry as PerformanceEntry & {
+            scripts?: Array<{
+              sourceURL?: string;
+              duration?: number;
+              invoker?: string;
+            }>;
+          };
+          window.__sheetwriteColdFrames!.push({
+            startTime: frame.startTime,
+            duration: frame.duration,
+            scripts: (frame.scripts ?? []).map((script) => ({
+              sourceURL: script.sourceURL ?? "",
+              duration: script.duration ?? 0,
+              invoker: script.invoker ?? "",
+            })),
+          });
+        }
+      }).observe({ type: "long-animation-frame", buffered: true });
+    });
+    await bootScale(page);
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    );
+    const measured = await page.evaluate(() => ({
+      usableMs: performance.now(),
+      longTasks: (window.__sheetwriteColdLongTasks ?? []).filter(
+        (entry) => entry.startTime <= performance.now(),
+      ),
+      frames: (window.__sheetwriteColdFrames ?? []).filter(
+        (entry) => entry.startTime <= performance.now(),
+      ),
+    }));
+    const { profile } = await session.send("Profiler.stop");
+    const nodes = new Map(profile.nodes.map((node) => [node.id, node.callFrame]));
+    const totals = new Map<number, number>();
+    profile.samples?.forEach((nodeId, index) => {
+      totals.set(nodeId, (totals.get(nodeId) ?? 0) + (profile.timeDeltas?.[index] ?? 0));
+    });
+    const cpu = [...totals]
+      .map(([nodeId, duration]) => ({
+        functionName: nodes.get(nodeId)?.functionName ?? "",
+        url: nodes.get(nodeId)?.url ?? "",
+        durationMs: duration / 1_000,
+      }))
+      .sort((left, right) => right.durationMs - left.durationMs)
+      .slice(0, 12);
+    samples.push({ ...measured, cpu });
+    await context.close();
+  }
+  const longTaskEvidence = samples.flatMap((sample, repetition) =>
+    sample.longTasks
+      .filter((task) => task.duration > 50)
+      .map((task) => ({
+        repetition,
+        task,
+        frames: sample.frames.filter(
+          (frame) =>
+            task.startTime < frame.startTime + frame.duration &&
+            frame.startTime < task.startTime + task.duration,
+        ),
+      })),
+  );
+  const sheetwriteLongTasks = longTaskEvidence.filter((evidence) =>
+    evidence.frames.some((frame) =>
+      frame.scripts.some((script) =>
+        /\/assets\/(?:showcases\.performance-|grid-|sheetwrite_|core-)/.test(script.sourceURL),
+      ),
+    ),
+  );
+  console.log(
+    `COLD_ROUTE_EVIDENCE ${JSON.stringify({ samples, longTaskEvidence, sheetwriteLongTasks })}`,
+  );
+  expect(sheetwriteLongTasks).toEqual([]);
+});
 
 test("performance page mounts one million paged rows allocation-lazy", async ({ page }) => {
   const errors = collectErrors(page);
@@ -377,6 +495,17 @@ test("benchmark evidence is committed, attributed, and separated from live numbe
   await expect(pagedProvenance).toContainText("bench/results/paged-results.json");
   await expect(pagedProvenance).toContainText("paged-full-v1");
   await expect(page.locator('[data-testid="scale-evidence-paged"]')).toContainText("Startup");
+
+  const interaction = page.locator('[data-testid="scale-evidence-interaction"]');
+  await expect(page.locator('[data-testid="scale-evidence-interaction-provenance"]')).toContainText(
+    "interaction-full-v1",
+  );
+  await expect(interaction).toContainText("Chrome 140.0.7339.127");
+  await expect(page.locator('[data-testid="scale-evidence-lookup"]')).toHaveText("29.15 ns");
+  await expect(page.locator('[data-testid="scale-evidence-cold"]')).toHaveText("0.0 ms");
+  await interaction.getByRole("button", { name: "Before" }).click();
+  await expect(page.locator('[data-testid="scale-evidence-lookup"]')).toHaveText("44.43 ns");
+  await expect(page.locator('[data-testid="scale-evidence-cold"]')).toHaveText("64.2 ms");
 
   const compareProvenance = page.locator('[data-testid="scale-evidence-compare-provenance"]');
   await expect(compareProvenance).toContainText("docs/src/generated/landing-bench.json");

@@ -24,9 +24,9 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 import { IncompleteDataError, SheetwriteStore, toCsv } from "@sheetwrite/core";
+import interactionResults from "../../../../bench/results/interaction-results.json";
 import pagedResults from "../../../../bench/results/paged-results.json";
 import landingBench from "../../generated/landing-bench.json";
-import { SHOWCASE_THEME } from "../revenue.js";
 
 // ── Dataset geometry ─────────────────────────────────────────────────────────
 
@@ -47,10 +47,10 @@ export function scaleSheetDescriptor(sheet: SheetId) {
   throw new Error(`Unknown performance showcase sheet: ${sheet}`);
 }
 export const SCALE_THEME: Partial<Theme> = {
-  font: SHOWCASE_THEME.font,
-  rowHeight: SHOWCASE_THEME.rowHeight,
-  headerHeight: SHOWCASE_THEME.headerHeight,
-  rowHeaderWidth: SHOWCASE_THEME.rowHeaderWidth,
+  font: '500 13px "Inter Variable", Inter, system-ui, sans-serif',
+  rowHeight: 30,
+  headerHeight: 32,
+  rowHeaderWidth: 48,
 };
 
 /** Clean-chunk budget kept deliberately small so cache churn is observable. */
@@ -429,6 +429,43 @@ export const PAGED_EVIDENCE = {
   firstPage: statOf(pagedResults.timings["first-page"]),
   distantPage: statOf(pagedResults.timings["distant-page"]),
   probes: pagedResults.probes,
+} as const;
+
+function sampleMedian(values: readonly number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.floor(sorted.length / 2)]!;
+}
+
+/** Committed five-sample interaction, memory, and cold-route evidence. */
+export const INTERACTION_EVIDENCE = {
+  source: "bench/results/interaction-results.json",
+  protocol: `${interactionResults.matrixId} (protocol v${interactionResults.protocolVersion})`,
+  capture: interactionResults.source,
+  prefetch: interactionResults.directionalPrefetch,
+  before: {
+    lookupMedianNs: sampleMedian(interactionResults.viewIndex.baseline.lookupMedianNsSamples),
+    viewIndexBytes: interactionResults.viewIndex.baseline.retainedBytes,
+    dirty100Bytes: interactionResults.sparseDirty.baseline100Bytes,
+    coldOwnedLongTaskMs: sampleMedian(
+      interactionResults.coldRoute.before.sheetwriteLongTaskMsSamples,
+    ),
+  },
+  after: {
+    lookupMedianNs: sampleMedian(interactionResults.viewIndex.packed.lookupMedianNsSamples),
+    viewIndexBytes: interactionResults.viewIndex.packed.retainedBytes,
+    dirty100Bytes: interactionResults.sparseDirty.dirty100Bytes,
+    coldOwnedLongTaskMs: sampleMedian(
+      interactionResults.coldRoute.after.sheetwriteLongTaskMsSamples,
+    ),
+  },
+  gains: {
+    lookup: interactionResults.viewIndex.medianLookupImprovementRatio,
+    heap: interactionResults.viewIndex.retainedHeapReductionRatio,
+    sparse: interactionResults.sparseDirty.dirty100ReductionRatio,
+    coldUsable: interactionResults.coldRoute.medianUsableImprovementRatio,
+  },
+  coldUnattributedLongTaskMs:
+    interactionResults.coldRoute.after.reportedUnattributedLongTaskMsSamples,
 } as const;
 
 /**

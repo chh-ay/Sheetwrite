@@ -9,7 +9,7 @@ Column definition accepted by the adapters’ simple row-object API.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L103</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L105</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>9</span>

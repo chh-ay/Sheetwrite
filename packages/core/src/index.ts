@@ -62,6 +62,18 @@ export {
   WORKBOOK_SCHEMA_VERSION,
 } from "./document-protocol.js";
 export {
+  isSheetwriteError,
+  SHEETWRITE_ERROR_CODES,
+  SHEETWRITE_ERROR_OPERATIONS,
+  SheetwriteError,
+  type SheetwriteErrorCode,
+  type SheetwriteErrorContext,
+  type SheetwriteErrorContextValue,
+  type SheetwriteErrorEnvelope,
+  type SheetwriteErrorOperation,
+  type SheetwriteErrorOptions,
+} from "./errors.js";
+export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   downloadBytes,
   fromCsv,

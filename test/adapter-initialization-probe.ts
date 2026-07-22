@@ -5,8 +5,8 @@ import { createApp, defineComponent, h, nextTick, ref, shallowRef } from "vue";
 // Bun resolves the public `svelte` entry to its server runtime outside a browser
 // bundle, so this lifecycle boundary intentionally selects Svelte's client entry.
 import { flushSync, mount, unmount } from "../node_modules/svelte/src/index-client.js";
-import type { GridReadyEvent } from "../packages/core/src/adapter.js";
-import type { Grid } from "../packages/core/src/index.js";
+import type { GridReadyEvent } from "../packages/core/dist/adapter.js";
+import { SheetwriteError, type Grid } from "../packages/core/dist/index.js";
 import { installCanvasTestStubs } from "../packages/core/src/testing.js";
 import { SheetwriteGrid as ReactSheetwriteGrid } from "../packages/react/src/index.js";
 import SvelteLifecycleHarness from "../packages/svelte/test/LifecycleHarness.svelte";
@@ -19,7 +19,7 @@ import { makeConformanceWorkbook } from "./adapter-lifecycle-contract.js";
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 type InitializationSource = Uint8Array | Promise<ArrayBuffer> | undefined;
-type InitializationErrorHandler = (error: unknown) => void;
+type InitializationErrorHandler = (error: SheetwriteError) => void;
 
 interface InitializationDriver {
   host: HTMLElement;
@@ -221,20 +221,24 @@ try {
   assert.equal(stale.getPublishedGrid() ?? null, null);
 
   let currentErrors = 0;
-  const replacement = await mountAdapter(new Uint8Array([0]), () => {
+  const currentFailures: SheetwriteError[] = [];
+  const reportCurrentFailure: InitializationErrorHandler = (error) => {
+    assert.ok(error instanceof SheetwriteError);
+    assert.equal(error.code, "initialization-failed");
+    assert.equal(error.operation, "initialize");
     currentErrors += 1;
-  });
+    currentFailures.push(error);
+  };
+  const replacement = await mountAdapter(new Uint8Array([0]), reportCurrentFailure);
   assert.ok(replacement.host.querySelector("[data-lifecycle-fallback]"));
   await waitFor(() => currentErrors === 1, "true initialization failure was not reported once");
 
   const sourceA = Promise.withResolvers<ArrayBuffer>();
-  await replacement.update(sourceA.promise, () => {
-    currentErrors += 1;
-  });
-  await replacement.update(new Uint8Array([1]), () => {
-    currentErrors += 1;
-  });
+  await replacement.update(sourceA.promise, reportCurrentFailure);
+  await replacement.update(new Uint8Array([1]), reportCurrentFailure);
   await waitFor(() => currentErrors === 2, "conflicting source rejection was not reported once");
+  assert.equal(currentFailures.length, 2);
+  assert.equal(currentFailures[0]!.toJSON().name, "SheetwriteError");
 
   const wasm = await Bun.file(
     new URL("../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url),
@@ -280,9 +284,7 @@ try {
       },
     ],
   });
-  await replacement.update(new Uint8Array([2]), () => {
-    currentErrors += 1;
-  });
+  await replacement.update(new Uint8Array([2]), reportCurrentFailure);
   await Bun.sleep(10);
   assert.equal(replacement.getPublishedGrid(), liveGrid);
   assert.deepEqual(liveGrid.getSelection(), selection);

@@ -25,11 +25,11 @@ constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, optio
 
 </details>
 
-<details class="api-member" id="indexed-db-pending-commit-storage-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
+<details class="api-member" id="indexed-db-pending-commit-storage-error-name" data-pagefind-weight="1">
+<summary><code>name</code></summary>
 
 ```ts generated
-code: IndexedDbPendingCommitStorageErrorCode
+name: "IndexedDbPendingCommitStorageError"
 ```
 
 </details>
@@ -41,13 +41,13 @@ code: IndexedDbPendingCommitStorageErrorCode
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class IndexedDbPendingCommitStorageError extends Error {
+class IndexedDbPendingCommitStorageError extends SheetwriteError {
   constructor(
     code: IndexedDbPendingCommitStorageErrorCode,
     message: string,
     options?: ErrorOptions,
   );
-  code: IndexedDbPendingCommitStorageErrorCode;
+  name: "IndexedDbPendingCommitStorageError";
 }
 ```
 

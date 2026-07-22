@@ -9,7 +9,7 @@ Grid creation options accepted when hydrating a validated snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L19</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L20</code></dd></div>
 </dl>
 
 ## Declaration

@@ -9,7 +9,7 @@ Aggregate ceilings for local commits retained until durable acknowledgement.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L96</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L102</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

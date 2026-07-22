@@ -93,7 +93,7 @@ function parseEntries(bytes: Uint8Array, context: XlsxCodecContext): ZipEntry[] 
   let totalUncompressed = 0;
   let offset = centralOffset;
   for (let index = 0; index < entryCount; index++) {
-    checkAbort(context.options);
+    checkAbort(context);
     if (offset + 46 > eocd || view.getUint32(offset, true) !== CENTRAL_SIGNATURE) {
       return fail(`central directory entry ${index} is truncated`);
     }
@@ -244,7 +244,7 @@ export class ZipArchive {
     if (!entry) throw new TypeError(`Sheetwrite: XLSX package is missing ${logicalName}`);
     const cached = this.#cache.get(entry.name);
     if (cached) return cached;
-    checkAbort(this.#context.options);
+    checkAbort(this.#context);
     const compressed = this.#bytes.subarray(
       entry.dataOffset,
       entry.dataOffset + entry.compressedSize,
@@ -293,7 +293,7 @@ export function writeZip(
   }
   const conservativeOutput = total + parts.size * 256;
   assertResource(context, "maxOutputBytes", conservativeOutput);
-  checkAbort(context.options);
+  checkAbort(context);
   const output = zipSync(files, { level: 6, mtime: DOS_EPOCH });
   assertResource(context, "maxOutputBytes", output.byteLength);
   return output;

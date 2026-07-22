@@ -1,4 +1,4 @@
-import { boundedJsonByteLength, JsonByteLengthError } from "./json-byte-length.js";
+import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
   DocumentOp,
@@ -172,8 +172,8 @@ export interface SnapshotValidationOptions {
 }
 
 /** Stable resource failure raised by direct workbook construction paths. */
-export class SnapshotResourceError extends RangeError {
-  readonly code = "resource-limit";
+export class SnapshotResourceError extends SheetwriteError {
+  override readonly name = "SnapshotResourceError";
 
   constructor(
     readonly resource: keyof SnapshotResourceLimits,
@@ -182,12 +182,13 @@ export class SnapshotResourceError extends RangeError {
     options?: ErrorOptions,
   ) {
     super(
+      "resource-limit",
+      "snapshot-allocate",
       actual > limit
         ? `Snapshot ${resource} limit ${limit} exceeded by ${actual}`
         : `Snapshot allocation failed for ${actual} within ${resource} limit ${limit}`,
-      options,
+      { cause: options?.cause, context: { resource, limit, actual } },
     );
-    this.name = "SnapshotResourceError";
   }
 }
 
@@ -212,12 +213,22 @@ export type DocumentValidationResult =
   | { ok: false; errors: DocumentValidationError[] };
 
 /** Path-qualified schema failure found while validating an untrusted snapshot. */
-export class SnapshotValidationError extends Error {
-  readonly code = "invalid-snapshot";
+export class SnapshotValidationError extends SheetwriteError {
+  override readonly name = "SnapshotValidationError";
 
   constructor(readonly errors: readonly DocumentValidationError[]) {
-    super(errors[0]?.message ?? "Invalid workbook snapshot");
-    this.name = "SnapshotValidationError";
+    super(
+      "invalid-snapshot",
+      "snapshot-validate",
+      errors[0]?.message ?? "Invalid workbook snapshot",
+      {
+        context: {
+          issueCount: errors.length,
+          firstPath: errors[0]?.path ?? "$",
+          firstCode: errors[0]?.code ?? "invalid-value",
+        },
+      },
+    );
   }
 }
 

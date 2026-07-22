@@ -364,15 +364,24 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
 
       expect(mutationEvents).toHaveLength(1);
       expect(mutationEvents[0]!.issues.map((issue) => issue.kind)).toEqual(["protection"]);
-      expect(fallbackEvents[0]!.requested).toBe("worker");
-      expect(fallbackEvents[0]!.error).toBeDefined();
+      expect(fallbackEvents[0]).toMatchObject({
+        requested: "worker",
+        error: { code: "renderer-fallback", operation: "renderer-worker" },
+      });
       expect(datasourceEvents[0]).toMatchObject({
         request: { sheet: "lifecycle", start: 0 },
-        error: datasourceFailure,
+        error: {
+          code: "datasource-request-failed",
+          operation: "datasource-request",
+          message: datasourceFailure.message,
+        },
       });
+      expect(datasourceEvents[0]!.error.cause).toBe(datasourceFailure);
       expect("signal" in datasourceEvents[0]!.request).toBe(false);
-      expect(exportEvents[0]!.format).toBe("xlsx");
-      expect(exportEvents[0]!.error).toBeInstanceOf(Error);
+      expect(exportEvents[0]).toMatchObject({
+        format: "xlsx",
+        error: { code: "optional-backend-unavailable", operation: "xlsx-export" },
+      });
 
       const swapped: Array<GridEvents["mutation-rejected"]> = [];
       await mounted.render({ ...props, onMutationRejected: (event) => swapped.push(event) });
@@ -416,8 +425,13 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
 
       expect(datasourceEvents[0]).toMatchObject({
         request: { sheet: "lifecycle", start: 0 },
-        error: datasourceFailure,
+        error: {
+          code: "datasource-request-failed",
+          operation: "datasource-request",
+          message: datasourceFailure.message,
+        },
       });
+      expect(datasourceEvents[0]!.error.cause).toBe(datasourceFailure);
       expect("signal" in datasourceEvents[0]!.request).toBe(false);
 
       await mounted.unmount();
@@ -469,7 +483,11 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const currentFailure = new Error("current generation");
       currentRequest.reject(currentFailure);
       await waitFor(() => currentEvents.length === 1);
-      expect(currentEvents[0]!.error).toBe(currentFailure);
+      expect(currentEvents[0]!.error).toMatchObject({
+        code: "datasource-request-failed",
+        operation: "datasource-request",
+        message: currentFailure.message,
+      });
 
       const unmountedRequest = Promise.withResolvers<DataSourcePage>();
       let unmountedRequests = 0;

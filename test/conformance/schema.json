@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sheetwrite.vercel.app/schemas/conformance-v1.json",
+  "title": "Sheetwrite neutral conformance corpus",
+  "type": "object",
+  "required": ["protocol", "license", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "protocol": { "const": 1 },
+    "license": { "type": "string", "minLength": 1 },
+    "cases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "scalar": { "type": ["null", "boolean", "number", "string"] },
+    "result": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "blank",
+            "boolean",
+            "number",
+            "string",
+            "error",
+            "array",
+            "workbook",
+            "unsupported"
+          ]
+        },
+        "value": {},
+        "error": { "type": "string" },
+        "rows": { "type": "integer", "minimum": 1 },
+        "columns": { "type": "integer", "minimum": 1 },
+        "displayedText": { "type": "string" },
+        "formula": { "type": "string" },
+        "tolerance": {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["absolute", "relative", "ulp"] },
+            "value": { "type": "number", "minimum": 0 }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "number" } } },
+          "then": { "required": ["value"], "properties": { "value": { "type": "number" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "boolean" } } },
+          "then": { "required": ["value"], "properties": { "value": { "type": "boolean" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "string" } } },
+          "then": { "required": ["value"], "properties": { "value": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "error" } } },
+          "then": { "required": ["error"], "not": { "required": ["value"] } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "array" } } },
+          "then": {
+            "required": ["value", "rows", "columns"],
+            "properties": { "value": { "type": "array" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "workbook" } } },
+          "then": { "required": ["value"], "properties": { "value": { "type": "object" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["blank", "unsupported"] } } },
+          "then": { "not": { "anyOf": [{ "required": ["value"] }, { "required": ["error"] }] } }
+        }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "required": ["producer", "producerVersion", "capturedAt", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "producer": {
+          "enum": ["excel-desktop", "excel-web", "google-sheets", "libreoffice", "sheetwrite"]
+        },
+        "producerVersion": { "type": "string", "minLength": 1 },
+        "capturedAt": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["reviewed", "provisional", "unavailable"] },
+        "result": { "$ref": "#/$defs/result" },
+        "artifactSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "notes": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["reviewed", "provisional"] } } },
+          "then": { "required": ["result", "artifactSha256"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "unavailable" } } },
+          "then": { "required": ["notes"], "not": { "required": ["result"] } }
+        }
+      ]
+    },
+    "case": {
+      "type": "object",
+      "required": ["id", "area", "dialect", "source", "kind", "expected", "observations"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]+$" },
+        "area": { "enum": ["formula", "mutation", "workbook", "xlsx"] },
+        "dialect": { "enum": ["shared", "excel", "google-sheets", "openformula"] },
+        "kind": { "enum": ["formula", "workbook"] },
+        "source": {
+          "type": "object",
+          "required": ["title", "section", "license", "authorship"],
+          "additionalProperties": false,
+          "properties": {
+            "title": { "type": "string", "minLength": 1 },
+            "section": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "format": "uri" },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "license": { "type": "string", "minLength": 1 },
+            "authorship": { "enum": ["original", "spec-derived", "producer-observation"] },
+            "notice": { "type": "string" }
+          },
+          "dependentRequired": { "url": ["sha256"] }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["cell", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "cell": { "type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$" },
+              "value": { "$ref": "#/$defs/scalar" }
+            }
+          }
+        },
+        "numberFormat": { "type": "string", "minLength": 1 },
+        "formula": { "type": "string", "pattern": "^=" },
+        "target": { "type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$" },
+        "operations": { "type": "array", "items": { "type": "object" } },
+        "expected": { "$ref": "#/$defs/result" },
+        "observations": { "type": "array", "items": { "$ref": "#/$defs/observation" } },
+        "knownDivergence": { "type": "string" },
+        "unsupported": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "formula" } } },
+          "then": { "required": ["inputs", "formula", "target"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "workbook" } } },
+          "then": { "required": ["operations"] }
+        },
+        {
+          "if": {
+            "properties": { "unsupported": { "const": true } },
+            "required": ["unsupported"]
+          },
+          "then": {
+            "properties": {
+              "expected": {
+                "properties": { "type": { "const": "unsupported" } },
+                "required": ["type"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "expected": {
+                "properties": { "type": { "const": "unsupported" } },
+                "required": ["type"]
+              }
+            },
+            "required": ["expected"]
+          },
+          "then": {
+            "required": ["unsupported"],
+            "properties": { "unsupported": { "const": true } }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,3 +1,16 @@
+import type { SheetwriteError } from "./errors.js";
+
+export {
+  isSheetwriteError,
+  SHEETWRITE_ERROR_CODES,
+  SHEETWRITE_ERROR_OPERATIONS,
+  SheetwriteError,
+  type SheetwriteErrorCode,
+  type SheetwriteErrorContext,
+  type SheetwriteErrorEnvelope,
+  type SheetwriteErrorOperation,
+} from "./errors.js";
+
 import type {
   CellFormat,
   CellScalar,
@@ -84,7 +97,7 @@ export interface GridAdapterEventHandlers {
   /** Fires after the adapter publishes a ready Grid generation. */
   onReady?: (event: GridReadyEvent) => void;
   /** Receives a WASM initialization failure while the adapter remains mounted. */
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
 }
 
 /** Optional explicit WASM source and initialization error callback for adapters. */
@@ -92,7 +105,7 @@ export interface SheetwriteInitializationProps {
   /** Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins. */
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
   /** Called when WASM initialization fails while the adapter is mounted. */
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
 }
 
 /** Explicit width and height accepted by framework adapters. */

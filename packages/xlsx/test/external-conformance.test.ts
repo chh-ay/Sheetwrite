@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   dateToSerial,
   type WorkbookSnapshot,
+  SheetwriteError,
   XlsxResourceError,
   type XlsxWorkbookWarning,
 } from "@sheetwrite/core";
@@ -820,7 +821,7 @@ describe("local deterministic and adversarial XLSX gates", () => {
     );
   });
 
-  it("propagates exact abort reasons during central-directory, shared-string, and export-part stages", async () => {
+  it("preserves exact abort reasons as canonical causes across codec stages", async () => {
     const centralReason = new Error("abort during central directory");
     let centralChecks = 0;
     const centralSignal = {
@@ -839,7 +840,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
       );
       throw new Error("expected central-directory abort");
     } catch (error) {
-      expect(error).toBe(centralReason);
+      expect(error).toBeInstanceOf(SheetwriteError);
+      expect(error).toMatchObject({
+        code: "aborted",
+        operation: "xlsx-import",
+      });
+      expect((error as SheetwriteError).cause).toBe(centralReason);
       expect(centralChecks).toBe(3);
     }
 
@@ -871,7 +877,8 @@ describe("local deterministic and adversarial XLSX gates", () => {
       );
       throw new Error("expected shared-string abort");
     } catch (error) {
-      expect(error).toBe(sharedReason);
+      expect(error).toBeInstanceOf(SheetwriteError);
+      expect((error as SheetwriteError).cause).toBe(sharedReason);
       expect(sharedChecks).toBe(16);
       expect(sharedWarnings).toEqual([]);
     }
@@ -895,7 +902,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
       });
       throw new Error("expected export-part abort");
     } catch (error) {
-      expect(error).toBe(exportReason);
+      expect(error).toBeInstanceOf(SheetwriteError);
+      expect(error).toMatchObject({
+        code: "aborted",
+        operation: "xlsx-export",
+      });
+      expect((error as SheetwriteError).cause).toBe(exportReason);
       expect(exportChecks).toBe(3);
       expect(exportWarnings).toEqual([]);
     }

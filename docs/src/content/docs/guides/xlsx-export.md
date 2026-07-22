@@ -16,6 +16,11 @@ import "@sheetwrite/xlsx/register";
 
 await grid.exportXlsx("sales.xlsx");
 ```
+All four optional XLSX functions are asynchronous. Missing registration and
+codec failures reject with `SheetwriteError`; use `code` rather than matching
+the installation message. Resource failures remain `XlsxResourceError`
+instances and therefore also satisfy `isSheetwriteError`.
+
 
 ## Table interchange
 

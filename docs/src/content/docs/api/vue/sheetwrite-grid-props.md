@@ -9,7 +9,7 @@ Advanced Vue adapter props for workbook data or datasource ownership.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L51</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L52</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>20</span>

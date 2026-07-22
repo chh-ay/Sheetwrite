@@ -10,7 +10,7 @@ ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L253</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L252</code></dd></div>
 </dl>
 
 ## Declaration

@@ -326,7 +326,7 @@ onReady?: (event: GridReadyEvent) => void;
 <summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 
 ```ts generated
-onInitializationError?: (error: unknown) => void;
+onInitializationError?: (error: SheetwriteError) => void;
 ```
 
 </details>
@@ -385,7 +385,7 @@ export interface SheetwriteGridProps extends Omit<
   onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
   onExportError?: (event: GridEvents["export-error"]) => void;
   onReady?: (event: GridReadyEvent) => void;
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 }
 ```

@@ -22,6 +22,7 @@ import {
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
 import { EditController, type EditNavigate } from "./editor.js";
+import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
@@ -281,7 +282,11 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
 export async function initSheetwrite(
   source?: BufferSource | URL | string | Request | WebAssembly.Module,
 ): Promise<void> {
-  await load(source);
+  try {
+    await load(source);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
+  }
 }
 
 /** Whether `initSheetwrite` has completed — the single readiness source. */
@@ -332,7 +337,11 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
 /** Creates and mounts an imperative Grid in the supplied host element. */
 export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
   if (!isLoaded()) {
-    throw new Error("Sheetwrite: await initSheetwrite() before createGrid()");
+    throw new SheetwriteError(
+      "initialization-required",
+      "create-grid",
+      "Sheetwrite: await initSheetwrite() before createGrid()",
+    );
   }
   return new GridImpl(host, opts);
 }
@@ -563,7 +572,15 @@ export class GridImpl implements Grid {
           this.scheduleRender();
         },
         onError: (request, error) => {
-          for (const fn of this.listeners["datasource-error"]) fn({ request, error });
+          const failure = normalizeSheetwriteError(
+            error,
+            "datasource-request-failed",
+            "datasource-request",
+            request,
+          );
+          for (const fn of this.listeners["datasource-error"]) {
+            fn({ request, error: failure });
+          }
         },
       },
       sheet.rowCount,
@@ -954,10 +971,13 @@ export class GridImpl implements Grid {
   }
 
   private emitRendererFallback(error: unknown): void {
+    const failure = normalizeSheetwriteError(error, "renderer-fallback", "renderer-worker", {
+      requested: "worker",
+    });
     queueMicrotask(() => {
       if (this.destroyed) return;
       for (const fn of this.listeners["renderer-fallback"]) {
-        fn({ requested: "worker", error });
+        fn({ requested: "worker", error: failure });
       }
     });
   }
@@ -2896,8 +2916,11 @@ export class GridImpl implements Grid {
 
   private emitExportError(error: unknown): void {
     if (this.destroyed) return;
+    const failure = normalizeSheetwriteError(error, "export-failed", "export-xlsx", {
+      format: "xlsx",
+    });
     for (const listener of this.listeners["export-error"]) {
-      listener({ format: "xlsx", error });
+      listener({ format: "xlsx", error: failure });
     }
   }
 

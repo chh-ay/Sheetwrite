@@ -286,7 +286,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L374",
+              "source": "src/types/grid.ts#L375",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -587,7 +587,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L444",
+              "source": "src/collaboration.ts#L473",
               "jsDocTags": [],
               "documentation": "Host persistence contract for versioned comment threads.",
               "memberDocs": []
@@ -599,7 +599,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L373",
+              "source": "src/collaboration.ts#L402",
               "jsDocTags": [],
               "documentation": "Document location to which a comment thread is attached.",
               "memberDocs": []
@@ -611,7 +611,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L366",
+              "source": "src/collaboration.ts#L395",
               "jsDocTags": [],
               "documentation": "Stable host-provided identity displayed on a comment message.",
               "memberDocs": []
@@ -623,7 +623,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L471",
+              "source": "src/collaboration.ts#L500",
               "jsDocTags": [],
               "documentation": "Transport/auth-neutral comment state with server-owned author and timestamp fields.",
               "memberDocs": []
@@ -631,11 +631,11 @@
             {
               "name": "CommentCoordinatorEvent",
               "kind": "type",
-              "signature": "export type CommentCoordinatorEvent = | { type: \"loaded\"; version: number; threads: readonly CommentThread[] } | { type: \"changed\"; version: number; thread: CommentThread } | { type: \"conflict\"; currentVersion: number } | { type: \"gap\"; expectedVersion: number; receivedVersion: number } | { type: \"error\"; error: unknown };",
+              "signature": "export type CommentCoordinatorEvent = | { type: \"loaded\"; version: number; threads: readonly CommentThread[] } | { type: \"changed\"; version: number; thread: CommentThread } | { type: \"conflict\"; currentVersion: number } | { type: \"gap\"; expectedVersion: number; receivedVersion: number } | { type: \"error\"; error: SheetwriteError };",
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L461",
+              "source": "src/collaboration.ts#L490",
               "jsDocTags": [],
               "documentation": "State transition emitted by the comment coordinator.",
               "memberDocs": []
@@ -647,7 +647,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L455",
+              "source": "src/collaboration.ts#L484",
               "jsDocTags": [],
               "documentation": "Document identity and initial version for comment coordination.",
               "memberDocs": []
@@ -659,7 +659,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L431",
+              "source": "src/collaboration.ts#L460",
               "jsDocTags": [],
               "documentation": "Versioned comment-thread listing returned by a host adapter.",
               "memberDocs": []
@@ -671,7 +671,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L378",
+              "source": "src/collaboration.ts#L407",
               "jsDocTags": [],
               "documentation": "One immutable author message in a comment thread.",
               "memberDocs": []
@@ -683,7 +683,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L399",
+              "source": "src/collaboration.ts#L428",
               "jsDocTags": [],
               "documentation": "Serializable operation that creates or updates comment state.",
               "memberDocs": []
@@ -695,7 +695,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L411",
+              "source": "src/collaboration.ts#L440",
               "jsDocTags": [],
               "documentation": "Versioned comment mutation submitted to a host adapter.",
               "memberDocs": []
@@ -707,7 +707,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L420",
+              "source": "src/collaboration.ts#L449",
               "jsDocTags": [],
               "documentation": "Applied, duplicate, or conflict acknowledgement for a comment mutation.",
               "memberDocs": []
@@ -719,7 +719,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L387",
+              "source": "src/collaboration.ts#L416",
               "jsDocTags": [],
               "documentation": "Versioned discussion anchored to a document location.",
               "memberDocs": []
@@ -755,7 +755,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L173",
+              "source": "src/types/grid.ts#L174",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom context-menu rows.",
               "memberDocs": []
@@ -767,7 +767,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L198",
+              "source": "src/types/grid.ts#L199",
               "jsDocTags": [],
               "documentation": "Cell and viewport coordinates resolved for one bundled context-menu opening.",
               "memberDocs": [
@@ -792,7 +792,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L208",
+              "source": "src/types/grid.ts#L209",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback row in the right-click menu.",
               "memberDocs": [
@@ -833,7 +833,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L226",
+              "source": "src/types/grid.ts#L227",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -845,7 +845,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L333",
+              "source": "src/grid.ts#L338",
               "jsDocTags": [],
               "documentation": "Creates and mounts an imperative Grid in the supplied host element.",
               "memberDocs": []
@@ -857,7 +857,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L48",
+              "source": "src/persistence.ts#L46",
               "jsDocTags": [],
               "documentation": "Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes\nthe hydrated store just like one created through `createGrid`.",
               "memberDocs": []
@@ -1023,7 +1023,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L29",
+              "source": "src/delimited-text.ts#L30",
               "jsDocTags": [],
               "documentation": "Synchronous operations return one in-memory string, so byte/cell ceilings\nbound allocation while sheet-compatible dimensions remain independently valid.",
               "memberDocs": []
@@ -1047,7 +1047,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L133",
+              "source": "src/sync.ts#L139",
               "jsDocTags": [],
               "documentation": "Security and durability defaults bound hostile remote versions, recovery\nbuffers, acknowledgement memory, and the offline pending queue independently.",
               "memberDocs": []
@@ -1059,7 +1059,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L250",
+              "source": "src/grid.ts#L251",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1083,7 +1083,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L253",
+              "source": "src/export.ts#L252",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -1095,7 +1095,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L48",
+              "source": "src/delimited-text.ts#L49",
               "jsDocTags": [],
               "documentation": "Phase reported by a typed delimited-text resource failure.",
               "memberDocs": []
@@ -1107,7 +1107,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L20",
+              "source": "src/delimited-text.ts#L21",
               "jsDocTags": [],
               "documentation": "Optional resource ceilings for an in-memory delimited-text operation.",
               "memberDocs": [
@@ -1120,11 +1120,11 @@
             {
               "name": "DelimitedTextOptionsError",
               "kind": "class",
-              "signature": "class DelimitedTextOptionsError extends TypeError { constructor(resource: keyof DelimitedTextResourceLimits, value: unknown); code: \"DELIMITED_TEXT_INVALID_LIMIT\"; name: \"DelimitedTextOptionsError\"; resource: keyof DelimitedTextResourceLimits; value: unknown }",
+              "signature": "class DelimitedTextOptionsError extends SheetwriteError { constructor(resource: keyof DelimitedTextResourceLimits, value: unknown); name: \"DelimitedTextOptionsError\"; resource: keyof DelimitedTextResourceLimits; value: unknown }",
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L68",
+              "source": "src/delimited-text.ts#L71",
               "jsDocTags": [],
               "documentation": "Stable invalid-option failure for a delimited-text resource ceiling.",
               "memberDocs": []
@@ -1132,11 +1132,11 @@
             {
               "name": "DelimitedTextResourceError",
               "kind": "class",
-              "signature": "class DelimitedTextResourceError extends RangeError { constructor(resource: keyof DelimitedTextResourceLimits, limit: number, actual: number, operation: DelimitedTextOperation); actual: number; code: \"DELIMITED_TEXT_RESOURCE_LIMIT\"; limit: number; name: \"DelimitedTextResourceError\"; operation: DelimitedTextOperation; resource: keyof DelimitedTextResourceLimits }",
+              "signature": "class DelimitedTextResourceError extends SheetwriteError { constructor(resource: keyof DelimitedTextResourceLimits, limit: number, actual: number, operation: DelimitedTextOperation); actual: number; limit: number; name: \"DelimitedTextResourceError\"; resource: keyof DelimitedTextResourceLimits }",
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L51",
+              "source": "src/delimited-text.ts#L52",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure raised before the next oversized parse or encode allocation.",
               "memberDocs": []
@@ -1148,7 +1148,7 @@
               "owners": [
                 "src/delimited-text.ts"
               ],
-              "source": "src/delimited-text.ts#L2",
+              "source": "src/delimited-text.ts#L3",
               "jsDocTags": [],
               "documentation": "Resource ceilings shared by synchronous CSV and TSV parsing and encoding.",
               "memberDocs": [
@@ -1213,7 +1213,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2363",
+              "source": "src/document-protocol.ts#L2374",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1237,7 +1237,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L195",
+              "source": "src/document-protocol.ts#L196",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -1249,7 +1249,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L210",
+              "source": "src/document-protocol.ts#L211",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -1261,7 +1261,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L182",
+              "source": "src/export.ts#L181",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -1297,7 +1297,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L151",
+              "source": "src/export.ts#L150",
               "jsDocTags": [],
               "documentation": "Parse CSV into `ColumnarData`. The first record is consumed as a positional\nheader. Input fields project onto declared visible columns; hidden declared\ncolumns are initialized to `null`, matching the visible-column CSV export.\nExtra fields are ignored and missing fields become `null`. The returned\ncolumnar table is fully materialized in memory.",
               "memberDocs": []
@@ -1309,7 +1309,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L352",
+              "source": "src/export.ts#L369",
               "jsDocTags": [],
               "documentation": "Parse the first sheet of `.xlsx` bytes into `ColumnarData`. The first parsed\nrow is treated as the header and its cell text becomes each column's key.\nNumbers stay numbers, date cells use the date-serial convention, strings are\nverbatim, and empty cells become `null`.",
               "memberDocs": []
@@ -1321,7 +1321,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L425",
+              "source": "src/export.ts#L458",
               "jsDocTags": [],
               "documentation": "Formula-preserving, multi-sheet workbook import through the optional XLSX backend.",
               "memberDocs": []
@@ -1333,7 +1333,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L410",
+              "source": "src/types/grid.ts#L414",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -1578,7 +1578,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L76",
+              "source": "src/types/grid.ts#L77",
               "jsDocTags": [],
               "documentation": "Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.",
               "memberDocs": [
@@ -1607,7 +1607,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L141",
+              "source": "src/types/grid.ts#L142",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -1619,7 +1619,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L144",
+              "source": "src/types/grid.ts#L145",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -1631,7 +1631,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L150",
+              "source": "src/types/grid.ts#L151",
               "jsDocTags": [],
               "documentation": "Complete command-state snapshot emitted whenever availability or activity can change.",
               "memberDocs": []
@@ -1643,7 +1643,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L234",
+              "source": "src/types/grid.ts#L235",
               "jsDocTags": [],
               "documentation": "Toolbar / feature configuration. When `config` is set the built-in toolbar is\nshown; control flags default to `true` except the opt-in `export` flag.",
               "memberDocs": [
@@ -1720,11 +1720,11 @@
             {
               "name": "GridEvents",
               "kind": "interface",
-              "signature": "export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number }; \"edit-begin\": { addr: CellAddress }; \"edit-commit\": { addr: CellAddress; value: CellValue }; search: SearchResult; \"command-state-change\": GridCommandStateChangeEvent; \"mutation-rejected\": { issues: MutationIssue[] }; \"active-sheet\": { sheet: SheetId }; \"renderer-fallback\": { requested: \"worker\"; error: unknown }; \"datasource-error\": { request: Omit<DataSourceRequest, \"signal\">; error: unknown }; \"export-error\": { format: \"xlsx\"; error: unknown }; }",
+              "signature": "export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number }; \"edit-begin\": { addr: CellAddress }; \"edit-commit\": { addr: CellAddress; value: CellValue }; search: SearchResult; \"command-state-change\": GridCommandStateChangeEvent; \"mutation-rejected\": { issues: MutationIssue[] }; \"active-sheet\": { sheet: SheetId }; \"renderer-fallback\": { requested: \"worker\"; error: SheetwriteError }; \"datasource-error\": { request: Omit<DataSourceRequest, \"signal\">; error: SheetwriteError; }; \"export-error\": { format: \"xlsx\"; error: SheetwriteError }; }",
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L387",
+              "source": "src/types/grid.ts#L388",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -1753,7 +1753,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L279",
+              "source": "src/types/grid.ts#L280",
               "jsDocTags": [],
               "documentation": "Workbook, data, rendering, policy, and built-in UI options used to create a Grid.",
               "memberDocs": [
@@ -1834,7 +1834,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L73",
+              "source": "src/types/grid.ts#L74",
               "jsDocTags": [],
               "documentation": "Header semantics used by the retained canvas and accessibility mirror.",
               "memberDocs": []
@@ -1871,11 +1871,11 @@
             {
               "name": "IncompleteDataError",
               "kind": "class",
-              "signature": "class IncompleteDataError extends Error { constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: \"incomplete\"; }>); capability: { status: \"incomplete\"; loadedCells: number; totalCells: number; } }",
+              "signature": "class IncompleteDataError extends SheetwriteError { constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: \"incomplete\"; }>); capability: { status: \"incomplete\"; loadedCells: number; totalCells: number; }; name: \"IncompleteDataError\" }",
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L144",
+              "source": "src/store/data-engine.ts#L145",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -1887,9 +1887,21 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L281",
+              "source": "src/grid.ts#L282",
               "jsDocTags": [],
               "documentation": "Load the WASM data engine once. Must be awaited before `createGrid`.",
+              "memberDocs": []
+            },
+            {
+              "name": "isSheetwriteError",
+              "kind": "function",
+              "signature": "(value: unknown): value is SheetwriteErrorEnvelope",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L179",
+              "jsDocTags": [],
+              "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
             },
             {
@@ -1899,7 +1911,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L288",
+              "source": "src/grid.ts#L293",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -1923,7 +1935,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L88",
+              "source": "src/persistence.ts#L86",
               "jsDocTags": [],
               "documentation": "Executable database-neutral reference adapter for tests, demos, and local workflows.",
               "memberDocs": []
@@ -2065,7 +2077,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L140",
+              "source": "src/export.ts#L139",
               "jsDocTags": [],
               "documentation": "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,\nbare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional\nleading UTF-8 BOM. The synchronous API consumes an existing in-memory string\nand returns an in-memory grid; it does not claim streaming. Scanning enforces\nresource ceilings before materializing the next oversized field or record.",
               "memberDocs": []
@@ -2113,7 +2125,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L24",
+              "source": "src/sync.ts#L30",
               "jsDocTags": [],
               "documentation": "Mandatory bounds for one durable pending-commit restore.",
               "memberDocs": [
@@ -2138,7 +2150,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L35",
+              "source": "src/sync.ts#L41",
               "jsDocTags": [],
               "documentation": "Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.",
               "memberDocs": [
@@ -2187,11 +2199,11 @@
             {
               "name": "PersistenceError",
               "kind": "class",
-              "signature": "class PersistenceError extends Error { constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions); code: PersistenceErrorCode }",
+              "signature": "class PersistenceError extends SheetwriteError { constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions); name: \"PersistenceError\" }",
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L33",
+              "source": "src/persistence.ts#L34",
               "jsDocTags": [],
               "documentation": "Typed failure raised by persistence and synchronization flows.",
               "memberDocs": []
@@ -2203,7 +2215,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L25",
+              "source": "src/persistence.ts#L26",
               "jsDocTags": [],
               "documentation": "Stable category for a persistence failure.",
               "memberDocs": []
@@ -2215,7 +2227,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L7",
+              "source": "src/collaboration.ts#L8",
               "jsDocTags": [],
               "documentation": "Public collaborator identity attached to presence updates.",
               "memberDocs": []
@@ -2227,7 +2239,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L77",
+              "source": "src/collaboration.ts#L78",
               "jsDocTags": [],
               "documentation": "Ephemeral presence lifecycle; it never calls a document mutation API.",
               "memberDocs": []
@@ -2235,11 +2247,11 @@
             {
               "name": "PresenceCoordinatorEvent",
               "kind": "type",
-              "signature": "export type PresenceCoordinatorEvent = | { type: \"published\"; message: PresenceMessage } | { type: \"updated\"; actorId: string } | { type: \"expired\"; actorId: string } | { type: \"error\"; error: unknown };",
+              "signature": "export type PresenceCoordinatorEvent = | { type: \"published\"; message: PresenceMessage } | { type: \"updated\"; actorId: string } | { type: \"expired\"; actorId: string } | { type: \"error\"; error: SheetwriteError };",
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L54",
+              "source": "src/collaboration.ts#L55",
               "jsDocTags": [],
               "documentation": "Connection or actor transition emitted by presence coordination.",
               "memberDocs": []
@@ -2251,7 +2263,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L39",
+              "source": "src/collaboration.ts#L40",
               "jsDocTags": [],
               "documentation": "Identity, privacy, and timing options for presence coordination.",
               "memberDocs": [
@@ -2280,7 +2292,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L14",
+              "source": "src/collaboration.ts#L15",
               "jsDocTags": [],
               "documentation": "Ephemeral collaborator selection and activity update.",
               "memberDocs": []
@@ -2304,7 +2316,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L31",
+              "source": "src/collaboration.ts#L32",
               "jsDocTags": [],
               "documentation": "Controls which ephemeral collaborator details may be transmitted.",
               "memberDocs": []
@@ -2316,7 +2328,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L22",
+              "source": "src/collaboration.ts#L23",
               "jsDocTags": [],
               "documentation": "Host transport contract for ephemeral presence messages.",
               "memberDocs": []
@@ -2477,7 +2489,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L360",
+              "source": "src/types/grid.ts#L361",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -2510,7 +2522,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L293",
+              "source": "src/grid.ts#L298",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -2555,7 +2567,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L264",
+              "source": "src/collaboration.ts#L272",
               "jsDocTags": [],
               "documentation": "Host persistence contract for revision history and restore.",
               "memberDocs": [
@@ -2572,7 +2584,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L287",
+              "source": "src/collaboration.ts#L295",
               "jsDocTags": [],
               "documentation": "Coordinates listing and restoring host-owned workbook revisions.",
               "memberDocs": []
@@ -2580,11 +2592,11 @@
             {
               "name": "RevisionCoordinatorEvent",
               "kind": "type",
-              "signature": "export type RevisionCoordinatorEvent = | { type: \"restored\"; targetVersion: number; version: number } | { type: \"conflict\"; targetVersion: number; currentVersion: number } | { type: \"error\"; error: unknown };",
+              "signature": "export type RevisionCoordinatorEvent = | { type: \"restored\"; targetVersion: number; version: number } | { type: \"conflict\"; targetVersion: number; currentVersion: number } | { type: \"error\"; error: SheetwriteError };",
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L279",
+              "source": "src/collaboration.ts#L287",
               "jsDocTags": [],
               "documentation": "State or restore transition emitted by revision coordination.",
               "memberDocs": []
@@ -2596,7 +2608,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L272",
+              "source": "src/collaboration.ts#L280",
               "jsDocTags": [],
               "documentation": "Document identity and version options for revision coordination.",
               "memberDocs": []
@@ -2608,7 +2620,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L244",
+              "source": "src/collaboration.ts#L252",
               "jsDocTags": [],
               "documentation": "Versioned restore request submitted to a revision adapter.",
               "memberDocs": []
@@ -2620,7 +2632,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L253",
+              "source": "src/collaboration.ts#L261",
               "jsDocTags": [],
               "documentation": "Applied or conflict acknowledgement for a revision restore.",
               "memberDocs": []
@@ -2632,7 +2644,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L236",
+              "source": "src/collaboration.ts#L244",
               "jsDocTags": [],
               "documentation": "Host-provided metadata describing a saved workbook revision.",
               "memberDocs": []
@@ -2752,7 +2764,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L338",
+              "source": "src/types/grid.ts#L339",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -2781,7 +2793,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L350",
+              "source": "src/types/grid.ts#L351",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -2830,7 +2842,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L304",
+              "source": "src/export.ts#L307",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -2842,7 +2854,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L342",
+              "source": "src/export.ts#L359",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -2854,7 +2866,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L405",
+              "source": "src/export.ts#L430",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -2971,7 +2983,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L384",
+              "source": "src/types/grid.ts#L385",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -3056,6 +3068,119 @@
               "jsDocTags": [],
               "documentation": "Private-format MIME type used for rich Sheetwrite clipboard payloads.",
               "memberDocs": []
+            },
+            {
+              "name": "SHEETWRITE_ERROR_CODES",
+              "kind": "variable",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\"]",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L2",
+              "jsDocTags": [],
+              "documentation": "Stable public failure codes. Messages are diagnostic and are not API contracts.",
+              "memberDocs": []
+            },
+            {
+              "name": "SHEETWRITE_ERROR_OPERATIONS",
+              "kind": "variable",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\"]",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L55",
+              "jsDocTags": [],
+              "documentation": "Stable operations at which a consumer-visible failure can surface.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteError",
+              "kind": "class",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"blocked\" | \"initialization-failed\" | \"initialization-required\" | \"datasource-request-failed\" | \"renderer-fallback\" | \"export-failed\" | \"xlsx-import-failed\" | \"optional-backend-unavailable\" | \"delimited-text-resource-limit\" | \"delimited-text-invalid-limit\" | \"xlsx-resource-limit\" | \"resource-limit\" | \"invalid-snapshot\" | \"not-found\" | \"commit-rejected\" | \"unavailable\" | \"quota\" | \"unsupported-schema\" | \"transaction\" | \"conflict\" | \"limit\" | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"pending-capacity\" | \"presence-failed\" | \"revision-failed\" | \"comment-failed\" | \"sync-failed\" | \"sync-storage-failed\" | \"incomplete-data\" | \"xlsx-invalid-options\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"initialize\" | \"create-grid\" | \"datasource-request\" | \"renderer-worker\" | \"export-xlsx\" | \"xlsx-import\" | \"xlsx-export\" | \"delimited-parse\" | \"delimited-import\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-options\" | \"snapshot-validate\" | \"snapshot-allocate\" | \"persistence\" | \"pending-storage\" | \"synchronize\" | \"presence\" | \"revision\" | \"comments\" | \"query\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L112",
+              "jsDocTags": [],
+              "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorCode",
+              "kind": "type",
+              "signature": "export type SheetwriteErrorCode = (typeof SHEETWRITE_ERROR_CODES)[number];",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L52",
+              "jsDocTags": [],
+              "documentation": "Exhaustive stable discriminator for consumer-visible Sheetwrite failures.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorContext",
+              "kind": "type",
+              "signature": "export type SheetwriteErrorContext = Readonly<Record<string, SheetwriteErrorContextValue>>;",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L92",
+              "jsDocTags": [],
+              "documentation": "Stable, serialization-safe diagnostic context.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorContextValue",
+              "kind": "type",
+              "signature": "export type SheetwriteErrorContextValue = | null | string | number | boolean | readonly SheetwriteErrorContextValue[] | { readonly [key: string]: SheetwriteErrorContextValue };",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L83",
+              "jsDocTags": [],
+              "documentation": "JSON-safe values accepted in a public failure context.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorEnvelope",
+              "kind": "interface",
+              "signature": "export interface SheetwriteErrorEnvelope { readonly name: string; readonly message: string; readonly code: SheetwriteErrorCode; readonly operation: SheetwriteErrorOperation; readonly context?: SheetwriteErrorContext; readonly retryable?: boolean; }",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L95",
+              "jsDocTags": [],
+              "documentation": "Structural form preserved across realms and JSON serialization.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorOperation",
+              "kind": "type",
+              "signature": "export type SheetwriteErrorOperation = (typeof SHEETWRITE_ERROR_OPERATIONS)[number];",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L80",
+              "jsDocTags": [],
+              "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorOptions",
+              "kind": "interface",
+              "signature": "export interface SheetwriteErrorOptions extends ErrorOptions { context?: SheetwriteErrorContext; retryable?: boolean; }",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L105",
+              "jsDocTags": [],
+              "documentation": "Optional cause, diagnostic context, and boundary-known retryability.",
+              "memberDocs": [
+                {
+                  "name": "retryable",
+                  "documentation": "Present only when Sheetwrite can determine retryability from the boundary itself."
+                }
+              ]
             },
             {
               "name": "SheetwriteStore",
@@ -3206,7 +3331,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L19",
+              "source": "src/persistence.ts#L20",
               "jsDocTags": [],
               "documentation": "Grid creation options accepted when hydrating a validated snapshot.",
               "memberDocs": []
@@ -3214,7 +3339,7 @@
             {
               "name": "SnapshotResourceError",
               "kind": "class",
-              "signature": "class SnapshotResourceError extends RangeError { constructor(resource: keyof SnapshotResourceLimits, limit: number, actual: number, options?: ErrorOptions); actual: number; code: \"resource-limit\"; limit: number; resource: keyof SnapshotResourceLimits }",
+              "signature": "class SnapshotResourceError extends SheetwriteError { constructor(resource: keyof SnapshotResourceLimits, limit: number, actual: number, options?: ErrorOptions); actual: number; limit: number; name: \"SnapshotResourceError\"; resource: keyof SnapshotResourceLimits }",
               "owners": [
                 "src/document-protocol.ts"
               ],
@@ -3279,11 +3404,11 @@
             {
               "name": "SnapshotValidationError",
               "kind": "class",
-              "signature": "class SnapshotValidationError extends Error { constructor(errors: readonly DocumentValidationError[]); code: \"invalid-snapshot\"; errors: readonly DocumentValidationError[] }",
+              "signature": "class SnapshotValidationError extends SheetwriteError { constructor(errors: readonly DocumentValidationError[]); errors: readonly DocumentValidationError[]; name: \"SnapshotValidationError\" }",
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L215",
+              "source": "src/document-protocol.ts#L216",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": []
@@ -3450,7 +3575,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L54",
+              "source": "src/sync.ts#L60",
               "jsDocTags": [],
               "documentation": "Current persistence activity reported by a sync coordinator.",
               "memberDocs": []
@@ -3462,7 +3587,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L52",
+              "source": "src/sync.ts#L58",
               "jsDocTags": [],
               "documentation": "Host-controlled online state reported by synchronization.",
               "memberDocs": []
@@ -3474,7 +3599,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L250",
+              "source": "src/sync.ts#L261",
               "jsDocTags": [],
               "documentation": "Deterministic, transport-neutral optimistic sync. Local rendering is never\nblocked: changes queue immediately, while hosts explicitly call `sendNext`\nor `retry` to perform network work.",
               "memberDocs": [
@@ -3503,11 +3628,11 @@
             {
               "name": "SyncCoordinatorEvent",
               "kind": "type",
-              "signature": "export type SyncCoordinatorEvent = | { type: \"state\"; state: SyncStateSnapshot } | { type: \"restored\"; pending: readonly SyncMutationRecord[] } | { type: \"persisting\"; mutation: SyncMutationRecord } | { type: \"pending\"; mutation: SyncMutationRecord } | { type: \"sending\"; mutation: SyncMutationRecord } | { type: \"acknowledged\"; clientMutationId: string; version: number; duplicate: boolean; } | { type: \"conflict\"; mutation: SyncMutationRecord; response: Extract<PersistenceCommitResponse, { status: \"conflict\" }>; } | { type: \"remote-applied\"; operation: VersionedOperation } | { type: \"reload-required\"; expectedVersion: number; receivedVersion: number; snapshot?: WorkbookSnapshot; } | { type: \"reloaded\"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: \"storage-error\"; error: unknown; clientMutationId?: string } | { type: \"error\"; error: unknown; clientMutationId?: string };",
+              "signature": "export type SyncCoordinatorEvent = | { type: \"state\"; state: SyncStateSnapshot } | { type: \"restored\"; pending: readonly SyncMutationRecord[] } | { type: \"persisting\"; mutation: SyncMutationRecord } | { type: \"pending\"; mutation: SyncMutationRecord } | { type: \"sending\"; mutation: SyncMutationRecord } | { type: \"acknowledged\"; clientMutationId: string; version: number; duplicate: boolean; } | { type: \"conflict\"; mutation: SyncMutationRecord; response: Extract<PersistenceCommitResponse, { status: \"conflict\" }>; } | { type: \"remote-applied\"; operation: VersionedOperation } | { type: \"reload-required\"; expectedVersion: number; receivedVersion: number; snapshot?: WorkbookSnapshot; } | { type: \"reloaded\"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: \"storage-error\"; error: SheetwriteError; clientMutationId?: string } | { type: \"error\"; error: SheetwriteError; clientMutationId?: string };",
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L213",
+              "source": "src/sync.ts#L217",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -3519,7 +3644,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L106",
+              "source": "src/sync.ts#L112",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied independently to remote collaboration input and local durability.",
               "memberDocs": [
@@ -3576,7 +3701,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L195",
+              "source": "src/sync.ts#L199",
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
@@ -3617,11 +3742,11 @@
             {
               "name": "SyncPendingCapacityError",
               "kind": "class",
-              "signature": "class SyncPendingCapacityError extends RangeError { constructor(issue: Extract<MutationIssue, { kind: \"resource-limit\"; }>); code: \"pending-capacity\"; issue: { kind: \"resource-limit\"; severity: \"error\"; resource: \"operations\" | \"encoded-bytes\" | \"pending-commits\" | \"pending-operations\" | \"pending-encoded-bytes\" | \"paged-dirty-cells\" | \"paged-reference-simulation\"; actual: number; max: number; message: string; }; name: \"SyncPendingCapacityError\" }",
+              "signature": "class SyncPendingCapacityError extends SheetwriteError { constructor(issue: Extract<MutationIssue, { kind: \"resource-limit\"; }>); issue: { kind: \"resource-limit\"; severity: \"error\"; resource: \"operations\" | \"encoded-bytes\" | \"pending-commits\" | \"pending-operations\" | \"pending-encoded-bytes\" | \"paged-dirty-cells\" | \"paged-reference-simulation\"; actual: number; max: number; message: string; }; name: \"SyncPendingCapacityError\" }",
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L185",
+              "source": "src/sync.ts#L188",
               "jsDocTags": [],
               "documentation": "Typed local transaction rejection produced when the durable queue cannot reserve capacity.",
               "memberDocs": []
@@ -3633,7 +3758,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L64",
+              "source": "src/sync.ts#L70",
               "jsDocTags": [],
               "documentation": "Whether the durable local queue can currently admit another transaction.",
               "memberDocs": []
@@ -3645,7 +3770,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L96",
+              "source": "src/sync.ts#L102",
               "jsDocTags": [],
               "documentation": "Aggregate ceilings for local commits retained until durable acknowledgement.",
               "memberDocs": [
@@ -3666,11 +3791,11 @@
             {
               "name": "SyncProtocolError",
               "kind": "class",
-              "signature": "class SyncProtocolError extends Error { constructor(code: SyncProtocolErrorCode, message: string); code: SyncProtocolErrorCode; name: \"SyncProtocolError\" }",
+              "signature": "class SyncProtocolError extends SheetwriteError { constructor(code: SyncProtocolErrorCode, message: string); name: \"SyncProtocolError\" }",
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L173",
+              "source": "src/sync.ts#L179",
               "jsDocTags": [],
               "documentation": "Typed rejection of malformed or resource-exhausting synchronization input.",
               "memberDocs": []
@@ -3682,7 +3807,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L154",
+              "source": "src/sync.ts#L160",
               "jsDocTags": [],
               "documentation": "Stable category identifying which synchronization protocol bound was violated.",
               "memberDocs": []
@@ -3694,7 +3819,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L72",
+              "source": "src/sync.ts#L78",
               "jsDocTags": [],
               "documentation": "Immutable observable synchronization state.",
               "memberDocs": [
@@ -3727,7 +3852,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L88",
+              "source": "src/sync.ts#L94",
               "jsDocTags": [],
               "documentation": "Contiguous-version recovery request produced when remote input skips ahead.",
               "memberDocs": []
@@ -3808,7 +3933,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L56",
+              "source": "src/export.ts#L57",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -3823,7 +3948,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L118",
+              "source": "src/types/grid.ts#L119",
               "jsDocTags": [],
               "documentation": "Built-in action names accepted by custom toolbar items.",
               "memberDocs": []
@@ -3835,7 +3960,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L155",
+              "source": "src/types/grid.ts#L156",
               "jsDocTags": [],
               "documentation": "Text, DOM node, or node factory used as toolbar icon content.",
               "memberDocs": []
@@ -3847,7 +3972,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L158",
+              "source": "src/types/grid.ts#L159",
               "jsDocTags": [],
               "documentation": "Built-in, separator, or custom callback item in the grid toolbar.",
               "memberDocs": [
@@ -3876,7 +4001,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L91",
+              "source": "src/export.ts#L92",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -3891,7 +4016,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L315",
+              "source": "src/export.ts#L324",
               "jsDocTags": [],
               "documentation": "Exports a table model through the registered optional XLSX backend.",
               "memberDocs": []
@@ -3903,7 +4028,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L416",
+              "source": "src/export.ts#L441",
               "jsDocTags": [],
               "documentation": "Formula-preserving, multi-sheet workbook export through the optional XLSX backend.",
               "memberDocs": []
@@ -4030,7 +4155,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2325",
+              "source": "src/document-protocol.ts#L2336",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -4054,7 +4179,7 @@
               "owners": [
                 "src/collaboration.ts"
               ],
-              "source": "src/collaboration.ts#L437",
+              "source": "src/collaboration.ts#L466",
               "jsDocTags": [],
               "documentation": "Comment mutation paired with its assigned server version.",
               "memberDocs": []
@@ -4228,11 +4353,11 @@
             {
               "name": "XlsxResourceError",
               "kind": "class",
-              "signature": "class XlsxResourceError extends RangeError { constructor(resource: keyof XlsxResourceLimits, limit: number, actual: number, operation: \"import\" | \"export\"); actual: number; code: \"XLSX_RESOURCE_LIMIT\"; limit: number; operation: \"import\" | \"export\"; resource: keyof XlsxResourceLimits }",
+              "signature": "class XlsxResourceError extends SheetwriteError { constructor(resource: keyof XlsxResourceLimits, limit: number, actual: number, operation: \"import\" | \"export\"); actual: number; limit: number; name: \"XlsxResourceError\"; resource: keyof XlsxResourceLimits }",
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L279",
+              "source": "src/export.ts#L278",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -4244,7 +4369,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L212",
+              "source": "src/export.ts#L211",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -4325,7 +4450,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L296",
+              "source": "src/export.ts#L299",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -4337,7 +4462,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L331",
+              "source": "src/export.ts#L348",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -4349,7 +4474,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L393",
+              "source": "src/export.ts#L418",
               "jsDocTags": [],
               "documentation": "Optional backend contract for complete workbook XLSX interchange.",
               "memberDocs": []
@@ -4361,7 +4486,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L382",
+              "source": "src/export.ts#L407",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -4386,7 +4511,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L363",
+              "source": "src/export.ts#L388",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -4407,7 +4532,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L157",
+              "source": "src/adapter.ts#L168",
               "jsDocTags": [],
               "documentation": "Applies live-updatable adapter option changes to an existing Grid.",
               "memberDocs": []
@@ -4433,7 +4558,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L210",
+              "source": "src/adapter.ts#L221",
               "jsDocTags": [],
               "documentation": "Converts simple columns and row objects into canonical workbook and columnar input.",
               "memberDocs": []
@@ -4445,7 +4570,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L170",
+              "source": "src/adapter.ts#L181",
               "jsDocTags": [],
               "documentation": "Default pixel width assigned to simple adapter columns.",
               "memberDocs": []
@@ -4457,7 +4582,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L134",
+              "source": "src/adapter.ts#L145",
               "jsDocTags": [],
               "documentation": "Extracts advanced GridOptions from framework adapter props.",
               "memberDocs": []
@@ -4469,7 +4594,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L143",
+              "source": "src/adapter.ts#L154",
               "jsDocTags": [],
               "documentation": "Returns the first reset-sensitive adapter input that changed, if any.",
               "memberDocs": []
@@ -4481,7 +4606,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L23",
+              "source": "src/adapter.ts#L34",
               "jsDocTags": [],
               "documentation": "Classification of adapter options as live-updatable or reset-sensitive.",
               "memberDocs": []
@@ -4489,11 +4614,11 @@
             {
               "name": "GridAdapterEventHandlers",
               "kind": "interface",
-              "signature": "export interface GridAdapterEventHandlers { onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; }",
+              "signature": "export interface GridAdapterEventHandlers { onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: SheetwriteError) => void; }",
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L59",
+              "source": "src/adapter.ts#L70",
               "jsDocTags": [],
               "documentation": "Framework-neutral readiness, change, and error callbacks shared by adapters.",
               "memberDocs": [
@@ -4664,7 +4789,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L49",
+              "source": "src/adapter.ts#L60",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
               "memberDocs": [
@@ -4689,7 +4814,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L46",
+              "source": "src/adapter.ts#L57",
               "jsDocTags": [],
               "documentation": "Reason an adapter published a ready Grid generation.",
               "memberDocs": []
@@ -4701,7 +4826,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L44",
+              "source": "src/adapter.ts#L55",
               "jsDocTags": [],
               "documentation": "Reset-sensitive input change that requires an adapter to replace its Grid.",
               "memberDocs": []
@@ -4713,7 +4838,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L99",
+              "source": "src/adapter.ts#L110",
               "jsDocTags": [],
               "documentation": "Explicit width and height accepted by framework adapters.",
               "memberDocs": []
@@ -4725,9 +4850,21 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L120",
+              "source": "src/adapter.ts#L131",
               "jsDocTags": [],
               "documentation": "Converts adapter size props into a host element style object.",
+              "memberDocs": []
+            },
+            {
+              "name": "isSheetwriteError",
+              "kind": "function",
+              "signature": "(value: unknown): value is SheetwriteErrorEnvelope",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L179",
+              "jsDocTags": [],
+              "documentation": "Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.",
               "memberDocs": []
             },
             {
@@ -4737,19 +4874,103 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L114",
+              "source": "src/adapter.ts#L125",
               "jsDocTags": [],
               "documentation": "Optional width and height accepted by advanced framework adapters.",
               "memberDocs": []
             },
             {
+              "name": "SHEETWRITE_ERROR_CODES",
+              "kind": "variable",
+              "signature": "readonly [\"initialization-failed\", \"initialization-required\", \"datasource-request-failed\", \"renderer-fallback\", \"export-failed\", \"xlsx-import-failed\", \"optional-backend-unavailable\", \"delimited-text-resource-limit\", \"delimited-text-invalid-limit\", \"xlsx-resource-limit\", \"resource-limit\", \"invalid-snapshot\", \"aborted\", \"not-found\", \"commit-rejected\", \"unavailable\", \"blocked\", \"quota\", \"unsupported-schema\", \"transaction\", \"conflict\", \"limit\", \"invalid-limits\", \"invalid-version\", \"invalid-id\", \"invalid-operations\", \"operation-limit\", \"payload-limit\", \"response-id-mismatch\", \"future-distance-limit\", \"buffer-count-limit\", \"buffer-operation-limit\", \"buffer-byte-limit\", \"pending-count-limit\", \"pending-operation-limit\", \"pending-byte-limit\", \"late-echo\", \"remote-operations-rejected\", \"pending-capacity\", \"presence-failed\", \"revision-failed\", \"comment-failed\", \"sync-failed\", \"sync-storage-failed\", \"incomplete-data\", \"xlsx-invalid-options\"]",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L2",
+              "jsDocTags": [],
+              "documentation": "Stable public failure codes. Messages are diagnostic and are not API contracts.",
+              "memberDocs": []
+            },
+            {
+              "name": "SHEETWRITE_ERROR_OPERATIONS",
+              "kind": "variable",
+              "signature": "readonly [\"initialize\", \"create-grid\", \"datasource-request\", \"renderer-worker\", \"export-xlsx\", \"xlsx-import\", \"xlsx-export\", \"delimited-parse\", \"delimited-import\", \"delimited-encode\", \"delimited-export\", \"delimited-options\", \"snapshot-validate\", \"snapshot-allocate\", \"persistence\", \"pending-storage\", \"synchronize\", \"presence\", \"revision\", \"comments\", \"query\"]",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L55",
+              "jsDocTags": [],
+              "documentation": "Stable operations at which a consumer-visible failure can surface.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteError",
+              "kind": "class",
+              "signature": "class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: \"aborted\" | \"blocked\" | \"initialization-failed\" | \"initialization-required\" | \"datasource-request-failed\" | \"renderer-fallback\" | \"export-failed\" | \"xlsx-import-failed\" | \"optional-backend-unavailable\" | \"delimited-text-resource-limit\" | \"delimited-text-invalid-limit\" | \"xlsx-resource-limit\" | \"resource-limit\" | \"invalid-snapshot\" | \"not-found\" | \"commit-rejected\" | \"unavailable\" | \"quota\" | \"unsupported-schema\" | \"transaction\" | \"conflict\" | \"limit\" | \"invalid-limits\" | \"invalid-version\" | \"invalid-id\" | \"invalid-operations\" | \"operation-limit\" | \"payload-limit\" | \"response-id-mismatch\" | \"future-distance-limit\" | \"buffer-count-limit\" | \"buffer-operation-limit\" | \"buffer-byte-limit\" | \"pending-count-limit\" | \"pending-operation-limit\" | \"pending-byte-limit\" | \"late-echo\" | \"remote-operations-rejected\" | \"pending-capacity\" | \"presence-failed\" | \"revision-failed\" | \"comment-failed\" | \"sync-failed\" | \"sync-storage-failed\" | \"incomplete-data\" | \"xlsx-invalid-options\"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: \"initialize\" | \"create-grid\" | \"datasource-request\" | \"renderer-worker\" | \"export-xlsx\" | \"xlsx-import\" | \"xlsx-export\" | \"delimited-parse\" | \"delimited-import\" | \"delimited-encode\" | \"delimited-export\" | \"delimited-options\" | \"snapshot-validate\" | \"snapshot-allocate\" | \"persistence\" | \"pending-storage\" | \"synchronize\" | \"presence\" | \"revision\" | \"comments\" | \"query\"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L112",
+              "jsDocTags": [],
+              "documentation": "Canonical envelope for thrown and callback-delivered Sheetwrite failures.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorCode",
+              "kind": "type",
+              "signature": "export type SheetwriteErrorCode = (typeof SHEETWRITE_ERROR_CODES)[number];",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L52",
+              "jsDocTags": [],
+              "documentation": "Exhaustive stable discriminator for consumer-visible Sheetwrite failures.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorContext",
+              "kind": "type",
+              "signature": "export type SheetwriteErrorContext = Readonly<Record<string, SheetwriteErrorContextValue>>;",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L92",
+              "jsDocTags": [],
+              "documentation": "Stable, serialization-safe diagnostic context.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorEnvelope",
+              "kind": "interface",
+              "signature": "export interface SheetwriteErrorEnvelope { readonly name: string; readonly message: string; readonly code: SheetwriteErrorCode; readonly operation: SheetwriteErrorOperation; readonly context?: SheetwriteErrorContext; readonly retryable?: boolean; }",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L95",
+              "jsDocTags": [],
+              "documentation": "Structural form preserved across realms and JSON serialization.",
+              "memberDocs": []
+            },
+            {
+              "name": "SheetwriteErrorOperation",
+              "kind": "type",
+              "signature": "export type SheetwriteErrorOperation = (typeof SHEETWRITE_ERROR_OPERATIONS)[number];",
+              "owners": [
+                "src/errors.ts"
+              ],
+              "source": "src/errors.ts#L80",
+              "jsDocTags": [],
+              "documentation": "Exhaustive stable operation discriminator for consumer-visible failures.",
+              "memberDocs": []
+            },
+            {
               "name": "SheetwriteInitializationProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteInitializationProps { wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; onInitializationError?: (error: unknown) => void; }",
+              "signature": "export interface SheetwriteInitializationProps { wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; onInitializationError?: (error: SheetwriteError) => void; }",
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L91",
+              "source": "src/adapter.ts#L102",
               "jsDocTags": [],
               "documentation": "Optional explicit WASM source and initialization error callback for adapters.",
               "memberDocs": [
@@ -4770,7 +4991,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L173",
+              "source": "src/adapter.ts#L184",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -4819,7 +5040,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L202",
+              "source": "src/adapter.ts#L213",
               "jsDocTags": [],
               "documentation": "Normalized workbook and columnar data produced from simple adapter props.",
               "memberDocs": [
@@ -4836,7 +5057,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L195",
+              "source": "src/adapter.ts#L206",
               "jsDocTags": [],
               "documentation": "Framework-neutral simple columns, rows, sizing, and grid options.",
               "memberDocs": []
@@ -4857,7 +5078,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L61",
+              "source": "src/indexeddb.ts#L62",
               "jsDocTags": [],
               "documentation": "Browser-only durable pending queue. Import it from `@sheetwrite/core/browser`;\nthe package's root entrypoint never evaluates IndexedDB globals.",
               "memberDocs": [
@@ -4870,7 +5091,7 @@
             {
               "name": "IndexedDbPendingCommitStorageError",
               "kind": "class",
-              "signature": "class IndexedDbPendingCommitStorageError extends Error { constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions); code: IndexedDbPendingCommitStorageErrorCode }",
+              "signature": "class IndexedDbPendingCommitStorageError extends SheetwriteError { constructor(code: IndexedDbPendingCommitStorageErrorCode, message: string, options?: ErrorOptions); name: \"IndexedDbPendingCommitStorageError\" }",
               "owners": [
                 "src/indexeddb.ts"
               ],
@@ -4898,7 +5119,7 @@
               "owners": [
                 "src/indexeddb.ts"
               ],
-              "source": "src/indexeddb.ts#L34",
+              "source": "src/indexeddb.ts#L35",
               "jsDocTags": [],
               "documentation": "Database and store naming options for durable pending commits.",
               "memberDocs": []
@@ -5359,7 +5580,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L322",
+              "source": "../core/dist/types/grid.d.ts#L323",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -5604,7 +5825,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L68",
+              "source": "../core/dist/types/grid.d.ts#L69",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -5616,7 +5837,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L70",
+              "source": "../core/dist/types/grid.d.ts#L71",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -5628,7 +5849,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L29",
+              "source": "../core/dist/adapter.d.ts#L31",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
               "memberDocs": [
@@ -5653,7 +5874,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L395",
+              "source": "src/index.tsx#L396",
               "jsDocTags": [],
               "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`\nthrough prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;\nuse `SheetwriteGrid` when the host already owns a workbook or datasource.",
               "memberDocs": []
@@ -5665,7 +5886,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L95",
+              "source": "src/index.tsx#L96",
               "jsDocTags": [],
               "documentation": "Advanced framework component for workbook data or datasource input.",
               "memberDocs": []
@@ -5673,11 +5894,11 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps { onMutationRejected?: GridAdapterEventHandlers[\"onMutationRejected\"]; onRendererFallback?: GridAdapterEventHandlers[\"onRendererFallback\"]; onDatasourceError?: GridAdapterEventHandlers[\"onDatasourceError\"]; onExportError?: GridAdapterEventHandlers[\"onExportError\"]; onReady?: GridAdapterEventHandlers[\"onReady\"]; className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; workbook: Workbook; data?: ColumnarData; datasource?: DataSource; datasourceStorage?: DataSourceStorageOptions; renderer?: \"canvas\" | \"worker\"; workerUrl?: string | URL; presentation?: GridPresentation; theme?: Partial<Theme>; readOnly?: boolean; protectionResolver?: ProtectionResolver; mutationPolicy?: MutationPolicyMode; transactionResourceLimits?: Partial<TransactionResourceLimits>; renderers?: Record<string, CellRenderer>; editors?: Record<string, CellEditor>; overscan?: number; minColumns?: number; config?: GridConfig; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "signature": "export interface SheetwriteGridProps { onMutationRejected?: GridAdapterEventHandlers[\"onMutationRejected\"]; onRendererFallback?: GridAdapterEventHandlers[\"onRendererFallback\"]; onDatasourceError?: GridAdapterEventHandlers[\"onDatasourceError\"]; onExportError?: GridAdapterEventHandlers[\"onExportError\"]; onReady?: GridAdapterEventHandlers[\"onReady\"]; className?: string; style?: CSSProperties; fallback?: ReactNode; height?: number | string; fill?: true; workbook: Workbook; data?: ColumnarData; datasource?: DataSource; datasourceStorage?: DataSourceStorageOptions; renderer?: \"canvas\" | \"worker\"; workerUrl?: string | URL; presentation?: GridPresentation; theme?: Partial<Theme>; readOnly?: boolean; protectionResolver?: ProtectionResolver; mutationPolicy?: MutationPolicyMode; transactionResourceLimits?: Partial<TransactionResourceLimits>; renderers?: Record<string, CellRenderer>; editors?: Record<string, CellEditor>; overscan?: number; minColumns?: number; config?: GridConfig; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onInitializationError?: (error: SheetwriteError) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L67",
+              "source": "src/index.tsx#L68",
               "jsDocTags": [],
               "documentation": "Advanced framework adapter props for workbook data or datasource ownership.",
               "memberDocs": [
@@ -6054,7 +6275,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L366",
+              "source": "src/index.tsx#L367",
               "jsDocTags": [],
               "documentation": "Simple framework adapter props for columns and default row objects.",
               "memberDocs": []
@@ -6066,7 +6287,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L103",
+              "source": "../core/dist/adapter.d.ts#L105",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -6231,7 +6452,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L322",
+              "source": "../core/dist/types/grid.d.ts#L323",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -6476,7 +6697,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L68",
+              "source": "../core/dist/types/grid.d.ts#L69",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -6488,7 +6709,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L70",
+              "source": "../core/dist/types/grid.d.ts#L71",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -6500,7 +6721,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L29",
+              "source": "../core/dist/adapter.d.ts#L31",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
               "memberDocs": [
@@ -6545,7 +6766,7 @@
             {
               "name": "SheetwriteGridProps",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; presentation?: GridOptions[\"presentation\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; editors?: GridOptions[\"editors\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: unknown) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
+              "signature": "export interface SheetwriteGridProps extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | \"children\"> { workbook: GridOptions[\"workbook\"]; data?: GridOptions[\"data\"]; datasource?: GridOptions[\"datasource\"]; datasourceStorage?: GridOptions[\"datasourceStorage\"]; renderer?: GridOptions[\"renderer\"]; workerUrl?: GridOptions[\"workerUrl\"]; presentation?: GridOptions[\"presentation\"]; theme?: GridOptions[\"theme\"]; readOnly?: GridOptions[\"readOnly\"]; protectionResolver?: GridOptions[\"protectionResolver\"]; mutationPolicy?: GridOptions[\"mutationPolicy\"]; transactionResourceLimits?: GridOptions[\"transactionResourceLimits\"]; renderers?: GridOptions[\"renderers\"]; editors?: GridOptions[\"editors\"]; overscan?: GridOptions[\"overscan\"]; minColumns?: GridOptions[\"minColumns\"]; config?: GridOptions[\"config\"]; height?: number | string; fill?: true; fallback?: Snippet; grid?: Grid; onGridChange?: (event: ChangeEvent) => void; onSelectionChange?: (selection: Selection | null) => void; onViewportChange?: (event: GridEvents[\"scroll\"]) => void; onEditBegin?: (event: GridEvents[\"edit-begin\"]) => void; onEditCommit?: (event: GridEvents[\"edit-commit\"]) => void; onSearch?: (result: GridEvents[\"search\"]) => void; onActiveSheetChange?: (event: GridEvents[\"active-sheet\"]) => void; onCommandStateChange?: (event: GridEvents[\"command-state-change\"]) => void; onMutationRejected?: (event: GridEvents[\"mutation-rejected\"]) => void; onRendererFallback?: (event: GridEvents[\"renderer-fallback\"]) => void; onDatasourceError?: (event: GridEvents[\"datasource-error\"]) => void; onExportError?: (event: GridEvents[\"export-error\"]) => void; onReady?: (event: GridReadyEvent) => void; onInitializationError?: (error: SheetwriteError) => void; wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module; }",
               "owners": [
                 "src/props.ts"
               ],
@@ -6930,7 +7151,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L103",
+              "source": "../core/dist/adapter.d.ts#L105",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -7095,7 +7316,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L322",
+              "source": "../core/dist/types/grid.d.ts#L323",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -7340,7 +7561,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L68",
+              "source": "../core/dist/types/grid.d.ts#L69",
               "jsDocTags": [],
               "documentation": "Built-in command names accepted by state queries and change events.",
               "memberDocs": []
@@ -7352,7 +7573,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L70",
+              "source": "../core/dist/types/grid.d.ts#L71",
               "jsDocTags": [],
               "documentation": "Observable availability and selection-derived activity for one command.",
               "memberDocs": []
@@ -7364,7 +7585,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L29",
+              "source": "../core/dist/adapter.d.ts#L31",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
               "memberDocs": [
@@ -7389,7 +7610,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L449",
+              "source": "src/index.ts#L452",
               "jsDocTags": [],
               "documentation": "Convenience component for local object rows with live option updates.",
               "memberDocs": []
@@ -7401,7 +7622,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L142",
+              "source": "src/index.ts#L143",
               "jsDocTags": [],
               "documentation": "Vue constructor type for Sheetwrite components: Sheetwrite-owned props,\nemitted events exposed as `on*` listener props, and the exposed instance\nsurface reachable through a template ref.",
               "memberDocs": []
@@ -7413,7 +7634,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L394",
+              "source": "src/index.ts#L397",
               "jsDocTags": [],
               "documentation": "Advanced framework component for workbook data or datasource input.",
               "memberDocs": []
@@ -7421,11 +7642,11 @@
             {
               "name": "SheetwriteGridEmits",
               "kind": "interface",
-              "signature": "export interface SheetwriteGridEmits { \"grid-change\": ChangeEvent; \"selection-change\": Selection | null; \"viewport-change\": GridEvents[\"scroll\"]; \"edit-begin\": GridEvents[\"edit-begin\"]; \"edit-commit\": GridEvents[\"edit-commit\"]; search: GridEvents[\"search\"]; \"command-state-change\": GridEvents[\"command-state-change\"]; \"active-sheet-change\": GridEvents[\"active-sheet\"]; \"mutation-rejected\": GridEvents[\"mutation-rejected\"]; \"renderer-fallback\": GridEvents[\"renderer-fallback\"]; \"datasource-error\": GridEvents[\"datasource-error\"]; \"export-error\": GridEvents[\"export-error\"]; ready: GridReadyEvent; \"initialization-error\": unknown; }",
+              "signature": "export interface SheetwriteGridEmits { \"grid-change\": ChangeEvent; \"selection-change\": Selection | null; \"viewport-change\": GridEvents[\"scroll\"]; \"edit-begin\": GridEvents[\"edit-begin\"]; \"edit-commit\": GridEvents[\"edit-commit\"]; search: GridEvents[\"search\"]; \"command-state-change\": GridEvents[\"command-state-change\"]; \"active-sheet-change\": GridEvents[\"active-sheet\"]; \"mutation-rejected\": GridEvents[\"mutation-rejected\"]; \"renderer-fallback\": GridEvents[\"renderer-fallback\"]; \"datasource-error\": GridEvents[\"datasource-error\"]; \"export-error\": GridEvents[\"export-error\"]; ready: GridReadyEvent; \"initialization-error\": SheetwriteError; }",
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L106",
+              "source": "src/index.ts#L107",
               "jsDocTags": [],
               "documentation": "Event payloads emitted by the Vue components, keyed by template event name.",
               "memberDocs": [
@@ -7494,7 +7715,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L46",
+              "source": "src/index.ts#L47",
               "jsDocTags": [],
               "documentation": "Imperative Grid handle exposed by the Vue advanced component.",
               "memberDocs": [
@@ -7511,7 +7732,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L51",
+              "source": "src/index.ts#L52",
               "jsDocTags": [],
               "documentation": "Advanced Vue adapter props for workbook data or datasource ownership.",
               "memberDocs": [
@@ -7604,7 +7825,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L95",
+              "source": "src/index.ts#L96",
               "jsDocTags": [],
               "documentation": "Simple Vue adapter props for columns and default row objects.",
               "memberDocs": [
@@ -7697,7 +7918,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L103",
+              "source": "../core/dist/adapter.d.ts#L105",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
