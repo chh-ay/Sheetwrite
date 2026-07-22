@@ -2993,6 +2993,69 @@ fn required_formula_regressions_cover_let_lookup_and_criteria_shape() {
     assert_eq!(string(&store, sheet, 0, 5).as_deref(), Some("#VALUE!"));
 }
 
+
+#[test]
+fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(20, 20);
+    for (row, (left, right)) in [(1.0, 10.0), (2.0, 20.0), (3.0, 30.0)]
+        .into_iter()
+        .enumerate()
+    {
+        store.set_number(sheet, row, 0, left, 0);
+        store.set_number(sheet, row, 1, right, 0);
+    }
+    store.set_number(sheet, 0, 3, 1.0, 0);
+    store.set_number(sheet, 1, 3, 2.0, 0);
+    store.set_number(sheet, 2, 3, 2.0, 0);
+    let formulas = [
+        (10, 0, "=ROW()"),
+        (10, 1, "=COLUMN()"),
+        (10, 2, "=ROWS(A1:B3)"),
+        (10, 3, "=COLUMNS(A1:B3)"),
+        (10, 4, "=ADDRESS(3,4)"),
+        (10, 5, "=COUNTBLANK(C1:C3)"),
+        (10, 6, "=SUBTOTAL(9,A1:A3)"),
+        (10, 7, "=SUMPRODUCT(A1:A3,B1:B3)"),
+        (10, 8, "=MAXIFS(B1:B3,A1:A3,\">1\")"),
+        (10, 9, "=MINIFS(B1:B3,A1:A3,\">1\")"),
+        (10, 10, "=XMATCH(2,D1:D3,0,-1)"),
+        (10, 11, "=XMATCH(2.5,A1:A3,-1)"),
+        (10, 12, "=CHOOSE(2,1/0,7)"),
+        (10, 13, "=LET(x,1/0,7)"),
+        (10, 14, "=LET(x,A1,x+1)"),
+        (10, 15, "=SUMPRODUCT(A1:B1,A1:A2)"),
+    ];
+    for (row, col, source) in formulas {
+        store.set_formula(sheet, row, col, source, 0);
+    }
+    store.recompute(sheet);
+
+    for (col, expected) in [
+        (0, 11.0),
+        (1, 2.0),
+        (2, 3.0),
+        (3, 2.0),
+        (5, 3.0),
+        (6, 6.0),
+        (7, 140.0),
+        (8, 30.0),
+        (9, 20.0),
+        (10, 3.0),
+        (11, 2.0),
+        (12, 7.0),
+        (13, 7.0),
+        (14, 2.0),
+    ] {
+        assert_close(number(&store, sheet, 10, col), expected);
+    }
+    assert_eq!(string(&store, sheet, 10, 4).as_deref(), Some("$D$3"));
+    assert_eq!(string(&store, sheet, 10, 15).as_deref(), Some("#VALUE!"));
+
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 10, 14), 6.0);
+}
 #[test]
 fn required_sequence_spill_regression_preserves_matrix_shape() {
     let mut store = CellStore::new();
