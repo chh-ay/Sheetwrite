@@ -112,6 +112,7 @@ describe("contributor and CI toolchain contract", () => {
     );
     expect(artifactBuilders).toHaveLength(1);
     const artifactBuild = artifactBuilders[0]!;
+    expect(commandsFor(artifactBuild)).toContain("bun run conformance:offline");
 
     const requiredNeeds = needsOf("required");
     expect(new Set(requiredNeeds)).toEqual(
