@@ -18,12 +18,16 @@ import {
 import {
   createGridController,
   createSimpleGridInput,
+  createSimpleRowBridge,
   type GridController,
   type GridControllerHandlers,
   type GridReadyEvent,
   type GridReadyReason,
   getGridResetReason,
   gridSizeStyle,
+  type RowBridge,
+  type RowBridgeHandler,
+  type RowBridgeId,
   type SheetwriteInitializationProps,
   type SimpleColumn,
   type SimpleGridInput,
@@ -49,7 +53,7 @@ export interface SheetwriteGridExpose {
   grid: Grid | null;
 }
 /** Advanced Vue adapter props for workbook data or datasource ownership. */
-export interface SheetwriteGridProps {
+export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   /** Live workbook schema adopted by the Grid. */
   workbook: Workbook;
   /** Eager column-major values for the active sheet. */
@@ -58,6 +62,8 @@ export interface SheetwriteGridProps {
   datasource?: DataSource;
   /** Allocation and cache policy for datasource storage. */
   datasourceStorage?: DataSourceStorageOptions;
+  /** Optional projection from canonical data-space operations to host row IDs. */
+  rowBridge?: RowBridge<Id>;
   /** Paint backend; defaults to main-thread canvas. */
   renderer?: GridOptions["renderer"];
   /** Browser-fetchable worker module URL. */
@@ -95,18 +101,26 @@ export interface SheetwriteGridProps {
 }
 
 /** Simple Vue adapter props for columns and default row objects. */
-export interface SheetwriteProps
-  extends Omit<SheetwriteGridProps, "workbook" | "data" | "datasource"> {
+export interface SheetwriteProps<
+  Row extends Record<string, CellScalar> = Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> extends Omit<SheetwriteGridProps<Id>, "workbook" | "data" | "datasource" | "rowBridge"> {
   /** Ordered schema used to derive the component-owned sheet. */
-  columns: readonly SimpleColumn<Record<string, CellScalar>>[];
+  columns: readonly SimpleColumn<Row>[];
   /** Rows converted to initial columnar data; missing keys become `null`. */
-  defaultRows: readonly Record<string, CellScalar>[];
+  defaultRows: readonly Row[];
   /** Generated sheet name; defaults to `Sheet 1`. */
   sheetName?: string;
+  /** Opt-in stable identity for each host row. */
+  getRowId?: (row: Row, index: number) => Id;
+  /** Creates stable identities for Grid-inserted rows. */
+  createRowId?: Parameters<typeof createSimpleRowBridge<Row, Id>>[0]["createRowId"];
 }
 
 /** Event payloads emitted by the Vue components, keyed by template event name. */
-export interface SheetwriteGridEmits {
+export interface SheetwriteGridEmits<Id extends RowBridgeId = RowBridgeId> {
+  /** Projected host-row changes. */
+  "row-delta": Parameters<RowBridgeHandler<Id>>[0];
   /** Committed Grid change, including its applied transaction. */
   "grid-change": ChangeEvent;
   /** Current selection, or `null` after it is cleared. */
@@ -165,6 +179,8 @@ const gridProps = {
     type: Object as PropType<DataSourceStorageOptions>,
     default: undefined,
   },
+  /** Optional stable host-row projection. */
+  rowBridge: { type: Object as PropType<RowBridge>, default: undefined },
   /** Paint backend; defaults to main-thread canvas. */
   renderer: { type: String as PropType<GridOptions["renderer"]>, default: undefined },
   /** Browser-fetchable worker module URL. */
@@ -221,6 +237,7 @@ const gridProps = {
 
 const gridEmits = {
   "grid-change": (_event: ChangeEvent) => true,
+  "row-delta": (_projection: Parameters<RowBridgeHandler>[0]) => true,
   "selection-change": (_selection: Selection | null) => true,
   "viewport-change": (_event: GridEvents["scroll"]) => true,
   "edit-begin": (_event: GridEvents["edit-begin"]) => true,
@@ -252,6 +269,7 @@ const SheetwriteGridComponent = defineComponent({
 
     const handlers: GridControllerHandlers = {
       onGridChange: (event) => emit("grid-change", event),
+      onRowDelta: (projection) => emit("row-delta", projection),
       onSelectionChange: (selection) => emit("selection-change", selection),
       onViewportChange: (event) => emit("viewport-change", event),
       onEditBegin: (event) => emit("edit-begin", event),
@@ -302,7 +320,7 @@ const SheetwriteGridComponent = defineComponent({
           ? "initial"
           : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
       teardownGrid();
-      const created = createGridController(host.value, options, handlers);
+      const created = createGridController(host.value, options, handlers, props.rowBridge);
       controller = created;
       generation += 1;
       previousOptions = options;
@@ -351,6 +369,7 @@ const SheetwriteGridComponent = defineComponent({
         props.data,
         props.datasource,
         props.datasourceStorage,
+        props.rowBridge,
         props.renderer,
         props.workerUrl,
         props.presentation,
@@ -419,6 +438,22 @@ const SheetwriteSimpleComponent = defineComponent({
     defaultRows: { type: Array as PropType<readonly Record<string, CellScalar>[]>, required: true },
     /** Generated sheet name; defaults to `Sheet 1`. */
     sheetName: { type: String, default: undefined },
+    /** Opt-in stable identity for host rows. */
+    getRowId: {
+      type: Function as PropType<(row: Record<string, CellScalar>, index: number) => RowBridgeId>,
+      default: undefined,
+    },
+    /** Creates identities for inserted rows. */
+    createRowId: {
+      type: Function as PropType<
+        NonNullable<
+          Parameters<
+            typeof createSimpleRowBridge<Record<string, CellScalar>, RowBridgeId>
+          >[0]["createRowId"]
+        >
+      >,
+      default: undefined,
+    },
     /** Host height in CSS pixels for numbers or any CSS length string. */
     height: { type: [Number, String], default: undefined },
     /** Fills the parent; exactly one of `fill` or `height` is required. */
@@ -429,6 +464,9 @@ const SheetwriteSimpleComponent = defineComponent({
     let inputColumns: typeof props.columns | null = null;
     let inputRows: typeof props.defaultRows | null = null;
     let inputSheetName: string | undefined;
+    let rowBridge: RowBridge | undefined;
+    let inputGetRowId: typeof props.getRowId;
+    let inputCreateRowId: typeof props.createRowId;
 
     return () => {
       if (
@@ -441,18 +479,32 @@ const SheetwriteSimpleComponent = defineComponent({
         input === null ||
         inputColumns !== props.columns ||
         inputRows !== props.defaultRows ||
-        inputSheetName !== props.sheetName
+        inputSheetName !== props.sheetName ||
+        inputGetRowId !== props.getRowId ||
+        inputCreateRowId !== props.createRowId
       ) {
         input = createSimpleGridInput({
           columns: props.columns,
           defaultRows: props.defaultRows,
           sheetName: props.sheetName,
         });
+        rowBridge = createSimpleRowBridge({
+          columns: props.columns,
+          defaultRows: props.defaultRows,
+          ...(props.getRowId === undefined ? {} : { getRowId: props.getRowId }),
+          ...(props.createRowId === undefined ? {} : { createRowId: props.createRowId }),
+        });
         inputColumns = props.columns;
         inputRows = props.defaultRows;
         inputSheetName = props.sheetName;
+        inputGetRowId = props.getRowId;
+        inputCreateRowId = props.createRowId;
       }
-      return h(SheetwriteGrid, { ...attrs, ...props, ...input }, slots);
+      return h(
+        SheetwriteGrid,
+        { ...attrs, height: props.height, fill: props.fill, ...input, rowBridge },
+        slots,
+      );
     };
   },
 });
@@ -473,4 +525,12 @@ export type {
   GridCommandName,
   GridCommandState,
 } from "@sheetwrite/core";
-export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";
+export type {
+  GridReadyEvent,
+  RowBridge,
+  RowBridgeDelta,
+  RowBridgeHandler,
+  RowBridgeId,
+  RowBridgeProjection,
+  SimpleColumn,
+} from "@sheetwrite/core/adapter";

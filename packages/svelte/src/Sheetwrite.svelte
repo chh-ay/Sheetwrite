@@ -1,13 +1,34 @@
-<script lang="ts" generics="Row extends Record<string, CellScalar>">
+<script lang="ts" generics="Row extends Record<string, CellScalar>, Id extends RowBridgeId = RowBridgeId">
 import type { CellScalar } from "@sheetwrite/core";
-import { createSimpleGridInput } from "@sheetwrite/core/adapter";
+import { createSimpleGridInput, createSimpleRowBridge } from "@sheetwrite/core/adapter";
+import type { RowBridgeId } from "@sheetwrite/core/adapter";
 import GridComponent from "./Grid.svelte";
-import type { SheetwriteProps } from "./props.js";
+import type { SheetwriteGridProps, SheetwriteProps } from "./props.js";
 
-type Props = SheetwriteProps<Row>;
+type Props = SheetwriteProps<Row, Id>;
 
-let { columns, defaultRows, sheetName, grid = $bindable(), ...props }: Props = $props();
+let {
+  columns,
+  defaultRows,
+  sheetName,
+  getRowId,
+  createRowId,
+  grid = $bindable(),
+  ...props
+}: Props = $props();
 let input = $derived(createSimpleGridInput({ columns, defaultRows, sheetName }));
+let rowBridge = $derived(
+  createSimpleRowBridge({
+    columns,
+    defaultRows,
+    ...(getRowId === undefined ? {} : { getRowId }),
+    ...(createRowId === undefined ? {} : { createRowId }),
+  }),
+);
+let resolvedProps = $derived.by(() => {
+  const forwarded = { ...props, ...input, rowBridge };
+  return forwarded as unknown as SheetwriteGridProps;
+});
 
 $effect(() => {
   if (
@@ -19,4 +40,4 @@ $effect(() => {
 });
 </script>
 
-<GridComponent {...props} {...input} bind:grid />
+<GridComponent {...resolvedProps} bind:grid />

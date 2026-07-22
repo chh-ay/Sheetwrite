@@ -6,6 +6,7 @@ import {
   initSheetwrite,
   isSheetwriteReady,
 } from "@sheetwrite/core";
+import {
   createGridController,
   createSimpleGridInput,
   createSimpleRowBridge,
@@ -20,6 +21,7 @@ import {
   type RowBridgeId,
   type SheetwriteInitializationProps,
   type SimpleColumn,
+} from "@sheetwrite/core/adapter";
 import {
   type CSSProperties,
   type ForwardedRef,
@@ -43,6 +45,7 @@ function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
 
 type GridAdapterEventHandlerName =
   | "onGridChange"
+  | "onRowDelta"
   | "onSelectionChange"
   | "onViewportChange"
   | "onEditBegin"
@@ -67,11 +70,15 @@ type SheetwriteGridHostAttributes = Omit<
 >;
 
 /** Advanced framework adapter props for workbook data or datasource ownership. */
-export interface SheetwriteGridProps
+export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
   extends GridOptions,
-    GridAdapterEventHandlers,
+    GridAdapterEventHandlers<Id>,
     SheetwriteInitializationProps,
     SheetwriteGridHostAttributes {
+  /** Projects canonical changes to host-owned row identities. */
+  rowBridge?: RowBridge<Id>;
+  /** Receives one accepted or reconciled row projection. */
+  onRowDelta?: RowBridgeHandler<Id>;
   /** Receives structured issues when a Grid mutation is rejected. */
   onMutationRejected?: GridAdapterEventHandlers["onMutationRejected"];
   /** Fires when worker rendering falls back to the main-thread canvas renderer. */
@@ -95,7 +102,7 @@ export interface SheetwriteGridProps
 }
 
 /** Advanced framework component for workbook data or datasource input. */
-export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
+const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
   function SheetwriteGrid(props, ref): ReactElement {
     const {
       className,
@@ -104,6 +111,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       wasmSource,
       onInitializationError,
       onGridChange,
+      onRowDelta,
       onSelectionChange,
       onViewportChange,
       onEditBegin,
@@ -116,6 +124,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       onDatasourceError,
       onExportError,
       onReady,
+      rowBridge,
       workbook,
       data,
       datasource,
@@ -162,11 +171,13 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
     useCommitLayoutEffect(() => {
       const committedHandlers: GridAdapterEventHandlers = {
         onGridChange,
+        onRowDelta,
         onSelectionChange,
         onViewportChange,
         onEditBegin,
         onEditCommit,
         onSearch,
+        onCommandStateChange,
         onActiveSheetChange,
         onMutationRejected,
         onRendererFallback,
@@ -181,6 +192,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       };
     }, [
       onGridChange,
+      onRowDelta,
       onSelectionChange,
       onViewportChange,
       onEditBegin,
@@ -266,20 +278,26 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
         generationRef.current === 0
           ? "initial"
           : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
-      const controller = createGridController(host, options, {
-        onGridChange: (event) => handlers.current?.onGridChange?.(event),
-        onSelectionChange: (selection) => handlers.current?.onSelectionChange?.(selection),
-        onViewportChange: (event) => handlers.current?.onViewportChange?.(event),
-        onEditBegin: (event) => handlers.current?.onEditBegin?.(event),
-        onEditCommit: (event) => handlers.current?.onEditCommit?.(event),
-        onSearch: (result) => handlers.current?.onSearch?.(result),
-        onCommandStateChange: (event) => handlers.current?.onCommandStateChange?.(event),
-        onActiveSheetChange: (event) => handlers.current?.onActiveSheetChange?.(event),
-        onMutationRejected: (event) => handlers.current?.onMutationRejected?.(event),
-        onRendererFallback: (event) => handlers.current?.onRendererFallback?.(event),
-        onDatasourceError: (event) => handlers.current?.onDatasourceError?.(event),
-        onExportError: (event) => handlers.current?.onExportError?.(event),
-      });
+      const controller = createGridController(
+        host,
+        options,
+        {
+          onGridChange: (event) => handlers.current?.onGridChange?.(event),
+          onRowDelta: (projection) => handlers.current?.onRowDelta?.(projection),
+          onSelectionChange: (selection) => handlers.current?.onSelectionChange?.(selection),
+          onViewportChange: (event) => handlers.current?.onViewportChange?.(event),
+          onEditBegin: (event) => handlers.current?.onEditBegin?.(event),
+          onEditCommit: (event) => handlers.current?.onEditCommit?.(event),
+          onSearch: (result) => handlers.current?.onSearch?.(result),
+          onCommandStateChange: (event) => handlers.current?.onCommandStateChange?.(event),
+          onActiveSheetChange: (event) => handlers.current?.onActiveSheetChange?.(event),
+          onMutationRejected: (event) => handlers.current?.onMutationRejected?.(event),
+          onRendererFallback: (event) => handlers.current?.onRendererFallback?.(event),
+          onDatasourceError: (event) => handlers.current?.onDatasourceError?.(event),
+          onExportError: (event) => handlers.current?.onExportError?.(event),
+        },
+        rowBridge,
+      );
       controllerRef.current = controller;
       generationRef.current += 1;
       let destroyed = false;
@@ -349,6 +367,7 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
       hyperlinkActivation,
       renderers,
       editors,
+      rowBridge,
     ]);
 
     useEffect(() => controllerRef.current?.setReadOnly(readOnly ?? false), [readOnly]);
@@ -368,10 +387,18 @@ export const SheetwriteGrid = forwardRef<Grid, SheetwriteGridProps>(
   },
 );
 
+/** Advanced framework component with inferred row-bridge identity. */
+export const SheetwriteGrid = SheetwriteGridComponent as <Id extends RowBridgeId = RowBridgeId>(
+  props: SheetwriteGridProps<Id> & { ref?: ForwardedRef<Grid> },
+) => ReactElement;
+
 /** Simple framework adapter props for columns and default row objects. */
-export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
-  SheetwriteGridProps,
-  "workbook" | "data" | "datasource" | "height" | "fill"
+export type SheetwriteProps<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> = Omit<
+  SheetwriteGridProps<Id>,
+  "workbook" | "data" | "datasource" | "height" | "fill" | "rowBridge"
 > &
   GridSizeProps & {
     /** Ordered schema used to derive the component-owned sheet. */
@@ -380,17 +407,35 @@ export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
     defaultRows: readonly Row[];
     /** Name of the generated sheet; defaults to `Sheet 1`. */
     sheetName?: string;
+    /** Opt-in stable identity for each host row. */
+    getRowId?: (row: Row, index: number) => Id;
+    /** Creates stable identities for Grid-inserted rows. */
+    createRowId?: Parameters<typeof createSimpleRowBridge<Row, Id>>[0]["createRowId"];
   };
 
-const SheetwriteComponent = forwardRef<Grid, SheetwriteProps<Record<string, CellScalar>>>(
-  function Sheetwrite({ columns, defaultRows, sheetName, ...props }, ref): ReactElement {
-    const input = useMemo(
-      () => createSimpleGridInput({ columns, defaultRows, sheetName }),
-      [columns, defaultRows, sheetName],
-    );
-    return <SheetwriteGrid {...props} {...input} ref={ref} />;
-  },
-);
+const SheetwriteComponent = forwardRef<
+  Grid,
+  SheetwriteProps<Record<string, CellScalar>, RowBridgeId>
+>(function Sheetwrite(
+  { columns, defaultRows, sheetName, getRowId, createRowId, ...props },
+  ref,
+): ReactElement {
+  const input = useMemo(
+    () => createSimpleGridInput({ columns, defaultRows, sheetName }),
+    [columns, defaultRows, sheetName],
+  );
+  const rowBridge = useMemo(
+    () =>
+      createSimpleRowBridge({
+        columns,
+        defaultRows,
+        ...(getRowId === undefined ? {} : { getRowId }),
+        ...(createRowId === undefined ? {} : { createRowId }),
+      }),
+    [columns, defaultRows, getRowId, createRowId],
+  );
+  return <SheetwriteGrid {...props} {...input} rowBridge={rowBridge} ref={ref} />;
+});
 
 /**
  * Convenience component for local object rows. It derives a single-sheet workbook from
@@ -398,8 +443,11 @@ const SheetwriteComponent = forwardRef<Grid, SheetwriteProps<Record<string, Cell
  * through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
  * use `SheetwriteGrid` when the host already owns a workbook or datasource.
  */
-export const Sheetwrite = SheetwriteComponent as <Row extends Record<string, CellScalar>>(
-  props: SheetwriteProps<Row> & {
+export const Sheetwrite = SheetwriteComponent as <
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+>(
+  props: SheetwriteProps<Row, Id> & {
     /** Receives the live Grid after readiness and `null` on reset or unmount. */
     ref?: ForwardedRef<Grid>;
   },
@@ -415,4 +463,12 @@ export type {
   GridCommandName,
   GridCommandState,
 } from "@sheetwrite/core";
-export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";
+export type {
+  GridReadyEvent,
+  RowBridge,
+  RowBridgeDelta,
+  RowBridgeHandler,
+  RowBridgeId,
+  RowBridgeProjection,
+  SimpleColumn,
+} from "@sheetwrite/core/adapter";

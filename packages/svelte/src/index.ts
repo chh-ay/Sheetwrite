@@ -8,7 +8,15 @@ export type {
   GridCommandName,
   GridCommandState,
 } from "@sheetwrite/core";
-export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";
+export type {
+  GridReadyEvent,
+  RowBridge,
+  RowBridgeDelta,
+  RowBridgeHandler,
+  RowBridgeId,
+  RowBridgeProjection,
+  SimpleColumn,
+} from "@sheetwrite/core/adapter";
 export type { SheetwriteGridProps } from "./Grid.svelte";
 export { default as SheetwriteGrid } from "./Grid.svelte";
 export type { SheetwriteProps } from "./Sheetwrite.svelte";

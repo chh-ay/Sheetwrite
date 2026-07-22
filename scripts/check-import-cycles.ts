@@ -164,6 +164,8 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ColumnarData",
       "DataCell",
       "DataSource",
+      "DataSourceCapabilities",
+      "DataSourceColumnBand",
       "DataSourcePage",
       "DataSourceRequest",
       "DataSourceStorageOptions",

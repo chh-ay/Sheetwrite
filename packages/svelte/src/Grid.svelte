@@ -38,8 +38,10 @@ let {
   wasmSource,
   height,
   fill,
+  rowBridge,
   fallback,
   onGridChange,
+  onRowDelta,
   onSelectionChange,
   onViewportChange,
   onEditBegin,
@@ -64,6 +66,7 @@ let generation = 0;
 
 const handlers = {
   onGridChange: (event: Parameters<NonNullable<typeof onGridChange>>[0]) => onGridChange?.(event),
+  onRowDelta: (event: Parameters<NonNullable<typeof onRowDelta>>[0]) => onRowDelta?.(event),
   onSelectionChange: (event: Parameters<NonNullable<typeof onSelectionChange>>[0]) =>
     onSelectionChange?.(event),
   onViewportChange: (event: Parameters<NonNullable<typeof onViewportChange>>[0]) =>
@@ -88,6 +91,7 @@ const handlers = {
 const UNSET_WASM_SOURCE = Symbol("unset-wasm-source");
 let previousOptions: GridOptions | null = null;
 let lastRequestedOptions: GridOptions | null = null;
+let previousRowBridge: Props["rowBridge"] | undefined;
 let previousWasmSource: Props["wasmSource"] | typeof UNSET_WASM_SOURCE = UNSET_WASM_SOURCE;
 let initializationToken = 0;
 let disposed = false;
@@ -123,11 +127,12 @@ function publishReadyGrid(): void {
     generation === 0
       ? "initial"
       : (previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset";
-  const active = untrack(() => createGridController(host, options, handlers));
+  const active = untrack(() => createGridController(host, options, handlers, rowBridge));
   controller = active;
   grid = active.grid;
   previousOptions = options;
   generation += 1;
+  previousRowBridge = rowBridge;
   loading = false;
   untrack(() => onReady?.({ grid: active.grid, generation, reason }));
 }
@@ -147,6 +152,7 @@ $effect(() => {
     hyperlinkActivation,
     renderers,
     editors,
+    rowBridge,
     wasmSource,
   };
   const currentOptions = (): GridOptions =>
@@ -175,7 +181,8 @@ $effect(() => {
   const wasmChanged =
     previousWasmSource === UNSET_WASM_SOURCE || previousWasmSource !== resetInputs.wasmSource;
   const resetReason =
-    lastRequestedOptions && getGridResetReason(lastRequestedOptions, requestedOptions);
+    (lastRequestedOptions && getGridResetReason(lastRequestedOptions, requestedOptions)) ??
+    (previousRowBridge !== rowBridge ? "input-reset" : null);
   const sourceOnlyChange = wasmChanged && resetReason === null && activeController !== undefined;
   const needsNewGeneration =
     lastRequestedOptions === null ||

@@ -11,6 +11,39 @@ export {
   type SheetwriteErrorOperation,
 } from "./errors.js";
 
+export {
+  createRowBridge,
+  RowBridge,
+  rowBridgeTransactionId,
+  type RowBridgeCell,
+  type RowBridgeColumn,
+  type RowBridgeClearDelta,
+  type RowBridgeDelta,
+  type RowBridgeFillDelta,
+  type RowBridgeHandler,
+  type RowBridgeHostActionDelta,
+  type RowBridgeId,
+  type RowBridgeInsertContext,
+  type RowBridgeMetadataDelta,
+  type RowBridgeOptions,
+  type RowBridgePasteDelta,
+  type RowBridgeProjection,
+  type RowBridgeRangeDelta,
+  type RowBridgeReconciliationInput,
+  type RowBridgeReconciliationStatus,
+  type RowBridgeRowStructureDelta,
+  type RowBridgeTransaction,
+  type RowBridgeUnprojectableDelta,
+} from "./row-bridge.js";
+
+import {
+  createRowBridge,
+  type RowBridge as RowBridgeInstance,
+  type RowBridgeHandler,
+  type RowBridgeId,
+  type RowBridgeOptions,
+} from "./row-bridge.js";
+
 import type {
   CellFormat,
   CellScalar,
@@ -70,9 +103,11 @@ export interface GridReadyEvent {
 }
 
 /** Framework-neutral readiness, change, and error callbacks shared by adapters. */
-export interface GridAdapterEventHandlers {
+export interface GridAdapterEventHandlers<Id extends RowBridgeId = RowBridgeId> {
   /** Receives every committed Grid change, including its applied transaction. */
   onGridChange?: (event: ChangeEvent) => void;
+  /** Receives projected host-row effects when a row bridge is attached. */
+  onRowDelta?: RowBridgeHandler<Id>;
   /** Receives the current selection, or `null` after it is cleared. */
   onSelectionChange?: (selection: Selection | null) => void;
   /** Receives visible row bounds and vertical scroll offset after scrolling. */
@@ -206,10 +241,32 @@ export interface SimpleColumn<Row extends Record<string, CellScalar>> {
 }
 
 /** Framework-neutral simple columns, rows, sizing, and grid options. */
-export interface SimpleSheetwriteOptions<Row extends Record<string, CellScalar>> {
+export interface SimpleSheetwriteOptions<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> {
   columns: readonly SimpleColumn<Row>[];
   defaultRows: readonly Row[];
   sheetName?: string;
+  /** Opt-in stable data-row identity extractor. */
+  getRowId?: (row: Row, index: number) => Id;
+  /** Optional identity factory for rows inserted by the Grid. */
+  createRowId?: RowBridgeOptions<Row, Id>["createRowId"];
+}
+
+/** Creates the optional row bridge for a simple data-first input. */
+export function createSimpleRowBridge<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+>(options: SimpleSheetwriteOptions<Row, Id>): RowBridgeInstance<Id> | undefined {
+  if (!options.getRowId) return undefined;
+  const bridge = createRowBridge({
+    columns: options.columns,
+    defaultRows: options.defaultRows,
+    getRowId: options.getRowId,
+    ...(options.createRowId === undefined ? {} : { createRowId: options.createRowId }),
+  });
+  return bridge as unknown as RowBridgeInstance<Id>;
 }
 
 /** Normalized workbook and columnar data produced from simple adapter props. */
