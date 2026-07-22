@@ -160,6 +160,10 @@ describe("SheetTabs", () => {
 
     tabButtons(host)[1]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    expect(input.closest('[role="tablist"]')).toBe(host.querySelector('[role="tablist"]'));
+    expect(
+      [...input.parentElement!.children].map((child) => child.getAttribute("data-sheet-id")),
+    ).toEqual(["a", "b", "c"]);
     inputText(input, "Revenue");
     key(input, "Enter");
     expect(renames).toEqual([["b", "Revenue"]]);

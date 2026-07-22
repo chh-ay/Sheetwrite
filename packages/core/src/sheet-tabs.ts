@@ -235,6 +235,7 @@ export class SheetTabs {
       const editing = this.editing?.id === sheet.id;
       if (editing) {
         renameInput = this.createRenameInput(sheet, active);
+        tablist.appendChild(renameInput);
       } else {
         tablist.appendChild(this.createTab(sheet, active, workbookIndex));
       }
@@ -242,9 +243,7 @@ export class SheetTabs {
     }
 
     fragment.appendChild(tablist);
-    if (renameInput) {
-      fragment.appendChild(renameInput);
-    } else if (activeSheet && !this.readOnly && this.hasSheetOptions(visible.length)) {
+    if (!renameInput && activeSheet && !this.readOnly && this.hasSheetOptions(visible.length)) {
       fragment.appendChild(this.createOptions(activeSheet, visible.length));
     }
 
