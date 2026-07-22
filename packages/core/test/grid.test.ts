@@ -1,7 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 import { SnapshotResourceError, validateTransactionResources } from "../src/document-protocol.js";
-import { SheetwriteError } from "../src/errors.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
@@ -20,6 +19,7 @@ import type {
   CellScalar,
   ChangeEvent,
   DataSourceRequest,
+  DataSourcePage,
   DocumentOp,
   GridEvents,
   RowData,
@@ -73,6 +73,25 @@ function mountHost(): HTMLDivElement {
   Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
   document.body.appendChild(host);
   return host;
+}
+
+const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
+
+function coveredRow(request: DataSourceRequest, values: RowData = {}): RowData {
+  const row: RowData = {};
+  for (const band of request.columns) {
+    for (const key of band.keys) row[key] = values[key] ?? null;
+  }
+  return row;
+}
+
+function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSourcePage {
+  return {
+    protocol: 2,
+    start: request.start,
+    columns: request.columns,
+    rows: rows.map((row) => coveredRow(request, row)),
+  };
 }
 
 function expectEditor(host: HTMLElement): HTMLTextAreaElement {
@@ -242,12 +261,10 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: async (request: DataSourceRequest) => {
           captured ??= request;
-          return {
-            start: request.start,
-            rows: [{ name: "Structured", amount: 7, city: "Paris" }],
-          };
+          return coveredPage(request, [{ name: "Structured", amount: 7, city: "Paris" }]);
         },
       },
     });
@@ -257,10 +274,12 @@ describe("Grid editing (Layer 3)", () => {
     if (!captured) throw new Error("datasource request was not issued");
     expect(captured).toMatchObject({
       sheet: "s1",
+      protocol: 2,
       start: 0,
       revision: 0,
     });
     expect(captured.end).toBeGreaterThan(captured.start);
+    expect(captured.columns).toEqual([{ start: 0, end: 3, keys: ["name", "amount", "city"] }]);
     expect(captured.signal).toBeInstanceOf(AbortSignal);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Structured");
     grid.destroy();
@@ -273,9 +292,10 @@ describe("Grid editing (Layer 3)", () => {
       workbook: makeWorkbook(200),
       overscan: 50,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: (request) => {
           requests.push(request);
-          return Promise.withResolvers<{ start: number; rows: RowData[] }>().promise;
+          return Promise.withResolvers<DataSourcePage>().promise;
         },
       },
     });
@@ -302,6 +322,7 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(host, {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: () => {
           requests++;
           return Promise.reject(new Error("load failed"));
@@ -326,9 +347,10 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: async (request: DataSourceRequest) => {
           starts.push(request.start);
-          return { start: request.start, rows: [{ name: `row ${request.start}` }] };
+          return coveredPage(request, [{ name: `row ${request.start}` }]);
         },
       },
     });
@@ -350,24 +372,36 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: async (request: DataSourceRequest) => {
           requests += 1;
-          return { start: request.start + 1, rows: [{ name: "wrong range" }] };
+          return {
+            protocol: 2,
+            start: request.end,
+            columns: request.columns,
+            rows: [coveredRow(request, { name: "wrong range" })],
+          };
         },
       },
     });
-    const errors: SheetwriteError[] = [];
-    grid.on("datasource-error", (event) => errors.push(event.error));
+    const errors: GridEvents["datasource-error"][] = [];
+    const failed = Promise.withResolvers<void>();
+    grid.on("datasource-error", (event) => {
+      errors.push(event);
+      failed.resolve();
+    });
     const initialRequests = requests;
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await failed.promise;
     grid.refresh();
+    await Promise.resolve();
 
     expect(errors.length).toBeGreaterThan(0);
     expect(
       errors.every(
-        (error) =>
+        ({ request, error }) =>
+          request.protocol === 2 &&
+          request.columns.length > 0 &&
           error.code === "datasource-request-failed" &&
           error.operation === "datasource-request" &&
           error.cause instanceof RangeError,
@@ -379,21 +413,24 @@ describe("Grid editing (Layer 3)", () => {
 
   it("preserves a newer local literal edit when a stale page resolves", async () => {
     const workbook = makeWorkbook(20);
-    const { promise, resolve } = Promise.withResolvers<{
-      start: number;
-      rows: RowData[];
-    }>();
+    const { promise, resolve } = Promise.withResolvers<DataSourcePage>();
+    let request: DataSourceRequest | undefined;
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
-        getRows: () => promise,
+        capabilities: WINDOWED_DATASOURCE,
+        getRows: (next) => {
+          request ??= next;
+          return promise;
+        },
       },
     });
     const addr = { sheet: "s1", row: 0, col: 0 };
     grid.store.applyTransaction({
       patches: [{ op: "set", addr, value: { kind: "literal", value: "local" } }],
     });
-    resolve({ start: 0, rows: [{ name: "stale server" }] });
+    if (!request) throw new Error("datasource request was not issued");
+    resolve(coveredPage(request, [{ name: "stale server" }]));
     await promise;
     await Promise.resolve();
 
@@ -402,11 +439,12 @@ describe("Grid editing (Layer 3)", () => {
   });
 
   it("aborts an outstanding datasource request on destroy", () => {
-    const { promise } = Promise.withResolvers<{ start: number; rows: RowData[] }>();
+    const { promise } = Promise.withResolvers<DataSourcePage>();
     let signal: AbortSignal | undefined;
     const grid = new GridImpl(mountHost(), {
       workbook: makeWorkbook(20),
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: (request: DataSourceRequest) => {
           signal = request.signal;
           return promise;
@@ -417,6 +455,29 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
 
     expect(signal?.aborted).toBe(true);
+  });
+
+  it("aborts active datasource rectangles when a structural change resets paging", () => {
+    const { promise } = Promise.withResolvers<DataSourcePage>();
+    const signals: AbortSignal[] = [];
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(20),
+      datasource: {
+        capabilities: WINDOWED_DATASOURCE,
+        getRows: (request) => {
+          signals.push(request.signal);
+          return promise;
+        },
+      },
+    });
+
+    expect(signals.length).toBeGreaterThan(0);
+    grid.store.applyTransaction({
+      patches: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }],
+    });
+
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    grid.destroy();
   });
 
   it("starts a new search at the current viewport and wraps when needed", () => {
@@ -955,26 +1016,29 @@ describe("Grid store lifecycle", () => {
     store.dispose();
   });
   it("ignores a pending datasource result after destroying an owned store", async () => {
-    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<{
-      start: number;
-      rows: RowData[];
-    }>();
+    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<DataSourcePage>();
+    let request: DataSourceRequest | undefined;
     const datasource = {
-      getRows: () => pending,
+      capabilities: WINDOWED_DATASOURCE,
+      getRows: (next: DataSourceRequest) => {
+        request ??= next;
+        return pending;
+      },
     };
-    const loadRowsSpy = spyOn(SheetwriteStore.prototype, "loadRows");
+    const loadPageSpy = spyOn(SheetwriteStore.prototype, "loadPage");
     const grid = new GridImpl(mountHost(), {
       workbook: makeWorkbook(20),
       datasource,
     });
 
     grid.destroy();
-    resolveRows({ start: 0, rows: [{ name: "Too late" }] });
+    if (!request) throw new Error("datasource request was not issued");
+    resolveRows(coveredPage(request, [{ name: "Too late" }]));
     await pending;
     await Promise.resolve();
 
-    expect(loadRowsSpy).not.toHaveBeenCalled();
-    loadRowsSpy.mockRestore();
+    expect(loadPageSpy).not.toHaveBeenCalled();
+    loadPageSpy.mockRestore();
   });
 });
 
@@ -1236,7 +1300,8 @@ describe("Grid.setMinColumns", () => {
 
   it("keeps dense datasource storage by default and enables paging explicitly", () => {
     const datasource = {
-      getRows: async (request: { start: number }) => ({ start: request.start, rows: [] }),
+      capabilities: WINDOWED_DATASOURCE,
+      getRows: async (request: DataSourceRequest) => coveredPage(request, []),
     };
     const dense = new GridImpl(mountHost(), { workbook: makeWorkbook(5), datasource });
     const paged = new GridImpl(mountHost(), {
@@ -1383,9 +1448,10 @@ describe("Grid.setMinColumns", () => {
       chunkRows: 4,
       cacheBytes: 1024,
     });
-    store.loadRows(
+    store.loadPage(
       "s1",
       0,
+      [{ start: 0, end: 3, keys: ["name", "amount", "city"] }],
       Array.from({ length: 5 }, (_, row) => ({
         name: `Customer ${row}`,
         amount: row * 10 + 0.5,

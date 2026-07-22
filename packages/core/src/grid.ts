@@ -506,7 +506,7 @@ export class GridImpl implements Grid {
     for (const sheet of workbook.sheets) {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
-    const datasource = opts.datasource?.getRows;
+    const datasource = opts.datasource;
     this.readOnly = opts.readOnly ?? false;
     this.config = opts.config;
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
@@ -573,6 +573,11 @@ export class GridImpl implements Grid {
     this.datasourceController = new DatasourceController(
       {
         datasource,
+        columns: (sheetId) => {
+          const liveSheet = this.sheetById(sheetId);
+          if (!liveSheet) throw new Error(`Sheetwrite: unknown sheet ${sheetId}`);
+          return liveSheet.columns;
+        },
         loadable: this.loadable,
         activeSheet: () => this.activeSheet,
         rowCount: (sheetId) => this.sheet(sheetId).rowCount,
@@ -589,7 +594,18 @@ export class GridImpl implements Grid {
             error,
             "datasource-request-failed",
             "datasource-request",
-            request,
+            {
+              protocol: request.protocol,
+              sheet: request.sheet,
+              start: request.start,
+              end: request.end,
+              revision: request.revision,
+              columns: request.columns.map(({ start, end, keys }) => ({
+                start,
+                end,
+                keys: [...keys],
+              })),
+            },
           );
           for (const fn of this.listeners["datasource-error"]) {
             fn({ request, error: failure });
@@ -825,6 +841,7 @@ export class GridImpl implements Grid {
       storeEpoch: () => this.storeEpoch,
       viewportHeight: () => this.viewportH(),
       viewportWidth: () => this.viewportEl.clientWidth,
+      datasourceColumnCount: () => this.sheetById(this.activeSheet)?.columns.length ?? 0,
       scrollTop: () => this.scroller.scrollTop,
       scrollLeft: () => this.scroller.scrollLeft,
       repositionEditor: (contentTop, scrollLeft) => this.repositionEditor(contentTop, scrollLeft),

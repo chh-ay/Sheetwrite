@@ -23,10 +23,18 @@ export interface RenderCoordinatorOptions {
   storeEpoch: () => number;
   viewportHeight: () => number;
   viewportWidth: () => number;
+  datasourceColumnCount?: () => number;
   scrollTop: () => number;
   scrollLeft: () => number;
   repositionEditor: (contentTop: number, scrollLeft: number) => void;
-  emitScroll: (event: { scrollTop: number; firstRow: number; lastRow: number }) => void;
+  emitScroll: (event: {
+    scrollTop: number;
+    scrollLeft: number;
+    firstRow: number;
+    lastRow: number;
+    firstVisibleColumn: number | null;
+    lastVisibleColumn: number | null;
+  }) => void;
 }
 
 /** Sole owner of frame scheduling, paint-window caches, and renderer/overlay updates. */
@@ -37,6 +45,8 @@ export class RenderCoordinator {
   private columnWindowStart = -1;
   private columnWindowEnd = -1;
   private windowedColumnIndices: readonly number[] = [];
+  private datasourceColumnIndices: readonly number[] = [];
+  private datasourceFrozenColumns = -1;
   private columnWindowSignature = "";
   private lastDataSignature = "";
   private lastPaintSignature = "";
@@ -70,7 +80,8 @@ export class RenderCoordinator {
   invalidateColumns(): void {
     this.columnWindowStart = -1;
     this.columnWindowEnd = -1;
-    this.windowedColumnIndices = [];
+    this.datasourceColumnIndices = [];
+    this.datasourceFrozenColumns = -1;
     this.columnWindowSignature = "";
     this.invalidateData();
   }
@@ -133,6 +144,16 @@ export class RenderCoordinator {
     const frozenColumns = paintWindow.frozenColumns;
     const frozenHeight = paintWindow.frozenHeight;
     const frozenWidth = paintWindow.frozenWidth;
+    const visibleColumns = geometry.columnWindow(scrollLeft, cellViewportWidth, 0);
+    const firstBodyVisibleColumn = geometry.columnIndices[visibleColumns.start] ?? null;
+    const lastBodyVisibleColumn = geometry.columnIndices[visibleColumns.end - 1] ?? null;
+    const firstVisibleColumn =
+      frozenColumns > 0
+        ? (geometry.columnIndices[0] ?? firstBodyVisibleColumn)
+        : firstBodyVisibleColumn;
+    const lastVisibleColumn =
+      lastBodyVisibleColumn ??
+      (frozenColumns > 0 ? (geometry.columnIndices[frozenColumns - 1] ?? null) : null);
     const rawVisibleRows = geometry.visibleRowWindow(
       contentTop + frozenHeight,
       Math.max(0, bodyHeight - frozenHeight) + theme.headerHeight,
@@ -148,16 +169,45 @@ export class RenderCoordinator {
     const usePanes =
       (frozenRows > 0 || frozenColumns > 0) && this.options.renderer().paintPanes !== undefined;
     const rowGeometry = geometry.rowGeometry(rows);
-    if (frozenRows > 0) this.options.datasource.ensureLoaded(0, frozenRows);
-    this.options.datasource.updateViewport(visibleRows.start, visibleRows.end);
-
-    if (columns.start !== this.columnWindowStart || columns.end !== this.columnWindowEnd) {
+    const columnWindowChanged =
+      columns.start !== this.columnWindowStart || columns.end !== this.columnWindowEnd;
+    if (columnWindowChanged) {
       this.columnWindowStart = columns.start;
       this.columnWindowEnd = columns.end;
       this.windowedColumnIndices = geometry.columnIndices.slice(columns.start, columns.end);
       this.columnWindowSignature = this.windowedColumnIndices.join(",");
       this.options.ariaMirror.bumpVersion();
     }
+    if (columnWindowChanged || frozenColumns !== this.datasourceFrozenColumns) {
+      const frozenColumnIndices =
+        frozenColumns > 0 ? geometry.columnIndices.slice(0, frozenColumns) : [];
+      const demanded = [...frozenColumnIndices, ...this.windowedColumnIndices].sort(
+        (left, right) => left - right,
+      );
+      const datasourceColumnCount =
+        this.options.datasourceColumnCount?.() ?? Number.MAX_SAFE_INTEGER;
+      let write = 0;
+      for (const column of demanded) {
+        if (
+          column >= 0 &&
+          column < datasourceColumnCount &&
+          (write === 0 || demanded[write - 1] !== column)
+        ) {
+          demanded[write++] = column;
+        }
+      }
+      demanded.length = write;
+      this.datasourceColumnIndices = demanded;
+      this.datasourceFrozenColumns = frozenColumns;
+    }
+    if (frozenRows > 0) {
+      this.options.datasource.ensureLoaded(0, frozenRows, this.datasourceColumnIndices);
+    }
+    this.options.datasource.updateViewport(
+      visibleRows.start,
+      visibleRows.end,
+      this.datasourceColumnIndices,
+    );
 
     const storeEpoch = this.options.storeEpoch();
     const viewport: Viewport = {
@@ -232,8 +282,11 @@ export class RenderCoordinator {
     this.options.repositionEditor(contentTop, scrollLeft);
     this.options.emitScroll({
       scrollTop: contentTop,
+      scrollLeft,
       firstRow: rows.start,
       lastRow: Math.max(rows.start, rows.end - 1),
+      firstVisibleColumn,
+      lastVisibleColumn,
     });
   }
 
@@ -361,7 +414,7 @@ export class RenderCoordinator {
     this.cachedDomMergeAnchorViews.length = requests.length;
     for (let slot = 0; slot < requests.length; slot++) {
       const request = requests[slot]!;
-      this.options.datasource.ensureLoaded(request.row, request.row + 1);
+      this.options.datasource.ensureLoaded(request.row, request.row + 1, request.cols);
       const view = this.options.store.getVisibleWindow(
         request.sheet,
         { start: request.row, end: request.row + 1 },

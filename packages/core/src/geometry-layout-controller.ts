@@ -229,12 +229,7 @@ export class GeometryLayoutController {
       Math.max(0, bodyHeight - frozenHeight),
       overscan,
     );
-    const rawColumns = computeColumnWindow(
-      this.columnIndex,
-      scrollLeft + frozenWidth,
-      Math.max(0, cellViewportWidth - frozenWidth),
-      overscan,
-    );
+    const columns = this.columnWindow(scrollLeft, cellViewportWidth, overscan);
     return {
       rows:
         frozenRows > 0
@@ -243,18 +238,33 @@ export class GeometryLayoutController {
               end: Math.max(rawRows.end, frozenRows),
             }
           : rawRows,
-      columns:
-        frozenColumns > 0
-          ? {
-              start: Math.max(rawColumns.start, frozenColumns),
-              end: Math.max(rawColumns.end, frozenColumns),
-            }
-          : rawColumns,
+      columns,
       frozenRows,
       frozenColumns,
       frozenHeight,
       frozenWidth,
     };
+  }
+
+  columnWindow(
+    scrollLeft: number,
+    cellViewportWidth: number,
+    overscan: number,
+  ): { start: number; end: number } {
+    const frozenColumns = this.frozenColumnCount();
+    const frozenWidth = this.frozenWidth();
+    const rawColumns = computeColumnWindow(
+      this.columnIndex,
+      scrollLeft + frozenWidth,
+      Math.max(0, cellViewportWidth - frozenWidth),
+      overscan,
+    );
+    return frozenColumns > 0
+      ? {
+          start: Math.max(rawColumns.start, frozenColumns),
+          end: Math.max(rawColumns.end, frozenColumns),
+        }
+      : rawColumns;
   }
 
   visibleRowWindow(
