@@ -33,10 +33,10 @@ function runFacadeContract(storage: "dense" | "paged"): void {
       0,
       [{ start: 0, end: 3, keys: ["name", "amount", "city"] }],
       [
-        { name: "", amount: 0, city: "" },
-        { name: "", amount: 0, city: "" },
-        { name: "", amount: 0, city: "" },
-        { name: "", amount: 0, city: "" },
+        { name: null, amount: 0, city: null },
+        { name: null, amount: 0, city: null },
+        { name: null, amount: 0, city: null },
+        { name: null, amount: 0, city: null },
       ],
     );
   }
