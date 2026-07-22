@@ -301,7 +301,30 @@ test("sustained Grid scrolling stays immediate, bounded, and free of long tasks"
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       ),
   );
-  const evidence = await page.evaluate(() => {
+  const frameCadence = await page.evaluate(async () => {
+    const host = document.querySelector<HTMLElement>('[data-testid="engine-grid"]')!;
+    const scrollTarget = [host, ...host.querySelectorAll<HTMLElement>("*")]
+      .filter((element) => element.scrollHeight > element.clientHeight + 10)
+      .sort(
+        (left, right) =>
+          right.scrollHeight - right.clientHeight - (left.scrollHeight - left.clientHeight),
+      )[0]!;
+    const gaps: number[] = [];
+    let previous = performance.now();
+    for (let frame = 0; frame < 90; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const now = performance.now();
+      gaps.push(now - previous);
+      previous = now;
+      scrollTarget.scrollTop = (frame % 2 === 0 ? frame : 90 - frame) * 320;
+    }
+    gaps.sort((left, right) => left - right);
+    return {
+      median: gaps[Math.floor(gaps.length * 0.5)] ?? Number.POSITIVE_INFINITY,
+      p95: gaps[Math.floor(gaps.length * 0.95)] ?? Number.POSITIVE_INFINITY,
+    };
+  });
+  const evidence = await page.evaluate((frameCadence) => {
     const gridInstance = window.__sheetwriteEngineShowcase!.grid()!;
     const pages = gridInstance.store.getPagedStats("forecast");
     const runtime = gridInstance.getRuntimeResourceSnapshot("scroll", "settled");
@@ -310,13 +333,15 @@ test("sustained Grid scrolling stays immediate, bounded, and free of long tasks"
       pageBytes: pages?.allocatedBytes ?? 0,
       engineBytes: runtime.wasm.allocatedCapacityBytes,
       longTasks: window.__sheetwriteEngineLongTasks ?? [],
+      frameCadence,
     };
-  });
+  }, frameCadence);
   expect(evidence.loadedCells).toBeGreaterThan(0);
   expect(evidence.loadedCells).toBeLessThanOrEqual(8_192);
   expect(evidence.pageBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
   expect(evidence.engineBytes).toBeGreaterThanOrEqual(0);
   expect(evidence.longTasks.filter((entry) => entry.duration > 50)).toEqual([]);
+  expect(evidence.frameCadence.p95).toBeLessThanOrEqual(35);
 });
 
 test("one hundred actions keep timers, trace, and DOM bounded, then lifecycle cleanup runs", async ({
@@ -351,7 +376,7 @@ test("one hundred actions keep timers, trace, and DOM bounded, then lifecycle cl
     .toBe(true);
 });
 
-test("landing keeps engine code idle until scroll intent, then loads only the teaser", async ({
+test("landing renders the stable teaser immediately without loading engine code", async ({
   page,
 }) => {
   const assets: string[] = [];
@@ -361,20 +386,13 @@ test("landing keeps engine code idle until scroll intent, then loads only the te
   });
   await page.goto(siteUrl("/"));
   await page.waitForLoadState("networkidle");
-  const engineAsset =
-    /EngineShowcase|EngineLandingTeaser|sheetwrite_bg|\.wasm(?:\?|$)|\/core-[^/]+\.js/;
-  expect(assets.filter((url) => engineAsset.test(url))).toEqual([]);
-
-  await page.locator(".sw-landing-engine-slot").scrollIntoViewIfNeeded();
+  expect(assets.some((url) => /EngineLandingTeaser/.test(url))).toBe(true);
+  expect(assets.some((url) => /EngineShowcase|sheetwrite_bg|\.wasm(?:\?|$)/.test(url))).toBe(false);
   await expect(
     page.getByRole("heading", {
       name: "Watch the Grid, the calculation engine, and your host agree.",
     }),
-  ).toBeVisible();
-  await expect
-    .poll(() => assets.some((url) => /EngineLandingTeaser/.test(url)), { timeout: 10_000 })
-    .toBe(true);
-  expect(assets.some((url) => /EngineShowcase|sheetwrite_bg|\.wasm(?:\?|$)/.test(url))).toBe(false);
+  ).toHaveCount(1);
 });
 
 test("measures the lazy route transfer and post-ready long tasks", async ({ page }) => {

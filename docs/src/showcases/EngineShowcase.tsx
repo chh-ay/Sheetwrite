@@ -73,6 +73,7 @@ export default function EngineShowcase() {
   const jumpInputRef = useRef("24001");
   const requestedRendererRef = useRef<EngineRenderer>("canvas");
   const mountedRef = useRef(true);
+  const passiveTraceTimerRef = useRef<number | null>(null);
 
   if (traceRef.current === null) traceRef.current = createEngineTrace();
   if (saverRef.current === null) saverRef.current = createEngineHostSaver();
@@ -95,6 +96,25 @@ export default function EngineShowcase() {
       setActiveRenderer(event.active);
       setRendererFallback(event.fallback);
     }
+    const passiveViewportEvent =
+      event.type === "visible-window" ||
+      event.type === "datasource-request" ||
+      event.type === "datasource-result" ||
+      (event.type === "page-resource" && event.reason === "load");
+    if (passiveViewportEvent) {
+      if (passiveTraceTimerRef.current !== null) {
+        window.clearTimeout(passiveTraceTimerRef.current);
+      }
+      passiveTraceTimerRef.current = window.setTimeout(() => {
+        passiveTraceTimerRef.current = null;
+        if (mountedRef.current) setEvents(traceRef.current!.snapshot());
+      }, 120);
+      return;
+    }
+    if (passiveTraceTimerRef.current !== null) {
+      window.clearTimeout(passiveTraceTimerRef.current);
+      passiveTraceTimerRef.current = null;
+    }
     setEvents(traceRef.current!.snapshot());
   }, []);
 
@@ -106,6 +126,10 @@ export default function EngineShowcase() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (passiveTraceTimerRef.current !== null) {
+        window.clearTimeout(passiveTraceTimerRef.current);
+        passiveTraceTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -116,6 +140,7 @@ export default function EngineShowcase() {
     let disposed = false;
     let grid: Grid | null = null;
     let bindings: EngineEventBindings | null = null;
+    let loadResourceTimer: number | null = null;
     setReady(false);
     setError(null);
     setRendererFallback(null);
@@ -131,7 +156,11 @@ export default function EngineShowcase() {
         grid = createGrid(host, {
           workbook: createEngineLiveWorkbook(),
           datasource: createEngineLiveDataSource(emit, () => {
-            if (!disposed) bindings?.sampleResource("load", "ingest");
+            if (loadResourceTimer !== null) window.clearTimeout(loadResourceTimer);
+            loadResourceTimer = window.setTimeout(() => {
+              loadResourceTimer = null;
+              if (!disposed) bindings?.sampleResource("load", "ingest");
+            }, 160);
           }),
           datasourceStorage: ENGINE_LIVE_STORAGE,
           theme,
@@ -168,6 +197,10 @@ export default function EngineShowcase() {
     return () => {
       disposed = true;
       setReady(false);
+      if (loadResourceTimer !== null) {
+        window.clearTimeout(loadResourceTimer);
+        loadResourceTimer = null;
+      }
       bindings?.dispose();
       if (bindingsRef.current === bindings) bindingsRef.current = null;
       if (gridRef.current === grid) gridRef.current = null;

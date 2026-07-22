@@ -387,9 +387,6 @@ export function bindEngineEvents(
       });
       sampleResource(action === "undo" ? "undo" : "edit", "formula-recompute");
     }),
-    grid.on("scroll", ({ firstRow, lastRow, scrollTop }) => {
-      emit({ type: "visible-window", firstRow, lastRow, scrollTop });
-    }),
     grid.on("renderer-fallback", ({ requested, error }) => {
       emit({
         type: "renderer",
