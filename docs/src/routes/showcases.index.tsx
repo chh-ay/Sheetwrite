@@ -209,32 +209,31 @@ function ShowcaseHub() {
       <SiteTopbar active="showcases" />
       <main className="sw-hub" id="main-content">
         <header className="sw-hub__hero">
-          <p className="sw-hub__eyebrow">Capability evaluation</p>
-          <h1>Every capability, live and verified.</h1>
+          <p className="sw-hub__eyebrow">Try real product work</p>
+          <h1>Every feature, live and tested.</h1>
           <p className="sw-hub__lede">
-            {CAPABILITY_INVENTORY.length} public capabilities, each with exactly one owning
-            showcase, a required interaction, and an executable browser contract. Open the live
-            scenario that matches your job.
+            {CAPABILITY_INVENTORY.length} public features, each with one live example, an action to
+            try, and a browser test you can run. Open the example that matches your job.
           </p>
           {heroStats ? (
             <p className="sw-hub__bench">
               <strong>{heroStats.millionRowMedianMs} ms</strong> median interaction at 1,000,000
               rows across {heroStats.millionRowScenarios} scenarios ·{" "}
               <strong>{heroStats.millionRowHeapMb} MB</strong> renderer heap —{" "}
-              <Link to="/showcases/performance/">see the measured evidence</Link> or{" "}
-              <a href="/docs/guides/performance-resources/">read the protocol</a>.
+              <Link to="/showcases/performance/">see the measured results</Link> or{" "}
+              <a href="/docs/guides/performance-resources/">see how we measured them</a>.
             </p>
           ) : (
             <p className="sw-hub__bench">
-              Benchmark evidence renders from checked-in protocol artifacts on the{" "}
+              Saved benchmark results are shown in the{" "}
               <Link to="/showcases/performance/">performance showcase</Link>.
             </p>
           )}
         </header>
 
         <section aria-labelledby="hub-scenes" className="sw-hub__scenes">
-          <h2 id="hub-scenes">Capability showcases</h2>
-          <p>Four framework-neutral live scenarios — one subsystem each, real and editable.</p>
+          <h2 id="hub-scenes">Live feature examples</h2>
+          <p>Four editable examples that run in your browser.</p>
           <ul className="sw-hub-scenes">
             {SCENE_ORDER.map((id) => {
               const owner = OWNER_BY_ID.get(id);

@@ -173,7 +173,7 @@ function Landing() {
                 <div className="sw-hero-facts__provenance">
                   <dt>Evidence</dt>
                   <dd>
-                    Protocol <code>{evidence.capture.commit.slice(0, 7)}</code>
+                    Source <code>{evidence.capture.commit.slice(0, 7)}</code>
                   </dd>
                 </div>
               </dl>
@@ -183,12 +183,12 @@ function Landing() {
 
         <section aria-labelledby="benchmarks-title" className="sw-landing-bench" id="benchmarks">
           <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Protocol evidence</p>
+            <p className="sw-section-eyebrow">Results you can check</p>
             <h2 id="benchmarks-title">Measured, not promised</h2>
             {evidence ? (
               <p className="sw-section-lede">
-                Median speedups over Handsontable, rendered straight from checked-in protocol
-                artifacts. The gap widens as the data grows.
+                Median speedups over Handsontable, read directly from saved benchmark results. The
+                gap widens as the data grows.
               </p>
             ) : null}
           </header>
@@ -257,27 +257,26 @@ function Landing() {
                 </aside>
               </div>
               <p className="sw-bench-footnote">
-                Correctness checkpoints guard every interaction, and failures are recorded as
-                failures. <a href="/docs/guides/performance-resources/">Read the full protocol.</a>
+                Every interaction must return the correct result; failed runs stay failed.{" "}
+                <a href="/docs/guides/performance-resources/">See how we measured it.</a>
               </p>
             </>
           ) : (
             <p className="sw-bench-footnote">
-              Benchmark evidence is generated from local protocol artifacts. Run{" "}
-              <code>bun run --filter @sheetwrite/bench bench:render:scale</code> and{" "}
-              <code>bun run docs:generate</code> to publish real numbers here.
+              No saved benchmark results are available yet. Run{" "}
+              <code>bun run --filter @sheetwrite/bench bench:render:scale</code> and then{" "}
+              <code>bun run docs:generate</code> to publish measured numbers here.
             </p>
           )}
         </section>
 
         <section aria-labelledby="proofs-title" className="sw-landing-proofs">
           <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Capability showcases</p>
-            <h2 id="proofs-title">Evaluate by capability, not by demo.</h2>
+            <p className="sw-section-eyebrow">Live feature examples</p>
+            <h2 id="proofs-title">Try the work you need to do.</h2>
             <p className="sw-section-lede">
-              Every public capability has one owning live showcase, a required interaction, and an
-              executable browser contract.{" "}
-              <Link to="/showcases/">Browse the full capability index →</Link>
+              Every public feature has one live example, an action to try, and a browser test you
+              can run. <Link to="/showcases/">Browse every feature →</Link>
             </p>
           </header>
           <ol className="sw-proof-ledger">

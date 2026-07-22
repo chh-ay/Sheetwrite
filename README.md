@@ -104,8 +104,8 @@ OOXML table/format extensions emit structured warnings instead of silently
 flattening into supported behavior. Calling any XLSX function without
 registration throws an error naming the exact package and registration import.
 CSV and TSV remain core-only. See [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
-and the [executable compatibility matrix](https://sheetwrite.vercel.app/docs/reference/compatibility-matrix/)
-for exact limits and evidence.
+and the [detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-matrix/)
+for the exact supported features, limits, and test evidence.
 
 ## Persistence
 
@@ -149,18 +149,18 @@ presence, comments, and revisions.
 ## v0.3 roadmap status
 
 Implemented on the development branch: complete worksheet lifecycle operations,
-the expanded portable formula kernel, native workbook tables and structured
-references, host-safe hyperlinks, bounded conditional formatting, and a
-source/provenance-checked 2,350-case conformance corpus. These are Sheetwrite
-contracts; they are not a blanket Excel or Google Sheets compatibility claim.
+more portable formulas, native workbook tables and structured references, safe
+links, bounded conditional formatting, and 2,350 checked examples. Each example
+is either an original Sheetwrite test or links to the public specification it
+uses. The results show exactly what Sheetwrite does today; they do not claim
+blanket Excel or Google Sheets compatibility.
 
-The v0.3 release remains gated on fresh authenticated Excel and Google Sheets
-observations, cross-producer workbook round trips, unchanged delivery-size
-ceilings, the measured billion-cell architecture decision, stable row-model and
-executable-onboarding work, and the final product-showcase/browser verification.
-See the [executable compatibility matrix](https://sheetwrite.vercel.app/docs/reference/compatibility-matrix/)
-for implemented subsets, warnings, unsupported behavior, producer versions,
-and evidence.
+The v0.3 release is still waiting on fresh test runs in Excel and Google Sheets,
+workbook save-and-open checks between apps, unchanged download-size limits, the
+measured decision on billion-cell sheets, stable row-model and executable
+onboarding work, and final browser checks for every product showcase. See the
+[detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-matrix/)
+for supported features, warnings, known limits, app versions, and test evidence.
 
 ## Releases
 
