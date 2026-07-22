@@ -15,9 +15,9 @@ description: Explicit compatibility boundaries, resource ceilings, tuning defaul
 
 Compatibility statements are feature contracts, not claims of Excel or Google Sheets parity.
 
-The [generated executable compatibility matrix](/docs/reference/compatibility-matrix/) links each formula, workbook, clipboard, and XLSX status to its evidence record and exact divergence.
+The [detailed compatibility results](/docs/reference/compatibility-matrix/) link each formula, workbook, clipboard, and XLSX status to its evidence record and exact difference.
 
-The [generated formula function contract](/docs/reference/formula-functions/) projects names, families, signatures, semantic/dialect profiles, source links, implementation evidence, and unsupported categories directly from the checked versioned inventory.
+The [generated formula function contract](/docs/reference/formula-functions/) publishes names, families, signatures, behavior profiles, source links, implementation evidence, and unsupported categories directly from the checked versioned inventory.
 
 The tables below describe the owning source definition, not generated API signatures. Ceilings are inclusive unless a row says otherwise. MiB means 1,048,576 bytes. “Compatibility” identifies an external or product boundary; “resource defense” identifies bounded allocation or retained state; “interaction tuning” identifies a non-failing operational default.
 

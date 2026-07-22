@@ -408,15 +408,15 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     status: "supported",
     resultMode: "evaluated",
     semantics:
-      "A checksum-locked LibreOffice workbook imports the declared scalar and format subset without warnings.",
-    divergence: "Producer evidence covers this fixture and version, not all LibreOffice documents.",
+      "A LibreOffice-produced workbook with a recorded file hash imports the declared scalar and format subset without warnings.",
+    divergence: "Evidence covers this file and version, not all LibreOffice documents.",
     source: "packages/xlsx/test/fixtures/manifest.json",
     evidence: [
       "packages/xlsx/test/xlsx-import.test.ts",
       "test/browser/showcase-interoperability.spec.ts",
     ],
     fixtureIds: ["libreoffice-positive", "interop-browser-contract"],
-    importBehavior: "Expected normalized cells import with zero warnings.",
+    importBehavior: "Expected cells import with zero warnings.",
     exportBehavior: "Equivalent Sheetwrite scalar cells export through the optional XLSX package.",
     warningCode: null,
     lastVerifiedProtocolVersion: 3,
@@ -429,7 +429,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     status: "partial",
     resultMode: "warning",
     semantics:
-      "A checksum-locked LibreOffice workbook imports the declared rich subset and exact warning boundary.",
+      "A LibreOffice-produced workbook with a recorded file hash imports the declared rich subset and exact warning boundary.",
     divergence:
       "Hidden worksheet visibility produces the recorded unsupported-feature warning for the legacy fixture path.",
     source: "packages/xlsx/test/fixtures/manifest.json",
@@ -440,7 +440,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     ],
     fixtureIds: ["libreoffice-rich", "interop-browser-contract"],
     importBehavior:
-      "Supported native parts normalize into the workbook; unsupported parts emit structured warnings.",
+      "Supported native parts become workbook data; unsupported parts emit structured warnings.",
     exportBehavior:
       "Canonical supported parts export; unknown OOXML parts are not promised lossless preservation.",
     warningCode: "unsupported-feature",
@@ -484,7 +484,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     ],
     fixtureIds: ["xlsx-conformance-vectors"],
     importBehavior:
-      "Supported rules normalize; unsupported rules do not masquerade as supported validation.",
+      "Supported rules import; unsupported rules do not masquerade as supported validation.",
     exportBehavior: "Supported canonical rules emit native validation records.",
     warningCode: "unsupported-validation",
     lastVerifiedProtocolVersion: 3,
@@ -533,7 +533,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     ],
     fixtureIds: ["hyperlink-conditional-vectors"],
     importBehavior:
-      "Safe external and internal targets normalize without fetching; unsafe or malformed targets never enter the snapshot.",
+      "Safe external and internal targets import without fetching; unsafe or malformed targets never enter the snapshot.",
     exportBehavior:
       "Safe external targets emit OPC relationships and internal targets emit stable worksheet locations.",
     warningCode: "hyperlink",
@@ -558,7 +558,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     ],
     fixtureIds: ["hyperlink-conditional-vectors"],
     importBehavior:
-      "Supported rules normalize in priority order; unsupported and over-limit rules emit exact warnings.",
+      "Supported rules import in priority order; unsupported and over-limit rules emit exact warnings.",
     exportBehavior:
       "Supported rules emit native differential styles and conditional-format records.",
     warningCode: "format-loss",
@@ -612,15 +612,15 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
   },
   {
     id: "producer.microsoft-excel",
-    label: "Pinned Microsoft Excel-produced corpus",
+    label: "Recorded Microsoft Excel-produced test files",
     area: "xlsx-import",
     dialect: "excel",
     status: "partial",
     resultMode: "warning",
     semantics:
-      "Five producer/version/checksum records are scheduled against the optional XLSX reader.",
+      "Five producer, version, source, and file-hash records are scheduled against the optional XLSX reader.",
     divergence:
-      "The workbook bytes are not redistributed; absent scheduled bytes remain unverified and cannot support a blanket Excel claim.",
+      "The workbook bytes and reviewed results are not checked in; missing files cannot support a blanket Excel claim.",
     source: "packages/xlsx/test/fixtures/external-corpus.json",
     evidence: [
       "packages/xlsx/test/external-corpus.test.ts",
@@ -628,20 +628,20 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     ],
     fixtureIds: ["external-producer-manifest"],
     importBehavior:
-      "Checksum-matched supplied or scheduled bytes execute exact normalized expectations and warnings.",
+      "When separately supplied bytes match their recorded hashes, the scheduled check compares exact expected results and warnings. No result exists in the default checkout.",
     exportBehavior: "No Excel resave claim is made without separately captured producer evidence.",
     warningCode: "unverified-producer-evidence",
     lastVerifiedProtocolVersion: 3,
   },
   {
     id: "producer.google-sheets",
-    label: "Pinned public Google Sheets export",
+    label: "Recorded public Google Sheets export",
     area: "xlsx-import",
     dialect: "google-sheets",
     status: "warning",
     resultMode: "warning",
     semantics:
-      "One non-redistributed public export has pinned URL, producer, checksum, expected subset, and warning boundary.",
+      "One non-redistributed public export has a recorded URL, producer, file hash, expected subset, and warning boundary.",
     divergence:
       "The local checkout contains metadata only; most Google Sheets workbook behaviors remain explicitly unverified.",
     source: "packages/xlsx/test/fixtures/external-corpus.json",
@@ -651,7 +651,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     ],
     fixtureIds: ["external-producer-manifest", "interop-browser-contract"],
     importBehavior:
-      "Scheduled checksum-matched bytes may verify the declared export only; missing bytes display unverified status.",
+      "Separately supplied bytes may verify only the declared export when the file hash matches; missing bytes display unavailable status.",
     exportBehavior: "No Google Sheets import or resave behavior is claimed.",
     warningCode: "unverified-producer-evidence",
     lastVerifiedProtocolVersion: 3,

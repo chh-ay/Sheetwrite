@@ -701,6 +701,206 @@
     font-size: var(--sw-type-xs);
   }
 
+  .sw-si-results__summary {
+    display: grid;
+    gap: var(--sw-demo-space-3);
+    margin-block: var(--sw-demo-space-4);
+    padding-block: var(--sw-demo-space-4);
+    border-block: 1px solid var(--sw-border);
+  }
+
+  .sw-si-results__summary > p {
+    display: grid;
+    grid-template-columns: minmax(10rem, 0.35fr) minmax(0, 1fr);
+    gap: var(--sw-demo-space-3);
+    margin: 0;
+    color: var(--sw-fg-muted);
+    line-height: 1.55;
+  }
+
+  .sw-si-results__summary > p > strong {
+    color: var(--sw-fg-strong);
+  }
+
+  .sw-si-results__summary > dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: var(--sw-demo-space-2);
+    margin: 0;
+  }
+
+  .sw-si-results__summary > dl > div {
+    min-width: 0;
+    padding-inline-start: var(--sw-demo-space-3);
+    border-inline-start: 1px solid var(--sw-border);
+  }
+
+  .sw-si-results__summary dt,
+  .sw-si-results__summary dd {
+    margin: 0;
+  }
+
+  .sw-si-results__summary dt {
+    color: var(--sw-fg-dim);
+    font: 620 var(--sw-type-xs) var(--font-sans);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .sw-si-results__summary dd {
+    margin-top: var(--sw-demo-space-1);
+    color: var(--sw-fg-strong);
+    font: 640 var(--sw-type-base) var(--font-mono);
+  }
+
+  .sw-si-results__gate {
+    padding: var(--sw-demo-space-3);
+    border-inline-start: var(--sw-demo-space-1) solid var(--sw-demo-warn);
+    background: color-mix(in srgb, var(--sw-demo-warn) 9%, var(--sw-surface-1));
+  }
+
+  .sw-si-results__checksum code {
+    color: var(--sw-fg);
+    font: 550 var(--sw-type-xs) / 1.5 var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  .sw-si-results__position {
+    margin-block: var(--sw-demo-space-2) 0;
+    color: var(--sw-fg-dim);
+    font: 600 var(--sw-type-xs) var(--font-mono);
+  }
+
+  .sw-si-results__notice,
+  .sw-si-results__difference {
+    margin-block: var(--sw-demo-space-4);
+    padding: var(--sw-demo-space-3);
+    border-inline-start: var(--sw-demo-space-1) solid var(--sw-demo-warn);
+    background: color-mix(in srgb, var(--sw-demo-warn) 8%, var(--sw-surface-1));
+    color: var(--sw-fg);
+    line-height: 1.55;
+  }
+
+  .sw-si-results__notice[data-state="unsupported"] {
+    border-inline-start-color: var(--sw-demo-danger);
+    background: color-mix(in srgb, var(--sw-demo-danger) 7%, var(--sw-surface-1));
+  }
+
+  .sw-si-results__difference h4,
+  .sw-si-results__preview h4,
+  .sw-si-results__apps h4 {
+    margin: 0 0 var(--sw-demo-space-2);
+    color: var(--sw-fg-strong);
+    font: 620 var(--sw-type-base) var(--font-display);
+  }
+
+  .sw-si-results__difference p,
+  .sw-si-results__preview p,
+  .sw-si-results__apps > p {
+    margin: 0 0 var(--sw-demo-space-2);
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-sm);
+    line-height: 1.55;
+  }
+
+  .sw-si-results__preview,
+  .sw-si-results__apps,
+  .sw-si-results__technical {
+    margin-top: var(--sw-demo-space-4);
+    padding-top: var(--sw-demo-space-4);
+    border-top: 1px solid var(--sw-border);
+  }
+
+  .sw-si-results__preview pre,
+  .sw-si-results__difference pre,
+  .sw-si-results__apps pre {
+    max-width: 100%;
+    margin: var(--sw-demo-space-2) 0 0;
+    padding: var(--sw-demo-space-3);
+    overflow: auto;
+    border-radius: var(--sw-demo-radius-1);
+    background: var(--sw-surface-2);
+    color: var(--sw-fg);
+    font: 550 var(--sw-type-xs) / 1.55 var(--font-mono);
+    white-space: pre-wrap;
+  }
+
+  .sw-si-results__inputs {
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  }
+
+  .sw-si-results__apps > ul {
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--sw-border);
+    list-style: none;
+  }
+
+  .sw-si-results__apps > ul > li {
+    padding-block: var(--sw-demo-space-3);
+    border-top: 1px solid var(--sw-border);
+  }
+
+  .sw-si-results__apps > ul > li > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--sw-demo-space-2);
+  }
+
+  .sw-si-results__apps > ul > li > div > strong {
+    color: var(--sw-fg-strong);
+  }
+
+  .sw-si-results__apps > ul > li > div > span {
+    color: var(--sw-type-number);
+    font: 620 var(--sw-type-xs) var(--font-mono);
+  }
+
+  .sw-si-results__apps > ul > li[data-state="reviewed"] > div > span {
+    color: var(--sw-accent-strong);
+  }
+
+  .sw-si-results__apps dl {
+    grid-template-columns: minmax(7rem, 0.35fr) minmax(0, 1fr);
+    gap: var(--sw-demo-space-2);
+  }
+
+  .sw-si-results__apps dl > div {
+    display: contents;
+  }
+
+  .sw-si-results__apps details,
+  .sw-si-results__technical {
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-sm);
+  }
+
+  .sw-si-results__apps summary,
+  .sw-si-results__technical summary {
+    width: fit-content;
+    cursor: pointer;
+    color: var(--sw-fg);
+    font-weight: 620;
+  }
+
+  .sw-si-results__apps summary:focus-visible,
+  .sw-si-results__technical summary:focus-visible {
+    border-radius: var(--sw-demo-radius-1);
+    outline: 2px solid var(--sw-accent);
+    outline-offset: var(--sw-demo-space-1);
+  }
+
+  .sw-si-results__technical > code {
+    display: block;
+    margin-top: var(--sw-demo-space-2);
+    overflow-wrap: anywhere;
+  }
+
+  .sw-si-inventory {
+    margin-top: var(--sw-demo-space-3);
+  }
+
   /* ── Reports ── */
 
   .sw-si-report {
@@ -892,7 +1092,7 @@
 
   .sw-si-producers > li {
     display: grid;
-    grid-template-columns: minmax(12rem, 0.7fr) minmax(18rem, 1.5fr) minmax(12rem, 0.8fr);
+    grid-template-columns: minmax(12rem, 0.7fr) minmax(18rem, 1.5fr);
     gap: 1.25rem;
     align-items: baseline;
     padding: 0.8rem 0;
@@ -949,7 +1149,7 @@
     line-height: 1.55;
   }
 
-  .sw-si-producers > li > code {
+  .sw-si-producers details code {
     color: var(--sw-fg-dim);
     font-size: var(--sw-type-xs);
     overflow-wrap: anywhere;
@@ -1256,6 +1456,15 @@
       max-height: 22rem;
       border-right: 0;
       border-bottom: 1px solid var(--sw-border);
+    }
+
+    .sw-si-results__summary > p,
+    .sw-si-results__apps dl {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sw-si-results__summary > dl {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .sw-si-workbench .sw-si-actions {

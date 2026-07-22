@@ -290,14 +290,20 @@ let compatibilityResultsPromise: Promise<CompatibilityResults> | undefined;
 
 function compatibilityResults(): Promise<CompatibilityResults> {
   compatibilityResultsPromise ??= (async () => {
+    const testDirectory = join(repositoryRoot, "test/conformance");
+    const paths = {
+      manifest: join(testDirectory, "corpus.manifest.json"),
+      inventory: join(testDirectory, "formula-contract.inventory.json"),
+      captures: join(repositoryRoot, "scripts/conformance/captures"),
+    };
     const [corpus, manifest, packageJson] = await Promise.all([
-      loadCorpus(),
-      readConformanceManifest(),
+      loadCorpus(join(testDirectory, "corpus.json"), paths),
+      readConformanceManifest(paths.manifest),
       readFile(join(repositoryRoot, "packages/core/package.json"), "utf8").then(
         (content) => JSON.parse(content) as { version: string },
       ),
     ]);
-    const offline = await runOffline(corpus);
+    const offline = await runOffline(corpus, paths);
     return buildCompatibilityResults({
       corpus,
       manifest,
@@ -1803,7 +1809,7 @@ function compatibilityCell(value: string): string {
 function compatibilitySource(source: string): string {
   return source.startsWith("https://")
     ? `[spec/source](${source})`
-    : `[\`${source}\`](https://github.com/chh-ay/sheetwrite/blob/main/${source})`;
+    : `[checked source file](https://github.com/chh-ay/sheetwrite/blob/main/${source})`;
 }
 
 function publicCompatibilitySource(source: string): string {

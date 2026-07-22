@@ -98,24 +98,31 @@ describe("documentation generation", () => {
 
   it("generates a public compatibility projection without executable test paths", async () => {
     const files = await expectedGeneratedFiles(manifest);
-    const matrix = files.find((file) => file.path.endsWith("compatibility-matrix.md"));
+    const reference = files.find((file) => file.path.endsWith("compatibility-matrix.md"));
     const data = files.find((file) => file.path.endsWith("/compatibility.json"));
-    if (!matrix || !data) {
+    const results = files.find((file) => file.path.endsWith("/compatibility-results.json"));
+    if (!reference || !data || !results) {
       throw new Error("generated compatibility outputs are missing");
     }
-    expect(matrix?.content).toContain("not a percentage or a blanket Excel");
-    expect(matrix?.content).toContain("`formula-engine-vectors`");
-    expect(matrix?.content).not.toContain("packages/wasm/src/tests.rs");
-    expect(matrix?.content).not.toContain("test/browser/showcase-interoperability.spec.ts");
+    expect(reference.content).toContain("Detailed compatibility results");
+    expect(reference.content).toContain("`formula-engine-vectors`");
+    expect(reference.content).not.toContain("packages/wasm/src/tests.rs");
+    expect(reference.content).not.toContain("test/browser/showcase-interoperability.spec.ts");
     expect(
       await readFile(
         resolve(import.meta.dir, "../docs/src/content/docs/reference/compatibility-matrix.md"),
         "utf8",
       ),
-    ).toBe(matrix.content);
+    ).toBe(reference.content);
     expect(
       await readFile(resolve(import.meta.dir, "../docs/src/generated/compatibility.json"), "utf8"),
     ).toBe(data.content);
+    expect(
+      await readFile(
+        resolve(import.meta.dir, "../docs/src/generated/compatibility-results.json"),
+        "utf8",
+      ),
+    ).toBe(results.content);
     const projected = JSON.parse(data.content) as {
       records: Array<Record<string, unknown>>;
       fixtures: Array<Record<string, unknown>>;
@@ -124,6 +131,45 @@ describe("documentation generation", () => {
     expect(projected.fixtures[0]).not.toHaveProperty("path");
     expect(data.content).not.toContain("/test/");
     expect(data.content).not.toContain("packages/wasm/src/tests");
+    const publishedResults = JSON.parse(results.content) as {
+      testSet: {
+        version: number;
+        checksum: string;
+        totalTests: number;
+        publishedExamples: number;
+        formulaTests: number;
+        editSequenceTests: number;
+        workbookTests: number;
+        localPassed: number;
+        reviewedResults: number;
+        missingReviewedResults: number;
+        unsupported: number;
+        regressions: number;
+      };
+      cases: Array<{ testChecksum: string; observations: unknown[] }>;
+    };
+    expect(publishedResults.testSet).toMatchObject({
+      version: 1,
+      checksum: "bdf94c76df81ea1fa2e1bf96a557c41b21a0f11ea11ae612fcccc35157d7275a",
+      totalTests: 2350,
+      formulaTests: 2000,
+      editSequenceTests: 250,
+      workbookTests: 100,
+      localPassed: 2290,
+      reviewedResults: 0,
+      missingReviewedResults: 2290,
+      unsupported: 60,
+      regressions: 0,
+    });
+    expect(publishedResults.cases).toHaveLength(publishedResults.testSet.publishedExamples);
+    expect(publishedResults.testSet.publishedExamples).toBeLessThan(
+      publishedResults.testSet.totalTests,
+    );
+    expect(
+      publishedResults.cases.every((entry) => /^[a-f0-9]{64}$/u.test(entry.testChecksum)),
+    ).toBe(true);
+    expect(publishedResults.cases.every((entry) => entry.observations.length === 0)).toBe(true);
+    expect(results.content.length).toBeLessThan(300_000);
   });
 
   it("fails closed when a compatibility fixture digest drifts", async () => {

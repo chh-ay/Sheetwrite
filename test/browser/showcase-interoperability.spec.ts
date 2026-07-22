@@ -73,65 +73,121 @@ test("interoperability page boots, verifies fixture checksums in-browser, and pr
       .toBe("verified");
   }
 
-  // Honest producer matrix: every status is backed by corpus records. Google
-  // Sheets and Microsoft Excel are suite-verified from genuine producer bytes
-  // (not run here), and the residual unverified aspects stay spelled out.
-  const matrix = page.locator('[data-testid="interop-producer-matrix"]');
-  const excelRow = matrix.locator('[data-producer="Microsoft Excel"]');
-  await expect(excelRow).toHaveAttribute("data-state", "verified-suite");
+  // External workbook metadata is not an executed result. Excel and Google
+  // Sheets remain unavailable until reviewed bytes/results are checked in.
+  const producerResults = page.locator('[data-testid="interop-producer-matrix"]');
+  const excelRow = producerResults.locator('[data-producer="Microsoft Excel"]');
+  await expect(excelRow).toHaveAttribute("data-state", "unverified");
+  await expect(excelRow).toContainText("Result unavailable");
   await expect(excelRow).toContainText("Apache POI");
-  const sheetsRow = matrix.locator('[data-producer="Google Sheets"]');
-  await expect(sheetsRow).toHaveAttribute("data-state", "verified-suite");
-  await expect(sheetsRow).toContainText("genuine Google Sheets-exported workbook");
-  await expect(sheetsRow).toContainText("Not yet verified from Google Sheets bytes");
+  await expect(excelRow).toContainText("no Excel result is available here");
+  const sheetsRow = producerResults.locator('[data-producer="Google Sheets"]');
+  await expect(sheetsRow).toHaveAttribute("data-state", "unverified");
+  await expect(sheetsRow).toContainText("Result unavailable");
+  await expect(sheetsRow).toContainText("no Google Sheets result is available here");
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
 
-test("@portability compatibility lab deep-links exact boundaries and filters the executable inventory", async ({
+test("@portability compatibility results expose every truthful state from checked data", async ({
   page,
 }) => {
   const errors = collectErrors(page);
   await bootInterop(page, `${ROUTE}?compatibility=producer.google-sheets`);
 
-  const detail = page.getByTestId("compatibility-detail");
-  await expect(detail).toContainText("Pinned public Google Sheets export");
-  await expect(detail).toContainText("unverified-producer-evidence");
-  await expect(detail).toContainText("No Google Sheets import or resave behavior is claimed.");
-  await expect(detail).toContainText("/docs/reference/compatibility-matrix/#sources");
+  const inventoryDetail = page.getByTestId("compatibility-detail");
+  await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");
+  await expect(inventoryDetail).toContainText(
+    "No Google Sheets import or resave behavior is claimed.",
+  );
+  await expect(inventoryDetail).toContainText("Open the checked source");
 
-  const cases = [
-    ["formula.portable-operators", "supported", "evaluated"],
-    ["xlsx.rich-workbook", "partial", "warning"],
-    ["worksheet.very-hidden", "roundtrip-only", "preserved"],
-    ["clipboard.delimited", "partial", "flattened"],
-    ["formula.let-lambda", "unsupported", "unsupported"],
-  ] as const;
-  for (const [id, status, result] of cases) {
-    await page.getByTestId(`compatibility-${id}`).click();
-    await expect(detail).toHaveAttribute("data-status", status);
-    await expect(detail).toHaveAttribute("data-result", result);
-  }
+  const summary = page.getByTestId("compatibility-results-summary");
+  await expect(summary).toContainText("2,350");
+  await expect(summary).toContainText("2,000");
+  await expect(summary).toContainText("250");
+  await expect(summary).toContainText("100");
+  await expect(summary).toContainText("2,290 of 2,290 supported tests passed locally");
+  await expect(summary).toContainText("0 reviewed results");
+  await expect(summary).toContainText("2,290 supported tests still lack");
+  await expect(summary).toContainText("60 unsupported tests");
+  await expect(page.getByTestId("compatibility-test-set-checksum")).toHaveText(
+    "bdf94c76df81ea1fa2e1bf96a557c41b21a0f11ea11ae612fcccc35157d7275a",
+  );
 
+  const detail = page.getByTestId("compatibility-result-detail");
+
+  // Shared local pass: a local result is real, while incumbent app observations
+  // remain explicitly unavailable.
+  await expect(detail).toHaveAttribute("data-behavior", "shared");
+  await expect(detail).toHaveAttribute("data-status", /local-pass/u);
+  await expect(page.getByTestId("app-result-excel-desktop")).toHaveAttribute(
+    "data-state",
+    "unavailable",
+  );
+  await expect(page.getByTestId("app-result-google-sheets")).toContainText(
+    "no reviewed result file is attached",
+  );
+
+  // The checked set currently carries exact tolerance only. Exercise that
+  // truthful comparison boundary rather than inventing a numeric tolerance.
+  await expect(page.getByTestId("compatibility-tolerance")).toHaveText("Exact type and value");
+
+  // Excel-specific behavior exists, but no reviewed Excel result is attached.
+  await page.getByTestId("compatibility-behavior-filter").selectOption("excel");
+  await expect(detail).toHaveAttribute("data-behavior", "excel");
+  await expect(detail).toHaveAttribute("data-status", /known-difference/u);
+  await expect(page.getByTestId("known-difference")).toContainText("1900-02-29");
+  await expect(page.getByTestId("app-result-excel-desktop")).toContainText("Result unavailable");
+
+  // The separate checked feature boundary records the Google-only scope and
+  // still renders it as unavailable rather than claiming an executed result.
+  await page.getByTestId("inventory-behavior-filter").selectOption("google-sheets");
+  await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");
+  await expect(inventoryDetail).toContainText("missing bytes display unavailable status");
+
+  // Known difference.
+  await page.getByTestId("compatibility-behavior-filter").selectOption("all");
+  await page.getByTestId("compatibility-status-filter").selectOption("known-difference");
+  await expect(detail).toHaveAttribute("data-status", /known-difference/u);
+  await expect(page.getByTestId("known-difference")).toBeVisible();
+
+  // Explicit unsupported nonclaim.
   await page.getByTestId("compatibility-status-filter").selectOption("unsupported");
-  const unsupported = page.locator(".sw-si-compat__records button");
-  expect(await unsupported.count()).toBeGreaterThan(0);
-  for (const button of await unsupported.all()) {
-    await expect(button).toHaveAttribute("data-status", "unsupported");
-  }
+  await expect(detail).toHaveAttribute("data-status", /unsupported/u);
+  await expect(detail).toContainText("excluded from the pass percentage");
 
+  // Warning behavior, with a real workbook-operation preview from checked data.
+  await page.getByTestId("compatibility-status-filter").selectOption("warning");
+  await expect(detail).toHaveAttribute("data-status", /warning/u);
+  await expect(detail).toContainText("Warning behavior check");
+  await expect(page.getByTestId("compatibility-workbook-preview")).toContainText('"warnings"');
+
+  // Regression is a tested empty state: there are no reviewed external results,
+  // therefore there can be no reviewed regression record.
+  await page.getByTestId("compatibility-status-filter").selectOption("regression");
+  await expect(page.getByTestId("compatibility-results-empty")).toContainText(
+    "No reviewed regressions are recorded",
+  );
+  await expect(page.locator(".sw-si-results .sw-si-compat__records button")).toHaveCount(0);
+
+  // Function/feature filtering and case selection work through the keyboard.
   await page.getByTestId("compatibility-status-filter").selectOption("all");
-  await page.getByTestId("compatibility-area-filter").selectOption("formula");
-  const formulas = page.locator(".sw-si-compat__records button");
-  expect(await formulas.count()).toBeGreaterThan(0);
-  for (const button of await formulas.all()) {
-    await expect(button).toContainText("formula /");
-  }
-  await page.getByTestId("compatibility-dialect-filter").selectOption("excel");
-  for (const button of await formulas.all()) {
-    await expect(button).toContainText("/ excel");
-  }
+  const featureFilter = page.getByTestId("compatibility-feature-filter");
+  await featureFilter.selectOption("function:ABS");
+  const absResults = page.locator(".sw-si-results .sw-si-compat__records button");
+  await expect(absResults).toHaveCount(1);
+  await expect(absResults.first()).toContainText("ABS");
+  await featureFilter.focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("compatibility-behavior-filter")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("compatibility-status-filter")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(absResults.first()).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(detail).toContainText("ABS");
 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -213,7 +269,7 @@ test("analytical workbook recalculates real precedents and clears resized spills
   expect(initial.values.endDate).toBe(47514);
   expect(initial.values.spill).toEqual([1, 2, 3, 4, null, null]);
   await expect(page.getByTestId("interop-model-evidence")).toContainText(
-    "No new Excel or Google Sheets observation",
+    "No new Excel or Google Sheets result",
   );
 
   await page.getByTestId("interop-rate-input").selectOption("0.09");

@@ -5,11 +5,18 @@ import { readConformanceManifest, readFormulaInventory } from "./generate.js";
 import { validateCorpus } from "./schema.js";
 import type { ConformanceCorpus, OfflineConformanceResult } from "./types.js";
 
-export async function runOffline(corpus: ConformanceCorpus): Promise<OfflineConformanceResult> {
+export async function runOffline(
+  corpus: ConformanceCorpus,
+  paths: {
+    manifest?: string;
+    inventory?: string;
+    captures?: string;
+  } = {},
+): Promise<OfflineConformanceResult> {
   const [artifacts, manifest, inventory] = await Promise.all([
-    verifyCaptureArtifacts(corpus),
-    readConformanceManifest(),
-    readFormulaInventory(),
+    verifyCaptureArtifacts(corpus, paths.captures),
+    readConformanceManifest(paths.manifest),
+    readFormulaInventory(paths.inventory),
   ]);
   const corpusIssues = [
     ...artifacts.issues,

@@ -9,7 +9,7 @@ Sheetwrite evaluates formulas in the Rust/WASM calculation engine. Formula sourc
 
 Sheetwrite intentionally implements a coherent spreadsheet subset. It does **not** claim full Google Sheets or Excel formula parity.
 
-See the generated [formula function contract](/docs/reference/formula-functions/) for the complete inventory-derived function table and the [executable compatibility matrix](/docs/reference/compatibility-matrix/) for evidence-linked operator, spill, preservation, and unsupported boundaries.
+See the generated [formula function contract](/docs/reference/formula-functions/) for the complete inventory-derived function table and the [detailed compatibility results](/docs/reference/compatibility-matrix/) for checked operator, spill, preservation, and unsupported boundaries.
 
 ## Authoring formulas
 
@@ -31,7 +31,7 @@ grid.store.applyTransaction({
 
 ## Supported formulas
 
-The checked, versioned `sheetwrite.formula-capabilities` contract is the source of truth for function registration. Its generated reference publishes all **100 required-supported target functions plus every incumbent function**, grouped by family, with aliases, exact signature and semantic profiles, implementation/evidence paths, source links, and dialect status. Do not infer support from an Excel, Google Sheets, or OpenFormula function with a similar name.
+The checked, versioned `sheetwrite.formula-capabilities` contract is the source of truth for function registration. Its generated reference publishes all **100 required-supported target functions plus every incumbent function**, grouped by family, with aliases, exact signature and semantic profiles, implementation/evidence paths, source links, and behavior status. Do not infer support from an Excel, Google Sheets, or OpenFormula function with a similar name.
 
 [Browse the generated formula function contract →](/docs/reference/formula-functions/)
 
@@ -74,7 +74,7 @@ One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes
 
 ## References, ranges, and named ranges
 
-A1 cells (`A1`, `$B12`, `AA$3`), normalized rectangles (`A1:B3`), and cross-sheet references (`Sales!E2`, `'Sales 2026'!E2:E10`) are supported. Absolute markers affect fill/structural rewriting; they do not change evaluation.
+A1 cells (`A1`, `$B12`, `AA$3`), rectangular ranges (`A1:B3`), and cross-sheet references (`Sales!E2`, `'Sales 2026'!E2:E10`) are supported. Absolute markers affect fill/structural rewriting; they do not change evaluation.
 
 Named ranges are document operations and snapshot metadata:
 
@@ -238,7 +238,7 @@ Unsupported names evaluate to `#NAME?` while preserving source for snapshots and
 
 ## Performance evidence
 
-No formula throughput or latency number is published from this guide because no checked final formula-performance artifact is present. Follow the [performance evidence protocol](/docs/guides/performance-resources/) to capture and freshness-validate measurements; do not treat resource ceilings as benchmark results.
+No formula throughput or latency number is published from this guide because no checked final formula-performance evidence file is present. Follow the [performance evidence guide](/docs/guides/performance-resources/) to capture and freshness-check measurements; do not treat resource ceilings as benchmark results.
 
 ## Point mode and reference rewriting
 

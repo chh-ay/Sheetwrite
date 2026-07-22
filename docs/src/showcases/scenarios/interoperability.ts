@@ -421,15 +421,15 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
 
 export interface ProducerVerification {
   producer: string;
-  status: "verified-live" | "verified-suite" | "unverified";
+  status: "verified-live" | "unverified";
   detail: string;
   evidence: string;
 }
 
-const EXCEL_CORPUS_FILES = externalCorpus.fixtures.length;
+const EXCEL_TEST_FILES = externalCorpus.fixtures.length;
 const EXCEL_UNVERIFIED = externalCorpus.unverified["Microsoft Excel"];
 const SHEETS_UNVERIFIED = externalCorpus.unverified["Google Sheets"];
-const GOOGLE_FIXTURES = externalCorpus.googleFixtures;
+const GOOGLE_TEST_FILES = externalCorpus.googleFixtures;
 
 /**
  * Honest producer compatibility: only claims backed by real bytes. Every row
@@ -441,7 +441,7 @@ export const PRODUCER_MATRIX: readonly ProducerVerification[] = [
     producer: `LibreOffice ${fixtureManifest.positive[0]?.producer.version ?? ""}`.trim(),
     status: "verified-live",
     detail:
-      "Committed LibreOffice-produced workbooks import on this page, in your browser, with checksums verified against the fixture manifest.",
+      "Committed LibreOffice-produced workbooks import on this page, in your browser, after their file hashes match the checked fixture record.",
     evidence: "packages/xlsx/test/fixtures/manifest.json",
   },
   {
@@ -453,23 +453,19 @@ export const PRODUCER_MATRIX: readonly ProducerVerification[] = [
   },
   {
     producer: "Microsoft Excel",
-    status: "verified-suite",
-    detail: `${EXCEL_CORPUS_FILES} Excel-produced workbooks from the Apache POI test corpus (commit ${externalCorpus.commit.slice(0, 10)}) are checksum-pinned and verified in the conformance suite. Those bytes are not redistributed here, so this page does not run them. Not yet verified from Excel bytes: ${EXCEL_UNVERIFIED.join(", ")}.`,
+    status: "unverified",
+    detail: `${EXCEL_TEST_FILES} Excel-produced test files are listed from Apache POI commit ${externalCorpus.commit.slice(0, 10)}, with expected file hashes and download sources. The workbook bytes and reviewed results are not checked in, so no Excel result is available here. Still unverified from Excel files: ${EXCEL_UNVERIFIED.join(", ")}.`,
     evidence: "packages/xlsx/test/fixtures/external-corpus.json",
   },
-  GOOGLE_FIXTURES.length > 0
-    ? {
-        producer: "Google Sheets",
-        status: "verified-suite",
-        detail: `${GOOGLE_FIXTURES.length} genuine Google Sheets-exported workbook${GOOGLE_FIXTURES.length === 1 ? "" : "s"} (${GOOGLE_FIXTURES.map((fixture) => fixture.file).join(", ")}) ${GOOGLE_FIXTURES.length === 1 ? "is" : "are"} checksum-pinned and verified in the conformance suite: ${GOOGLE_FIXTURES[0]?.expected.join(", ") ?? ""}. Licensing does not permit redistributing the bytes here, so this page does not run them. Not yet verified from Google Sheets bytes: ${SHEETS_UNVERIFIED.join(", ")}.`,
-        evidence: "packages/xlsx/test/fixtures/external-corpus.json",
-      }
-    : {
-        producer: "Google Sheets",
-        status: "unverified",
-        detail: `Unverified. No genuine Google Sheets-produced bytes exist in the corpus yet, so no compatibility claim is made for: ${SHEETS_UNVERIFIED.join(", ")}.`,
-        evidence: "packages/xlsx/test/fixtures/external-corpus.json",
-      },
+  {
+    producer: "Google Sheets",
+    status: "unverified",
+    detail:
+      GOOGLE_TEST_FILES.length > 0
+        ? `Metadata lists ${GOOGLE_TEST_FILES.length} Google Sheets-exported test file${GOOGLE_TEST_FILES.length === 1 ? "" : "s"} (${GOOGLE_TEST_FILES.map((fixture) => fixture.file).join(", ")}) with ${GOOGLE_TEST_FILES.length === 1 ? "its" : "their"} file hash recorded. The bytes and reviewed compatibility results are not checked in, so no Google Sheets result is available here. Still unverified from Google Sheets files: ${SHEETS_UNVERIFIED.join(", ")}.`
+        : `No Google Sheets-produced test file or reviewed result is checked in, so no compatibility claim is made for: ${SHEETS_UNVERIFIED.join(", ")}.`,
+    evidence: "packages/xlsx/test/fixtures/external-corpus.json",
+  },
 ];
 
 // ── Import / export protocol ─────────────────────────────────────────────────

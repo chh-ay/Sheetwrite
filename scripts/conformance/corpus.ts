@@ -29,11 +29,16 @@ function declaredArtifactHashes(value: unknown): Set<string> {
 
 export async function loadCorpus(
   path = "test/conformance/corpus.json",
+  paths: {
+    manifest?: string;
+    inventory?: string;
+    captures?: string;
+  } = {},
 ): Promise<ConformanceCorpus> {
   const [value, manifest, inventory] = await Promise.all([
     readCorpusJson(path),
-    readConformanceManifest(MANIFEST_PATH),
-    readFormulaInventory(INVENTORY_PATH),
+    readConformanceManifest(paths.manifest ?? MANIFEST_PATH),
+    readFormulaInventory(paths.inventory ?? INVENTORY_PATH),
   ]);
   const structuralIssues = validateCorpus(
     value,
@@ -43,7 +48,7 @@ export async function loadCorpus(
   );
   if (structuralIssues.length > 0) throw new Error(structuralIssues.join("\n"));
   const corpus = value as ConformanceCorpus;
-  const artifacts = await verifyCaptureArtifacts(corpus);
+  const artifacts = await verifyCaptureArtifacts(corpus, paths.captures);
   const issues = [
     ...artifacts.issues,
     ...validateCorpus(corpus, manifest, inventory, artifacts.verified),

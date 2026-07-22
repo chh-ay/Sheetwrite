@@ -22,7 +22,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import compatibilityData from "../generated/compatibility.json";
+import compatibilityResultsData from "../generated/compatibility-results.json";
+import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
 import { pageMeta } from "../lib/seo.js";
+import type {
+  CompatibilityResults,
+  CompatibilityResultStatus,
+} from "../showcases/compatibility-results.js";
 import {
   ADVERSARIAL_FIXTURES,
   abortedImport,
@@ -77,9 +83,51 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
  * follows the site light/dark theme instead of a hardcoded dark palette.
  */
 const CANVAS_THEME: Partial<Theme> = { rowHeight: 30 };
+const COMPATIBILITY_RESULTS = compatibilityResultsData as unknown as CompatibilityResults;
+
+const RESULT_STATUS_LABELS: Record<CompatibilityResultStatus, string> = {
+  "local-pass": "Local check passed",
+  "result-unavailable": "Tested app result missing",
+  "reviewed-pass": "Reviewed app result passed",
+  "known-difference": "Known difference",
+  unsupported: "Unsupported / not claimed",
+  warning: "Warning behavior",
+  regression: "Regression",
+};
+
+const BEHAVIOR_LABELS: Record<string, string> = {
+  shared: "Shared spreadsheet behavior",
+  excel: "Excel-specific behavior",
+  "google-sheets": "Google Sheets-specific behavior",
+  openformula: "OpenFormula-specific behavior",
+};
+
+const TESTED_APPS = [
+  { id: "excel-desktop", label: "Microsoft Excel desktop" },
+  { id: "excel-web", label: "Microsoft Excel for the web" },
+  { id: "google-sheets", label: "Google Sheets" },
+  { id: "libreoffice", label: "LibreOffice" },
+  { id: "sheetwrite", label: "Sheetwrite captured result" },
+] as const;
+
+type ResultFilter = "all" | CompatibilityResultStatus;
 
 type CompatibilityRecord = (typeof compatibilityData.records)[number];
 type CompatibilityFilter = "all" | CompatibilityRecord["status"];
+const INVENTORY_STATUS_LABELS: Record<CompatibilityRecord["status"], string> = {
+  supported: "Supported",
+  partial: "Partially supported",
+  "roundtrip-only": "Preserved on round-trip only",
+  warning: "Supported with warning",
+  unsupported: "Unsupported",
+};
+const RESULT_MODE_LABELS: Record<CompatibilityRecord["resultMode"], string> = {
+  evaluated: "Evaluated",
+  preserved: "Preserved",
+  flattened: "Flattened for interchange",
+  warning: "Warning reported",
+  unsupported: "Unsupported",
+};
 
 const COMPATIBILITY_AREAS = [...new Set(compatibilityData.records.map((record) => record.area))];
 const COMPATIBILITY_DIALECTS = [
@@ -87,7 +135,7 @@ const COMPATIBILITY_DIALECTS = [
 ];
 
 const SECTIONS = [
-  { id: "contract", label: "Compatibility contract" },
+  { id: "contract", label: "Compatibility results" },
   { id: "xlsx", label: "XLSX round-trip" },
   { id: "fixtures", label: "Independent fixtures" },
   { id: "warnings", label: "Fidelity warnings" },
@@ -254,6 +302,10 @@ function InteroperabilityRoute() {
   const [fixtureLoad, setFixtureLoad] = useState<FixtureLoad | null>(null);
   const [modelReadout, setModelReadout] = useState<AnalyticalReadout | null>(null);
   const [modelChange, setModelChange] = useState<AnalyticalChange | null>(null);
+  const [resultStatus, setResultStatus] = useState<ResultFilter>("all");
+  const [resultFeature, setResultFeature] = useState("all");
+  const [resultBehavior, setResultBehavior] = useState("all");
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [compatibilityStatus, setCompatibilityStatus] = useState<CompatibilityFilter>("all");
   const [compatibilityArea, setCompatibilityArea] = useState("all");
   const [compatibilityDialect, setCompatibilityDialect] = useState("all");
@@ -581,7 +633,7 @@ function InteroperabilityRoute() {
       setStatus(
         tsv === null
           ? "Select a cell or range in the grid first, then export the selection."
-          : "Selection exported as clipboard-dialect TSV.",
+          : "Selection exported as clipboard-format TSV.",
       );
     } catch (error) {
       setStatus(`TSV export failed — ${describeError(error)}`);
@@ -607,6 +659,21 @@ function InteroperabilityRoute() {
   };
 
   const injectionCsvLine = csvPreview?.split(/\r?\n/).find((line) => line.includes("OP-1045"));
+  const visibleResults = COMPATIBILITY_RESULTS.cases.filter(
+    (entry) =>
+      (resultStatus === "all" || entry.statusTags.includes(resultStatus)) &&
+      (resultFeature === "all" || entry.featureValue === resultFeature) &&
+      (resultBehavior === "all" || entry.behavior === resultBehavior),
+  );
+  const selectedResult =
+    visibleResults.find((entry) => entry.id === selectedResultId) ?? visibleResults[0];
+  const selectedResultSource = selectedResult
+    ? COMPATIBILITY_RESULTS.sources[selectedResult.sourceIndex]
+    : undefined;
+  const selectedResultEvidence = selectedResult
+    ? COMPATIBILITY_RESULTS.evidence[selectedResult.evidenceIndex]
+    : undefined;
+
   const visibleCompatibility = compatibilityData.records.filter(
     (record) =>
       (compatibilityStatus === "all" || record.status === compatibilityStatus) &&
@@ -657,58 +724,446 @@ function InteroperabilityRoute() {
         </p>
 
         <section aria-labelledby="contract-title" className="sw-si-section" id="contract">
-          <h2 id="contract-title">Executable compatibility contract</h2>
+          <h2 id="contract-title">Compatibility results you can inspect</h2>
           <p>
-            Every row below comes from the same fail-closed inventory as the generated{" "}
-            <a href="/docs/reference/compatibility-matrix/">documentation matrix</a>. Status means
-            only what the named fixture and semantic vector establish — never blanket Excel, Google
-            Sheets, LibreOffice, or OpenFormula parity.
+            This page publishes a fixed, checked test set and the product&apos;s declared feature
+            boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice, or OpenFormula
+            compatibility.{" "}
+            <a href="/docs/reference/compatibility-matrix/">Read the detailed checked results →</a>
+          </p>
+
+          <div
+            aria-label="Checked compatibility test set summary"
+            className="sw-si-results__summary"
+            data-testid="compatibility-results-summary"
+          >
+            <p>
+              <strong>Local result</strong>
+              <span>
+                {(
+                  (COMPATIBILITY_RESULTS.testSet.localPassed /
+                    (COMPATIBILITY_RESULTS.testSet.totalTests -
+                      COMPATIBILITY_RESULTS.testSet.unsupported)) *
+                  100
+                ).toFixed(0)}
+                % — {COMPATIBILITY_RESULTS.testSet.localPassed.toLocaleString()} of{" "}
+                {(
+                  COMPATIBILITY_RESULTS.testSet.totalTests -
+                  COMPATIBILITY_RESULTS.testSet.unsupported
+                ).toLocaleString()}{" "}
+                supported tests passed locally
+              </span>
+            </p>
+            <dl>
+              <div>
+                <dt>Test set version</dt>
+                <dd>{COMPATIBILITY_RESULTS.testSet.version}</dd>
+              </div>
+              <div>
+                <dt>Total tests</dt>
+                <dd>{COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>Formula tests</dt>
+                <dd>{COMPATIBILITY_RESULTS.testSet.formulaTests.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>Edit sequences</dt>
+                <dd>{COMPATIBILITY_RESULTS.testSet.editSequenceTests.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>Workbook tests</dt>
+                <dd>{COMPATIBILITY_RESULTS.testSet.workbookTests.toLocaleString()}</dd>
+              </div>
+            </dl>
+            <p className="sw-si-results__gate" data-state="blocked">
+              <strong>External app evidence is incomplete.</strong>
+              <span>
+                {COMPATIBILITY_RESULTS.testSet.reviewedResults.toLocaleString()} reviewed results;{" "}
+                {COMPATIBILITY_RESULTS.testSet.missingReviewedResults.toLocaleString()} supported
+                tests still lack a reviewed tested-app result.{" "}
+                {COMPATIBILITY_RESULTS.testSet.unsupported.toLocaleString()} unsupported tests are
+                explicit nonclaims and are excluded from the local percentage.
+              </span>
+            </p>
+            <p>
+              <strong>Explicit result categories</strong>
+              <span>
+                {COMPATIBILITY_RESULTS.testSet.warningChecks.toLocaleString()} warning-behavior
+                checks · {COMPATIBILITY_RESULTS.testSet.knownDifferences.toLocaleString()} known
+                difference · {COMPATIBILITY_RESULTS.testSet.regressions.toLocaleString()} reviewed
+                regressions
+              </span>
+            </p>
+            <p className="sw-si-results__checksum">
+              <span>Checked test set SHA-256</span>
+              <code data-testid="compatibility-test-set-checksum">
+                {COMPATIBILITY_RESULTS.testSet.checksum}
+              </code>
+            </p>
+          </div>
+
+          <h3>Inspect representative checked tests</h3>
+          <p>
+            The compact page includes the first checked example for every function or feature, plus
+            every available result state. Counts above always refer to the full{" "}
+            {COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()}-test set; the browser below
+            contains {COMPATIBILITY_RESULTS.testSet.publishedExamples.toLocaleString()} inspectable
+            examples.
           </p>
           <fieldset className="sw-si-compat__filters">
-            <legend>Filter compatibility records</legend>
+            <legend>Filter checked tests</legend>
+            <label>
+              Function or feature
+              <select
+                data-testid="compatibility-feature-filter"
+                onChange={(event) => {
+                  setResultFeature(event.currentTarget.value);
+                  setSelectedResultId(null);
+                }}
+                value={resultFeature}
+              >
+                <option value="all">All functions and features</option>
+                {COMPATIBILITY_RESULTS.filterOptions.features.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Behavior
+              <select
+                data-testid="compatibility-behavior-filter"
+                onChange={(event) => {
+                  setResultBehavior(event.currentTarget.value);
+                  setSelectedResultId(null);
+                }}
+                value={resultBehavior}
+              >
+                <option value="all">All behavior scopes</option>
+                {COMPATIBILITY_RESULTS.filterOptions.behaviors.map((behavior) => (
+                  <option key={behavior} value={behavior}>
+                    {BEHAVIOR_LABELS[behavior]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Result status
+              <select
+                data-testid="compatibility-status-filter"
+                onChange={(event) => {
+                  setResultStatus(event.currentTarget.value as ResultFilter);
+                  setSelectedResultId(null);
+                }}
+                value={resultStatus}
+              >
+                <option value="all">All result states</option>
+                {COMPATIBILITY_RESULTS.filterOptions.statuses.map((entryStatus) => (
+                  <option key={entryStatus} value={entryStatus}>
+                    {RESULT_STATUS_LABELS[entryStatus]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span aria-live="polite" className="sw-si-compat__count">
+              {visibleResults.length}/{COMPATIBILITY_RESULTS.testSet.publishedExamples} examples
+            </span>
+          </fieldset>
+
+          <div className="sw-si-compat sw-si-results">
+            <ul aria-label="Checked compatibility tests" className="sw-si-compat__records">
+              {visibleResults.map((entry) => (
+                <li key={entry.id}>
+                  <button
+                    aria-pressed={selectedResult?.id === entry.id}
+                    data-behavior={entry.behavior}
+                    data-status={entry.statusTags.join(" ")}
+                    data-testid={`compatibility-result-${entry.position}`}
+                    data-tolerance={entry.tolerance.kind}
+                    onClick={() => setSelectedResultId(entry.id)}
+                    type="button"
+                  >
+                    <span>
+                      {entry.featureLabel} / {BEHAVIOR_LABELS[entry.behavior]}
+                    </span>
+                    <strong>{entry.label}</strong>
+                    <small>
+                      {entry.statusTags.map((tag) => RESULT_STATUS_LABELS[tag]).join(" · ")}
+                    </small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {selectedResult && selectedResultSource && selectedResultEvidence ? (
+              <article
+                className="sw-si-compat__detail sw-si-results__detail"
+                data-behavior={selectedResult.behavior}
+                data-status={selectedResult.statusTags.join(" ")}
+                data-testid="compatibility-result-detail"
+              >
+                <p className="sw-si-compat__mode">
+                  {selectedResult.statusTags.map((tag) => (
+                    <span data-state={tag} key={tag}>
+                      {RESULT_STATUS_LABELS[tag]}
+                    </span>
+                  ))}
+                </p>
+                <p className="sw-si-results__position">
+                  Test {selectedResult.position.toLocaleString()} of{" "}
+                  {COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()} ·{" "}
+                  {BEHAVIOR_LABELS[selectedResult.behavior]}
+                </p>
+                <h3>{selectedResult.label}</h3>
+                <p>{selectedResultEvidence.description}</p>
+
+                {selectedResult.unsupported && (
+                  <p className="sw-si-results__notice" data-state="unsupported">
+                    <strong>Unsupported and excluded from the pass percentage.</strong> This is a
+                    checked nonclaim, not a failed supported feature.
+                  </p>
+                )}
+                {selectedResult.statusTags.includes("warning") && (
+                  <p className="sw-si-results__notice" data-state="warning">
+                    <strong>Warning behavior check.</strong> This test exercises the warning path;
+                    it does not claim that an external app emitted a warning.
+                  </p>
+                )}
+                {selectedResult.knownDifference && (
+                  <aside className="sw-si-results__difference" data-testid="known-difference">
+                    <h4>Known difference</h4>
+                    <p>{selectedResult.knownDifference.reason}</p>
+                    <p>
+                      Recorded for{" "}
+                      {selectedResult.knownDifference.producers
+                        .map(
+                          (producer) =>
+                            TESTED_APPS.find((app) => app.id === producer)?.label ?? producer,
+                        )
+                        .join(", ")}
+                      .
+                    </p>
+                    <pre>{JSON.stringify(selectedResult.knownDifference.alternate, null, 2)}</pre>
+                  </aside>
+                )}
+
+                <section aria-labelledby="selected-test-preview" className="sw-si-results__preview">
+                  <h4 id="selected-test-preview">
+                    {selectedResult.kind === "formula"
+                      ? "Input and expected result"
+                      : "Workbook preview"}
+                  </h4>
+                  {selectedResult.formula && (
+                    <p>
+                      Formula <code>{selectedResult.formula}</code>
+                      {selectedResult.target ? (
+                        <>
+                          {" "}
+                          at <code>{selectedResult.target}</code>
+                        </>
+                      ) : null}
+                    </p>
+                  )}
+                  {selectedResult.inputs && selectedResult.inputs.length > 0 ? (
+                    <dl className="sw-si-results__inputs">
+                      {selectedResult.inputs.map((input) => (
+                        <div key={input.cell}>
+                          <dt>{input.cell}</dt>
+                          <dd>
+                            <code>{JSON.stringify(input.value)}</code>
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : selectedResult.formula ? (
+                    <p>No input cells are required.</p>
+                  ) : null}
+                  {selectedResult.operations && (
+                    <pre data-testid="compatibility-workbook-preview">
+                      {JSON.stringify(selectedResult.operations, null, 2)}
+                    </pre>
+                  )}
+                  <dl>
+                    <div>
+                      <dt>Expected checked result</dt>
+                      <dd>
+                        <pre>{JSON.stringify(selectedResult.expected, null, 2)}</pre>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Comparison tolerance</dt>
+                      <dd data-testid="compatibility-tolerance">
+                        {selectedResult.tolerance.kind === "exact"
+                          ? "Exact type and value"
+                          : `${selectedResult.tolerance.kind} · ${selectedResult.tolerance.value}`}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section aria-labelledby="tested-app-results" className="sw-si-results__apps">
+                  <h4 id="tested-app-results">Tested app results and differences</h4>
+                  <p>
+                    Missing results stay unavailable. A source description or expected value never
+                    substitutes for a reviewed app result.
+                  </p>
+                  <ul>
+                    {TESTED_APPS.map((app) => {
+                      const observation = selectedResult.observations.find(
+                        (entry) => entry.testedApp === app.id,
+                      );
+                      const reviewed = observation?.reviewStatus === "reviewed";
+                      return (
+                        <li
+                          data-state={observation?.reviewStatus ?? "unavailable"}
+                          data-testid={`app-result-${app.id}`}
+                          key={app.id}
+                        >
+                          <div>
+                            <strong>{app.label}</strong>
+                            <span>{reviewed ? "Reviewed result" : "Result unavailable"}</span>
+                          </div>
+                          <dl>
+                            <div>
+                              <dt>Version</dt>
+                              <dd>{observation?.version ?? "Unavailable"}</dd>
+                            </div>
+                            <div>
+                              <dt>Captured</dt>
+                              <dd>{observation?.capturedAt ?? "Unavailable"}</dd>
+                            </div>
+                            <div>
+                              <dt>Result differences</dt>
+                              <dd>
+                                {!reviewed
+                                  ? "Unavailable — no reviewed result file is attached to this test."
+                                  : observation.differences.length === 0
+                                    ? "No differences after type-aware comparison."
+                                    : observation.differences.join("; ")}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Evidence file checksum</dt>
+                              <dd>{observation?.evidenceFileChecksum ?? "Unavailable"}</dd>
+                            </div>
+                          </dl>
+                          {observation?.result && (
+                            <details>
+                              <summary>Technical captured result</summary>
+                              <pre>{JSON.stringify(observation.result, null, 2)}</pre>
+                            </details>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+
+                <details className="sw-si-results__technical">
+                  <summary>Technical test details</summary>
+                  <dl>
+                    <div>
+                      <dt>Machine ID</dt>
+                      <dd>
+                        <code>{selectedResult.id}</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Test record SHA-256</dt>
+                      <dd>
+                        <code>{selectedResult.testChecksum}</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Exact source</dt>
+                      <dd>
+                        <a href={selectedResultSource.url}>
+                          {selectedResultSource.title}, {selectedResultSource.section}
+                        </a>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Source record SHA-256</dt>
+                      <dd>
+                        <code>{selectedResultSource.sha256}</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Source rights</dt>
+                      <dd>
+                        {selectedResultSource.authorship} · {selectedResultSource.license}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Generated checked data</dt>
+                      <dd>
+                        <a href={compatibilityResultsUrl}>Open exact generated JSON</a>
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
+              </article>
+            ) : (
+              <p className="sw-si-empty" data-testid="compatibility-results-empty">
+                {resultStatus === "regression"
+                  ? "No reviewed regressions are recorded. Tested-app results are currently unavailable rather than assumed."
+                  : "No published example matches these filters. Choose a broader function, behavior, or status."}
+              </p>
+            )}
+          </div>
+
+          <h3>Declared feature boundaries</h3>
+          <p>
+            These product-level records cover import, export, preservation, warnings, and explicit
+            unsupported behavior. They come from the existing checked inventory and link to exact
+            sources; they do not turn missing Excel or Google Sheets results into claims.
+          </p>
+          <fieldset className="sw-si-compat__filters sw-si-compat__filters--inventory">
+            <legend>Filter feature boundary records</legend>
             <label>
               Status
               <select
-                data-testid="compatibility-status-filter"
+                data-testid="inventory-status-filter"
                 onChange={(event) =>
                   setCompatibilityStatus(event.currentTarget.value as CompatibilityFilter)
                 }
                 value={compatibilityStatus}
               >
                 <option value="all">All statuses</option>
-                <option value="supported">Supported</option>
-                <option value="partial">Partial</option>
-                <option value="roundtrip-only">Round-trip only</option>
-                <option value="warning">Warning</option>
-                <option value="unsupported">Unsupported</option>
-              </select>
-            </label>
-            <label>
-              Area
-              <select
-                data-testid="compatibility-area-filter"
-                onChange={(event) => setCompatibilityArea(event.currentTarget.value)}
-                value={compatibilityArea}
-              >
-                <option value="all">All areas</option>
-                {COMPATIBILITY_AREAS.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
+                {Object.entries(INVENTORY_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
                   </option>
                 ))}
               </select>
             </label>
             <label>
-              Dialect
+              Feature area
               <select
-                data-testid="compatibility-dialect-filter"
+                data-testid="inventory-area-filter"
+                onChange={(event) => setCompatibilityArea(event.currentTarget.value)}
+                value={compatibilityArea}
+              >
+                <option value="all">All feature areas</option>
+                {COMPATIBILITY_AREAS.map((area) => (
+                  <option key={area} value={area}>
+                    {area.replaceAll("-", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Behavior
+              <select
+                data-testid="inventory-behavior-filter"
                 onChange={(event) => setCompatibilityDialect(event.currentTarget.value)}
                 value={compatibilityDialect}
               >
-                <option value="all">All dialects</option>
-                {COMPATIBILITY_DIALECTS.map((dialect) => (
-                  <option key={dialect} value={dialect}>
-                    {dialect}
+                <option value="all">All behavior scopes</option>
+                {COMPATIBILITY_DIALECTS.map((behavior) => (
+                  <option key={behavior} value={behavior}>
+                    {BEHAVIOR_LABELS[behavior]}
                   </option>
                 ))}
               </select>
@@ -717,8 +1172,8 @@ function InteroperabilityRoute() {
               {visibleCompatibility.length}/{compatibilityData.records.length} records
             </span>
           </fieldset>
-          <div className="sw-si-compat">
-            <ul aria-label="Compatibility records" className="sw-si-compat__records">
+          <div className="sw-si-compat sw-si-inventory">
+            <ul aria-label="Declared feature boundary records" className="sw-si-compat__records">
               {visibleCompatibility.map((record) => (
                 <li key={record.id}>
                   <button
@@ -730,11 +1185,12 @@ function InteroperabilityRoute() {
                     type="button"
                   >
                     <span>
-                      {record.area} / {record.dialect}
+                      {record.area.replaceAll("-", " ")} / {BEHAVIOR_LABELS[record.dialect]}
                     </span>
                     <strong>{record.label}</strong>
                     <small>
-                      {record.status} · {record.resultMode}
+                      {INVENTORY_STATUS_LABELS[record.status]} ·{" "}
+                      {RESULT_MODE_LABELS[record.resultMode]}
                     </small>
                   </button>
                 </li>
@@ -748,8 +1204,8 @@ function InteroperabilityRoute() {
                 data-testid="compatibility-detail"
               >
                 <p className="sw-si-compat__mode">
-                  <span>{selectedCompatibility.status}</span>
-                  <span>{selectedCompatibility.resultMode}</span>
+                  <span>{INVENTORY_STATUS_LABELS[selectedCompatibility.status]}</span>
+                  <span>{RESULT_MODE_LABELS[selectedCompatibility.resultMode]}</span>
                 </p>
                 <h3>{selectedCompatibility.label}</h3>
                 <p>{selectedCompatibility.semantics}</p>
@@ -767,13 +1223,9 @@ function InteroperabilityRoute() {
                     <dd>{selectedCompatibility.divergence}</dd>
                   </div>
                   <div>
-                    <dt>Evidence fixtures</dt>
-                    <dd>{selectedCompatibility.fixtureIds.join(", ")}</dd>
-                  </div>
-                  <div>
-                    <dt>Source</dt>
+                    <dt>Exact source</dt>
                     <dd>
-                      <a href={selectedCompatibility.source}>{selectedCompatibility.source}</a>
+                      <a href={selectedCompatibility.source}>Open the checked source</a>
                     </dd>
                   </div>
                   {selectedCompatibility.warningCode && (
@@ -785,9 +1237,13 @@ function InteroperabilityRoute() {
                     </div>
                   )}
                 </dl>
+                <details className="sw-si-results__technical">
+                  <summary>Technical evidence record IDs</summary>
+                  <code>{selectedCompatibility.fixtureIds.join(", ")}</code>
+                </details>
               </article>
             ) : (
-              <p className="sw-si-empty">No records match both filters.</p>
+              <p className="sw-si-empty">No feature boundary record matches these filters.</p>
             )}
           </div>
         </section>
@@ -817,8 +1273,8 @@ function InteroperabilityRoute() {
                   <h3 id="analytical-model-title">Portable analytical workbench</h3>
                 </div>
                 <p className="sw-si-model__evidence" data-testid="interop-model-evidence">
-                  Local engine: evaluated now. No new Excel or Google Sheets observation is added;
-                  the producer matrix remains authoritative.
+                  Local engine: evaluated now. No new Excel or Google Sheets result is added; the
+                  tested-app results above remain the source of truth.
                 </p>
               </div>
               <div aria-label="Analytical model inputs" className="sw-si-model__controls">
@@ -1110,25 +1566,27 @@ function InteroperabilityRoute() {
               </li>
             ))}
           </ul>
-          <h3>Producer verification status</h3>
+          <h3>Results by producing application</h3>
           <ul className="sw-si-producers" data-testid="interop-producer-matrix">
             {PRODUCER_MATRIX.map((entry) => (
               <li data-producer={entry.producer} data-state={entry.status} key={entry.producer}>
                 <div className="sw-si-producers__identity">
                   <strong>{entry.producer}</strong>
                   <span className="sw-si-producers__status" data-state={entry.status}>
-                    {entry.status === "verified-live"
-                      ? "Verified here"
-                      : entry.status === "verified-suite"
-                        ? "Suite verified"
-                        : "Unverified"}
+                    {entry.status === "verified-live" ? "Verified here" : "Result unavailable"}
                   </span>
                 </div>
                 <details>
-                  <summary>Scope and limitations</summary>
+                  <summary>Scope, limitations, and technical evidence</summary>
                   <p>{entry.detail}</p>
+                  {entry.evidence.startsWith("packages/") ? (
+                    <a href={`https://github.com/chh-ay/sheetwrite/blob/main/${entry.evidence}`}>
+                      Open checked evidence file
+                    </a>
+                  ) : (
+                    <code>{entry.evidence}</code>
+                  )}
                 </details>
-                <code>{entry.evidence}</code>
               </li>
             ))}
           </ul>
@@ -1337,7 +1795,7 @@ function InteroperabilityRoute() {
             <div className="sw-si-tablewrap">
               <table className="sw-si-matrix sw-si-hostile" data-testid="interop-hostile-table">
                 <caption>
-                  Hand-authored attack packages (committed, checksum-pinned) and the live verdict.
+                  Hand-authored attack packages with recorded file hashes and the live verdict.
                 </caption>
                 <thead>
                   <tr>
