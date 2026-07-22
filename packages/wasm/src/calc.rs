@@ -1036,44 +1036,114 @@ pub fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
 where
     F: Fn(&str, u32) -> Option<NamedRangeRef>,
 {
+    resolve_named_ranges_inner(ast, formula_sheet, resolve, &[])
+}
+
+fn resolve_named_ranges_inner<F>(
+    ast: Ast,
+    formula_sheet: u32,
+    resolve: &F,
+    locals: &[String],
+) -> Ast
+where
+    F: Fn(&str, u32) -> Option<NamedRangeRef>,
+{
     match ast {
+        Ast::Name(name)
+            if locals
+                .iter()
+                .any(|local| local.eq_ignore_ascii_case(&name)) =>
+        {
+            Ast::Name(name)
+        }
         Ast::Name(name) => resolve(&name, formula_sheet).map_or(Ast::Name(name), Ast::NamedRange),
+        Ast::Func(Func::Let, args) if args.len() >= 3 && args.len() % 2 == 1 => {
+            let mut scoped = locals.to_vec();
+            let mut resolved = Vec::with_capacity(args.len());
+            let last = args.len() - 1;
+            for (index, arg) in args.into_iter().enumerate() {
+                if index == last {
+                    resolved.push(resolve_named_ranges_inner(
+                        arg,
+                        formula_sheet,
+                        resolve,
+                        &scoped,
+                    ));
+                } else if index % 2 == 0 {
+                    resolved.push(arg);
+                } else {
+                    resolved.push(resolve_named_ranges_inner(
+                        arg,
+                        formula_sheet,
+                        resolve,
+                        &scoped,
+                    ));
+                    if let Some(Ast::Name(name)) = resolved.get(index - 1) {
+                        scoped.push(name.clone());
+                    }
+                }
+            }
+            Ast::Func(Func::Let, resolved)
+        }
         Ast::Func(func, args) => Ast::Func(
             func,
             args.into_iter()
-                .map(|arg| resolve_named_ranges(arg, formula_sheet, resolve))
+                .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
                 .collect(),
         ),
         Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
             name,
             args.into_iter()
-                .map(|arg| resolve_named_ranges(arg, formula_sheet, resolve))
+                .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
                 .collect(),
         ),
         Ast::Bin(op, left, right) => Ast::Bin(
             op,
-            Box::new(resolve_named_ranges(*left, formula_sheet, resolve)),
-            Box::new(resolve_named_ranges(*right, formula_sheet, resolve)),
+            Box::new(resolve_named_ranges_inner(
+                *left,
+                formula_sheet,
+                resolve,
+                locals,
+            )),
+            Box::new(resolve_named_ranges_inner(
+                *right,
+                formula_sheet,
+                resolve,
+                locals,
+            )),
         ),
         Ast::Cmp(op, left, right) => Ast::Cmp(
             op,
-            Box::new(resolve_named_ranges(*left, formula_sheet, resolve)),
-            Box::new(resolve_named_ranges(*right, formula_sheet, resolve)),
+            Box::new(resolve_named_ranges_inner(
+                *left,
+                formula_sheet,
+                resolve,
+                locals,
+            )),
+            Box::new(resolve_named_ranges_inner(
+                *right,
+                formula_sheet,
+                resolve,
+                locals,
+            )),
         ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(resolve_named_ranges(
+        Ast::Neg(inner) => Ast::Neg(Box::new(resolve_named_ranges_inner(
             *inner,
             formula_sheet,
             resolve,
+            locals,
         ))),
-        Ast::Pos(inner) => Ast::Pos(Box::new(resolve_named_ranges(
+        Ast::Pos(inner) => Ast::Pos(Box::new(resolve_named_ranges_inner(
             *inner,
             formula_sheet,
             resolve,
+            locals,
         ))),
-        Ast::Percent(inner) => Ast::Percent(Box::new(resolve_named_ranges(
+        Ast::Percent(inner) => Ast::Percent(Box::new(resolve_named_ranges_inner(
             *inner,
             formula_sheet,
             resolve,
+            locals,
         ))),
         other => other,
     }

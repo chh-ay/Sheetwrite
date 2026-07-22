@@ -14,10 +14,17 @@ pub(super) struct FuncValue {
     pub(super) from_range: bool,
 }
 
+#[derive(Debug)]
+struct FuncArg {
+    end: usize,
+    rows: usize,
+    cols: usize,
+}
+
 #[derive(Debug, Default)]
 pub(super) struct FuncAccumulator {
     values: Vec<FuncValue>,
-    arg_ends: Vec<usize>,
+    args: Vec<FuncArg>,
 }
 
 impl FuncAccumulator {
@@ -40,14 +47,25 @@ impl FuncAccumulator {
         Ok(())
     }
 
-    pub(super) fn finish_arg(&mut self) -> Result<(), FormulaError> {
-        if self.arg_ends.len() >= MAX_FUNCTION_ARGS {
+    pub(super) fn finish_arg(
+        &mut self,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), FormulaError> {
+        if self.args.len() >= MAX_FUNCTION_ARGS || rows == 0 || cols == 0 {
             return Err(FormulaError::Value);
         }
-        self.arg_ends
-            .try_reserve(1)
-            .map_err(|_| FormulaError::Num)?;
-        self.arg_ends.push(self.values.len());
+        let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
+        let start = self.args.last().map_or(0, |argument| argument.end);
+        if cells != self.values.len().saturating_sub(start) {
+            return Err(FormulaError::Value);
+        }
+        self.args.try_reserve(1).map_err(|_| FormulaError::Num)?;
+        self.args.push(FuncArg {
+            end: self.values.len(),
+            rows,
+            cols,
+        });
         Ok(())
     }
 
@@ -56,7 +74,7 @@ impl FuncAccumulator {
     }
 
     pub(super) fn arg_count(&self) -> usize {
-        self.arg_ends.len()
+        self.args.len()
     }
 
     pub(super) fn entries(&self) -> &[FuncValue] {
@@ -64,13 +82,19 @@ impl FuncAccumulator {
     }
 
     pub(super) fn arg(&self, index: usize) -> Option<&[FuncValue]> {
-        let end = *self.arg_ends.get(index)?;
+        let argument = self.args.get(index)?;
         let start = if index == 0 {
             0
         } else {
-            self.arg_ends[index - 1]
+            self.args[index - 1].end
         };
-        Some(&self.values[start..end])
+        Some(&self.values[start..argument.end])
+    }
+
+    pub(super) fn arg_shape(&self, index: usize) -> Option<(usize, usize)> {
+        self.args
+            .get(index)
+            .map(|argument| (argument.rows, argument.cols))
     }
 
     pub(super) fn arg_value(&self, index: usize) -> Option<&Value> {
@@ -81,7 +105,7 @@ impl FuncAccumulator {
         let start = if index == 0 {
             0
         } else {
-            self.arg_ends.get(index - 1).copied().unwrap_or(self.values.len())
+            self.args.get(index - 1).map(|argument| argument.end).unwrap_or(self.values.len())
         };
         &self.values[start..]
     }
@@ -151,7 +175,11 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
 
 fn logical_reduce(func: Func, values: &FuncAccumulator) -> Value {
     if values.len() == 0 {
-        return Value::Error(FormulaError::Value);
+        return match func {
+            Func::And => Value::Bool(true),
+            Func::Or => Value::Bool(false),
+            _ => Value::Error(FormulaError::Value),
+        };
     }
     let mut any = false;
     let mut parity = false;

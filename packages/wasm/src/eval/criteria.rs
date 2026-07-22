@@ -211,3 +211,34 @@ pub(super) fn aggregate_if(
     }
     Ok((sum, count))
 }
+
+pub(super) fn extreme_if(
+    value_range: &EvalMatrix,
+    criteria: &[(&EvalMatrix, &Criterion)],
+    maximum: bool,
+) -> Result<f64, FormulaError> {
+    let mut found = None;
+    for (index, value) in value_range.values.iter().enumerate() {
+        if !criteria
+            .iter()
+            .all(|(range, criterion)| criterion.matches(&range.values[index]))
+        {
+            continue;
+        }
+        match value {
+            Value::Number(value) if value.is_finite() => {
+                found = Some(found.map_or(*value, |current: f64| {
+                    if maximum {
+                        current.max(*value)
+                    } else {
+                        current.min(*value)
+                    }
+                }));
+            }
+            Value::Number(_) => return Err(FormulaError::Num),
+            Value::Error(error) => return Err(*error),
+            Value::Text(_) | Value::Bool(_) | Value::Blank => {}
+        }
+    }
+    Ok(found.unwrap_or(0.0))
+}
