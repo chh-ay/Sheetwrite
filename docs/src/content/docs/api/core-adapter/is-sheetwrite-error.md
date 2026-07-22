@@ -9,7 +9,7 @@ Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L182</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L318</code></dd></div>
 </dl>
 
 ## Declaration

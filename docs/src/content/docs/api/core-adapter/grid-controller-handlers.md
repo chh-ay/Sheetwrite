@@ -15,10 +15,10 @@ Every field is optional; a missing callback simply drops that event.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L16</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L17</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>12</span>
+## Members <span class="api-count" data-pagefind-ignore>13</span>
 
 <div class="api-member-list">
 
@@ -27,6 +27,15 @@ Every field is optional; a missing callback simply drops that event.
 
 ```ts generated
 onGridChange?(event: ChangeEvent): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-row-delta" data-pagefind-weight="1">
+<summary><code>onRowDelta</code> <span class="api-member-summary">Forwarded as a typed host-row projection when a bridge is attached.</span></summary>
+
+```ts generated
+onRowDelta?(projection: Parameters<RowBridgeHandler<Id>>[0]): void;
 ```
 
 </details>
@@ -137,8 +146,11 @@ onExportError?(event: GridEvents["export-error"]): void;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface GridControllerHandlers {
+export interface GridControllerHandlers<
+  Id extends RowBridgeId = RowBridgeId,
+> {
   onGridChange?(event: ChangeEvent): void;
+  onRowDelta?(projection: Parameters<RowBridgeHandler<Id>>[0]): void;
   onSelectionChange?(selection: Selection | null): void;
   onViewportChange?(event: GridEvents["scroll"]): void;
   onEditBegin?(event: GridEvents["edit-begin"]): void;

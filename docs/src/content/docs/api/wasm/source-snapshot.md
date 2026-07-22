@@ -11,7 +11,7 @@ range. Offsets are row-major and sorted; reference targets are packed
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L352</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L355</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

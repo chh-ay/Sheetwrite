@@ -9,7 +9,7 @@ Native worksheet visibility preserved across workbook snapshots and tab renderin
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L9</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L38</code></dd></div>
 </dl>
 
 ## Declaration

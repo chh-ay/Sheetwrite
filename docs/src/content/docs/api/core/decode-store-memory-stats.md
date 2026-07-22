@@ -9,7 +9,7 @@ Decode the flat Rust protocol and fail closed on version/order/total drift.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L254</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L241</code></dd></div>
 </dl>
 
 ## Declaration

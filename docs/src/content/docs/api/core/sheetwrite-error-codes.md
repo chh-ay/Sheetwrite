@@ -64,6 +64,7 @@ const SHEETWRITE_ERROR_CODES: readonly [
   "sync-storage-failed",
   "incomplete-data",
   "xlsx-invalid-options",
+  "unsafe-hyperlink",
 ]
 ```
 

@@ -9,10 +9,10 @@ Result of module initialization: the instantiated exports plus the shared linear
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L410</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L413</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>131</span>
+## Members <span class="api-count" data-pagefind-ignore>134</span>
 
 <div class="api-member-list">
 
@@ -255,6 +255,15 @@ readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: n
 
 ```ts generated
 readonly cellstore_colCount: (a: number, b: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-columns-fully-loaded" data-pagefind-weight="1">
+<summary><code>cellstore_columnsFullyLoaded</code></summary>
+
+```ts generated
+readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
 ```
 
 </details>
@@ -637,6 +646,15 @@ readonly cellstore_removeSheet: (a: number, b: number) => number;
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-remove-table" data-pagefind-weight="1">
+<summary><code>cellstore_removeTable</code></summary>
+
+```ts generated
+readonly cellstore_removeTable: (a: number, b: number, c: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-rename-sheet" data-pagefind-weight="1">
 <summary><code>cellstore_renameSheet</code></summary>
 
@@ -804,6 +822,15 @@ readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number
 
 ```ts generated
 readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-set-table" data-pagefind-weight="1">
+<summary><code>cellstore_setTable</code></summary>
+
+```ts generated
+readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number;
 ```
 
 </details>
@@ -1297,6 +1324,14 @@ export interface InitOutput {
     h: number,
   ) => number;
   readonly cellstore_colCount: (a: number, b: number) => number;
+  readonly cellstore_columnsFullyLoaded: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
   readonly cellstore_compactStringStorage: (a: number) => void;
   readonly cellstore_dataEdge: (
     a: number,
@@ -1522,6 +1557,7 @@ export interface InitOutput {
     d: number,
   ) => void;
   readonly cellstore_removeSheet: (a: number, b: number) => number;
+  readonly cellstore_removeTable: (a: number, b: number, c: number) => number;
   readonly cellstore_renameSheet: (
     a: number,
     b: number,
@@ -1702,6 +1738,24 @@ export interface InitOutput {
     f: number,
     g: number,
   ) => void;
+  readonly cellstore_setTable: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+    i: number,
+    j: number,
+    k: number,
+    l: number,
+    m: number,
+    n: number,
+    o: number,
+    p: number,
+  ) => number;
   readonly cellstore_snapshotNumbers: (
     a: number,
     b: number,

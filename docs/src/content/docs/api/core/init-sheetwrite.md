@@ -9,7 +9,7 @@ Load the WASM data engine once. Must be awaited before `createGrid`.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L282</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid.ts#L285</code></dd></div>
 </dl>
 
 ## Declaration

@@ -1,15 +1,15 @@
 ---
 title: "GridCommandName | @sheetwrite/svelte"
-description: "Source summary unavailable; docs:check rejects this omission."
+description: "Built-in command names accepted by state queries and change events."
 ---
 <!-- api-export:@sheetwrite/svelte|.|GridCommandName -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="symbol">symbol</span></div>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="type">type</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Built-in command names accepted by state queries and change events.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/svelte</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L105</code></dd></div>
 </dl>
 
 ## Declaration
@@ -17,7 +17,7 @@ Source summary unavailable; docs:check rejects this omission.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-const GridCommandName: unknown
+export type GridCommandName = Exclude<ToolbarActionName, "separator">;
 ```
 
 </div>

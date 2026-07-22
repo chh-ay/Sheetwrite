@@ -12,7 +12,7 @@ use `SheetwriteGrid` when the host already owns a workbook or datasource.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L396</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L446</code></dd></div>
 </dl>
 
 ## Declaration
@@ -20,8 +20,11 @@ use `SheetwriteGrid` when the host already owns a workbook or datasource.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-function Sheetwrite<Row extends Record<string, CellScalar>>(
-  props: SheetwriteProps<Row> & {
+function Sheetwrite<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+>(
+  props: SheetwriteProps<Row, Id> & {
     ref?: ForwardedRef<Grid>;
   },
 ): ReactElement

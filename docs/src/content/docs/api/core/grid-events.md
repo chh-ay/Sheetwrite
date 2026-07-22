@@ -9,10 +9,10 @@ Payload map for events emitted by a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L388</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L444</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>12</span>
+## Members <span class="api-count" data-pagefind-ignore>13</span>
 
 <div class="api-member-list">
 
@@ -38,7 +38,7 @@ selection: { selection: Selection | null };
 <summary><code>scroll</code></summary>
 
 ```ts generated
-scroll: { scrollTop: number; firstRow: number; lastRow: number };
+scroll: { scrollTop: number; firstRow: number; lastRow: number; scrollLeft: number; firstVisibleColumn: number | null; lastVisibleColumn: number | null; };
 ```
 
 </details>
@@ -97,6 +97,15 @@ search: SearchResult;
 
 </details>
 
+<details class="api-member" id="grid-events-hyperlink-activate" data-pagefind-weight="1">
+<summary><code>hyperlink-activate</code></summary>
+
+```ts generated
+"hyperlink-activate": HyperlinkActivationEvent;
+```
+
+</details>
+
 <details class="api-member" id="grid-events-renderer-fallback" data-pagefind-weight="1">
 <summary><code>renderer-fallback</code> <span class="api-member-summary">Emitted once when the worker renderer could not be constructed and the grid fell back to the main-thread canvas renderer.</span></summary>
 
@@ -140,6 +149,9 @@ export interface GridEvents {
     scrollTop: number;
     firstRow: number;
     lastRow: number;
+    scrollLeft: number;
+    firstVisibleColumn: number | null;
+    lastVisibleColumn: number | null;
   };
   "edit-begin": {
     addr: CellAddress;
@@ -156,6 +168,7 @@ export interface GridEvents {
   "active-sheet": {
     sheet: SheetId;
   };
+  "hyperlink-activate": HyperlinkActivationEvent;
   "renderer-fallback": {
     requested: "worker";
     error: SheetwriteError;

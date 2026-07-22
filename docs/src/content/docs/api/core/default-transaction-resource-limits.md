@@ -11,7 +11,7 @@ exact UTF-8 JSON size bounds hostile or accidentally oversized payloads.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L20</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L39</code></dd></div>
 </dl>
 
 ## Declaration

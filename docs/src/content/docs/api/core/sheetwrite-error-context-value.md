@@ -9,7 +9,7 @@ JSON-safe values accepted in a public failure context.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L83</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L85</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>6</span>

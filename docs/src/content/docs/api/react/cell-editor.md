@@ -1,23 +1,40 @@
 ---
 title: "CellEditor | @sheetwrite/react"
-description: "Source summary unavailable; docs:check rejects this omission."
+description: "Framework-neutral named editor definition registered through GridOptions.editors."
 ---
 <!-- api-export:@sheetwrite/react|.|CellEditor -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="symbol">symbol</span></div>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Framework-neutral named editor definition registered through GridOptions.editors.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L44</code></dd></div>
 </dl>
+
+## Members <span class="api-count" data-pagefind-ignore>1</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="cell-editor-mount" data-pagefind-weight="1">
+<summary><code>mount</code></summary>
+
+```ts generated
+mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance;
+```
+
+</details>
+</div>
 
 ## Declaration
 
-<div class="api-declaration-open" data-pagefind-ignore>
+<details class="api-declaration" data-pagefind-ignore>
+<summary>View full TypeScript declaration</summary>
 
 ```ts generated
-const CellEditor: unknown
+export interface CellEditor {
+  mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance;
+}
 ```
 
-</div>
+</details>

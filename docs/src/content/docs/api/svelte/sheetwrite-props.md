@@ -9,7 +9,7 @@ Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L61</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L68</code></dd></div>
 </dl>
 
 ## Declaration
@@ -17,14 +17,19 @@ Simple framework adapter props for columns and default row objects.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
-  SheetwriteGridProps,
-  "workbook" | "data" | "datasource" | "height" | "fill"
+export type SheetwriteProps<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> = Omit<
+  SheetwriteGridProps<Id>,
+  "workbook" | "data" | "datasource" | "height" | "fill" | "rowBridge"
 > &
   GridSizeProps & {
     columns: readonly SimpleColumn<Row>[];
     defaultRows: readonly Row[];
     sheetName?: string;
+    getRowId?: (row: Row, index: number) => Id;
+    createRowId?: (context: RowBridgeInsertContext) => Id;
   };
 ```
 

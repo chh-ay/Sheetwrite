@@ -9,7 +9,7 @@ Retained logical payload and allocated capacity attributed to one exclusive owne
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L54</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L21</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

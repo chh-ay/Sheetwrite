@@ -9,7 +9,7 @@ Structural form preserved across realms and JSON serialization.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L95</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L97</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

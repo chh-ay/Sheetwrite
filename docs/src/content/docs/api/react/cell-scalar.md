@@ -1,15 +1,15 @@
 ---
 title: "CellScalar | @sheetwrite/react"
-description: "Source summary unavailable; docs:check rejects this omission."
+description: "A scalar that can be displayed directly."
 ---
 <!-- api-export:@sheetwrite/react|.|CellScalar -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="symbol">symbol</span></div>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/react/">@sheetwrite/react</a><span class="api-status" data-kind="type">type</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+A scalar that can be displayed directly.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/cell.d.ts#L97</code></dd></div>
 </dl>
 
 ## Declaration
@@ -17,7 +17,7 @@ Source summary unavailable; docs:check rejects this omission.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-const CellScalar: unknown
+export type CellScalar = string | number | boolean | null;
 ```
 
 </div>

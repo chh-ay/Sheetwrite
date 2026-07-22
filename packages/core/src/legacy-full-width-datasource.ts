@@ -6,6 +6,7 @@ export interface LegacyRowPage {
   readonly rows: readonly RowData[];
 }
 
+/** Loads one row-only page for the full-width compatibility adapter. */
 export type LegacyRowLoader = (
   request: DataSourceRequest,
 ) => Promise<LegacyRowPage> | LegacyRowPage;

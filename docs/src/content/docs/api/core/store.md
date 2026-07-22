@@ -9,10 +9,10 @@ Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L120</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L136</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>19</span>
 
 <div class="api-member-list">
 
@@ -150,6 +150,15 @@ on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
 
 </details>
 
+<details class="api-member" id="store-set-detailed-change-capture" data-pagefind-weight="1">
+<summary><code>setDetailedChangeCapture</code> <span class="api-member-summary">Opt in to per-cell before/after capture for packed and clear operations.</span></summary>
+
+```ts generated
+setDetailedChangeCapture?(enabled: boolean): void;
+```
+
+</details>
+
 <details class="api-member" id="store-query-capability" data-pagefind-weight="1">
 <summary><code>queryCapability</code> <span class="api-member-summary">Explicit partial-data state for paged datasource stores.</span></summary>
 
@@ -243,6 +252,7 @@ export interface Store {
     mode?: MutationPolicyMode,
   ): void;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
+  setDetailedChangeCapture?(enabled: boolean): void;
   queryCapability?(sheet: SheetId): QueryCapability;
   getCellLoadState?(addr: CellAddress): CellLoadState;
   acknowledgeOperations?(

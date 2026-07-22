@@ -9,7 +9,7 @@ Atomic or partial handling for locally denied operations.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L167</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L200</code></dd></div>
 </dl>
 
 ## Declaration

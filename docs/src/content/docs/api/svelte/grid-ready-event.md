@@ -1,23 +1,60 @@
 ---
 title: "GridReadyEvent | @sheetwrite/svelte"
-description: "Source summary unavailable; docs:check rejects this omission."
+description: "Grid handle, generation, and reason published after adapter initialization."
 ---
 <!-- api-export:@sheetwrite/svelte|.|GridReadyEvent -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="symbol">symbol</span></div>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Source summary unavailable; docs:check rejects this omission.
+Grid handle, generation, and reason published after adapter initialization.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/svelte</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L34</code></dd></div>
 </dl>
+
+## Members <span class="api-count" data-pagefind-ignore>3</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="grid-ready-event-grid" data-pagefind-weight="1">
+<summary><code>grid</code> <span class="api-member-summary">Live handle just published by the adapter; replaced on the next reset generation.</span></summary>
+
+```ts generated
+grid: Grid;
+```
+
+</details>
+
+<details class="api-member" id="grid-ready-event-generation" data-pagefind-weight="1">
+<summary><code>generation</code> <span class="api-member-summary">One-based adapter generation, incremented whenever a Grid is replaced.</span></summary>
+
+```ts generated
+generation: number;
+```
+
+</details>
+
+<details class="api-member" id="grid-ready-event-reason" data-pagefind-weight="1">
+<summary><code>reason</code> <span class="api-member-summary">Whether readiness followed first initialization, an input reset, or a renderer reset.</span></summary>
+
+```ts generated
+reason: GridReadyReason;
+```
+
+</details>
+</div>
 
 ## Declaration
 
-<div class="api-declaration-open" data-pagefind-ignore>
+<details class="api-declaration" data-pagefind-ignore>
+<summary>View full TypeScript declaration</summary>
 
 ```ts generated
-const GridReadyEvent: unknown
+export interface GridReadyEvent {
+  grid: Grid;
+  generation: number;
+  reason: GridReadyReason;
+}
 ```
 
-</div>
+</details>

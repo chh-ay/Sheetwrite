@@ -9,7 +9,7 @@ Reject overlap, negative values, and attempts to fold runtime observations into 
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L365</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L352</code></dd></div>
 </dl>
 
 ## Declaration

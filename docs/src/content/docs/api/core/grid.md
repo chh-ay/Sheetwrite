@@ -9,10 +9,10 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L414</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L478</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>84</span>
+## Members <span class="api-count" data-pagefind-ignore>88</span>
 
 <div class="api-member-list">
 
@@ -577,6 +577,44 @@ setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
 
 </details>
 
+<details class="api-member" id="grid-set-hyperlink" data-pagefind-weight="1">
+<summary><code>setHyperlink</code></summary>
+
+```ts generated
+setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-remove-hyperlink" data-pagefind-weight="1">
+<summary><code>removeHyperlink</code></summary>
+
+```ts generated
+removeHyperlink(id: string): ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-hyperlink" data-pagefind-weight="1">
+<summary><code>getHyperlink</code></summary>
+
+```ts generated
+getHyperlink(addr: CellAddress): CellHyperlink | null;
+```
+
+</details>
+
+<details class="api-member" id="grid-activate-hyperlink" data-pagefind-weight="1">
+<summary><code>activateHyperlink</code> <span class="api-member-summary">Validate and emit a host-owned activation event.</span></summary>
+
+```ts generated
+activateHyperlink(addr: CellAddress): boolean;
+```
+
+<p class="api-member-doc">Validate and emit a host-owned activation event. External targets are never
+opened by Sheetwrite; internal navigation occurs only under the explicit policy.</p>
+</details>
+
 <details class="api-member" id="grid-set-validation-rule" data-pagefind-weight="1">
 <summary><code>setValidationRule</code></summary>
 
@@ -892,6 +930,10 @@ export interface Grid {
     visibility: SheetVisibility,
   ): SheetLifecycleResult;
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+  setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult;
+  removeHyperlink(id: string): ApplyTransactionResult;
+  getHyperlink(addr: CellAddress): CellHyperlink | null;
+  activateHyperlink(addr: CellAddress): boolean;
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;

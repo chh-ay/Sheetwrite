@@ -9,7 +9,7 @@ Dense or allocation-lazy paged storage policy for datasource cells.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L45</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L73</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

@@ -9,7 +9,7 @@ Stable lifecycle rejection codes suitable for inline sheet-management UI.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L205</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L238</code></dd></div>
 </dl>
 
 ## Declaration

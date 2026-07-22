@@ -9,7 +9,7 @@ Built-in action names accepted by custom toolbar items.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L119</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L162</code></dd></div>
 </dl>
 
 ## Declaration

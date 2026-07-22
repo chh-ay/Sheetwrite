@@ -9,10 +9,10 @@ Workbook sheet schema used when creating a live grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L12</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L41</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>19</span>
 
 <div class="api-member-list">
 
@@ -97,6 +97,15 @@ conditionalFormats?: ConditionalFormatRule[];
 
 </details>
 
+<details class="api-member" id="sheet-hyperlinks" data-pagefind-weight="1">
+<summary><code>hyperlinks</code> <span class="api-member-summary">Stable, serializable range hyperlinks; external URLs pass the shared safety policy.</span></summary>
+
+```ts generated
+hyperlinks?: CellHyperlink[];
+```
+
+</details>
+
 <details class="api-member" id="sheet-validation-rules" data-pagefind-weight="1">
 <summary><code>validationRules</code> <span class="api-member-summary">Serializable data-entry rules evaluated at the local mutation barrier.</span></summary>
 
@@ -168,6 +177,15 @@ frozenCols?: number;
 ```
 
 </details>
+
+<details class="api-member" id="sheet-tables" data-pagefind-weight="1">
+<summary><code>tables</code> <span class="api-member-summary">Native workbook tables anchored to this stable worksheet identity.</span></summary>
+
+```ts generated
+tables?: WorkbookTable[];
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -186,6 +204,7 @@ export interface Sheet {
   hiddenRows?: Set<number>;
   rowGroups?: RowGroup[];
   conditionalFormats?: ConditionalFormatRule[];
+  hyperlinks?: CellHyperlink[];
   validationRules?: DataValidationRule[];
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
@@ -194,6 +213,7 @@ export interface Sheet {
   merges?: MergeRange[];
   frozenRows?: number;
   frozenCols?: number;
+  tables?: WorkbookTable[];
 }
 ```
 

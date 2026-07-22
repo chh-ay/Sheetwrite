@@ -9,7 +9,7 @@ Owner and runtime deltas between two phases of the same operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L135</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L122</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

@@ -21,7 +21,7 @@ expose callbacks from work that never commits.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L105</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L108</code></dd></div>
 </dl>
 
 ## Declaration
@@ -29,10 +29,11 @@ expose callbacks from work that never commits.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-function createGridController(
+function createGridController<Id extends RowBridgeId = RowBridgeId>(
   host: HTMLElement,
   options: GridOptions,
-  handlers: GridControllerHandlers,
+  handlers: GridControllerHandlers<Id>,
+  rowBridge?: RowBridge<Id>,
 ): GridController
 ```
 

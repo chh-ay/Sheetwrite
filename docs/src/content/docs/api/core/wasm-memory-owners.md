@@ -9,7 +9,7 @@ Stable ordered owner list encoded by the WASM store-memory protocol.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L9</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L12</code></dd></div>
 </dl>
 
 ## Declaration

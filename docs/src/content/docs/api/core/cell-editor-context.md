@@ -6,12 +6,10 @@ description: "Immutable state and guarded completion callbacks for one mounted e
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Immutable state and guarded completion callbacks for one mounted editor.
-`address` is the canonical data address; `viewAddress` is the current visual
-row/column. Async work must use `signal` so reset, cancel, and unmount abort it.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/editor.ts#L21</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L74</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>12</span>
@@ -109,7 +107,7 @@ readonly signal: AbortSignal;
 </details>
 
 <details class="api-member" id="cell-editor-context-commit" data-pagefind-weight="1">
-<summary><code>commit</code> <span class="api-member-summary">Commit text through the Grid parser, policy, history, and collaboration path.</span></summary>
+<summary><code>commit</code></summary>
 
 ```ts generated
 commit(value: string, navigation?: CellEditorNavigation): void;
@@ -118,7 +116,7 @@ commit(value: string, navigation?: CellEditorNavigation): void;
 </details>
 
 <details class="api-member" id="cell-editor-context-cancel" data-pagefind-weight="1">
-<summary><code>cancel</code> <span class="api-member-summary">Cancel without mutating and return focus to the Grid.</span></summary>
+<summary><code>cancel</code></summary>
 
 ```ts generated
 cancel(): void;

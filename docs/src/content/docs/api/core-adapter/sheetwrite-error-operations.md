@@ -9,7 +9,7 @@ Stable operations at which a consumer-visible failure can surface.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L55</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/errors.ts#L56</code></dd></div>
 </dl>
 
 ## Declaration
@@ -39,6 +39,7 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "revision",
   "comments",
   "query",
+  "hyperlink-activate",
 ]
 ```
 

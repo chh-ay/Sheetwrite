@@ -9,7 +9,7 @@ Stable conservative-rebase conflict category.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L6</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L7</code></dd></div>
 </dl>
 
 ## Declaration

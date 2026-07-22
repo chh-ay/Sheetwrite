@@ -9,10 +9,10 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L72</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L106</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>14</span>
+## Members <span class="api-count" data-pagefind-ignore>15</span>
 
 <div class="api-member-list">
 <h3 id="ongridchange" class="api-search-anchor">onGridChange</h3>
@@ -21,6 +21,15 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 ```ts generated
 onGridChange?: (event: ChangeEvent) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-row-delta" data-pagefind-weight="1">
+<summary><code>onRowDelta</code> <span class="api-member-summary">Receives projected host-row effects when a row bridge is attached.</span></summary>
+
+```ts generated
+onRowDelta?: RowBridgeHandler<Id>;
 ```
 
 </details>
@@ -149,8 +158,11 @@ onInitializationError?: (error: SheetwriteError) => void;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface GridAdapterEventHandlers {
+export interface GridAdapterEventHandlers<
+  Id extends RowBridgeId = RowBridgeId,
+> {
   onGridChange?: (event: ChangeEvent) => void;
+  onRowDelta?: RowBridgeHandler<Id>;
   onSelectionChange?: (selection: Selection | null) => void;
   onViewportChange?: (event: GridEvents["scroll"]) => void;
   onEditBegin?: (event: GridEvents["edit-begin"]) => void;

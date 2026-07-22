@@ -1,0 +1,122 @@
+---
+title: "RowBridgeUnprojectableDelta | @sheetwrite/core/adapter"
+description: "An explicit projection record for an operation with no row-space meaning."
+---
+<!-- api-export:@sheetwrite/core|./adapter|RowBridgeUnprojectableDelta -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
+
+An explicit projection record for an operation with no row-space meaning.
+
+<dl class="api-metadata" data-pagefind-ignore>
+<div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L149</code></dd></div>
+</dl>
+
+## Members <span class="api-count" data-pagefind-ignore>9</span>
+
+<div class="api-member-list">
+
+<details class="api-member" id="row-bridge-unprojectable-delta-kind" data-pagefind-weight="1">
+<summary><code>kind</code></summary>
+
+```ts generated
+readonly kind: "unprojectable";
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-reason" data-pagefind-weight="1">
+<summary><code>reason</code></summary>
+
+```ts generated
+readonly reason: string;
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-transaction" data-pagefind-weight="1">
+<summary><code>transaction</code></summary>
+
+```ts generated
+readonly transaction: RowBridgeTransaction;
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-transaction-id" data-pagefind-weight="1">
+<summary><code>transactionId</code></summary>
+
+```ts generated
+readonly transactionId: string;
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-source" data-pagefind-weight="1">
+<summary><code>source</code></summary>
+
+```ts generated
+readonly source: OperationSource;
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-previous" data-pagefind-weight="1">
+<summary><code>previous</code></summary>
+
+```ts generated
+readonly previous: unknown;
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-next" data-pagefind-weight="1">
+<summary><code>next</code></summary>
+
+```ts generated
+readonly next: unknown;
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-operation" data-pagefind-weight="1">
+<summary><code>operation</code></summary>
+
+```ts generated
+readonly operation: DocumentOp;
+```
+
+</details>
+
+<details class="api-member" id="row-bridge-unprojectable-delta-row-ids" data-pagefind-weight="1">
+<summary><code>rowIds</code></summary>
+
+```ts generated
+readonly rowIds: readonly (Id | null)[];
+```
+
+</details>
+</div>
+
+## Declaration
+
+<details class="api-declaration" data-pagefind-ignore>
+<summary>View full TypeScript declaration</summary>
+
+```ts generated
+export interface RowBridgeUnprojectableDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> {
+  readonly kind: "unprojectable";
+  readonly reason: string;
+  readonly transaction: RowBridgeTransaction;
+  readonly transactionId: string;
+  readonly source: OperationSource;
+  readonly previous: unknown;
+  readonly next: unknown;
+  readonly operation: DocumentOp;
+  readonly rowIds: readonly (Id | null)[];
+}
+```
+
+</details>

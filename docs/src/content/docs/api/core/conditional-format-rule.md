@@ -9,10 +9,10 @@ Ordered condition and style applied to a cell range.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L58</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L77</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -42,6 +42,15 @@ style: CellStyle;
 ```
 
 </details>
+
+<details class="api-member" id="conditional-format-rule-stop-if-true" data-pagefind-weight="1">
+<summary><code>stopIfTrue</code> <span class="api-member-summary">Stop evaluating lower-precedence rules for a cell when this rule matches.</span></summary>
+
+```ts generated
+stopIfTrue?: boolean;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -54,6 +63,7 @@ export interface ConditionalFormatRule {
   range: Range;
   when: ConditionalFormatPredicate;
   style: CellStyle;
+  stopIfTrue?: boolean;
 }
 ```
 

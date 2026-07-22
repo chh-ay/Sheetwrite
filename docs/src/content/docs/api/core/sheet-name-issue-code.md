@@ -9,7 +9,7 @@ Stable reason codes returned by worksheet-name validation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sheet-name.ts#L10</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L16</code></dd></div>
 </dl>
 
 ## Declaration

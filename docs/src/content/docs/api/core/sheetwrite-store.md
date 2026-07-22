@@ -9,10 +9,10 @@ Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L106</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L103</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>57</span>
+## Members <span class="api-count" data-pagefind-ignore>59</span>
 
 <div class="api-member-list">
 
@@ -55,6 +55,15 @@ applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | Transaction
 This bypasses Grid read-only checks and Grid undo/redo history. Use
 `Grid.applyTransaction` for normal host-driven edits.
 Queued and flushed at a barrier — never reentrant.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-are-columns-fully-loaded" data-pagefind-weight="1">
+<summary><code>areColumnsFullyLoaded</code></summary>
+
+```ts generated
+areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean;
+```
+
 </details>
 
 <details class="api-member" id="sheetwrite-store-can-apply-locally" data-pagefind-weight="1">
@@ -335,11 +344,11 @@ isRangeFullyLoaded: (input: Range) => boolean;
 
 </details>
 
-<details class="api-member" id="sheetwrite-store-load-rows" data-pagefind-weight="1">
-<summary><code>loadRows</code></summary>
+<details class="api-member" id="sheetwrite-store-load-page" data-pagefind-weight="1">
+<summary><code>loadPage</code></summary>
 
 ```ts generated
-loadRows: (sheet: SheetId, start: number, rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void;
+loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void;
 ```
 
 </details>
@@ -450,6 +459,15 @@ searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; w
 
 ```ts generated
 setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-set-detailed-change-capture" data-pagefind-weight="1">
+<summary><code>setDetailedChangeCapture</code> <span class="api-member-summary">Opt in to per-cell before/after capture for packed and clear operations.</span></summary>
+
+```ts generated
+setDetailedChangeCapture: (enabled: boolean) => void;
 ```
 
 </details>
@@ -568,6 +586,12 @@ class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions?: CommitReason | TransactionApplicationOptions,
   ) => ApplyTransactionResult;
+  areColumnsFullyLoaded: (
+    sheet: SheetId,
+    startRow: number,
+    endRow: number,
+    columns: readonly number[],
+  ) => boolean;
   canApplyLocally: (patch: DocumentOp) => boolean;
   captureRangeHistory: (input: Range) => CompactRangeHistory | null;
   clearView: (sheet: SheetId) => void;
@@ -633,9 +657,10 @@ class SheetwriteStore implements Store {
   hideRows: (sheet: SheetId, rows: readonly number[]) => void;
   isPaged: (sheet: SheetId) => boolean;
   isRangeFullyLoaded: (input: Range) => boolean;
-  loadRows: (
+  loadPage: (
     sheet: SheetId,
     start: number,
+    columns: readonly DataSourceColumnBand[],
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ) => void;
@@ -671,6 +696,7 @@ class SheetwriteStore implements Store {
     col: number,
     filter: ColumnFilter | null,
   ) => void;
+  setDetailedChangeCapture: (enabled: boolean) => void;
   setGroupCollapsed: (
     sheet: SheetId,
     start: number,

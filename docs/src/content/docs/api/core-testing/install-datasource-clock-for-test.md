@@ -9,7 +9,7 @@ Installs a deterministic monotonic clock through the public testing entrypoint.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/testing</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/datasource-controller.ts#L18</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/datasource-controller.ts#L24</code></dd></div>
 </dl>
 
 ## Declaration

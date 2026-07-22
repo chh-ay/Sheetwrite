@@ -20,10 +20,10 @@ Advanced framework component for workbook data or datasource input.
 function SheetwriteGrid(
   this: void,
   internals: ComponentInternals,
-  props: SheetwriteGridProps,
+  props: SheetwriteGridProps<RowBridgeId>,
 ): {
   $on?(type: string, callback: (e: any) => void): () => void;
-  $set?(props: Partial<SheetwriteGridProps>): void;
+  $set?(props: Partial<SheetwriteGridProps<RowBridgeId>>): void;
 }
 ```
 

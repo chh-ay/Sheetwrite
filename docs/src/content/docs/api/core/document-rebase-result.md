@@ -9,7 +9,7 @@ Successful rebased operations or a conservative rebase conflict.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L23</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L24</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

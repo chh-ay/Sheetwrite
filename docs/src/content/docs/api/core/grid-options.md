@@ -9,10 +9,10 @@ Workbook, data, rendering, policy, and built-in UI options used to create a Grid
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L280</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L323</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -110,6 +110,18 @@ readOnly?: boolean;
 
 </details>
 
+<details class="api-member" id="grid-options-hyperlink-activation" data-pagefind-weight="1">
+<summary><code>hyperlinkActivation</code> <span class="api-member-summary">Hyperlink activation never opens a browser URL.</span></summary>
+
+```ts generated
+hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
+```
+
+<p class="api-member-doc">Hyperlink activation never opens a browser URL. `event-only` (default)
+emits a safe resolved target; `internal-navigation` additionally moves to
+stable internal destinations; `disabled` rejects every activation request.</p>
+</details>
+
 <details class="api-member" id="grid-options-protection-resolver" data-pagefind-weight="1">
 <summary><code>protectionResolver</code> <span class="api-member-summary">Host-owned client UX permission check.</span></summary>
 
@@ -203,6 +215,7 @@ export interface GridOptions {
   presentation?: GridPresentation;
   theme?: Partial<Theme>;
   readOnly?: boolean;
+  hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
   transactionResourceLimits?: Partial<TransactionResourceLimits>;

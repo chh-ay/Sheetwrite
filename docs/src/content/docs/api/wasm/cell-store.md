@@ -12,7 +12,7 @@ The workbook-wide store: every sheet, one string pool.
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>88</span>
+## Members <span class="api-count" data-pagefind-ignore>91</span>
 
 <div class="api-member-list">
 
@@ -163,6 +163,15 @@ clearRange: (sheet: number, r0: number, c0: number, r1: number, c1: number, cont
 
 ```ts generated
 colCount: (sheet: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-columns-fully-loaded" data-pagefind-weight="1">
+<summary><code>columnsFullyLoaded</code></summary>
+
+```ts generated
+columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => boolean;
 ```
 
 </details>
@@ -578,6 +587,15 @@ removeSheet: (sheet: number) => boolean;
 
 </details>
 
+<details class="api-member" id="cell-store-remove-table" data-pagefind-weight="1">
+<summary><code>removeTable</code></summary>
+
+```ts generated
+removeTable: (id: string) => boolean;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-rename-sheet" data-pagefind-weight="1">
 <summary><code>renameSheet</code> <span class="api-member-summary">Rename a live stable sheet handle and rewrite every resolved formula AST reference.</span></summary>
 
@@ -700,10 +718,10 @@ setConditionalRules: (sheet: number, kinds: Uint8Array, bounds: Uint32Array, num
 
 <p class="api-member-doc">Replace a sheet's conditional-format rules. Packed columnar encoding,
 one entry per rule: `kinds` 0 gt / 1 lt / 2 eqNum / 3 eqStr / 4 eqEmpty /
-5 contains; `bounds` = normalized `[r0, c0, r1, c1]` per rule; `nums`
-carries the numeric operand; `strs` the text operand; `flags` bit 0 =
-match-case for `contains`. Case-insensitive needles are lowercased here
-once so the per-cell match never allocates.</p>
+5 contains / 6 boolean formula; `bounds` = normalized `[r0, c0, r1, c1]`
+per rule; `nums` carries the numeric operand; `strs` the text/formula
+operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
+Formula strings are parsed once here, never once per visible cell.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-formula" data-pagefind-weight="1">
@@ -778,6 +796,15 @@ without weakening the old gate.</p>
 
 ```ts generated
 setString: (sheet: number, row: number, col: number, value: string, style: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-set-table" data-pagefind-weight="1">
+<summary><code>setTable</code></summary>
+
+```ts generated
+setTable: (id: string, name: string, sheet: number, row_start: number, col_start: number, row_end: number, col_end: number, header_row: boolean, totals_row: boolean, column_ids: string[], column_names: string[]) => boolean;
 ```
 
 </details>
@@ -943,6 +970,12 @@ class CellStore {
     style: boolean,
   ) => boolean;
   colCount: (sheet: number) => number;
+  columnsFullyLoaded: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    cols: Uint32Array,
+  ) => boolean;
   compactStringStorage: () => void;
   dataEdge: (
     sheet: number,
@@ -1083,6 +1116,7 @@ class CellStore {
   removeNamedRange: (name: string, scope: number) => boolean;
   removeRows: (sheet: number, at: number, count: number) => void;
   removeSheet: (sheet: number) => boolean;
+  removeTable: (id: string) => boolean;
   renameSheet: (sheet: number, id: string, name: string) => boolean;
   resetFormulaMatrixResourceStats: () => void;
   resetQueryResourceStats: () => void;
@@ -1200,6 +1234,19 @@ class CellStore {
     value: string,
     style: number,
   ) => void;
+  setTable: (
+    id: string,
+    name: string,
+    sheet: number,
+    row_start: number,
+    col_start: number,
+    row_end: number,
+    col_end: number,
+    header_row: boolean,
+    totals_row: boolean,
+    column_ids: string[],
+    column_names: string[],
+  ) => boolean;
   snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array;
   snapshotTexts: (snapshot: RangeSnapshot) => string[];
   sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array;

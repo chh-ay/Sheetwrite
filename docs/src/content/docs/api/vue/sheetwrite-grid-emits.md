@@ -9,12 +9,21 @@ Event payloads emitted by the Vue components, keyed by template event name.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L107</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L121</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>14</span>
+## Members <span class="api-count" data-pagefind-ignore>15</span>
 
 <div class="api-member-list">
+
+<details class="api-member" id="sheetwrite-grid-emits-row-delta" data-pagefind-weight="1">
+<summary><code>row-delta</code> <span class="api-member-summary">Projected host-row changes.</span></summary>
+
+```ts generated
+"row-delta": Parameters<RowBridgeHandler<Id>>[0];
+```
+
+</details>
 
 <details class="api-member" id="sheetwrite-grid-emits-grid-change" data-pagefind-weight="1">
 <summary><code>grid-change</code> <span class="api-member-summary">Committed Grid change, including its applied transaction.</span></summary>
@@ -149,7 +158,8 @@ ready: GridReadyEvent;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SheetwriteGridEmits {
+export interface SheetwriteGridEmits<Id extends RowBridgeId = RowBridgeId> {
+  "row-delta": Parameters<RowBridgeHandler<Id>>[0];
   "grid-change": ChangeEvent;
   "selection-change": Selection | null;
   "viewport-change": GridEvents["scroll"];

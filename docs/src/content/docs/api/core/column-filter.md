@@ -10,7 +10,7 @@ matching is against the cell's resolved value (text or number).
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L61</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L94</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>

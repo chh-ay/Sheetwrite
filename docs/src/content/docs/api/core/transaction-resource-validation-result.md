@@ -9,7 +9,7 @@ Successful byte/count inspection or one structured transaction rejection.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L27</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L46</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

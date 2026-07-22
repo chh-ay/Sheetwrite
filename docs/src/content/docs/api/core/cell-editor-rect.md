@@ -9,7 +9,7 @@ Viewport-relative geometry of the cell currently owned by an editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/editor.ts#L9</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L66</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
