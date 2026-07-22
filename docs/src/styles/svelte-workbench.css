@@ -1,50 +1,6 @@
 /* Route-owned composition for /svelte/: a field dispatch surface where the
    editable Grid and its durable handoff are the first, highest-contrast story. */
 
-/* The shared adapter page is intentionally editorial. This route compresses
-   that introduction so the real product surface owns the first viewport. */
-.sw-showcase-page[data-framework="svelte"] {
-  padding-top: var(--sw-demo-space-4);
-}
-
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-page__hero {
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
-  gap: var(--sw-demo-space-4);
-  align-items: center;
-  padding-bottom: var(--sw-demo-space-4);
-}
-
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-page__eyebrow {
-  margin-bottom: var(--sw-demo-space-2);
-}
-
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-page__hero h1 {
-  max-width: none;
-  font-size: clamp(2rem, 3vw, 2.75rem);
-  line-height: 1;
-}
-
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-page__hero-copy > p:last-of-type {
-  max-width: 58rem;
-  margin-top: var(--sw-demo-space-2);
-  font-size: var(--sw-type-base);
-  line-height: 1.5;
-}
-
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-page__specs {
-  margin-top: var(--sw-demo-space-3);
-}
-
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-page__install {
-  gap: var(--sw-demo-space-2);
-  padding: var(--sw-demo-space-3);
-  box-shadow: none;
-}
-
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-page__install > div strong {
-  font-size: var(--sw-type-base);
-}
-
 .sw-showcase-page[data-framework="svelte"] .sw-showcase-stage__bar {
   min-height: 2.5rem;
 }
@@ -642,30 +598,6 @@
 }
 
 @media (max-width: 42rem) {
-  .sw-showcase-page[data-framework="svelte"] {
-    padding-top: var(--sw-demo-space-2);
-  }
-
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-page__hero {
-    gap: var(--sw-demo-space-2);
-    padding-bottom: var(--sw-demo-space-3);
-  }
-
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-page__hero h1 {
-    font-size: 2rem;
-  }
-
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-page__hero-copy > p:last-of-type {
-    margin-top: var(--sw-demo-space-1);
-    font-size: var(--sw-type-sm);
-    line-height: 1.45;
-  }
-
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-page__specs,
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-page__install {
-    display: none;
-  }
-
   .sw-showcase-page[data-framework="svelte"] .sw-showcase-stage__bar {
     min-height: 2rem;
   }

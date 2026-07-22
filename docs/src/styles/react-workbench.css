@@ -18,55 +18,6 @@
   --sw-rwb-strong-rule: 0.125rem;
 }
 
-/* React is the controlled-analytics route: its introduction is deliberately
-   compact so the working product, not setup copy, owns the first viewport. */
-.sw-showcase-page[data-framework="react"] {
-  padding-top: var(--sw-demo-space-4);
-}
-
-.sw-showcase-page[data-framework="react"] .sw-showcase-page__hero {
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 23rem);
-  gap: calc(var(--sw-demo-space-4) * 2);
-  align-items: center;
-  padding-bottom: var(--sw-demo-space-4);
-}
-
-.sw-showcase-page[data-framework="react"] .sw-showcase-page__eyebrow {
-  margin-bottom: var(--sw-demo-space-2);
-}
-
-.sw-showcase-page[data-framework="react"] .sw-showcase-page__hero h1 {
-  max-width: none;
-  font-size: calc(var(--sw-type-base) * 2);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
-}
-
-.sw-showcase-page[data-framework="react"] .sw-showcase-page__hero-copy > p:last-of-type {
-  max-width: 58rem;
-  margin-top: var(--sw-demo-space-2);
-  font-size: var(--sw-type-sm);
-  line-height: 1.5;
-}
-
-.sw-showcase-page[data-framework="react"] .sw-showcase-page__specs {
-  margin-top: var(--sw-demo-space-3);
-}
-
-.sw-showcase-page[data-framework="react"] .sw-showcase-page__install {
-  gap: var(--sw-demo-space-2);
-  padding: var(--sw-demo-space-3);
-  box-shadow: none;
-}
-
-.sw-showcase-page[data-framework="react"] .sw-showcase-page__install > div {
-  display: none;
-}
-
-.sw-showcase-page[data-framework="react"] .sw-install-command {
-  padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
-}
-
 /* The 44rem shared stage is divided around one dominant workspace. */
 .sw-rwb__main {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
@@ -601,15 +552,6 @@
 }
 
 @media (max-width: 48rem) {
-  .sw-showcase-page[data-framework="react"] .sw-showcase-page__hero {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sw-demo-space-3);
-  }
-
-  .sw-showcase-page[data-framework="react"] .sw-showcase-page__hero h1 {
-    font-size: calc(var(--sw-type-base) * 1.75);
-  }
-
   .sw-showcase-page[data-framework="react"] .sw-showcase-page__install {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
