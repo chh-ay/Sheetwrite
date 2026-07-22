@@ -60,6 +60,7 @@ impl FuncAccumulator {
     }
 
 
+    #[cfg(test)]
     pub(super) fn finish_arg(
         &mut self,
         rows: usize,
@@ -129,10 +130,7 @@ impl FuncAccumulator {
     }
 
     pub(super) fn arg_missing(&self, index: usize) -> bool {
-        self.arg_count
-            .checked_sub(index + 1)
-            .is_some()
-            && self.args[index].missing
+        index < self.arg_count && self.args[index].missing
     }
 
     pub(super) fn arg_value(&self, index: usize) -> Option<&Value> {
