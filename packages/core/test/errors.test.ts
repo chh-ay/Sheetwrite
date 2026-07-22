@@ -47,6 +47,88 @@ describe("SheetwriteError", () => {
     expect(JSON.stringify(error)).not.toContain("cause");
   });
 
+  it("snapshots and freezes context so caller mutation cannot invalidate serialization", () => {
+    const shared = { count: 1 };
+    const source: Record<string, unknown> = {
+      nested: shared,
+      alias: shared,
+      values: [1, "two", null],
+    };
+    const error = new SheetwriteError("transaction", "persistence", "write failed", {
+      context: source as never,
+    });
+    const stored = error.context as Record<string, unknown>;
+
+    shared.count = Number.POSITIVE_INFINITY;
+    source.cycle = source;
+
+    const storedNested = stored.nested;
+    expect(storedNested).toEqual({ count: 1 });
+    expect(stored.nested).toBe(stored.alias);
+    expect(Object.isFrozen(stored)).toBe(true);
+    if (typeof storedNested !== "object" || storedNested === null) {
+      throw new Error("Expected stored nested context");
+    }
+    expect(Object.isFrozen(storedNested)).toBe(true);
+    expect(Reflect.set(storedNested, "count", 2n)).toBe(false);
+    expect(Reflect.set(error, "context", source)).toBe(false);
+    expect(JSON.parse(JSON.stringify(error)).context).toEqual({
+      nested: { count: 1 },
+      alias: { count: 1 },
+      values: [1, "two", null],
+    });
+  });
+
+  it("rejects cyclic, unsupported, and excessively nested or wide context", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    const accessor: Record<string, unknown> = {};
+    let getterCalled = false;
+    Object.defineProperty(accessor, "unstable", {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return 1;
+      },
+    });
+
+    let tooDeep: Record<string, unknown> = {};
+    for (let depth = 0; depth < 40; depth += 1) tooDeep = { nested: tooDeep };
+
+    const tooWide: Record<string, unknown> = {};
+    for (let index = 0; index < 300; index += 1) tooWide[`field${index}`] = index;
+
+    const decoratedArray: unknown[] = [1];
+    Object.defineProperty(decoratedArray, "extra", { enumerable: true, value: 1n });
+    const sparseArray = new Array<unknown>(2);
+
+    const invalidContexts: unknown[] = [
+      cyclic,
+      { invalid: undefined },
+      { invalid: () => undefined },
+      { invalid: Symbol("invalid") },
+      { invalid: 1n },
+      { invalid: Number.NaN },
+      { invalid: Number.POSITIVE_INFINITY },
+      { invalid: new Date() },
+      accessor,
+      tooDeep,
+      tooWide,
+      { invalid: decoratedArray },
+      { invalid: sparseArray },
+    ];
+    for (const context of invalidContexts) {
+      expect(
+        () =>
+          new SheetwriteError("transaction", "persistence", "write failed", {
+            context: context as never,
+          }),
+      ).toThrow(TypeError);
+    }
+    expect(getterCalled).toBe(false);
+  });
+
   it("recognizes valid instances and serialized envelopes but rejects malformed context", () => {
     const error = new SheetwriteError("export-failed", "export-xlsx", "codec failed");
     expect(isSheetwriteError(error)).toBe(true);
@@ -88,6 +170,16 @@ describe("SheetwriteError", () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     expect(isSheetwriteError({ ...error.toJSON(), context: cyclic })).toBe(false);
+
+    const sameRealmImpostor = Object.assign(Object.create(SheetwriteError.prototype), {
+      name: "SheetwriteError",
+      message: "forged",
+      code: "transaction",
+      operation: "persistence",
+      context: { invalid: 1n },
+    });
+    expect(sameRealmImpostor).toBeInstanceOf(SheetwriteError);
+    expect(isSheetwriteError(sameRealmImpostor)).toBe(false);
   });
 
   it("retains canonical instances, reconstructs serialized envelopes, and wraps causes once", () => {

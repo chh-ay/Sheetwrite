@@ -1,9 +1,10 @@
 <script lang="ts">
 import {
   initSheetwrite,
+  isSheetwriteError,
   isSheetwriteReady,
+  SheetwriteError,
   type GridOptions,
-  type SheetwriteError,
 } from "@sheetwrite/core";
 import {
   createGridController,
@@ -90,6 +91,23 @@ let previousWasmSource: Props["wasmSource"] | typeof UNSET_WASM_SOURCE = UNSET_W
 let initializationToken = 0;
 let disposed = false;
 
+function normalizeInitializationError(error: unknown): SheetwriteError {
+  if (error instanceof SheetwriteError) return error;
+  if (isSheetwriteError(error)) {
+    return new SheetwriteError(error.code, error.operation, error.message, {
+      cause: error,
+      context: error.context,
+      retryable: error.retryable,
+    });
+  }
+  return new SheetwriteError(
+    "initialization-failed",
+    "initialize",
+    error instanceof Error ? error.message : "Sheetwrite initialize failed",
+    { cause: error },
+  );
+}
+
 function teardownGrid(): void {
   const active = untrack(() => controller);
   grid = undefined;
@@ -165,9 +183,10 @@ $effect(() => {
   lastRequestedOptions = requestedOptions;
   const token = ++initializationToken;
   if (sourceOnlyChange) {
-    void initSheetwrite(resetInputs.wasmSource).catch((error: SheetwriteError) => {
+    void initSheetwrite(resetInputs.wasmSource).then(undefined, (error: unknown) => {
       if (!disposed && token === initializationToken) {
-        untrack(() => onInitializationError?.(error));
+        const initializationError = normalizeInitializationError(error);
+        untrack(() => onInitializationError?.(initializationError));
       }
     });
     return;
@@ -177,19 +196,26 @@ $effect(() => {
   teardownGrid();
   loading = !isSheetwriteReady();
 
-  void (async () => {
-    const alreadyReady = isSheetwriteReady();
-    try {
-      const initialization = initSheetwrite(resetInputs.wasmSource);
-      if (alreadyReady) publishReadyGrid();
-      await initialization;
-      if (!alreadyReady && !disposed && isSheetwriteReady()) publishReadyGrid();
-    } catch (error) {
+  const alreadyReady = isSheetwriteReady();
+  const initialization = initSheetwrite(resetInputs.wasmSource);
+  if (alreadyReady) publishReadyGrid();
+  void initialization.then(
+    () => {
+      if (!alreadyReady && !disposed && isSheetwriteReady()) {
+        try {
+          publishReadyGrid();
+        } catch (error) {
+          reportError(error);
+        }
+      }
+    },
+    (error: unknown) => {
       if (disposed || token !== initializationToken) return;
       loading = true;
-      untrack(() => onInitializationError?.(error as SheetwriteError));
-    }
-  })();
+      const initializationError = normalizeInitializationError(error);
+      untrack(() => onInitializationError?.(initializationError));
+    },
+  );
 });
 
 $effect(() => {

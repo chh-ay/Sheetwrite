@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach } from "bun:test";
+import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 import type { Grid } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
@@ -7,6 +7,8 @@ import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { flushSync, mount, unmount } from "../../../node_modules/svelte/src/index-client.js";
 import {
   type AdapterConformanceProps,
+  makeConformanceData,
+  makeConformanceWorkbook,
   type MountedAdapter,
   runSharedAdapterLifecycleContract,
 } from "../../../test/adapter-lifecycle-contract.js";
@@ -62,3 +64,31 @@ async function mountConformanceGrid(props: AdapterConformanceProps): Promise<Mou
 }
 
 runSharedAdapterLifecycleContract("Svelte", mountConformanceGrid);
+
+it("does not report an ordinary onReady throw as an initialization failure", async () => {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const readyFailure = new Error("consumer onReady failed");
+  const initializationErrors: unknown[] = [];
+  const component = mount(SvelteLifecycleHarness, {
+    target: host,
+    props: {
+      initialProps: {
+        workbook: makeConformanceWorkbook(),
+        data: makeConformanceData(),
+        fallbackLabel: "callback fallback",
+        onReady: () => {
+          throw readyFailure;
+        },
+        onInitializationError: (error) => initializationErrors.push(error),
+      },
+    },
+  }) as SvelteLifecycleHarnessApi;
+
+  expect(() => flushSync()).toThrow(readyFailure);
+  await Promise.resolve();
+  expect(initializationErrors).toEqual([]);
+  expect(component.getGrid()).toBeDefined();
+  await unmount(component);
+  flushSync();
+});

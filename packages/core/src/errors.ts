@@ -108,6 +108,172 @@ export interface SheetwriteErrorOptions extends ErrorOptions {
   retryable?: boolean;
 }
 
+const MAX_ERROR_CONTEXT_DEPTH = 32;
+const MAX_ERROR_CONTEXT_WIDTH = 256;
+const MAX_ERROR_CONTEXT_ENTRIES = 1_024;
+const INVALID_CONTEXT_VALUE = Symbol("invalid-context-value");
+
+type MutableContextContainer =
+  | SheetwriteErrorContextValue[]
+  | Record<string, SheetwriteErrorContextValue>;
+
+interface ContextInspection {
+  entries: number;
+  readonly active: WeakSet<object>;
+  readonly clones?: WeakMap<object, MutableContextContainer>;
+  readonly snapshots?: MutableContextContainer[];
+}
+
+function isPlainContextObject(value: object): boolean {
+  if (Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype === null) return true;
+  const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor");
+  return (
+    Object.getPrototypeOf(prototype) === null &&
+    constructor !== undefined &&
+    "value" in constructor &&
+    typeof constructor.value === "function" &&
+    constructor.value.name === "Object"
+  );
+}
+
+function hasUnsafeToJSON(value: object): boolean {
+  let current: object | null = value;
+  while (current !== null) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, "toJSON");
+    if (descriptor !== undefined) {
+      return !("value" in descriptor) || typeof descriptor.value === "function";
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  return false;
+}
+
+function inspectContextValue(
+  value: unknown,
+  depth: number,
+  inspection: ContextInspection,
+): SheetwriteErrorContextValue | typeof INVALID_CONTEXT_VALUE {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : INVALID_CONTEXT_VALUE;
+  }
+  if (typeof value !== "object" || depth > MAX_ERROR_CONTEXT_DEPTH) {
+    return INVALID_CONTEXT_VALUE;
+  }
+
+  const source = value;
+  const isArray = Array.isArray(source);
+  if ((!isArray && !isPlainContextObject(source)) || hasUnsafeToJSON(source)) {
+    return INVALID_CONTEXT_VALUE;
+  }
+  if (inspection.active.has(source)) return INVALID_CONTEXT_VALUE;
+
+  let target = inspection.clones?.get(source);
+  if (inspection.clones && target === undefined) {
+    target = isArray
+      ? (Object.setPrototypeOf([], null) as SheetwriteErrorContextValue[])
+      : (Object.create(null) as Record<string, SheetwriteErrorContextValue>);
+    inspection.clones.set(source, target);
+    inspection.snapshots!.push(target);
+  }
+
+  inspection.active.add(source);
+  try {
+    if (isArray) {
+      if (source.length > MAX_ERROR_CONTEXT_WIDTH) return INVALID_CONTEXT_VALUE;
+      const ownKeys = Reflect.ownKeys(source);
+      if (ownKeys.length !== source.length + 1) return INVALID_CONTEXT_VALUE;
+      for (const key of ownKeys) {
+        if (key === "length") continue;
+        if (
+          typeof key !== "string" ||
+          !Number.isSafeInteger(Number(key)) ||
+          Number(key) < 0 ||
+          Number(key) >= source.length ||
+          String(Number(key)) !== key
+        ) {
+          return INVALID_CONTEXT_VALUE;
+        }
+      }
+      inspection.entries += source.length;
+      if (inspection.entries > MAX_ERROR_CONTEXT_ENTRIES) return INVALID_CONTEXT_VALUE;
+
+      for (let index = 0; index < source.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(source, String(index));
+        if (descriptor === undefined || !("value" in descriptor)) return INVALID_CONTEXT_VALUE;
+        const child = inspectContextValue(descriptor.value, depth + 1, inspection);
+        if (child === INVALID_CONTEXT_VALUE) return INVALID_CONTEXT_VALUE;
+        if (target) (target as SheetwriteErrorContextValue[])[index] = child;
+      }
+    } else {
+      const keys = Reflect.ownKeys(source);
+      if (keys.length > MAX_ERROR_CONTEXT_WIDTH) return INVALID_CONTEXT_VALUE;
+      inspection.entries += keys.length;
+      if (inspection.entries > MAX_ERROR_CONTEXT_ENTRIES) return INVALID_CONTEXT_VALUE;
+
+      for (const key of keys) {
+        if (typeof key !== "string") return INVALID_CONTEXT_VALUE;
+        const descriptor = Object.getOwnPropertyDescriptor(source, key);
+        if (descriptor === undefined || !descriptor.enumerable || !("value" in descriptor)) {
+          return INVALID_CONTEXT_VALUE;
+        }
+        const child = inspectContextValue(descriptor.value, depth + 1, inspection);
+        if (child === INVALID_CONTEXT_VALUE) return INVALID_CONTEXT_VALUE;
+        if (target) {
+          (target as Record<string, SheetwriteErrorContextValue>)[key] = child;
+        }
+      }
+    }
+    return target ?? (source as SheetwriteErrorContextValue);
+  } finally {
+    inspection.active.delete(source);
+  }
+}
+
+function inspectSheetwriteErrorContext(
+  context: unknown,
+  snapshot: boolean,
+): SheetwriteErrorContext | undefined {
+  try {
+    if (typeof context !== "object" || context === null || !isPlainContextObject(context)) {
+      return undefined;
+    }
+    const snapshots: MutableContextContainer[] | undefined = snapshot ? [] : undefined;
+    const inspection: ContextInspection = {
+      entries: 0,
+      active: new WeakSet<object>(),
+      clones: snapshot ? new WeakMap<object, MutableContextContainer>() : undefined,
+      snapshots,
+    };
+    const inspected = inspectContextValue(context, 0, inspection);
+    if (inspected === INVALID_CONTEXT_VALUE || Array.isArray(inspected)) return undefined;
+    if (snapshots) {
+      for (let index = snapshots.length - 1; index >= 0; index -= 1) {
+        Object.freeze(snapshots[index]);
+      }
+    }
+    return inspected as SheetwriteErrorContext;
+  } catch {
+    return undefined;
+  }
+}
+
+function snapshotSheetwriteErrorContext(context: SheetwriteErrorContext): SheetwriteErrorContext {
+  const snapshot = inspectSheetwriteErrorContext(context, true);
+  if (snapshot === undefined) {
+    throw new TypeError(
+      "SheetwriteError context must be a bounded record containing only JSON-safe values",
+    );
+  }
+  return snapshot;
+}
+
+function isSheetwriteErrorContext(context: unknown): context is SheetwriteErrorContext {
+  return inspectSheetwriteErrorContext(context, false) !== undefined;
+}
+
 /** Canonical envelope for thrown and callback-delivered Sheetwrite failures. */
 export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
   override readonly name: string = "SheetwriteError";
@@ -121,7 +287,13 @@ export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
     options: SheetwriteErrorOptions = {},
   ) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.context = options.context;
+    Object.defineProperty(this, "context", {
+      value:
+        options.context === undefined ? undefined : snapshotSheetwriteErrorContext(options.context),
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
     this.retryable = options.retryable;
   }
 
@@ -140,47 +312,8 @@ export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
 const ERROR_NAMES =
   "|SheetwriteError|DelimitedTextResourceError|DelimitedTextOptionsError|XlsxResourceError|SnapshotResourceError|SnapshotValidationError|PersistenceError|IndexedDbPendingCommitStorageError|SyncProtocolError|SyncPendingCapacityError|IncompleteDataError|";
 
-function isContextValue(value: unknown): value is SheetwriteErrorContextValue {
-  const pending: Array<{ value: unknown; exit: boolean }> = [{ value, exit: false }];
-  const active = new WeakSet<object>();
-  try {
-    while (pending.length > 0) {
-      const frame = pending.pop()!;
-      const candidate = frame.value;
-      if (candidate === null || typeof candidate === "string" || typeof candidate === "boolean") {
-        continue;
-      }
-      if (typeof candidate === "number" && Number.isFinite(candidate)) continue;
-      if (typeof candidate !== "object") return false;
-      if (frame.exit) {
-        active.delete(candidate);
-        continue;
-      }
-      if (active.has(candidate)) return false;
-      active.add(candidate);
-      pending.push({ value: candidate, exit: true });
-      if (!Array.isArray(candidate)) {
-        const prototype = Object.getPrototypeOf(candidate);
-        if (
-          Object.prototype.toString.call(candidate) !== "[object Object]" ||
-          (prototype !== null && prototype.constructor?.name !== "Object")
-        ) {
-          return false;
-        }
-      }
-      for (const key of Object.keys(candidate)) {
-        pending.push({ value: (candidate as Record<string, unknown>)[key], exit: false });
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Narrow same-realm errors, cross-realm errors, and serialized failure envelopes. */
 export function isSheetwriteError(value: unknown): value is SheetwriteErrorEnvelope {
-  if (value instanceof SheetwriteError) return true;
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<SheetwriteErrorEnvelope>;
   try {
@@ -193,7 +326,7 @@ export function isSheetwriteError(value: unknown): value is SheetwriteErrorEnvel
       SHEETWRITE_ERROR_CODES.includes(candidate.code as SheetwriteErrorCode) &&
       typeof candidate.operation === "string" &&
       SHEETWRITE_ERROR_OPERATIONS.includes(candidate.operation as SheetwriteErrorOperation) &&
-      (candidate.context === undefined || isContextValue(candidate.context)) &&
+      (candidate.context === undefined || isSheetwriteErrorContext(candidate.context)) &&
       (candidate.retryable === undefined || typeof candidate.retryable === "boolean")
     );
   } catch {
@@ -208,8 +341,8 @@ export function normalizeSheetwriteError(
   operation: SheetwriteErrorOperation,
   context?: SheetwriteErrorContext,
 ): SheetwriteError {
-  if (error instanceof SheetwriteError) return error;
   if (isSheetwriteError(error)) {
+    if (error instanceof SheetwriteError) return error;
     return new SheetwriteError(error.code, error.operation, error.message, {
       cause: error,
       context: error.context,
