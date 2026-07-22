@@ -28,6 +28,7 @@ playwright-report/
 bench/results/candidates/
 bench/results/render-fresh.json
 bench/results/render-fresh.md
+.formula-evidence/
 
 # Editor / OS
 .DS_Store

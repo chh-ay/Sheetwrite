@@ -1,0 +1,3208 @@
+{
+  "evidenceVersion": 1,
+  "protocol": "formula-corrected-baseline-matched-v1",
+  "candidateCommit": "27be3443e3e8fa9404f522ad161b5c04adbc0987",
+  "baselineCommit": "77c41983b53f09c393c6f8b82a4033283c0f9830",
+  "harnessSha256": "027d0b7401a3bc40964b08f8bdbfb83750e6390edcd6e9e4bf8b1533fb4f44b6",
+  "rawArtifactSha256": "20bcbc7fba63518a785d96aacfb01b5343b1428b21b344e98a18b051623d36bd",
+  "wasmSha256": {
+    "baseline": "7c6ccfd4b16099276b4ce666ce6feb73f0d10be66b826b5475f11158a4c44081",
+    "candidate": "41dff106a2963cfece6b142346b169391bbbd569b93b0723a1c1dc3b2556c180"
+  },
+  "releaseBuild": {
+    "rust": "opt-level=3,lto=fat,codegen-units=1",
+    "wasmOpt": "-O3",
+    "bun": "1.3.14"
+  },
+  "controls": {
+    "cpuAffinity": [
+      12
+    ],
+    "concurrency": 1,
+    "warmupsPerSidePerWorkload": 1,
+    "alternatingPairs": 20,
+    "platformProfile": "performance",
+    "governor": "powersave",
+    "energyPerformancePreference": "performance"
+  },
+  "workloadBoundaries": {
+    "independent-parse-load/1000": "setup store/sheet/numeric input; timed 1000 setFormula calls (parse, FormulaEntry metadata, store insertion); correctness recompute/read is untimed",
+    "error-propagation/1000": "setup 1001 setFormula calls; timed first recompute only; read check untimed",
+    "scalar-edit-affects-1000/1000": "setup 1000 formulas plus initial recompute; timed setNumber plus incremental recompute; read check untimed",
+    "shared-range-edit/1000": "setup 1000 SUM(range) formulas plus initial recompute; timed setNumber plus incremental recompute; read check untimed",
+    "removed-sheet-ref/1000": "setup sheets, 1000 cross-sheet formulas, initial recompute; timed removeSheet only (invalidation/recompute inside API); read check untimed",
+    "wide-fan-out-edit/1000": "setup 1000 scalar formulas plus initial recompute; timed setNumber plus incremental recompute; read check untimed",
+    "wide-fan-out-edit/100000": "setup 100000 scalar formulas plus initial recompute; timed setNumber plus incremental recompute; read check untimed"
+  },
+  "bootstrap": {
+    "resamples": 100000,
+    "seed": 24301,
+    "confidence": 0.95,
+    "statistic": "candidate percentile / baseline percentile - 1, expressed as percent",
+    "pairing": "paired alternating rounds; bootstrap resamples whole rounds with replacement"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 0.9983860000002096,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.7878489999998237,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.3592839999996613,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1865150000003268,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 1.0840829999997368,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0162380000001576,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.253403000000162,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.143501000000015,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.082687999999962,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0864329999999427,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 0.9850910000000113,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9241050000000541,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 140.27555200000006,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 131.62079499999982,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 2,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7710339999998723,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9773580000000948,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.1711890000001404,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 2.5698859999997694,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9371399999999994,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0280080000002272,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.157623999999942,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.194141999999829,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.030456000000413,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0861460000000989,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9577540000000226,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9968560000002071,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 135.70712500000036,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 137.84175300000015,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 3,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 0.9760059999998703,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.7854800000000068,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.342160000000149,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1756360000003951,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 1.0387919999998303,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9694479999998293,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.155340000000251,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.253537999999935,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.4444320000002335,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0362020000002303,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0136859999997796,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9196719999999914,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 141.5185850000007,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 137.36555399999997,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 4,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7807259999999587,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9711109999998371,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.1812330000002476,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 2.3518850000000384,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9573049999999057,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0193280000003142,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.224750999999742,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.111261000000013,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 6.05152999999973,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 2.7109780000000683,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9727160000002186,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0193659999995361,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 133.1417360000005,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 142.61819800000012,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 5,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 1.4183549999997922,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.8524009999991904,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.3754319999998188,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1828969999996843,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 1.0382939999999508,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9672849999997197,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.0682129999995595,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.091145999999753,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.1270500000000538,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0582380000005287,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0238280000003215,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9496159999998781,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 138.50157299999955,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 139.02961400000004,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 6,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7828049999998257,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0124900000000707,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.2043279999998049,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.339415000000372,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9854009999999107,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.012445000000298,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.0019090000005235,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.309369999999944,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.0248400000000402,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0719429999999193,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.939115999999558,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0027599999993981,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 136.35840499999995,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 143.02139499999976,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 7,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 0.976158000000396,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.7837650000001304,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.3187459999999191,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1665769999999611,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 0.9814519999999902,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9705210000001898,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.3182770000003075,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.065558000000237,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.0976540000001478,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0222630000007484,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0202629999994315,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9465350000000399,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 142.98800800000026,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 132.35910200000035,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 8,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7711880000006204,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9864179999985936,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.1563779999996768,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.2997230000000854,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9526170000008278,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0105679999996937,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.134895999999571,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.071462999998403,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.0005799999998999,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0850549999995565,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9361810000009427,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0312379999995755,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 135.2534629999991,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 138.04235599999993,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 9,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 0.9785420000007434,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.7446039999995264,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.3294850000002043,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.441967000000659,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 1.0288670000009006,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9648749999996653,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.087914000001547,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.065483999998833,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.052854000001389,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0103330000001733,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0070360000008804,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.937724999999773,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 141.92769600000065,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 134.12167899999986,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 10,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 1.2339169999995647,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9836050000012619,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.157469999998284,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.333185000001322,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9471880000000965,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9926739999991696,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.021882000000915,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.094492000000173,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.0363189999989117,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.029699000000619,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9521390000008978,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0121699999999691,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 131.913235,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 148.4426769999991,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 11,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 2.439081000000442,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.8504909999992378,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.375119000000268,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1964509999997972,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 1.0468939999991562,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9630630000010569,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.470994999999675,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.091531000000032,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.0852520000007644,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0399429999997665,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0169560000013007,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9484320000010484,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 145.1795490000004,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 137.84795799999847,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 12,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7725709999995161,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9828820000002452,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.173119000000952,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.29254199999923,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9531420000002981,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9570119999989402,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.189739000001282,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.257673000000068,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 0.9913570000007894,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0273789999992005,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9782090000007884,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0061100000002625,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 133.58673500000077,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 139.96972000000096,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 13,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 0.9771270000001095,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.8595050000003539,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.296652000000904,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1623919999983627,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 0.9995380000000296,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9679070000001957,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.033889000000272,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.167161000001215,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.070289999999659,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.07505300000048,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0258450000001176,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9730079999990267,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 140.02383499999996,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 136.76816999999937,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 14,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7684659999995347,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9842470000003232,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.1806800000013027,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.3341610000006767,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 1.1902289999998175,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.1302859999996144,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.155806999999186,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.176873000000342,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.01958999999988,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.048780999999508,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9328409999998257,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0034859999996115,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 135.99285999999847,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 141.04562299999998,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 15,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 0.9893130000000383,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.7793689999998605,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.343155000000479,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1575730000004114,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 0.9901150000005146,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9435009999997419,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.202784000000975,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.10754900000029,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.0810990000009042,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0107560000014928,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0351299999983894,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.964298000000781,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 141.85252600000058,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 131.39136999999937,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 16,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7664049999984854,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9730339999987336,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.1657180000001972,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.3547030000008817,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9652869999990799,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9813729999987117,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.160657999998875,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.117792999999438,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.0172220000004017,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0396679999994376,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9379259999986971,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9812490000003891,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 134.38693299999977,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 144.9445799999994,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 17,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 1.5428099999990081,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.8499420000007376,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.3731840000000375,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1830530000006547,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 1.053686999999627,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9595950000002631,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.190714000000298,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.171085000001767,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.1616890000004787,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0676209999983257,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0432619999992312,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9372059999986959,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 141.3623320000006,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 133.3040899999978,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 18,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7630240000034973,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.083466000000044,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.1973109999998996,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.33422100000098,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9566669999985606,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0152880000023288,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.116919000000053,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.19269599999825,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.022173000001203,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0717939999994996,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.9547089999978198,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9984760000006645,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 136.89302500000122,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 138.66136200000255,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 19,
+      "order": [
+        "baseline",
+        "post94"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "baseline": {
+            "ms": 0.9718090000023949,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.782509000000573,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "baseline": {
+            "ms": 1.3410139999978128,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.1569359999994049,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "baseline": {
+            "ms": 1.0146630000017467,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9502260000008391,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "baseline": {
+            "ms": 5.0126039999995555,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 5.069817999999941,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "baseline": {
+            "ms": 1.0438520000025164,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 1.0187670000013895,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "baseline": {
+            "ms": 1.0214510000005248,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 0.9279180000012275,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "baseline": {
+            "ms": 141.1710979999989,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "post94": {
+            "ms": 136.70196299999952,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 20,
+      "order": [
+        "post94",
+        "baseline"
+      ],
+      "samples": {
+        "independent-parse-load/1000": {
+          "post94": {
+            "ms": 0.7730040000024019,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9831840000006196,
+            "allocationAvailable": true,
+            "retainedBytes": 368861,
+            "retainedDeltaBytes": 340845,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "error-propagation/1000": {
+          "post94": {
+            "ms": 1.1755700000030629,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.331873999999516,
+            "allocationAvailable": true,
+            "retainedBytes": 283455,
+            "retainedDeltaBytes": 12387,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "scalar-edit-affects-1000/1000": {
+          "post94": {
+            "ms": 0.9339189999991504,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9992540000021108,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "shared-range-edit/1000": {
+          "post94": {
+            "ms": 5.176849000003131,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 5.0704379999988305,
+            "allocationAvailable": true,
+            "retainedBytes": 519440,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "removed-sheet-ref/1000": {
+          "post94": {
+            "ms": 1.0641409999989264,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 1.0683380000009493,
+            "allocationAvailable": true,
+            "retainedBytes": 213146,
+            "retainedDeltaBytes": -68417,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/1000": {
+          "post94": {
+            "ms": 0.948487000001478,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 0.9910340000024007,
+            "allocationAvailable": true,
+            "retainedBytes": 396248,
+            "retainedDeltaBytes": 0,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        },
+        "wide-fan-out-edit/100000": {
+          "post94": {
+            "ms": 131.75316200000088,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          },
+          "baseline": {
+            "ms": 140.0778219999993,
+            "allocationAvailable": true,
+            "retainedBytes": 32088637,
+            "retainedDeltaBytes": 27,
+            "peakTransientBytes": 0,
+            "transientAllocations": 0
+          }
+        }
+      }
+    }
+  ],
+  "workloads": {
+    "independent-parse-load/1000": {
+      "raw": {
+        "baselineMs": [
+          0.9983860000002096,
+          0.9773580000000948,
+          0.9760059999998703,
+          0.9711109999998371,
+          1.4183549999997922,
+          1.0124900000000707,
+          0.976158000000396,
+          0.9864179999985936,
+          0.9785420000007434,
+          0.9836050000012619,
+          2.439081000000442,
+          0.9828820000002452,
+          0.9771270000001095,
+          0.9842470000003232,
+          0.9893130000000383,
+          0.9730339999987336,
+          1.5428099999990081,
+          1.083466000000044,
+          0.9718090000023949,
+          0.9831840000006196
+        ],
+        "candidateMs": [
+          0.7878489999998237,
+          0.7710339999998723,
+          0.7854800000000068,
+          0.7807259999999587,
+          0.8524009999991904,
+          0.7828049999998257,
+          0.7837650000001304,
+          0.7711880000006204,
+          0.7446039999995264,
+          1.2339169999995647,
+          0.8504909999992378,
+          0.7725709999995161,
+          0.8595050000003539,
+          0.7684659999995347,
+          0.7793689999998605,
+          0.7664049999984854,
+          0.8499420000007376,
+          0.7630240000034973,
+          0.782509000000573,
+          0.7730040000024019
+        ]
+      },
+      "median": {
+        "value": -20.518418600112355,
+        "ciPct": [
+          -21.641070399896932,
+          -19.806985932865327
+        ]
+      },
+      "p95": {
+        "value": -44.68300750509633,
+        "ciPct": [
+          -65.12676290787059,
+          13.84893361625208
+        ]
+      },
+      "allocation": {
+        "exact": true
+      }
+    },
+    "error-propagation/1000": {
+      "raw": {
+        "baselineMs": [
+          1.3592839999996613,
+          2.5698859999997694,
+          1.342160000000149,
+          2.3518850000000384,
+          1.3754319999998188,
+          1.339415000000372,
+          1.3187459999999191,
+          1.2997230000000854,
+          1.3294850000002043,
+          1.333185000001322,
+          1.375119000000268,
+          1.29254199999923,
+          1.296652000000904,
+          1.3341610000006767,
+          1.343155000000479,
+          1.3547030000008817,
+          1.3731840000000375,
+          1.33422100000098,
+          1.3410139999978128,
+          1.331873999999516
+        ],
+        "candidateMs": [
+          1.1865150000003268,
+          1.1711890000001404,
+          1.1756360000003951,
+          1.1812330000002476,
+          1.1828969999996843,
+          1.2043279999998049,
+          1.1665769999999611,
+          1.1563779999996768,
+          1.441967000000659,
+          1.157469999998284,
+          1.1964509999997972,
+          1.173119000000952,
+          1.1623919999983627,
+          1.1806800000013027,
+          1.1575730000004114,
+          1.1657180000001972,
+          1.1830530000006547,
+          1.1973109999998996,
+          1.1569359999994049,
+          1.1755700000030629
+        ]
+      },
+      "median": {
+        "value": -12.282474185846725,
+        "ciPct": [
+          -13.313508569683307,
+          -11.485199645325006
+        ]
+      },
+      "p95": {
+        "value": -48.52642435672111,
+        "ciPct": [
+          -53.441747999720235,
+          4.86005861319847
+        ]
+      },
+      "allocation": {
+        "exact": true
+      }
+    },
+    "scalar-edit-affects-1000/1000": {
+      "raw": {
+        "baselineMs": [
+          1.0840829999997368,
+          1.0280080000002272,
+          1.0387919999998303,
+          1.0193280000003142,
+          1.0382939999999508,
+          1.012445000000298,
+          0.9814519999999902,
+          1.0105679999996937,
+          1.0288670000009006,
+          0.9926739999991696,
+          1.0468939999991562,
+          0.9570119999989402,
+          0.9995380000000296,
+          1.1302859999996144,
+          0.9901150000005146,
+          0.9813729999987117,
+          1.053686999999627,
+          1.0152880000023288,
+          1.0146630000017467,
+          0.9992540000021108
+        ],
+        "candidateMs": [
+          1.0162380000001576,
+          0.9371399999999994,
+          0.9694479999998293,
+          0.9573049999999057,
+          0.9672849999997197,
+          0.9854009999999107,
+          0.9705210000001898,
+          0.9526170000008278,
+          0.9648749999996653,
+          0.9471880000000965,
+          0.9630630000010569,
+          0.9531420000002981,
+          0.9679070000001957,
+          1.1902289999998175,
+          0.9435009999997419,
+          0.9652869999990799,
+          0.9595950000002631,
+          0.9566669999985606,
+          0.9502260000008391,
+          0.9339189999991504
+        ]
+      },
+      "median": {
+        "value": -5.285497039216214,
+        "ciPct": [
+          -6.83900706353252,
+          -3.7666020057483762
+        ]
+      },
+      "p95": {
+        "value": -5.656847155157896,
+        "ciPct": [
+          -7.892856227652678,
+          5.30334800220682
+        ]
+      },
+      "allocation": {
+        "exact": true
+      }
+    },
+    "shared-range-edit/1000": {
+      "raw": {
+        "baselineMs": [
+          5.253403000000162,
+          5.194141999999829,
+          5.155340000000251,
+          5.111261000000013,
+          5.0682129999995595,
+          5.309369999999944,
+          5.3182770000003075,
+          5.071462999998403,
+          5.087914000001547,
+          5.094492000000173,
+          5.470994999999675,
+          5.257673000000068,
+          5.033889000000272,
+          5.176873000000342,
+          5.202784000000975,
+          5.117792999999438,
+          5.190714000000298,
+          5.19269599999825,
+          5.0126039999995555,
+          5.0704379999988305
+        ],
+        "candidateMs": [
+          5.143501000000015,
+          5.157623999999942,
+          5.253537999999935,
+          5.224750999999742,
+          5.091145999999753,
+          5.0019090000005235,
+          5.065558000000237,
+          5.134895999999571,
+          5.065483999998833,
+          5.021882000000915,
+          5.091531000000032,
+          5.189739000001282,
+          5.167161000001215,
+          5.155806999999186,
+          5.10754900000029,
+          5.160657999998875,
+          5.171085000001767,
+          5.116919000000053,
+          5.069817999999941,
+          5.176849000003131
+        ]
+      },
+      "median": {
+        "value": -0.5208564709322516,
+        "ciPct": [
+          -1.8304623063472691,
+          1.030049140516054
+        ]
+      },
+      "p95": {
+        "value": -1.872402945240037,
+        "ciPct": [
+          -5.376462599519138,
+          -0.05067062357145824
+        ]
+      },
+      "allocation": {
+        "exact": true
+      }
+    },
+    "removed-sheet-ref/1000": {
+      "raw": {
+        "baselineMs": [
+          1.082687999999962,
+          1.0861460000000989,
+          1.4444320000002335,
+          2.7109780000000683,
+          1.1270500000000538,
+          1.0719429999999193,
+          1.0976540000001478,
+          1.0850549999995565,
+          1.052854000001389,
+          1.029699000000619,
+          1.0852520000007644,
+          1.0273789999992005,
+          1.070289999999659,
+          1.048780999999508,
+          1.0810990000009042,
+          1.0396679999994376,
+          1.1616890000004787,
+          1.0717939999994996,
+          1.0438520000025164,
+          1.0683380000009493
+        ],
+        "candidateMs": [
+          1.0864329999999427,
+          1.030456000000413,
+          1.0362020000002303,
+          6.05152999999973,
+          1.0582380000005287,
+          1.0248400000000402,
+          1.0222630000007484,
+          1.0005799999998999,
+          1.0103330000001733,
+          1.0363189999989117,
+          1.0399429999997665,
+          0.9913570000007894,
+          1.07505300000048,
+          1.01958999999988,
+          1.0107560000014928,
+          1.0172220000004017,
+          1.0676209999983257,
+          1.022173000001203,
+          1.0187670000013895,
+          1.0641409999989264
+        ]
+      },
+      "median": {
+        "value": -4.5399021477673385,
+        "ciPct": [
+          -5.727551315857071,
+          -2.3738664354018835
+        ]
+      },
+      "p95": {
+        "value": -11.478718784905828,
+        "ciPct": [
+          -26.061413759992803,
+          123.22313202097463
+        ]
+      },
+      "allocation": {
+        "exact": true
+      }
+    },
+    "wide-fan-out-edit/1000": {
+      "raw": {
+        "baselineMs": [
+          0.9850910000000113,
+          0.9968560000002071,
+          1.0136859999997796,
+          1.0193659999995361,
+          1.0238280000003215,
+          1.0027599999993981,
+          1.0202629999994315,
+          1.0312379999995755,
+          1.0070360000008804,
+          1.0121699999999691,
+          1.0169560000013007,
+          1.0061100000002625,
+          1.0258450000001176,
+          1.0034859999996115,
+          1.0351299999983894,
+          0.9812490000003891,
+          1.0432619999992312,
+          0.9984760000006645,
+          1.0214510000005248,
+          0.9910340000024007
+        ],
+        "candidateMs": [
+          0.9241050000000541,
+          0.9577540000000226,
+          0.9196719999999914,
+          0.9727160000002186,
+          0.9496159999998781,
+          0.939115999999558,
+          0.9465350000000399,
+          0.9361810000009427,
+          0.937724999999773,
+          0.9521390000008978,
+          0.9484320000010484,
+          0.9782090000007884,
+          0.9730079999990267,
+          0.9328409999998257,
+          0.964298000000781,
+          0.9379259999986971,
+          0.9372059999986959,
+          0.9547089999978198,
+          0.9279180000012275,
+          0.948487000001478
+        ]
+      },
+      "median": {
+        "value": -6.46092318499818,
+        "ciPct": [
+          -7.930909997041824,
+          -5.393800662176684
+        ]
+      },
+      "p95": {
+        "value": -6.013167472729686,
+        "ciPct": [
+          -7.759083551521528,
+          -4.6435865066675515
+        ]
+      },
+      "allocation": {
+        "exact": true
+      }
+    },
+    "wide-fan-out-edit/100000": {
+      "raw": {
+        "baselineMs": [
+          140.27555200000006,
+          137.84175300000015,
+          141.5185850000007,
+          142.61819800000012,
+          138.50157299999955,
+          143.02139499999976,
+          142.98800800000026,
+          138.04235599999993,
+          141.92769600000065,
+          148.4426769999991,
+          145.1795490000004,
+          139.96972000000096,
+          140.02383499999996,
+          141.04562299999998,
+          141.85252600000058,
+          144.9445799999994,
+          141.3623320000006,
+          138.66136200000255,
+          141.1710979999989,
+          140.0778219999993
+        ],
+        "candidateMs": [
+          131.62079499999982,
+          135.70712500000036,
+          137.36555399999997,
+          133.1417360000005,
+          139.02961400000004,
+          136.35840499999995,
+          132.35910200000035,
+          135.2534629999991,
+          134.12167899999986,
+          131.913235,
+          137.84795799999847,
+          133.58673500000077,
+          136.76816999999937,
+          135.99285999999847,
+          131.39136999999937,
+          134.38693299999977,
+          133.3040899999978,
+          136.89302500000122,
+          136.70196299999952,
+          131.75316200000088
+        ]
+      },
+      "median": {
+        "value": -4.563365828957178,
+        "ciPct": [
+          -6.051176462891594,
+          -2.9903713651486363
+        ]
+      },
+      "p95": {
+        "value": -5.11595307073579,
+        "ciPct": [
+          -7.780546830207024,
+          -2.8563513898922643
+        ]
+      },
+      "allocation": {
+        "exact": true
+      }
+    }
+  },
+  "gates": {
+    "passed": true,
+    "failures": [],
+    "allocationEquality": true
+  }
+}
