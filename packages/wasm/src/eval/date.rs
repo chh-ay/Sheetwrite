@@ -120,7 +120,7 @@ pub(super) fn parse_date_value(text: &str) -> Option<f64> {
     exact_date(year, month, day)
 }
 
-fn parse_time_value(text: &str) -> Option<f64> {
+fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
     let mut raw = text.trim();
     let mut meridiem = None;
     if raw.len() >= 2 {
@@ -131,7 +131,21 @@ fn parse_time_value(text: &str) -> Option<f64> {
             }
         }
     }
-    let time = raw.rsplit(['T', ' ']).next()?;
+    let (date, time) = if let Some(separator) = raw.rfind(['T', ' ']) {
+        let prefix = raw.get(..separator)?.trim();
+        if prefix.is_empty()
+            || prefix.contains('T')
+            || prefix.chars().any(char::is_whitespace)
+        {
+            return None;
+        }
+        (
+            Some(parse_date_value(prefix)?),
+            raw.get(separator + 1..)?.trim_start(),
+        )
+    } else {
+        (None, raw)
+    };
     let mut parts = time.split(':');
     let mut hour: i64 = parts.next()?.parse().ok()?;
     let minute: i64 = parts.next()?.parse().ok()?;
@@ -155,7 +169,9 @@ fn parse_time_value(text: &str) -> Option<f64> {
         None if !(0..24).contains(&hour) => return None,
         None => {}
     }
-    Some((hour as f64 * 3_600.0 + minute as f64 * 60.0 + second) / SECONDS_PER_DAY as f64)
+    let fraction =
+        (hour as f64 * 3_600.0 + minute as f64 * 60.0 + second) / SECONDS_PER_DAY as f64;
+    Some((date, fraction))
 }
 
 fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
@@ -164,8 +180,10 @@ fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
             let trimmed = text.trim();
             if let Ok(number) = trimmed.parse::<f64>() {
                 number
-            } else if let Some(time) = parse_time_value(trimmed) {
-                parse_date_value(trimmed).map_or(time, |date| date.floor() + time)
+            } else if let Some((date, time)) = parse_time_with_date(trimmed) {
+                date.map_or(time, |date| date.floor() + time)
+            } else if trimmed.contains(':') {
+                return Err(FormulaError::Value);
             } else {
                 parse_date_value(trimmed).ok_or(FormulaError::Value)?
             }
@@ -263,11 +281,11 @@ fn add_months(serial: i64, months: i64, end_of_month: bool) -> Result<f64, Formu
 }
 
 fn sunday_zero_weekday(serial: i64) -> Result<i64, FormulaError> {
-    let (year, month, day) = date_parts(serial as f64).ok_or(FormulaError::Num)?;
-    if (year, month, day) == (1900, 2, 29) {
-        return Ok((days_from_civil(1900, 2, 28) + 5).rem_euclid(7));
+    if (0..=MAX_DATE_SERIAL).contains(&serial) {
+        Ok((serial + 6).rem_euclid(7))
+    } else {
+        Err(FormulaError::Num)
     }
-    Ok((days_from_civil(year, month, day) + 4).rem_euclid(7))
 }
 
 fn weekday_number(serial: i64, return_type: i64) -> Result<i64, FormulaError> {
@@ -594,7 +612,9 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         Func::TimeValue => {
             let result = require_arity(values, 1, 1).and_then(|_| {
                 let text = text_arg(values, 0, None)?;
-                parse_time_value(&text).ok_or(FormulaError::Value)
+                parse_time_with_date(&text)
+                    .map(|(_, time)| time)
+                    .ok_or(FormulaError::Value)
             });
             result.map_or_else(Value::Error, Value::number)
         }
@@ -666,7 +686,7 @@ mod tests {
             for value in arg {
                 values.push_range(value.clone()).unwrap();
             }
-            values.finish_arg(1, arg.len()).unwrap();
+            values.finish_arg(arg.len(), 1).unwrap();
         }
         values
     }
@@ -745,6 +765,25 @@ mod tests {
         assert_eq!(result(Func::Hour, &[vec![Value::text("12:30 AM")]]), scalar(0.0)[0]);
         assert_eq!(result(Func::Minute, &[vec![Value::text("23:59:58")]]), scalar(59.0)[0]);
         assert_eq!(result(Func::Second, &[vec![Value::text("23:59:58")]]), scalar(58.0)[0]);
+        assert_eq!(
+            result(Func::Hour, &[vec![Value::text("2024-06-01 14:00")]]),
+            Value::number(14.0)
+        );
+        let parsed = number(result(
+            Func::TimeValue,
+            &[vec![Value::text("2024-06-01T14:00")]],
+        ));
+        assert!((parsed - 14.0 / 24.0).abs() < 1e-15);
+        for invalid in ["not-a-date 14:00", "2024-02-30 14:00", "2024-06-01 junk 14:00"] {
+            assert_eq!(
+                result(Func::TimeValue, &[vec![Value::text(invalid)]]),
+                Value::Error(FormulaError::Value)
+            );
+            assert_eq!(
+                result(Func::Hour, &[vec![Value::text(invalid)]]),
+                Value::Error(FormulaError::Value)
+            );
+        }
     }
 
     #[test]
@@ -773,6 +812,30 @@ mod tests {
                 Value::number(expected)
             );
         }
+        for &(serial, expected) in &[(1.0, 1.0), (59.0, 3.0), (60.0, 4.0), (61.0, 5.0)] {
+            assert_eq!(
+                result(Func::Weekday, &[scalar(serial)]),
+                Value::number(expected)
+            );
+        }
+        assert_eq!(
+            result(Func::Workday, &[scalar(1.0), scalar(1.0)]),
+            Value::number(2.0)
+        );
+        assert_eq!(
+            result(Func::Workday, &[scalar(59.0), scalar(1.0)]),
+            Value::number(60.0)
+        );
+        for serial in [1.0, 59.0, 60.0, 61.0] {
+            assert_eq!(
+                result(Func::WeekNum, &[scalar(serial)]),
+                Value::number(if serial == 1.0 { 1.0 } else { 9.0 })
+            );
+        }
+        assert_eq!(
+            result(Func::NetworkDays, &[scalar(59.0), scalar(61.0)]),
+            Value::number(3.0)
+        );
         assert_eq!(
             result(Func::WeekNum, &[scalar(monday), scalar(21.0)]),
             Value::number(1.0)

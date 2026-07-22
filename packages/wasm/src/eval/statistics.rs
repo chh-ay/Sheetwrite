@@ -129,6 +129,9 @@ fn rank_eq(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     if numbers.is_empty() {
         return Err(FormulaError::Na);
     }
+    if !numbers.contains(&target) {
+        return Err(FormulaError::Na);
+    }
     let ascending = number_arg(values, 2, Some(0.0))? != 0.0;
     let before = numbers
         .iter()
@@ -363,13 +366,14 @@ fn conditional_extreme(values: &FuncAccumulator, maximum: bool) -> Value {
         return Value::Error(FormulaError::Value);
     }
     let target = values.arg(0).unwrap_or_default();
+    let target_shape = values.arg_shape(0);
     let mut criteria = Vec::new();
     if criteria.try_reserve((arg_count - 1) / 2).is_err() {
         return Value::Error(FormulaError::Num);
     }
     for pair in (1..arg_count).step_by(2) {
         let range = values.arg(pair).unwrap_or_default();
-        if range.len() != target.len() {
+        if values.arg_shape(pair) != target_shape {
             return Value::Error(FormulaError::Value);
         }
         let Some(criterion) = values.arg_value(pair + 1) else {
@@ -415,7 +419,18 @@ mod tests {
             for value in arg {
                 values.push_range(value.clone()).unwrap();
             }
-            values.finish_arg(1, arg.len()).unwrap();
+            values.finish_arg(arg.len(), 1).unwrap();
+        }
+        values
+    }
+
+    fn shaped_accumulator(args: &[(Vec<Value>, usize, usize)]) -> FuncAccumulator {
+        let mut values = FuncAccumulator::default();
+        for (arg, rows, cols) in args {
+            for value in arg {
+                values.push_range(value.clone()).unwrap();
+            }
+            values.finish_arg(*rows, *cols).unwrap();
         }
         values
     }
@@ -458,6 +473,31 @@ mod tests {
             2.5,
         );
         assert_near(result(Func::QuartileInc, &[data, scalar(3.0)]), 3.5);
+    }
+
+    #[test]
+    fn rank_requires_the_target_in_both_orders() {
+        let data = vec![Value::number(5.0), Value::number(3.0), Value::number(1.0)];
+        assert_eq!(
+            result(Func::RankEq, &[scalar(3.0), data.clone()]),
+            Value::number(2.0)
+        );
+        assert_eq!(
+            result(
+                Func::RankEq,
+                &[scalar(3.0), data.clone(), scalar(1.0)],
+            ),
+            Value::number(2.0)
+        );
+        for order in [0.0, 1.0] {
+            assert_eq!(
+                result(
+                    Func::RankEq,
+                    &[scalar(4.0), data.clone(), scalar(order)],
+                ),
+                Value::Error(FormulaError::Na)
+            );
+        }
     }
 
     #[test]
@@ -528,6 +568,33 @@ mod tests {
                 Func::MaxIfs,
                 &[scalar(1.0), vec![Value::number(1.0), Value::number(2.0)], scalar(1.0)],
             ),
+            Value::Error(FormulaError::Value)
+        );
+        let shape_mismatch = shaped_accumulator(&[
+            (
+                vec![
+                    Value::number(1.0),
+                    Value::number(2.0),
+                    Value::number(3.0),
+                    Value::number(4.0),
+                ],
+                2,
+                2,
+            ),
+            (
+                vec![
+                    Value::text("x"),
+                    Value::text("x"),
+                    Value::text("x"),
+                    Value::text("x"),
+                ],
+                1,
+                4,
+            ),
+            (vec![Value::text("x")], 1, 1),
+        ]);
+        assert_eq!(
+            apply(Func::MaxIfs, &shape_mismatch).unwrap(),
             Value::Error(FormulaError::Value)
         );
     }
