@@ -56,3 +56,13 @@ export function distinctRangeFormulas(count: number): FormulaCell[] {
     return { row, col: 1, src: `=SUM(A${start}:A${start + 9})` };
   });
 }
+
+/** Independent two-formula closures; editing one A cell affects only its B/C branch. */
+export function dependencyClosureFormulas(count: number): FormulaCell[] {
+  const formulas = new Array<FormulaCell>(count * 2);
+  for (let row = 0; row < count; row++) {
+    formulas[row * 2] = { row, col: 1, src: `=A${row + 1}+1` };
+    formulas[row * 2 + 1] = { row, col: 2, src: `=B${row + 1}+1` };
+  }
+  return formulas;
+}
