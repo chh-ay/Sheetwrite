@@ -85,6 +85,17 @@ describe("documentation generation", () => {
     expect(inventory?.content).toContain("supported");
   });
 
+  it("generates the complete formula contract from the versioned inventory", async () => {
+    const files = await expectedGeneratedFiles(manifest);
+    const reference = files.find((file) => file.path.endsWith("formula-functions.md"));
+    expect(reference?.content).toContain("**100 required-supported target functions**");
+    expect(reference?.content).toContain("**54 incumbent functions**");
+    expect(reference?.content).toContain("| `LET` | required target |");
+    expect(reference?.content).toContain("| `SUMPRODUCT` | required target |");
+    expect(reference?.content).toContain("Google Sheets and OpenFormula behavior is unverified");
+    expect(reference?.content).toContain("No formula throughput or latency number is published");
+  });
+
   it("generates a public compatibility projection without executable test paths", async () => {
     const files = await expectedGeneratedFiles(manifest);
     const matrix = files.find((file) => file.path.endsWith("compatibility-matrix.md"));
@@ -93,6 +104,15 @@ describe("documentation generation", () => {
     expect(matrix?.content).toContain("`formula-engine-vectors`");
     expect(matrix?.content).not.toContain("packages/wasm/src/tests.rs");
     expect(matrix?.content).not.toContain("test/browser/showcase-interoperability.spec.ts");
+    expect(
+      await readFile(
+        resolve(import.meta.dir, "../docs/src/content/docs/reference/compatibility-matrix.md"),
+        "utf8",
+      ),
+    ).toBe(matrix?.content);
+    expect(
+      await readFile(resolve(import.meta.dir, "../docs/src/generated/compatibility.json"), "utf8"),
+    ).toBe(data?.content);
     const projected = JSON.parse(data?.content ?? "{}") as {
       records: Array<Record<string, unknown>>;
       fixtures: Array<Record<string, unknown>>;

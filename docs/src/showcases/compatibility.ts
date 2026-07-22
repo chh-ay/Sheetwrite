@@ -236,15 +236,15 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
   },
   {
     id: "formula.dynamic-arrays",
-    label: "FILTER, SORT, UNIQUE, and bounded spill ranges",
+    label: "Bounded dynamic arrays and spill ranges",
     area: "formula",
     dialect: "shared",
     status: "partial",
     resultMode: "evaluated",
     semantics:
-      "FILTER, SORT, UNIQUE, direct range arrays, spill ownership, resizing, obstruction, history, and dependency invalidation are evaluated.",
+      "FILTER, SORT, UNIQUE, TRANSPOSE, SEQUENCE, TAKE, DROP, CHOOSECOLS, CHOOSEROWS, direct range arrays, spill ownership, resizing, obstruction, history, and dependency invalidation are evaluated.",
     divergence:
-      "No implicit-intersection operator, spill-reference # syntax, multi-key SORT, or general Excel/Sheets dynamic-array family is claimed.",
+      "No implicit-intersection operator, spill-reference # syntax, multi-key SORT, higher-order LAMBDA array functions, or general Excel/Sheets dynamic-array family is claimed.",
     source:
       "https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531",
     evidence: [
@@ -261,16 +261,40 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     lastVerifiedProtocolVersion: 3,
   },
   {
+    id: "formula.let",
+    label: "Bounded lexical and lazy LET bindings",
+    area: "formula",
+    dialect: "excel",
+    status: "supported",
+    resultMode: "evaluated",
+    semantics:
+      "LET evaluates lexical, case-insensitive bindings lazily; inner bindings shadow outer bindings, and unused reads, errors, and volatility do not become dependencies.",
+    divergence:
+      "At most 126 bindings and 16,384 expanded AST nodes are admitted; LET does not define or execute reusable functions.",
+    source:
+      "https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999",
+    evidence: ["packages/wasm/src/tests.rs", "docs/src/content/docs/guides/formulas.md"],
+    fixtureIds: ["formula-engine-vectors"],
+    importBehavior:
+      "Recognized LET source evaluates within the bounded lexical subset; invalid names, arity, or resource expansion return explicit formula errors.",
+    exportBehavior:
+      "The exact formula source is preserved and emitted without a fabricated cached result.",
+    warningCode: null,
+    lastVerifiedProtocolVersion: 3,
+  },
+  {
     id: "formula.let-lambda",
-    label: "LET, LAMBDA, and reusable named functions",
+    label: "LAMBDA and reusable named functions",
     area: "formula",
     dialect: "excel",
     status: "unsupported",
     resultMode: "unsupported",
-    semantics: "Formula source is retained but these functions are not evaluated.",
-    divergence: "No approximation or JavaScript execution fallback is provided.",
+    semantics:
+      "Formula source is retained, but LAMBDA and higher-order execution are not evaluated.",
+    divergence:
+      "LET is supported separately; no approximation, reusable named-function runtime, or JavaScript execution fallback is provided.",
     source:
-      "https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999",
+      "https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67",
     evidence: ["packages/wasm/src/tests.rs", "docs/src/content/docs/guides/formulas.md"],
     fixtureIds: ["formula-engine-vectors"],
     importBehavior: "Source is preserved; evaluation returns an explicit unsupported-name error.",

@@ -25,6 +25,7 @@ import {
   collectCompatibilityIssues,
   collectMissingCompatibilityFiles,
 } from "../docs/src/showcases/compatibility-validation.js";
+import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
   type ApiEntryPoint,
   type ApiExport,
@@ -1858,6 +1859,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     ...(await collectCompatibilityDigestIssues()),
   ];
   if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
+  const formulaInventory = await loadFormulaContractInventory(repositoryRoot);
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
@@ -1904,6 +1906,9 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     compatibilitySha256: createHash("sha256")
       .update(JSON.stringify([COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES]))
       .digest("hex"),
+    formulaContractSha256: createHash("sha256")
+      .update(JSON.stringify(formulaInventory))
+      .digest("hex"),
   };
   return [
     ...apiFiles,
@@ -1918,6 +1923,10 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     {
       path: join(contentRoot, "reference/compatibility-matrix.md"),
       content: renderCompatibilityMatrix(),
+    },
+    {
+      path: join(contentRoot, "reference/formula-functions.md"),
+      content: renderFormulaFunctionContract(formulaInventory),
     },
     {
       path: join(generatedDataRoot, "compatibility.json"),

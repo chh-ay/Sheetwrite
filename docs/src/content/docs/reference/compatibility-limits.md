@@ -6,7 +6,7 @@ description: Explicit compatibility boundaries, resource ceilings, tuning defaul
 | Area | Supported contract | Boundary |
 | --- | --- | --- |
 | Data | Eager columnar data or cancellable datasource pages; dense and allocation-lazy paged storage | Full-sheet queries and exports are incomplete until required pages load |
-| Formulas | Persisted formula source, A1/range references, named ranges, supported deterministic functions, and bounded `FILTER`/`SORT`/`UNIQUE` spills | No blanket dynamic-array family, external `IMPORT*`, custom JavaScript, random functions, charts, or pivots |
+| Formulas | Persisted formula source, A1/range references, named ranges, the inventory-derived supported function contract, bounded lexical `LET`, and bounded dynamic-array spills | No blanket Excel/Sheets/OpenFormula claim; external/network/database/cube/LAMBDA categories and automatic volatility beyond the clock barrier are unsupported |
 | Protection | Serializable client interaction policy with atomic/partial local mutation behavior | Never server authorization; remote operations bypass local UX policy |
 | Collaboration | Host sequencing, stable mutation IDs, durable optimistic edits, ordered remote operations, presence/comments/revisions, conservative rebase | No bundled server, CRDT, or general OT; ambiguous structural/formula conflicts require host UX |
 | Worker | OffscreenCanvas rendering with capability/startup fallback | Custom function renderers cannot transfer to the worker |
@@ -16,6 +16,8 @@ description: Explicit compatibility boundaries, resource ceilings, tuning defaul
 Compatibility statements are feature contracts, not claims of Excel or Google Sheets parity.
 
 The [generated executable compatibility matrix](/docs/reference/compatibility-matrix/) links each formula, workbook, clipboard, and XLSX status to its evidence record and exact divergence.
+
+The [generated formula function contract](/docs/reference/formula-functions/) projects names, families, signatures, semantic/dialect profiles, source links, implementation evidence, and unsupported categories directly from the checked versioned inventory.
 
 The tables below describe the owning source definition, not generated API signatures. Ceilings are inclusive unless a row says otherwise. MiB means 1,048,576 bytes. “Compatibility” identifies an external or product boundary; “resource defense” identifies bounded allocation or retained state; “interaction tuning” identifies a non-failing operational default.
 
@@ -43,8 +45,15 @@ The accessibility mirror uses the same virtual window and overscan as the canvas
 | `PARSE_RECURSION_LIMIT` | 256 nested parser levels | Resource defense: bound recursive formula parsing | Deeper syntax is a malformed formula and resolves to `#VALUE!` | Not configurable |
 | `FORMULA_RECURSION_LIMIT` | 256 dependency/evaluation levels | Resource defense: bound recursive dependency evaluation | A deeper dependency or expression resolves to `#NUM!` | Not configurable |
 | `RANGE_CELL_LIMIT` | 1,000,000 materialized cells per formula range | Resource defense: bound range/matrix allocation | An oversized range resolves to `#NUM!` | Not configurable |
+| `SPILL_MAX_ROWS` / `SPILL_MAX_COLS` | 1,048,576 rows and 16,384 columns per matrix | Compatibility and resource defense: match worksheet axes before allocation | An invalid or oversized dimension resolves to `#NUM!` | Not configurable |
+| `SPILL_MAX_CELLS` / `SPILL_MAX_BYTES` | 1,000,000 cells and 64 MiB value/intermediate storage per matrix operation | Resource defense: bound dynamic arrays, criteria matrices, transforms, and spill materialization | Preflight or materialization resolves to `#NUM!`; no truncated matrix is installed | Not configurable |
+| `SPILL_MAX_RECOMPUTE_CELLS` | 2,000,000 cell operations per dynamic recompute | Resource defense: bound filtering, sorting, uniqueness comparisons, and transforms | The operation resolves to `#NUM!`; spill publication remains atomic | Not configurable |
+| `LET_BINDING_LIMIT` | 126 lexical bindings per `LET` | Resource defense: bound binding state and source expansion | Binding 127 resolves to `#VALUE!` | Not configurable |
+| `LET_EXPANDED_NODE_LIMIT` | 16,384 reachable expanded AST nodes | Resource defense: bound lazy substitution, including repeated bindings | The first node above the ceiling resolves to `#NUM!`; unused bindings do not consume expansion work | Not configurable |
+| `MAX_TEXT_OUTPUT_BYTES` / `MAX_SEARCH_STEPS` | 16 MiB generated text and 4,000,000 bounded search steps | Resource defense: bound Unicode output and text search/substitution work | Excess work resolves to `#NUM!` | Not configurable |
+| Financial root solver | 14 bracket steps, 100 solve steps, fixed `1e-12` tolerances | Determinism and resource defense for `IRR`/`RATE` | Invalid domains or non-convergence resolve to `#NUM!` | Not configurable |
 
-See [formula functions, errors, and compatibility](/docs/guides/formulas/).
+See [formula functions, exact semantics, errors, and compatibility](/docs/guides/formulas/) and the [inventory-generated function reference](/docs/reference/formula-functions/).
 
 ## Transactions and snapshots
 

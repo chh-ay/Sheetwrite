@@ -26,5 +26,6 @@
   "exportCount": 370,
   "symbolPageCount": 370,
   "apiSha256": "6083288e26a51f62b45d1ecc5da98c2e72669d6f73e2aa176cecbf0f00db83a5",
-  "compatibilitySha256": "a5c7e7aba94fe50419af60b84027f9bf6e02092d597b2d0b83e2da97a92611f8"
+  "compatibilitySha256": "edbd1b0375b44d15008fafb0e00b4be85128609cde3bd4f66d089ca4bc678245",
+  "formulaContractSha256": "89471cd9e4826df490b5374f61d0ec42997131795967e8e449c52313a369b38e"
 }

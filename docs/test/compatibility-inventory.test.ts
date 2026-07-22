@@ -20,6 +20,7 @@ type MutableFixture = {
 const REQUIRED_RECORD_IDS = [
   "formula.portable-operators",
   "formula.dynamic-arrays",
+  "formula.let",
   "formula.let-lambda",
   "reference.cross-sheet-stable-id",
   "worksheet.lifecycle",
@@ -59,6 +60,27 @@ describe("compatibility inventory contract", () => {
     expect(new Set(COMPATIBILITY_INVENTORY.map(({ resultMode }) => resultMode))).toEqual(
       new Set(["evaluated", "preserved", "flattened", "warning", "unsupported"]),
     );
+  });
+
+  it("splits supported LET from unsupported LAMBDA without broadening dialect claims", () => {
+    const letRecord = COMPATIBILITY_INVENTORY.find(({ id }) => id === "formula.let");
+    expect(letRecord).toMatchObject({
+      status: "supported",
+      resultMode: "evaluated",
+      dialect: "excel",
+    });
+    expect(letRecord?.semantics).toContain("lazily");
+    expect(letRecord?.divergence).toContain("126 bindings");
+    expect(letRecord?.divergence).toContain("16,384 expanded AST nodes");
+
+    const lambdaRecord = COMPATIBILITY_INVENTORY.find(({ id }) => id === "formula.let-lambda");
+    expect(lambdaRecord).toMatchObject({
+      status: "unsupported",
+      resultMode: "unsupported",
+      dialect: "excel",
+    });
+    expect(lambdaRecord?.semantics).not.toContain("LET and");
+    expect(lambdaRecord?.divergence).toContain("LET is supported separately");
   });
 
   it("locks every redistributed XLSX fixture to its checked-in digest", async () => {
