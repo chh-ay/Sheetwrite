@@ -2,6 +2,7 @@ import "./dom-setup.js";
 import { readFileSync } from "node:fs";
 import {
   createGrid,
+  type DataSourceColumnBand,
   createRuntimeResourceSnapshot,
   diffRuntimeResourcePhases,
   emptyStoreMemoryStats,
@@ -42,6 +43,32 @@ const DIRTY_LIMIT = 1_000_000;
 const DENSE_STRING_POOL_CAPACITY_BEFORE = 20_971_520;
 const DENSE_INGEST_TIMING_BEFORE_MS = 1_044.660_382;
 const DENSE_STRING_POOL_CAPACITY_BUDGET = 16 * 1024 * 1024;
+
+const datasourcePageBands = new WeakMap<
+  SheetwriteStore,
+  Map<string, readonly DataSourceColumnBand[]>
+>();
+
+function loadDatasourcePage(
+  store: SheetwriteStore,
+  sheet: string,
+  start: number,
+  pageRows: readonly RowData[],
+): void {
+  let bySheet = datasourcePageBands.get(store);
+  if (!bySheet) {
+    bySheet = new Map();
+    datasourcePageBands.set(store, bySheet);
+  }
+  let bands = bySheet.get(sheet);
+  if (!bands) {
+    const columns = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.columns;
+    if (!columns || columns.length === 0) throw new Error(`Missing benchmark sheet ${sheet}`);
+    bands = [{ start: 0, end: columns.length, keys: columns.map((column) => column.key) }];
+    bySheet.set(sheet, bands);
+  }
+  store.loadPage(sheet, start, bands, pageRows);
+}
 
 interface ResourceGrid extends Grid {
   getAutoFitResourceStats(): {
@@ -189,13 +216,13 @@ function pagedLoad(id: "first-page" | "deep-jump"): ResourceScenarioResult {
     cacheBytes: CACHE_BYTES,
     dirtyCellLimit: DIRTY_LIMIT,
   });
-  if (id === "deep-jump") store.loadRows("resource", 0, numericRows(0, 120));
+  if (id === "deep-jump") loadDatasourcePage(store, "resource", 0, numericRows(0, 120));
   Bun.gc(true);
   const before = storeSnapshot(store, operation, "before");
   const started = performance.now();
   const start = id === "first-page" ? 0 : 742_000;
   store.withResourceOperation(operation, () =>
-    store.loadRows("resource", start, numericRows(start, 120)),
+    loadDatasourcePage(store, "resource", start, numericRows(start, 120)),
   );
   const peak = storeSnapshot(store, operation, "peak");
   Bun.gc(true);

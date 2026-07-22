@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import {
   type DocumentOp,
+  type DataSourceColumnBand,
   initSheetwrite,
   type RowData,
   SheetwriteStore,
@@ -42,6 +43,32 @@ const CACHE_CHURN_CHUNK_BYTES = chunkBytes(CACHE_CHURN_CHUNK_ROWS);
 const CACHE_CHURN_BUDGET_BYTES = CACHE_CHURN_RETAINED_CHUNKS * CACHE_CHURN_CHUNK_BYTES;
 const DIRTY_100_BASELINE_BYTES = 5_427_200;
 const DIRTY_COUNTS = [100, 10_000] as const;
+
+const datasourcePageBands = new WeakMap<
+  SheetwriteStore,
+  Map<string, readonly DataSourceColumnBand[]>
+>();
+
+function loadDatasourcePage(
+  store: SheetwriteStore,
+  sheet: string,
+  start: number,
+  pageRows: readonly RowData[],
+): void {
+  let bySheet = datasourcePageBands.get(store);
+  if (!bySheet) {
+    bySheet = new Map();
+    datasourcePageBands.set(store, bySheet);
+  }
+  let bands = bySheet.get(sheet);
+  if (!bands) {
+    const columns = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.columns;
+    if (!columns || columns.length === 0) throw new Error(`Missing benchmark sheet ${sheet}`);
+    bands = [{ start: 0, end: columns.length, keys: columns.map((column) => column.key) }];
+    bySheet.set(sheet, bands);
+  }
+  store.loadPage(sheet, start, bands, pageRows);
+}
 export const PAGED_SCENARIOS = [
   "empty",
   "padding",
@@ -328,7 +355,7 @@ function loadFraction(
 ): void {
   const limit = Math.floor(rowCount * fraction);
   for (let start = 0; start < limit; start += chunkRows) {
-    store.loadRows("s1", start, rows(start, Math.min(chunkRows, limit - start)));
+    loadDatasourcePage(store, "s1", start, rows(start, Math.min(chunkRows, limit - start)));
   }
 }
 
@@ -395,7 +422,7 @@ function verifyDirtySemantics(
     throw new Error("dirty rich-cell read/formula/ref/style semantics changed");
   }
 
-  store.loadRows("s1", stringPatch.addr.row, [
+  loadDatasourcePage(store, "s1", stringPatch.addr.row, [
     { c0: -1, c1: "server-overwrite", c2: -1, c3: -1, c4: -1 },
   ]);
   if (
@@ -457,7 +484,7 @@ function verifyDirtySemantics(
     chunkRows: 4,
     cacheBytes: CACHE_BYTES,
   });
-  persisted.loadRows("s1", 0, rows(0, 2));
+  loadDatasourcePage(persisted, "s1", 0, rows(0, 2));
   persisted.applyTransaction({
     patches: patches.slice(0, 4).map((patch, index) =>
       patch.op === "set"
@@ -507,7 +534,7 @@ async function runProbe(
   let patches: DocumentOp[] = [];
 
   if (scenario === "viewport") {
-    store.loadRows("s1", 0, rows(0, 30));
+    loadDatasourcePage(store, "s1", 0, rows(0, 30));
   } else if (scenario === "scroll-1") {
     loadFraction(store, 0.01, rowCount, chunkRows);
   } else if (scenario === "scroll-10") {
@@ -652,12 +679,12 @@ async function runBenchmark(
     startup.push(performance.now() - started);
 
     started = performance.now();
-    store.loadRows("s1", 0, rows(0));
+    loadDatasourcePage(store, "s1", 0, rows(0));
     firstPage.push(performance.now() - started);
 
     const distantStart = Math.floor(rowCount / 2);
     started = performance.now();
-    store.loadRows("s1", distantStart, rows(distantStart));
+    loadDatasourcePage(store, "s1", distantStart, rows(distantStart));
     distantPage.push(performance.now() - started);
 
     const stats = store.getPagedStats("s1");
@@ -671,7 +698,7 @@ async function runBenchmark(
       cacheBytes: CACHE_BYTES,
     });
     started = performance.now();
-    wideStore.loadRows("s1", 0, widePage);
+    loadDatasourcePage(wideStore, "s1", 0, widePage);
     widePageMs.push(performance.now() - started);
     wideStore.dispose();
 
@@ -682,7 +709,7 @@ async function runBenchmark(
     });
     started = performance.now();
     for (let page = 0; page < churnPages.length; page++) {
-      churnStore.loadRows("s1", page * CACHE_CHURN_CHUNK_ROWS, churnPages[page]!);
+      loadDatasourcePage(churnStore, "s1", page * CACHE_CHURN_CHUNK_ROWS, churnPages[page]!);
     }
     cacheChurnMs.push(performance.now() - started);
     cacheChurnRetainedChunks = Math.max(
