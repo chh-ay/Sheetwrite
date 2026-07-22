@@ -444,7 +444,14 @@ export interface HyperlinkActivationEvent {
 export interface GridEvents {
   change: ChangeEvent;
   selection: { selection: Selection | null };
-  scroll: { scrollTop: number; firstRow: number; lastRow: number };
+  scroll: {
+    scrollTop: number;
+    firstRow: number;
+    lastRow: number;
+    scrollLeft: number;
+    firstVisibleColumn: number | null;
+    lastVisibleColumn: number | null;
+  };
   "edit-begin": { addr: CellAddress };
   "edit-commit": { addr: CellAddress; value: CellValue };
   search: SearchResult;
