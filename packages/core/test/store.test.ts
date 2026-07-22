@@ -1645,6 +1645,48 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 
+  it("keeps separately hydrated rectangles correlated by both row and column coverage", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 2,
+      cacheBytes: 1_000_000,
+    });
+    store.loadPage("s1", 0, NAME_SOURCE_COLUMN_BAND, [{ name: "r0" }, { name: "r1" }]);
+    store.loadPage(
+      "s1",
+      1,
+      [{ start: 2, end: 3, keys: ["city"] }],
+      [{ city: "r1" }, { city: "r2" }],
+    );
+
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 1, 3, [2])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 1, 2, [2, 0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 3, [2, 0])).toBe(false);
+    expect(store.getCellLoadState(addr(0, 2))).toBe("unloaded");
+    expect(store.getCellLoadState(addr(2, 0))).toBe("unloaded");
+    expect(
+      store.isRangeFullyLoaded({
+        sheet: "s1",
+        start: { row: 1, col: 0 },
+        end: { row: 1, col: 2 },
+      }),
+    ).toBe(false);
+    expect(
+      store.isRangeFullyLoaded({
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 2, col: 2 },
+      }),
+    ).toBe(false);
+    expect(store.getPagedStats("s1")).toMatchObject({
+      chunks: 3,
+      loadedCells: 4,
+      dirtyCells: 0,
+    });
+    store.dispose();
+  });
+
   it("rejects malformed rectangular pages atomically without marking any target cell loaded", () => {
     const store = new SheetwriteStore(makeWorkbook(4), undefined, {
       storage: "paged",
