@@ -344,6 +344,14 @@
   border-top: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
+.sheetwrite-tablist {
+  display: flex;
+  height: 100%;
+  flex: 0 0 auto;
+  gap: 3px;
+  align-items: center;
+}
+
 .sheetwrite-tab {
   position: relative;
   height: 100%;
@@ -367,43 +375,31 @@
   background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
 }
 
+.sheetwrite-tab:focus,
+.sheetwrite-tab-options-button:focus,
+.sheetwrite-tab-add:focus,
+.sheetwrite-tab-menu-item:focus,
+.sheetwrite-tab-unhide:focus {
+  outline: none;
+}
+
 .sheetwrite-tab:focus-visible,
-.sheetwrite-tab-close:focus-visible,
+.sheetwrite-tab-options-button:focus-visible,
+.sheetwrite-tab-add:focus-visible,
+.sheetwrite-tab-menu-item:focus-visible,
 .sheetwrite-tab-unhide:focus-visible {
-  outline: 2px solid var(--sheetwrite-tab-active-fg, #1a73e8);
-  outline-offset: -2px;
+  box-shadow: inset 0 0 0 1px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
 }
 
 .sheetwrite-tab-active {
-  border-color: color-mix(in srgb, var(--sheetwrite-tab-active-fg, #1a73e8) 35%, transparent);
+  border-color: transparent;
   background: var(--sheetwrite-tab-active-bg, #e8f0fe);
   color: var(--sheetwrite-tab-active-fg, #1a73e8);
-  box-shadow: inset 0 -3px 0 var(--sheetwrite-tab-active-fg, #1a73e8);
+  box-shadow: inset 0 -2px 0 var(--sheetwrite-tab-active-fg, #1a73e8);
   font-weight: 680;
 }
 
-.sheetwrite-tab-close {
-  height: calc(100% - 6px);
-  min-width: 24px;
-  border: 1px solid transparent;
-  margin-inline-start: -10px;
-  padding: 0 6px 1px 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--sheetwrite-tab-fg, #5f6368);
-  cursor: pointer;
-  font: inherit;
-  opacity: 0.72;
-}
-
-.sheetwrite-tab-close:hover {
-  border-color: var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
-  background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
-  color: var(--sheetwrite-tab-active-fg, #1a73e8);
-  opacity: 1;
-}
-
-.sheetwrite-tab-actions {
+.sheetwrite-tab-options {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -411,10 +407,74 @@
   margin-inline-start: -3px;
 }
 
-.sheetwrite-tab-actions .sheetwrite-tab-close {
-  min-width: 26px;
-  margin-inline-start: 0;
-  padding: 0 5px;
+.sheetwrite-tab-options-button,
+.sheetwrite-tab-add {
+  flex: none;
+  height: calc(100% - 6px);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sheetwrite-tab-fg, #5f6368);
+  cursor: pointer;
+  font: inherit;
+}
+
+.sheetwrite-tab-options-button {
+  min-width: 28px;
+  padding: 0 6px 2px;
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+.sheetwrite-tab-add {
+  padding: 0 10px;
+  font-weight: 550;
+}
+
+.sheetwrite-tab-options-button:hover,
+.sheetwrite-tab-options-button[aria-expanded="true"],
+.sheetwrite-tab-add:hover {
+  border-color: var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
+  color: var(--sheetwrite-tab-active-fg, #1a73e8);
+}
+
+.sheetwrite-tab-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 9rem;
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 6px;
+  box-sizing: border-box;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+  color: var(--sheetwrite-tab-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-tab-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+}
+
+.sheetwrite-tab-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.sheetwrite-tab-menu-item:hover,
+.sheetwrite-tab-menu-item:focus-visible {
+  background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
+}
+
+.sheetwrite-tab-menu-item-destructive {
+  color: var(--sheetwrite-error-fg, #b3261e);
 }
 
 .sheetwrite-tab-input {

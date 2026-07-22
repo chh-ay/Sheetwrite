@@ -227,8 +227,10 @@ describe("SheetTabs", () => {
       },
     });
     tabs.update(SHEETS, "b");
-    tabButtons(host)[1]!.focus();
-    key(host, "F2");
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+    const rename = host.querySelector<HTMLButtonElement>('[aria-label="Rename Sales sheet"]')!;
+    expect(document.activeElement).toBe(rename);
+    rename.click();
 
     let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
     inputText(input, "Summary");
@@ -249,7 +251,7 @@ describe("SheetTabs", () => {
     expect(attempts).toEqual(["Summary", ""]);
   });
 
-  it("offers compact pointer actions and keyboard equivalents for lifecycle operations", () => {
+  it("exposes lifecycle actions through an accessible active-sheet menu and keyboard shortcuts", () => {
     const actions: string[] = [];
     const options: SheetTabsOptions = {
       onActivate: () => {},
@@ -277,20 +279,50 @@ describe("SheetTabs", () => {
     };
     tabs.destroy();
     tabs = new SheetTabs(host, options);
-    tabs.update(
-      [
-        ...SHEETS,
-        { id: "hidden", name: "Hidden", visibility: "hidden" },
-        { id: "secret", name: "Secret", visibility: "veryHidden" },
-      ],
-      "b",
-    );
+    const workbook = [
+      ...SHEETS,
+      { id: "hidden", name: "Hidden", visibility: "hidden" as const },
+      { id: "secret", name: "Secret", visibility: "veryHidden" as const },
+    ];
+    tabs.update(workbook, "b");
 
-    expect(host.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe(
-      "Sales sheet actions",
-    );
-    host.querySelector<HTMLButtonElement>('[aria-label="Move Sales sheet right"]')!.click();
+    expect(host.querySelector(".sheetwrite-tab-actions")).toBeNull();
+    expect(host.textContent).not.toContain("+");
+    let trigger = host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!;
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    const tablist = host.querySelector<HTMLElement>('[role="tablist"]')!;
+    expect(tablist.getAttribute("aria-label")).toBe("Sheets");
+    expect([...tablist.children].every((child) => child.getAttribute("role") === "tab")).toBe(true);
+    expect(trigger.closest('[role="tablist"]')).toBeNull();
+    trigger.focus();
+    key(trigger, "ArrowDown");
+
+    const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(menu.getAttribute("aria-label")).toBe("Sales sheet options");
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+    expect(items.map((item) => item.textContent)).toEqual(["Rename", "Hide", "Remove"]);
+    expect(document.activeElement).toBe(items[0]!);
+    key(items[0]!, "End");
+    expect(document.activeElement).toBe(items[2]!);
+    key(items[2]!, "Home");
+    expect(document.activeElement).toBe(items[0]!);
+    key(items[0]!, "Escape");
+    trigger = host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!;
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+
+    trigger.click();
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+    tabs.update(workbook, "b");
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Hide Sales sheet"]')!.click();
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Remove Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Add sheet"]')!.click();
     const unhide = host.querySelector<HTMLSelectElement>('[aria-label="Unhide sheet"]')!;
@@ -302,6 +334,9 @@ describe("SheetTabs", () => {
     let active = tabButtons(host)[1]!;
     active.focus();
     key(host, "ArrowLeft", { ctrlKey: true, shiftKey: true });
+    active = tabButtons(host)[1]!;
+    active.focus();
+    key(host, "ArrowRight", { ctrlKey: true, shiftKey: true });
     active = tabButtons(host)[1]!;
     active.focus();
     key(host, "h", { ctrlKey: true, shiftKey: true });
@@ -316,12 +351,12 @@ describe("SheetTabs", () => {
     key(host, "u", { ctrlKey: true, shiftKey: true });
 
     expect(actions).toEqual([
-      "move:b:2",
       "hide:b",
       "remove:b",
       "add",
       "unhide:hidden",
       "move:b:0",
+      "move:b:2",
       "hide:b",
       "remove:b",
       "add",
@@ -433,7 +468,7 @@ describe("SheetTabs", () => {
     tabs.update([...SHEETS, { id: "hidden", name: "Hidden", visibility: "hidden" }], "b");
     expect(host.querySelector('[aria-label="Add sheet"]')).toBeNull();
     expect(host.querySelector('[aria-label="Unhide sheet"]')).toBeNull();
-    expect(host.querySelector('[role="group"]')).toBeNull();
+    expect(host.querySelector(".sheetwrite-tab-options-button")).toBeNull();
     const buttons = tabButtons(host);
     expect(buttons.every((button) => !button.draggable)).toBe(true);
     buttons[1]!.focus();
@@ -463,12 +498,17 @@ describe("SheetTabs", () => {
     tabs.update([{ id: "only", name: "Only" }], "only");
     expect(tabButtons(host)).toHaveLength(1);
     expect(host.querySelector('[aria-label="Add sheet"]')).not.toBeNull();
+    host.querySelector<HTMLButtonElement>('[aria-label="Options for Only sheet"]')!.click();
     expect(host.querySelector('[aria-label="Rename Only sheet"]')).not.toBeNull();
     host.querySelector<HTMLButtonElement>('[aria-label="Hide Only sheet"]')!.click();
     const tab = tabButtons(host)[0]!;
     const error = host.querySelector<HTMLElement>('[role="alert"]')!;
     expect(error.dataset.code).toBe("last-visible-sheet");
     expect(tab.getAttribute("aria-describedby")).toBe(error.id);
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(
+      host.querySelector<HTMLButtonElement>('[aria-label="Options for Only sheet"]'),
+    );
   });
 
   it("associates applied lifecycle rejections with the ordinary Unhide control", () => {

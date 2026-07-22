@@ -71,12 +71,15 @@ export class SheetTabs {
   private readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
   private readonly onHide?: (id: SheetId) => SheetLifecycleResult;
   private readonly onUnhide?: (id: SheetId) => SheetLifecycleResult;
+  private readonly label: string;
   private readonly errorId = `sheetwrite-sheet-error-${++nextErrorId}`;
+  private readonly menuId = `${this.errorId}-options`;
 
   private sheets: readonly SheetTabRecord[] = [];
   private activeId: SheetId = "";
   private focusedId: SheetId | null = null;
   private editing: RenameState | null = null;
+  private menuSheetId: SheetId | null = null;
   private feedback: LifecycleFeedback | null = null;
   private buttons: HTMLButtonElement[] = [];
   private buttonIds: SheetId[] = [];
@@ -96,14 +99,18 @@ export class SheetTabs {
     this.onHide = options.onHide;
     this.onUnhide = options.onUnhide;
     this.readOnly = options.readOnly ?? false;
-    host.setAttribute("role", "tablist");
-    host.setAttribute("aria-label", options.label ?? "Sheets");
+    this.label = options.label ?? "Sheets";
+    host.setAttribute("role", "group");
+    host.setAttribute("aria-label", `${this.label} controls`);
     host.addEventListener("keydown", this.onKeydown);
+    host.addEventListener("focusout", this.onFocusOut);
   }
 
   /** Reconciles the controlled workbook records while preserving transient focus/editor state by ID. */
   update(sheets: readonly SheetTabRecord[], activeId: SheetId): void {
     if (this.destroyed) return;
+    this.removeMenuDismissListeners();
+    this.menuSheetId = null;
 
     const oldVisible = this.visibleSheets();
     const oldFocusIndex = oldVisible.findIndex(({ sheet }) => sheet.id === this.focusedId);
@@ -151,6 +158,8 @@ export class SheetTabs {
     if (readOnly) {
       this.editing = null;
       this.feedback = null;
+      this.removeMenuDismissListeners();
+      this.menuSheetId = null;
     }
     this.render(hadFocus);
   }
@@ -161,6 +170,8 @@ export class SheetTabs {
     this.destroyed = true;
     this.rendering = true;
     this.host.removeEventListener("keydown", this.onKeydown);
+    this.host.removeEventListener("focusout", this.onFocusOut);
+    this.removeMenuDismissListeners();
     this.host.replaceChildren();
     this.host.removeAttribute("role");
     this.host.removeAttribute("aria-label");
@@ -171,6 +182,7 @@ export class SheetTabs {
     this.moveIndexes = [];
     this.editing = null;
     this.feedback = null;
+    this.menuSheetId = null;
     this.focusedId = null;
     this.draggedId = null;
   }
@@ -206,6 +218,12 @@ export class SheetTabs {
     const visible = this.visibleSheets();
     const hidden = this.hiddenSheets();
     const fragment = document.createDocumentFragment();
+    const tablist = document.createElement("div");
+    tablist.className = "sheetwrite-tablist";
+    tablist.setAttribute("role", "tablist");
+    tablist.setAttribute("aria-label", this.label);
+    let renameInput: HTMLInputElement | null = null;
+    let activeSheet: SheetTabRecord | null = null;
     this.rendering = true;
     this.buttons = [];
     this.buttonIds = [];
@@ -215,17 +233,19 @@ export class SheetTabs {
       const { sheet, workbookIndex } = visible[visibleIndex]!;
       const active = sheet.id === this.activeId;
       const editing = this.editing?.id === sheet.id;
-
       if (editing) {
-        fragment.appendChild(this.createRenameInput(sheet, active));
+        renameInput = this.createRenameInput(sheet, active);
       } else {
-        fragment.appendChild(this.createTab(sheet, active, workbookIndex));
+        tablist.appendChild(this.createTab(sheet, active, workbookIndex));
       }
+      if (active) activeSheet = sheet;
+    }
 
-      if (active && !editing && !this.readOnly) {
-        const actions = this.createActions(sheet, visible, visibleIndex);
-        if (actions.childElementCount > 0) fragment.appendChild(actions);
-      }
+    fragment.appendChild(tablist);
+    if (renameInput) {
+      fragment.appendChild(renameInput);
+    } else if (activeSheet && !this.readOnly && this.hasSheetOptions(visible.length)) {
+      fragment.appendChild(this.createOptions(activeSheet, visible.length));
     }
 
     if (!this.readOnly && this.onAdd) fragment.appendChild(this.createAddButton());
@@ -238,12 +258,16 @@ export class SheetTabs {
     this.rendering = false;
 
     const editedInput = this.host.querySelector<HTMLInputElement>(".sheetwrite-tab-input");
+    const menu = this.host.querySelector<HTMLElement>(`#${this.menuId}`);
     const focusButton =
       this.buttonFor(this.focusedId) ?? this.buttonFor(this.activeId) ?? this.buttons[0];
     if (editedInput) {
       editedInput.focus();
       editedInput.setSelectionRange(0, editedInput.value.length);
       this.scrollIntoView(editedInput);
+    } else if (menu) {
+      this.positionMenu(menu);
+      this.focusMenuItem(0);
     } else if (restoreFocus && focusButton) {
       this.setRovingFocus(focusButton);
       focusButton.focus();
@@ -361,71 +385,99 @@ export class SheetTabs {
     return input;
   }
 
-  private createActions(
-    sheet: SheetTabRecord,
-    visible: readonly VisibleSheet[],
-    visibleIndex: number,
-  ): HTMLElement {
-    const actions = document.createElement("span");
-    actions.className = "sheetwrite-tab-actions";
-    actions.dataset.sheetId = sheet.id;
-    actions.setAttribute("role", "group");
-    actions.setAttribute("aria-label", `${sheet.name} sheet actions`);
-
-    if (this.onRename) {
-      actions.appendChild(
-        this.actionButton("Rename", `Rename ${sheet.name} sheet`, "F2", () =>
-          this.startRename(sheet.id),
-        ),
-      );
-    }
-    if (this.onMove && visibleIndex > 0) {
-      const to = visible[visibleIndex - 1]!.workbookIndex;
-      actions.appendChild(
-        this.actionButton("←", `Move ${sheet.name} sheet left`, "Control+Shift+ArrowLeft", () => {
-          this.focusedId = sheet.id;
-          this.performLifecycle(sheet.id, () => this.onMove!(sheet.id, to));
-        }),
-      );
-    }
-    if (this.onMove && visibleIndex + 1 < visible.length) {
-      const to = visible[visibleIndex + 1]!.workbookIndex;
-      actions.appendChild(
-        this.actionButton("→", `Move ${sheet.name} sheet right`, "Control+Shift+ArrowRight", () => {
-          this.focusedId = sheet.id;
-          this.performLifecycle(sheet.id, () => this.onMove!(sheet.id, to));
-        }),
-      );
-    }
-    if (this.onHide) {
-      actions.appendChild(
-        this.actionButton("Hide", `Hide ${sheet.name} sheet`, "Control+Shift+H", () => {
-          this.focusedId = sheet.id;
-          this.performLifecycle(sheet.id, () => this.onHide!(sheet.id));
-        }),
-      );
-    }
-    if (this.onRemove && visible.length > 1) {
-      actions.appendChild(
-        this.actionButton("×", `Remove ${sheet.name} sheet`, "Delete", () => {
-          this.focusedId = sheet.id;
-          this.performLifecycle(sheet.id, () => this.onRemove!(sheet.id));
-        }),
-      );
-    }
-    return actions;
+  private hasSheetOptions(visibleCount: number): boolean {
+    return (
+      this.onRename !== undefined ||
+      this.onHide !== undefined ||
+      (this.onRemove !== undefined && visibleCount > 1)
+    );
   }
 
-  private actionButton(
+  private createOptions(sheet: SheetTabRecord, visibleCount: number): HTMLElement {
+    const options = document.createElement("span");
+    options.className = "sheetwrite-tab-options";
+    options.dataset.sheetId = sheet.id;
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.id = `${this.menuId}-trigger`;
+    trigger.className = "sheetwrite-tab-options-button";
+    trigger.setAttribute("aria-label", `Options for ${sheet.name} sheet`);
+    trigger.setAttribute("aria-haspopup", "menu");
+    trigger.setAttribute("aria-expanded", String(this.menuSheetId === sheet.id));
+    trigger.setAttribute("aria-controls", this.menuId);
+    trigger.textContent = "⋯";
+    trigger.addEventListener("click", () => {
+      if (this.menuSheetId === sheet.id) this.closeMenu(true);
+      else this.openMenu(sheet.id);
+    });
+    trigger.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.openMenu(sheet.id, event.key === "ArrowUp");
+    });
+    options.appendChild(trigger);
+
+    if (this.menuSheetId === sheet.id) {
+      const menu = document.createElement("div");
+      menu.id = this.menuId;
+      menu.className = "sheetwrite-tab-menu";
+      menu.setAttribute("role", "menu");
+      menu.setAttribute("aria-label", `${sheet.name} sheet options`);
+
+      if (this.onRename) {
+        menu.appendChild(
+          this.createMenuItem("Rename", `Rename ${sheet.name} sheet`, "F2", () => {
+            this.clearMenuState();
+            this.startRename(sheet.id);
+          }),
+        );
+      }
+      if (this.onHide) {
+        menu.appendChild(
+          this.createMenuItem("Hide", `Hide ${sheet.name} sheet`, "Control+Shift+H", () => {
+            this.clearMenuState();
+            this.focusedId = sheet.id;
+            this.performLifecycle(sheet.id, () => this.onHide!(sheet.id), true);
+          }),
+        );
+      }
+      if (this.onRemove && visibleCount > 1) {
+        menu.appendChild(
+          this.createMenuItem(
+            "Remove",
+            `Remove ${sheet.name} sheet`,
+            "Delete",
+            () => {
+              this.clearMenuState();
+              this.focusedId = sheet.id;
+              this.performLifecycle(sheet.id, () => this.onRemove!(sheet.id), true);
+            },
+            true,
+          ),
+        );
+      }
+      options.appendChild(menu);
+    }
+    return options;
+  }
+
+  private createMenuItem(
     text: string,
     label: string,
     shortcut: string,
     action: () => void,
+    destructive = false,
   ): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "sheetwrite-tab-close";
+    button.className = destructive
+      ? "sheetwrite-tab-menu-item sheetwrite-tab-menu-item-destructive"
+      : "sheetwrite-tab-menu-item";
     button.textContent = text;
+    button.tabIndex = -1;
+    button.setAttribute("role", "menuitem");
     button.setAttribute("aria-label", label);
     button.setAttribute("aria-keyshortcuts", shortcut);
     button.addEventListener("click", action);
@@ -433,9 +485,14 @@ export class SheetTabs {
   }
 
   private createAddButton(): HTMLButtonElement {
-    return this.actionButton("+", "Add sheet", "Shift+F11", () =>
-      this.performLifecycle(this.activeId, this.onAdd!),
-    );
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sheetwrite-tab-add";
+    button.textContent = "Add sheet";
+    button.setAttribute("aria-label", "Add sheet");
+    button.setAttribute("aria-keyshortcuts", "Shift+F11");
+    button.addEventListener("click", () => this.performLifecycle(this.activeId, this.onAdd!));
+    return button;
   }
 
   private createUnhideSelect(hidden: readonly SheetTabRecord[]): HTMLSelectElement {
@@ -515,12 +572,103 @@ export class SheetTabs {
     this.render(true);
   }
 
-  private performLifecycle(id: SheetId, operation: () => SheetLifecycleResult): void {
+  private openMenu(id: SheetId, focusLast = false): void {
+    if (this.destroyed || this.readOnly || id !== this.activeId) return;
+    if (!this.visibleSheets().some(({ sheet }) => sheet.id === id)) return;
+    this.menuSheetId = id;
+    this.render();
+    if (focusLast) this.focusMenuItem(-1);
+    this.addMenuDismissListeners();
+  }
+
+  private clearMenuState(): SheetId | null {
+    const id = this.menuSheetId;
+    this.menuSheetId = null;
+    this.removeMenuDismissListeners();
+    return id;
+  }
+
+  private closeMenu(restoreFocus: boolean): void {
+    const id = this.clearMenuState();
+    if (!id) return;
+    this.host.querySelector<HTMLElement>(`#${this.menuId}`)?.remove();
+    const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
+    trigger?.setAttribute("aria-expanded", "false");
+    if (restoreFocus && trigger?.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) {
+      trigger.focus();
+    }
+  }
+
+  private focusMenuItem(index: number): void {
+    const menu = this.host.querySelector<HTMLElement>(`#${this.menuId}`);
+    if (!menu) return;
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+    if (items.length === 0) return;
+    const targetIndex = (index + items.length) % items.length;
+    for (let current = 0; current < items.length; current++) {
+      items[current]!.tabIndex = current === targetIndex ? 0 : -1;
+    }
+    items[targetIndex]!.focus();
+  }
+
+  private positionMenu(menu: HTMLElement): void {
+    const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
+    if (!trigger) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const left = Math.max(0, Math.min(triggerRect.left, window.innerWidth - menuRect.width));
+    const below = triggerRect.bottom + menuRect.height <= window.innerHeight;
+    const top = below ? triggerRect.bottom : Math.max(0, triggerRect.top - menuRect.height);
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+
+  private addMenuDismissListeners(): void {
+    document.addEventListener("pointerdown", this.onOutsideInteraction, true);
+    document.addEventListener("focusin", this.onOutsideInteraction, true);
+    window.addEventListener("scroll", this.onMenuViewportChange, true);
+    window.addEventListener("resize", this.onMenuViewportChange);
+  }
+
+  private removeMenuDismissListeners(): void {
+    document.removeEventListener("pointerdown", this.onOutsideInteraction, true);
+    document.removeEventListener("focusin", this.onOutsideInteraction, true);
+    window.removeEventListener("scroll", this.onMenuViewportChange, true);
+    window.removeEventListener("resize", this.onMenuViewportChange);
+  }
+
+  private readonly onOutsideInteraction = (event: Event): void => {
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    const options = this.host.querySelector<HTMLElement>(".sheetwrite-tab-options");
+    if (!options?.contains(target)) this.closeMenu(false);
+  };
+
+  private readonly onMenuViewportChange = (): void => {
+    this.closeMenu(false);
+  };
+
+  private readonly onFocusOut = (event: FocusEvent): void => {
+    if (this.rendering || !this.menuSheetId) return;
+    const next = event.relatedTarget;
+    const options = this.host.querySelector<HTMLElement>(".sheetwrite-tab-options");
+    if (!(next instanceof Node) || !options?.contains(next)) this.closeMenu(false);
+  };
+
+  private performLifecycle(
+    id: SheetId,
+    operation: () => SheetLifecycleResult,
+    restoreOptions = false,
+  ): void {
     if (this.destroyed || this.readOnly) return;
+    this.clearMenuState();
     const result = operation();
     const feedback = feedbackFrom(result);
     this.feedback = feedback ? { sheet: id || result.sheet, ...feedback } : null;
-    this.render(this.host.contains(document.activeElement));
+    this.render(restoreOptions || this.host.contains(document.activeElement));
+    if (!restoreOptions) return;
+    const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
+    if (trigger?.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) trigger.focus();
   }
 
   private buttonFor(id: SheetId | null): HTMLButtonElement | undefined {
@@ -539,6 +687,32 @@ export class SheetTabs {
 
   private readonly onKeydown = (event: KeyboardEvent): void => {
     if (this.destroyed || !this.host.contains(document.activeElement)) return;
+    const active = document.activeElement;
+    if (this.menuSheetId) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeMenu(true);
+        return;
+      }
+      if (active instanceof HTMLButtonElement && active.getAttribute("role") === "menuitem") {
+        const items = [
+          ...this.host.querySelectorAll<HTMLButtonElement>(`#${this.menuId} [role="menuitem"]`),
+        ];
+        const current = items.indexOf(active);
+        let next: number | null = null;
+        if (event.key === "ArrowDown") next = current + 1;
+        else if (event.key === "ArrowUp") next = current - 1;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = items.length - 1;
+        if (next !== null) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.focusMenuItem(next);
+          return;
+        }
+      }
+    }
 
     if (!this.readOnly && event.shiftKey && event.key === "F11" && this.onAdd) {
       event.preventDefault();
@@ -563,7 +737,6 @@ export class SheetTabs {
       return;
     }
 
-    const active = document.activeElement;
     if (!(active instanceof HTMLButtonElement) || active.getAttribute("role") !== "tab") return;
     const current = this.buttons.indexOf(active);
     if (current < 0) return;
