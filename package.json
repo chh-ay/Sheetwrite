@@ -24,6 +24,7 @@
     "conformance:offline": "bun scripts/conformance.ts offline",
     "conformance:capture:excel": "bun scripts/conformance.ts capture-excel",
     "conformance:capture:google": "bun scripts/conformance.ts capture-google",
+    "conformance:roundtrip:libreoffice": "bun scripts/conformance.ts roundtrip-libreoffice",
     "docs:generate": "bun scripts/docs.ts generate",
     "docs:check": "bun scripts/docs.ts check",
     "check:cycles": "bun scripts/check-import-cycles.ts",
