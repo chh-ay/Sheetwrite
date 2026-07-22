@@ -667,6 +667,20 @@ mod tests {
             result_number(Func::Ppmt, &number_args([0.1, 1.0, 10.0, 1000.0])),
             -62.7453948825115,
         );
+        assert_close(
+            result_number(
+                Func::Ipmt,
+                &number_args([0.1, 1.5, 10.0, 1000.0]),
+            ),
+            -96.93746954780329,
+        );
+        assert_close(
+            result_number(
+                Func::Ppmt,
+                &number_args([0.1, 1.5, 10.0, 1000.0]),
+            ),
+            -65.80792533470833,
+        );
     }
 
     #[test]
@@ -693,6 +707,15 @@ mod tests {
         npv_values.finish_arg(1, 3).unwrap();
         let expected = 100.0 / 1.1 + 1.0 / 1.1f64.powi(3) + 200.0 / 1.1f64.powi(4);
         assert_close(result_number(Func::Npv, &npv_values), expected);
+
+        let mut irr_values = FuncAccumulator::default();
+        irr_values.push_range(Value::Number(-100.0)).unwrap();
+        irr_values.push_range(Value::Blank).unwrap();
+        irr_values.push_range(Value::text("ignored")).unwrap();
+        irr_values.push_range(Value::Bool(true)).unwrap();
+        irr_values.push_range(Value::Number(121.0)).unwrap();
+        irr_values.finish_arg().unwrap();
+        assert_close(result_number(Func::Irr, &irr_values), 0.21);
 
         assert_error(
             Func::Pv,
