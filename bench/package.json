@@ -12,6 +12,7 @@
     "bench:paged": "bun run src/paged-bench.ts",
     "bench:paged:smoke": "bun run src/paged-bench.ts --smoke",
     "bench:prefetch": "bun run src/datasource-prefetch-bench.ts",
+    "bench:billion-cell": "bun run src/billion-cell-bench.ts",
     "bench:formula": "bun run src/formula-bench.ts",
     "bench:view-index": "bun run src/view-index-bench.ts",
     "bench:formula:smoke": "bun run src/formula-bench.ts --smoke",
