@@ -5,8 +5,8 @@ import type {
   GridReadyReason,
 } from "../packages/core/src/adapter.js";
 import type {
-  ColumnarData,
   CellEditor,
+  ColumnarData,
   DataSource,
   DataSourcePage,
   Grid,

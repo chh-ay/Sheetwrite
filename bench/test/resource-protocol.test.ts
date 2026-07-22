@@ -3,11 +3,11 @@ import {
   createRuntimeResourceSnapshot,
   decodeStoreMemoryStats,
   RUNTIME_RESOURCE_SCHEMA_VERSION,
+  type RuntimeResourceOperation,
+  type RuntimeResourcePhase,
   STORE_MEMORY_HASH_ESTIMATE_VERSION,
   STORE_MEMORY_PROTOCOL_VERSION,
   WASM_MEMORY_OWNERS,
-  type RuntimeResourceOperation,
-  type RuntimeResourcePhase,
 } from "@sheetwrite/core";
 import {
   RESOURCE_BENCHMARK_SCHEMA_VERSION,

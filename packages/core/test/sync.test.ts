@@ -2,9 +2,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "b
 import {
   type ApplyTransactionResult,
   type ChangeEvent,
-  type DocumentOp,
   createGridFromSnapshot,
   DEFAULT_SYNC_COORDINATOR_LIMITS,
+  type DocumentOp,
   initSheetwrite,
   MemoryPersistenceAdapter,
   type PersistenceAdapter,

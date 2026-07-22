@@ -5,8 +5,8 @@ import {
   SnapshotResourceError,
   type SnapshotResourceLimits,
   SnapshotValidationError,
-  validateTransactionResources,
   validateDocumentOperationShape,
+  validateTransactionResources,
 } from "./document-protocol.js";
 import type {
   RuntimeMemoryObservation,

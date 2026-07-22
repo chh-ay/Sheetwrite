@@ -8,9 +8,9 @@ import {
   createRef,
   type ReactElement,
   type ReactNode,
-  startTransition,
   StrictMode,
   Suspense,
+  startTransition,
 } from "react";
 import { createRoot } from "react-dom/client";
 import {

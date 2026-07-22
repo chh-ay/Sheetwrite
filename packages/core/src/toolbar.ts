@@ -1,9 +1,9 @@
 import type {
   Grid,
   GridActions,
-  GridConfig,
   GridCommandName,
   GridCommandState,
+  GridConfig,
   ToolbarActionName,
   ToolbarIcon,
   ToolbarItem,

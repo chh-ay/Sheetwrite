@@ -1,10 +1,10 @@
-import { createServer } from "node:http";
-import { chromium } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { basename, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { chromium } from "@playwright/test";
 import { bindCanonicalTarballIntegrities } from "../../scripts/release-lock-integrity.mjs";
 
 const fixturesRoot = fileURLToPath(new URL(".", import.meta.url));

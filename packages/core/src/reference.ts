@@ -81,7 +81,7 @@ export function referenceTargetFromPacked(
   packed: Uint32Array | undefined,
   sheetIds: readonly SheetId[],
 ): CellAddress | null {
-  if (!packed || packed.length !== 3) return null;
+  if (packed?.length !== 3) return null;
   const sheet = sheetIds[packed[0]!];
   return sheet === undefined ? null : { sheet, row: packed[1]!, col: packed[2]! };
 }

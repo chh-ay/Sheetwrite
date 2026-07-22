@@ -4,8 +4,8 @@ import {
 } from "./document-protocol.js";
 import {
   type HistoryAction,
-  type HistoryResourceStats,
   type HistoryPart,
+  type HistoryResourceStats,
   materializeHistoryAction,
   UndoManager,
 } from "./history.js";

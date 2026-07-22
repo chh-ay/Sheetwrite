@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";

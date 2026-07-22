@@ -232,6 +232,7 @@ export class CustomEditorController {
       return;
     }
 
+    // biome-ignore lint/suspicious/noConfusingVoidType: preserve the public async editor result contract.
     let result: string | void | Promise<string | void>;
     try {
       result = active.instance.commit(navigation);

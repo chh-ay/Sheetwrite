@@ -486,7 +486,6 @@ function spillFilterResizeFixture(count: number): TimedFixture {
   };
 }
 
-
 function runWorkloads(smoke: boolean): FormulaWorkloadResult[] {
   const results: FormulaWorkloadResult[] = [];
   const sizes = smoke ? ([1_000] as const) : FORMULA_SIZES;

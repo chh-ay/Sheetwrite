@@ -5,12 +5,12 @@ import {
   createRuntimeResourceSnapshot,
   decodeStoreMemoryStats,
   diffRuntimeResourcePhases,
+  type ResourceOwnerBytes,
   RUNTIME_RESOURCE_SCHEMA_VERSION,
+  type RuntimeResourceSnapshot,
   STORE_MEMORY_HASH_ESTIMATE_VERSION,
   STORE_MEMORY_PROTOCOL_VERSION,
   WASM_MEMORY_OWNERS,
-  type ResourceOwnerBytes,
-  type RuntimeResourceSnapshot,
 } from "../src/resource-accounting.js";
 
 function encodedStoreMemory(

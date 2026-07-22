@@ -1,10 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import type { CellEditor, CellEditorContext, Column, Grid, Workbook } from "../src/types.js";
 import { CustomEditorController } from "../src/custom-editor.js";
 import { toCsv } from "../src/export.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import type { CellEditor, CellEditorContext, Column, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 let restoreCanvas: () => void;

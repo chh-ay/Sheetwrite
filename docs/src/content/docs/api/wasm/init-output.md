@@ -9,10 +9,10 @@ Result of module initialization: the instantiated exports plus the shared linear
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L397</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L410</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>129</span>
+## Members <span class="api-count" data-pagefind-ignore>131</span>
 
 <div class="api-member-list">
 
@@ -210,6 +210,15 @@ readonly cellstore_captureReferences: (a: number, b: number, c: number) => numbe
 
 ```ts generated
 readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-capture-sources-for-rows" data-pagefind-weight="1">
+<summary><code>cellstore_captureSourcesForRows</code></summary>
+
+```ts generated
+readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
 ```
 
 </details>
@@ -480,6 +489,15 @@ readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, num
 
 ```ts generated
 readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-persisted-cell-data" data-pagefind-weight="1">
+<summary><code>cellstore_persistedCellData</code></summary>
+
+```ts generated
+readonly cellstore_persistedCellData: (a: number, b: number) => [number, number];
 ```
 
 </details>
@@ -1247,6 +1265,14 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => number;
+  readonly cellstore_captureSourcesForRows: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
   readonly cellstore_cellState: (
     a: number,
     b: number,
@@ -1417,6 +1443,10 @@ export interface InitOutput {
     b: number,
   ) => [number, number];
   readonly cellstore_pagedStats: (a: number, b: number) => [number, number];
+  readonly cellstore_persistedCellData: (
+    a: number,
+    b: number,
+  ) => [number, number];
   readonly cellstore_pinRange: (
     a: number,
     b: number,

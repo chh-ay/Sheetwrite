@@ -12,7 +12,7 @@ The workbook-wide store: every sheet, one string pool.
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>86</span>
+## Members <span class="api-count" data-pagefind-ignore>88</span>
 
 <div class="api-member-list">
 
@@ -118,6 +118,17 @@ captureSources: (sheet: number, r0: number, c0: number, rows: number, cols: numb
 
 <p class="api-member-doc">Capture only persisted formula/reference sources in a rectangle. The
 returned opaque object is compact in source cardinality, not cell count.</p>
+</details>
+
+<details class="api-member" id="cell-store-capture-sources-for-rows" data-pagefind-weight="1">
+<summary><code>captureSourcesForRows</code> <span class="api-member-summary">Capture persisted formula/reference sources for arbitrary row/column coordinates.</span></summary>
+
+```ts generated
+captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined;
+```
+
+<p class="api-member-doc">Capture persisted formula/reference sources for arbitrary row/column
+coordinates. Offsets follow the caller's row-major coordinate order.</p>
 </details>
 
 <details class="api-member" id="cell-store-cell-state" data-pagefind-weight="1">
@@ -406,6 +417,20 @@ pagedDirtyCoordinates: (sheet: number) => Float64Array;
 pagedStats: (sheet: number) => Float64Array;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-persisted-cell-data" data-pagefind-weight="1">
+<summary><code>persistedCellData</code> <span class="api-member-summary">Sparse persisted-cell records.</span></summary>
+
+```ts generated
+persistedCellData: (sheet: number) => Float64Array;
+```
+
+<p class="api-member-doc">Sparse persisted-cell records. Each record starts with
+`[row, col, kind, number, style, string_id, source_kind, source_length]`.
+Formula UTF-8 is packed into little-endian u32 words; references append
+one `[sheet, row, col]` triple. The allocation scales with serialized
+cells and source bytes, never the logical sheet rectangle.</p>
 </details>
 
 <details class="api-member" id="cell-store-pin-range" data-pagefind-weight="1">
@@ -901,6 +926,11 @@ class CellStore {
     rows: number,
     cols: number,
   ) => SourceSnapshot | undefined;
+  captureSourcesForRows: (
+    sheet: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ) => SourceSnapshot | undefined;
   cellState: (sheet: number, row: number, col: number) => number;
   clearCell: (sheet: number, row: number, col: number, style: number) => void;
   clearRange: (
@@ -1005,6 +1035,7 @@ class CellStore {
   memoryStats: () => Float64Array;
   pagedDirtyCoordinates: (sheet: number) => Float64Array;
   pagedStats: (sheet: number) => Float64Array;
+  persistedCellData: (sheet: number) => Float64Array;
   pinRange: (
     sheet: number,
     start_row: number,

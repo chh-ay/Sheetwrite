@@ -99,6 +99,13 @@ export {
   type SnapshotGridOptions,
 } from "./persistence.js";
 export {
+  type DocumentRebaseResult,
+  type RebaseConflict,
+  type RebaseConflictCode,
+  rebaseDocumentOperations,
+} from "./rebase.js";
+export { REF_CYCLE } from "./reference.js";
+export {
   assertRuntimeResourceSnapshot,
   type BoundaryDirection,
   type BoundaryOperationStats,
@@ -115,20 +122,13 @@ export {
   type RuntimeResourcePhase,
   type RuntimeResourcePhaseDelta,
   type RuntimeResourceSnapshot,
-  type StoreMemoryBreakdown,
   STORE_MEMORY_HASH_ESTIMATE_VERSION,
   STORE_MEMORY_PROTOCOL_VERSION,
-  type WasmMemoryOwner,
+  type StoreMemoryBreakdown,
   type TransientResourcePeak,
   WASM_MEMORY_OWNERS,
+  type WasmMemoryOwner,
 } from "./resource-accounting.js";
-export {
-  type DocumentRebaseResult,
-  type RebaseConflict,
-  type RebaseConflictCode,
-  rebaseDocumentOperations,
-} from "./rebase.js";
-export { REF_CYCLE } from "./reference.js";
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 export {
   DEFAULT_SYNC_COORDINATOR_LIMITS,
@@ -156,12 +156,12 @@ export type {
   CellBlock,
   CellBorder,
   CellBorders,
+  CellChange,
   CellEditor,
   CellEditorContext,
   CellEditorInstance,
   CellEditorNavigation,
   CellEditorRect,
-  CellChange,
   CellFormat,
   CellInputSnapshot,
   CellLoadState,

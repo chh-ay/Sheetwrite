@@ -28,6 +28,7 @@ import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { InputController } from "./input-controller.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
+import { RenderCoordinator } from "./render-coordinator.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -35,7 +36,6 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
-import { RenderCoordinator } from "./render-coordinator.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { SheetTabs } from "./sheet-tabs.js";
@@ -58,7 +58,6 @@ import type {
   Selection,
   SheetId,
 } from "./types/coordinates.js";
-import type { CellEditor, CellEditorRect } from "./types/editor.js";
 import type { AggregateOp } from "./types/data.js";
 import type {
   AddSheetInput,
@@ -75,13 +74,14 @@ import type {
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
+import type { CellEditor, CellEditorRect } from "./types/editor.js";
 import type {
   CellInputSnapshot,
   Grid,
   GridActions,
-  GridConfig,
   GridCommandName,
   GridCommandState,
+  GridConfig,
   GridEvents,
   GridOptions,
   GridPresentation,

@@ -1,9 +1,9 @@
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
-import { chromium } from "@playwright/test";
 import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { chromium } from "@playwright/test";
 import { readReleaseManifestDigest, verifyReleaseArtifacts } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 

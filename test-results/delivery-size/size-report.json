@@ -6,9 +6,9 @@
     "version": "1.0.0"
   },
   "meta": {
-    "commit": "d14b2ed2b1277e7821b8fe6bacb6d7038ba4f27f",
+    "commit": "6fe7e39f7a1576955c99b9a42b5fef0a9b00f308",
     "dirty": true,
-    "timestamp": "2026-07-21T23:31:15.029Z"
+    "timestamp": "2026-07-22T00:04:39.513Z"
   },
   "toolchain": {
     "bun": "1.3.14",
@@ -1245,6 +1245,26 @@
           "sha256": "995b9fe012beca23233de01ab6900bb1e309fdd1d8682dd3ced4c0f2c7953344"
         },
         {
+          "path": "test/bundler-fixtures/next/.next/static/hgP0MskwYjnnY8oZQZOvy/_buildManifest.js",
+          "kind": "javascript",
+          "owner": "next-async",
+          "roles": ["next-async"],
+          "rawBytes": 506,
+          "gzipBytes": 299,
+          "brotliBytes": 257,
+          "sha256": "549fc1f6f226df947f859689a5217eeedc49d3ff876d9f364976a47ef4aad63d"
+        },
+        {
+          "path": "test/bundler-fixtures/next/.next/static/hgP0MskwYjnnY8oZQZOvy/_ssgManifest.js",
+          "kind": "javascript",
+          "owner": "next-async",
+          "roles": ["next-async"],
+          "rawBytes": 80,
+          "gzipBytes": 64,
+          "brotliBytes": 67,
+          "sha256": "678f6ce2cb80b1fe72fc67e7412be6e2ab6ada083111b64f7c40d35e3cba5e00"
+        },
+        {
           "path": "test/bundler-fixtures/next/.next/static/media/sheetwrite_wasm_bg.76e05208.wasm",
           "kind": "wasm",
           "owner": "core-initial",
@@ -1263,26 +1283,6 @@
           "gzipBytes": 1345,
           "brotliBytes": 1232,
           "sha256": "68432482a7a96857a76039090c9f4e4cb00657c2e110a61a09a56df820da4c61"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/smk3w1ZybyvGlAnYC_VoD/_buildManifest.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 506,
-          "gzipBytes": 299,
-          "brotliBytes": 257,
-          "sha256": "549fc1f6f226df947f859689a5217eeedc49d3ff876d9f364976a47ef4aad63d"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/smk3w1ZybyvGlAnYC_VoD/_ssgManifest.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 80,
-          "gzipBytes": 64,
-          "brotliBytes": 67,
-          "sha256": "678f6ce2cb80b1fe72fc67e7412be6e2ab6ada083111b64f7c40d35e3cba5e00"
         }
       ]
     },

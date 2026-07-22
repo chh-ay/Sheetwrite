@@ -1,6 +1,5 @@
-import type { CellScalar } from "./cell.js";
+import type { CellScalar, Column } from "./cell.js";
 import type { CellAddress } from "./coordinates.js";
-import type { Column } from "./cell.js";
 import type { Grid } from "./grid.js";
 
 /** Selection movement applied after a successful editor commit. */
@@ -43,6 +42,7 @@ export interface CellEditorInstance {
   /** Reposition editor-owned popovers after the core wrapper has moved. */
   reposition(rect: CellEditorRect): void;
   /** Called for Enter/Tab. Return text (or a promise for it) to use the canonical commit path. */
+  // biome-ignore lint/suspicious/noConfusingVoidType: async editors may resolve without committed text.
   commit(navigation: CellEditorNavigation): string | void | Promise<string | void>;
   /** Called for Escape or replacement before teardown. */
   cancel(): void;

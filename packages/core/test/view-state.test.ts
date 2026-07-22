@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import type { Workbook } from "../src/types.js";
 import { StoreViewState } from "../src/store/view-state.js";
 import type { RecomputingCellStore } from "../src/store/wasm-contract.js";
+import type { Workbook } from "../src/types.js";
 
 function workbook(rowCount: number): Workbook {
   return {

@@ -1,8 +1,8 @@
 import type { Grid } from "@sheetwrite/core";
 import "@sheetwrite/svelte/styles.css";
 import { mount, unmount } from "svelte";
-import App from "./SvelteApp.svelte";
 import { assertUnmounted, passed } from "./lifecycle.js";
+import App from "./SvelteApp.svelte";
 
 const target = document.getElementById("app");
 if (!target) throw new Error("Svelte Vite fixture is missing #app");

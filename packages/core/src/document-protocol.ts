@@ -1439,9 +1439,9 @@ export function validateDocumentOperationShape(
     case "setRange": {
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       const cells = arrayAt(ownValue(operation, "cells"), `${path}.cells`, errors);
-      cells?.forEach((cell, index) =>
-        validateOperationCell(cell, `${path}.cells[${index}]`, errors),
-      );
+      cells?.forEach((cell, index) => {
+        validateOperationCell(cell, `${path}.cells[${index}]`, errors);
+      });
       break;
     }
     case "setBlock": {
@@ -1505,9 +1505,9 @@ export function validateDocumentOperationShape(
         styleTableValue === undefined
           ? undefined
           : arrayAt(styleTableValue, `${blockPath}.styleTable`, errors);
-      styleTable?.forEach((style, index) =>
-        validateCellStyle(style, `${blockPath}.styleTable[${index}]`, errors),
-      );
+      styleTable?.forEach((style, index) => {
+        validateCellStyle(style, `${blockPath}.styleTable[${index}]`, errors);
+      });
       const styleIdsValue = ownValue(block, "styleIds");
       if (styleIdsValue !== undefined) {
         const styleIds = arrayAt(styleIdsValue, `${blockPath}.styleIds`, errors);
@@ -1553,9 +1553,9 @@ export function validateDocumentOperationShape(
       validateOperationSheetId(operation, path, errors);
       requireNonNegativeInteger(operation, "at", path, errors);
       const columns = arrayAt(ownValue(operation, "columns"), `${path}.columns`, errors);
-      columns?.forEach((column, index) =>
-        validateColumnShape(column, `${path}.columns[${index}]`, errors),
-      );
+      columns?.forEach((column, index) => {
+        validateColumnShape(column, `${path}.columns[${index}]`, errors);
+      });
       break;
     }
     case "removeColumns":
@@ -1642,34 +1642,34 @@ export function validateDocumentOperationShape(
       const conditionalFormats = ownValue(patch, "conditionalFormats");
       if (conditionalFormats !== undefined) {
         const entries = arrayAt(conditionalFormats, `${patchPath}.conditionalFormats`, errors);
-        entries?.forEach((entry, index) =>
+        entries?.forEach((entry, index) => {
           validateOperationConditionalFormat(
             entry,
             `${patchPath}.conditionalFormats[${index}]`,
             errors,
-          ),
-        );
+          );
+        });
       }
       const rowGroups = ownValue(patch, "rowGroups");
       if (rowGroups !== undefined) {
         const entries = arrayAt(rowGroups, `${patchPath}.rowGroups`, errors);
-        entries?.forEach((entry, index) =>
-          validateOperationRowGroup(entry, `${patchPath}.rowGroups[${index}]`, errors),
-        );
+        entries?.forEach((entry, index) => {
+          validateOperationRowGroup(entry, `${patchPath}.rowGroups[${index}]`, errors);
+        });
       }
       const sortKeys = ownValue(patch, "sortKeys");
       if (sortKeys !== undefined) {
         const entries = arrayAt(sortKeys, `${patchPath}.sortKeys`, errors);
-        entries?.forEach((entry, index) =>
-          validateOperationSortKey(entry, `${patchPath}.sortKeys[${index}]`, errors),
-        );
+        entries?.forEach((entry, index) => {
+          validateOperationSortKey(entry, `${patchPath}.sortKeys[${index}]`, errors);
+        });
       }
       const filters = ownValue(patch, "filters");
       if (filters !== undefined) {
         const entries = arrayAt(filters, `${patchPath}.filters`, errors);
-        entries?.forEach((entry, index) =>
-          validateOperationFilterTuple(entry, `${patchPath}.filters[${index}]`, errors),
-        );
+        entries?.forEach((entry, index) => {
+          validateOperationFilterTuple(entry, `${patchPath}.filters[${index}]`, errors);
+        });
       }
       break;
     }

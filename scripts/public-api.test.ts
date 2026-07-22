@@ -7,8 +7,8 @@ import {
   checkManifestBaseline,
   publicApiDigest,
   readPublicApiBaseline,
-  writePublicApiBaseline,
   validateManifest,
+  writePublicApiBaseline,
 } from "./public-api.js";
 
 const roots: string[] = [];

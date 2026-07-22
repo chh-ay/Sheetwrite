@@ -1,7 +1,7 @@
 import { SheetwriteGrid } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
-import wasmUrl from "@sheetwrite/wasm/wasm?url";
 import type { Grid } from "@sheetwrite/core";
+import wasmUrl from "@sheetwrite/wasm/wasm?url";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import {

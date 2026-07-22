@@ -1,5 +1,5 @@
 import type { DataSourcePage, Grid, RowData, Workbook } from "@sheetwrite/core";
-import { createGrid, initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
+import { createGrid, initSheetwrite, type SheetwriteStore } from "@sheetwrite/core";
 import { installDatasourceClockForTest } from "@sheetwrite/core/testing";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";

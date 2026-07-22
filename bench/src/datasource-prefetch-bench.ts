@@ -1,8 +1,8 @@
 import {
   DATASOURCE_MAX_ACTIVE_REQUESTS,
-  DatasourceController,
   DATASOURCE_PREFETCH_MAX_BYTES,
   DATASOURCE_PREFETCH_MAX_ROWS,
+  DatasourceController,
 } from "../../packages/core/src/datasource-controller.js";
 import { initSheetwrite } from "../../packages/core/src/grid.js";
 import { SheetwriteStore } from "../../packages/core/src/store.js";
