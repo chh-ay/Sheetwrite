@@ -2975,3 +2975,31 @@ fn million_row_source_snapshot_scales_with_source_cardinality() {
     assert_eq!(sources.reference_offsets().len(), 1);
     assert!(sources.byte_length() < 128);
 }
+
+#[test]
+fn required_formula_regressions_cover_let_lookup_and_criteria_shape() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 10);
+    for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+        store.set_number(sheet, row, 1, value * 10.0, 0);
+    }
+    store.set_formula(sheet, 0, 3, "=LET(x,2,LET(x,3,x)+x)", 0);
+    store.set_formula(sheet, 0, 4, "=XMATCH(2,A1:A3,0)", 0);
+    store.set_formula(sheet, 0, 5, "=MAXIFS(A1:B1,A1:A2,\">0\")", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 3), 5.0);
+    assert_close(number(&store, sheet, 0, 4), 2.0);
+    assert_eq!(string(&store, sheet, 0, 5).as_deref(), Some("#VALUE!"));
+}
+
+#[test]
+fn required_sequence_spill_regression_preserves_matrix_shape() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 8);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(2,3,10,2)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 0), 10.0);
+    assert_close(number(&store, sheet, 0, 2), 14.0);
+    assert_close(number(&store, sheet, 1, 0), 16.0);
+}
