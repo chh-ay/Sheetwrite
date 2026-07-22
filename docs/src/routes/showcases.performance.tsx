@@ -194,11 +194,11 @@ function PerformanceRoute() {
   const [scan, setScan] = useState<ScanAttempt | null>(null);
   const [resourceDelta, setResourceDelta] = useState<RuntimeResourcePhaseDelta | null>(null);
   const [evictionWatch, setEvictionWatch] = useState<EvictionWatch | null>(null);
+  const activeStorage = evictionStress ? SCALE_EVICTION_STRESS_STORAGE : SCALE_STORAGE;
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const activeStorage = evictionStress ? SCALE_EVICTION_STRESS_STORAGE : SCALE_STORAGE;
     let disposed = false;
     let grid: Grid | null = null;
     const unsubscribes: Array<() => void> = [];
@@ -320,7 +320,7 @@ function PerformanceRoute() {
       }
       grid?.destroy();
     };
-  }, [renderer, evictionStress]);
+  }, [renderer, evictionStress, activeStorage]);
 
   useEffect(() => {
     const observer = new MutationObserver(() => gridRef.current?.replaceTheme(SCALE_THEME));
