@@ -331,6 +331,8 @@ pub(super) fn seed_dependency_depth_errors(
     }
 }
 
+const LINEAR_DEPENDENCY_DEDUP_LIMIT: usize = 8;
+
 fn collect_formula_dependencies(
     sheets: &[SheetData],
     affected: &HashSet<AbsCellKey>,
@@ -344,12 +346,10 @@ fn collect_formula_dependencies(
     let formula_set: HashSet<AbsCellKey> = formula_cells.iter().copied().collect();
     let mut dependencies: HashMap<AbsCellKey, Vec<AbsCellKey>> =
         HashMap::with_capacity(formula_cells.len());
-    let mut seen_dependencies: HashMap<AbsCellKey, HashSet<AbsCellKey>> =
-        HashMap::with_capacity(formula_cells.len());
+    let mut seen_dependencies: HashMap<AbsCellKey, HashSet<AbsCellKey>> = HashMap::new();
 
     for &formula_cell in &formula_cells {
         dependencies.entry(formula_cell).or_default();
-        seen_dependencies.entry(formula_cell).or_default();
     }
 
     for &formula_cell in &formula_cells {
@@ -409,15 +409,27 @@ fn push_unique_dependency(
     formula_cell: AbsCellKey,
     dependency: AbsCellKey,
 ) {
-    if seen_dependencies
-        .entry(formula_cell)
-        .or_default()
-        .insert(dependency)
-    {
-        dependencies
-            .entry(formula_cell)
-            .or_default()
-            .push(dependency);
+    let formula_dependencies = dependencies.entry(formula_cell).or_default();
+    if let Some(seen) = seen_dependencies.get_mut(&formula_cell) {
+        if seen.insert(dependency) {
+            formula_dependencies.push(dependency);
+        }
+        return;
+    }
+    if formula_dependencies.contains(&dependency) {
+        return;
+    }
+    if formula_dependencies.len() < LINEAR_DEPENDENCY_DEDUP_LIMIT {
+        formula_dependencies.push(dependency);
+        return;
+    }
+
+    let mut seen = HashSet::with_capacity(formula_dependencies.len() + 1);
+    seen.extend(formula_dependencies.iter().copied());
+    let inserted = seen.insert(dependency);
+    seen_dependencies.insert(formula_cell, seen);
+    if inserted {
+        formula_dependencies.push(dependency);
     }
 }
 
@@ -462,4 +474,104 @@ fn formula_dependency_depth(
     visiting.remove(&key);
     depth_memo.insert(key, result);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::CellStore;
+
+    #[test]
+    fn dependency_index_is_authoritative_for_direct_and_nested_array_producers() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 32);
+        store.set_formula(sheet, 0, 0, "=SUM(B1:B2)", 0);
+        let scalar_index = build_dep_index(&store.sheets, store.formula_epoch);
+        assert!(!scalar_index.has_dynamic_arrays);
+        assert!(store.set_named_range("Rows", -1, sheet, 0, 1, 1, 1));
+
+        for (row, source) in [
+            "=B1:B2",
+            "=$B$1:$B$2",
+            "=Rows",
+            "=FILTER(B1:B2,B1:B2)",
+            "=SORT(B1:B2)",
+            "=UNIQUE(B1:B2)",
+            "=SEQUENCE(2)",
+            "=TRANSPOSE(B1:B2)",
+            "=TAKE(B1:B2,1)",
+            "=DROP(B1:B2,1)",
+            "=CHOOSECOLS(B1:C2,1)",
+            "=CHOOSEROWS(B1:B2,1)",
+
+            "=LET(x,B1:B2,x)",
+            "=CHOOSE(1,B1:B2,SEQUENCE(2))",
+            "=LET(x,CHOOSE(1,SEQUENCE(2),B1:B2),x)",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            store.set_formula(sheet, row + 1, 0, source, 0);
+            assert_ne!(scalar_index.epoch, store.formula_epoch);
+            let index = build_dep_index(&store.sheets, store.formula_epoch);
+            assert!(index.has_dynamic_arrays, "missed array producer {source}");
+        }
+    }
+
+    #[test]
+    fn dependency_collection_deduplicates_repeated_overlapping_and_high_degree_edges() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 32);
+        for row in 0..16 {
+            store.set_formula(sheet, row, 1, "=1", 0);
+        }
+        store.set_formula(
+            sheet,
+            0,
+            0,
+            "=B1+B1+SUM(B1:B16)+SUM(B1:B2)+SUM(B8:B16)",
+            0,
+        );
+        let dependent = AbsCellKey::new(sheet, 0, 0);
+        let mut affected: HashSet<_> = (0..16)
+            .map(|row| AbsCellKey::new(sheet, row, 1))
+            .collect();
+        affected.insert(dependent);
+
+        let index = build_dep_index(&store.sheets, store.formula_epoch);
+        let dependencies = collect_formula_dependencies(&store.sheets, &affected, &index);
+        let collected = dependencies.get(&dependent).expect("dependent formula");
+        assert_eq!(collected.len(), 16);
+        let unique: HashSet<_> = collected.iter().copied().collect();
+        assert_eq!(unique.len(), collected.len());
+        for row in 0..16 {
+            assert!(unique.contains(&AbsCellKey::new(sheet, row, 1)));
+        }
+    }
+
+    #[test]
+    fn duplicate_direct_and_range_edges_preserve_cycle_error_propagation() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_formula(sheet, 0, 0, "=B1+B1+SUM(B1:B1)", 0);
+        store.set_formula(sheet, 0, 1, "=A1+SUM(A1:A1)", 0);
+        let left = AbsCellKey::new(sheet, 0, 0);
+        let right = AbsCellKey::new(sheet, 0, 1);
+        let affected = HashSet::from([left, right]);
+        let index = build_dep_index(&store.sheets, store.formula_epoch);
+        let dependencies = collect_formula_dependencies(&store.sheets, &affected, &index);
+        assert_eq!(dependencies.get(&left), Some(&vec![right]));
+        assert_eq!(dependencies.get(&right), Some(&vec![left]));
+
+        let mut memo = HashMap::new();
+        seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+        assert!(matches!(
+            memo.get(&left),
+            Some(Value::Error(FormulaError::Cycle))
+        ));
+        assert!(matches!(
+            memo.get(&right),
+            Some(Value::Error(FormulaError::Cycle))
+        ));
+    }
 }

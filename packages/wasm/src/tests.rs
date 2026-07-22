@@ -3150,3 +3150,53 @@ fn required_sequence_spill_regression_preserves_matrix_shape() {
     assert_close(number(&store, sheet, 0, 2), 14.0);
     assert_close(number(&store, sheet, 1, 0), 16.0);
 }
+
+#[test]
+fn every_indexed_array_producer_reinstalls_spills_after_dependency_edits() {
+    let cases = [
+        ("=A1:A3", 0, 9.0, 2, 0, 3.0),
+        ("=$A$1:$A$3", 0, 9.0, 2, 0, 3.0),
+        ("=Rows", 0, 9.0, 2, 0, 3.0),
+        ("=FILTER(A1:A3,A1:A3)", 0, 9.0, 2, 0, 3.0),
+        ("=SORT(A1:A3)", 0, 2.0, 2, 0, 9.0),
+        ("=UNIQUE(A1:A3)", 0, 9.0, 2, 0, 3.0),
+        ("=SEQUENCE(3,1,A1,1)", 0, 9.0, 2, 0, 11.0),
+        ("=TRANSPOSE(A1:A3)", 0, 9.0, 0, 2, 3.0),
+        ("=TAKE(A1:A3,2)", 0, 9.0, 1, 0, 2.0),
+        ("=DROP(A1:A3,1)", 1, 20.0, 1, 0, 3.0),
+        ("=CHOOSECOLS(A1:B3,1)", 0, 9.0, 2, 0, 3.0),
+        ("=CHOOSEROWS(A1:A3,2,3)", 1, 20.0, 1, 0, 3.0),
+        ("=LET(x,A1:A3,x)", 0, 9.0, 2, 0, 3.0),
+        ("=CHOOSE(1,A1:A3,SEQUENCE(3))", 0, 9.0, 2, 0, 3.0),
+        (
+            "=LET(x,CHOOSE(1,A1:A3,SEQUENCE(3)),x)",
+            0,
+            9.0,
+            2,
+            0,
+            3.0,
+        ),
+    ];
+
+    for (source, edit_row, anchor, probe_row, probe_col, probe) in cases {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
+            store.set_number(sheet, row, 0, value, 0);
+            store.set_number(sheet, row, 1, value * 10.0, 0);
+        }
+        if source == "=Rows" {
+            assert!(store.set_named_range("Rows", -1, sheet, 0, 0, 2, 0));
+        }
+        store.set_formula(sheet, 0, 4, "=0", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 4), 0.0);
+        store.set_formula(sheet, 0, 4, source, 0);
+        store.recompute(sheet);
+        store.set_number(sheet, edit_row, 0, if edit_row == 0 { 9.0 } else { 20.0 }, 0);
+        store.recompute(sheet);
+
+        assert_close(number(&store, sheet, 0, 4), anchor);
+        assert_close(number(&store, sheet, probe_row, 4 + probe_col), probe);
+    }
+}
