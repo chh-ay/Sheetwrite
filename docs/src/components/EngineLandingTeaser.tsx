@@ -1,12 +1,14 @@
 import { Link } from "@tanstack/react-router";
 
-/** Static, engine-free preview copy loaded only after the landing slot is reached. */
+/** Static, engine-free callout for the live engine route. */
 export default function EngineLandingTeaser() {
   return (
     <div className="sw-landing-engine-teaser">
       <div className="sw-landing-engine-teaser__copy">
         <p className="sw-section-eyebrow">The live route, reserved below</p>
-        <h2>Watch the Grid, the calculation engine, and your host agree.</h2>
+        <h2 id="landing-engine-title">
+          Watch the Grid, the calculation engine, and your host agree.
+        </h2>
         <p>
           A paged formula sheet makes each request, checked result, drawing choice, and host save
           readable. No illustration stands in for the working Grid.

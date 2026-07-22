@@ -2432,6 +2432,10 @@ body .sw-code-popover__accessible-signature {
   background-size: 4rem 4rem;
 }
 
+.sw-landing > .sw-product-nav {
+  flex: none;
+}
+
 .sw-landing :is(a, button):focus-visible {
   outline: 2px solid var(--sw-accent);
   outline-offset: 2px;
@@ -2450,9 +2454,13 @@ body .sw-code-popover__accessible-signature {
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  column-gap: clamp(2.25rem, 4.5vw, 4.75rem);
+  min-height: calc(
+    100svh - var(--sw-header-height) - clamp(2.25rem, 6vh, 3.75rem)
+  );
+  grid-template-columns: minmax(0, 0.9fr) minmax(36rem, 1.1fr);
+  column-gap: clamp(2rem, 4vw, 4rem);
   row-gap: 0;
+  align-content: center;
   padding: clamp(1rem, 3.5vh, 2.25rem) 0 clamp(1.25rem, 3.5vh, 2.25rem);
 }
 
@@ -2952,8 +2960,8 @@ body .sw-code-popover__accessible-signature {
   }
 }
 
-/* The engine preview is an inert reserved slot until scrolling shows intent.
-   Its loaded content remains an editorial cutaway, never a fake spreadsheet. */
+/* The engine callout is immediately present and remains an editorial
+   cutaway; the linked route owns the live Grid and its runtime. */
 .sw-landing-engine-slot {
   min-height: 18rem;
   margin-top: clamp(2.5rem, 7vh, 4rem);
@@ -2963,21 +2971,7 @@ body .sw-code-popover__accessible-signature {
   box-shadow: var(--sw-shadow);
 }
 
-.sw-landing-engine-slot__reserved,
-.sw-landing-engine-slot__placeholder,
-.sw-landing-engine-teaser {
-  min-height: 18rem;
-}
 
-.sw-landing-engine-slot__reserved,
-.sw-landing-engine-slot__placeholder {
-  display: grid;
-  align-content: center;
-  max-width: 50rem;
-  padding: clamp(1.5rem, 5vw, 3rem);
-}
-
-.sw-landing-engine-slot__reserved h2,
 .sw-landing-engine-teaser h2 {
   max-width: 20ch;
   margin: 0;
@@ -2986,7 +2980,6 @@ body .sw-code-popover__accessible-signature {
   letter-spacing: -0.03em;
 }
 
-.sw-landing-engine-slot__reserved > p:not(.sw-section-eyebrow),
 .sw-landing-engine-teaser__copy > p:not(.sw-section-eyebrow) {
   max-width: 38rem;
   margin: 1rem 0 0;
@@ -2994,7 +2987,6 @@ body .sw-code-popover__accessible-signature {
   line-height: 1.6;
 }
 
-.sw-landing-engine-slot__link,
 .sw-landing-engine-teaser__link {
   width: fit-content;
   margin-top: 1.25rem;
@@ -3588,6 +3580,10 @@ body .sw-code-popover__accessible-signature {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sw-product-story__field {
+    mask-image: radial-gradient(circle at 50% 42%, #000, transparent 68%);
+  }
+
   .sw-cta,
   .sw-cta--ghost,
   .sw-proof-ledger a,
