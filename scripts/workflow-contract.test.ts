@@ -72,6 +72,12 @@ describe("CI and release workflow contracts", () => {
     ).toThrow("cannot define both run and uses");
     expect(() =>
       parseWorkflowContract(
+        "jobs:\n  check:\n    steps:\n      - run: echo ok\n        with:\n          mode: invalid",
+        "fixture",
+      ),
+    ).toThrow("fixture.jobs.check.steps[0].with is only valid for action steps");
+    expect(() =>
+      parseWorkflowContract(
         "jobs:\n  check:\n    steps:\n      - run: echo ok\n        if: []",
         "fixture",
       ),

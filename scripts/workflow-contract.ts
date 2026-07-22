@@ -4,17 +4,18 @@ interface WorkflowStepBase {
   readonly id?: string;
   readonly name?: string;
   readonly if?: string;
-  readonly with?: Readonly<Record<string, unknown>>;
 }
 
 export interface RunWorkflowStep extends WorkflowStepBase {
   readonly run: string;
   readonly uses?: never;
+  readonly with?: never;
 }
 
 export interface ActionWorkflowStep extends WorkflowStepBase {
   readonly run?: never;
   readonly uses: string;
+  readonly with?: Readonly<Record<string, unknown>>;
 }
 
 export type WorkflowStep = RunWorkflowStep | ActionWorkflowStep;
@@ -99,12 +100,14 @@ function parseStep(value: unknown, label: string): WorkflowStep {
     if (value.uses !== undefined) {
       throw new Error(`${label} cannot define both run and uses`);
     }
+    if (value.with !== undefined) {
+      throw new Error(`${label}.with is only valid for action steps`);
+    }
     return {
       id: value.id,
       name: value.name,
       run: value.run,
       if: value.if,
-      with: value.with,
     };
   }
   if (value.uses !== undefined) {
