@@ -299,19 +299,7 @@ export function LandingSpreadsheet() {
               })}
             </div>
           ))}
-          <svg aria-hidden="true" className="sw-workbook-stage__paths" viewBox="0 0 600 300">
-            <path
-              d="M 480 74 C 548 92, 548 214, 480 258"
-              pathLength="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            <path
-              d="M 480 115 C 530 128, 530 220, 480 258"
-              pathLength="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            <circle cx="480" cy="258" data-landing-animate="request" r="4" />
-          </svg>
+          <div aria-hidden="true" className="sw-workbook-stage__reference-range" />
         </div>
         <footer className="sw-workbook-stage__foot">
           <span>

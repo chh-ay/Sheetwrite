@@ -2454,9 +2454,7 @@ body .sw-code-popover__accessible-signature {
   position: relative;
   isolation: isolate;
   display: grid;
-  min-height: calc(
-    100svh - var(--sw-header-height) - clamp(2.25rem, 6vh, 3.75rem)
-  );
+  min-height: calc(100svh - var(--sw-header-height) - clamp(2.25rem, 6vh, 3.75rem));
   grid-template-columns: minmax(0, 0.9fr) minmax(36rem, 1.1fr);
   column-gap: clamp(2rem, 4vw, 4rem);
   row-gap: 0;
@@ -2789,11 +2787,15 @@ body .sw-code-popover__accessible-signature {
   background: color-mix(in srgb, var(--sw-state-requested) 7%, var(--sw-surface-1));
 }
 
-.sw-sheet-row > .is-precedent::after {
+.sw-workbook-stage__reference-range {
   position: absolute;
-  inset: 2px;
-  border: 1px solid var(--sw-state-requested);
-  content: "";
+  z-index: 3;
+  top: 4.5rem;
+  bottom: 2.25rem;
+  left: calc(75% + 0.55rem);
+  width: calc(25% - 0.55rem);
+  border: 2px solid var(--sw-state-requested);
+  pointer-events: none;
   opacity: var(--sw-landing-dependencies);
 }
 
@@ -2815,33 +2817,6 @@ body .sw-code-popover__accessible-signature {
   background: var(--sw-state-resolved);
   content: "";
   opacity: var(--sw-landing-resolved);
-}
-
-.sw-workbook-stage__paths {
-  position: absolute;
-  z-index: 3;
-  inset: 2.25rem 0 0;
-  width: 100%;
-  height: calc(100% - 2.25rem);
-  overflow: visible;
-  pointer-events: none;
-}
-
-.sw-workbook-stage__paths path {
-  fill: none;
-  stroke: var(--sw-state-requested);
-  stroke-dasharray: 1;
-  stroke-dashoffset: calc(1 - var(--sw-landing-dependencies));
-  stroke-width: 1.5;
-  opacity: var(--sw-landing-dependencies);
-}
-
-.sw-workbook-stage__paths circle {
-  fill: var(--sw-state-pending);
-  opacity: var(--sw-landing-request);
-  transform-box: fill-box;
-  transform-origin: center;
-  scale: 1;
 }
 
 .sw-workbook-stage__foot {
@@ -2970,7 +2945,6 @@ body .sw-code-popover__accessible-signature {
   background: color-mix(in srgb, var(--sw-accent) 5%, var(--sw-surface-1));
   box-shadow: var(--sw-shadow);
 }
-
 
 .sw-landing-engine-teaser h2 {
   max-width: 20ch;
