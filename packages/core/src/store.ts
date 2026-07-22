@@ -29,7 +29,7 @@ import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
-import type { AggregateOp, ColumnarData, RowData } from "./types/data.js";
+import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
   ColumnFilter,
   CommitReason,
@@ -225,6 +225,15 @@ export class SheetwriteStore implements Store {
 
   getCellLoadState(addr: CellAddress): CellLoadState {
     return this.engine.getCellLoadState(addr);
+  }
+
+  areColumnsFullyLoaded(
+    sheet: SheetId,
+    startRow: number,
+    endRow: number,
+    columns: readonly number[],
+  ): boolean {
+    return this.engine.areColumnsFullyLoaded(sheet, startRow, endRow, columns);
   }
 
   isRangeFullyLoaded(input: Range): boolean {
@@ -705,13 +714,14 @@ export class SheetwriteStore implements Store {
     return this.engine.removeSheetFormulaIdentity(sheet);
   }
 
-  loadRows(
+  loadPage(
     sheet: SheetId,
     start: number,
+    columns: readonly DataSourceColumnBand[],
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ): void {
-    this.engine.loadRows(sheet, start, rows, protect);
+    this.engine.loadPage(sheet, start, columns, rows, protect);
   }
 
   dispose(): void {

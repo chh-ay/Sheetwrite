@@ -165,6 +165,7 @@ export type RecomputingCellStore = CellStore & {
   acknowledgeRevision(revision: bigint): void;
   isFullyLoaded(sheet: number): boolean;
   rangeFullyLoaded(sheet: number, r0: number, c0: number, r1: number, c1: number): boolean;
+  columnsFullyLoaded(sheet: number, startRow: number, endRow: number, cols: Uint32Array): boolean;
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
   beginPageLoad(): void;
   endPageLoad(): void;

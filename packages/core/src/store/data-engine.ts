@@ -49,7 +49,13 @@ import type {
   ConditionalFormatRule,
 } from "../types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { AggregateOp, ColumnarData, DataCell, RowData } from "../types/data.js";
+import type {
+  AggregateOp,
+  ColumnarData,
+  DataCell,
+  DataSourceColumnBand,
+  RowData,
+} from "../types/data.js";
 import type {
   ColumnFilter,
   DataValidationRule,
@@ -741,6 +747,20 @@ export class StoreDataEngine {
       range.start.col,
       range.end.row,
       range.end.col,
+    );
+  }
+
+  areColumnsFullyLoaded(
+    sheet: SheetId,
+    startRow: number,
+    endRow: number,
+    columns: readonly number[],
+  ): boolean {
+    return this.wasm.columnsFullyLoaded(
+      this.handleOf(sheet),
+      startRow,
+      endRow,
+      Uint32Array.from(columns),
     );
   }
 
@@ -3352,51 +3372,101 @@ export class StoreDataEngine {
     return true;
   }
 
-  /** Bulk-load one mixed datasource page in one Rust-owned source transaction. */
-  loadRows(
+  /** Bulk-load one rectangular datasource page in one Rust-owned source transaction. */
+  loadPage(
     sheet: SheetId,
     start: number,
+    columns: readonly DataSourceColumnBand[],
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ): void {
-    if (rows.length === 0) return;
+    if (rows.length === 0 || columns.length === 0) return;
     const meta = this.sheetMeta(sheet);
     const rowCount = Math.min(rows.length, Math.max(0, meta.rowCount - start));
     if (rowCount === 0) return;
-    const colCount = meta.columns.length;
-    const cells: Array<{ offset: number; value: CellValue; style?: CellStyle }> = [];
-    const address: CellAddress = { sheet, row: start, col: 0 };
+    if (!Number.isSafeInteger(start) || start < 0) {
+      throw new Error("datasource page contains an invalid row start");
+    }
+
+    let previousEnd = -1;
+    const declaredKeys = new Set<string>();
+    for (const band of columns) {
+      if (
+        !Number.isSafeInteger(band.start) ||
+        !Number.isSafeInteger(band.end) ||
+        band.start < 0 ||
+        band.start < previousEnd ||
+        band.end <= band.start ||
+        band.end > meta.columns.length ||
+        band.keys.length !== band.end - band.start
+      ) {
+        throw new Error("datasource page contains invalid column bounds");
+      }
+      for (let offset = 0; offset < band.keys.length; offset++) {
+        const key = band.keys[offset]!;
+        if (meta.columns[band.start + offset]?.key !== key || declaredKeys.has(key)) {
+          throw new Error("datasource page contains invalid column keys");
+        }
+        declaredKeys.add(key);
+      }
+      previousEnd = band.end;
+    }
     for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
-      address.row = start + rowOffset;
       const row = rows[rowOffset]!;
-      for (let col = 0; col < colCount; col++) {
-        address.col = col;
-        if (protect?.(address)) continue;
-        const column = meta.columns[col]!;
-        const dataCell = row[column.key];
-        const wrapped =
-          dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
-            ? dataCell
-            : undefined;
-        const source = dataCellValue(dataCell);
-        const value: CellValue =
-          source && typeof source === "object"
-            ? source
-            : {
-                kind: "literal",
-                value:
-                  column.type === "number" || column.type === "currency"
-                    ? toNumber(dataCell)
-                    : toText(dataCell),
-              };
-        cells.push({ offset: rowOffset * colCount + col, value, style: wrapped?.style });
+      for (const key of declaredKeys) {
+        if (!Object.hasOwn(row, key)) {
+          throw new Error("datasource page omits declared cell data");
+        }
+      }
+      for (const key of Object.keys(row)) {
+        if (!declaredKeys.has(key))
+          throw new Error("datasource page contains undeclared cell data");
       }
     }
 
+    const blockStart = columns[0]!.start;
+    const blockEnd = columns[columns.length - 1]!.end;
+    const blockWidth = blockEnd - blockStart;
+    const cells: Array<{ offset: number; value: CellValue; style?: CellStyle }> = [];
+    const address: CellAddress = { sheet, row: start, col: blockStart };
+    for (let rowOffset = 0; rowOffset < rowCount; rowOffset++) {
+      address.row = start + rowOffset;
+      const row = rows[rowOffset]!;
+      for (const band of columns) {
+        for (let col = band.start; col < band.end; col++) {
+          address.col = col;
+          if (protect?.(address)) continue;
+          const column = meta.columns[col]!;
+          const dataCell = row[column.key];
+          const wrapped =
+            dataCell && typeof dataCell === "object" && !("kind" in dataCell) && "value" in dataCell
+              ? dataCell
+              : undefined;
+          const source = dataCellValue(dataCell);
+          const value: CellValue =
+            source && typeof source === "object"
+              ? source
+              : {
+                  kind: "literal",
+                  value:
+                    column.type === "number" || column.type === "currency"
+                      ? toNumber(dataCell)
+                      : toText(dataCell),
+                };
+          cells.push({
+            offset: rowOffset * blockWidth + col - blockStart,
+            value,
+            style: wrapped?.style,
+          });
+        }
+      }
+    }
+
+    if (cells.length === 0) return;
     const bounds: Range = {
       sheet,
-      start: { row: start, col: 0 },
-      end: { row: start + rowCount - 1, col: colCount - 1 },
+      start: { row: start, col: blockStart },
+      end: { row: start + rowCount - 1, col: blockEnd - 1 },
     };
     const previousOperation = this.resourceOperation;
     this.resourceOperation ??= "ingest";

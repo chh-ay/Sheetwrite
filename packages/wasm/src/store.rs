@@ -496,6 +496,27 @@ impl CellStore {
             .is_some_and(|data| data.range_fully_loaded(r0, c0, r1, c1))
     }
 
+    #[wasm_bindgen(js_name = columnsFullyLoaded)]
+    pub fn columns_fully_loaded(
+        &self,
+        sheet: usize,
+        start_row: usize,
+        end_row: usize,
+        cols: &[u32],
+    ) -> bool {
+        if start_row >= end_row || cols.is_empty() {
+            return true;
+        }
+        self.sheets.get(sheet).is_some_and(|data| {
+            cols.iter().all(|&col| {
+                let col = col as usize;
+                data.contains_cell(start_row, col)
+                    && data.contains_cell(end_row - 1, col)
+                    && (start_row..end_row).all(|row| data.is_loaded(row, col))
+            })
+        })
+    }
+
     #[wasm_bindgen(js_name = markRangeClean)]
     pub fn mark_range_clean(
         &mut self,
