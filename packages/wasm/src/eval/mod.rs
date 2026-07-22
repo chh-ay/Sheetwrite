@@ -77,6 +77,15 @@ pub(super) fn expand_let_ast(args: &[Ast]) -> Result<Ast, FormulaError> {
     expand_let_args(args, &mut bindings, &mut nodes)
 }
 
+pub(crate) fn expand_let_reachable_ast(ast: &Ast) -> Result<Ast, FormulaError> {
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve(4)
+        .map_err(|_| FormulaError::Num)?;
+    let mut nodes = 0usize;
+    expand_let_node(ast, &mut bindings, &mut nodes)
+}
+
 fn expand_let_args<'a>(
     args: &'a [Ast],
     bindings: &mut Vec<LetBinding<'a>>,
@@ -985,19 +994,22 @@ impl CellStore {
             if args.len() != 1 {
                 return Value::Error(FormulaError::Value);
             }
-            if let Some(range) = range_from_ast(&args[0], sheet) {
-                let count = if func == Func::Rows {
-                    range.row_end.saturating_sub(range.row_start) + 1
-                } else {
-                    range.col_end.saturating_sub(range.col_start) + 1
-                };
-                return Value::number(count as f64);
-            }
-            let scalar = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
-            return match scalar {
-                Value::Error(error) => Value::Error(error),
-                _ => Value::Number(1.0),
+            let matrix = match self.eval_matrix_arg(
+                &args[0],
+                sheet,
+                affected,
+                memo,
+                visiting,
+                depth + 1,
+            ) {
+                Ok(matrix) => matrix,
+                Err(error) => return Value::Error(error),
             };
+            return Value::number(if func == Func::Rows {
+                matrix.rows as f64
+            } else {
+                matrix.cols as f64
+            });
         }
 
         if func == Func::Address {
@@ -1299,14 +1311,17 @@ impl CellStore {
                 }
                 (1, 1)
             };
-            if let Err(error) = values.finish_arg(shape.0, shape.1) {
+            if let Err(error) = values.finish_arg_with_missing(
+                shape.0,
+                shape.1,
+                matches!(arg, Ast::Missing),
+            ) {
                 return Value::Error(error);
             }
         }
 
         apply_func(func, &values)
     }
-
     fn eval_matrix_arg(
         &self,
         ast: &Ast,
@@ -1316,6 +1331,16 @@ impl CellStore {
         visiting: &mut HashSet<AbsCellKey>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
+        if range_from_ast(ast, formula_sheet).is_none() {
+            let Some(result) =
+                self.eval_dynamic_array(ast, formula_sheet, affected, memo, visiting, depth + 1)
+            else {
+                return Err(FormulaError::Value);
+            };
+            let matrix = result?;
+            matrix.validate_copies(2)?;
+            return Ok(matrix);
+        }
         let range = range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?;
         let sheet = range.sheet as usize;
         let Some(data) = self.sheets.get(sheet) else {

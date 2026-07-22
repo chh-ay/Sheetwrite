@@ -4,6 +4,7 @@ use crate::calc::{
     invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast, Func,
     RefFlags, SheetRef,
 };
+use crate::eval::expand_let_reachable_ast;
 use crate::memory::MemoryOwnerStats;
 use std::rc::Rc;
 
@@ -251,6 +252,12 @@ fn ast_is_volatile(ast: &Ast) -> bool {
     }
 }
 
+fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
+    let expanded = expand_let_reachable_ast(ast).ok();
+    let metadata = expanded.as_ref().unwrap_or(ast);
+    (ReadSet::from_ast(metadata, formula_sheet), ast_is_volatile(metadata))
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PersistedSourceKind {
     Formula,
@@ -278,8 +285,7 @@ impl FormulaEntry {
     }
 
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
-        let reads = ReadSet::from_ast(&ast, sheet);
-        let volatile = ast_is_volatile(&ast);
+        let (reads, volatile) = formula_metadata(&ast, sheet);
         Self {
             ast: Some(ast),
             source: source.to_string(),
@@ -366,7 +372,9 @@ impl FormulaEntry {
         if let Some(ast) = &mut self.ast {
             shift_rows(ast, at, delta, formula_sheet, edited_sheet);
             self.source = serialize(ast);
-            self.reads = ReadSet::from_ast(ast, formula_sheet);
+            let (reads, volatile) = formula_metadata(ast, formula_sheet);
+            self.reads = reads;
+            self.volatile = volatile;
         }
     }
 
@@ -380,7 +388,9 @@ impl FormulaEntry {
         if let Some(ast) = &mut self.ast {
             shift_cols(ast, at, delta, formula_sheet, edited_sheet);
             self.source = serialize(ast);
-            self.reads = ReadSet::from_ast(ast, formula_sheet);
+            let (reads, volatile) = formula_metadata(ast, formula_sheet);
+            self.reads = reads;
+            self.volatile = volatile;
         }
     }
 
@@ -392,7 +402,9 @@ impl FormulaEntry {
             return false;
         }
         self.source = serialize(ast);
-        self.reads = ReadSet::from_ast(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.volatile = volatile;
         true
     }
 
@@ -404,7 +416,9 @@ impl FormulaEntry {
             return false;
         }
         self.source = serialize(ast);
-        self.reads = ReadSet::from_ast(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.volatile = volatile;
         true
     }
 

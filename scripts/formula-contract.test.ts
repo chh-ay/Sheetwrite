@@ -190,7 +190,7 @@ describe("formula capability contract", () => {
       requiredSupported: 100,
       unsupportedCategories: 7,
       parserSpellings: 156,
-      assistSpellings: 72,
+      assistSpellings: 156,
     });
   });
 

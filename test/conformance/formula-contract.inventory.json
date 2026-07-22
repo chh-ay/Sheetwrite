@@ -3651,7 +3651,7 @@
       "signature": "choose",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3717,7 +3717,7 @@
       "signature": "array-unary",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3728,7 +3728,7 @@
       "signature": "sequence",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3739,7 +3739,7 @@
       "signature": "take-drop",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3750,7 +3750,7 @@
       "signature": "take-drop",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3761,7 +3761,7 @@
       "signature": "choose-axis",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3772,7 +3772,7 @@
       "signature": "choose-axis",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {

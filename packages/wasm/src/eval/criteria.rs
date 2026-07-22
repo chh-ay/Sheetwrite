@@ -115,6 +115,17 @@ fn wildcard_tokens(pattern: &str) -> Option<Vec<WildcardToken>> {
     has_pattern_syntax.then_some(tokens)
 }
 
+pub(super) fn wildcard_matches_pattern(pattern: &str, candidate: &Value) -> bool {
+    let Some(text) = criterion_text(candidate) else {
+        return false;
+    };
+    if let Some(tokens) = wildcard_tokens(pattern) {
+        wildcard_matches(&tokens, &text)
+    } else {
+        text.eq_ignore_ascii_case(pattern)
+    }
+}
+
 fn wildcard_matches(pattern: &[WildcardToken], value: &str) -> bool {
     let text: Vec<char> = value.to_lowercase().chars().collect();
     let (mut pattern_index, mut text_index) = (0usize, 0usize);

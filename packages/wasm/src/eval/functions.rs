@@ -19,6 +19,7 @@ struct FuncArg {
     end: u32,
     rows: u32,
     cols: u32,
+    missing: bool,
 }
 
 #[derive(Debug)]
@@ -64,6 +65,15 @@ impl FuncAccumulator {
         rows: usize,
         cols: usize,
     ) -> Result<(), FormulaError> {
+        self.finish_arg_with_missing(rows, cols, false)
+    }
+
+    pub(super) fn finish_arg_with_missing(
+        &mut self,
+        rows: usize,
+        cols: usize,
+        missing: bool,
+    ) -> Result<(), FormulaError> {
         if self.arg_count >= MAX_FUNCTION_ARGS || rows == 0 || cols == 0 {
             return Err(FormulaError::Value);
         }
@@ -80,6 +90,7 @@ impl FuncAccumulator {
             end: u32::try_from(self.values.len()).map_err(|_| FormulaError::Num)?,
             rows: u32::try_from(rows).map_err(|_| FormulaError::Num)?,
             cols: u32::try_from(cols).map_err(|_| FormulaError::Num)?,
+            missing,
         };
         self.arg_count += 1;
         Ok(())
@@ -115,6 +126,13 @@ impl FuncAccumulator {
             let argument = self.args[index];
             (argument.rows as usize, argument.cols as usize)
         })
+    }
+
+    pub(super) fn arg_missing(&self, index: usize) -> bool {
+        self.arg_count
+            .checked_sub(index + 1)
+            .is_some()
+            && self.args[index].missing
     }
 
     pub(super) fn arg_value(&self, index: usize) -> Option<&Value> {
@@ -273,6 +291,9 @@ pub(super) fn number_arg(
     index: usize,
     default: Option<f64>,
 ) -> Result<f64, FormulaError> {
+    if values.arg_missing(index) {
+        return default.ok_or(FormulaError::Value);
+    }
     match values.arg_value(index) {
         Some(value) => number_from_value(value),
         None => default.ok_or(FormulaError::Value),
@@ -284,6 +305,9 @@ pub(super) fn integer_arg(
     index: usize,
     default: Option<i64>,
 ) -> Result<i64, FormulaError> {
+    if values.arg_missing(index) {
+        return default.ok_or(FormulaError::Value);
+    }
     let number = match values.arg_value(index) {
         Some(value) => number_from_value(value)?,
         None => return default.ok_or(FormulaError::Value),
@@ -299,6 +323,9 @@ pub(super) fn bool_arg(
     index: usize,
     default: Option<bool>,
 ) -> Result<bool, FormulaError> {
+    if values.arg_missing(index) {
+        return default.ok_or(FormulaError::Value);
+    }
     match values.arg_value(index) {
         Some(value) => bool_from_value(value),
         None => default.ok_or(FormulaError::Value),
@@ -310,6 +337,11 @@ pub(super) fn text_arg(
     index: usize,
     default: Option<&str>,
 ) -> Result<String, FormulaError> {
+    if values.arg_missing(index) {
+        return default
+            .map(str::to_string)
+            .ok_or(FormulaError::Value);
+    }
     match values.arg_value(index) {
         Some(value) => text_from_value(value),
         None => default

@@ -2987,10 +2987,41 @@ fn required_formula_regressions_cover_let_lookup_and_criteria_shape() {
     store.set_formula(sheet, 0, 3, "=LET(x,2,LET(x,3,x)+x)", 0);
     store.set_formula(sheet, 0, 4, "=XMATCH(2,A1:A3,0)", 0);
     store.set_formula(sheet, 0, 5, "=MAXIFS(A1:B1,A1:A2,\">0\")", 0);
+    store.set_formula(sheet, 1, 3, "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:A3),\">1\")", 0);
+    store.set_formula(sheet, 1, 4, "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:B2),\">1\")", 0);
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 3), 5.0);
     assert_close(number(&store, sheet, 0, 4), 2.0);
     assert_eq!(string(&store, sheet, 0, 5).as_deref(), Some("#VALUE!"));
+    assert_close(number(&store, sheet, 1, 3), 30.0);
+    assert_eq!(string(&store, sheet, 1, 4).as_deref(), Some("#VALUE!"));
+}
+
+#[test]
+fn let_metadata_tracks_only_reachable_reads_and_volatility() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 4);
+    store.set_formula(sheet, 0, 0, "=LET(unused,B1,1)", 0);
+    store.set_formula(sheet, 0, 1, "=A1", 0);
+    store.set_formula(sheet, 0, 2, "=LET(unused,NOW(),1)", 0);
+    store.set_formula(sheet, 0, 3, "=LET(value,NOW(),value)", 0);
+
+    let unused_volatile = store.sheets[sheet]
+        .formulas
+        .get(&(0, 2))
+        .expect("unused volatile formula")
+        .volatile;
+    let reachable_volatile = store.sheets[sheet]
+        .formulas
+        .get(&(0, 3))
+        .expect("reachable volatile formula")
+        .volatile;
+    assert!(!unused_volatile);
+    assert!(reachable_volatile);
+
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 0), 1.0);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
 }
 
 
@@ -3008,11 +3039,14 @@ fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() 
     store.set_number(sheet, 0, 3, 1.0, 0);
     store.set_number(sheet, 1, 3, 2.0, 0);
     store.set_number(sheet, 2, 3, 2.0, 0);
+    store.set_string(sheet, 0, 4, "alpha", 0);
+    store.set_string(sheet, 1, 4, "a*", 0);
+    store.set_string(sheet, 2, 4, ">abc", 0);
     let formulas = [
         (10, 0, "=ROW()"),
         (10, 1, "=COLUMN()"),
-        (10, 2, "=ROWS(A1:B3)"),
-        (10, 3, "=COLUMNS(A1:B3)"),
+        (10, 2, "=ROWS(CHOOSE(1,A1:B2))"),
+        (10, 3, "=COLUMNS(CHOOSE(1,A1:B2))"),
         (10, 4, "=ADDRESS(3,4)"),
         (10, 5, "=COUNTBLANK(C1:C3)"),
         (10, 6, "=SUBTOTAL(9,A1:A3)"),
@@ -3025,6 +3059,10 @@ fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() 
         (10, 13, "=LET(x,1/0,7)"),
         (10, 14, "=LET(x,A1,x+1)"),
         (10, 15, "=SUMPRODUCT(A1:B1,A1:A2)"),
+        (10, 16, "=LOG(100,)"),
+        (10, 17, "=XMATCH(\"a*\",E1:E3,2)"),
+        (10, 18, "=XMATCH(\"a~*\",E1:E3,2)"),
+        (10, 19, "=XMATCH(\">*\",E1:E3,2)"),
     ];
     for (row, col, source) in formulas {
         store.set_formula(sheet, row, col, source, 0);
@@ -3034,7 +3072,7 @@ fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() 
     for (col, expected) in [
         (0, 11.0),
         (1, 2.0),
-        (2, 3.0),
+        (2, 2.0),
         (3, 2.0),
         (5, 3.0),
         (6, 6.0),
@@ -3046,6 +3084,10 @@ fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() 
         (12, 7.0),
         (13, 7.0),
         (14, 2.0),
+        (16, 2.0),
+        (17, 1.0),
+        (18, 2.0),
+        (19, 3.0),
     ] {
         assert_close(number(&store, sheet, 10, col), expected);
     }
