@@ -88,6 +88,7 @@ export default function CollaborationShowcase() {
   const serverDisposerRef = useRef<(() => void) | null>(null);
   const logIdRef = useRef(0);
   const recoveringRef = useRef<Record<ClientKey, boolean>>({ a: false, b: false });
+  const bootGenerationRef = useRef(0);
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [statusDetail, setStatusDetail] = useState("Starting the in-page server…");
@@ -121,14 +122,18 @@ export default function CollaborationShowcase() {
     });
   };
 
-  const bootClient = async (key: ClientKey): Promise<void> => {
+  const bootClient = async (key: ClientKey, generation: number): Promise<void> => {
     const host = hostRefs[key].current;
     const server = serverRef.current;
     const bus = busRef.current;
-    if (!host || !server || !bus) return;
+    if (!host || !server || !bus || generation !== bootGenerationRef.current) return;
     const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
     const link = new ShowcaseNetworkLink(server);
     const snapshot = await server.load(COLLABORATION_DOCUMENT_ID);
+    if (generation !== bootGenerationRef.current) {
+      link.destroy();
+      return;
+    }
     host.replaceChildren();
     const grid = createGridFromSnapshot(host, snapshot);
     const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE[key] });
@@ -144,6 +149,10 @@ export default function CollaborationShowcase() {
     clientsRef.current[key] = runtime;
     runtime.disposers.push(sync.subscribe(link));
     await sync.ready();
+    if (generation !== bootGenerationRef.current) {
+      if (clientsRef.current[key] === runtime) disposeClient(key);
+      return;
+    }
     if (sync.pendingCount > 0) await sync.flush().catch(() => {});
     patchView(key, { ready: true, online: true, linkState: link.state() });
     readClient(key);
@@ -241,11 +250,12 @@ export default function CollaborationShowcase() {
     clientsRef.current[key] = null;
   };
 
-  const bootAll = async () => {
+  const bootAll = async (generation: number) => {
     setStatus("loading");
     setStatusDetail("Starting the in-page server…");
     try {
       await initSheetwrite();
+      if (generation !== bootGenerationRef.current) return;
       const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
       serverRef.current = server;
       busRef.current = new ShowcasePresenceBus();
@@ -262,14 +272,18 @@ export default function CollaborationShowcase() {
         setServerLog((entries) => [entry, ...entries].slice(0, SERVER_LOG_LIMIT));
         setServerVersion((current) => Math.max(current, record.version));
       });
-      await bootClient("a");
-      await bootClient("b");
+      await bootClient("a", generation);
+      if (generation !== bootGenerationRef.current) return;
+      await bootClient("b", generation);
+      if (generation !== bootGenerationRef.current) return;
       // Both clients are subscribed now; announce presence deterministically.
       await clientsRef.current.a?.presence.publishNow();
       await clientsRef.current.b?.presence.publishNow();
+      if (generation !== bootGenerationRef.current) return;
       setStatus("ready");
       setStatusDetail("Two live clients, one sequencing server");
     } catch (error) {
+      if (generation !== bootGenerationRef.current) return;
       setStatus("error");
       setStatusDetail(error instanceof Error ? error.message : String(error));
     }
@@ -277,15 +291,11 @@ export default function CollaborationShowcase() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the public page owns one mount/unmount session; reset invokes the current callbacks explicitly.
   useEffect(() => {
-    let cancelled = false;
-    void bootAll().then(() => {
-      if (cancelled) {
-        for (const key of CLIENT_KEYS) disposeClient(key);
-        serverDisposerRef.current?.();
-      }
-    });
+    const generation = bootGenerationRef.current + 1;
+    bootGenerationRef.current = generation;
+    void bootAll(generation);
     return () => {
-      cancelled = true;
+      if (bootGenerationRef.current === generation) bootGenerationRef.current += 1;
       for (const key of CLIENT_KEYS) disposeClient(key);
       serverDisposerRef.current?.();
       serverDisposerRef.current = null;
@@ -461,6 +471,8 @@ export default function CollaborationShowcase() {
   };
 
   const resetDemo = () => {
+    const generation = bootGenerationRef.current + 1;
+    bootGenerationRef.current = generation;
     void (async () => {
       for (const key of CLIENT_KEYS) disposeClient(key);
       serverDisposerRef.current?.();
@@ -473,90 +485,253 @@ export default function CollaborationShowcase() {
         request.onblocked = () => resolve();
         await promise;
       }
+      if (generation !== bootGenerationRef.current) return;
       setViews({ a: EMPTY_CLIENT_VIEW, b: EMPTY_CLIENT_VIEW });
-      await bootAll();
+      await bootAll(generation);
     })();
   };
+
+  const bramPending = views.b.syncState?.pendingCount ?? 0;
+  const challengePhase =
+    !views.b.online && bramPending === 0
+      ? "offline"
+      : !views.b.online && bramPending > 0
+        ? "queued"
+        : views.b.online && bramPending > 0
+          ? "reconnecting"
+          : serverVersion > 0
+            ? "resolved"
+            : "initial";
+  const challengeCopy = {
+    initial: ["Start with a disconnect", "Take Bram offline. His Grid remains editable."],
+    offline: [
+      "Bram is offline",
+      "Queue a real Grid edit while the server stays at its current head.",
+    ],
+    queued: [
+      `${bramPending} edit${bramPending === 1 ? "" : "s"} waiting`,
+      "Reconnect to sequence the durable queue and broadcast the result to Ana.",
+    ],
+    reconnecting: ["Queue is draining", "The server is sequencing Bram’s pending work in order."],
+    resolved: ["Clients converged", "Both Grids now reflect the sequenced server history."],
+  }[challengePhase];
 
   return (
     <section aria-label="Collaboration protocol showcase" className="sw-clb">
       <header className="sw-clb__statusbar">
-        <p className="sw-clb__status" data-status={status} data-testid="clb-status">
-          {status === "ready" ? "Ready" : status === "error" ? "Error" : "Loading"}
-          <span className="sw-clb__status-detail">{statusDetail}</span>
-        </p>
-        <button className="sw-clb__button" data-variant="danger" onClick={resetDemo} type="button">
-          Reset demo
-        </button>
+        <div className="sw-clb__scenario-title">
+          <p className="sw-clb__status" data-status={status} data-testid="clb-status">
+            {status === "ready" ? "Live" : status === "error" ? "Error" : "Loading"}
+            <span className="sw-clb__status-detail">{statusDetail}</span>
+          </p>
+          <div>
+            <span className="sw-clb__kicker">Reconnect drill</span>
+            <strong>One offline edit, one ordered resolution</strong>
+          </div>
+        </div>
       </header>
 
-      <div className="sw-clb__clients">
-        {CLIENT_KEYS.map((key) => {
-          const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
-          const view = views[key];
-          return (
-            <ClientPanel
-              actor={actor}
-              key={key}
-              onHold={() => holdNextBroadcast(key)}
-              onLoseAck={() => loseNextAck(key)}
-              onRelease={() => releaseHeld(key)}
-              onRetry={() => retryPending(key)}
-              onSampleEdit={() => sampleEdit(key)}
-              onToggleOnline={(online) => toggleOnline(key, online)}
-              slug={key}
-              view={view}
-            >
-              <div
-                aria-label={`${actor.displayName}'s workbook`}
-                className="sw-clb__grid"
-                data-testid={`clb-${key}-grid`}
-                ref={hostRefs[key]}
-                role="application"
-              />
-            </ClientPanel>
-          );
-        })}
-      </div>
+      <div className="sw-clb__workbench">
+        <ClientPanel
+          actor={COLLABORATION_ACTORS[0]}
+          onSampleEdit={() => sampleEdit("a")}
+          onToggleOnline={(online) => toggleOnline("a", online)}
+          slug="a"
+          view={views.a}
+        >
+          <div
+            aria-label={`${COLLABORATION_ACTORS[0].displayName}'s workbook`}
+            className="sw-clb__grid"
+            data-testid="clb-a-grid"
+            ref={hostRefs.a}
+            role="application"
+          />
+        </ClientPanel>
 
-      <div aria-hidden="true" className="sw-clb__flow">
-        <span className="sw-clb__flow-stem" />
-        <span className="sw-clb__flow-label">commits in · sequenced broadcasts out</span>
-        <span className="sw-clb__flow-stem" data-flip="true" />
-      </div>
-
-      <section aria-labelledby="clb-server-title" className="sw-clb__server">
-        <header>
-          <h3 id="clb-server-title">In-page sequencing server</h3>
-          <p className="sw-clb__server-meta">
-            Head version <output data-testid="clb-server-version">v{serverVersion}</output>
-          </p>
-          <button className="sw-clb__button" onClick={serverEdit} type="button">
-            Server-authored commit
-          </button>
-        </header>
-        <ol aria-live="polite" className="sw-clb__server-log" data-testid="clb-server-log">
-          {serverLog.length === 0 ? (
-            <li className="sw-clb__log-empty">
-              Every commit request lands here with its sequencing decision.
+        <section
+          aria-labelledby="clb-sequence-title"
+          className="sw-clb__sequence"
+          data-phase={challengePhase}
+          data-testid="clb-sequence"
+        >
+          <header>
+            <span>Sequencing lane</span>
+            <output data-testid="clb-server-version">v{serverVersion}</output>
+          </header>
+          <div aria-live="polite" className="sw-clb__challenge">
+            <span className="sw-clb__challenge-state">{challengePhase}</span>
+            <h3 id="clb-sequence-title">{challengeCopy[0]}</h3>
+            <p>{challengeCopy[1]}</p>
+          </div>
+          <ol aria-label="Offline reconnect sequence" className="sw-clb__steps">
+            <li data-current={challengePhase === "initial" ? "true" : undefined}>
+              <button
+                className="sw-clb__button"
+                disabled={status !== "ready" || !views.b.online}
+                onClick={() => toggleOnline("b", false)}
+                type="button"
+              >
+                <span aria-hidden="true">01</span> Take Bram offline
+              </button>
             </li>
-          ) : (
-            serverLog.map((entry) => (
-              <li data-ack={entry.status} key={entry.id}>
-                {entry.text}
-              </li>
-            ))
-          )}
-        </ol>
-        <p className="sw-clb__server-note">
-          <span className="sw-clb__server-note-tag">Demo-only</span>
-          <span>
-            This server lives in the page so the protocol is observable. It implements the same{" "}
-            <code>PersistenceAdapter</code> + <code>RemoteOperationSource</code> pair your backend
-            implements over its own transport and database.
-          </span>
-        </p>
-      </section>
+            <li data-current={challengePhase === "offline" ? "true" : undefined}>
+              <button
+                className="sw-clb__button"
+                data-variant="primary"
+                disabled={status !== "ready" || views.b.online}
+                onClick={() => sampleEdit("b")}
+                type="button"
+              >
+                <span aria-hidden="true">02</span> Queue one Grid edit
+              </button>
+            </li>
+            <li data-current={challengePhase === "queued" ? "true" : undefined}>
+              <button
+                className="sw-clb__button"
+                disabled={status !== "ready" || views.b.online}
+                onClick={() => toggleOnline("b", true)}
+                type="button"
+              >
+                <span aria-hidden="true">03</span> Reconnect
+              </button>
+            </li>
+          </ol>
+          <div aria-hidden="true" className="sw-clb__direction">
+            <span>Ana</span>
+            <i>commit → order → broadcast</i>
+            <span>Bram</span>
+          </div>
+          <section aria-label="Recent server decisions" className="sw-clb__decisions">
+            <h3>Server decisions</h3>
+            <ol aria-live="polite" className="sw-clb__server-log" data-testid="clb-server-log">
+              {serverLog.length === 0 ? (
+                <li className="sw-clb__log-empty">Waiting for the first commit.</li>
+              ) : (
+                serverLog.map((entry) => (
+                  <li data-ack={entry.status} key={entry.id}>
+                    {entry.text}
+                  </li>
+                ))
+              )}
+            </ol>
+          </section>
+        </section>
+
+        <ClientPanel
+          actor={COLLABORATION_ACTORS[1]}
+          onSampleEdit={() => sampleEdit("b")}
+          onToggleOnline={(online) => toggleOnline("b", online)}
+          slug="b"
+          view={views.b}
+        >
+          <div
+            aria-label={`${COLLABORATION_ACTORS[1].displayName}'s workbook`}
+            className="sw-clb__grid"
+            data-testid="clb-b-grid"
+            ref={hostRefs.b}
+            role="application"
+          />
+        </ClientPanel>
+      </div>
+
+      <details className="sw-clb__advanced">
+        <summary>Advanced protocol faults</summary>
+        <div className="sw-clb__advanced-body">
+          {CLIENT_KEYS.map((key) => {
+            const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
+            const held = views[key].linkState?.heldBroadcasts ?? 0;
+            return (
+              <section
+                aria-labelledby={`clb-${key}-faults-title`}
+                className="sw-clb__fault-client"
+                data-fault-client={key}
+                key={key}
+              >
+                <h3 id={`clb-${key}-faults-title`}>{actor.displayName} · transport faults</h3>
+                <div
+                  aria-label={`${actor.displayName}'s advanced network controls`}
+                  className="sw-clb__controls"
+                  role="toolbar"
+                >
+                  <button
+                    className="sw-clb__button"
+                    data-variant="quiet"
+                    onClick={() => loseNextAck(key)}
+                    type="button"
+                  >
+                    Lose next ack
+                  </button>
+                  <button
+                    className="sw-clb__button"
+                    data-variant="quiet"
+                    onClick={() => retryPending(key)}
+                    type="button"
+                  >
+                    Retry pending
+                  </button>
+                  <button
+                    className="sw-clb__button"
+                    data-variant="quiet"
+                    onClick={() => holdNextBroadcast(key)}
+                    type="button"
+                  >
+                    Hold next broadcast
+                  </button>
+                  <button
+                    className="sw-clb__button"
+                    data-variant="quiet"
+                    onClick={() => releaseHeld(key)}
+                    type="button"
+                  >
+                    Release held
+                    {held > 0 ? <span className="sw-clb__held-count">{held}</span> : null}
+                  </button>
+                </div>
+                <ol
+                  aria-label={`${actor.displayName}'s sync events`}
+                  aria-live="polite"
+                  className="sw-clb__log"
+                  data-testid={`clb-${key}-log`}
+                >
+                  {views[key].log.length === 0 ? (
+                    <li className="sw-clb__log-empty">Sync events appear here.</li>
+                  ) : (
+                    views[key].log.map((entry) => (
+                      <li data-kind={entry.kind} key={entry.id}>
+                        {entry.text}
+                      </li>
+                    ))
+                  )}
+                </ol>
+              </section>
+            );
+          })}
+          <section aria-labelledby="clb-server-tools-title" className="sw-clb__server-tools">
+            <h3 id="clb-server-tools-title">Server and recovery</h3>
+            <div className="sw-clb__controls">
+              <button className="sw-clb__button" onClick={serverEdit} type="button">
+                Server-authored commit
+              </button>
+              <button
+                className="sw-clb__button"
+                data-variant="danger"
+                onClick={resetDemo}
+                type="button"
+              >
+                Reset demo
+              </button>
+            </div>
+            <p className="sw-clb__server-note">
+              <span className="sw-clb__server-note-tag">Demo-only</span>
+              <span>
+                This in-page sequencer makes the real <code>PersistenceAdapter</code> +{" "}
+                <code>RemoteOperationSource</code> boundary observable. Your backend supplies that
+                transport and durable store.
+              </span>
+            </p>
+          </section>
+        </div>
+      </details>
     </section>
   );
 }
@@ -564,10 +739,6 @@ export default function CollaborationShowcase() {
 interface ClientPanelProps {
   actor: ShowcaseActor;
   children: ReactNode;
-  onHold(): void;
-  onLoseAck(): void;
-  onRelease(): void;
-  onRetry(): void;
   onSampleEdit(): void;
   onToggleOnline(online: boolean): void;
   slug: ClientKey;
@@ -577,25 +748,20 @@ interface ClientPanelProps {
 function ClientPanel({
   actor,
   children,
-  onHold,
-  onLoseAck,
-  onRelease,
-  onRetry,
   onSampleEdit,
   onToggleOnline,
   slug,
   view,
 }: Readonly<ClientPanelProps>) {
   const connection = view.online ? "online" : "offline";
-  const held = view.linkState?.heldBroadcasts ?? 0;
   const pending = view.syncState?.pendingCount ?? 0;
+  const latestEvent = view.log[0]?.text ?? "No sync events yet.";
   return (
     <article
       aria-label={`Client ${actor.displayName}`}
       className="sw-clb__client"
       data-client={slug}
       data-connection={connection}
-      style={{ "--clb-actor": actor.color } as React.CSSProperties}
     >
       <header className="sw-clb__client-head">
         <span className="sw-clb__actor">{actor.displayName}</span>
@@ -609,6 +775,7 @@ function ClientPanel({
         <label className="sw-clb__switch">
           <input
             checked={view.online}
+            disabled={!view.ready}
             onChange={(event) => onToggleOnline(event.currentTarget.checked)}
             type="checkbox"
           />
@@ -618,83 +785,54 @@ function ClientPanel({
 
       {children}
 
-      <div
-        aria-label={`${actor.displayName}'s network controls`}
-        className="sw-clb__controls"
-        role="toolbar"
-      >
+      <div className="sw-clb__client-action">
         <button
           className="sw-clb__button"
-          data-variant="primary"
+          disabled={!view.ready}
           onClick={onSampleEdit}
           type="button"
         >
           Edit {actor.displayName === "Ana" ? "“Import pipeline”" : "“Offline drain QA”"}
         </button>
-        <button className="sw-clb__button" data-variant="quiet" onClick={onLoseAck} type="button">
-          Lose next ack
-        </button>
-        <button className="sw-clb__button" data-variant="quiet" onClick={onRetry} type="button">
-          Retry pending
-        </button>
-        <button className="sw-clb__button" data-variant="quiet" onClick={onHold} type="button">
-          Hold next broadcast
-        </button>
-        <button className="sw-clb__button" data-variant="quiet" onClick={onRelease} type="button">
-          Release held
-          {held > 0 ? <span className="sw-clb__held-count">{held}</span> : null}
-        </button>
+        <p aria-live="polite">
+          <span>Latest</span>
+          {latestEvent}
+        </p>
       </div>
 
       <dl className="sw-clb__stats">
         <div>
-          <dt>Server version</dt>
+          <dt>Version</dt>
           <dd data-testid={`clb-${slug}-version`}>v{view.syncState?.serverVersion ?? 0}</dd>
         </div>
         <div>
-          <dt>Pending</dt>
+          <dt>Queue</dt>
           <dd data-state={pending > 0 ? "queued" : undefined} data-testid={`clb-${slug}-pending`}>
             {pending}
           </dd>
         </div>
         <div>
-          <dt>Committed total</dt>
+          <dt>Grid total</dt>
           <dd data-testid={`clb-${slug}-total`}>{view.total}</dd>
         </div>
+        <div className="sw-clb__presence">
+          <dt>Presence</dt>
+          <dd>
+            <ul
+              aria-label={`Collaborators visible to ${actor.displayName}`}
+              data-testid={`clb-${slug}-roster`}
+            >
+              {view.roster.length === 0 ? (
+                <li className="sw-clb__presence-empty">No one yet</li>
+              ) : (
+                view.roster.map((message) => (
+                  <li key={message.actor.id}>{message.actor.displayName ?? message.actor.id}</li>
+                ))
+              )}
+            </ul>
+          </dd>
+        </div>
       </dl>
-
-      <div className="sw-clb__presence">
-        <span className="sw-clb__presence-label">Sees</span>
-        <ul
-          aria-label={`Collaborators visible to ${actor.displayName}`}
-          data-testid={`clb-${slug}-roster`}
-        >
-          {view.roster.length === 0 ? (
-            <li className="sw-clb__presence-empty">no one yet</li>
-          ) : (
-            view.roster.map((message) => (
-              <li key={message.actor.id}>{message.actor.displayName ?? message.actor.id}</li>
-            ))
-          )}
-        </ul>
-      </div>
-
-      <ol
-        aria-label={`${actor.displayName}'s sync events`}
-        aria-live="polite"
-        className="sw-clb__log"
-        data-testid={`clb-${slug}-log`}
-      >
-        {view.log.length === 0 ? (
-          <li className="sw-clb__log-empty">Sync events appear here.</li>
-        ) : (
-          view.log.map((entry) => (
-            <li data-kind={entry.kind} key={entry.id}>
-              {entry.text}
-            </li>
-          ))
-        )}
-      </ol>
     </article>
   );
 }
