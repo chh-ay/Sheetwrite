@@ -412,12 +412,40 @@ async function validateEvidencePaths(
   );
 }
 
+function validatePortableFormulaSemantics(inventory: JsonObject, issues: string[]): void {
+  const signatures = stringMap(inventory.signatureProfiles);
+  const numberValue = isObject(signatures["number-value"]) ? signatures["number-value"] : undefined;
+  const numberArguments =
+    numberValue && Array.isArray(numberValue.arguments)
+      ? numberValue.arguments.filter(isObject)
+      : [];
+  const decimal = numberArguments.find((argument) => argument.name === "decimalSeparator");
+  const grouping = numberArguments.find((argument) => argument.name === "groupSeparator");
+  if (decimal?.default !== ".") {
+    issues.push(
+      "contract.signatureProfiles.number-value.decimalSeparator: expected invariant default",
+    );
+  }
+  if (grouping?.default !== ",") {
+    issues.push(
+      "contract.signatureProfiles.number-value.groupSeparator: expected invariant default",
+    );
+  }
+  const semantics = stringMap(inventory.semanticsProfiles);
+  const dateTime = isObject(semantics["date-time"]) ? semantics["date-time"] : undefined;
+  const environment = dateTime && isObject(dateTime.environment) ? dateTime.environment : undefined;
+  if (environment?.locale !== "invariant") {
+    issues.push("contract.semanticsProfiles.date-time.environment.locale: expected invariant");
+  }
+}
+
 export function validateFormulaContractData(inventory: unknown, schema: unknown): string[] {
   const issues = [
     ...validateClosedSchema(schema),
     ...validateAgainstFormulaSchema(inventory, schema),
   ];
   if (isObject(inventory)) validateReferencesAndNames(inventory, issues);
+  if (isObject(inventory)) validatePortableFormulaSemantics(inventory, issues);
   return issues;
 }
 

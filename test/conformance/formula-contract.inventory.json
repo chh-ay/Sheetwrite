@@ -529,14 +529,14 @@
         {
           "name": "decimalSeparator",
           "required": false,
-          "default": "locale",
+          "default": ".",
           "accepts": ["scalar", "reference"],
           "repeat": "once"
         },
         {
           "name": "groupSeparator",
           "required": false,
-          "default": "locale",
+          "default": ",",
           "accepts": ["scalar", "reference"],
           "repeat": "once"
         }
@@ -1823,7 +1823,7 @@
         "error": "propagate"
       },
       "text": { "case": "insensitive", "wildcard": "literal" },
-      "environment": { "locale": "locale-aware", "dateSystem": "excel-1900" },
+      "environment": { "locale": "invariant", "dateSystem": "excel-1900" },
       "numeric": {
         "tolerance": "binary64",
         "domain": "bounded",

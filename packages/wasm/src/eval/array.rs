@@ -190,17 +190,20 @@ impl CellStore {
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) => {
                 self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
             }
-            Ast::Func(Func::Let, args) => expand_let_ast(args).and_then(|expanded| {
-                self.eval_dynamic_array(
+            Ast::Func(Func::Let, args) => {
+                let expanded = match expand_let_ast(args) {
+                    Ok(expanded) => expanded,
+                    Err(error) => return Some(Err(error)),
+                };
+                return self.eval_dynamic_array(
                     &expanded,
                     sheet,
                     affected,
                     memo,
                     visiting,
                     depth + 1,
-                )
-                .unwrap_or(Err(FormulaError::Value))
-            }),
+                );
+            }
             Ast::Func(Func::Filter, args) => {
                 self.eval_filter(args, sheet, affected, memo, visiting, depth + 1)
             }

@@ -2985,12 +2985,14 @@ fn required_formula_regressions_cover_let_lookup_and_criteria_shape() {
         store.set_number(sheet, row, 1, value * 10.0, 0);
     }
     store.set_formula(sheet, 0, 3, "=LET(x,2,LET(x,3,x)+x)", 0);
+    store.set_formula(sheet, 0, 2, "=SUM(LET(x,SEQUENCE(2),1),2)", 0);
     store.set_formula(sheet, 0, 4, "=XMATCH(2,A1:A3,0)", 0);
     store.set_formula(sheet, 0, 5, "=MAXIFS(A1:B1,A1:A2,\">0\")", 0);
     store.set_formula(sheet, 1, 3, "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:A3),\">1\")", 0);
     store.set_formula(sheet, 1, 4, "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:B2),\">1\")", 0);
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 3), 5.0);
+    assert_close(number(&store, sheet, 0, 2), 3.0);
     assert_close(number(&store, sheet, 0, 4), 2.0);
     assert_eq!(string(&store, sheet, 0, 5).as_deref(), Some("#VALUE!"));
     assert_close(number(&store, sheet, 1, 3), 30.0);

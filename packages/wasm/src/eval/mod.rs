@@ -1275,25 +1275,44 @@ impl CellStore {
                     Err(error) => return Value::Error(error),
                 }
             } else if ast_produces_array(arg) {
-                let result = self
+                let shape = match self
                     .eval_dynamic_array(arg, sheet, affected, memo, visiting, depth + 1)
-                    .ok_or(FormulaError::Value);
-                let matrix = match result {
-                    Ok(Ok(matrix)) => matrix,
-                    Ok(Err(error)) | Err(error) => return Value::Error(error),
+                {
+                    Some(Ok(matrix)) => {
+                        if let Err(error) = matrix.validate_copies(2) {
+                            return Value::Error(error);
+                        }
+                        let shape = (matrix.rows, matrix.cols);
+                        for value in &matrix.values {
+                            if let Value::Error(error) = value {
+                                return Value::Error(*error);
+                            }
+                            if let Err(error) = values.push_range(value.clone()) {
+                                return Value::Error(error);
+                            }
+                        }
+                        shape
+                    }
+                    Some(Err(error)) => return Value::Error(error),
+                    None => {
+                        let value =
+                            self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
+                        if let Value::Error(error) = value {
+                            return Value::Error(error);
+                        }
+                        let pushed = if treats_cell_as_reference(func)
+                            && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..))
+                        {
+                            values.push_range(value)
+                        } else {
+                            values.push_scalar(value)
+                        };
+                        if let Err(error) = pushed {
+                            return Value::Error(error);
+                        }
+                        (1, 1)
+                    }
                 };
-                if let Err(error) = matrix.validate_copies(2) {
-                    return Value::Error(error);
-                }
-                let shape = (matrix.rows, matrix.cols);
-                for value in &matrix.values {
-                    if let Value::Error(error) = value {
-                        return Value::Error(*error);
-                    }
-                    if let Err(error) = values.push_range(value.clone()) {
-                        return Value::Error(error);
-                    }
-                }
                 shape
             } else {
                 let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
