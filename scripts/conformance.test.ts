@@ -1,15 +1,22 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   type ConformanceCorpus,
   type ConformanceResult,
   canonicalJson,
   compareResults,
+  compareReviewedObservation,
   loadCorpus,
   runOffline,
   sha256,
+  sha256Bytes,
   validateCorpus,
   validateExcelCapture,
+  verifyCaptureArtifacts,
 } from "./conformance.js";
+import { readBoundedResponse } from "./conformance/capture.js";
 
 function clone(corpus: ConformanceCorpus): ConformanceCorpus {
   return structuredClone(corpus);
@@ -65,11 +72,66 @@ describe("neutral conformance corpus", () => {
     expect(hasIssue(validateCorpus(secret), "secret-like field name")).toBe(true);
   });
 
+  it("binds reviewed observations to exact immutable capture bytes", async () => {
+    const corpus = await loadCorpus();
+    const capturedAt = "2026-07-22T00:00:00.000Z";
+    const artifact = {
+      protocol: 1,
+      producer: "excel-web",
+      producerVersion: "16.0.19029.20136",
+      capturedAt,
+      observations: [{ caseId: corpus.cases[0]!.id, result: corpus.cases[0]!.expected }],
+    };
+    const bytes = new TextEncoder().encode(`${canonicalJson(artifact)}\n`);
+    const hash = sha256Bytes(bytes);
+    corpus.cases[0]!.observations.push({
+      producer: "excel-web",
+      producerVersion: artifact.producerVersion,
+      capturedAt,
+      status: "reviewed",
+      result: corpus.cases[0]!.expected,
+      artifactSha256: hash,
+    });
+    expect(hasIssue(validateCorpus(corpus), "no verified immutable capture binding")).toBe(true);
+
+    const directory = await mkdtemp(join(tmpdir(), "sheetwrite-capture-"));
+    try {
+      await writeFile(join(directory, `${hash}.json`), bytes);
+      const verified = await verifyCaptureArtifacts(corpus, directory);
+      expect(verified.issues).toEqual([]);
+      expect(validateCorpus(corpus, verified.verified)).toEqual([]);
+
+      corpus.cases[0]!.observations[0]!.result = { type: "number", value: 3 };
+      const drifted = await verifyCaptureArtifacts(corpus, directory);
+      expect(hasIssue(drifted.issues, "does not bind reviewed observation")).toBe(true);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("bounds capture responses before and during streaming", async () => {
+    const declared = new Response("oversized", { headers: { "content-length": "9" } });
+    await expect(readBoundedResponse(declared, 8)).rejects.toThrow("Content-Length");
+    await expect(readBoundedResponse(new Response("123456789"), 8)).rejects.toThrow(
+      "response exceeds",
+    );
+  });
+
   it("rejects ambiguous result types and unsupported cases rendered as passing", async () => {
     const corpus = await loadCorpus();
     const ambiguous = clone(corpus);
     ambiguous.cases[0]!.expected = {} as ConformanceResult;
     expect(hasIssue(validateCorpus(ambiguous), "ambiguous or missing result type")).toBe(true);
+
+    const nonFinite = clone(corpus);
+    nonFinite.cases[0]!.expected = { type: "number", value: Number.POSITIVE_INFINITY };
+    expect(hasIssue(validateCorpus(nonFinite), "expected finite number")).toBe(true);
+    nonFinite.cases[0]!.expected = {
+      type: "number",
+      value: 2,
+      tolerance: { kind: "absolute", value: Number.NaN },
+    };
+    expect(hasIssue(validateCorpus(nonFinite), "invalid numeric tolerance")).toBe(true);
 
     const unsupportedPass = clone(corpus);
     unsupportedPass.cases[0]!.unsupported = true;
@@ -109,6 +171,8 @@ describe("neutral conformance corpus", () => {
 
   it("canonicalizes object keys and fixes the protocol checksum", async () => {
     expect(canonicalJson({ z: 1, a: { d: 2, c: 3 } })).toBe('{"a":{"c":3,"d":2},"z":1}');
+    expect(canonicalJson(-0)).toBe("-0");
+    expect(() => canonicalJson(Number.NaN)).toThrow("non-finite");
     const corpus = await loadCorpus();
     expect(sha256(corpus)).toMatch(/^[a-f0-9]{64}$/);
     expect(sha256(corpus)).toBe(sha256(JSON.parse(canonicalJson(corpus))));
@@ -174,6 +238,39 @@ describe("offline typed comparison", () => {
     expect(differences[0]).toContain("relationships");
   });
 
+  it("accepts only the exact declared producer alternate", () => {
+    const observation = {
+      producer: "excel-web" as const,
+      producerVersion: "16.0.19029.20136",
+      capturedAt: "2026-07-22T00:00:00.000Z",
+      status: "reviewed" as const,
+      artifactSha256: "0".repeat(64),
+      result: { type: "number" as const, value: 60, displayedText: "1900-02-29" },
+    };
+    const divergence = {
+      reason: "Excel synthetic leap day",
+      producers: ["excel-web" as const],
+      alternate: { type: "number" as const, value: 60, displayedText: "1900-02-29" },
+    };
+    expect(
+      compareReviewedObservation(
+        { type: "number", value: 60, displayedText: "1900-02-28" },
+        observation,
+        divergence,
+      ),
+    ).toEqual([]);
+    observation.result.displayedText = "1900-03-01";
+    expect(
+      compareReviewedObservation(
+        { type: "number", value: 60, displayedText: "1900-02-28" },
+        observation,
+        divergence,
+      ),
+    ).toEqual(
+      expect.arrayContaining([expect.stringContaining("declared alternate did not match")]),
+    );
+  });
+
   it("rejects incomplete or drifted Excel Office Script captures", async () => {
     const corpus = await loadCorpus();
     const capture = {
@@ -197,11 +294,32 @@ describe("offline typed comparison", () => {
     expect(hasIssue(issues, "missing, extra, or reordered")).toBe(true);
   });
 
+  it("reports all-unsupported corpora as blocked non-claims", async () => {
+    const corpus = await loadCorpus();
+    corpus.cases = [corpus.cases[0]!];
+    corpus.cases[0]!.expected = { type: "unsupported" };
+    corpus.cases[0]!.unsupported = true;
+    await expect(runOffline(corpus)).resolves.toEqual({
+      status: "blocked",
+      checked: 1,
+      reviewed: 0,
+      deferred: 0,
+      warnings: [`${corpus.cases[0]!.id}: explicitly unsupported; compatibility is not claimed`],
+      unsupported: [corpus.cases[0]!.id],
+    });
+  });
+
   it("runs every pinned case through the local engine", async () => {
     const corpus = await loadCorpus();
     await expect(runOffline(corpus)).resolves.toEqual({
+      status: "blocked",
       checked: corpus.cases.length,
+      reviewed: 0,
       deferred: corpus.cases.length,
+      warnings: corpus.cases.map(
+        (entry) => `${entry.id}: no reviewed producer capture; compatibility is not claimed`,
+      ),
+      unsupported: [],
     });
   });
 });

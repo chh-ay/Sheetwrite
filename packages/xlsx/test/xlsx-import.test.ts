@@ -556,12 +556,24 @@ describe("workbook OOXML fidelity", () => {
     const imported = await fromXlsxWorkbook(bytes, {
       onWarning: (warning) => warnings.push(warning),
     });
-    expect(warnings.map((warning) => warning.code).sort()).toEqual([
-      "external-relationship",
-      "hyperlink",
-      "rich-text",
+    expect(warnings).toEqual([
+      {
+        code: "external-relationship",
+        message: "External relationship rId1 was not followed",
+        part: "xl/worksheets/sheet1.xml",
+      },
+      {
+        code: "rich-text",
+        message: "Rich text formatting was flattened",
+        part: "xl/sharedStrings.xml",
+      },
+      {
+        code: "hyperlink",
+        message: "Hyperlink target was dropped; display text was preserved",
+        sheet: "Sheet1",
+        cell: "A1",
+      },
     ]);
-    expect(warnings.every((warning) => warning.message.length > 0)).toBe(true);
     expect(imported.sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
       kind: "literal",
       value: "rich text",

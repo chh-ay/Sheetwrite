@@ -1,0 +1,35 @@
+import { verifyCaptureArtifacts } from "./capture.js";
+import { isObject } from "./normalize.js";
+import { readCorpusJson, SHA256_PATTERN, validateCorpus } from "./schema.js";
+import type { ConformanceCorpus } from "./types.js";
+
+function declaredArtifactHashes(value: unknown): Set<string> {
+  const hashes = new Set<string>();
+  if (!isObject(value) || !Array.isArray(value.cases)) return hashes;
+  for (const entry of value.cases) {
+    if (!isObject(entry) || !Array.isArray(entry.observations)) continue;
+    for (const observation of entry.observations) {
+      if (
+        isObject(observation) &&
+        observation.status === "reviewed" &&
+        SHA256_PATTERN.test(String(observation.artifactSha256 ?? ""))
+      ) {
+        hashes.add(String(observation.artifactSha256));
+      }
+    }
+  }
+  return hashes;
+}
+
+export async function loadCorpus(
+  path = "test/conformance/corpus.json",
+): Promise<ConformanceCorpus> {
+  const value = await readCorpusJson(path);
+  const structuralIssues = validateCorpus(value, declaredArtifactHashes(value));
+  if (structuralIssues.length > 0) throw new Error(structuralIssues.join("\n"));
+  const corpus = value as ConformanceCorpus;
+  const artifacts = await verifyCaptureArtifacts(corpus);
+  const issues = [...artifacts.issues, ...validateCorpus(corpus, artifacts.verified)];
+  if (issues.length > 0) throw new Error(issues.join("\n"));
+  return corpus;
+}

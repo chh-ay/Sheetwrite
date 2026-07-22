@@ -35,7 +35,11 @@
       "numberFormat": "yyyy-mm-dd",
       "target": "B1",
       "expected": { "type": "number", "value": 60, "displayedText": "1900-02-28" },
-      "knownDivergence": "Specification-derived expectation pending versioned oracle capture: Excel's synthetic serial 60 displays as 1900-02-29; JavaScript-date renderers use the documented 1900-02-28 fallback while preserving raw serial 60.",
+      "knownDivergence": {
+        "reason": "Excel's synthetic serial 60 displays as 1900-02-29; Sheetwrite preserves the raw serial and uses the documented JavaScript-date fallback 1900-02-28.",
+        "producers": ["excel-desktop", "excel-web"],
+        "alternate": { "type": "number", "value": 60, "displayedText": "1900-02-29" }
+      },
       "observations": []
     },
     {
