@@ -53,6 +53,14 @@ async function bootWorkbench(page: Page): Promise<void> {
     .toBe("ready");
 }
 
+async function revealRecoveryScenarios(page: Page): Promise<void> {
+  const details = page.getByTestId("rare-actions");
+  if (!(await details.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await details.locator("summary").click();
+  }
+  await expect(details).toHaveAttribute("open", "");
+}
+
 async function assertPresenceGeometry(page: Page): Promise<void> {
   await page.evaluate(
     ({ row, col }) => {
@@ -140,10 +148,33 @@ function resolvedCell(page: Page, row: number, col: number): Promise<unknown> {
 test("svelte workbench boots synced, paints the dispatch model, and shows live presence", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1568, height: 898 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   const errors = collectErrors(page);
   await bootWorkbench(page);
+
+  // Visual acceptance: the compact route introduction yields to the actual
+  // product surface, and the editable Grid owns more of the first viewport
+  // than the adjacent queue evidence.
+  const gridSurface = page.locator(".sw-svw .sw-demo-grid");
+  const syncRail = page.locator(".sw-svw-rail");
+  await expect(gridSurface).toBeVisible();
+  await expect(page.getByTestId("connection-toggle")).toContainText("Connected");
+  await expect(page.getByTestId("queue-count")).toBeVisible();
+  const firstViewport = await Promise.all([gridSurface.boundingBox(), syncRail.boundingBox()]);
+  expect(firstViewport[0]).not.toBeNull();
+  expect(firstViewport[1]).not.toBeNull();
+  const visibleGridHeight =
+    Math.min(900, firstViewport[0]!.y + firstViewport[0]!.height) -
+    Math.max(0, firstViewport[0]!.y);
+  const visibleRailHeight =
+    Math.min(900, firstViewport[1]!.y + firstViewport[1]!.height) -
+    Math.max(0, firstViewport[1]!.y);
+  expect(firstViewport[0]!.y).toBeLessThan(450);
+  expect(visibleGridHeight).toBeGreaterThan(360);
+  expect(firstViewport[0]!.width * visibleGridHeight).toBeGreaterThan(
+    firstViewport[1]!.width * visibleRailHeight * 2,
+  );
 
   // The ARIA mirror windows the scrollable pane; the frozen ticket column is
   // asserted through the authoritative store handle below.
@@ -173,7 +204,7 @@ test("svelte workbench boots synced, paints the dispatch model, and shows live p
     })
     .toBeGreaterThan(0);
   await assertPresenceGeometry(page);
-  await test.info().attach("svelte-presence-1568x898-baseline", {
+  await test.info().attach("svelte-presence-1440x900-baseline", {
     body: await page.screenshot(),
     contentType: "image/png",
   });
@@ -246,6 +277,7 @@ test("the durable outbox survives a full island remount while offline", async ({
   await page.getByTestId("log-button").click();
   await expect(page.getByTestId("queue-count")).toHaveText("1");
 
+  await revealRecoveryScenarios(page);
   await page.getByTestId("remount-button").click();
   await expect(page.locator(".sw-svw")).toHaveAttribute("data-generation", "2", {
     timeout: 15_000,
@@ -284,6 +316,7 @@ test("reconnecting onto concurrent server work surfaces a conflict that merge re
 
   await page.getByTestId("connection-toggle").click();
   await page.getByTestId("log-button").click();
+  await revealRecoveryScenarios(page);
   await page.getByTestId("colleague-button").click();
   await expect(page.getByTestId("activity-feed")).toContainText(
     "committed server v1 while you're offline",
@@ -320,6 +353,7 @@ test("server-sequenced remote commits apply live while online", async ({ page })
   const errors = collectErrors(page);
   await bootWorkbench(page);
 
+  await revealRecoveryScenarios(page);
   await page.getByTestId("colleague-button").click();
   await expect
     .poll(() => resolvedCell(page, COLLEAGUE_ROW, CREW_COL), {
@@ -342,6 +376,7 @@ test("reconnecting with an empty queue reloads a document the server moved ahead
   await bootWorkbench(page);
 
   await page.getByTestId("connection-toggle").click();
+  await revealRecoveryScenarios(page);
   await page.getByTestId("colleague-button").click();
   await expect(page.getByTestId("activity-feed")).toContainText(
     "committed server v1 while you're offline",
@@ -471,6 +506,7 @@ test.describe("mobile viewport", () => {
     await page.getByTestId("log-button").click();
     await expect(page.getByTestId("queue-count")).toHaveText("2");
 
+    await revealRecoveryScenarios(page);
     await page.getByTestId("remount-button").click();
     await expect(page.locator(".sw-svw")).toHaveAttribute("data-generation", "2", {
       timeout: 15_000,
@@ -496,6 +532,7 @@ test.describe("mobile viewport", () => {
 
     await page.getByTestId("connection-toggle").click();
     await page.getByTestId("log-button").click();
+    await revealRecoveryScenarios(page);
     await page.getByTestId("colleague-button").click();
     await page.getByTestId("connection-toggle").click();
 

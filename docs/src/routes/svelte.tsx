@@ -5,7 +5,7 @@ import { ShowcasePage } from "../showcases/ShowcasePage.js";
 import svelteWorkbenchStylesheet from "../styles/svelte-workbench.css?url";
 
 const description =
-  "Queue edits offline in a durable IndexedDB outbox, reconnect to drain them through host persistence, and recover a real base-version conflict — with live presence — inside one Svelte component.";
+  "Take a live dispatch board through signal loss: edit real tickets offline, keep every change in IndexedDB, then reconnect and watch the authoritative queue drain.";
 
 export const Route = createFileRoute("/svelte")({
   head: () => ({
@@ -20,30 +20,30 @@ function SvelteShowcaseRoute() {
     <ShowcasePage
       active="svelte"
       description={description}
-      eyebrow="SVELTE / OFFLINE & COLLABORATION"
+      eyebrow="SVELTE / OFFLINE FIELD WORK"
       guide="/docs/frameworks/svelte/"
       packageName="@sheetwrite/svelte"
       proof={[
         {
-          title: "Durable offline queue",
-          detail: "Edits persist to an IndexedDB outbox before any network send.",
+          title: "Offline ticket edits",
+          detail: "The live Grid remains editable while the connection is down.",
         },
         {
-          title: "Reconnect drain & conflicts",
-          detail: "Queued work drains in order; stale bases surface as explicit conflicts.",
+          title: "Durable outbox",
+          detail: "IndexedDB owns each edit before reconnect drains it in order.",
         },
         {
-          title: "Presence & remote commits",
-          detail: "Collaborator selections and server-sequenced edits land on the live grid.",
+          title: "Causal collaboration",
+          detail: "Presence, remote commits, queue state, and server versions stay live.",
         },
         {
-          title: "Remount persistence",
-          detail: "Destroying and remounting the island restores pending work from disk.",
+          title: "Explicit recovery",
+          detail: "Version conflicts and remount restoration remain inspectable on demand.",
         },
       ]}
-      prompt="Go offline, log two field updates, let HQ commit concurrent work, then reconnect and merge — or remount the island mid-queue."
+      prompt="Switch Offline → edit a ticket → see it enter the durable outbox → reconnect and watch dispatch acknowledge it."
       sourcePath="docs/src/showcases/SvelteShowcase.svelte"
-      title="Offline-first collaboration, held in Svelte state."
+      title="Dispatch keeps moving without signal."
     >
       <SvelteShowcaseIsland />
     </ShowcasePage>
