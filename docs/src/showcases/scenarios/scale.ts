@@ -1,19 +1,14 @@
 /**
- * Performance and scale scenario — capability owner for
- * `/showcases/performance/`.
- *
- * Framework-neutral: owns the deterministic million-row and wide-page
- * datasets, the instrumented datasource, the paged-store/WASM measurement
- * protocols, and the committed benchmark evidence (with provenance) that the
- * route and its browser spec both consume. Every number shown live is
- * measured in the visitor's browser through public APIs; every static number
- * comes from a committed benchmark artifact and is labeled with its capture
- * provenance. Nothing here invents a figure.
+ * Deterministic protocol-2 datasource and measured evidence for the interactive
+ * scale showcase. Live values are collected from datasource, Grid, Store, and
+ * runtime diagnostics; committed values retain their checked-artifact source.
  */
 
 import type {
   AggregateOp,
   DataSource,
+  DataSourceColumnBand,
+  DataSourcePage,
   DataSourceStorageOptions,
   Grid,
   PagedStoreStats,
@@ -28,46 +23,43 @@ import interactionResults from "../../../../bench/results/interaction-results.js
 import pagedResults from "../../../../bench/results/paged-results.json";
 import landingBench from "../../generated/landing-bench.json";
 
-// ── Dataset geometry ─────────────────────────────────────────────────────────
-
-export const FEED_SHEET = "feed" satisfies SheetId;
-export const WIDE_SHEET = "wide" satisfies SheetId;
+export const FEED_SHEET = "scale" satisfies SheetId;
+export const SCALE_ROWS = 1_000_000;
+export const SCALE_COLUMNS = 1_000;
+export const SCALE_LOGICAL_CELLS = SCALE_ROWS * SCALE_COLUMNS;
+export const FEED_ROWS = SCALE_ROWS;
 export const SCALE_SHEETS = {
-  [FEED_SHEET]: { id: FEED_SHEET, label: "Telemetry feed", rowCount: 1_000_000 },
-  [WIDE_SHEET]: { id: WIDE_SHEET, label: "Wide metrics", rowCount: 250_000 },
+  [FEED_SHEET]: {
+    id: FEED_SHEET,
+    label: "Billion-address sheet",
+    rowCount: SCALE_ROWS,
+    columnCount: SCALE_COLUMNS,
+  },
 } as const;
-export type ScaleSheetId = keyof typeof SCALE_SHEETS;
-export const FEED_ROWS = SCALE_SHEETS[FEED_SHEET].rowCount;
-export const WIDE_ROWS = SCALE_SHEETS[WIDE_SHEET].rowCount;
-export const WIDE_METRIC_COLUMNS = 120;
 
-export function scaleSheetDescriptor(sheet: SheetId) {
-  if (sheet === FEED_SHEET) return SCALE_SHEETS[FEED_SHEET];
-  if (sheet === WIDE_SHEET) return SCALE_SHEETS[WIDE_SHEET];
-  throw new Error(`Unknown performance showcase sheet: ${sheet}`);
-}
 export const SCALE_THEME: Partial<Theme> = {
   font: '500 13px "Inter Variable", Inter, system-ui, sans-serif',
   rowHeight: 30,
-  headerHeight: 32,
-  rowHeaderWidth: 48,
+  headerHeight: 34,
+  rowHeaderWidth: 72,
 };
 
-/** Clean-chunk budget kept deliberately small so cache churn is observable. */
+/** Fixed clean-page budget; sparse local edits are accounted separately. */
 export const SCALE_STORAGE: Required<DataSourceStorageOptions> = {
   mode: "paged",
   chunkRows: 4096,
-  cacheBytes: 8 * 1024 * 1024,
+  cacheBytes: 4 * 1024 * 1024,
   dirtyCellLimit: 1_000_000,
 };
 
-/** Visible latency for every page after the first, so lazy loading is observable. */
+/** Deliberate source latency after first paint, kept visible in the diagnostics. */
 export const PAGE_LATENCY_MS = 90;
 
+const GENERATION_SLICE_ROWS = 256;
 const REGIONS = ["eu-west", "us-east", "ap-south", "sa-east", "af-north"] as const;
 const STATUSES = ["ok", "ok", "ok", "degraded", "alert"] as const;
+const encoder = new TextEncoder();
 
-/** Deterministic per-row hash so any page of one million rows is reproducible. */
 function rowHash(row: number, salt: number): number {
   let hash = (row + 1) * 2654435761 + salt * 40503;
   hash = Math.imul(hash ^ (hash >>> 16), 2246822519);
@@ -76,22 +68,37 @@ function rowHash(row: number, salt: number): number {
   return hash >>> 0;
 }
 
-export function feedRowAt(row: number): RowData {
-  const hash = rowHash(row, 1);
-  return {
-    id: row + 1,
-    sensor: `S-${String(hash % 4096).padStart(4, "0")}`,
-    region: REGIONS[hash % REGIONS.length] ?? "eu-west",
-    reading: Math.round((hash % 100_000) / 100 + (row % 7)) / 10,
-    peak: Math.round((rowHash(row, 2) % 120_000) / 100) / 10,
-    status: STATUSES[rowHash(row, 3) % STATUSES.length] ?? "ok",
-  };
+export function scaleColumnKey(column: number): string {
+  return `c${column}`;
 }
 
-export function wideRowAt(row: number): RowData {
-  const out: RowData = { id: row + 1 };
-  for (let column = 0; column < WIDE_METRIC_COLUMNS; column++) {
-    out[`m${column}`] = (rowHash(row, column + 16) % 100_000) / 100;
+function columnHeader(column: number): string {
+  if (column === 0) return "Row ID";
+  if (column === 1) return "Sensor";
+  if (column === 2) return "Region";
+  if (column === 3) return "Reading";
+  if (column === 4) return "Status";
+  return `Metric ${String(column - 4).padStart(3, "0")}`;
+}
+
+function scaleCellAt(row: number, column: number): string | number | null {
+  const hash = rowHash(row, column + 1);
+  if (column === 0) return row + 1;
+  if (column === 1) return `S-${String(hash % 4096).padStart(4, "0")}`;
+  if (column === 2) return REGIONS[hash % REGIONS.length] ?? "eu-west";
+  if (column === 3) return Math.round((hash % 100_000) / 10) / 10;
+  if (column === 4) return STATUSES[hash % STATUSES.length] ?? "ok";
+  if (hash % 17 === 0) return null;
+  return Math.round(((hash % 100_000) / 100 + (row % 11)) * 100) / 100;
+}
+
+export function scaleRowAt(row: number, bands: readonly DataSourceColumnBand[]): RowData {
+  const out: RowData = {};
+  for (const band of bands) {
+    for (let offset = 0; offset < band.keys.length; offset += 1) {
+      const key = band.keys[offset];
+      if (key !== undefined) out[key] = scaleCellAt(row, band.start + offset);
+    }
   }
   return out;
 }
@@ -103,92 +110,170 @@ export function createScaleWorkbook(): Workbook {
       {
         id: FEED_SHEET,
         name: SCALE_SHEETS[FEED_SHEET].label,
-        rowCount: SCALE_SHEETS[FEED_SHEET].rowCount,
-        columns: [
-          { key: "id", header: "ID", width: 84, type: "number" },
-          { key: "sensor", header: "Sensor", width: 100, type: "text" },
-          { key: "region", header: "Region", width: 104, type: "text" },
-          { key: "reading", header: "Reading", width: 104, type: "number" },
-          { key: "peak", header: "Peak", width: 104, type: "number" },
-          { key: "status", header: "Status", width: 96, type: "text" },
-        ],
-      },
-      {
-        id: WIDE_SHEET,
-        name: SCALE_SHEETS[WIDE_SHEET].label,
-        rowCount: SCALE_SHEETS[WIDE_SHEET].rowCount,
-        columns: [
-          { key: "id", header: "ID", width: 84, type: "number" },
-          ...Array.from({ length: WIDE_METRIC_COLUMNS }, (_, column) => ({
-            key: `m${column}`,
-            header: `M${String(column).padStart(3, "0")}`,
-            width: 76,
-            type: "number" as const,
-          })),
-        ],
+        rowCount: SCALE_ROWS,
+        columns: Array.from({ length: SCALE_COLUMNS }, (_, column) => ({
+          key: scaleColumnKey(column),
+          header: columnHeader(column),
+          width: column === 0 ? 88 : column < 5 ? 104 : 92,
+          type:
+            column === 1 || column === 2 || column === 4 ? ("text" as const) : ("number" as const),
+        })),
       },
     ],
   };
 }
 
-// ── Instrumented datasource ──────────────────────────────────────────────────
+export interface DatasourceTile {
+  id: number;
+  sheet: SheetId;
+  start: number;
+  end: number;
+  columns: readonly DataSourceColumnBand[];
+  cells: number;
+  requestBytes: number;
+  returnedBytes: number;
+  latencyMs: number | null;
+  state: "requested" | "returned" | "aborted";
+}
 
 export interface DatasourceTelemetry {
   requests: number;
-  rowsServed: number;
-  cellsServed: number;
+  requestedCells: number;
+  requestBytes: number;
+  returnedRows: number;
+  returnedCells: number;
+  returnedBytes: number;
   aborted: number;
-  lastPage: { sheet: SheetId; start: number; end: number; latencyMs: number } | null;
+  lastRequest: DatasourceTile | null;
+  lastReturn: DatasourceTile | null;
+  recentTiles: readonly DatasourceTile[];
 }
 
 export function emptyTelemetry(): DatasourceTelemetry {
-  return { requests: 0, rowsServed: 0, cellsServed: 0, aborted: 0, lastPage: null };
+  return {
+    requests: 0,
+    requestedCells: 0,
+    requestBytes: 0,
+    returnedRows: 0,
+    returnedCells: 0,
+    returnedBytes: 0,
+    aborted: 0,
+    lastRequest: null,
+    lastReturn: null,
+    recentTiles: [],
+  };
 }
 
 /**
- * Serve deterministic pages for both sheets with observable latency. The
- * first request resolves immediately so boot never paints an empty canvas.
- * Aborted requests stop work and are counted — that is the contract hosts
- * should implement too.
+ * Windowed source: every row contains only the exact sorted column bands in the
+ * request. Generation yields between small row slices so a distant page cannot
+ * monopolize the main thread.
  */
 export function createScaleDataSource(
   onUpdate: (telemetry: Readonly<DatasourceTelemetry>) => void,
 ): DataSource {
   const telemetry = emptyTelemetry();
   let firstRequest = true;
+  let nextTileId = 1;
+
+  const publish = () => onUpdate({ ...telemetry, recentTiles: [...telemetry.recentTiles] });
+  const replaceTile = (next: DatasourceTile) => {
+    telemetry.recentTiles = telemetry.recentTiles.map((tile) =>
+      tile.id === next.id ? next : tile,
+    );
+  };
+
   return {
-    getRows({ sheet, start, end, signal, revision }) {
-      const { promise, resolve, reject } = Promise.withResolvers<{
-        start: number;
-        rows: RowData[];
-        revision: number;
-      }>();
+    capabilities: { protocol: 2, columns: "windowed" },
+    getRows(request) {
+      const { protocol, sheet, start, end, columns, signal, revision } = request;
+      const requestedColumns = columns.reduce((count, band) => count + band.keys.length, 0);
+      const cells = (end - start) * requestedColumns;
+      const requestBytes = encoder.encode(
+        JSON.stringify({ protocol, sheet, start, end, columns, revision }),
+      ).byteLength;
+      const tile: DatasourceTile = {
+        id: nextTileId,
+        sheet,
+        start,
+        end,
+        columns,
+        cells,
+        requestBytes,
+        returnedBytes: 0,
+        latencyMs: null,
+        state: "requested",
+      };
+      nextTileId += 1;
+      telemetry.requests += 1;
+      telemetry.requestedCells += cells;
+      telemetry.requestBytes += requestBytes;
+      telemetry.lastRequest = tile;
+      telemetry.recentTiles = [tile, ...telemetry.recentTiles].slice(0, 256);
+      publish();
+
       const latency = firstRequest ? 0 : PAGE_LATENCY_MS;
       firstRequest = false;
-      telemetry.requests += 1;
       const startedAt = performance.now();
-      const timer = setTimeout(() => {
-        const rows: RowData[] = [];
-        for (let row = start; row < end; row++) {
-          rows.push(sheet === WIDE_SHEET ? wideRowAt(row) : feedRowAt(row));
+
+      const { promise, resolve, reject } = Promise.withResolvers<DataSourcePage>();
+      const rows: RowData[] = [];
+      let cursor = start;
+      let returnedBytes = 2;
+      let timer = 0;
+      let settled = false;
+
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        const abortedTile: DatasourceTile = {
+          ...tile,
+          latencyMs: performance.now() - startedAt,
+          state: "aborted",
+        };
+        telemetry.aborted += 1;
+        replaceTile(abortedTile);
+        publish();
+        reject(new DOMException("Datasource request aborted", "AbortError"));
+      };
+
+      const generate = () => {
+        if (signal.aborted) {
+          abort();
+          return;
         }
-        const columns = sheet === WIDE_SHEET ? WIDE_METRIC_COLUMNS + 1 : 6;
-        telemetry.rowsServed += rows.length;
-        telemetry.cellsServed += rows.length * columns;
-        telemetry.lastPage = { sheet, start, end, latencyMs: performance.now() - startedAt };
-        onUpdate(telemetry);
-        resolve({ start, rows, revision });
-      }, latency);
-      signal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timer);
-          telemetry.aborted += 1;
-          onUpdate(telemetry);
-          reject(new DOMException("Datasource request aborted", "AbortError"));
-        },
-        { once: true },
-      );
+        const sliceEnd = Math.min(cursor + GENERATION_SLICE_ROWS, end);
+        for (; cursor < sliceEnd; cursor += 1) {
+          const row = scaleRowAt(cursor, columns);
+          const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
+          returnedBytes += rowBytes + (rows.length === 0 ? 0 : 1);
+          rows.push(row);
+        }
+        if (cursor < end) {
+          timer = window.setTimeout(generate, 0);
+          return;
+        }
+
+        settled = true;
+        signal.removeEventListener("abort", abort);
+        const returnedTile: DatasourceTile = {
+          ...tile,
+          returnedBytes,
+          latencyMs: performance.now() - startedAt,
+          state: "returned",
+        };
+        telemetry.returnedRows += rows.length;
+        telemetry.returnedCells += cells;
+        telemetry.returnedBytes += returnedBytes;
+        telemetry.lastReturn = returnedTile;
+        replaceTile(returnedTile);
+        publish();
+        resolve({ protocol: 2, start, columns, rows, revision });
+      };
+
+      signal.addEventListener("abort", abort, { once: true });
+      timer = window.setTimeout(generate, latency);
       return promise;
     },
   };
