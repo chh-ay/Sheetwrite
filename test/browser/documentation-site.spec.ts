@@ -19,6 +19,12 @@ function docsUrl(path = ""): string {
   return siteUrl(`/docs/${path}`);
 }
 
+const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV";
+const SITE_DESCRIPTION =
+  "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
+const SOCIAL_IMAGE_ALT =
+  "Sheetwrite multi-sheet workbook with selected formula cell and sheet tabs";
+
 /** Interactive steps need attached listeners; the root component marks hydration. */
 async function waitForHydration(page: Page): Promise<void> {
   await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15_000 });
@@ -94,19 +100,29 @@ test("site root serves the product landing", async ({ page }) => {
   await expect(productStory.getByText("Illustrative product view")).toBeVisible();
   await expect(productStory.getByText(/static Sheetwrite composition/i)).toBeVisible();
   expect(wasmRequests).toEqual([]);
-  await expect(page).toHaveTitle("Sheetwrite — Web spreadsheet library powered by Rust/WASM");
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
-    "content",
-    "A fast, editable web spreadsheet and data-grid library with a TypeScript API and Rust/WASM engine. React, Vue, Svelte, and vanilla adapters included.",
-  );
-  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
-    "content",
-    "Sheetwrite spreadsheet grid showing typed web data",
-  );
-  await expect(page.locator('meta[name="twitter:image:alt"]')).toHaveAttribute(
-    "content",
-    "Sheetwrite spreadsheet grid showing typed web data",
-  );
+  await expect(page).toHaveTitle(SITE_TITLE);
+  for (const selector of [
+    'meta[name="description"]',
+    'meta[property="og:description"]',
+    'meta[name="twitter:description"]',
+  ]) {
+    await expect(page.locator(selector)).toHaveAttribute("content", SITE_DESCRIPTION);
+  }
+  for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
+    await expect(page.locator(selector)).toHaveAttribute("content", SITE_TITLE);
+  }
+  for (const selector of ['meta[property="og:image:alt"]', 'meta[name="twitter:image:alt"]']) {
+    await expect(page.locator(selector)).toHaveAttribute("content", SOCIAL_IMAGE_ALT);
+  }
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
+  const socialImageDimensions = await page.evaluate(async () => {
+    const image = new Image();
+    image.src = "/og-sheetwrite.webp";
+    await image.decode();
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  });
+  expect(socialImageDimensions).toEqual({ width: 1200, height: 630 });
   const structuredData = await page
     .locator('script[type="application/ld+json"]')
     .evaluateAll((scripts) => scripts.map((script) => JSON.parse(script.textContent ?? "null")));

@@ -8,8 +8,8 @@ import { pageMeta } from "../lib/seo.js";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: pageMeta(
-      "Sheetwrite — Web spreadsheet library powered by Rust/WASM",
-      "A fast, editable web spreadsheet and data-grid library with a TypeScript API and Rust/WASM engine. React, Vue, Svelte, and vanilla adapters included.",
+      "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV",
+      "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.",
     ),
   }),
   component: Landing,
