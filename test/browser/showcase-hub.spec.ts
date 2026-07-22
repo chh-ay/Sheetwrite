@@ -46,6 +46,19 @@ test("hub launches every owning showcase without errors", async ({ page }) => {
     count: links.length,
   }));
   expect(launcherViewportState).toEqual({ allWithinViewport: true, count: 8 });
+  const clippedLabels = await page
+    .locator(
+      ".sw-hub-launch__meta span, .sw-hub-launch__body > strong, .sw-hub-framework-scene code, .sw-hub-framework-scene small",
+    )
+    .evaluateAll((labels) =>
+      labels
+        .filter(
+          (label) =>
+            label.scrollWidth > label.clientWidth || label.scrollHeight > label.clientHeight,
+        )
+        .map((label) => label.textContent?.trim()),
+    );
+  expect(clippedLabels).toEqual([]);
 
   // The hub is a static launcher: previews do not eagerly mount a Grid or a
   // renderer surface. The separate engine diagnostic remains on demand.
