@@ -34,11 +34,15 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   output.setAttribute("role", "status");
   output.setAttribute("aria-live", "polite");
 
-  const unsubscribe = grid.on("selection", (event) => {
-    output.textContent = describeSelection(event.selection);
-  });
-  output.textContent = describeSelection(grid.getSelection());
+  const render = (selection: Selection | null): void => {
+    const description = describeSelection(selection);
+    output.textContent = description;
+    output.hidden = description === "";
+    host.hidden = output.hidden && host.childElementCount === 1;
+  };
+  const unsubscribe = grid.on("selection", (event) => render(event.selection));
   host.appendChild(output);
+  render(grid.getSelection());
 
   let destroyed = false;
   return {

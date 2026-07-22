@@ -332,14 +332,19 @@ describe("createSelectionStatus", () => {
     expect(describeSelection({ kind: "row", sheet: "s1", row: 6 })).toBe("Row 7");
     expect(describeSelection({ kind: "column", sheet: "s1", col: 1 })).toBe("Column 2");
 
-    const { grid, store, host } = makeGrid();
-    const piece = createSelectionStatus(host, grid);
+    const { grid, store } = makeGrid();
+    const statusHost = document.createElement("div");
+    const piece = createSelectionStatus(statusHost, grid);
+    expect(statusHost.hidden).toBe(true);
+    expect(piece.element.hidden).toBe(true);
     grid.setSelection({
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     });
     expect(piece.element.textContent).toBe("2 × 2 cells");
     expect(piece.element.getAttribute("role")).toBe("status");
+    expect(statusHost.hidden).toBe(false);
+    expect(piece.element.hidden).toBe(false);
 
     piece.destroy();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
