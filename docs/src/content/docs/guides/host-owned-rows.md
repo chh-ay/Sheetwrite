@@ -51,8 +51,23 @@ function applyProjection(projection: RowBridgeProjection<string>) {
 Attach the same bridge and callback in any adapter:
 
 ```tsx prelude="react" partial="requires surrounding component state" title="React adapter"
-import { SheetwriteGrid } from "@sheetwrite/react";
+import {
+  SheetwriteGrid,
+  type RowBridge,
+  type RowBridgeProjection,
+  type SimpleColumn,
+} from "@sheetwrite/react";
 
+interface InvoiceRow {
+  id: string;
+  customer: string;
+  total: number;
+}
+
+declare const columns: readonly SimpleColumn<InvoiceRow>[];
+declare const rows: readonly InvoiceRow[];
+declare const bridge: RowBridge<string>;
+declare const applyProjection: (projection: RowBridgeProjection<string>) => void;
 <SheetwriteGrid
   columns={columns}
   defaultRows={rows}

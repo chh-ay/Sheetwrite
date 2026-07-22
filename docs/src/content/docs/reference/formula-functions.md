@@ -238,6 +238,13 @@ Taxonomy/source: [Text functions](https://support.microsoft.com/en-us/office/exc
 | `PROPER` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `NUMBERVALUE` | required target | [`number-value`](#signature-number-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 
+### Formula operators
+
+Taxonomy/source: [Types of operators](https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a).
+
+| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- |
+
 ## Signature profiles
 
 Argument order, required/default state, accepted shapes, repetition, and return shape come directly from the inventory.
