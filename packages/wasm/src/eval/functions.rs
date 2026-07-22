@@ -58,6 +58,7 @@ impl FuncAccumulator {
         Ok(())
     }
 
+
     pub(super) fn finish_arg(
         &mut self,
         rows: usize,
@@ -352,5 +353,7 @@ pub(super) fn treats_cell_as_reference(func: Func) -> bool {
             | Func::VarP
             | Func::GeoMean
             | Func::CountBlank
+            | Func::Npv
+            | Func::Irr
     )
 }

@@ -415,7 +415,7 @@ mod tests {
             for value in arg {
                 values.push_range(value.clone()).unwrap();
             }
-            values.finish_arg().unwrap();
+            values.finish_arg(1, arg.len()).unwrap();
         }
         values
     }

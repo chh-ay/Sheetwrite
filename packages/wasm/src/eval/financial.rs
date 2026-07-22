@@ -582,7 +582,7 @@ mod tests {
         let mut values = FuncAccumulator::default();
         for value in args {
             values.push_scalar(value).unwrap();
-            values.finish_arg().unwrap();
+            values.finish_arg(1, 1).unwrap();
         }
         values
     }
@@ -591,15 +591,19 @@ mod tests {
         scalar_args(args.into_iter().map(Value::Number))
     }
 
-    fn irr_args(cashflows: impl IntoIterator<Item = f64>, guess: Option<f64>) -> FuncAccumulator {
+    fn irr_args(
+        cashflows: impl IntoIterator<Item = f64>,
+        guess: Option<f64>,
+    ) -> FuncAccumulator {
+        let cashflows: Vec<f64> = cashflows.into_iter().collect();
         let mut values = FuncAccumulator::default();
         for cashflow in cashflows {
             values.push_range(Value::Number(cashflow)).unwrap();
         }
-        values.finish_arg().unwrap();
+        values.finish_arg(1, values.len()).unwrap();
         if let Some(guess) = guess {
             values.push_scalar(Value::Number(guess)).unwrap();
-            values.finish_arg().unwrap();
+            values.finish_arg(1, 1).unwrap();
         }
         values
     }
@@ -676,17 +680,17 @@ mod tests {
 
         let mut npv_values = FuncAccumulator::default();
         npv_values.push_scalar(Value::Number(0.1)).unwrap();
-        npv_values.finish_arg().unwrap();
+        npv_values.finish_arg(1, 1).unwrap();
         npv_values.push_scalar(Value::Number(100.0)).unwrap();
-        npv_values.finish_arg().unwrap();
+        npv_values.finish_arg(1, 1).unwrap();
         npv_values.push_scalar(Value::Blank).unwrap();
-        npv_values.finish_arg().unwrap();
+        npv_values.finish_arg(1, 1).unwrap();
         npv_values.push_scalar(Value::Bool(true)).unwrap();
-        npv_values.finish_arg().unwrap();
+        npv_values.finish_arg(1, 1).unwrap();
         npv_values.push_range(Value::text("ignored")).unwrap();
         npv_values.push_range(Value::Bool(true)).unwrap();
         npv_values.push_range(Value::Number(200.0)).unwrap();
-        npv_values.finish_arg().unwrap();
+        npv_values.finish_arg(1, 3).unwrap();
         let expected = 100.0 / 1.1 + 1.0 / 1.1f64.powi(3) + 200.0 / 1.1f64.powi(4);
         assert_close(result_number(Func::Npv, &npv_values), expected);
 
