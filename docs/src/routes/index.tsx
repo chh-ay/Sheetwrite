@@ -59,7 +59,7 @@ const CAPABILITY_PROOFS = [
     id: "collaboration",
     label: "Collaboration",
     href: "/showcases/collaboration/",
-    headline: "Two live clients converging through one shared protocol.",
+    headline: "Two live clients staying in sync through one shared server.",
   },
 ] as const;
 
