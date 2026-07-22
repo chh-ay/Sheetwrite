@@ -2947,7 +2947,7 @@
       "signature": "let",
       "semantics": "let-binding",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -2958,7 +2958,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -2969,7 +2969,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -2980,7 +2980,7 @@
       "signature": "binary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -2991,7 +2991,7 @@
       "signature": "unary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3002,7 +3002,7 @@
       "signature": "unary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3013,7 +3013,7 @@
       "signature": "log",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3024,7 +3024,7 @@
       "signature": "unary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3035,7 +3035,7 @@
       "signature": "round",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3046,7 +3046,7 @@
       "signature": "round",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3057,7 +3057,7 @@
       "signature": "binary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3068,7 +3068,7 @@
       "signature": "unary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3079,7 +3079,7 @@
       "signature": "unary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3090,7 +3090,7 @@
       "signature": "binary-number",
       "semantics": "scalar",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3101,7 +3101,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3112,7 +3112,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3123,7 +3123,7 @@
       "signature": "subtotal",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3134,7 +3134,7 @@
       "signature": "text-join",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3145,7 +3145,7 @@
       "signature": "substitute",
       "semantics": "text-sensitive",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3156,7 +3156,7 @@
       "signature": "replace",
       "semantics": "text-sensitive",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3167,7 +3167,7 @@
       "signature": "find-search",
       "semantics": "text-sensitive",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3178,7 +3178,7 @@
       "signature": "find-search",
       "semantics": "text-search",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3189,7 +3189,7 @@
       "signature": "unary-value",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3200,7 +3200,7 @@
       "signature": "unary-value",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3211,7 +3211,7 @@
       "signature": "repeat-text",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3222,7 +3222,7 @@
       "signature": "unary-number",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3233,7 +3233,7 @@
       "signature": "unary-value",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3244,7 +3244,7 @@
       "signature": "unary-number",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3255,7 +3255,7 @@
       "signature": "unary-value",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3266,7 +3266,7 @@
       "signature": "unary-value",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3277,7 +3277,7 @@
       "signature": "number-value",
       "semantics": "text",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3288,7 +3288,7 @@
       "signature": "date-three",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3299,7 +3299,7 @@
       "signature": "unary-value",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3310,7 +3310,7 @@
       "signature": "unary-value",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3321,7 +3321,7 @@
       "signature": "unary-value",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3332,7 +3332,7 @@
       "signature": "unary-value",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3343,7 +3343,7 @@
       "signature": "date-pair",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3354,7 +3354,7 @@
       "signature": "date-offset",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3365,7 +3365,7 @@
       "signature": "date-offset",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3376,7 +3376,7 @@
       "signature": "weekday-weeknum",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3387,7 +3387,7 @@
       "signature": "weekday-weeknum",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3398,7 +3398,7 @@
       "signature": "workday",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3409,7 +3409,7 @@
       "signature": "networkdays",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3420,7 +3420,7 @@
       "signature": "yearfrac-days360",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3431,7 +3431,7 @@
       "signature": "yearfrac-days360",
       "semantics": "date-time",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3442,7 +3442,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3453,7 +3453,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3464,7 +3464,7 @@
       "signature": "value-k",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3475,7 +3475,7 @@
       "signature": "value-k",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3486,7 +3486,7 @@
       "signature": "rank",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3497,7 +3497,7 @@
       "signature": "percentile",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3508,7 +3508,7 @@
       "signature": "percentile",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3519,7 +3519,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3530,7 +3530,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3541,7 +3541,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3552,7 +3552,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3563,7 +3563,7 @@
       "signature": "variadic-values",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3574,7 +3574,7 @@
       "signature": "pair-arrays",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3585,7 +3585,7 @@
       "signature": "pair-arrays",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3596,7 +3596,7 @@
       "signature": "pair-arrays",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3607,7 +3607,7 @@
       "signature": "unary-value",
       "semantics": "aggregate",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3618,7 +3618,7 @@
       "signature": "sumifs",
       "semantics": "criteria",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3629,7 +3629,7 @@
       "signature": "sumifs",
       "semantics": "criteria",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3640,7 +3640,7 @@
       "signature": "xmatch",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3651,7 +3651,7 @@
       "signature": "choose",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3662,7 +3662,7 @@
       "signature": "optional-reference",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3673,7 +3673,7 @@
       "signature": "unary-value",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3684,7 +3684,7 @@
       "signature": "optional-reference",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3695,7 +3695,7 @@
       "signature": "unary-value",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3706,7 +3706,7 @@
       "signature": "address",
       "semantics": "lookup",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3717,7 +3717,7 @@
       "signature": "array-unary",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3728,7 +3728,7 @@
       "signature": "sequence",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3739,7 +3739,7 @@
       "signature": "take-drop",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3750,7 +3750,7 @@
       "signature": "take-drop",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3761,7 +3761,7 @@
       "signature": "choose-axis",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3772,7 +3772,7 @@
       "signature": "choose-axis",
       "semantics": "array",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3783,7 +3783,7 @@
       "signature": "pv-fv-pmt",
       "semantics": "financial",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3794,7 +3794,7 @@
       "signature": "pv-fv-pmt",
       "semantics": "financial",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3805,7 +3805,7 @@
       "signature": "pv-fv-pmt",
       "semantics": "financial",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3816,7 +3816,7 @@
       "signature": "npv",
       "semantics": "financial",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3827,7 +3827,7 @@
       "signature": "irr",
       "semantics": "financial-iterative",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3838,7 +3838,7 @@
       "signature": "rate",
       "semantics": "financial-iterative",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3849,7 +3849,7 @@
       "signature": "period-payment",
       "semantics": "financial",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     },
     {
@@ -3860,7 +3860,7 @@
       "signature": "period-payment",
       "semantics": "financial",
       "dialects": "excel-documented",
-      "implementation": "parser-declared-target",
+      "implementation": "implemented-assisted",
       "version": 1
     }
   ]
