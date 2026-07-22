@@ -3056,6 +3056,46 @@ fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() 
     store.recompute(sheet);
     assert_close(number(&store, sheet, 10, 14), 6.0);
 }
+
+#[test]
+fn let_binding_and_expansion_limits_are_deterministic() {
+    fn bindings(count: usize) -> String {
+        let mut source = String::from("=LET(");
+        for index in 0..count {
+            source.push_str(&format!("name_{index},{index},"));
+        }
+        source.push_str(&format!("name_{}", count - 1));
+        source.push(')');
+        source
+    }
+
+    fn doubling(depth: usize) -> String {
+        let mut source = String::from("=LET(value_0,1");
+        for index in 1..=depth {
+            source.push_str(&format!(
+                ",value_{index},value_{}+value_{}",
+                index - 1,
+                index - 1
+            ));
+        }
+        source.push_str(&format!(",value_{depth})"));
+        source
+    }
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_formula(sheet, 0, 0, &bindings(126), 0);
+    store.set_formula(sheet, 0, 1, &bindings(127), 0);
+    store.set_formula(sheet, 0, 2, &doubling(13), 0);
+    store.set_formula(sheet, 0, 3, &doubling(14), 0);
+    store.recompute(sheet);
+
+    assert_close(number(&store, sheet, 0, 0), 125.0);
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("#VALUE!"));
+    assert_close(number(&store, sheet, 0, 2), 8192.0);
+    assert_eq!(string(&store, sheet, 0, 3).as_deref(), Some("#NUM!"));
+}
+
 #[test]
 fn required_sequence_spill_regression_preserves_matrix_shape() {
     let mut store = CellStore::new();
