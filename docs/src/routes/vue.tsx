@@ -7,7 +7,7 @@ import VueWorkbench from "../showcases/VueWorkbench.js";
 import vueWorkbenchStylesheet from "../styles/vue-workbench.css?url";
 
 const description =
-  "Run a governed revenue pipeline through one Vue component: reactive configuration, validation and protection, cell notes, sheet operations, and live host persistence state.";
+  "Reject a protected workbook edit, inspect the exact policy issue, authorize the finance role, and commit the same mutation through Vue-owned state.";
 
 export const Route = createFileRoute("/vue")({
   head: () => ({
@@ -27,25 +27,28 @@ function VueWorkbenchRoute() {
       packageName="@sheetwrite/vue"
       proof={[
         {
-          title: "Reactive configuration",
-          detail: "Role, read-only, and mutation policy are Vue state bound to adapter props.",
+          title: "Policy result beside the mutation",
+          detail:
+            "The selected cell, access rule, rejection, role change, and accepted commit stay in one causal view.",
         },
         {
-          title: "Validation and protection",
-          detail: "Rejected edits surface as structured issues, never silent failures.",
+          title: "Vue-native authority",
+          detail:
+            "Reactive props drive the published adapter while every workbook change crosses the real Grid API.",
         },
         {
-          title: "Notes and workbook workflow",
-          detail: "Cell notes, sheet metadata, and workbook operations use the public Grid API.",
+          title: "Attached workbook tools",
+          detail:
+            "The selected-cell note editor and adapter event feed stay accessible while native tabs own sheet lifecycle.",
         },
         {
-          title: "Host persistence state",
-          detail: "Pending commits, server versions, and acknowledgements mirror into Vue refs.",
+          title: "Host acknowledgement",
+          detail: "Accepted edits enter the real pending queue before the host version advances.",
         },
       ]}
-      prompt="Enter an out-of-policy amount, unlock the protected quarter as finance lead, note a cell, or sync pending edits to the host adapter."
+      prompt="Attempt the protected G1 override as Reviewer, inspect the rejection, authorize Finance lead, then commit the same edit."
       sourcePath="docs/src/showcases/VueWorkbench.ts"
-      title="Governed data entry, driven by Vue state."
+      title="A governed edit, from rejection to commit."
     >
       <VueWorkbenchIsland />
     </ShowcasePage>
