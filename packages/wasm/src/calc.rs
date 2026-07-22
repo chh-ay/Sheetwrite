@@ -18,6 +18,7 @@
 //! The evaluator lives on `CellStore` (it needs cell access); this module is the
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
+use std::{borrow::Cow, cmp::Ordering};
 use crate::memory::MemoryOwnerStats;
 
 /// Bounds syntax recursion below the evaluator limit because each parenthesized
@@ -191,6 +192,225 @@ pub enum Func {
     Rate,
     Ipmt,
     Ppmt,
+}
+
+const fn ascii_upper(byte: u8) -> u8 {
+    if byte >= b'a' && byte <= b'z' {
+        byte - (b'a' - b'A')
+    } else {
+        byte
+    }
+}
+
+fn registered_name_cmp(registered: &str, input: &str) -> Ordering {
+    let length_order = registered.len().cmp(&input.len());
+    if length_order != Ordering::Equal {
+        return length_order;
+    }
+
+    for (&expected, &actual) in registered.as_bytes().iter().zip(input.as_bytes()) {
+        let byte_order = expected.cmp(&ascii_upper(actual));
+        if byte_order != Ordering::Equal {
+            return byte_order;
+        }
+    }
+    Ordering::Equal
+}
+
+macro_rules! define_function_registry {
+    (
+        canonical { $($variant:ident => $canonical:literal;)+ }
+        aliases { $($alias:literal => $alias_variant:ident;)* }
+    ) => {
+        const FUNCTION_NAMES: &[(&str, Func)] = &[
+            $(($canonical, Func::$variant),)+
+        ];
+        const FUNCTION_ALIASES: &[(&str, Func)] = &[
+            $(($alias, Func::$alias_variant),)*
+        ];
+
+        #[inline(never)]
+        fn lookup_func(name: &str) -> Option<Func> {
+            if let Ok(index) = FUNCTION_NAMES
+                .binary_search_by(|(registered, _)| registered_name_cmp(registered, name))
+            {
+                return Some(FUNCTION_NAMES[index].1);
+            }
+            FUNCTION_ALIASES
+                .binary_search_by(|(registered, _)| registered_name_cmp(registered, name))
+                .ok()
+                .map(|index| FUNCTION_ALIASES[index].1)
+        }
+
+        fn func_name(func: Func) -> &'static str {
+            match func {
+                $(Func::$variant => $canonical,)+
+            }
+        }
+    };
+}
+
+define_function_registry! {
+    canonical {
+        N => "N";
+        T => "T";
+        Fv => "FV";
+        If => "IF";
+        Ln => "LN";
+        Na => "NA";
+        Or => "OR";
+        Pi => "PI";
+        Pv => "PV";
+        Abs => "ABS";
+        And => "AND";
+        Avg => "AVG";
+        Day => "DAY";
+        Exp => "EXP";
+        Gcd => "GCD";
+        Ifs => "IFS";
+        Int => "INT";
+        Irr => "IRR";
+        Lcm => "LCM";
+        Len => "LEN";
+        Let => "LET";
+        Log => "LOG";
+        Max => "MAX";
+        Mid => "MID";
+        Min => "MIN";
+        Mod => "MOD";
+        Not => "NOT";
+        Now => "NOW";
+        Npv => "NPV";
+        Odd => "ODD";
+        Pmt => "PMT";
+        Pow => "POW";
+        Row => "ROW";
+        Sum => "SUM";
+        Xor => "XOR";
+        Char => "CHAR";
+        Code => "CODE";
+        Date => "DATE";
+        Days => "DAYS";
+        Drop => "DROP";
+        Even => "EVEN";
+        Find => "FIND";
+        Hour => "HOUR";
+        IfNa => "IFNA";
+        Ipmt => "IPMT";
+        IsNa => "ISNA";
+        Left => "LEFT";
+        Ppmt => "PPMT";
+        Rate => "RATE";
+        Rept => "REPT";
+        Rows => "ROWS";
+        Sign => "SIGN";
+        Sort => "SORT";
+        Sqrt => "SQRT";
+        Take => "TAKE";
+        Text => "TEXT";
+        Time => "TIME";
+        Trim => "TRIM";
+        True => "TRUE";
+        Type => "TYPE";
+        Year => "YEAR";
+        Clean => "CLEAN";
+        Count => "COUNT";
+        EDate => "EDATE";
+        Exact => "EXACT";
+        False => "FALSE";
+        Floor => "FLOOR";
+        Index => "INDEX";
+        IsErr => "ISERR";
+        Large => "LARGE";
+        Log10 => "LOG10";
+        Lower => "LOWER";
+        Match => "MATCH";
+        Month => "MONTH";
+        Power => "POWER";
+        Right => "RIGHT";
+        Round => "ROUND";
+        Small => "SMALL";
+        SumIf => "SUMIF";
+        Today => "TODAY";
+        Trunc => "TRUNC";
+        Upper => "UPPER";
+        Value => "VALUE";
+        VarP => "VAR.P";
+        VarS => "VAR.S";
+        Choose => "CHOOSE";
+        Column => "COLUMN";
+        Concat => "CONCAT";
+        Correl => "CORREL";
+        CountA => "COUNTA";
+        Filter => "FILTER";
+        IsText => "ISTEXT";
+        MaxIfs => "MAXIFS";
+        Median => "MEDIAN";
+        MinIfs => "MINIFS";
+        Minute => "MINUTE";
+        MRound => "MROUND";
+        Proper => "PROPER";
+        Search => "SEARCH";
+        Second => "SECOND";
+        SumIfs => "SUMIFS";
+        Switch => "SWITCH";
+        Unique => "UNIQUE";
+        XMatch => "XMATCH";
+        Address => "ADDRESS";
+        Ceiling => "CEILING";
+        Columns => "COLUMNS";
+        CountIf => "COUNTIF";
+        Days360 => "DAYS360";
+        EOMonth => "EOMONTH";
+        GeoMean => "GEOMEAN";
+        HLookup => "HLOOKUP";
+        IfError => "IFERROR";
+        IsBlank => "ISBLANK";
+        IsError => "ISERROR";
+        Product => "PRODUCT";
+        RankEq => "RANK.EQ";
+        Replace => "REPLACE";
+        RoundUp => "ROUNDUP";
+        StdevP => "STDEV.P";
+        StdevS => "STDEV.S";
+        UniChar => "UNICHAR";
+        Unicode => "UNICODE";
+        VLookup => "VLOOKUP";
+        Weekday => "WEEKDAY";
+        WeekNum => "WEEKNUM";
+        Workday => "WORKDAY";
+        XLookup => "XLOOKUP";
+        CountIfs => "COUNTIFS";
+        IsNumber => "ISNUMBER";
+        Quotient => "QUOTIENT";
+        Sequence => "SEQUENCE";
+        Subtotal => "SUBTOTAL";
+        TextJoin => "TEXTJOIN";
+        YearFrac => "YEARFRAC";
+        AverageIf => "AVERAGEIF";
+        DateValue => "DATEVALUE";
+        IsLogical => "ISLOGICAL";
+        ModeSngl => "MODE.SNGL";
+        RoundDown => "ROUNDDOWN";
+        TimeValue => "TIMEVALUE";
+        Transpose => "TRANSPOSE";
+        AverageIfs => "AVERAGEIFS";
+        ChooseCols => "CHOOSECOLS";
+        ChooseRows => "CHOOSEROWS";
+        CountBlank => "COUNTBLANK";
+        Substitute => "SUBSTITUTE";
+        SumProduct => "SUMPRODUCT";
+        Concatenate => "CONCATENATE";
+        NetworkDays => "NETWORKDAYS";
+        NumberValue => "NUMBERVALUE";
+        CovarianceP => "COVARIANCE.P";
+        CovarianceS => "COVARIANCE.S";
+        QuartileInc => "QUARTILE.INC";
+        PercentileInc => "PERCENTILE.INC";
+    }
+    aliases {
+        "AVERAGE" => Avg;
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -413,10 +633,10 @@ fn normalize_range(
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum Tok {
+enum Tok<'a> {
     Num(f64),
     Str(String),
-    Ident(String, bool),
+    Ident(Cow<'a, str>, bool),
     Op(char),
     LParen,
     RParen,
@@ -427,136 +647,162 @@ enum Tok {
     InvalidRef,
 }
 
-fn tokenize(src: &str) -> Result<Vec<Tok>, String> {
+fn quoted_token(
+    src: &str,
+    index: &mut usize,
+    quote: u8,
+    unterminated: &str,
+) -> Result<String, String> {
+    let bytes = src.as_bytes();
+    *index += 1;
+    let mut segment = *index;
+    let mut value = String::new();
+    loop {
+        if *index >= bytes.len() {
+            return Err(unterminated.into());
+        }
+        if bytes[*index] != quote {
+            *index += 1;
+            continue;
+        }
+
+        value.push_str(&src[segment..*index]);
+        if bytes.get(*index + 1) == Some(&quote) {
+            value.push(quote as char);
+            *index += 2;
+            segment = *index;
+        } else {
+            *index += 1;
+            return Ok(value);
+        }
+    }
+}
+
+fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
     let mut toks = Vec::new();
-    let chars: Vec<char> = src.chars().collect();
+    let bytes = src.as_bytes();
     let mut i = 0;
 
-    while i < chars.len() {
-        let c = chars[i];
-        if c.is_whitespace() {
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c.is_ascii_whitespace() {
             i += 1;
-        } else if c == '"' {
-            i += 1;
-            let mut value = String::new();
-            loop {
-                let Some(&ch) = chars.get(i) else {
-                    return Err("unterminated string literal".into());
-                };
-                if ch == '"' {
-                    if chars.get(i + 1) == Some(&'"') {
-                        value.push('"');
-                        i += 2;
-                    } else {
-                        i += 1;
-                        break;
-                    }
-                } else {
-                    value.push(ch);
-                    i += 1;
-                }
-            }
-            toks.push(Tok::Str(value));
+        } else if c == b'"' {
+            toks.push(Tok::Str(quoted_token(
+                src,
+                &mut i,
+                b'"',
+                "unterminated string literal",
+            )?));
         } else if c.is_ascii_digit()
-            || (c == '.' && chars.get(i + 1).is_some_and(char::is_ascii_digit))
+            || (c == b'.' && bytes.get(i + 1).is_some_and(u8::is_ascii_digit))
         {
             let start = i;
             let mut saw_decimal = false;
-            while i < chars.len() {
-                if chars[i].is_ascii_digit() {
+            while i < bytes.len() {
+                if bytes[i].is_ascii_digit() {
                     i += 1;
-                } else if chars[i] == '.' && !saw_decimal {
+                } else if bytes[i] == b'.' && !saw_decimal {
                     saw_decimal = true;
                     i += 1;
                 } else {
                     break;
                 }
             }
-            let s: String = chars[start..i].iter().collect();
-            toks.push(Tok::Num(s.parse().map_err(|_| format!("bad number: {s}"))?));
-        } else if c == '\'' {
-            i += 1;
-            let mut value = String::new();
-            loop {
-                let Some(&ch) = chars.get(i) else {
-                    return Err("unterminated sheet name".into());
-                };
-                if ch == '\'' {
-                    if chars.get(i + 1) == Some(&'\'') {
-                        value.push('\'');
-                        i += 2;
-                    } else {
-                        i += 1;
-                        break;
-                    }
-                } else {
-                    value.push(ch);
-                    i += 1;
-                }
-            }
-            toks.push(Tok::Ident(value, true));
-        } else if chars[i..].starts_with(&['#', 'R', 'E', 'F', '!']) {
+            let number = &src[start..i];
+            toks.push(Tok::Num(
+                number
+                    .parse()
+                    .map_err(|_| format!("bad number: {number}"))?,
+            ));
+        } else if c == b'\'' {
+            toks.push(Tok::Ident(
+                Cow::Owned(quoted_token(
+                    src,
+                    &mut i,
+                    b'\'',
+                    "unterminated sheet name",
+                )?),
+                true,
+            ));
+        } else if bytes[i..].starts_with(b"#REF!") {
             toks.push(Tok::InvalidRef);
             i += 5;
-        } else if c == '$' || c == '_' || c.is_ascii_alphabetic() {
+        } else if c == b'$' || c == b'_' || c.is_ascii_alphabetic() {
             let start = i;
-            while i < chars.len()
-                && (chars[i].is_ascii_alphanumeric()
-                    || chars[i] == '$'
-                    || chars[i] == '_'
-                    || chars[i] == '.')
+            while i < bytes.len()
+                && (bytes[i].is_ascii_alphanumeric()
+                    || bytes[i] == b'$'
+                    || bytes[i] == b'_'
+                    || bytes[i] == b'.')
             {
                 i += 1;
             }
-            toks.push(Tok::Ident(chars[start..i].iter().collect(), false));
-        } else if c == '!' {
+            toks.push(Tok::Ident(Cow::Borrowed(&src[start..i]), false));
+        } else if c == b'!' {
             toks.push(Tok::Bang);
             i += 1;
-        } else if c == '<' || c == '>' || c == '=' {
-            let next = chars.get(i + 1).copied();
+        } else if c == b'<' || c == b'>' || c == b'=' {
+            let next = bytes.get(i + 1).copied();
             let (op, len) = match (c, next) {
-                ('<', Some('=')) => (CmpOp::Le, 2),
-                ('>', Some('=')) => (CmpOp::Ge, 2),
-                ('<', Some('>')) => (CmpOp::Ne, 2),
-                ('=', _) => (CmpOp::Eq, 1),
-                ('<', _) => (CmpOp::Lt, 1),
+                (b'<', Some(b'=')) => (CmpOp::Le, 2),
+                (b'>', Some(b'=')) => (CmpOp::Ge, 2),
+                (b'<', Some(b'>')) => (CmpOp::Ne, 2),
+                (b'=', _) => (CmpOp::Eq, 1),
+                (b'<', _) => (CmpOp::Lt, 1),
                 _ => (CmpOp::Gt, 1),
             };
             toks.push(Tok::Cmp(op));
             i += len;
         } else {
             match c {
-                '+' | '-' | '*' | '/' | '^' | '&' | '%' => toks.push(Tok::Op(c)),
-                '(' => toks.push(Tok::LParen),
-                ')' => toks.push(Tok::RParen),
-                ',' => toks.push(Tok::Comma),
-                ':' => toks.push(Tok::Colon),
-                _ => return Err(format!("unexpected char: {c}")),
+                b'+' | b'-' | b'*' | b'/' | b'^' | b'&' | b'%' => {
+                    toks.push(Tok::Op(c as char));
+                    i += 1;
+                }
+                b'(' => {
+                    toks.push(Tok::LParen);
+                    i += 1;
+                }
+                b')' => {
+                    toks.push(Tok::RParen);
+                    i += 1;
+                }
+                b',' => {
+                    toks.push(Tok::Comma);
+                    i += 1;
+                }
+                b':' => {
+                    toks.push(Tok::Colon);
+                    i += 1;
+                }
+                _ if !c.is_ascii() => {
+                    let ch = src[i..].chars().next().expect("valid UTF-8 source");
+                    if ch.is_whitespace() {
+                        i += ch.len_utf8();
+                    } else {
+                        return Err(format!("unexpected char: {ch}"));
+                    }
+                }
+                _ => return Err(format!("unexpected char: {}", c as char)),
             }
-            i += 1;
         }
     }
 
     Ok(toks)
 }
 
-struct Parser {
-    toks: Vec<Tok>,
-    pos: usize,
+struct Parser<'a> {
+    toks: std::vec::IntoIter<Tok<'a>>,
 }
 
-impl Parser {
-    fn peek(&self) -> Option<&Tok> {
-        self.toks.get(self.pos)
+impl<'a> Parser<'a> {
+    fn peek(&self) -> Option<&Tok<'a>> {
+        self.toks.as_slice().first()
     }
 
-    fn next(&mut self) -> Option<Tok> {
-        if self.pos >= self.toks.len() {
-            return None;
-        }
-        let token = self.toks[self.pos].clone();
-        self.pos += 1;
-        Some(token)
+    fn next(&mut self) -> Option<Tok<'a>> {
+        self.toks.next()
     }
 
     fn guard_depth(depth: usize) -> Result<(), String> {
@@ -577,7 +823,7 @@ impl Parser {
         let left = self.concat_at(depth)?;
         if let Some(Tok::Cmp(op)) = self.peek() {
             let op = *op;
-            self.pos += 1;
+            let _ = self.next();
             let right = self.concat_at(depth)?;
             return Ok(Ast::Cmp(op, Box::new(left), Box::new(right)));
         }
@@ -589,7 +835,7 @@ impl Parser {
 
         let mut left = self.additive_at(depth)?;
         while self.peek() == Some(&Tok::Op('&')) {
-            self.pos += 1;
+            let _ = self.next();
             let right = self.additive_at(depth)?;
             left = Ast::Bin(Op::Concat, Box::new(left), Box::new(right));
         }
@@ -602,7 +848,7 @@ impl Parser {
         let mut left = self.term_at(depth)?;
         while let Some(Tok::Op(c @ ('+' | '-'))) = self.peek() {
             let op = if *c == '+' { Op::Add } else { Op::Sub };
-            self.pos += 1;
+            let _ = self.next();
             let right = self.term_at(depth)?;
             left = Ast::Bin(op, Box::new(left), Box::new(right));
         }
@@ -615,7 +861,7 @@ impl Parser {
         let mut left = self.power_at(depth)?;
         while let Some(Tok::Op(c @ ('*' | '/'))) = self.peek() {
             let op = if *c == '*' { Op::Mul } else { Op::Div };
-            self.pos += 1;
+            let _ = self.next();
             let right = self.power_at(depth)?;
             left = Ast::Bin(op, Box::new(left), Box::new(right));
         }
@@ -627,7 +873,7 @@ impl Parser {
 
         let mut left = self.postfix_at(depth)?;
         while self.peek() == Some(&Tok::Op('^')) {
-            self.pos += 1;
+            let _ = self.next();
             let right = self.postfix_at(depth)?;
             left = Ast::Bin(Op::Pow, Box::new(left), Box::new(right));
         }
@@ -639,7 +885,7 @@ impl Parser {
 
         let mut value = self.unary_at(depth)?;
         while self.peek() == Some(&Tok::Op('%')) {
-            self.pos += 1;
+            let _ = self.next();
             value = Ast::Percent(Box::new(value));
         }
         Ok(value)
@@ -650,7 +896,7 @@ impl Parser {
 
         if let Some(Tok::Op(sign @ ('+' | '-'))) = self.peek() {
             let sign = *sign;
-            self.pos += 1;
+            let _ = self.next();
             let inner = Box::new(self.unary_at(depth + 1)?);
             return Ok(if sign == '-' {
                 Ast::Neg(inner)
@@ -684,174 +930,22 @@ impl Parser {
         }
     }
 
-    fn ident_at(&mut self, name: String, quoted: bool, depth: usize) -> Result<Ast, String> {
+    fn ident_at(
+        &mut self,
+        name: Cow<'a, str>,
+        quoted: bool,
+        depth: usize,
+    ) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 
         if let Some(Tok::Bang) = self.peek() {
-            self.pos += 1;
-            return self.sheet_ref_at(name, quoted);
+            let _ = self.next();
+            return self.sheet_ref_at(name.into_owned(), quoted);
         }
 
         if let Some(Tok::LParen) = self.peek() {
-            self.pos += 1;
-            let func = match name.to_ascii_uppercase().as_str() {
-                "SUM" => Some(Func::Sum),
-                "AVG" | "AVERAGE" => Some(Func::Avg),
-                "MIN" => Some(Func::Min),
-                "MAX" => Some(Func::Max),
-                "COUNT" => Some(Func::Count),
-                "IF" => Some(Func::If),
-                "ABS" => Some(Func::Abs),
-                "ROUND" => Some(Func::Round),
-                "SQRT" => Some(Func::Sqrt),
-                "MOD" => Some(Func::Mod),
-                "POW" => Some(Func::Pow),
-                "AND" => Some(Func::And),
-                "OR" => Some(Func::Or),
-                "NOT" => Some(Func::Not),
-                "FLOOR" => Some(Func::Floor),
-                "CEILING" => Some(Func::Ceiling),
-                "INT" => Some(Func::Int),
-                "TRUNC" => Some(Func::Trunc),
-                "SIGN" => Some(Func::Sign),
-                "PI" => Some(Func::Pi),
-                "IFERROR" => Some(Func::IfError),
-                "IFNA" => Some(Func::IfNa),
-                "IFS" => Some(Func::Ifs),
-                "SWITCH" => Some(Func::Switch),
-                "XOR" => Some(Func::Xor),
-                "TRUE" => Some(Func::True),
-                "FALSE" => Some(Func::False),
-                "ISBLANK" => Some(Func::IsBlank),
-                "ISNUMBER" => Some(Func::IsNumber),
-                "ISTEXT" => Some(Func::IsText),
-                "ISLOGICAL" => Some(Func::IsLogical),
-                "ISERROR" => Some(Func::IsError),
-                "ISERR" => Some(Func::IsErr),
-                "ISNA" => Some(Func::IsNa),
-                "TYPE" => Some(Func::Type),
-                "N" => Some(Func::N),
-                "T" => Some(Func::T),
-                "COUNTA" => Some(Func::CountA),
-                "LEN" => Some(Func::Len),
-                "LEFT" => Some(Func::Left),
-                "RIGHT" => Some(Func::Right),
-                "MID" => Some(Func::Mid),
-                "CONCAT" => Some(Func::Concat),
-                "CONCATENATE" => Some(Func::Concatenate),
-                "UPPER" => Some(Func::Upper),
-                "LOWER" => Some(Func::Lower),
-                "TRIM" => Some(Func::Trim),
-                "TEXT" => Some(Func::Text),
-                "EXACT" => Some(Func::Exact),
-                "DATE" => Some(Func::Date),
-                "DATEVALUE" => Some(Func::DateValue),
-                "DAY" => Some(Func::Day),
-                "MONTH" => Some(Func::Month),
-                "YEAR" => Some(Func::Year),
-                "TODAY" => Some(Func::Today),
-                "NOW" => Some(Func::Now),
-                "COUNTIF" => Some(Func::CountIf),
-                "COUNTIFS" => Some(Func::CountIfs),
-                "SUMIF" => Some(Func::SumIf),
-                "SUMIFS" => Some(Func::SumIfs),
-                "AVERAGEIF" => Some(Func::AverageIf),
-                "AVERAGEIFS" => Some(Func::AverageIfs),
-                "INDEX" => Some(Func::Index),
-                "MATCH" => Some(Func::Match),
-                "VLOOKUP" => Some(Func::VLookup),
-                "HLOOKUP" => Some(Func::HLookup),
-                "XLOOKUP" => Some(Func::XLookup),
-                "NA" => Some(Func::Na),
-                "FILTER" => Some(Func::Filter),
-                "SORT" => Some(Func::Sort),
-                "UNIQUE" => Some(Func::Unique),
-                "LET" => Some(Func::Let),
-                "PRODUCT" => Some(Func::Product),
-                "SUMPRODUCT" => Some(Func::SumProduct),
-                "POWER" => Some(Func::Power),
-                "EXP" => Some(Func::Exp),
-                "LN" => Some(Func::Ln),
-                "LOG" => Some(Func::Log),
-                "LOG10" => Some(Func::Log10),
-                "ROUNDUP" => Some(Func::RoundUp),
-                "ROUNDDOWN" => Some(Func::RoundDown),
-                "MROUND" => Some(Func::MRound),
-                "EVEN" => Some(Func::Even),
-                "ODD" => Some(Func::Odd),
-                "QUOTIENT" => Some(Func::Quotient),
-                "GCD" => Some(Func::Gcd),
-                "LCM" => Some(Func::Lcm),
-                "SUBTOTAL" => Some(Func::Subtotal),
-                "TEXTJOIN" => Some(Func::TextJoin),
-                "SUBSTITUTE" => Some(Func::Substitute),
-                "REPLACE" => Some(Func::Replace),
-                "FIND" => Some(Func::Find),
-                "SEARCH" => Some(Func::Search),
-                "VALUE" => Some(Func::Value),
-                "CLEAN" => Some(Func::Clean),
-                "REPT" => Some(Func::Rept),
-                "CHAR" => Some(Func::Char),
-                "CODE" => Some(Func::Code),
-                "UNICHAR" => Some(Func::UniChar),
-                "UNICODE" => Some(Func::Unicode),
-                "PROPER" => Some(Func::Proper),
-                "NUMBERVALUE" => Some(Func::NumberValue),
-                "TIME" => Some(Func::Time),
-                "TIMEVALUE" => Some(Func::TimeValue),
-                "HOUR" => Some(Func::Hour),
-                "MINUTE" => Some(Func::Minute),
-                "SECOND" => Some(Func::Second),
-                "DAYS" => Some(Func::Days),
-                "EDATE" => Some(Func::EDate),
-                "EOMONTH" => Some(Func::EOMonth),
-                "WEEKDAY" => Some(Func::Weekday),
-                "WEEKNUM" => Some(Func::WeekNum),
-                "WORKDAY" => Some(Func::Workday),
-                "NETWORKDAYS" => Some(Func::NetworkDays),
-                "YEARFRAC" => Some(Func::YearFrac),
-                "DAYS360" => Some(Func::Days360),
-                "MEDIAN" => Some(Func::Median),
-                "MODE.SNGL" => Some(Func::ModeSngl),
-                "LARGE" => Some(Func::Large),
-                "SMALL" => Some(Func::Small),
-                "RANK.EQ" => Some(Func::RankEq),
-                "PERCENTILE.INC" => Some(Func::PercentileInc),
-                "QUARTILE.INC" => Some(Func::QuartileInc),
-                "STDEV.S" => Some(Func::StdevS),
-                "STDEV.P" => Some(Func::StdevP),
-                "VAR.S" => Some(Func::VarS),
-                "VAR.P" => Some(Func::VarP),
-                "GEOMEAN" => Some(Func::GeoMean),
-                "CORREL" => Some(Func::Correl),
-                "COVARIANCE.S" => Some(Func::CovarianceS),
-                "COVARIANCE.P" => Some(Func::CovarianceP),
-                "COUNTBLANK" => Some(Func::CountBlank),
-                "MAXIFS" => Some(Func::MaxIfs),
-                "MINIFS" => Some(Func::MinIfs),
-                "XMATCH" => Some(Func::XMatch),
-                "CHOOSE" => Some(Func::Choose),
-                "ROW" => Some(Func::Row),
-                "ROWS" => Some(Func::Rows),
-                "COLUMN" => Some(Func::Column),
-                "COLUMNS" => Some(Func::Columns),
-                "ADDRESS" => Some(Func::Address),
-                "TRANSPOSE" => Some(Func::Transpose),
-                "SEQUENCE" => Some(Func::Sequence),
-                "TAKE" => Some(Func::Take),
-                "DROP" => Some(Func::Drop),
-                "CHOOSECOLS" => Some(Func::ChooseCols),
-                "CHOOSEROWS" => Some(Func::ChooseRows),
-                "PV" => Some(Func::Pv),
-                "FV" => Some(Func::Fv),
-                "PMT" => Some(Func::Pmt),
-                "NPV" => Some(Func::Npv),
-                "IRR" => Some(Func::Irr),
-                "RATE" => Some(Func::Rate),
-                "IPMT" => Some(Func::Ipmt),
-                "PPMT" => Some(Func::Ppmt),
-                _ => None,
-            };
+            let _ = self.next();
+            let func = lookup_func(name.as_ref());
             let mut args = Vec::new();
             if self.peek() != Some(&Tok::RParen) {
                 loop {
@@ -862,7 +956,7 @@ impl Parser {
                     }
                     match self.peek() {
                         Some(Tok::Comma) => {
-                            self.pos += 1;
+                            let _ = self.next();
                         }
                         _ => break,
                     }
@@ -871,22 +965,23 @@ impl Parser {
             match self.next() {
                 Some(Tok::RParen) => Ok(match func {
                     Some(func) => Ast::Func(func, args),
-                    None => Ast::UnknownFunc(name, args),
+                    None => Ast::UnknownFunc(name.into_owned(), args),
                 }),
                 _ => Err("expected )".into()),
             }
         } else {
-            match name.to_ascii_uppercase().as_str() {
-                "TRUE" => return Ok(Ast::Bool(true)),
-                "FALSE" => return Ok(Ast::Bool(false)),
-                _ => {}
+            if name.eq_ignore_ascii_case("TRUE") {
+                return Ok(Ast::Bool(true));
+            }
+            if name.eq_ignore_ascii_case("FALSE") {
+                return Ok(Ast::Bool(false));
             }
 
-            let Some((row, col, flags)) = parse_a1(&name) else {
-                return Ok(Ast::Name(name));
+            let Some((row, col, flags)) = parse_a1(name.as_ref()) else {
+                return Ok(Ast::Name(name.into_owned()));
             };
             if let Some(Tok::Colon) = self.peek() {
-                self.pos += 1;
+                let _ = self.next();
                 match self.next() {
                     Some(Tok::Ident(end, _)) => {
                         let (r1, c1, end_flags) =
@@ -914,7 +1009,7 @@ impl Parser {
         };
 
         if let Some(Tok::Colon) = self.peek() {
-            self.pos += 1;
+            let _ = self.next();
             let (end_sheet, r1, c1, end_flags) = self.sheet_range_end(&sheet_name)?;
             if sheet_name_key(&end_sheet) != sheet_name_key(&sheet_name) {
                 return Err("cross-sheet ranges must stay on one sheet".into());
@@ -935,12 +1030,12 @@ impl Parser {
         };
 
         if let Some(Tok::Bang) = self.peek() {
-            self.pos += 1;
+            let _ = self.next();
             let Some(Tok::Ident(end, _)) = self.next() else {
                 return Err("expected cell after !".into());
             };
             let (row, col, flags) = parse_a1(&end).ok_or_else(|| format!("bad cell ref: {end}"))?;
-            return Ok((first, row, col, flags));
+            return Ok((first.into_owned(), row, col, flags));
         }
 
         let (row, col, flags) = parse_a1(&first).ok_or_else(|| format!("bad cell ref: {first}"))?;
@@ -956,9 +1051,11 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 pub fn parse(src: &str) -> Result<Ast, String> {
     let trimmed = src.trim().strip_prefix('=').unwrap_or(src.trim());
     let toks = tokenize(trimmed)?;
-    let mut parser = Parser { toks, pos: 0 };
+    let mut parser = Parser {
+        toks: toks.into_iter(),
+    };
     let ast = parser.expr()?;
-    if parser.pos != parser.toks.len() {
+    if parser.peek().is_some() {
         return Err("trailing tokens".into());
     }
     Ok(ast)
@@ -1513,165 +1610,6 @@ fn write_col(mut col: u32, out: &mut String) {
     out.push_str(std::str::from_utf8(&letters[index..]).expect("ASCII column letters"));
 }
 
-fn func_name(func: Func) -> &'static str {
-    match func {
-        Func::Sum => "SUM",
-        Func::Avg => "AVG",
-        Func::Min => "MIN",
-        Func::Max => "MAX",
-        Func::Count => "COUNT",
-        Func::If => "IF",
-        Func::Abs => "ABS",
-        Func::Round => "ROUND",
-        Func::Sqrt => "SQRT",
-        Func::Mod => "MOD",
-        Func::Pow => "POW",
-        Func::And => "AND",
-        Func::Or => "OR",
-        Func::Not => "NOT",
-        Func::Floor => "FLOOR",
-        Func::Ceiling => "CEILING",
-        Func::Int => "INT",
-        Func::Trunc => "TRUNC",
-        Func::Sign => "SIGN",
-        Func::Pi => "PI",
-        Func::IfError => "IFERROR",
-        Func::IfNa => "IFNA",
-        Func::Ifs => "IFS",
-        Func::Switch => "SWITCH",
-        Func::Xor => "XOR",
-        Func::True => "TRUE",
-        Func::False => "FALSE",
-        Func::IsBlank => "ISBLANK",
-        Func::IsNumber => "ISNUMBER",
-        Func::IsText => "ISTEXT",
-        Func::IsLogical => "ISLOGICAL",
-        Func::IsError => "ISERROR",
-        Func::IsErr => "ISERR",
-        Func::IsNa => "ISNA",
-        Func::Type => "TYPE",
-        Func::N => "N",
-        Func::T => "T",
-        Func::CountA => "COUNTA",
-        Func::Len => "LEN",
-        Func::Left => "LEFT",
-        Func::Right => "RIGHT",
-        Func::Mid => "MID",
-        Func::Concat => "CONCAT",
-        Func::Concatenate => "CONCATENATE",
-        Func::Upper => "UPPER",
-        Func::Lower => "LOWER",
-        Func::Trim => "TRIM",
-        Func::Text => "TEXT",
-        Func::Exact => "EXACT",
-        Func::Date => "DATE",
-        Func::DateValue => "DATEVALUE",
-        Func::Day => "DAY",
-        Func::Month => "MONTH",
-        Func::Year => "YEAR",
-        Func::Today => "TODAY",
-        Func::Now => "NOW",
-        Func::CountIf => "COUNTIF",
-        Func::CountIfs => "COUNTIFS",
-        Func::SumIf => "SUMIF",
-        Func::SumIfs => "SUMIFS",
-        Func::AverageIf => "AVERAGEIF",
-        Func::AverageIfs => "AVERAGEIFS",
-        Func::Index => "INDEX",
-        Func::Match => "MATCH",
-        Func::VLookup => "VLOOKUP",
-        Func::HLookup => "HLOOKUP",
-        Func::XLookup => "XLOOKUP",
-        Func::Na => "NA",
-        Func::Filter => "FILTER",
-        Func::Sort => "SORT",
-        Func::Unique => "UNIQUE",
-        Func::Let => "LET",
-        Func::Product => "PRODUCT",
-        Func::SumProduct => "SUMPRODUCT",
-        Func::Power => "POWER",
-        Func::Exp => "EXP",
-        Func::Ln => "LN",
-        Func::Log => "LOG",
-        Func::Log10 => "LOG10",
-        Func::RoundUp => "ROUNDUP",
-        Func::RoundDown => "ROUNDDOWN",
-        Func::MRound => "MROUND",
-        Func::Even => "EVEN",
-        Func::Odd => "ODD",
-        Func::Quotient => "QUOTIENT",
-        Func::Gcd => "GCD",
-        Func::Lcm => "LCM",
-        Func::Subtotal => "SUBTOTAL",
-        Func::TextJoin => "TEXTJOIN",
-        Func::Substitute => "SUBSTITUTE",
-        Func::Replace => "REPLACE",
-        Func::Find => "FIND",
-        Func::Search => "SEARCH",
-        Func::Value => "VALUE",
-        Func::Clean => "CLEAN",
-        Func::Rept => "REPT",
-        Func::Char => "CHAR",
-        Func::Code => "CODE",
-        Func::UniChar => "UNICHAR",
-        Func::Unicode => "UNICODE",
-        Func::Proper => "PROPER",
-        Func::NumberValue => "NUMBERVALUE",
-        Func::Time => "TIME",
-        Func::TimeValue => "TIMEVALUE",
-        Func::Hour => "HOUR",
-        Func::Minute => "MINUTE",
-        Func::Second => "SECOND",
-        Func::Days => "DAYS",
-        Func::EDate => "EDATE",
-        Func::EOMonth => "EOMONTH",
-        Func::Weekday => "WEEKDAY",
-        Func::WeekNum => "WEEKNUM",
-        Func::Workday => "WORKDAY",
-        Func::NetworkDays => "NETWORKDAYS",
-        Func::YearFrac => "YEARFRAC",
-        Func::Days360 => "DAYS360",
-        Func::Median => "MEDIAN",
-        Func::ModeSngl => "MODE.SNGL",
-        Func::Large => "LARGE",
-        Func::Small => "SMALL",
-        Func::RankEq => "RANK.EQ",
-        Func::PercentileInc => "PERCENTILE.INC",
-        Func::QuartileInc => "QUARTILE.INC",
-        Func::StdevS => "STDEV.S",
-        Func::StdevP => "STDEV.P",
-        Func::VarS => "VAR.S",
-        Func::VarP => "VAR.P",
-        Func::GeoMean => "GEOMEAN",
-        Func::Correl => "CORREL",
-        Func::CovarianceS => "COVARIANCE.S",
-        Func::CovarianceP => "COVARIANCE.P",
-        Func::CountBlank => "COUNTBLANK",
-        Func::MaxIfs => "MAXIFS",
-        Func::MinIfs => "MINIFS",
-        Func::XMatch => "XMATCH",
-        Func::Choose => "CHOOSE",
-        Func::Row => "ROW",
-        Func::Rows => "ROWS",
-        Func::Column => "COLUMN",
-        Func::Columns => "COLUMNS",
-        Func::Address => "ADDRESS",
-        Func::Transpose => "TRANSPOSE",
-        Func::Sequence => "SEQUENCE",
-        Func::Take => "TAKE",
-        Func::Drop => "DROP",
-        Func::ChooseCols => "CHOOSECOLS",
-        Func::ChooseRows => "CHOOSEROWS",
-        Func::Pv => "PV",
-        Func::Fv => "FV",
-        Func::Pmt => "PMT",
-        Func::Npv => "NPV",
-        Func::Irr => "IRR",
-        Func::Rate => "RATE",
-        Func::Ipmt => "IPMT",
-        Func::Ppmt => "PPMT",
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -1890,6 +1828,90 @@ mod tests {
             )
         );
     }
+    #[test]
+    fn function_registry_is_exact_complete_and_case_insensitive() {
+        assert_eq!(FUNCTION_NAMES.len(), 155);
+        assert_eq!(FUNCTION_NAMES.len() + FUNCTION_ALIASES.len(), 156);
+        for registry in [FUNCTION_NAMES, FUNCTION_ALIASES] {
+            for pair in registry.windows(2) {
+                assert_eq!(
+                    registered_name_cmp(pair[0].0, pair[1].0),
+                    Ordering::Less,
+                    "registry order: {} before {}",
+                    pair[0].0,
+                    pair[1].0
+                );
+            }
+        }
+
+        for &(spelling, func) in FUNCTION_NAMES.iter().chain(FUNCTION_ALIASES) {
+            assert_eq!(lookup_func(spelling), Some(func), "{spelling}");
+            assert_eq!(lookup_func(&spelling.to_ascii_lowercase()), Some(func), "{spelling}");
+            let mixed: String = spelling
+                .chars()
+                .enumerate()
+                .map(|(index, ch)| {
+                    if index % 2 == 0 {
+                        ch.to_ascii_lowercase()
+                    } else {
+                        ch
+                    }
+                })
+                .collect();
+            assert_eq!(lookup_func(&mixed), Some(func), "{spelling}");
+
+            let parsed = parse(&format!("={mixed}(1)")).expect("registered call should parse");
+            assert_eq!(parsed, Ast::Func(func, vec![Ast::Num(1.0)]), "{spelling}");
+            assert_eq!(parse(&serialize(&parsed)), Ok(parsed), "{spelling}");
+        }
+        for &(spelling, func) in FUNCTION_NAMES {
+            assert_eq!(func_name(func), spelling);
+        }
+        assert_eq!(func_name(Func::Avg), "AVG");
+        assert_eq!(lookup_func("AVERAGE"), Some(Func::Avg));
+        assert_eq!(lookup_func("NOT_A_FUNCTION"), None);
+    }
+
+    #[test]
+    fn names_sheet_refs_and_unknown_calls_preserve_source_case() {
+        assert_eq!(
+            parse("=Revenue_Q1"),
+            Ok(Ast::Name("Revenue_Q1".to_string()))
+        );
+        assert_eq!(
+            parse("=Sales.Data"),
+            Ok(Ast::Name("Sales.Data".to_string()))
+        );
+
+        let sheet_ref = parse("='North East'!a1").expect("quoted sheet ref should parse");
+        assert_eq!(serialize(&sheet_ref), "='North East'!A1");
+        assert_eq!(parse(&serialize(&sheet_ref)), Ok(sheet_ref));
+
+        let unicode_sheet =
+            parse("='München Süd'!b2").expect("UTF-8 quoted sheet ref should parse");
+        assert_eq!(serialize(&unicode_sheet), "='München Süd'!B2");
+        assert_eq!(parse(&serialize(&unicode_sheet)), Ok(unicode_sheet));
+        assert_eq!(
+            parse("=\"café\""),
+            Ok(Ast::Str("café".to_string()))
+        );
+        assert_eq!(
+            serialize(&parse("=1\u{2003}+2").expect("Unicode whitespace should parse")),
+            "=(1+2)"
+        );
+
+        let unknown =
+            parse("=MiXeD.Call(Revenue_Q1)").expect("unknown call should remain parseable");
+        assert_eq!(
+            unknown,
+            Ast::UnknownFunc(
+                "MiXeD.Call".to_string(),
+                vec![Ast::Name("Revenue_Q1".to_string())]
+            )
+        );
+        assert_eq!(serialize(&unknown), "=MiXeD.Call(Revenue_Q1)");
+    }
+
     #[test]
     fn dotted_function_names_and_leading_decimal_round_trip() {
         let dotted = parse("=MODE.SNGL(.5)").expect("dotted function should parse");
