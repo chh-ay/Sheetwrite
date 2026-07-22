@@ -380,7 +380,6 @@ fn subtotal(values: &FuncAccumulator) -> Value {
         return Value::Error(error);
     }
     let function = match integer_arg(values, 0, None) {
-        Ok(code @ 101..=111) => code - 100,
         Ok(code @ 1..=11) => code,
         Ok(_) => return Value::Error(FormulaError::Value),
         Err(error) => return Value::Error(error),
@@ -758,6 +757,15 @@ mod tests {
         ]);
         assert_eq!(
             apply(Func::Subtotal, &invalid_code).unwrap(),
+            Value::Error(FormulaError::Value)
+        );
+
+        let hidden_row_code = accumulator(vec![
+            (false, vec![Value::number(109.0)]),
+            (true, vec![Value::number(1.0)]),
+        ]);
+        assert_eq!(
+            apply(Func::Subtotal, &hidden_row_code).unwrap(),
             Value::Error(FormulaError::Value)
         );
     }

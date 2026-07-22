@@ -160,12 +160,12 @@ fn left_right(values: &FuncAccumulator, right: bool) -> Value {
         Err(error) => return Value::Error(error),
     };
     let length = text.chars().count();
-    let output: String = if right {
-        text.chars().skip(length.saturating_sub(count)).collect()
+    let start = if right {
+        length.saturating_sub(count)
     } else {
-        text.chars().take(count).collect()
+        0
     };
-    Value::text(output)
+    slice_text(&text, start, count).unwrap_or_else(Value::Error)
 }
 
 fn mid(values: &FuncAccumulator) -> Value {
@@ -177,7 +177,10 @@ fn mid(values: &FuncAccumulator) -> Value {
         Err(error) => return Value::Error(error),
     };
     let start = match integer_arg(values, 1, None) {
-        Ok(start) if start > 0 => start as usize,
+        Ok(start) if start > 0 => match usize::try_from(start - 1) {
+            Ok(start) => start,
+            Err(_) => return Value::Error(FormulaError::Value),
+        },
         Ok(_) => return Value::Error(FormulaError::Value),
         Err(error) => return Value::Error(error),
     };
@@ -185,7 +188,15 @@ fn mid(values: &FuncAccumulator) -> Value {
         Ok(count) => count,
         Err(error) => return Value::Error(error),
     };
-    Value::text(text.chars().skip(start - 1).take(count).collect::<String>())
+    slice_text(&text, start, count).unwrap_or_else(Value::Error)
+}
+
+fn slice_text(text: &str, start: usize, count: usize) -> Result<Value, FormulaError> {
+    let mut output = String::new();
+    for character in text.chars().skip(start).take(count) {
+        checked_push_character(&mut output, character)?;
+    }
+    bounded_text(output)
 }
 
 fn concat(values: &FuncAccumulator) -> Value {
@@ -673,7 +684,7 @@ fn parse_number(text: &str, decimal: &str, group: &str) -> Result<f64, FormulaEr
 #[cfg(test)]
 mod tests {
     use super::{
-        apply, clean_text, literal_find, MAX_SEARCH_STEPS, MAX_TEXT_OUTPUT_BYTES,
+        apply, clean_text, literal_find, slice_text, MAX_SEARCH_STEPS, MAX_TEXT_OUTPUT_BYTES,
     };
     use crate::calc::Func;
     use crate::types::{FormulaError, Value};
@@ -975,6 +986,33 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn code_point_slices_enforce_output_bounds() {
+        assert_eq!(
+            evaluate(
+                Func::Right,
+                vec![Value::text("a😀ç"), Value::number(2.0)],
+            ),
+            Value::text("😀ç")
+        );
+        assert_eq!(
+            evaluate(
+                Func::Mid,
+                vec![
+                    Value::text("a😀ç"),
+                    Value::number(2.0),
+                    Value::number(1.0),
+                ],
+            ),
+            Value::text("😀")
+        );
+        let oversized = "a".repeat(MAX_TEXT_OUTPUT_BYTES + 1);
+        assert_eq!(
+            slice_text(&oversized, 0, MAX_TEXT_OUTPUT_BYTES + 1),
+            Err(FormulaError::Num)
+        );
+    }
     #[test]
     fn proper_uses_nonletters_as_word_boundaries_without_per_character_strings() {
         assert_eq!(
