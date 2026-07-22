@@ -54,14 +54,16 @@
     scroll-margin-top: calc(var(--sw-header-height) + var(--sw-sp-space-6));
   }
 
-  .sw-sp-section > h2 {
+  .sw-sp-section > h2,
+  .sw-sp-resource-copy h2 {
     margin: 0 0 var(--sw-sp-space-3);
     color: var(--sw-fg-strong);
     font: 630 clamp(1.45rem, 3vw, 2.15rem) / 1.14 var(--sw-font-display);
     letter-spacing: -0.025em;
   }
 
-  .sw-sp-section > p:not(.sw-sp-kicker) {
+  .sw-sp-section > p:not(.sw-sp-kicker),
+  .sw-sp-resource-copy > p:not(.sw-sp-kicker) {
     max-width: var(--sw-sp-measure);
     margin: 0 0 var(--sw-sp-space-4);
     color: var(--sw-fg-muted);
@@ -241,6 +243,12 @@
     font-size: 0.66rem;
   }
 
+  .sw-sp-readout dd.sw-sp-readout__formula {
+    grid-column: 1 / -1;
+    color: var(--sw-accent-strong);
+    font: 600 0.68rem / 1.4 var(--sw-font-mono);
+    overflow-wrap: anywhere;
+  }
   .sw-sp-stage-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--sw-sp-instrument-width);
@@ -249,6 +257,8 @@
   }
 
   .sw-sp-grid-shell {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     overflow: hidden;
     border-right: var(--sw-sp-line) solid var(--sw-border);
@@ -317,8 +327,9 @@
 
   .sw-sp-grid {
     width: 100%;
-    height: var(--sw-sp-grid-height);
+    height: auto;
     min-height: var(--sw-sp-grid-height);
+    flex: 1 1 var(--sw-sp-grid-height);
     touch-action: pan-x pan-y;
     overscroll-behavior: contain;
   }
@@ -391,14 +402,17 @@
 
   .sw-sp-navigator {
     display: grid;
-    grid-template-columns: 5.5rem minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sw-sp-space-2);
     padding: var(--sw-sp-space-3);
     border-bottom: var(--sw-sp-line) solid var(--sw-border);
   }
 
   .sw-sp-navigator .sw-sp-overview-head {
-    align-content: center;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sw-sp-space-2);
     padding: 0;
     text-align: left;
   }
@@ -406,6 +420,38 @@
   .sw-sp-navigator .sw-sp-overview-track {
     min-height: 9rem;
     margin: 0;
+  }
+  .sw-sp-navigator .sw-sp-overview-head strong {
+    font-size: var(--sw-type-xs);
+  }
+
+  .sw-sp-column-overview {
+    display: grid;
+    grid-column: 1 / -1;
+    gap: var(--sw-sp-space-2);
+    padding-top: var(--sw-sp-space-3);
+    border-top: var(--sw-sp-line) solid var(--sw-border);
+  }
+
+  .sw-sp-column-overview > span {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sw-sp-space-2);
+    color: var(--sw-fg-strong);
+    font-size: var(--sw-type-xs);
+  }
+
+  .sw-sp-column-overview small {
+    color: var(--sw-accent-strong);
+    font: 600 var(--sw-type-xs) var(--sw-font-mono);
+  }
+
+  .sw-sp-column-overview input {
+    width: 100%;
+    margin: 0;
+    accent-color: var(--sw-accent);
+    cursor: ew-resize;
   }
 
   .sw-sp-render-details {
@@ -502,7 +548,7 @@
     margin: 0;
     appearance: none;
     background: transparent;
-    direction: rtl;
+    direction: ltr;
     writing-mode: vertical-lr;
     cursor: ns-resize;
   }
@@ -798,6 +844,52 @@
     margin-top: var(--sw-sp-space-2);
     border: var(--sw-sp-line) solid var(--sw-border);
     border-radius: var(--sw-demo-radius-2);
+  }
+
+  #resources {
+    display: block;
+  }
+
+  .sw-sp-resource-copy {
+    max-width: var(--sw-sp-measure);
+    margin: 0;
+    text-align: left;
+  }
+
+  .sw-sp-resource-copy > p {
+    margin-inline: 0;
+  }
+
+  .sw-sp-resource-copy > p:last-child {
+    margin-bottom: 0;
+  }
+
+  .sw-sp-resource-panel {
+    overflow: hidden;
+    width: min(var(--sw-sp-measure), 100%);
+    margin: var(--sw-sp-space-6) 0 0;
+    border: var(--sw-sp-line) solid var(--sw-border);
+    border-radius: var(--sw-demo-radius-3);
+    background: var(--sw-surface-1);
+    box-shadow: var(--sw-shadow);
+  }
+
+  .sw-sp-resource-panel .sw-sp-debug-disclosure {
+    max-width: none;
+    margin-top: 0;
+  }
+
+  .sw-sp-resource-panel .sw-sp-debug-disclosure > summary {
+    width: 100%;
+    border: 0;
+    border-top: var(--sw-sp-line) solid var(--sw-border);
+    border-radius: 0;
+  }
+
+  .sw-sp-resource-panel .sw-sp-debug-disclosure > .sw-sp-tablewrap {
+    margin: 0;
+    border-width: var(--sw-sp-line) 0 0;
+    border-radius: 0;
   }
 
   .sw-sp-stats {

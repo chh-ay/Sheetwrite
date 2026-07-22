@@ -963,4 +963,4 @@ These protocols have no validated artifact in this environment yet, so no number
 
 | Artifact | Status | Reproduce with |
 | --- | --- | --- |
-| `test-results/delivery-size/size-report.json` | artifact is missing | `bun run size:report` |
+| `test-results/delivery-size/size-report.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run size:report` |

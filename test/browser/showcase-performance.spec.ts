@@ -392,6 +392,11 @@ test("semantic headers and coherent financial operations values are rendered by 
         window.__sheetwriteScaleGrid?.store.getCell({ sheet: "scale", row: 0, col }).resolved,
     ),
   );
+  const formulas = await page.evaluate(() => {
+    const store = window.__sheetwriteScaleGrid?.store;
+    return [5, 7, 8, 10].map((col) => store?.getFormula({ sheet: "scale", row: 0, col }));
+  });
+  expect(formulas).toEqual(["=D1-E1", "=F1-G1", "=IF(D1=0,0,H1/D1)", "=D1-J1"]);
   expect(row[0]).toBe("FY2024 P01");
   expect(row[1]).toMatch(/4100|4200|4300|4400/);
   expect(["North America", "EMEA", "APAC", "Latin America"]).toContain(row[2]);
@@ -412,9 +417,7 @@ test("semantic headers and coherent financial operations values are rendered by 
   expect(["Ahead", "On plan", "Watch"]).toContain(row[11]);
 });
 
-test("wheel, Page keys, landmarks, and a physical overview drag agree with public headers", async ({
-  page,
-}) => {
+test("row and column navigators agree with the public window headers", async ({ page }) => {
   await bootScale(page);
   const grid = page.locator(GRID);
   await grid.scrollIntoViewIfNeeded();
@@ -476,6 +479,13 @@ test("wheel, Page keys, landmarks, and a physical overview drag agree with publi
   await page.mouse.up();
   await expect.poll(async () => (await readWindow(page)).firstRow).toBeLessThan(landmarkRows[2]!);
   await readWindow(page);
+
+  const columnRail = page.getByTestId("scale-column-overview");
+  await columnRail.focus();
+  await page.keyboard.press("End");
+  await expect(page.getByTestId("scale-current-a1")).toHaveText(/^ALL\d+$/);
+  await expect.poll(async () => (await readWindow(page)).firstColumn).toBeGreaterThan(900);
+  await expect(page.getByTestId("scale-selected-formula")).toHaveText(/^=J\d+\*\(1\+/);
 });
 
 test("a distant physical edit survives clean-tile eviction, far horizontal motion, and revisit", async ({
@@ -911,7 +921,7 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
     scrollWidth: document.documentElement.scrollWidth,
     controls: [
       ...document.querySelectorAll<HTMLElement>(
-        ".sw-sp-zoom button, .sw-sp-zoom output, .sw-sp-stress button, .sw-sp-render-switch button, .sw-sp-overview-track input, .sw-sp-landmarks button, .sw-sp-jump input, .sw-sp-jump button",
+        ".sw-sp-zoom button, .sw-sp-zoom output, .sw-sp-stress button, .sw-sp-render-switch button, .sw-sp-navigator input, .sw-sp-landmarks button, .sw-sp-jump input, .sw-sp-jump button",
       ),
     ]
       .filter((element) => element.offsetParent !== null)
@@ -942,7 +952,7 @@ test("owned controls do not clip at desktop, phone, or 200% reflow dimensions", 
       const grid = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
       const controls = [
         ...document.querySelectorAll<HTMLElement>(
-          ".sw-sp-zoom button, .sw-sp-zoom output, .sw-sp-stress button, .sw-sp-render-switch button, .sw-sp-overview-track input, .sw-sp-landmarks button, .sw-sp-jump input, .sw-sp-jump button",
+          ".sw-sp-zoom button, .sw-sp-zoom output, .sw-sp-stress button, .sw-sp-render-switch button, .sw-sp-navigator input, .sw-sp-landmarks button, .sw-sp-jump input, .sw-sp-jump button",
         ),
       ].filter((element) => element.offsetParent !== null);
       const metricValues = [

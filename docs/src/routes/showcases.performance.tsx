@@ -135,6 +135,16 @@ function selectionA1(selection: Selection | null): string {
   const first = selection.ranges[0]?.start;
   return first ? cellA1(first.row, first.col) : "A1";
 }
+function selectedCellAddress(selection: Selection | null): CellAddress | null {
+  if (!selection) return null;
+  if (selection.kind === "cell") return selection.addr;
+  if (selection.kind === "range") return { sheet: FEED_SHEET, ...selection.range.start };
+  if (selection.kind === "multi") {
+    const start = selection.ranges[0]?.start;
+    return start ? { sheet: FEED_SHEET, ...start } : null;
+  }
+  return null;
+}
 
 function columnBandsLabel(columns: readonly DatasourceTile["columns"][number][]): string {
   return columns
@@ -185,6 +195,11 @@ function PerformanceRoute() {
     lastColumn: 0,
   });
   const [selection, setSelection] = useState("A1");
+  const [selectedAddress, setSelectedAddress] = useState<CellAddress>({
+    sheet: FEED_SHEET,
+    row: 0,
+    col: 0,
+  });
   const [zoom, setZoom] = useState(1);
   const [evictionStress, setEvictionStress] = useState(false);
   const [jumpRow, setJumpRow] = useState("742000");
@@ -254,6 +269,9 @@ function PerformanceRoute() {
         grid.setZoom(zoomRef.current);
         setRendererState({ requested: renderer, active: grid.rendererKind(), fallback: null });
         setSelection(selectionA1(grid.getSelection()));
+        setSelectedAddress(
+          selectedCellAddress(grid.getSelection()) ?? { sheet: FEED_SHEET, row: 0, col: 0 },
+        );
         unsubscribes.push(
           grid.on("scroll", (event) => {
             const nextVisible = {
@@ -266,7 +284,11 @@ function PerformanceRoute() {
             visibleRef.current = nextVisible;
             setVisible(nextVisible);
           }),
-          grid.on("selection", ({ selection: next }) => setSelection(selectionA1(next))),
+          grid.on("selection", ({ selection: next }) => {
+            setSelection(selectionA1(next));
+            const address = selectedCellAddress(next);
+            if (address) setSelectedAddress(address);
+          }),
           grid.on("edit-commit", ({ addr }) => {
             const mountedGrid = gridRef.current;
             const cleanRow =
@@ -359,7 +381,11 @@ function PerformanceRoute() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const jumpTo = (row: number, column: number, source: "form" | "overview" | "landmark") => {
+  const jumpTo = (
+    row: number,
+    column: number,
+    source: "form" | "overview" | "column-overview" | "landmark",
+  ) => {
     const grid = gridRef.current;
     if (!grid) return;
     const resolvedRow = Math.min(Math.max(Math.round(row), 0), SCALE_ROWS - 1);
@@ -368,7 +394,7 @@ function PerformanceRoute() {
     grid.setSelection({ kind: "cell", addr });
     grid.scrollToCell(addr);
     if (source === "form") hostRef.current?.focus({ preventScroll: true });
-    if (source !== "overview") {
+    if (source !== "overview" && source !== "column-overview") {
       setStatus(
         `${source === "form" ? "Exact jump" : "Overview landmark"}: ${cellA1(resolvedRow, resolvedColumn)} is selected; its rectangular tile is requested on demand.`,
       );
@@ -495,6 +521,7 @@ function PerformanceRoute() {
   const interactionBefore = INTERACTION_EVIDENCE.before;
   const interactionAfter = INTERACTION_EVIDENCE.after;
 
+  const selectedFormula = gridRef.current?.store.getFormula(selectedAddress) ?? null;
   return (
     <div className="sw-sp-frame">
       <SiteTopbar active="performance" />
@@ -648,7 +675,10 @@ function PerformanceRoute() {
                 <section className="sw-sp-navigator" aria-labelledby="scale-navigator-title">
                   <div className="sw-sp-overview-head">
                     <span id="scale-navigator-title">Sheet navigator</span>
-                    <strong>{Math.round((firstRow / (SCALE_ROWS - 1)) * 100)}%</strong>
+                    <strong>
+                      Row {Math.round((firstRow / (SCALE_ROWS - 1)) * 100)}% · Column{" "}
+                      {Math.round((firstColumn / (SCALE_COLUMNS - 1)) * 100)}%
+                    </strong>
                   </div>
                   <div className="sw-sp-overview-track">
                     <input
@@ -694,6 +724,28 @@ function PerformanceRoute() {
                       ))}
                     </div>
                   </div>
+                  <label className="sw-sp-column-overview">
+                    <span>
+                      <strong>Columns</strong>
+                      <small>
+                        {colToA1(firstColumn)} of {colToA1(SCALE_COLUMNS - 1)}
+                      </small>
+                    </span>
+                    <input
+                      aria-label="Horizontal sheet overview"
+                      aria-valuetext={`Column ${firstColumn + 1} (${colToA1(firstColumn)}) of ${SCALE_COLUMNS}`}
+                      data-testid="scale-column-overview"
+                      disabled={gridState !== "ready"}
+                      max={SCALE_COLUMNS - 1}
+                      min={0}
+                      onChange={(event) =>
+                        jumpTo(firstRow, Number(event.currentTarget.value), "column-overview")
+                      }
+                      step={1}
+                      type="range"
+                      value={firstColumn}
+                    />
+                  </label>
                 </section>
 
                 <dl className="sw-sp-readout" aria-label="Live window and residency instrument">
@@ -708,6 +760,12 @@ function PerformanceRoute() {
                       <span data-testid="scale-window-columns">
                         {colToA1(firstColumn)}–{colToA1(lastColumn)}
                       </span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Selected cell input</dt>
+                    <dd className="sw-sp-readout__formula" data-testid="scale-selected-formula">
+                      {selectedFormula ?? "Literal value"}
                     </dd>
                   </div>
                   <div>
@@ -970,72 +1028,78 @@ function PerformanceRoute() {
         </section>
 
         <section aria-labelledby="resource-title" className="sw-sp-section" id="resources">
-          <p className="sw-sp-kicker">Measured ownership</p>
-          <h2 id="resource-title">Cache capacity is not logical size</h2>
-          <p>
-            Public resource report v
-            <span data-testid="scale-resource-schema">{stats.resource?.schemaVersion ?? "—"}</span>{" "}
-            separates logical live bytes, allocated owner capacity, and observed WASM committed
-            pages. The clean page cache and sparse dirty overlay remain distinct owners.
-          </p>
-          <dl className="sw-sp-stats" data-testid="scale-resource-summary">
-            <div>
-              <dt>Logical live payload</dt>
-              <dd data-testid="scale-resource-logical">
-                {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0)}
-              </dd>
-            </div>
-            <div>
-              <dt>Allocated owner capacity</dt>
-              <dd data-testid="scale-resource-allocated">
-                {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0)}
-              </dd>
-            </div>
-            <div>
-              <dt>WASM committed pages</dt>
-              <dd data-testid="scale-resource-committed">
-                {stats.resource?.wasm.wasmCommittedBytes == null
-                  ? "Unavailable"
-                  : formatBytes(stats.resource.wasm.wasmCommittedBytes)}
-              </dd>
-            </div>
-          </dl>
-          <details className="sw-sp-debug-disclosure">
-            <summary>
-              <span className="sw-sp-disclosure-copy">
-                <strong>Inspect exclusive runtime owners</strong>
-                <small>{resourceOwners.length} active owners</small>
-              </span>
-              <span aria-hidden="true" className="sw-sp-disclosure-chevron">
-                ›
-              </span>
-            </summary>
-            <div className="sw-sp-tablewrap">
-              <table className="sw-sp-table" data-testid="scale-resource-owners">
-                <caption>Largest exclusive live owners in this mounted Grid.</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Owner</th>
-                    <th scope="col">Logical</th>
-                    <th scope="col">Allocated</th>
-                    <th scope="col">Entries</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resourceOwners.map((owner) => (
-                    <tr key={owner.owner}>
-                      <th scope="row">
-                        <code>{owner.owner}</code>
-                      </th>
-                      <td>{formatBytes(owner.logicalBytes)}</td>
-                      <td>{formatBytes(owner.allocatedBytes)}</td>
-                      <td>{owner.entries.toLocaleString()}</td>
+          <div className="sw-sp-resource-copy">
+            <p className="sw-sp-kicker">Measured ownership</p>
+            <h2 id="resource-title">Cache capacity is not logical size</h2>
+            <p>
+              Public resource report v
+              <span data-testid="scale-resource-schema">
+                {stats.resource?.schemaVersion ?? "—"}
+              </span>{" "}
+              separates logical live bytes, allocated owner capacity, and observed WASM committed
+              pages. The clean page cache and sparse dirty overlay remain distinct owners.
+            </p>
+          </div>
+          <div className="sw-sp-resource-panel">
+            <dl className="sw-sp-stats" data-testid="scale-resource-summary">
+              <div>
+                <dt>Logical live payload</dt>
+                <dd data-testid="scale-resource-logical">
+                  {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0)}
+                </dd>
+              </div>
+              <div>
+                <dt>Allocated owner capacity</dt>
+                <dd data-testid="scale-resource-allocated">
+                  {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0)}
+                </dd>
+              </div>
+              <div>
+                <dt>WASM committed pages</dt>
+                <dd data-testid="scale-resource-committed">
+                  {stats.resource?.wasm.wasmCommittedBytes == null
+                    ? "Unavailable"
+                    : formatBytes(stats.resource.wasm.wasmCommittedBytes)}
+                </dd>
+              </div>
+            </dl>
+            <details className="sw-sp-debug-disclosure">
+              <summary>
+                <span className="sw-sp-disclosure-copy">
+                  <strong>Inspect exclusive runtime owners</strong>
+                  <small>{resourceOwners.length} active owners</small>
+                </span>
+                <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+                  ›
+                </span>
+              </summary>
+              <div className="sw-sp-tablewrap">
+                <table className="sw-sp-table" data-testid="scale-resource-owners">
+                  <caption>Largest exclusive live owners in this mounted Grid.</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Owner</th>
+                      <th scope="col">Logical</th>
+                      <th scope="col">Allocated</th>
+                      <th scope="col">Entries</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
+                  </thead>
+                  <tbody>
+                    {resourceOwners.map((owner) => (
+                      <tr key={owner.owner}>
+                        <th scope="row">
+                          <code>{owner.owner}</code>
+                        </th>
+                        <td>{formatBytes(owner.logicalBytes)}</td>
+                        <td>{formatBytes(owner.allocatedBytes)}</td>
+                        <td>{owner.entries.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </div>
         </section>
 
         <section aria-labelledby="crossing-title" className="sw-sp-section" id="wasm-crossings">

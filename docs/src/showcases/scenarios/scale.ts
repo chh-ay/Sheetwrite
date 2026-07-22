@@ -6,6 +6,7 @@
 
 import type {
   AggregateOp,
+  DataCell,
   DataSource,
   DataSourceColumnBand,
   DataSourcePage,
@@ -147,23 +148,27 @@ function financialRowAt(row: number): FinancialRow {
   };
 }
 
-function scaleCellAt(row: number, column: number, financial: FinancialRow): string | number {
+function scaleCellAt(row: number, column: number, financial: FinancialRow): DataCell {
+  const sheetRow = row + 1;
   if (column === 0) return financial.period;
   if (column === 1) return financial.account;
   if (column === 2) return financial.region;
   if (column === 3) return financial.revenue;
   if (column === 4) return financial.cogs;
-  if (column === 5) return financial.grossProfit;
+  if (column === 5) return { kind: "formula", src: `=D${sheetRow}-E${sheetRow}` };
   if (column === 6) return financial.operatingExpenses;
-  if (column === 7) return financial.ebitda;
-  if (column === 8) return financial.ebitdaMargin;
+  if (column === 7) return { kind: "formula", src: `=F${sheetRow}-G${sheetRow}` };
+  if (column === 8) {
+    return { kind: "formula", src: `=IF(D${sheetRow}=0,0,H${sheetRow}/D${sheetRow})` };
+  }
   if (column === 9) return financial.forecastRevenue;
-  if (column === 10) return financial.variance;
+  if (column === 10) return { kind: "formula", src: `=D${sheetRow}-J${sheetRow}` };
   if (column === 11) return financial.status;
 
   const horizon = column - (FINANCIAL_COLUMNS.length - 1);
   const seasonalRate = ((rowHash(row, column + 1) % 201) - 100) / 10_000;
-  return roundMoney(financial.forecastRevenue * (1 + horizon * 0.0015 + seasonalRate));
+  const growthRate = horizon * 0.0015 + seasonalRate;
+  return { kind: "formula", src: `=J${sheetRow}*(1+${growthRate})` };
 }
 
 export function scaleRowAt(row: number, bands: readonly DataSourceColumnBand[]): RowData {

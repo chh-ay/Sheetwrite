@@ -83,7 +83,7 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
  * --sheetwrite-* seeds (adaptive --sw-* tokens), so the workbench canvas
  * follows the site light/dark theme instead of a hardcoded dark palette.
  */
-const CANVAS_THEME: Partial<Theme> = { rowHeight: 30 };
+const CANVAS_THEME: Partial<Theme> = { rowHeight: 36 };
 const COMPATIBILITY_RESULTS = compatibilityResultsData as unknown as CompatibilityResults;
 
 const RESULT_STATUS_LABELS: Record<CompatibilityResultStatus, string> = {

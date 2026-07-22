@@ -120,8 +120,8 @@ test("live workbook and fidelity ledger lead the first desktop viewport", async 
       trailingGap: workbenchBox.bottom - modelBox.bottom,
     };
   });
-  expect(workbenchGeometry.stageHeight).toBeGreaterThanOrEqual(384);
-  expect(workbenchGeometry.stageHeight).toBeLessThanOrEqual(449);
+  expect(workbenchGeometry.stageHeight).toBeGreaterThanOrEqual(500);
+  expect(workbenchGeometry.stageHeight).toBeLessThanOrEqual(577);
   expect(
     Math.abs(workbenchGeometry.ledgerHeight - workbenchGeometry.stageHeight),
   ).toBeLessThanOrEqual(1);

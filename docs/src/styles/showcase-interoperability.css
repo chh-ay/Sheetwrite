@@ -15,7 +15,7 @@
   }
 
   .sw-si-page {
-    --sw-si-grid-block-size: clamp(24rem, 52dvh, 28rem);
+    --sw-si-grid-block-size: clamp(30rem, 60dvh, 36rem);
     --sw-si-split-block-size: clamp(27rem, calc(100dvh - (var(--sw-header-height) * 2)), 46rem);
     display: flex;
     width: min(74rem, 100% - 2.5rem);
