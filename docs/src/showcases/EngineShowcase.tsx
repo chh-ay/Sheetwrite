@@ -2,7 +2,7 @@ import type { Grid } from "@sheetwrite/core";
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { Link } from "@tanstack/react-router";
-import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import {
   bindEngineEvents,
@@ -10,20 +10,19 @@ import {
   createEngineLiveDataSource,
   createEngineLiveWorkbook,
   createEngineTrace,
-  type EngineAction,
-  type EngineEvent,
-  type EngineEventInput,
-  type EngineEventBindings,
-  type EngineTrace,
   ENGINE_LIVE_ROWS,
   ENGINE_LIVE_SHEET,
   ENGINE_LIVE_STORAGE,
-  ENGINE_LIVE_THEME,
-  ENGINE_SCRIPT,
   ENGINE_TRACE_LIMIT,
-  formatEngineEvent,
+  type EngineAction,
+  type EngineEvent,
+  type EngineEventBindings,
+  type EngineEventInput,
   type EngineHostSaver,
   type EngineRenderer,
+  type EngineTrace,
+  engineLiveTheme,
+  formatEngineEvent,
 } from "./scenarios/engine-live.js";
 import "@sheetwrite/core/styles.css";
 
@@ -41,34 +40,6 @@ declare global {
   }
 }
 
-const SCRIPT_DELAY_BY_SPEED = {
-  "0.5": 1_600,
-  "1": 900,
-  "2": 500,
-} as const;
-
-type ScriptSpeed = keyof typeof SCRIPT_DELAY_BY_SPEED;
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
-
-function isFormControl(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLSelectElement ||
-    target instanceof HTMLButtonElement
-  );
-}
-
 function eventOfType<Type extends EngineEvent["type"]>(
   events: readonly EngineEvent[],
   type: Type,
@@ -80,18 +51,27 @@ function eventOfType<Type extends EngineEvent["type"]>(
   return undefined;
 }
 
+function currentEngineTheme(): "light" | "dark" {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function applyEngineTheme(grid: Grid, host: HTMLElement): void {
+  const mode = currentEngineTheme();
+  const theme = engineLiveTheme(mode);
+  grid.replaceTheme(theme);
+  host.dataset.gridTheme = mode;
+  host.style.backgroundColor = theme.bg ?? "";
+}
+
 export default function EngineShowcase() {
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<Grid | null>(null);
   const bindingsRef = useRef<EngineEventBindings | null>(null);
   const traceRef = useRef<EngineTrace | null>(null);
   const saverRef = useRef<EngineHostSaver | null>(null);
-  const currentRowRef = useRef(0);
+  const currentRowRef = useRef(1);
   const jumpInputRef = useRef("24001");
   const requestedRendererRef = useRef<EngineRenderer>("canvas");
-  const scriptStepRef = useRef(0);
-  const scriptCycleRef = useRef(0);
-  const activeTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
   if (traceRef.current === null) traceRef.current = createEngineTrace();
@@ -106,12 +86,8 @@ export default function EngineShowcase() {
   const [error, setError] = useState<string | null>(null);
   const [pendingOperations, setPendingOperations] = useState(0);
   const [jumpInput, setJumpInput] = useState("24001");
-  const [currentRow, setCurrentRow] = useState(0);
+  const [currentRow, setCurrentRow] = useState(1);
   const [status, setStatus] = useState("Starting the calculation engine…");
-  const [playing, setPlaying] = useState(false);
-  const [scriptStep, setScriptStep] = useState(0);
-  const [speed, setSpeed] = useState<ScriptSpeed>("1");
-  const reducedMotion = useReducedMotion();
 
   const emit = useCallback((input: EngineEventInput) => {
     const event = traceRef.current!.push(input);
@@ -136,6 +112,7 @@ export default function EngineShowcase() {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    host.dataset.generation = String(generation);
     let disposed = false;
     let grid: Grid | null = null;
     let bindings: EngineEventBindings | null = null;
@@ -148,13 +125,16 @@ export default function EngineShowcase() {
       .then(() => {
         if (disposed) return;
         const renderer = requestedRenderer;
+        const theme = engineLiveTheme(currentEngineTheme());
+        host.dataset.gridTheme = currentEngineTheme();
+        host.style.backgroundColor = theme.bg ?? "";
         grid = createGrid(host, {
           workbook: createEngineLiveWorkbook(),
           datasource: createEngineLiveDataSource(emit, () => {
             if (!disposed) bindings?.sampleResource("load", "ingest");
           }),
           datasourceStorage: ENGINE_LIVE_STORAGE,
-          theme: ENGINE_LIVE_THEME,
+          theme,
           config: { toolbar: true, tabs: false },
           renderer,
           ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
@@ -162,7 +142,7 @@ export default function EngineShowcase() {
         grid.setFrozen(1, 2);
         grid.setSelection({
           kind: "cell",
-          addr: { sheet: ENGINE_LIVE_SHEET, row: currentRowRef.current, col: 3 },
+          addr: { sheet: ENGINE_LIVE_SHEET, row: currentRowRef.current, col: 2 },
         });
         bindings = bindEngineEvents(grid, emit, setPendingOperations);
         gridRef.current = grid;
@@ -196,17 +176,17 @@ export default function EngineShowcase() {
   }, [emit, generation, requestedRenderer]);
 
   useEffect(() => {
-    const observer = new MutationObserver(() => gridRef.current?.replaceTheme(ENGINE_LIVE_THEME));
+    const observer = new MutationObserver(() => {
+      const grid = gridRef.current;
+      const host = hostRef.current;
+      if (grid && host) applyEngineTheme(grid, host);
+    });
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["data-theme"],
     });
     return () => observer.disconnect();
   }, []);
-
-  useEffect(() => {
-    if (reducedMotion) setPlaying(false);
-  }, [reducedMotion]);
 
   const runAction = useCallback(async (action: EngineAction, rowOverride?: number) => {
     const grid = gridRef.current;
@@ -227,10 +207,10 @@ export default function EngineShowcase() {
           return;
         }
         const row = requested - 1;
-        grid.scrollToCell({ sheet: ENGINE_LIVE_SHEET, row, col: 3 });
+        grid.scrollToCell({ sheet: ENGINE_LIVE_SHEET, row, col: 2 });
         grid.setSelection({
           kind: "cell",
-          addr: { sheet: ENGINE_LIVE_SHEET, row, col: 3 },
+          addr: { sheet: ENGINE_LIVE_SHEET, row, col: 2 },
         });
         currentRowRef.current = row;
         jumpInputRef.current = String(requested);
@@ -243,13 +223,15 @@ export default function EngineShowcase() {
         return;
       }
       case "edit": {
-        const address = { sheet: ENGINE_LIVE_SHEET, row: currentRowRef.current, col: 3 };
+        const row = currentRowRef.current;
+        const address = { sheet: ENGINE_LIVE_SHEET, row, col: 2 };
         const current = grid.store.getCell(address).resolved;
         if (typeof current !== "number") {
           bindings.announceResult("edit", "noop");
-          setStatus("That row is still loading. Try the edit again when its values appear.");
+          setStatus("Select a loaded financial data row before editing Actual.");
           return;
         }
+        const before = bindings.dependencySnapshot(row);
         const result = grid.applyTransaction({
           patches: [
             {
@@ -259,10 +241,22 @@ export default function EngineShowcase() {
             },
           ],
         });
-        if (result.status !== "applied") bindings.announceResult("edit", result.status);
+        if (result.status === "applied") {
+          bindings.announceDependencies("edit", row, before);
+          grid.setSelection({
+            kind: "range",
+            range: {
+              sheet: ENGINE_LIVE_SHEET,
+              start: { row, col: 4 },
+              end: { row, col: 5 },
+            },
+          });
+        } else {
+          bindings.announceResult("edit", result.status);
+        }
         setStatus(
           result.status === "applied"
-            ? `Actual at D${currentRowRef.current + 1} increased by 25; the formula in E${currentRowRef.current + 1} recalculated.`
+            ? `Actual C${row + 1} increased by 25; Variance E${row + 1} and Attainment F${row + 1} recalculated and are selected.`
             : `The edit returned ${result.status}.`,
         );
         return;
@@ -273,8 +267,19 @@ export default function EngineShowcase() {
           setStatus("There is no Grid edit to undo.");
           return;
         }
+        const row = currentRowRef.current;
+        const before = bindings.dependencySnapshot(row);
         grid.undo();
-        setStatus(`The Grid undid the last edit at row ${currentRowRef.current + 1}.`);
+        bindings.announceDependencies("undo", row, before);
+        grid.setSelection({
+          kind: "range",
+          range: {
+            sheet: ENGINE_LIVE_SHEET,
+            start: { row, col: 4 },
+            end: { row, col: 5 },
+          },
+        });
+        setStatus(`The Grid undid the edit; E${row + 1}:F${row + 1} show restored results.`);
         return;
       }
       case "save": {
@@ -301,56 +306,19 @@ export default function EngineShowcase() {
     }
   }, []);
 
-  const runNextStep = useCallback(async () => {
-    const index = scriptStepRef.current % ENGINE_SCRIPT.length;
-    const action = ENGINE_SCRIPT[index]!;
-    if (action === "jump") {
-      const row = 12_000 + ((scriptCycleRef.current * 7_919) % 28_000);
-      await runAction(action, row);
-    } else {
-      await runAction(action);
-    }
-    const next = (index + 1) % ENGINE_SCRIPT.length;
-    if (next === 0) scriptCycleRef.current += 1;
-    scriptStepRef.current = next;
-    setScriptStep(next);
-  }, [runAction]);
-
   const reset = useCallback(() => {
-    setPlaying(false);
-    if (activeTimerRef.current !== null) {
-      window.clearTimeout(activeTimerRef.current);
-      activeTimerRef.current = null;
-    }
     traceRef.current!.clear();
     saverRef.current!.reset();
-    currentRowRef.current = 0;
+    currentRowRef.current = 1;
     jumpInputRef.current = "24001";
     requestedRendererRef.current = "canvas";
-    scriptStepRef.current = 0;
-    scriptCycleRef.current = 0;
     setEvents([]);
     setPendingOperations(0);
-    setCurrentRow(0);
+    setCurrentRow(1);
     setJumpInput("24001");
-    setScriptStep(0);
     setRequestedRenderer("canvas");
     setGeneration((value) => value + 1);
   }, []);
-
-  useEffect(() => {
-    if (!playing || !ready || reducedMotion) return;
-    activeTimerRef.current = window.setTimeout(() => {
-      activeTimerRef.current = null;
-      void runNextStep();
-    }, SCRIPT_DELAY_BY_SPEED[speed]);
-    return () => {
-      if (activeTimerRef.current !== null) {
-        window.clearTimeout(activeTimerRef.current);
-        activeTimerRef.current = null;
-      }
-    };
-  }, [playing, ready, reducedMotion, runNextStep, scriptStep, speed]);
 
   useEffect(() => {
     const handle: EngineShowcaseHandle = {
@@ -358,7 +326,7 @@ export default function EngineShowcase() {
       run: (action) => runAction(action),
       reset,
       traceLength: () => traceRef.current!.size,
-      timerCount: () => (activeTimerRef.current === null ? 0 : 1),
+      timerCount: () => 0,
     };
     window.__sheetwriteEngineShowcase = handle;
     return () => {
@@ -368,52 +336,39 @@ export default function EngineShowcase() {
     };
   }, [reset, runAction]);
 
-  const handleKeyboard = (event: KeyboardEvent<HTMLElement>) => {
-    if (isFormControl(event.target)) return;
-    if (event.key === " ") {
-      event.preventDefault();
-      if (!reducedMotion) setPlaying((value) => !value);
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault();
-      void runNextStep();
-    } else if (event.key.toLowerCase() === "r") {
-      event.preventDefault();
-      reset();
-    }
-  };
-
   const latestRequest = eventOfType(events, "datasource-request");
   const latestResult = eventOfType(events, "datasource-result");
   const latestTransaction = eventOfType(events, "transaction-result");
   const latestFormula = eventOfType(events, "formula-update");
   const latestResource = eventOfType(events, "page-resource");
   const latestSave = eventOfType(events, "host-save");
+  const latestEvent = events.at(-1);
 
   return (
     <div className="sw-engine-frame">
       <SiteTopbar active="engine" />
-      <main
-        className="sw-engine"
-        data-reduced-motion={reducedMotion ? "true" : "false"}
-        id="main-content"
-        onKeyDown={handleKeyboard}
-      >
+      <main className="sw-engine" id="main-content">
         <header className="sw-engine__hero">
-          <p className="sw-engine__eyebrow">Behind one live edit</p>
-          <h1>The Grid moves first. The explanation follows.</h1>
-          <p>
-            Use the real paged formula sheet below. Every line beside it comes from a public Grid
-            event, a datasource result, a measured resource sample, or the host’s save response.
-          </p>
-          <Link to="/showcases/">Browse every live feature →</Link>
+          <div className="sw-engine__hero-title">
+            <p className="sw-engine__eyebrow">Live calculation workbench</p>
+            <h1>A financial Grid with its public evidence beside it.</h1>
+          </div>
+          <div className="sw-engine__hero-copy">
+            <p>
+              Jump through a real 50,000-row regional forecast, change an actual, and save it to the
+              host. The adjacent trace reports only public Grid events, datasource results, measured
+              resources, and host acknowledgements.
+            </p>
+            <Link to="/showcases/">Browse every live feature →</Link>
+          </div>
         </header>
 
         <section aria-labelledby="engine-stage-title" className="sw-engine-stage">
           <header className="sw-engine-stage__head">
             <div>
-              <p className="sw-engine__eyebrow">Live working view</p>
+              <p className="sw-engine__eyebrow">Regional forecast · live</p>
               <h2 id="engine-stage-title">
-                Weekly forecast · {ENGINE_LIVE_ROWS.toLocaleString()} rows
+                {ENGINE_LIVE_ROWS.toLocaleString()} rows, paged on demand
               </h2>
             </div>
             <dl aria-label="Current runtime facts" className="sw-engine-facts">
@@ -428,239 +383,230 @@ export default function EngineShowcase() {
                 </dd>
               </div>
               <div>
-                <dt>Host changes</dt>
+                <dt>Unsaved</dt>
                 <dd data-testid="engine-pending-operations">{pendingOperations}</dd>
               </div>
             </dl>
           </header>
 
-          <div className="sw-engine-stage__workspace">
+          <div className="sw-engine-stage__workspace" data-testid="engine-workbench">
             <section aria-label="Live Sheetwrite Grid" className="sw-engine-grid-panel">
               <div className="sw-engine-grid-panel__status">
                 <span data-state={ready ? "ready" : error ? "error" : "loading"}>
                   {ready ? "Grid ready" : error ? "Grid error" : "Loading Grid"}
                 </span>
-                <span>Row {currentRow + 1}</span>
-                <span>{activeRenderer} active</span>
+                <span>Selected row {currentRow + 1}</span>
+                <span>{activeRenderer} drawing</span>
               </div>
               <div className="sw-engine-grid" data-testid="engine-grid" ref={hostRef} />
             </section>
 
-            <aside aria-label="Explanation of current Grid work" className="sw-engine-cutaway">
-              <svg aria-hidden="true" className="sw-engine-cutaway__map" viewBox="0 0 520 150">
-                <path d="M24 36H194C224 36 224 76 254 76H496" pathLength="1" />
-                <path d="M24 76H164C204 76 214 116 254 116H496" pathLength="1" />
-                <circle cx="24" cy="36" r="6" />
-                <circle cx="254" cy="76" r="6" />
-                <circle cx="496" cy="116" r="6" />
-              </svg>
+            <aside
+              aria-label="Public evidence for current Grid work"
+              className="sw-engine-cutaway"
+              data-testid="engine-public-trace"
+            >
+              <header className="sw-engine-cutaway__head">
+                <div>
+                  <p className="sw-engine__eyebrow">Public trace</p>
+                  <h3>What the workbench reported</h3>
+                </div>
+                <span aria-live="polite">
+                  {events.length} / {ENGINE_TRACE_LIMIT}
+                </span>
+              </header>
               <ol className="sw-engine-lanes">
                 <li data-lane="rows">
-                  <span>01 · Rows</span>
+                  <span>Datasource</span>
                   <strong>
                     {latestRequest
-                      ? `${latestRequest.start + 1}–${latestRequest.end} requested`
-                      : "Waiting for a row request"}
+                      ? `Rows ${latestRequest.start + 1}–${latestRequest.end}`
+                      : "Waiting for a request"}
                   </strong>
                   <p>
                     {latestResult
-                      ? `${latestResult.rows.toLocaleString()} rows ready in ${latestResult.durationMs.toFixed(1)} ms`
-                      : "The datasource has not returned a page yet."}
+                      ? `${latestResult.rows.toLocaleString()} rows returned in ${latestResult.durationMs.toFixed(1)} ms`
+                      : "Requested column bands and timings will appear here."}
                   </p>
                 </li>
                 <li data-lane="engine">
-                  <span>02 · Calculation engine</span>
+                  <span>Dependency path</span>
                   <strong>
                     {latestTransaction
-                      ? `${latestTransaction.action} ${latestTransaction.status}`
-                      : "Waiting for a Grid change"}
+                      ? `${latestTransaction.action} · ${latestTransaction.status}`
+                      : "Actual → Variance + Attainment"}
                   </strong>
-                  <p>
-                    {latestFormula
-                      ? `E${latestFormula.row + 1} is now ${String(latestFormula.resolved)}`
-                      : "Formula results will appear here after an edit."}
-                  </p>
-                  <p>
-                    After an edit, work is sent to the calculation engine to update the formula.
-                  </p>
+                  {latestFormula ? (
+                    <ol
+                      aria-label="Recalculated formula dependencies"
+                      className="sw-engine-dependency"
+                      data-action={latestFormula.action}
+                      data-testid="engine-dependency-readout"
+                    >
+                      {latestFormula.dependencies.map((dependency) => (
+                        <li data-address={dependency.address} key={dependency.address}>
+                          <span>{dependency.address}</span>
+                          <strong>
+                            {String(dependency.before)} → {String(dependency.after)}
+                          </strong>
+                          <code>{dependency.formula}</code>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p>Edit Actual to show the exact before/after formula results here.</p>
+                  )}
                 </li>
                 <li data-lane="host">
-                  <span>03 · Host</span>
+                  <span>Host + drawing</span>
                   <strong>
                     {latestSave
                       ? `${latestSave.status} · version ${latestSave.version}`
-                      : "Waiting for Save to host"}
+                      : "No host save yet"}
                   </strong>
                   <p>
                     {rendererFallback
-                      ? `The ${requestedRenderer} drawing path fell back to ${activeRenderer}: ${rendererFallback}`
+                      ? `${requestedRenderer} fell back to ${activeRenderer}: ${rendererFallback}`
                       : `${activeRenderer} is the drawing path actually in use.`}
                   </p>
                 </li>
               </ol>
+              <p className="sw-engine-cutaway__resource">
+                {latestResource
+                  ? `${latestResource.loadedCells.toLocaleString()} loaded · ${latestResource.dirtyCells.toLocaleString()} dirty cells`
+                  : "Resource accounting appears after the first page settles."}
+              </p>
             </aside>
           </div>
 
-          <div className="sw-engine-controls">
-            <form
-              className="sw-engine-controls__jump"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void runAction("jump");
-              }}
-            >
-              <label htmlFor="engine-jump">Jump to row</label>
-              <input
-                data-testid="engine-jump-input"
-                id="engine-jump"
-                inputMode="numeric"
-                max={ENGINE_LIVE_ROWS}
-                min="1"
-                onChange={(event) => {
-                  jumpInputRef.current = event.target.value;
-                  setJumpInput(event.target.value);
+          <section aria-label="Workbook controls" className="sw-engine-controls">
+            <fieldset>
+              <legend>Navigate</legend>
+              <form
+                className="sw-engine-controls__jump"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void runAction("jump");
                 }}
-                value={jumpInput}
-              />
-              <button data-testid="engine-jump" disabled={!ready} type="submit">
-                Jump
-              </button>
-            </form>
-            <div className="sw-engine-controls__actions">
-              <button
-                data-testid="engine-edit"
-                disabled={!ready}
-                onClick={() => void runAction("edit")}
-                type="button"
               >
-                Increase actual
-              </button>
-              <button
-                data-testid="engine-undo"
-                disabled={!ready}
-                onClick={() => void runAction("undo")}
-                type="button"
-              >
-                Undo Grid edit
-              </button>
-              <label htmlFor="engine-renderer">Drawing path</label>
-              <select
-                data-testid="engine-renderer"
-                disabled={!ready}
-                id="engine-renderer"
-                onChange={(event) => {
-                  const renderer = event.target.value as EngineRenderer;
-                  requestedRendererRef.current = renderer;
-                  setRequestedRenderer(renderer);
-                }}
-                value={requestedRenderer}
-              >
-                <option value="canvas">Main canvas</option>
-                <option value="worker">Worker canvas</option>
-              </select>
-              <button
-                data-testid="engine-save"
-                disabled={!ready || pendingOperations === 0}
-                onClick={() => void runAction("save")}
-                type="button"
-              >
-                Save to host
-              </button>
-              <button data-testid="engine-reset" onClick={reset} type="button">
-                Reset sheet
-              </button>
-            </div>
-          </div>
+                <label htmlFor="engine-jump">Row</label>
+                <input
+                  data-testid="engine-jump-input"
+                  id="engine-jump"
+                  inputMode="numeric"
+                  max={ENGINE_LIVE_ROWS}
+                  min="1"
+                  onChange={(event) => {
+                    jumpInputRef.current = event.target.value;
+                    setJumpInput(event.target.value);
+                  }}
+                  value={jumpInput}
+                />
+                <button data-testid="engine-jump" disabled={!ready} type="submit">
+                  Jump
+                </button>
+              </form>
+            </fieldset>
+            <fieldset>
+              <legend>Edit forecast</legend>
+              <div className="sw-engine-controls__actions">
+                <button
+                  data-testid="engine-edit"
+                  disabled={!ready}
+                  onClick={() => void runAction("edit")}
+                  type="button"
+                >
+                  Actual +25
+                </button>
+                <button
+                  data-testid="engine-undo"
+                  disabled={!ready}
+                  onClick={() => void runAction("undo")}
+                  type="button"
+                >
+                  Undo
+                </button>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Draw + persist</legend>
+              <div className="sw-engine-controls__actions">
+                <div
+                  aria-label="Drawing path"
+                  className="sw-engine-renderer"
+                  data-testid="engine-renderer"
+                  role="radiogroup"
+                >
+                  {(["canvas", "worker"] as const).map((renderer) => (
+                    <label key={renderer}>
+                      <input
+                        checked={requestedRenderer === renderer}
+                        data-testid={`engine-renderer-${renderer}`}
+                        disabled={!ready}
+                        name="engine-renderer"
+                        onChange={() => {
+                          requestedRendererRef.current = renderer;
+                          setRequestedRenderer(renderer);
+                        }}
+                        type="radio"
+                        value={renderer}
+                      />
+                      <span>{renderer === "canvas" ? "Main canvas" : "Worker canvas"}</span>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  data-testid="engine-save"
+                  disabled={!ready || pendingOperations === 0}
+                  onClick={() => void runAction("save")}
+                  type="button"
+                >
+                  Save to host
+                </button>
+                <button data-testid="engine-reset" onClick={reset} type="button">
+                  Reset
+                </button>
+              </div>
+            </fieldset>
+          </section>
 
           <p aria-live="polite" className="sw-engine-status" data-testid="engine-status">
             {status}
           </p>
         </section>
 
-        <section
-          aria-labelledby="engine-script-title"
-          className="sw-engine-story"
-          data-testid="engine-keyboard-surface"
-          tabIndex={0}
-        >
-          <header>
-            <div>
-              <p className="sw-engine__eyebrow">One repeatable path</p>
-              <h2 id="engine-script-title">Play the same actions you can perform by hand.</h2>
-            </div>
-            <p>
-              The player calls the same jump, edit, undo, drawing, and host-save handlers as the
-              controls above. Focus this section: Space plays or pauses, Right Arrow steps, R
-              resets.
-            </p>
-          </header>
-          <div className="sw-engine-player">
-            <button
-              aria-pressed={playing}
-              data-testid="engine-play"
-              disabled={!ready || reducedMotion}
-              onClick={() => setPlaying((value) => !value)}
-              type="button"
-            >
-              {playing ? "Pause" : "Play"}
-            </button>
-            <button
-              data-testid="engine-step"
-              disabled={!ready}
-              onClick={() => void runNextStep()}
-              type="button"
-            >
-              Step
-            </button>
-            <button onClick={reset} type="button">
-              Reset
-            </button>
-            <label htmlFor="engine-speed">Speed</label>
-            <select
-              id="engine-speed"
-              onChange={(event) => setSpeed(event.target.value as ScriptSpeed)}
-              value={speed}
-            >
-              <option value="0.5">0.5×</option>
-              <option value="1">1×</option>
-              <option value="2">2×</option>
-            </select>
-            <span data-testid="engine-script-step">
-              Next: {ENGINE_SCRIPT[scriptStep]} · {scriptStep + 1}/{ENGINE_SCRIPT.length}
-            </span>
-          </div>
-          {reducedMotion ? (
-            <p className="sw-engine-motion-note" data-testid="engine-reduced-note">
-              Motion is reduced. The player stays paused; use Step to move through each action.
-            </p>
-          ) : null}
-        </section>
-
         <section aria-labelledby="engine-log-title" className="sw-engine-log">
           <header>
             <div>
-              <p className="sw-engine__eyebrow">Text record</p>
+              <p className="sw-engine__eyebrow">Bounded evidence</p>
               <h2 id="engine-log-title">Latest measured events</h2>
             </div>
             <p>
-              At most {ENGINE_TRACE_LIMIT} lines stay in the page. New lines replace the oldest;
-              Grid and datasource listeners are removed when you leave.
+              The newest {ENGINE_TRACE_LIMIT} source events are retained. The list and latest-event
+              detail scroll inside this fixed-height viewer.
             </p>
           </header>
           {events.length === 0 ? (
             <p className="sw-engine-log__empty">
-              Make an edit or step the player to add the first checked result.
+              Use the Grid or workbook controls to record the first public event.
             </p>
           ) : (
-            <ol aria-live="polite" data-testid="engine-event-log">
-              {[...events].reverse().map((event) => (
-                <li data-event={event.type} key={event.sequence}>
-                  <span>{String(event.sequence).padStart(3, "0")}</span>
-                  <strong>{event.type.replaceAll("-", " ")}</strong>
-                  <p>{formatEngineEvent(event)}</p>
-                </li>
-              ))}
-            </ol>
+            <div className="sw-engine-log__viewer" data-testid="engine-evidence-viewer">
+              <ol aria-live="polite" data-testid="engine-event-log">
+                {[...events].reverse().map((event) => (
+                  <li data-event={event.type} key={event.sequence}>
+                    <span>{String(event.sequence).padStart(3, "0")}</span>
+                    <strong>{event.type.replaceAll("-", " ")}</strong>
+                    <p>{formatEngineEvent(event)}</p>
+                  </li>
+                ))}
+              </ol>
+              <article aria-live="polite" className="sw-engine-log__detail">
+                <span>Latest public event</span>
+                <strong>{latestEvent?.type.replaceAll("-", " ")}</strong>
+                <p>{latestEvent ? formatEngineEvent(latestEvent) : ""}</p>
+              </article>
+            </div>
           )}
         </section>
       </main>

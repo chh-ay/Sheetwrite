@@ -18,7 +18,6 @@ export const ENGINE_LIVE_SHEET = "forecast" satisfies SheetId;
 export const ENGINE_LIVE_ROWS = 50_000;
 export const ENGINE_TRACE_LIMIT = 40;
 export const ENGINE_PENDING_LIMIT = 16;
-export const ENGINE_PAGE_DELAY_MS = 24;
 
 export const ENGINE_LIVE_STORAGE: Required<DataSourceStorageOptions> = {
   mode: "paged",
@@ -27,12 +26,42 @@ export const ENGINE_LIVE_STORAGE: Required<DataSourceStorageOptions> = {
   dirtyCellLimit: 4_096,
 };
 
-export const ENGINE_LIVE_THEME: Partial<Theme> = {
+const ENGINE_THEME_BASE = {
   font: '500 13px "Inter Variable", Inter, system-ui, sans-serif',
   rowHeight: 30,
   headerHeight: 32,
   rowHeaderWidth: 48,
-};
+} as const;
+
+export function engineLiveTheme(mode: "light" | "dark"): Partial<Theme> {
+  return mode === "dark"
+    ? {
+        ...ENGINE_THEME_BASE,
+        bg: "#0d1522",
+        fg: "#dce5f3",
+        gridLine: "#26364f",
+        headerBg: "#121f30",
+        headerFg: "#a8b7cd",
+        selection: "rgb(52 211 153 / 18%)",
+        selectionBorder: "#34d399",
+        searchMatch: "rgb(251 191 36 / 24%)",
+        searchActiveMatch: "#fbbf24",
+        highlight: "rgb(96 165 250 / 24%)",
+      }
+    : {
+        ...ENGINE_THEME_BASE,
+        bg: "#fbfcfe",
+        fg: "#1b2435",
+        gridLine: "#d9e0e9",
+        headerBg: "#e9eef5",
+        headerFg: "#46546a",
+        selection: "rgb(4 120 87 / 14%)",
+        selectionBorder: "#047857",
+        searchMatch: "rgb(180 83 9 / 18%)",
+        searchActiveMatch: "#a34d08",
+        highlight: "rgb(37 99 235 / 16%)",
+      };
+}
 
 const TEAMS = ["North", "West", "South", "East"] as const;
 
@@ -92,9 +121,14 @@ export type EngineEvent =
     })
   | (EngineEventBase & {
       readonly type: "formula-update";
+      readonly action: "edit" | "undo";
       readonly row: number;
-      readonly source: string;
-      readonly resolved: string | number | boolean | null;
+      readonly dependencies: readonly {
+        readonly address: string;
+        readonly formula: string;
+        readonly before: string | number | boolean | null;
+        readonly after: string | number | boolean | null;
+      }[];
     })
   | (EngineEventBase & {
       readonly type: "visible-window";
@@ -171,15 +205,15 @@ export function createEngineLiveWorkbook(): Workbook {
     sheets: [
       {
         id: ENGINE_LIVE_SHEET,
-        name: "Weekly forecast",
+        name: "Regional forecast",
         rowCount: ENGINE_LIVE_ROWS,
         columns: [
-          { key: "week", header: "Week", width: 84, type: "number" },
-          { key: "team", header: "Team", width: 108, type: "text" },
-          { key: "planned", header: "Planned", width: 108, type: "number" },
+          { key: "period", header: "Period", width: 104, type: "text" },
+          { key: "region", header: "Region", width: 104, type: "text" },
           { key: "actual", header: "Actual", width: 108, type: "number" },
-          { key: "difference", header: "Difference", width: 118, type: "number" },
-          { key: "pace", header: "Pace", width: 100, type: "number" },
+          { key: "forecast", header: "Forecast", width: 112, type: "number" },
+          { key: "variance", header: "Variance", width: 112, type: "number" },
+          { key: "attainment", header: "Attainment", width: 116, type: "number" },
         ],
       },
     ],
@@ -187,16 +221,31 @@ export function createEngineLiveWorkbook(): Workbook {
 }
 
 export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]): RowData {
+  if (row === 0) {
+    const headerRow: RowData = {
+      period: "Period",
+      region: "Region",
+      actual: "Actual",
+      forecast: "Forecast",
+      variance: "Variance",
+      attainment: "Attainment",
+    };
+    if (!columns) return headerRow;
+    const keys = new Set(columns.flatMap((band) => band.keys));
+    return Object.fromEntries(Object.entries(headerRow).filter(([key]) => keys.has(key)));
+  }
   const sheetRow = row + 1;
-  const planned = 900 + ((row * 37) % 700);
-  const actual = planned - 90 + ((row * 53) % 181);
+  const dataIndex = row - 1;
+  const forecast = 900 + ((dataIndex * 37) % 700);
+  const actual = forecast - 90 + ((dataIndex * 53) % 181);
+  const week = (dataIndex % 52) + 1;
   const completeRow: RowData = {
-    week: sheetRow,
-    team: TEAMS[row % TEAMS.length] ?? "North",
-    planned,
+    period: `FY26 W${String(week).padStart(2, "0")}`,
+    region: TEAMS[dataIndex % TEAMS.length] ?? "North",
     actual,
-    difference: { kind: "formula", src: `=D${sheetRow}-C${sheetRow}` },
-    pace: { kind: "formula", src: `=IF(C${sheetRow}=0,0,D${sheetRow}/C${sheetRow})` },
+    forecast,
+    variance: { kind: "formula", src: `=C${sheetRow}-D${sheetRow}` },
+    attainment: { kind: "formula", src: `=IF(D${sheetRow}=0,0,C${sheetRow}/D${sheetRow})` },
   };
   if (!columns) return completeRow;
   const keys = new Set(columns.flatMap((band) => band.keys));
@@ -205,12 +254,11 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
 export function createEngineLiveDataSource(
   emit: (event: EngineEventInput) => void,
   onResult?: () => void,
-  delayMs = ENGINE_PAGE_DELAY_MS,
 ): DataSource {
   let requestId = 0;
   return {
     capabilities: { protocol: 2, columns: "windowed" },
-    getRows({ protocol, sheet, start, end, columns, signal, revision }) {
+    async getRows({ protocol, sheet, start, end, columns, signal, revision }) {
       if (protocol !== 2) throw new Error(`Unsupported datasource protocol ${protocol}`);
       requestId += 1;
       const currentRequest = requestId;
@@ -223,37 +271,24 @@ export function createEngineLiveDataSource(
         end,
         columns: requestedColumns,
       });
-      const { promise, resolve, reject } = Promise.withResolvers<{
-        protocol: 2;
-        start: number;
-        columns: readonly EngineColumnBand[];
-        rows: RowData[];
-        revision: number;
-      }>();
-      const timer = setTimeout(() => {
-        if (signal.aborted) return;
-        const rows = Array.from({ length: end - start }, (_, offset) =>
-          engineLiveRow(start + offset, requestedColumns),
-        );
-        emit({
-          type: "datasource-result",
-          requestId: currentRequest,
-          rows: rows.length,
-          durationMs: performance.now() - startedAt,
-          columns: requestedColumns,
-        });
-        resolve({ protocol: 2, start, columns: requestedColumns, rows, revision });
-        queueMicrotask(() => onResult?.());
-      }, delayMs);
-      signal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timer);
-          reject(new DOMException(`Request for ${sheet} was cancelled`, "AbortError"));
-        },
-        { once: true },
+      if (signal.aborted) {
+        throw new DOMException(`Request for ${sheet} was cancelled`, "AbortError");
+      }
+      const rows = Array.from({ length: end - start }, (_, offset) =>
+        engineLiveRow(start + offset, requestedColumns),
       );
-      return promise;
+      if (signal.aborted) {
+        throw new DOMException(`Request for ${sheet} was cancelled`, "AbortError");
+      }
+      emit({
+        type: "datasource-result",
+        requestId: currentRequest,
+        rows: rows.length,
+        durationMs: performance.now() - startedAt,
+        columns: requestedColumns,
+      });
+      queueMicrotask(() => onResult?.());
+      return { protocol: 2, start, columns: requestedColumns, rows, revision };
     },
   };
 }
@@ -277,11 +312,23 @@ function operationKey(operation: DocumentOp, index: number): string {
   return `${operation.op}:${index}`;
 }
 
+interface EngineDependencySnapshot {
+  readonly address: string;
+  readonly formula: string;
+  readonly value: string | number | boolean | null;
+}
+
 export interface EngineEventBindings {
   announceRenderer(requested: EngineRenderer, fallback?: string | null): void;
   announceResult(
     action: "edit" | "undo" | "grid-edit",
     status: "noop" | "rejected" | "conflict",
+  ): void;
+  dependencySnapshot(row: number): readonly EngineDependencySnapshot[];
+  announceDependencies(
+    action: "edit" | "undo",
+    row: number,
+    before: readonly EngineDependencySnapshot[],
   ): void;
   acknowledgeHost(response: PersistenceCommitResponse, operations: readonly DocumentOp[]): void;
   pendingOperations(): readonly DocumentOp[];
@@ -338,16 +385,6 @@ export function bindEngineEvents(
         changedCells: change.changes.length,
         epoch: change.epoch ?? null,
       });
-      const editedActual = [...change.changes].reverse().find((cell) => cell.addr.col === 3);
-      if (editedActual) {
-        const formulaAddress = { ...editedActual.addr, col: 4 };
-        emit({
-          type: "formula-update",
-          row: formulaAddress.row,
-          source: grid.store.getFormula(formulaAddress) ?? "",
-          resolved: grid.store.getCell(formulaAddress).resolved,
-        });
-      }
       sampleResource(action === "undo" ? "undo" : "edit", "formula-recompute");
     }),
     grid.on("scroll", ({ firstRow, lastRow, scrollTop }) => {
@@ -363,12 +400,33 @@ export function bindEngineEvents(
     }),
   );
 
+  const dependencySnapshot = (row: number): readonly EngineDependencySnapshot[] =>
+    [4, 5].map((col) => {
+      const address = { sheet: ENGINE_LIVE_SHEET, row, col };
+      return {
+        address: `${String.fromCharCode(65 + col)}${row + 1}`,
+        formula: grid.store.getFormula(address) ?? "",
+        value: grid.store.getCell(address).resolved,
+      };
+    });
+
   return {
     announceRenderer(requested, fallback = null) {
       emit({ type: "renderer", requested, active: grid.rendererKind(), fallback });
     },
     announceResult(action, status) {
       emit({ type: "transaction-result", action, status, changedCells: 0, epoch: null });
+    },
+    dependencySnapshot,
+    announceDependencies(action, row, before) {
+      const after = dependencySnapshot(row);
+      const dependencies = after.map((dependency, index) => ({
+        address: dependency.address,
+        formula: dependency.formula,
+        before: before[index]?.value ?? null,
+        after: dependency.value,
+      }));
+      emit({ type: "formula-update", action, row, dependencies });
     },
     acknowledgeHost(response, operations) {
       if (response.status === "conflict") {
@@ -441,15 +499,6 @@ export function createEngineHostSaver(): EngineHostSaver {
   };
 }
 
-export const ENGINE_SCRIPT: readonly EngineAction[] = [
-  "jump",
-  "edit",
-  "undo",
-  "edit",
-  "save",
-  "renderer",
-];
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
@@ -477,7 +526,12 @@ export function formatEngineEvent(event: EngineEvent): string {
     case "page-resource":
       return `Page sample: ${event.loadedCells.toLocaleString()} cells loaded, ${event.dirtyCells.toLocaleString()} changed, ${formatBytes(event.pageBytes)} kept in pages, ${formatBytes(event.engineBytes)} in the calculation engine`;
     case "formula-update":
-      return `Formula E${event.row + 1}: ${event.source} → ${formatValue(event.resolved)}`;
+      return `${event.action === "undo" ? "Undo dependencies" : "Recalculated"}: ${event.dependencies
+        .map(
+          (dependency) =>
+            `${dependency.address} ${formatValue(dependency.before)} → ${formatValue(dependency.after)} via ${dependency.formula}`,
+        )
+        .join("; ")}`;
     case "visible-window":
       return `Visible rows: ${event.firstRow + 1}–${event.lastRow + 1}`;
     case "renderer":

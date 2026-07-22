@@ -5,13 +5,13 @@ import stylesheet from "../styles/showcase-engine.css?url";
 const EngineShowcase = lazy(() => import("../showcases/EngineShowcase.js"));
 
 const description =
-  "A live paged formula sheet where Grid edits, row requests, checked results, drawing choices, and host saves stay readable in one view.";
+  "Edit a live 50,000-row regional forecast in a real Grid while public datasource, formula, resource, drawing, and host-save evidence stays aligned beside it.";
 
 export const Route = createFileRoute("/showcases/engine")({
   head: () => ({
     meta: [
       { name: "description", content: description },
-      { title: "Live engine view — Sheetwrite" },
+      { title: "Live financial Grid and engine evidence — Sheetwrite" },
     ],
     links: [{ rel: "stylesheet", href: stylesheet }],
   }),
