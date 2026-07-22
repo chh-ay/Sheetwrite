@@ -93,13 +93,21 @@ async function readB2(page: Page): Promise<string> {
   return page.locator("#formula").inputValue();
 }
 
-/** Host action buttons, scoped away from the grid's built-in toolbar. */
+/** Host action buttons, excluding the Grid's built-in toolbar. */
 function actionButton(page: Page, name: string) {
-  return page.getByRole("toolbar", { name: "Workbook operations" }).getByRole("button", { name });
+  return page.locator(".sw-vw-instrument").getByRole("button", { name, exact: true });
 }
 
-test("boots the framework-free workbench, paints, and stays accessible", async ({ page }) => {
+async function openConstructionControls(page: Page): Promise<void> {
+  const details = page.locator(".sw-vw-details");
+  if (!(await details.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.getByText("Construction & debug controls", { exact: true }).click();
+  }
+}
+
+test("boots product-first, paints, and exposes the ownership instruments", async ({ page }) => {
   const errors = collectErrors(page);
+  await page.setViewportSize({ width: 1568, height: 900 });
 
   await page.goto(VANILLA_URL);
   await waitForLive(page);
@@ -109,17 +117,50 @@ test("boots the framework-free workbench, paints, and stays accessible", async (
   );
   await expect.poll(() => canvasBodyPainted(page)).toBe(true);
 
-  // Accessibility contract: named toolbars, named radio groups, a polite
-  // live region for host activity, and a labelled grid host.
-  await expect(page.getByRole("toolbar", { name: "Workbench controls" })).toBeVisible();
-  await expect(page.getByRole("toolbar", { name: "Workbook operations" })).toBeVisible();
+  const hero = await page.locator(".sw-showcase-page__hero").boundingBox();
+  const installCommand = page.locator(".sw-showcase-page__install .sw-install-command");
+  expect(hero).not.toBeNull();
+  expect(hero!.height).toBeGreaterThanOrEqual(300);
+  expect(hero!.height).toBeLessThanOrEqual(390);
+  await expect(installCommand).toContainText("npm install @sheetwrite/core");
+  expect(
+    await installCommand.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+
+  const stage = await page.locator(".sw-vw-gridstage").boundingBox();
+  const instrument = await page.locator(".sw-vw-instrument").boundingBox();
+  expect(stage).not.toBeNull();
+  expect(instrument).not.toBeNull();
+  expect(stage!.y).toBeLessThan(620);
+  expect(stage!.width).toBeGreaterThan(instrument!.width * 2.5);
+  await expect(page.locator(".sw-vw-stagewrap")).toBeInViewport();
+
+  const scenarios = page.getByRole("tablist", { name: "Vanilla Grid scenarios" });
+  await expect(scenarios).toBeVisible();
+  await expect(scenarios.getByRole("tab")).toHaveCount(3);
+  await expect(page.getByRole("tab", { name: /Main \/ Worker/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("complementary", { name: "Lifecycle ownership" })).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "Grid lifecycle" })).toBeVisible();
   await expect(page.getByRole("radiogroup", { name: "Rendering thread" })).toBeVisible();
-  await expect(page.getByRole("radiogroup", { name: "Data path" })).toBeVisible();
   await expect(page.getByTestId("activity")).toHaveAttribute("aria-live", "polite");
   await expect(page.locator('.sw-vw-stage [aria-label="Spreadsheet grid"]')).toBeAttached();
+
+  await openConstructionControls(page);
+  await expect(page.getByRole("toolbar", { name: "Workbench controls" })).toBeVisible();
+  await expect(page.getByRole("radiogroup", { name: "Data path" })).toBeVisible();
+
+  await page.getByRole("tab", { name: /XLSX/ }).click();
+  await expect(page.getByRole("toolbar", { name: "Workbook operations" })).toBeVisible();
   await expect(page.getByLabel("Import an XLSX workbook")).toBeAttached();
 
-  // Proof pages are linked, not re-implemented, on this route.
   const proofNav = page.getByRole("navigation", { name: "Dedicated capability proofs" });
   await expect(proofNav.locator('a[href="/showcases/performance/#million-rows"]')).toBeVisible();
   await expect(proofNav.locator('a[href="/showcases/interoperability/#xlsx"]')).toBeVisible();
@@ -130,6 +171,32 @@ test("boots the framework-free workbench, paints, and stays accessible", async (
   expect(errors.console).toEqual([]);
 });
 
+test("scenario tabs support keyboard focus and drive real construction options", async ({
+  page,
+}) => {
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+
+  const lifecycle = page.getByRole("tab", { name: /Main \/ Worker/ });
+  await lifecycle.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: /Paged source/ })).toBeFocused();
+  await expect(page.getByRole("tab", { name: /Paged source/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page).toHaveURL(/[?&]data=paged/);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2", {
+    timeout: 20_000,
+  });
+
+  await page.keyboard.press("End");
+  await expect(page.getByRole("tab", { name: /XLSX/ })).toBeFocused();
+  await expect(page).not.toHaveURL(/data=paged/);
+  await page.keyboard.press("Home");
+  await expect(lifecycle).toBeFocused();
+  await expect(lifecycle).toHaveAttribute("aria-selected", "true");
+});
 test("destroy, create, and reset bound explicit grid generations", async ({ page }) => {
   const errors = collectErrors(page);
 
@@ -152,9 +219,10 @@ test("destroy, create, and reset bound explicit grid generations", async ({ page
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2");
   await expect.poll(() => readB2(page)).not.toBe("generation-one-edit");
 
+  await openConstructionControls(page);
   // Reset rebuilds with the same construction options.
   await commitB2(page, "generation-two-edit");
-  await page.getByRole("button", { name: "Reset" }).click();
+  await page.getByRole("button", { name: "Reset generation" }).click();
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "3", {
     timeout: 20_000,
   });
@@ -168,6 +236,7 @@ test("destroy, create, and reset bound explicit grid generations", async ({ page
 test("read-only is a live option that never rebuilds the grid", async ({ page }) => {
   await page.goto(VANILLA_URL);
   await waitForLive(page);
+  await openConstructionControls(page);
 
   await page.getByRole("checkbox", { name: "Read-only" }).check();
   await expect(page.locator("#formula")).toHaveJSProperty("readOnly", true);
@@ -318,12 +387,13 @@ test("the paged data path serves host pages and reports allocation honestly", as
   await expect(page.getByTestId("activity")).toContainText("served by the host page source");
 
   // Back to the dense path: stats disappear, aggregates complete.
-  await page.getByRole("radio", { name: "Dense columnar" }).click();
+  await page.getByRole("tab", { name: /Main \/ Worker/ }).click();
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
     timeout: 20_000,
   });
   await expect(page).not.toHaveURL(/data=paged/);
   await expect(page.getByTestId("paged-stats")).toHaveCount(0);
+  await page.getByRole("tab", { name: /XLSX/ }).click();
   await actionButton(page, "Total ARR").click();
   await expect(page.getByTestId("activity")).toContainText("Pipeline total");
 
@@ -336,6 +406,7 @@ test("workbook operations and the XLSX round trip run through the core API", asy
 
   await page.goto(VANILLA_URL);
   await waitForLive(page);
+  await page.getByRole("tab", { name: /XLSX/ }).click();
 
   // Sheet operation: summary tab with live cross-sheet formulas.
   await actionButton(page, "Summary sheet").click();
@@ -360,6 +431,15 @@ test("workbook operations and the XLSX round trip run through the core API", asy
     timeout: 30_000,
   });
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2");
+  // XLSX preserves the active Summary sheet. Its formulas survive the round trip,
+  // and the owning data sheet remains reachable with its first account intact.
+  await expect.poll(() => gridCellTexts(page), { timeout: 15_000 }).toContain("Total ARR");
+  const importedSummary = await gridCellTexts(page);
+  const totalIndex = importedSummary.indexOf("Total ARR");
+  expect(totalIndex).toBeGreaterThanOrEqual(0);
+  expect(importedSummary[totalIndex + 1]).toMatch(/\d/);
+  expect(importedSummary[totalIndex + 1]).not.toMatch(/^#/);
+  await page.locator(`${GRID} .sheetwrite-tab`, { hasText: "Revenue pipeline" }).click();
   await expect.poll(() => gridCellTexts(page), { timeout: 15_000 }).toContain(FIRST_ACCOUNT);
 
   expect(errors.page).toEqual([]);
@@ -399,6 +479,25 @@ test("the workbench stays operable on a mobile viewport", async ({ page }) => {
 
   await page.goto(VANILLA_URL);
   await waitForLive(page);
+  const stageTop = await page
+    .locator(".sw-vw-gridstage")
+    .evaluate((element) => (element as HTMLElement).offsetTop);
+  const instrumentTop = await page
+    .locator(".sw-vw-instrument")
+    .evaluate((element) => (element as HTMLElement).offsetTop);
+  expect(stageTop).toBeLessThan(instrumentTop);
+
+  const installCommand = page.locator(".sw-showcase-page__install .sw-install-command");
+  await expect(installCommand).toContainText("npm install @sheetwrite/core");
+  await expect(page.getByRole("link", { name: /Open the integration guide/ })).toBeVisible();
+  expect(
+    await installCommand.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
 
   // The workbench itself never overflows horizontally.
   const overflow = await page
@@ -420,16 +519,23 @@ test("the workbench stays operable on a mobile viewport", async ({ page }) => {
   expect(errors.console).toEqual([]);
 });
 
-test("selected controls follow the site theme contrast", async ({ page }) => {
+test("selected scenarios follow the site theme contrast", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("sheetwrite-theme", "light"));
   await page.goto(VANILLA_URL);
   await waitForLive(page);
-  const selected = page.getByRole("radio", { name: "Main thread" });
-  const light = await selected.evaluate((element) => getComputedStyle(element).color);
+  const selected = page.getByRole("tab", { name: /Main \/ Worker/ });
+  const light = await selected.evaluate((element) => getComputedStyle(element).backgroundColor);
+  const installCard = page.locator(".sw-showcase-page__install");
+  const cardLight = await installCard.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
 
   await page.getByRole("button", { name: "Use dark theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect
-    .poll(() => selected.evaluate((element) => getComputedStyle(element).color))
+    .poll(() => installCard.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(cardLight);
+  await expect
+    .poll(() => selected.evaluate((element) => getComputedStyle(element).backgroundColor))
     .not.toBe(light);
 });

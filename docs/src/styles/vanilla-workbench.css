@@ -35,54 +35,70 @@
   min-width: 0;
 }
 
-/* This route deliberately compresses generic showcase chrome so the real
-   editable product occupies the first viewport. */
+/* The route hero is intentionally editorial rather than compressed: it gives
+   the ownership story room, then hands the viewport to the live product. */
 .sw-showcase-page[data-framework="vanilla"] {
   padding-top: var(--sw-demo-space-4);
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero {
-  grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem);
-  gap: var(--sw-demo-space-4);
+  min-height: 20rem;
+  grid-template-columns: minmax(0, 1fr) minmax(21rem, 24rem);
+  gap: calc(var(--sw-demo-space-4) * 3);
   align-items: center;
-  padding-bottom: var(--sw-demo-space-4);
+  padding-block: calc(var(--sw-demo-space-4) * 2);
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__eyebrow {
-  margin-bottom: var(--sw-demo-space-2);
+  margin-bottom: var(--sw-demo-space-3);
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero h1 {
-  max-width: none;
-  font-size: clamp(2rem, 3vw, 3rem);
-  line-height: 1;
+  max-width: 16ch;
+  font-size: clamp(3rem, 4vw, 4.5rem);
+  line-height: 0.98;
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero-copy > p:last-of-type {
-  max-width: 68rem;
-  margin-top: var(--sw-demo-space-2);
-  font-size: var(--sw-type-sm);
-  line-height: 1.5;
+  max-width: 50rem;
+  margin-top: var(--sw-demo-space-4);
+  font-size: var(--sw-type-base);
+  line-height: 1.65;
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs {
-  margin-top: var(--sw-demo-space-3);
+  margin-top: calc(var(--sw-demo-space-4) * 2);
+}
+
+.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs > div {
+  min-width: 9.5rem;
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install {
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--sw-demo-space-2);
-  align-items: center;
-  padding: var(--sw-demo-space-3);
-  box-shadow: none;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sw-demo-space-4);
+  align-items: stretch;
+  padding: calc(var(--sw-demo-space-4) + var(--sw-demo-space-2));
+  box-shadow: var(--sw-shadow);
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install > div {
-  display: none;
+  display: grid;
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install > a {
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.sw-showcase-page[data-framework="vanilla"] .sw-install-command {
+  grid-template-columns: auto minmax(max-content, 1fr) auto;
+  gap: var(--sw-demo-space-2);
+}
+
+.sw-showcase-page[data-framework="vanilla"] .sw-install-command code {
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-stage__viewport {
@@ -673,25 +689,36 @@
   }
 
   .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero {
+    min-height: 0;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sw-demo-space-3);
-    padding-bottom: var(--sw-demo-space-3);
+    gap: calc(var(--sw-demo-space-4) * 2);
+    padding-block: var(--sw-demo-space-4) calc(var(--sw-demo-space-4) * 2);
   }
 
   .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero h1 {
-    font-size: 2.25rem;
+    max-width: 14ch;
+    font-size: 2.75rem;
+  }
+
+  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero-copy > p:last-of-type {
+    margin-top: var(--sw-demo-space-3);
+    font-size: var(--sw-type-sm);
   }
 
   .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs {
-    display: none;
+    display: flex;
+    margin-top: var(--sw-demo-space-4);
+  }
+
+  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs > div {
+    min-width: 6.5rem;
+    padding-inline: var(--sw-demo-space-3);
   }
 
   .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install > a {
-    display: none;
+    gap: var(--sw-demo-space-3);
+    padding: var(--sw-demo-space-3);
   }
 
   .sw-showcase-page[data-framework="vanilla"] .sw-showcase-stage__bar {
