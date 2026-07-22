@@ -21,7 +21,6 @@ declare global {
 
 const ROUTE = siteUrl("/showcases/performance/");
 const GRID = '[data-testid="scale-grid"]';
-const CACHE_BUDGET_BYTES = 4 * 1024 * 1024;
 const ROWS = 1_000_000;
 const COLUMNS = 1_000;
 
@@ -54,7 +53,7 @@ function columnIndex(label: string): number {
 }
 
 function numericText(text: string | null): number {
-  return Number((text ?? "").replaceAll(",", "").replaceAll(/[^\d.]/g, ""));
+  return Number((text ?? "").replace(/,/g, "").replace(/[^\d.]/g, ""));
 }
 
 async function pagedStats(page: Page): Promise<PagedStoreStats | null> {
@@ -112,7 +111,8 @@ async function readWindow(page: Page): Promise<WindowReadout> {
   return readout;
 }
 
-async function assertLoadedRowIdWithoutStaleFlash(page: Page, row: number): Promise<void> {
+async function assertLoadedPeriodWithoutStaleFlash(page: Page, row: number): Promise<void> {
+  const expectedPeriod = `FY${2024 + (Math.floor(row / 12) % 5)} P${String((row % 12) + 1).padStart(2, "0")}`;
   const samples: Array<{ state: string | null; value: unknown }> = [];
   for (let sample = 0; sample < 8; sample += 1) {
     samples.push(
@@ -127,8 +127,11 @@ async function assertLoadedRowIdWithoutStaleFlash(page: Page, row: number): Prom
     await page.waitForTimeout(20);
   }
   for (const sample of samples) {
-    if (sample.state === "unloaded") expect(sample.value).toBeNull();
-    else expect(sample.value).toBe(row + 1);
+    if (sample.state === "unloaded") {
+      expect(sample.value).toBe("#LOADING!");
+    } else {
+      expect(sample.value).toBe(expectedPeriod);
+    }
   }
   await expect
     .poll(
@@ -144,7 +147,7 @@ async function assertLoadedRowIdWithoutStaleFlash(page: Page, row: number): Prom
         ),
       { timeout: 20_000 },
     )
-    .toBe(row + 1);
+    .toBe(expectedPeriod);
 }
 
 async function gridBodyPoint(page: Page, row: number, column: number) {
@@ -289,12 +292,18 @@ test("the live Grid is exactly one billion logical addresses with bounded rectan
   expect(workbook?.sheets).toHaveLength(1);
   expect(workbook?.sheets[0]?.rowCount).toBe(ROWS);
   expect(workbook?.sheets[0]?.columns).toHaveLength(COLUMNS);
+  const cacheBudgetBytes = Number(
+    await page.getByTestId("scale-grid").getAttribute("data-cache-bytes"),
+  );
 
   const stats = await pagedStats(page);
   expect(stats).not.toBeNull();
   expect(stats!.fullyLoaded).toBe(false);
-  expect(stats!.allocatedBytes).toBeLessThanOrEqual(CACHE_BUDGET_BYTES);
+  expect(stats!.allocatedBytes).toBeLessThanOrEqual(cacheBudgetBytes);
   expect(stats!.loadedCells).toBeLessThan(ROWS * COLUMNS);
+  expect(cacheBudgetBytes).toBe(32 * 1024 * 1024);
+  await expect(page.getByText("Resident tile payload", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("32 MiB cache ceiling", { exact: false }).first()).toBeVisible();
 
   const initial = await readWindow(page);
   expect(initial.firstRow).toBe(1);
@@ -307,6 +316,7 @@ test("the live Grid is exactly one billion logical addresses with bounded rectan
     0,
   );
 
+  await page.getByTestId("scale-global-details").locator("summary").click();
   await page.getByTestId("scale-scan-attempt").click();
   await expect(page.getByTestId("scale-scan-report")).toHaveAttribute("data-state", "incomplete");
   await expect(page.getByTestId("scale-scan-report")).toContainText("IncompleteDataError");
@@ -318,6 +328,88 @@ test("the live Grid is exactly one billion logical addresses with bounded rectan
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
+});
+
+test("semantic headers and coherent financial operations values are rendered by the real Grid", async ({
+  page,
+}) => {
+  await bootScale(page);
+  const columnHeaders = page.locator(`${GRID} [role="columnheader"]`);
+  await expect(columnHeaders.nth(0)).toHaveText("Period");
+  await expect(columnHeaders.nth(1)).toHaveText("Account");
+  await expect(columnHeaders.nth(2)).toHaveText("Region");
+  await expect(columnHeaders.nth(3)).toHaveText("Revenue");
+
+  const schema = await page.evaluate(() =>
+    window.__sheetwriteScaleGrid?.store
+      .getWorkbook()
+      .sheets[0]?.columns.slice(0, 12)
+      .map(({ header, type, numberFormat }) => ({
+        header,
+        type,
+        ...(numberFormat ? { numberFormat } : {}),
+      })),
+  );
+  expect(schema).toEqual([
+    { header: "Period", type: "text" },
+    { header: "Account", type: "text" },
+    { header: "Region", type: "text" },
+    { header: "Revenue", type: "currency" },
+    { header: "COGS", type: "currency" },
+    { header: "Gross profit", type: "currency" },
+    { header: "Operating expenses", type: "currency" },
+    { header: "EBITDA", type: "currency" },
+    { header: "EBITDA margin", type: "number", numberFormat: "0.0%" },
+    { header: "Forecast revenue", type: "currency" },
+    { header: "Variance", type: "currency" },
+    { header: "Plan status", type: "text" },
+  ]);
+
+  await page.getByTestId("scale-jump-row").fill("1");
+  await page.getByTestId("scale-jump-column").fill("12");
+  await page.getByTestId("scale-jump").click();
+  await expect(page.getByTestId("scale-current-a1")).toHaveText("L1");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Array.from(
+          { length: 12 },
+          (_, col) =>
+            window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
+              sheet: "scale",
+              row: 0,
+              col,
+            }) ?? "unloaded",
+        ),
+      ),
+    )
+    .not.toContain("unloaded");
+
+  const row = await page.evaluate(() =>
+    Array.from(
+      { length: 12 },
+      (_, col) =>
+        window.__sheetwriteScaleGrid?.store.getCell({ sheet: "scale", row: 0, col }).resolved,
+    ),
+  );
+  expect(row[0]).toBe("FY2024 P01");
+  expect(row[1]).toMatch(/4100|4200|4300|4400/);
+  expect(["North America", "EMEA", "APAC", "Latin America"]).toContain(row[2]);
+  const revenue = Number(row[3]);
+  const cogs = Number(row[4]);
+  const grossProfit = Number(row[5]);
+  const operatingExpenses = Number(row[6]);
+  const ebitda = Number(row[7]);
+  const margin = Number(row[8]);
+  const forecastRevenue = Number(row[9]);
+  const variance = Number(row[10]);
+  expect(revenue).toBeGreaterThan(0);
+  expect(cogs).toBeGreaterThan(0);
+  expect(grossProfit).toBeCloseTo(revenue - cogs, 5);
+  expect(ebitda).toBeCloseTo(grossProfit - operatingExpenses, 5);
+  expect(margin).toBeCloseTo(ebitda / revenue, 4);
+  expect(variance).toBeCloseTo(revenue - forecastRevenue, 5);
+  expect(["Ahead", "On plan", "Watch"]).toContain(row[11]);
 });
 
 test("wheel, Page keys, landmarks, and a physical overview drag agree with public headers", async ({
@@ -357,13 +449,18 @@ test("wheel, Page keys, landmarks, and a physical overview drag agree with publi
     await page.getByTestId(`scale-landmark-${landmark}`).click();
     await expect(page.getByTestId("scale-current-a1")).toHaveText(selected);
     await expect
-      .poll(async () => (await readWindow(page)).lastRow)
+      .poll(async () => {
+        const rows = (await page.getByTestId("scale-window-rows").textContent())?.match(
+          /([\d,]+)\s*–\s*([\d,]+)/,
+        );
+        return numericText(rows?.[2] ?? null);
+      })
       .toBeGreaterThanOrEqual(dataRow + 1);
     const readout = await readWindow(page);
     expect(readout.firstRow).toBeLessThanOrEqual(dataRow + 1);
     expect(readout.lastRow).toBeGreaterThanOrEqual(dataRow + 1);
     landmarkRows.push(readout.firstRow);
-    await assertLoadedRowIdWithoutStaleFlash(page, dataRow);
+    await assertLoadedPeriodWithoutStaleFlash(page, dataRow);
   }
   expect(landmarkRows[0]).toBeLessThan(landmarkRows[1]!);
   expect(landmarkRows[1]).toBeLessThan(landmarkRows[2]!);
@@ -386,6 +483,14 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
 }) => {
   test.setTimeout(120_000);
   await bootScale(page);
+  const grid = page.locator(GRID);
+  await page.getByTestId("scale-eviction-stress").click();
+  await expect(grid).toHaveAttribute("data-cache-bytes", String(1024 * 1024));
+  await expect(page.getByTestId("scale-status")).toContainText(
+    "Optional 1 MiB eviction stress active",
+  );
+  const chunkRows = Number(await grid.getAttribute("data-chunk-rows"));
+  expect(chunkRows).toBe(4_096);
   await page.getByTestId("scale-jump-row").fill("742000");
   await page.getByTestId("scale-jump-column").fill("4");
   await page.getByTestId("scale-jump").click();
@@ -401,23 +506,49 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
   expect(exactWindow.lastRow).toBeGreaterThanOrEqual(742_000);
   expect(exactWindow.firstColumn).toBeLessThanOrEqual(3);
   expect(exactWindow.lastColumn).toBeGreaterThanOrEqual(3);
+  await page.getByTestId("scale-jump-row").fill("737904");
+  await page.getByTestId("scale-jump-column").fill("4");
+  await page.getByTestId("scale-jump").click();
+  await expect(page.getByTestId("scale-current-a1")).toHaveText("D737904");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
+          sheet: "scale",
+          row: 737_903,
+          col: 3,
+        }),
+      ),
+    )
+    .toBe("loaded-value");
+  await page.getByTestId("scale-jump-row").fill("742000");
+  await page.getByTestId("scale-jump").click();
+  await expect(page.getByTestId("scale-current-a1")).toHaveText("D742000");
 
   await expect
     .poll(
       () =>
-        page.evaluate(() =>
-          window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
+        page.evaluate(() => ({
+          target: window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
             sheet: "scale",
             row: 741_999,
-            col: 4,
+            col: 3,
           }),
-        ),
+          cleanComparison: window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
+            sheet: "scale",
+            row: 737_903,
+            col: 3,
+          }),
+        })),
       { timeout: 20_000 },
     )
-    .toMatch(/loaded/);
+    .toEqual({ target: "loaded-value", cleanComparison: "loaded-value" });
 
+  await grid.scrollIntoViewIfNeeded();
   const target = await gridBodyPoint(page, 741_999, 3);
   await page.mouse.click(target.x, target.y);
+  await expect(page.getByTestId("scale-current-a1")).toHaveText("D742000");
+  await expect(grid).toBeFocused();
   await page.keyboard.press("F2");
   await expect(page.locator(`${GRID} .sheetwrite-editor`)).toBeVisible();
   await page.locator(`${GRID} .sheetwrite-editor`).fill("777777");
@@ -432,18 +563,23 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
     )
     .toBe(777_777);
 
-  const grid = page.locator(GRID);
   const box = await grid.boundingBox();
   if (!box) throw new Error("Grid has no physical bounds");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  const sampledColumns: number[] = [];
-  for (let motion = 0; motion < 34; motion += 1) {
+  let sampledColumn = (await readWindow(page)).firstColumn;
+  for (let motion = 0; motion < 34 && sampledColumn <= 900; motion += 1) {
     await page.mouse.wheel(3_600, 0);
-    await page.waitForTimeout(125);
-    sampledColumns.push((await readWindow(page)).firstColumn);
-  }
-  for (let index = 1; index < sampledColumns.length; index += 1) {
-    expect(sampledColumns[index]).toBeGreaterThanOrEqual(sampledColumns[index - 1]!);
+    let observedColumn = sampledColumn;
+    await expect
+      .poll(async () => {
+        const columns = (await page.getByTestId("scale-window-columns").textContent())?.match(
+          /([A-Z]+)\s*–\s*([A-Z]+)/,
+        );
+        observedColumn = columnIndex(columns?.[1] ?? "A");
+        return observedColumn;
+      })
+      .toBeGreaterThan(sampledColumn);
+    sampledColumn = observedColumn;
   }
   const farWindow = await readWindow(page);
   expect(farWindow.firstColumn).toBeGreaterThan(900);
@@ -453,6 +589,44 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
     await page.getByTestId(`scale-landmark-${landmark}`).click();
     await page.waitForTimeout(250);
   }
+  let watchedCleanState: string | undefined;
+  for (let visit = 0; visit < 128; visit += 1) {
+    const row = 10_000 + visit * 7_500;
+    const column = 1 + ((visit * 113) % 990);
+    if (
+      Math.floor((row - 1) / chunkRows) === Math.floor(737_903 / chunkRows) ||
+      Math.floor((row - 1) / chunkRows) === Math.floor(741_999 / chunkRows)
+    ) {
+      continue;
+    }
+    await page.getByTestId("scale-jump-row").fill(String(row));
+    await page.getByTestId("scale-jump-column").fill(String(column));
+    await page.getByTestId("scale-jump").click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          ({ targetRow, targetColumn }) =>
+            window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
+              sheet: "scale",
+              row: targetRow - 1,
+              col: targetColumn - 1,
+            }),
+          { targetRow: row, targetColumn: column },
+        ),
+      )
+      .toMatch(/loaded/);
+    watchedCleanState = await page.evaluate(() =>
+      window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
+        sheet: "scale",
+        row: 737_903,
+        col: 3,
+      }),
+    );
+    if (watchedCleanState === "unloaded") break;
+  }
+  expect(watchedCleanState, "finite 32 MiB churn never evicted the watched clean tile").toBe(
+    "unloaded",
+  );
 
   await expect
     .poll(
@@ -460,8 +634,8 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
         page.evaluate(() =>
           window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
             sheet: "scale",
-            row: 741_999,
-            col: 4,
+            row: 737_903,
+            col: 3,
           }),
         ),
       { timeout: 20_000 },
@@ -485,7 +659,8 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
   );
 
   const afterEviction = await pagedStats(page);
-  expect(afterEviction!.allocatedBytes).toBeLessThanOrEqual(CACHE_BUDGET_BYTES);
+  const cacheBudgetBytes = Number(await grid.getAttribute("data-cache-bytes"));
+  expect(afterEviction!.allocatedBytes).toBeLessThanOrEqual(cacheBudgetBytes);
   expect(afterEviction!.dirtyCells).toBe(1);
   const visibleWidth = farWindow.lastColumn - farWindow.firstColumn + 1;
   const amplification = Number(await page.getByTestId("scale-column-amplification").textContent());
@@ -513,6 +688,7 @@ test("main and Worker canvas paths report what actually mounted", async ({ page 
   await expect(page.getByTestId("scale-renderer-active")).toHaveText("canvas");
   await expect(page.locator(`${GRID} canvas`)).toHaveCount(1);
 
+  await page.locator(".sw-sp-render-details summary").click();
   await page.getByTestId("scale-renderer-worker").click();
   await page.waitForSelector(`${GRID} canvas`, { state: "attached" });
   await expect(page.getByTestId("scale-renderer-state")).toContainText("Requested worker");
@@ -524,6 +700,150 @@ test("main and Worker canvas paths report what actually mounted", async ({ page 
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
+});
+
+test("desktop first viewport is a live Grid with an adjacent navigation instrument", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootScale(page);
+  const layout = await page.evaluate(() => {
+    const grid = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
+    const instrument = document.querySelector<HTMLElement>(".sw-sp-instrument");
+    const paging = document.querySelector<HTMLElement>("#paging");
+    return {
+      viewportHeight: innerHeight,
+      grid: grid?.getBoundingClientRect().toJSON(),
+      instrument: instrument?.getBoundingClientRect().toJSON(),
+      paging: paging?.getBoundingClientRect().toJSON(),
+    };
+  });
+  expect(layout.grid).toBeTruthy();
+  expect(layout.instrument).toBeTruthy();
+  expect(layout.grid!.top).toBeLessThan(layout.viewportHeight * 0.45);
+  expect(layout.grid!.height).toBeGreaterThan(layout.viewportHeight * 0.55);
+  expect(layout.grid!.bottom).toBeGreaterThan(layout.viewportHeight * 0.78);
+  expect(layout.instrument!.left).toBeGreaterThanOrEqual(layout.grid!.right - 1);
+  expect(layout.paging!.top).toBeGreaterThanOrEqual(layout.grid!.bottom - 1);
+  expect(layout.paging!.top).toBeGreaterThan(layout.viewportHeight * 0.9);
+  await expect(page.getByRole("heading", { name: "Jump deep. Then scroll wide." })).toBeVisible();
+});
+
+test("Grid zoom changes real rendered geometry and reset restores the logical window", async ({
+  page,
+}) => {
+  await bootScale(page);
+  const beforeWindow = await readWindow(page);
+  const before = await page.evaluate(() => {
+    const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
+    const grid = window.__sheetwriteScaleGrid;
+    if (!host || !grid) return null;
+    const rect = host.getBoundingClientRect();
+    const theme = grid.getEffectiveTheme();
+    return {
+      zoom: grid.getZoom(),
+      rowHeight: theme.rowHeight,
+      selection: grid.getSelection(),
+      probe: grid.getCellAtPoint(
+        rect.left + theme.rowHeaderWidth + 16,
+        rect.top + Math.min(240, rect.height - 10),
+      ),
+      transform: getComputedStyle(host).transform,
+    };
+  });
+  expect(before).not.toBeNull();
+  expect(before!.zoom).toBe(1);
+  expect(before!.transform).toBe("none");
+
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(page.getByTestId("scale-zoom-value")).toHaveText("125%");
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  const zoomedWindow = await readWindow(page);
+  expect(zoomedWindow.firstRow).toBe(beforeWindow.firstRow);
+  expect(zoomedWindow.firstColumn).toBe(beforeWindow.firstColumn);
+  expect(zoomedWindow.selected).toBe(beforeWindow.selected);
+  const zoomed = await page.evaluate(() => {
+    const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
+    const grid = window.__sheetwriteScaleGrid;
+    if (!host || !grid) return null;
+    const rect = host.getBoundingClientRect();
+    const theme = grid.getEffectiveTheme();
+    return {
+      zoom: grid.getZoom(),
+      rowHeight: theme.rowHeight,
+      selection: grid.getSelection(),
+      probe: grid.getCellAtPoint(
+        rect.left + theme.rowHeaderWidth + 16,
+        rect.top + Math.min(240, rect.height - 10),
+      ),
+      transform: getComputedStyle(host).transform,
+    };
+  });
+  expect(zoomed).not.toBeNull();
+  expect(zoomed!.zoom).toBe(1.25);
+  expect(zoomed!.rowHeight).toBeGreaterThan(before!.rowHeight);
+  expect(zoomed!.probe?.row).toBeLessThan(before!.probe?.row ?? Number.POSITIVE_INFINITY);
+  expect(zoomed!.selection).toEqual(before!.selection);
+  expect(zoomed!.transform).toBe("none");
+
+  await page.getByRole("button", { name: "Reset" }).click();
+  await expect(page.getByTestId("scale-zoom-value")).toHaveText("100%");
+  const reset = await page.evaluate(() => {
+    const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
+    const grid = window.__sheetwriteScaleGrid;
+    if (!host || !grid) return null;
+    const rect = host.getBoundingClientRect();
+    const theme = grid.getEffectiveTheme();
+    return {
+      zoom: grid.getZoom(),
+      rowHeight: theme.rowHeight,
+      selection: grid.getSelection(),
+      probe: grid.getCellAtPoint(
+        rect.left + theme.rowHeaderWidth + 16,
+        rect.top + Math.min(240, rect.height - 10),
+      ),
+    };
+  });
+  expect(reset).not.toBeNull();
+  expect(reset!.zoom).toBe(1);
+  expect(reset!.rowHeight).toBe(before!.rowHeight);
+  expect(reset!.probe).toEqual(before!.probe);
+  expect(reset!.selection).toEqual(before!.selection);
+  await expect.poll(() => readWindow(page)).toEqual(beforeWindow);
+});
+
+test("comparison evidence uses an explicit evidence-aligned logarithmic axis", async ({ page }) => {
+  await bootScale(page);
+  const comparison = page.getByTestId("scale-evidence-compare");
+  await expect(comparison).toContainText("1× is the parity baseline");
+
+  const chart = await comparison.evaluate((root) => {
+    const ticks = Array.from(
+      root.querySelectorAll(".sw-sp-scale-curve__axis > div > span"),
+      (tick) => Number((tick.textContent ?? "").replace(/,/g, "").replace("×", "")),
+    );
+    const ratios = Array.from(root.querySelectorAll(".sw-sp-scale-curve li > strong"), (label) =>
+      Number((label.textContent ?? "").replace("×", "")),
+    );
+    const widths = Array.from(root.querySelectorAll(".sw-sp-scale-curve__track > span"), (bar) =>
+      Number.parseFloat((bar as HTMLElement).style.width),
+    );
+    return { ticks, ratios, widths };
+  });
+
+  expect(chart.ticks.length).toBeGreaterThanOrEqual(2);
+  for (let index = 1; index < chart.ticks.length; index += 1) {
+    expect(chart.ticks[index]).toBe(chart.ticks[index - 1]! * 10);
+  }
+  const domainExponent = Math.log10(chart.ticks[chart.ticks.length - 1]!);
+  expect(chart.widths).toHaveLength(chart.ratios.length);
+  for (let index = 0; index < chart.ratios.length; index += 1) {
+    expect(chart.widths[index]).toBeCloseTo(
+      (Math.log10(Math.max(chart.ratios[index]!, 1)) / domainExponent) * 100,
+      4,
+    );
+  }
+  expect(Math.max(...chart.widths)).toBeLessThanOrEqual(100);
 });
 
 test("@portability mobile touch input, lifecycle, and responsive reflow stay operable", async ({
@@ -578,6 +898,7 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
       .toBeGreaterThan(beforeTouch.firstRow);
   }
 
+  await page.locator(".sw-sp-render-details summary").click();
   await page.getByTestId("scale-renderer-worker").click();
   await page.waitForSelector(`${GRID} canvas`, { state: "attached" });
   await expect(page.getByTestId("scale-renderer-state")).toContainText("Requested worker");
@@ -590,11 +911,12 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
     scrollWidth: document.documentElement.scrollWidth,
     controls: [
       ...document.querySelectorAll<HTMLElement>(
-        ".sw-sp-render-switch button, .sw-sp-overview-panel input, .sw-sp-overview-panel button, .sw-sp-jump input, .sw-sp-jump button",
+        ".sw-sp-zoom button, .sw-sp-zoom output, .sw-sp-stress button, .sw-sp-render-switch button, .sw-sp-overview-track input, .sw-sp-landmarks button, .sw-sp-jump input, .sw-sp-jump button",
       ),
-    ].map((element) => element.getBoundingClientRect().toJSON()),
+    ]
+      .filter((element) => element.offsetParent !== null)
+      .map((element) => element.getBoundingClientRect().toJSON()),
   }));
-  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.innerWidth + 1);
   for (const rect of layout.controls) {
     expect(rect.left).toBeGreaterThanOrEqual(0);
     expect(rect.right).toBeLessThanOrEqual(layout.innerWidth + 1);
@@ -620,14 +942,36 @@ test("owned controls do not clip at desktop, phone, or 200% reflow dimensions", 
       const grid = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
       const controls = [
         ...document.querySelectorAll<HTMLElement>(
-          ".sw-sp-render-switch button, .sw-sp-overview-panel input, .sw-sp-overview-panel button, .sw-sp-jump input, .sw-sp-jump button",
+          ".sw-sp-zoom button, .sw-sp-zoom output, .sw-sp-stress button, .sw-sp-render-switch button, .sw-sp-overview-track input, .sw-sp-landmarks button, .sw-sp-jump input, .sw-sp-jump button",
         ),
-      ];
+      ].filter((element) => element.offsetParent !== null);
+      const metricValues = [
+        ...document.querySelectorAll<HTMLElement>(".sw-sp-proof-wins article > strong"),
+      ].map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          height: element.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(style.lineHeight),
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+        };
+      });
+      const metricLabels = [
+        ...document.querySelectorAll<HTMLElement>(".sw-sp-proof-wins article > span"),
+      ].map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          height: element.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(style.lineHeight),
+        };
+      });
       return {
         innerWidth,
         scrollWidth: document.documentElement.scrollWidth,
         grid: grid?.getBoundingClientRect().toJSON(),
         controls: controls.map((element) => element.getBoundingClientRect().toJSON()),
+        metricValues,
+        metricLabels,
       };
     });
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.innerWidth + 1);
@@ -636,6 +980,13 @@ test("owned controls do not clip at desktop, phone, or 200% reflow dimensions", 
       expect(rect.left).toBeGreaterThanOrEqual(0);
       expect(rect.right).toBeLessThanOrEqual(layout.innerWidth + 1);
       expect(rect.width).toBeGreaterThan(0);
+    }
+    for (const metric of layout.metricValues) {
+      expect(metric.height).toBeLessThanOrEqual(metric.lineHeight + 1);
+      expect(metric.scrollWidth).toBeLessThanOrEqual(metric.clientWidth + 1);
+    }
+    for (const label of layout.metricLabels) {
+      expect(label.height).toBeLessThanOrEqual(label.lineHeight + 1);
     }
   }
 });

@@ -44,20 +44,45 @@ export const SCALE_THEME: Partial<Theme> = {
   rowHeaderWidth: 72,
 };
 
-/** Fixed clean-page budget; sparse local edits are accounted separately. */
+/** Product-default 32 MiB clean-page budget; sparse local edits are accounted separately. */
 export const SCALE_STORAGE: Required<DataSourceStorageOptions> = {
   mode: "paged",
   chunkRows: 4096,
-  cacheBytes: 4 * 1024 * 1024,
+  cacheBytes: 32 * 1024 * 1024,
   dirtyCellLimit: 1_000_000,
+};
+
+/** Explicit opt-in mode for demonstrating clean-tile eviction; never the product default. */
+export const SCALE_EVICTION_STRESS_STORAGE: Required<DataSourceStorageOptions> = {
+  ...SCALE_STORAGE,
+  cacheBytes: 1024 * 1024,
 };
 
 /** Deliberate source latency after first paint, kept visible in the diagnostics. */
 export const PAGE_LATENCY_MS = 90;
 
 const GENERATION_SLICE_ROWS = 256;
-const REGIONS = ["eu-west", "us-east", "ap-south", "sa-east", "af-north"] as const;
-const STATUSES = ["ok", "ok", "ok", "degraded", "alert"] as const;
+const REGIONS = ["North America", "EMEA", "APAC", "Latin America"] as const;
+const ACCOUNTS = [
+  "Enterprise · 4100",
+  "Commercial · 4200",
+  "Digital · 4300",
+  "Services · 4400",
+] as const;
+const FINANCIAL_COLUMNS = [
+  { header: "Period", width: 104, type: "text" },
+  { header: "Account", width: 152, type: "text" },
+  { header: "Region", width: 124, type: "text" },
+  { header: "Revenue", width: 116, type: "currency" },
+  { header: "COGS", width: 108, type: "currency" },
+  { header: "Gross profit", width: 124, type: "currency" },
+  { header: "Operating expenses", width: 148, type: "currency" },
+  { header: "EBITDA", width: 112, type: "currency" },
+  { header: "EBITDA margin", width: 128, type: "number" },
+  { header: "Forecast revenue", width: 140, type: "currency" },
+  { header: "Variance", width: 112, type: "currency" },
+  { header: "Plan status", width: 112, type: "text" },
+] as const;
 const encoder = new TextEncoder();
 
 function rowHash(row: number, salt: number): number {
@@ -72,32 +97,82 @@ export function scaleColumnKey(column: number): string {
   return `c${column}`;
 }
 
-function columnHeader(column: number): string {
-  if (column === 0) return "Row ID";
-  if (column === 1) return "Sensor";
-  if (column === 2) return "Region";
-  if (column === 3) return "Reading";
-  if (column === 4) return "Status";
-  return `Metric ${String(column - 4).padStart(3, "0")}`;
+interface FinancialRow {
+  period: string;
+  account: string;
+  region: string;
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  operatingExpenses: number;
+  ebitda: number;
+  ebitdaMargin: number;
+  forecastRevenue: number;
+  variance: number;
+  status: string;
 }
 
-function scaleCellAt(row: number, column: number): string | number | null {
-  const hash = rowHash(row, column + 1);
-  if (column === 0) return row + 1;
-  if (column === 1) return `S-${String(hash % 4096).padStart(4, "0")}`;
-  if (column === 2) return REGIONS[hash % REGIONS.length] ?? "eu-west";
-  if (column === 3) return Math.round((hash % 100_000) / 10) / 10;
-  if (column === 4) return STATUSES[hash % STATUSES.length] ?? "ok";
-  if (hash % 17 === 0) return null;
-  return Math.round(((hash % 100_000) / 100 + (row % 11)) * 100) / 100;
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function financialRowAt(row: number): FinancialRow {
+  const hash = rowHash(row, 1);
+  const fiscalYear = 2024 + (Math.floor(row / 12) % 5);
+  const period = `FY${fiscalYear} P${String((row % 12) + 1).padStart(2, "0")}`;
+  const revenue = roundMoney(90_000 + (hash % 360_000) + (row % 12) * 4_500);
+  const cogs = roundMoney(revenue * (0.36 + (rowHash(row, 2) % 9) / 100));
+  const grossProfit = roundMoney(revenue - cogs);
+  const operatingExpenses = roundMoney(revenue * (0.24 + (rowHash(row, 3) % 8) / 100));
+  const ebitda = roundMoney(grossProfit - operatingExpenses);
+  const ebitdaMargin = Math.round((ebitda / revenue) * 10_000) / 10_000;
+  const forecastRate = ((rowHash(row, 4) % 1_701) - 700) / 10_000;
+  const forecastRevenue = roundMoney(revenue / (1 + forecastRate));
+  const variance = roundMoney(revenue - forecastRevenue);
+  const varianceRate = variance / forecastRevenue;
+
+  return {
+    period,
+    account: ACCOUNTS[Math.floor(row / 12) % ACCOUNTS.length] ?? ACCOUNTS[0],
+    region: REGIONS[hash % REGIONS.length] ?? REGIONS[0],
+    revenue,
+    cogs,
+    grossProfit,
+    operatingExpenses,
+    ebitda,
+    ebitdaMargin,
+    forecastRevenue,
+    variance,
+    status: varianceRate > 0.03 ? "Ahead" : varianceRate < -0.03 ? "Watch" : "On plan",
+  };
+}
+
+function scaleCellAt(row: number, column: number, financial: FinancialRow): string | number {
+  if (column === 0) return financial.period;
+  if (column === 1) return financial.account;
+  if (column === 2) return financial.region;
+  if (column === 3) return financial.revenue;
+  if (column === 4) return financial.cogs;
+  if (column === 5) return financial.grossProfit;
+  if (column === 6) return financial.operatingExpenses;
+  if (column === 7) return financial.ebitda;
+  if (column === 8) return financial.ebitdaMargin;
+  if (column === 9) return financial.forecastRevenue;
+  if (column === 10) return financial.variance;
+  if (column === 11) return financial.status;
+
+  const horizon = column - (FINANCIAL_COLUMNS.length - 1);
+  const seasonalRate = ((rowHash(row, column + 1) % 201) - 100) / 10_000;
+  return roundMoney(financial.forecastRevenue * (1 + horizon * 0.0015 + seasonalRate));
 }
 
 export function scaleRowAt(row: number, bands: readonly DataSourceColumnBand[]): RowData {
   const out: RowData = {};
+  const financial = financialRowAt(row);
   for (const band of bands) {
     for (let offset = 0; offset < band.keys.length; offset += 1) {
       const key = band.keys[offset];
-      if (key !== undefined) out[key] = scaleCellAt(row, band.start + offset);
+      if (key !== undefined) out[key] = scaleCellAt(row, band.start + offset, financial);
     }
   }
   return out;
@@ -111,13 +186,18 @@ export function createScaleWorkbook(): Workbook {
         id: FEED_SHEET,
         name: SCALE_SHEETS[FEED_SHEET].label,
         rowCount: SCALE_ROWS,
-        columns: Array.from({ length: SCALE_COLUMNS }, (_, column) => ({
-          key: scaleColumnKey(column),
-          header: columnHeader(column),
-          width: column === 0 ? 88 : column < 5 ? 104 : 92,
-          type:
-            column === 1 || column === 2 || column === 4 ? ("text" as const) : ("number" as const),
-        })),
+        columns: Array.from({ length: SCALE_COLUMNS }, (_, column) => {
+          const financialColumn = FINANCIAL_COLUMNS[column];
+          return {
+            key: scaleColumnKey(column),
+            header:
+              financialColumn?.header ??
+              `Forecast M+${String(column - (FINANCIAL_COLUMNS.length - 1)).padStart(3, "0")}`,
+            width: financialColumn?.width ?? 116,
+            type: financialColumn?.type ?? ("currency" as const),
+            ...(column === 8 ? { numberFormat: "0.0%" } : {}),
+          };
+        }),
       },
     ],
   };
