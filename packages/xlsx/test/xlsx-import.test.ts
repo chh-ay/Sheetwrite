@@ -570,7 +570,7 @@ describe("workbook OOXML fidelity", () => {
       {
         code: "hyperlink",
         message: "Hyperlink target was dropped; display text was preserved",
-        sheet: "Sheet1",
+        sheet: "External",
         cell: "A1",
       },
     ]);

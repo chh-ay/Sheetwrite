@@ -7,18 +7,19 @@ import {
 } from "@sheetwrite/core";
 import { registerXlsxBackends } from "../src/index.js";
 
-const FORMULA_SOURCES = [
-  "=SUMPRODUCT(A1:A3,B1:B3)",
-  '=COUNTIFS(A1:A3,">0",B1:B3,"ok")',
-  '=TEXT(DATE(2024,2,29),"yyyy-mm-dd")',
-  "=PERCENTILE.INC(A1:A3,0.5)",
-  "=COVARIANCE.P(A1:A3,B1:B3)",
-  "=FILTER(A1:A3,B1:B3>0)",
-  "=LET(values,A1:A3,SUM(values))",
-  "=IRR(A1:A3)",
-  "=IFS(A1>0,TRUE(),A1=0,FALSE())",
-  "=SWITCH(TYPE(A1),1,N(A1),T(A1))",
-] as const;
+interface FormulaContractInventory {
+  functions: {
+    canonical: string;
+    contractStatus: string;
+  }[];
+}
+
+const INVENTORY = (await Bun.file(
+  new URL("../../../test/conformance/formula-contract.inventory.json", import.meta.url),
+).json()) as FormulaContractInventory;
+const FORMULA_SOURCES = INVENTORY.functions
+  .filter((entry) => entry.contractStatus === "required-supported")
+  .map((entry) => `=${entry.canonical}()`);
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -63,10 +64,20 @@ function formulaSources(snapshot: WorkbookSnapshot): string[] {
 }
 
 describe("XLSX formula source preservation", () => {
-  it("round-trips supported source names verbatim without asserting recalculation", async () => {
+  it("round-trips every required target source without asserting recalculation or producer compatibility", async () => {
     const encoded = await toXlsxWorkbook(formulaWorkbook());
     const decoded = await fromXlsxWorkbook(encoded);
+    expect(FORMULA_SOURCES).toHaveLength(100);
+    expect(new Set(FORMULA_SOURCES).size).toBe(100);
 
+    expect(decoded.workbook.activeSheet).toBe("formula");
+    expect(decoded.sheets).toHaveLength(1);
+    expect(decoded.sheets[0]).toMatchObject({
+      id: "formula",
+      name: "Formula Source",
+      order: 0,
+      rowCount: 100,
+    });
     expect(formulaSources(decoded)).toEqual(FORMULA_SOURCES);
   });
 });
