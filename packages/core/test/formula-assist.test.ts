@@ -65,13 +65,25 @@ afterEach(() => {
 describe("FORMULA_FUNCTIONS catalog", () => {
   it("matches the function names accepted by the calc.rs parser", async () => {
     const source = await Bun.file(new URL("../../wasm/src/calc.rs", import.meta.url)).text();
-    const parserTable = source.match(
-      /let func = match name\.to_ascii_uppercase\(\)\.as_str\(\) \{([\s\S]*?)\n\s*_ => None,/,
+    const parserRegistry = source.match(
+      /define_function_registry!\s*\{\s*canonical\s*\{([\s\S]*?)\n\s*\}\s*aliases\s*\{([\s\S]*?)\n\s*\}\s*\}/,
     );
-    if (!parserTable?.[1]) throw new Error("calc.rs parser function table not found");
+    if (!parserRegistry?.[1] || parserRegistry[2] === undefined) {
+      throw new Error("calc.rs parser function registry not found");
+    }
 
-    const engineFunctions = [...parserTable[1].matchAll(/"([A-Z][A-Z0-9.]*)"/g)].map(
-      (match) => match[1]!,
+    const engineFunctions = [parserRegistry[1], parserRegistry[2]].flatMap((block, index) =>
+      block
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .map((line) => {
+          const arm =
+            index === 0
+              ? line.match(/^\s*[A-Za-z][A-Za-z0-9_]*\s*=>\s*"([A-Z][A-Z0-9.]*)";\s*$/)
+              : line.match(/^\s*"([A-Z][A-Z0-9.]*)"\s*=>\s*[A-Za-z][A-Za-z0-9_]*;\s*$/);
+          if (!arm?.[1]) throw new Error(`unrecognized calc.rs function registry arm: ${line}`);
+          return arm[1];
+        }),
     );
 
     expect(new Set(FORMULA_FUNCTIONS).size).toBe(FORMULA_FUNCTIONS.length);

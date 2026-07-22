@@ -26,7 +26,7 @@ use crate::types::{
     KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
-use array::dynamic_recompute_within_limit;
+use array::{ast_produces_array, dynamic_recompute_within_limit};
 use criteria::{aggregate_if, extreme_if, Criterion};
 pub(crate) use dependency::DepIndex;
 use dependency::{build_dep_index, collect_affected_formulas, seed_dependency_depth_errors};

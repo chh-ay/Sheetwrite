@@ -228,17 +228,21 @@ describe("formula capability contract", () => {
     );
   });
 
-  test("extracts pipe aliases from the case-insensitive Rust dispatch", () => {
+  test("extracts canonical and alias spellings from the Rust function registry", () => {
     const source = `
-      let func = match name.to_ascii_uppercase().as_str() {
-        "AVG" | "AVERAGE" => Some(Func::Avg),
-        "MODE.SNGL" => Some(Func::ModeSngl),
-        _ => None,
-      };
+      define_function_registry! {
+        canonical {
+          Avg => "AVG";
+          ModeSngl => "MODE.SNGL";
+        }
+        aliases {
+          "AVERAGE" => Avg;
+        }
+      }
     `;
-    expect(extractParserSpellings(source)).toEqual(["AVG", "AVERAGE", "MODE.SNGL"]);
+    expect(extractParserSpellings(source)).toEqual(["AVG", "MODE.SNGL", "AVERAGE"]);
     expect(INVENTORY.parserRules).toMatchObject({
-      dispatch: "name.to_ascii_uppercase().as_str()",
+      dispatch: "lookup_func(name.as_ref())",
       caseSensitive: false,
     });
   });

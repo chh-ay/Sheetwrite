@@ -222,36 +222,34 @@ function compareNameSets(
 }
 
 export function extractParserSpellings(source: string): string[] {
-  const marker = "let func = match name.to_ascii_uppercase().as_str() {";
-  const start = source.indexOf(marker);
-  if (start < 0) throw new Error("formula parser dispatch marker not found");
-  const end = source.indexOf("_ => None,", start);
-  if (end < 0) throw new Error("formula parser dispatch terminator not found");
-  const block = source.slice(start + marker.length, end);
-  const spellings: string[] = [];
-  let armCount = 0;
-  for (const line of block.split("\n")) {
-    if (!line.includes("=> Some(Func::")) continue;
-    armCount += 1;
-    const arm = line.match(
-      /^\s*((?:"[A-Z][A-Z0-9.]*"\s*(?:\|\s*)?)+)=>\s*Some\(Func::[A-Za-z0-9_]+\),\s*$/,
-    );
-    const armSource = arm?.[1];
-    if (armSource === undefined) {
-      throw new Error(`unrecognized formula parser arm: ${line.trim()}`);
-    }
-    const names: string[] = [];
-    for (const match of armSource.matchAll(/"([A-Z][A-Z0-9.]*)"/g)) {
-      const name = match[1];
-      if (name === undefined) {
-        throw new Error(`unrecognized formula parser spelling: ${line.trim()}`);
-      }
-      names.push(name);
-    }
-    if (names.length === 0) throw new Error(`empty formula parser arm: ${line.trim()}`);
-    spellings.push(...names);
+  const registry = source.match(
+    /define_function_registry!\s*\{\s*canonical\s*\{([\s\S]*?)\n\s*\}\s*aliases\s*\{([\s\S]*?)\n\s*\}\s*\}/,
+  );
+  if (!registry?.[1] || registry[2] === undefined) {
+    throw new Error("formula parser registry not found");
   }
-  if (armCount === 0) throw new Error("formula parser dispatch has no recognized arms");
+
+  const spellings: string[] = [];
+  const parseBlock = (block: string, arm: RegExp, label: string): void => {
+    let armCount = 0;
+    for (const line of block.split("\n")) {
+      if (line.trim().length === 0) continue;
+      const match = line.match(arm);
+      if (!match?.[1]) throw new Error(`unrecognized formula parser ${label}: ${line.trim()}`);
+      spellings.push(match[1]);
+      armCount += 1;
+    }
+    if (label === "canonical arm" && armCount === 0) {
+      throw new Error("formula parser registry has no canonical arms");
+    }
+  };
+
+  parseBlock(
+    registry[1],
+    /^\s*[A-Za-z][A-Za-z0-9_]*\s*=>\s*"([A-Z][A-Z0-9.]*)";\s*$/,
+    "canonical arm",
+  );
+  parseBlock(registry[2], /^\s*"([A-Z][A-Z0-9.]*)"\s*=>\s*[A-Za-z][A-Za-z0-9_]*;\s*$/, "alias arm");
   return spellings;
 }
 
