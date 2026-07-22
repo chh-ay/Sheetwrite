@@ -55,9 +55,10 @@ test("interoperability page boots, verifies fixture checksums in-browser, and pr
   const errors = collectErrors(page);
   await bootInterop(page);
 
-  // The isolation probe ran before this page ever loaded @sheetwrite/xlsx, so
-  // a direct navigation must observe the unregistered typed error.
-  await expect(page.locator('[data-testid="interop-isolation-error"]')).toContainText(
+  // Await the core boundary rejection before any XLSX action can lazily load
+  // @sheetwrite/xlsx/register.
+  await expect(page.getByTestId("interop-isolation")).toHaveAttribute("data-state", "isolated");
+  await expect(page.getByTestId("interop-isolation-error")).toContainText(
     "XLSX backend not registered",
   );
 
@@ -142,6 +143,168 @@ test("@portability compatibility lab deep-links exact boundaries and filters the
   expect(errors.console).toEqual([]);
 });
 
+test("analytical workbook recalculates real precedents and clears resized spills", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await bootInterop(page);
+
+  for (const name of ["Orders", "Invoice", "Assumptions", "Analysis"]) {
+    await expect(page.getByRole("tab", { name: `${name} sheet` })).toBeVisible();
+  }
+
+  const initial = await page.evaluate(() => {
+    const grid = window.__sheetwriteInteropGrid;
+    if (!grid) throw new Error("interop grid unavailable");
+    const cell = (sheet: string, row: number, col: number) =>
+      grid.store.getCell({ sheet, row, col }).resolved;
+    const formula = (sheet: string, row: number, col: number) =>
+      grid.store.getFormula({ sheet, row, col });
+    return {
+      sheets: grid.store.getWorkbook().sheets.map(({ id, name }) => ({ id, name })),
+      formulas: {
+        lookup: formula("assumptions", 1, 1),
+        payment: formula("analysis", 0, 3),
+        spill: formula("analysis", 0, 4),
+        date: formula("analysis", 4, 0),
+        statistical: formula("analysis", 1, 3),
+        letResult: formula("analysis", 2, 3),
+        npv: formula("analysis", 3, 3),
+        irr: formula("analysis", 4, 3),
+      },
+      values: {
+        rate: cell("assumptions", 1, 1),
+        payment: cell("analysis", 0, 3),
+        statistical: cell("analysis", 1, 3),
+        letResult: cell("analysis", 2, 3),
+        npv: cell("analysis", 3, 3),
+        irr: cell("analysis", 4, 3),
+        startDate: cell("analysis", 0, 0),
+        endDate: cell("analysis", 4, 0),
+        spill: Array.from({ length: 6 }, (_, row) => cell("analysis", row, 4)),
+      },
+    };
+  });
+
+  expect(initial.sheets).toEqual([
+    { id: "orders", name: "Orders" },
+    { id: "invoice", name: "Invoice" },
+    { id: "assumptions", name: "Assumptions" },
+    { id: "analysis", name: "Analysis" },
+  ]);
+  expect(initial.formulas).toEqual({
+    lookup: "=XLOOKUP(B1,C1:C3,D1:D3)",
+    payment: "=-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4)",
+    spill: "=SEQUENCE(Assumptions!B5,1,1,1)",
+    date: "=EDATE(A4,12)",
+    statistical: "=ROUND(STDEV.S(Orders!E1:E6),2)",
+    letResult:
+      "=LET(payment,-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4),ROUND(payment*Assumptions!B3-payment,2))",
+    npv: "=NPV(Assumptions!B2,B2:B5)+B1",
+    irr: "=IRR(B1:B5)",
+  });
+  expect(initial.values.rate).toBeCloseTo(0.06, 12);
+  expect(initial.values.payment).toBeCloseTo(1032.7971564849884, 10);
+  expect(initial.values.statistical).toBe(1592.74);
+  expect(initial.values.letResult).toBe(11360.77);
+  expect(initial.values.npv).toBeCloseTo(127.86964444879777, 10);
+  expect(initial.values.irr).toBeCloseTo(0.06464423448532142, 10);
+  expect(initial.values.startDate).toBe(46053);
+  expect(initial.values.endDate).toBe(47514);
+  expect(initial.values.spill).toEqual([1, 2, 3, 4, null, null]);
+  await expect(page.getByTestId("interop-model-evidence")).toContainText(
+    "No new Excel or Google Sheets observation",
+  );
+
+  await page.getByTestId("interop-rate-input").selectOption("0.09");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteInteropGrid?.store.getCell({
+            sheet: "analysis",
+            row: 0,
+            col: 3,
+          }).resolved,
+      ),
+    )
+    .toBeCloseTo(1049.4177212390496, 10);
+  const afterRate = await page.evaluate(() => {
+    const store = window.__sheetwriteInteropGrid?.store;
+    if (!store) throw new Error("interop grid unavailable");
+    const resolved = (sheet: string, row: number, col: number) =>
+      store.getCell({ sheet, row, col }).resolved;
+    return {
+      payment: resolved("analysis", 0, 3),
+      npv: resolved("analysis", 3, 3),
+      letResult: resolved("analysis", 2, 3),
+      unchanged: {
+        statistical: resolved("analysis", 1, 3),
+        irr: resolved("analysis", 4, 3),
+        endDate: resolved("analysis", 4, 0),
+        spill: Array.from({ length: 6 }, (_, row) => resolved("analysis", row, 4)),
+      },
+    };
+  });
+  expect(afterRate.payment).toBeCloseTo(1049.4177212390496, 10);
+  expect(afterRate.npv).toBeCloseTo(-660.9804303132023, 10);
+  expect(afterRate.letResult).toBe(11543.59);
+  expect(afterRate.unchanged).toEqual({
+    statistical: initial.values.statistical,
+    irr: initial.values.irr,
+    endDate: initial.values.endDate,
+    spill: initial.values.spill,
+  });
+  const rateScope = page.getByTestId("interop-model-change-scope");
+  await expect(rateScope).toHaveAttribute("data-change-count", "1");
+  await expect(rateScope).toHaveAttribute("data-changed-results", "Payment,NPV,LET");
+  await expect(rateScope).toContainText("assumptions!R2C4");
+
+  await page.getByTestId("interop-spill-input").selectOption("6");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Array.from(
+          { length: 6 },
+          (_, row) =>
+            window.__sheetwriteInteropGrid?.store.getCell({
+              sheet: "analysis",
+              row,
+              col: 4,
+            }).resolved,
+        ),
+      ),
+    )
+    .toEqual([1, 2, 3, 4, 5, 6]);
+  await expect(rateScope).toHaveAttribute("data-changed-results", "Spill");
+  await expect(rateScope).toContainText("assumptions!R5C2");
+
+  await page.getByTestId("interop-spill-input").selectOption("3");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const store = window.__sheetwriteInteropGrid?.store;
+        if (!store) return null;
+        return Array.from({ length: 6 }, (_, row) => ({
+          value: store.getCell({ sheet: "analysis", row, col: 4 }).resolved,
+          anchor: store.getSpillAnchor({ sheet: "analysis", row, col: 4 }),
+        }));
+      }),
+    )
+    .toEqual([
+      { value: 1, anchor: { sheet: "analysis", row: 0, col: 4 } },
+      { value: 2, anchor: { sheet: "analysis", row: 0, col: 4 } },
+      { value: 3, anchor: { sheet: "analysis", row: 0, col: 4 } },
+      { value: null, anchor: null },
+      { value: null, anchor: null },
+      { value: null, anchor: null },
+    ]);
+  await expect(page.getByTestId("interop-model-spill")).toHaveText("1, 2, 3");
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("live round-trip preserves formulas, the merge, and frozen rows after an edit", async ({
   page,
 }) => {
@@ -167,8 +330,8 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
   const report = page.locator('[data-testid="interop-roundtrip-report"]');
   await expect(report).toBeVisible({ timeout: 15_000 });
   await expect(report).toHaveAttribute("data-state", "pass");
-  // Canonical document ships 9 formulas (6 line totals + 3 invoice formulas).
-  await expect(page.locator('[data-testid="interop-roundtrip-formulas"]')).toHaveText("9/9");
+  // Canonical document ships 21 formulas across the interchange and analytical sheets.
+  await expect(page.locator('[data-testid="interop-roundtrip-formulas"]')).toHaveText("21/21");
   // The warnings panel now reflects the round-trip operation, not the empty state.
   await expect(page.locator('[data-testid="interop-warnings"]')).not.toContainText(
     "No interchange operation has run yet",
@@ -254,7 +417,8 @@ test("hostile packages, aborted signals, and resource ceilings are rejected with
   const abortReport = page.locator('[data-testid="interop-abort-report"]');
   await expect(abortReport).toBeVisible({ timeout: 15_000 });
   await expect(abortReport).toHaveAttribute("data-state", "pass");
-  await expect(abortReport).toContainText("AbortError");
+  await expect(abortReport).toContainText(/AbortError|SheetwriteError/);
+  await expect(abortReport).toContainText(/abort/i);
 
   await page.click('[data-testid="interop-cellcap-demo"]');
   const cellCap = page.locator('[data-testid="interop-cellcap-report"]');

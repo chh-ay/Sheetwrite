@@ -44,6 +44,8 @@ import traversalUrl from "../../../../packages/xlsx/test/fixtures/traversal.xlsx
 
 export const INTEROP_ORDERS_SHEET = "orders";
 export const INTEROP_INVOICE_SHEET = "invoice";
+export const INTEROP_ASSUMPTIONS_SHEET = "assumptions";
+export const INTEROP_ANALYSIS_SHEET = "analysis";
 
 /** Literal text that MUST leave the CSV path neutralized, never executable. */
 export const INTEROP_INJECTION_TEXT = '=HYPERLINK("https://evil.example","Q3 total")';
@@ -67,10 +69,10 @@ function formula(rowOffset: number, colOffset: number, src: string) {
 }
 
 /**
- * The canonical multi-sheet snapshot the workbench boots from: literals,
- * per-row and cross-sheet formulas, currency number formats, a merge, a
- * frozen header band, and a styled cell — every feature the XLSX workbook
- * codec round-trips, in one document.
+ * The canonical multi-sheet snapshot the workbench boots from: the original
+ * order/invoice interchange fixture plus a compact, bounded analytical model.
+ * Its formula sources exercise portable lookup, date, statistics, array, LET,
+ * and financial families while retaining every XLSX/CSV fidelity feature.
  */
 export function createInteropSnapshot(): WorkbookSnapshot {
   return {
@@ -154,6 +156,112 @@ export function createInteropSnapshot(): WorkbookSnapshot {
           },
         ],
       },
+      {
+        id: INTEROP_ASSUMPTIONS_SHEET,
+        name: "Assumptions",
+        order: 2,
+        rowCount: 5,
+        frozenRows: 1,
+        columns: [
+          { key: "assumption", header: "Assumption", width: 180, type: "text" },
+          { key: "input", header: "Selected input", width: 120, type: "number" },
+          { key: "scenario", header: "Scenario", width: 120, type: "text" },
+          {
+            key: "annualRate",
+            header: "Annual rate",
+            width: 110,
+            type: "number",
+            numberFormat: "0.0%",
+          },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: 5,
+            colCount: 4,
+            cells: [
+              literal(0, 0, "Selected scenario"),
+              literal(0, 1, "Base"),
+              literal(0, 2, "Conservative"),
+              literal(0, 3, 0.04),
+              literal(1, 0, "Selected annual rate"),
+              formula(1, 1, "=XLOOKUP(B1,C1:C3,D1:D3)"),
+              literal(1, 2, "Base"),
+              literal(1, 3, 0.06),
+              literal(2, 0, "Loan term (months)"),
+              literal(2, 1, 12),
+              literal(2, 2, "Growth"),
+              literal(2, 3, 0.08),
+              literal(3, 0, "Principal"),
+              literal(3, 1, 12_000),
+              literal(4, 0, "Projection periods"),
+              literal(4, 1, 4),
+            ],
+          },
+        ],
+      },
+      {
+        id: INTEROP_ANALYSIS_SHEET,
+        name: "Analysis",
+        order: 3,
+        rowCount: 6,
+        frozenRows: 1,
+        columns: [
+          {
+            key: "date",
+            header: "Cash-flow date",
+            width: 125,
+            type: "date",
+            numberFormat: "yyyy-mm-dd",
+          },
+          {
+            key: "cashFlow",
+            header: "Cash flow",
+            width: 110,
+            type: "currency",
+            numberFormat: "$#,##0.00",
+          },
+          { key: "metric", header: "Analytical result", width: 230, type: "text" },
+          { key: "result", header: "Value", width: 135, type: "number" },
+          { key: "projection", header: "Bounded spill", width: 110, type: "number" },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: 6,
+            colCount: 5,
+            cells: [
+              formula(0, 0, "=DATE(2026,1,31)"),
+              literal(0, 1, -12_000),
+              literal(0, 2, "Monthly payment (PMT)"),
+              formula(0, 3, "=-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4)"),
+              formula(0, 4, "=SEQUENCE(Assumptions!B5,1,1,1)"),
+              formula(1, 0, "=EDATE(A1,12)"),
+              literal(1, 1, 3_500),
+              literal(1, 2, "Order total standard deviation"),
+              formula(1, 3, "=ROUND(STDEV.S(Orders!E1:E6),2)"),
+              formula(2, 0, "=EDATE(A2,12)"),
+              literal(2, 1, 3_500),
+              literal(2, 2, "Remaining scheduled payments (LET)"),
+              formula(
+                2,
+                3,
+                "=LET(payment,-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4),ROUND(payment*Assumptions!B3-payment,2))",
+              ),
+              formula(3, 0, "=EDATE(A3,12)"),
+              literal(3, 1, 3_500),
+              literal(3, 2, "Project NPV"),
+              formula(3, 3, "=NPV(Assumptions!B2,B2:B5)+B1"),
+              formula(4, 0, "=EDATE(A4,12)"),
+              literal(4, 1, 3_500),
+              literal(4, 2, "Project IRR"),
+              formula(4, 3, "=IRR(B1:B5)"),
+            ],
+          },
+        ],
+      },
     ],
   };
 }
@@ -161,24 +269,49 @@ export function createInteropSnapshot(): WorkbookSnapshot {
 /** Observable states the browser contract asserts against. */
 export const INTEROP_EXPECTED = {
   orderRows: ORDER_ROWS.length,
+  sheets: [
+    INTEROP_ORDERS_SHEET,
+    INTEROP_INVOICE_SHEET,
+    INTEROP_ASSUMPTIONS_SHEET,
+    INTEROP_ANALYSIS_SHEET,
+  ],
   /** Formula source of the first computed line total. */
   firstTotalFormula: "=C1*D1",
   /** Cross-sheet subtotal on the invoice sheet. */
   subtotalFormula: `=SUM(Orders!E1:E${ORDER_ROWS.length})`,
+  lookupFormula: "=XLOOKUP(B1,C1:C3,D1:D3)",
+  paymentFormula: "=-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4)",
+  spillFormula: "=SEQUENCE(Assumptions!B5,1,1,1)",
+  dateFormula: "=EDATE(A4,12)",
+  statisticalFormula: "=ROUND(STDEV.S(Orders!E1:E6),2)",
+  letFormula:
+    "=LET(payment,-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4),ROUND(payment*Assumptions!B3-payment,2))",
+  npvFormula: "=NPV(Assumptions!B2,B2:B5)+B1",
+  irrFormula: "=IRR(B1:B5)",
   /** Every formula the canonical snapshot ships, for round-trip comparison. */
-  formulaCount: ORDER_ROWS.length + 3,
+  formulaCount: ORDER_ROWS.length + 3 + 1 + 11,
+  selectedRate: 0.06,
+  monthlyPayment: 1032.7971564849884,
+  statisticalResult: 1592.74,
+  letResult: 11360.77,
+  npv: 127.86964444879777,
+  irr: 0.06464423448532142,
+  scheduleEndSerial: 47514,
+  spill: [1, 2, 3, 4],
   injectionCell: { sheet: INTEROP_ORDERS_SHEET, row: 4, col: 1 },
 } as const;
 
 // ── Optional package boundary ────────────────────────────────────────────────
 
 /**
- * Synchronous probe of the workbook-backend registration state. Returns the
- * exact error message core throws while `@sheetwrite/xlsx` is absent, or null
- * once a backend is registered. The successful probe export is tiny and its
- * result is discarded.
+ * Probe the workbook-backend registration state. The core boundary rejects an
+ * unregistered backend asynchronously, so this must await the tiny discarded
+ * export instead of treating the returned Promise as proof of registration.
  */
-export function probeXlsxRegistration(): { registered: boolean; error: string | null } {
+export async function probeXlsxRegistration(): Promise<{
+  registered: boolean;
+  error: string | null;
+}> {
   try {
     const probe = toXlsxWorkbook({
       schemaVersion: 1,
@@ -194,7 +327,7 @@ export function probeXlsxRegistration(): { registered: boolean; error: string | 
         },
       ],
     });
-    probe.catch(() => {});
+    await probe;
     return { registered: true, error: null };
   } catch (error) {
     return { registered: false, error: error instanceof Error ? error.message : String(error) };

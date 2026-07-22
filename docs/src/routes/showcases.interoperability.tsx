@@ -26,6 +26,8 @@ import { pageMeta } from "../lib/seo.js";
 import {
   ADVERSARIAL_FIXTURES,
   abortedImport,
+  INTEROP_ANALYSIS_SHEET,
+  INTEROP_ASSUMPTIONS_SHEET,
   createInteropSnapshot,
   csvOfActiveSheet,
   delimitedCeilingDemo,
@@ -33,6 +35,7 @@ import {
   exportWorkbook,
   fetchFixtureBytes,
   INTEROP_INJECTION_TEXT,
+  INTEROP_EXPECTED,
   type InteropFixture,
   importDelimitedText,
   importWorkbook,
@@ -120,8 +123,104 @@ interface FixtureLoad {
   detail: string;
 }
 
+interface AnalyticalReadout {
+  selectedRate: number | null;
+  payment: number | null;
+  statistical: number | null;
+  letResult: number | null;
+  npv: number | null;
+  irr: number | null;
+  scheduleEnd: number | null;
+  spill: readonly (number | null)[];
+}
+
+interface AnalyticalChange {
+  address: string;
+  committedCells: number;
+  changedResults: readonly string[];
+}
+
 function describeError(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
+function modelNumber(grid: Grid, sheet: string, row: number, col: number): number | null {
+  const resolved = grid.store.getCell({ sheet, row, col }).resolved;
+  return typeof resolved === "number" && Number.isFinite(resolved) ? resolved : null;
+}
+
+function readAnalyticalModel(grid: Grid): AnalyticalReadout | null {
+  const sheets = new Set(grid.store.getWorkbook().sheets.map((sheet) => sheet.id));
+  if (!sheets.has(INTEROP_ASSUMPTIONS_SHEET) || !sheets.has(INTEROP_ANALYSIS_SHEET)) {
+    return null;
+  }
+  const spillAnchor = { sheet: INTEROP_ANALYSIS_SHEET, row: 0, col: 4 };
+  const spill = Array.from({ length: 6 }, (_, row) => {
+    const address = { ...spillAnchor, row };
+    const owner = grid.store.getSpillAnchor(address);
+    return owner?.sheet === spillAnchor.sheet &&
+      owner.row === spillAnchor.row &&
+      owner.col === spillAnchor.col
+      ? modelNumber(grid, address.sheet, address.row, address.col)
+      : null;
+  });
+  return {
+    selectedRate: modelNumber(grid, INTEROP_ASSUMPTIONS_SHEET, 1, 1),
+    payment: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 0, 3),
+    statistical: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 1, 3),
+    letResult: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 2, 3),
+    npv: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 3, 3),
+    irr: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 4, 3),
+    scheduleEnd: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 4, 0),
+    spill,
+  };
+}
+
+function changedAnalyticalResults(
+  previous: AnalyticalReadout,
+  next: AnalyticalReadout,
+): readonly string[] {
+  const changed = [
+    ["Payment", previous.payment, next.payment],
+    ["NPV", previous.npv, next.npv],
+    ["IRR", previous.irr, next.irr],
+    ["STDEV.S", previous.statistical, next.statistical],
+    ["LET", previous.letResult, next.letResult],
+    ["Date schedule", previous.scheduleEnd, next.scheduleEnd],
+  ] as const;
+  const labels: string[] = changed
+    .filter(([, before, after]) => !Object.is(before, after))
+    .map(([label]) => label);
+  if (previous.spill.some((value, index) => !Object.is(value, next.spill[index]))) {
+    labels.push("Spill");
+  }
+  return labels;
+}
+
+function formatCurrency(value: number | null): string {
+  return value === null
+    ? "Unavailable"
+    : new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2,
+      }).format(value);
+}
+
+function formatPercent(value: number | null): string {
+  return value === null
+    ? "Unavailable"
+    : new Intl.NumberFormat("en-US", {
+        style: "percent",
+        maximumFractionDigits: 2,
+      }).format(value);
+}
+
+function formatSerialDate(value: number | null): string {
+  if (value === null) return "Unavailable";
+  return new Date(Date.UTC(1899, 11, 30) + Math.trunc(value) * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 function InteroperabilityRoute() {
@@ -153,6 +252,8 @@ function InteroperabilityRoute() {
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>(SECTIONS[0].id);
   const [fixtureLoad, setFixtureLoad] = useState<FixtureLoad | null>(null);
+  const [modelReadout, setModelReadout] = useState<AnalyticalReadout | null>(null);
+  const [modelChange, setModelChange] = useState<AnalyticalChange | null>(null);
   const [compatibilityStatus, setCompatibilityStatus] = useState<CompatibilityFilter>("all");
   const [compatibilityArea, setCompatibilityArea] = useState("all");
   const [compatibilityDialect, setCompatibilityDialect] = useState("all");
@@ -184,14 +285,17 @@ function InteroperabilityRoute() {
     let disposed = false;
     let grid: Grid | null = null;
     const pieces: ShellPiece[] = [];
+    let unsubscribeChange: (() => void) | null = null;
+    let previousModel: AnalyticalReadout | null = null;
 
-    void initSheetwrite().then(() => {
+    void initSheetwrite().then(async () => {
       if (disposed) return;
       // The registration probe must observe the page BEFORE this route ever
       // touches the optional XLSX package, so it runs exactly once, here.
       if (!probedRef.current) {
         probedRef.current = true;
-        setProbe(probeXlsxRegistration());
+        setProbe(await probeXlsxRegistration());
+        if (disposed) return;
       }
       const base = { theme: CANVAS_THEME, config: { toolbar: false } };
       grid =
@@ -219,11 +323,30 @@ function InteroperabilityRoute() {
       );
       gridRef.current = grid;
       window.__sheetwriteInteropGrid = grid;
+      previousModel = readAnalyticalModel(grid);
+      setModelReadout(previousModel);
+      setModelChange(null);
+      unsubscribeChange = grid.on("change", (event) => {
+        if (!grid) return;
+        const nextModel = readAnalyticalModel(grid);
+        setModelReadout(nextModel);
+        if (previousModel && nextModel) {
+          setModelChange({
+            address: event.changes
+              .map(({ addr }) => `${String(addr.sheet)}!R${addr.row + 1}C${addr.col + 1}`)
+              .join(", "),
+            committedCells: event.changes.length,
+            changedResults: changedAnalyticalResults(previousModel, nextModel),
+          });
+        }
+        previousModel = nextModel;
+      });
       setGridReady(true);
       setStatus(`Loaded: ${source.label}. Edit any cell, then export below.`);
     });
 
     return () => {
+      unsubscribeChange?.();
       disposed = true;
       setGridReady(false);
       for (const piece of pieces) piece.destroy();
@@ -330,6 +453,25 @@ function InteroperabilityRoute() {
     } catch (error) {
       setStatus(`Round-trip failed — ${describeError(error)}`);
     }
+  };
+
+  const handleModelInput = (row: number, col: number, value: number, label: string) => {
+    const grid = gridRef.current;
+    if (!grid || !modelReadout) return;
+    const outcome = grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: INTEROP_ASSUMPTIONS_SHEET, row, col },
+          value: { kind: "literal", value },
+        },
+      ],
+    });
+    setStatus(
+      outcome.status === "applied"
+        ? `${label} changed through Grid.applyTransaction; live dependents recalculated.`
+        : `${label} was not changed — transaction status: ${outcome.status}.`,
+    );
   };
 
   const handleFile = async (file: File | null) => {
@@ -653,12 +795,13 @@ function InteroperabilityRoute() {
         <section aria-labelledby="xlsx-title" className="sw-si-section" id="xlsx">
           <h2 id="xlsx-title">XLSX round-trip workbench</h2>
           <p>
-            Edit any cell through the shell chrome, then download the document, re-import your own,
-            or run the round-trip in place.
+            Edit any cell through the shell chrome, exercise the live analytical precedents below,
+            then download the document, re-import your own, or run the round-trip in place.
           </p>
           <ul aria-label="Canonical document features" className="sw-si-facts">
-            <li>Orders + Invoice sheets</li>
-            <li>9 formulas — per-row &amp; cross-sheet</li>
+            <li>Orders + Invoice + Assumptions + Analysis</li>
+            <li>{INTEROP_EXPECTED.formulaCount} preserved formula sources</li>
+            <li>XLOOKUP · DATE · STDEV.S · SEQUENCE · LET · PMT · NPV · IRR</li>
             <li>currency formats</li>
             <li>merged footer</li>
             <li>frozen header row</li>
@@ -667,6 +810,131 @@ function InteroperabilityRoute() {
             <p className="sw-si-workbench__label" data-testid="interop-source">
               Document: {source.label}
             </p>
+            <section aria-labelledby="analytical-model-title" className="sw-si-model">
+              <div className="sw-si-model__heading">
+                <div>
+                  <p className="sw-si-model__eyebrow">LIVE FORMULA MODEL</p>
+                  <h3 id="analytical-model-title">Portable analytical workbench</h3>
+                </div>
+                <p className="sw-si-model__evidence" data-testid="interop-model-evidence">
+                  Local engine: evaluated now. No new Excel or Google Sheets observation is added;
+                  the producer matrix remains authoritative.
+                </p>
+              </div>
+              <div aria-label="Analytical model inputs" className="sw-si-model__controls">
+                <label>
+                  Base annual rate
+                  <select
+                    data-testid="interop-rate-input"
+                    disabled={!modelReadout}
+                    onChange={(event) =>
+                      handleModelInput(1, 3, Number(event.currentTarget.value), "Base annual rate")
+                    }
+                    value={
+                      modelReadout?.selectedRate === 0.09
+                        ? "0.09"
+                        : modelReadout?.selectedRate === 0.06
+                          ? "0.06"
+                          : ""
+                    }
+                  >
+                    {!modelReadout && <option value="">Model unavailable</option>}
+                    <option value="0.06">6.0%</option>
+                    <option value="0.09">9.0%</option>
+                  </select>
+                </label>
+                <label>
+                  Spill periods
+                  <select
+                    data-testid="interop-spill-input"
+                    disabled={!modelReadout}
+                    onChange={(event) =>
+                      handleModelInput(
+                        4,
+                        1,
+                        Number(event.currentTarget.value),
+                        "Projection periods",
+                      )
+                    }
+                    value={
+                      modelReadout
+                        ? String(modelReadout.spill.filter((value) => value !== null).length)
+                        : ""
+                    }
+                  >
+                    {!modelReadout && <option value="">Model unavailable</option>}
+                    <option value="3">3 periods</option>
+                    <option value="4">4 periods</option>
+                    <option value="6">6 periods</option>
+                  </select>
+                </label>
+              </div>
+              <dl className="sw-si-model__results" data-testid="interop-model-readout">
+                <div>
+                  <dt>XLOOKUP rate</dt>
+                  <dd data-testid="interop-model-rate">
+                    {formatPercent(modelReadout?.selectedRate ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>PMT / month</dt>
+                  <dd data-testid="interop-model-payment">
+                    {formatCurrency(modelReadout?.payment ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>NPV</dt>
+                  <dd data-testid="interop-model-npv">
+                    {formatCurrency(modelReadout?.npv ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>IRR</dt>
+                  <dd data-testid="interop-model-irr">
+                    {formatPercent(modelReadout?.irr ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>STDEV.S</dt>
+                  <dd data-testid="interop-model-statistical">
+                    {formatCurrency(modelReadout?.statistical ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>LET remaining payments</dt>
+                  <dd data-testid="interop-model-let">
+                    {formatCurrency(modelReadout?.letResult ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Schedule end</dt>
+                  <dd data-testid="interop-model-date">
+                    {formatSerialDate(modelReadout?.scheduleEnd ?? null)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>SEQUENCE spill</dt>
+                  <dd data-testid="interop-model-spill">
+                    {modelReadout
+                      ? modelReadout.spill.filter((value) => value !== null).join(", ")
+                      : "Unavailable"}
+                  </dd>
+                </div>
+              </dl>
+              <p
+                aria-live="polite"
+                className="sw-si-model__scope"
+                data-change-count={modelChange?.committedCells ?? 0}
+                data-changed-results={modelChange?.changedResults.join(",") ?? ""}
+                data-testid="interop-model-change-scope"
+              >
+                {modelChange
+                  ? `Public change event: ${modelChange.committedCells} input cell at ${modelChange.address}. Changed dependent results: ${
+                      modelChange.changedResults.join(", ") || "none"
+                    }.`
+                  : "Public change event: awaiting an analytical input edit."}
+              </p>
+            </section>
             {/* shell.css sizes .sheetwrite-shell at height:100% (unlayered),
                 so the definite height lives on this owned wrapper. */}
             <div className="sw-si-stage">
