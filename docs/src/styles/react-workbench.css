@@ -373,7 +373,6 @@
 .sw-rwb .sheetwrite-tab-active {
   background: color-mix(in srgb, var(--sw-demo-accent) 13%, var(--sw-demo-surface));
   color: var(--sw-demo-accent-strong);
-  box-shadow: inset 0 calc(var(--sw-rwb-strong-rule) * -1) 0 var(--sw-demo-accent);
 }
 
 /* Secondary capabilities live in a real disclosure shelf. Closed, it costs one

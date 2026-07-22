@@ -1628,6 +1628,9 @@ function InteroperabilityRoute() {
                           {record.area.replaceAll("-", " ")} / {BEHAVIOR_LABELS[record.dialect]}
                         </span>
                         <strong>{record.label}</strong>
+                        <small className="sw-si-compat__record-status">
+                          {compatibilityStatusSummary(record)}
+                        </small>
                       </button>
                     </li>
                   ))}

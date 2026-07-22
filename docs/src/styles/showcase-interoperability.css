@@ -1009,6 +1009,27 @@
     color: var(--sw-demo-danger);
   }
 
+  .sw-si-compat__records .sw-si-compat__record-status {
+    width: fit-content;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  .sw-si-compat__records button[data-status="supported"] > .sw-si-compat__record-status {
+    color: var(--sw-accent-strong);
+  }
+
+  .sw-si-compat__records button[data-status="partial"] > .sw-si-compat__record-status,
+  .sw-si-compat__records button[data-status="roundtrip-only"] > .sw-si-compat__record-status,
+  .sw-si-compat__records button[data-status="warning"] > .sw-si-compat__record-status {
+    color: var(--sw-state-requested);
+  }
+
+  .sw-si-compat__records button[data-status="unsupported"] > .sw-si-compat__record-status {
+    color: var(--sw-demo-danger);
+  }
+
   .sw-si-compat__records button > strong {
     color: var(--sw-fg-strong);
     font: 620 var(--sw-type-sm) / 1.35 var(--font-sans);

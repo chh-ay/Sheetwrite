@@ -401,7 +401,7 @@
 }
 
 .sheetwrite-tab:focus-visible {
-  box-shadow: inset 0 -2px 0 var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
+  box-shadow: inset 0 0 0 2px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
 }
 
 .sheetwrite-tab-options-button:focus-visible,
@@ -536,11 +536,11 @@
   max-width: min(16rem, 45vw);
   cursor: text;
   outline: none;
-  box-shadow: inset 0 -2px 0 var(--sheetwrite-tab-active-fg, #1a73e8);
+  box-shadow: inset 0 0 0 2px var(--sheetwrite-tab-active-fg, #1a73e8);
 }
 
 .sheetwrite-tab-input[aria-invalid="true"] {
-  box-shadow: inset 0 -2px 0 var(--sheetwrite-error-fg, #b3261e);
+  box-shadow: inset 0 0 0 2px var(--sheetwrite-error-fg, #b3261e);
 }
 
 .sheetwrite-tab-unhide[aria-invalid="true"] {

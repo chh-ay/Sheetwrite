@@ -595,36 +595,6 @@
   }
 }
 
-@media (min-width: 80rem) {
-  .sw-hub {
-    display: flex;
-    min-height: calc(100svh - var(--sw-header-height));
-    flex-direction: column;
-    padding-bottom: var(--sw-demo-space-4);
-  }
-
-  .sw-hub__scenes {
-    display: flex;
-    min-height: 0;
-    flex: 1;
-    flex-direction: column;
-  }
-
-  .sw-hub-scenes {
-    max-height: min(43rem, calc(100svh - 13.25rem));
-    flex: 1;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-  }
-
-  .sw-hub-scenes > li {
-    height: auto;
-  }
-
-  .sw-hub-launch {
-    grid-template-rows: minmax(6.5rem, 50%) minmax(0, 1fr);
-  }
-}
-
 /* Tablet is a stable two-column gallery. */
 @media (max-width: 79.999rem) {
   .sw-hub-scenes {
