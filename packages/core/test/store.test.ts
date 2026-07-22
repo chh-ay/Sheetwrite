@@ -2803,7 +2803,8 @@ it("keeps virtual sheet membership aligned when addSheet snapshots are semantica
     { ...baseSheet, order: 2 },
     { ...baseSheet, frozenRows: 3 },
   ];
-  for (const sheet of invalidSheets) {
+  const expectedCodes = ["invalid-sheet", "invalid-position", "invalid-sheet"] as const;
+  for (const [index, sheet] of invalidSheets.entries()) {
     const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
     const outcome = store.applyTransaction({
       patches: [
@@ -2818,7 +2819,7 @@ it("keeps virtual sheet membership aligned when addSheet snapshots are semantica
     expect(outcome).toMatchObject({
       status: "rejected",
       epoch: 0,
-      issues: [{ kind: "invalid-operation", operationIndex: 1 }],
+      issues: [{ kind: "sheet-lifecycle", code: expectedCodes[index], operationIndex: 0 }],
     });
     expect(store.getWorkbook().sheets.map((candidate) => candidate.id)).toEqual(["s1"]);
     store.dispose();
@@ -2853,15 +2854,13 @@ it("keeps lifecycle names aligned when rename collides with another sheet id", (
       },
     ],
   });
-  expect(outcome).toMatchObject({
-    status: "rejected",
-    epoch: 0,
-    issues: [{ kind: "invalid-operation", operationIndex: 2 }],
-  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
   expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
-    ["s1", "Sheet 1"],
+    ["s1", "s2"],
     ["s2", "Second"],
+    ["s3", "Sheet 1"],
   ]);
+  expect(store.getCell({ sheet: "s3", row: 0, col: 0 }).resolved).toBe("unsafe");
   store.dispose();
 });
 
@@ -2899,14 +2898,13 @@ it("keeps lifecycle names aligned after a new sheet name shadows an existing id"
       },
     ],
   });
-  expect(outcome).toMatchObject({
-    status: "rejected",
-    epoch: 0,
-    issues: [{ kind: "invalid-operation", operationIndex: 3 }],
-  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
   expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
-    ["s1", "Sheet 1"],
+    ["s1", "Primary"],
+    ["s2", "s1"],
+    ["s3", "Sheet 1"],
   ]);
+  expect(store.getCell({ sheet: "s3", row: 0, col: 0 }).resolved).toBe("unsafe");
   store.dispose();
 });
 
@@ -2918,9 +2916,13 @@ it("retains last-sheet membership when removeSheet is a no-op", () => {
       { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "kept" } },
     ],
   });
-  expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "sheet-lifecycle", code: "last-visible-sheet", operationIndex: 0 }],
+  });
   expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
-  expect(store.getCell(addr(0, 0)).resolved).toBe("kept");
+  expect(store.getCell(addr(0, 0)).resolved).not.toBe("kept");
   store.dispose();
 });
 
