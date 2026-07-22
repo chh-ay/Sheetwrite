@@ -46,7 +46,15 @@ declare global {
 
 type HostRole = "reviewer" | "finance-lead";
 type FeedKind = "event" | "rejected" | "lifecycle" | "sync";
-type TaskId = "challenge" | "notes" | "formatting" | "sheets" | "persistence" | "renderer";
+type TaskId =
+  | "validation"
+  | "protection"
+  | "change"
+  | "notes"
+  | "formatting"
+  | "sheets"
+  | "persistence"
+  | "renderer";
 type ChallengeState = "ready" | "rejected" | "authorized" | "accepted";
 
 interface FeedEntry {
@@ -63,7 +71,9 @@ const ARCHIVE_SHEET_ID = "archive";
 const CHALLENGE_CELL: CellAddress = { sheet: "orders", row: 0, col: 6 };
 const CHALLENGE_VALUE = 999;
 const TASKS: ReadonlyArray<{ id: TaskId; label: string }> = [
-  { id: "challenge", label: "Policy challenge" },
+  { id: "validation", label: "Validation" },
+  { id: "protection", label: "Protection" },
+  { id: "change", label: "Change" },
   { id: "notes", label: "Notes" },
   { id: "formatting", label: "Formatting" },
   { id: "sheets", label: "Sheets" },
@@ -119,7 +129,7 @@ const App = defineComponent({
     const syncBusy = ref(false);
 
     const feed = ref<FeedEntry[]>([]);
-    const activeTask = ref<TaskId>("challenge");
+    const activeTask = ref<TaskId>("protection");
     const challengeState = ref<ChallengeState>("ready");
     const challengeIssue = ref("Protected totals require the finance-lead role.");
 
@@ -282,7 +292,7 @@ const App = defineComponent({
           challengeIssue.value = detail;
         }
         challengeState.value = "rejected";
-        activeTask.value = "challenge";
+        activeTask.value = "protection";
         refreshInspector();
       });
       bindHostPersistence(grid);
@@ -313,7 +323,7 @@ const App = defineComponent({
       if (role.value === "finance-lead" && committedChallenge) {
         challengeState.value = "accepted";
         challengeIssue.value = `orders!G1 changed from 8 to ${CHALLENGE_VALUE}; host commit queued.`;
-        activeTask.value = "challenge";
+        activeTask.value = "protection";
       }
     }
 
@@ -613,13 +623,41 @@ const App = defineComponent({
                 { class: "sw-vuewb-tasktabs", role: "tablist", "aria-label": "Workbook tasks" },
                 [...TASKS.map(taskTab)],
               ),
-              h("section", panelAttrs("challenge"), [
+              h("section", panelAttrs("validation"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Validation"),
+                    h("p", "The selected cell resolves its workbook rule before any commit."),
+                  ]),
+                ]),
+                h("dl", { class: "sw-vuewb-inspector" }, inspectorRows()),
+                h(
+                  "div",
+                  {
+                    class: "sw-vuewb-task-summary",
+                    "data-state": selectedRule.value ? "active" : "idle",
+                  },
+                  [
+                    h(
+                      "strong",
+                      selectedRule.value ? selectedRule.value.id : "No rule on this cell",
+                    ),
+                    h(
+                      "span",
+                      selectedRule.value
+                        ? `${selectedRule.value.policy} validation is enforced at the mutation barrier.`
+                        : "Select a Status or Quantity cell to inspect its validation contract.",
+                    ),
+                  ],
+                ),
+              ]),
+              h("section", panelAttrs("protection"), [
                 h("div", { class: "sw-vuewb-challenge__head" }, [
                   h("span", "ONE LIVE CHALLENGE"),
                   h("strong", "Override the protected G1 total"),
                   h(
                     "p",
-                    "The reviewer is denied. Change the host role, then commit the identical mutation.",
+                    "Attempt as Reviewer, authorize Finance lead, then commit the same mutation.",
                   ),
                 ]),
                 h(
@@ -653,7 +691,7 @@ const App = defineComponent({
                 h("ol", { class: "sw-vuewb-steps", "aria-label": "Protected edit workflow" }, [
                   h("li", { "data-state": challengeState.value === "ready" ? "current" : "done" }, [
                     h("span", "1"),
-                    h("div", [h("strong", "Attempt"), h("small", "Write 999 to orders!G1")]),
+                    h("div", [h("strong", "Attempt"), h("small", "Write 999 to G1")]),
                   ]),
                   h(
                     "li",
@@ -676,7 +714,7 @@ const App = defineComponent({
                     { "data-state": challengeState.value === "accepted" ? "done" : "waiting" },
                     [
                       h("span", "3"),
-                      h("div", [h("strong", "Commit"), h("small", "Queue host mutation")]),
+                      h("div", [h("strong", "Commit"), h("small", "Queue mutation")]),
                     ],
                   ),
                 ]),
@@ -706,17 +744,80 @@ const App = defineComponent({
                   ),
                 ]),
               ]),
+              h("section", panelAttrs("change"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Change"),
+                    h("p", "Policy outcome and host work stay causally adjacent."),
+                  ]),
+                ]),
+                h("div", { class: "sw-vuewb-task-summary", "data-state": challengeState.value }, [
+                  h(
+                    "strong",
+                    challengeState.value === "accepted"
+                      ? "Mutation queued"
+                      : challengeState.value === "rejected"
+                        ? "Mutation rejected"
+                        : "Awaiting governed edit",
+                  ),
+                  h("span", challengeIssue.value),
+                ]),
+                h("dl", { class: "sw-vuewb-change-meters" }, [
+                  h("div", [h("dt", "Cell"), h("dd", selectedLabel.value)]),
+                  h("div", [h("dt", "Pending"), h("dd", String(pendingCount.value))]),
+                  h("div", [h("dt", "Host"), h("dd", `v${serverVersion.value}`)]),
+                ]),
+              ]),
               h("section", panelAttrs("notes"), [
                 h("div", { class: "sw-vuewb-section__head" }, [
                   h("div", [
-                    h("h3", "Cell notes"),
-                    h("p", `The attached editor follows ${selectedLabel.value}.`),
+                    h("h3", "Notes"),
+                    h("p", `Selected ${selectedLabel.value} · ${accessLabel.value.text}`),
                   ]),
                 ]),
-                h("dl", { class: "sw-vuewb-inspector" }, inspectorRows()),
-                h("p", { class: "sw-vuewb-taskhint" }, [
-                  h("strong", "Always in reach: "),
-                  "the selected-cell note editor stays attached below every task.",
+                h(
+                  "dl",
+                  { class: "sw-vuewb-inspector sw-vuewb-inspector--compact" },
+                  inspectorRows(),
+                ),
+                h("div", { class: "sw-vuewb-note" }, [
+                  h("label", { for: "vue-cell-note" }, "Selected-cell note"),
+                  h("textarea", {
+                    id: "vue-cell-note",
+                    "data-testid": "note-input",
+                    "aria-label": "Cell note",
+                    placeholder:
+                      selected.value === null ? "Select a cell to annotate" : "Add a note…",
+                    disabled: selected.value === null || readOnly.value,
+                    value: noteDraft.value,
+                    onInput: (event: Event) => {
+                      noteDraft.value = (event.target as HTMLTextAreaElement).value;
+                    },
+                  }),
+                  h("div", { class: "sw-vuewb-note__actions" }, [
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "data-testid": "note-save",
+                        "data-variant": "primary",
+                        disabled: selected.value === null || readOnly.value,
+                        onClick: () => saveNote(false),
+                      },
+                      "Save note",
+                    ),
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "data-testid": "note-clear",
+                        disabled:
+                          selected.value === null || readOnly.value || noteStored.value === null,
+                        onClick: () => saveNote(true),
+                      },
+                      "Clear",
+                    ),
+                  ]),
                 ]),
               ]),
               h("section", panelAttrs("formatting"), [
@@ -932,61 +1033,13 @@ const App = defineComponent({
                   ]),
                 ]),
               ]),
-              h(
-                "section",
-                {
-                  class: "sw-vuewb-attached-tools",
-                  "aria-label": "Attached workbook tools",
-                },
-                [
-                  h("div", { class: "sw-vuewb-attached-note" }, [
-                    h("label", { for: "vue-cell-note" }, [
-                      h("strong", "Cell note"),
-                      h("span", selectedLabel.value),
-                    ]),
-                    h("textarea", {
-                      id: "vue-cell-note",
-                      "data-testid": "note-input",
-                      "aria-label": "Cell note",
-                      placeholder:
-                        selected.value === null ? "Select a cell to annotate" : "Add a note…",
-                      disabled: selected.value === null || readOnly.value,
-                      value: noteDraft.value,
-                      onInput: (event: Event) => {
-                        noteDraft.value = (event.target as HTMLTextAreaElement).value;
-                      },
-                    }),
-                    h("div", { class: "sw-vuewb-note__actions" }, [
-                      h(
-                        "button",
-                        {
-                          type: "button",
-                          "data-testid": "note-save",
-                          "data-variant": "primary",
-                          disabled: selected.value === null || readOnly.value,
-                          onClick: () => saveNote(false),
-                        },
-                        "Save note",
-                      ),
-                      h(
-                        "button",
-                        {
-                          type: "button",
-                          "data-testid": "note-clear",
-                          disabled:
-                            selected.value === null || readOnly.value || noteStored.value === null,
-                          onClick: () => saveNote(true),
-                        },
-                        "Clear",
-                      ),
-                    ]),
-                  ]),
-                  h("div", { class: "sw-vuewb-attached-events" }, [
-                    h("header", [h("strong", "Adapter events"), h("span", "Vue + Grid")]),
-                    eventFeed(),
-                  ]),
-                ],
-              ),
+              h("section", { class: "sw-vuewb-eventrail", "data-testid": "event-panel" }, [
+                h("header", [
+                  h("strong", "Adapter events"),
+                  h("span", `${feed.value.length} recent · Vue + Grid`),
+                ]),
+                eventFeed(),
+              ]),
             ]),
           ]),
           h("footer", { class: "sw-demo-status sw-demo-status--metrics" }, [

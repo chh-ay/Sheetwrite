@@ -114,7 +114,7 @@ async function commitCell(page: Page, row: number, col: number, text: string): P
 
 test("boots the governed business workbook, paints, and stays accessible", async ({ page }) => {
   const errors = collectErrors(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 1568, height: 869 });
   await openWorkbench(page);
 
   // The frozen PO column stays out of the ARIA mirror window, so the first
@@ -167,21 +167,30 @@ test("boots the governed business workbook, paints, and stays accessible", async
   expect(model.total0).toBe(8); // =E1*F1 evaluated by the engine
 
   // The governed workflow, not generic controls, is the first visible task.
-  await expect(page.getByRole("tablist", { name: "Workbook tasks" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Policy challenge" })).toHaveAttribute(
+  const taskTabs = page.getByRole("tablist", { name: "Workbook tasks" });
+  await expect(taskTabs).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Protection" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
   await expect(page.getByTestId("policy-result")).toContainText(
     "Protected totals require the finance-lead role.",
   );
+  const taskGeometry = await taskTabs.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(taskGeometry.scrollWidth).toBeLessThanOrEqual(taskGeometry.clientWidth);
   const gridBox = await page.locator(`${APP} .sw-demo-grid`).boundingBox();
   const panelBox = await page.locator(`${APP} .sw-vuewb-panel`).boundingBox();
   expect(gridBox).not.toBeNull();
   expect(panelBox).not.toBeNull();
-  expect(gridBox!.y).toBeLessThan(900);
+  expect(gridBox!.y).toBeLessThan(869);
   expect(gridBox!.width).toBeGreaterThan(panelBox!.width * 2);
   expect(gridBox!.height).toBeGreaterThan(500);
+  const eventBox = await page.getByTestId("event-panel").boundingBox();
+  expect(eventBox).not.toBeNull();
+  expect(eventBox!.height).toBeGreaterThanOrEqual(120);
 
   // Host persistence and lifecycle state remain explicit, labeled text.
   await expect(page.getByTestId("generation")).toHaveText("1 · initial");
@@ -194,7 +203,12 @@ test("boots the governed business workbook, paints, and stays accessible", async
   await expect(page.getByRole("tablist", { name: "Sheets" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Orders sheet" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Suppliers sheet" })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Cell note" })).toBeVisible();
+  await openTask(page, "Notes");
+  const noteEditor = page.getByRole("textbox", { name: "Cell note" });
+  await expect(noteEditor).toBeVisible();
+  expect(await noteEditor.evaluate((element) => element.clientHeight)).toBeGreaterThanOrEqual(90);
+  await expect(page.getByRole("heading", { name: "Cell notes", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Notes", exact: true })).toHaveCount(1);
   await expect(page.getByRole("list", { name: "Adapter events" })).toBeVisible();
   await expect(page.getByTestId("persistence")).toHaveAttribute("aria-live", "polite");
 
@@ -530,6 +544,7 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   await readOnly.click();
   await expect(readOnly).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(GRID)).toHaveAttribute("aria-readonly", "true");
+  await openTask(page, "Notes");
   await expect(page.getByRole("textbox", { name: "Cell note" })).toBeDisabled();
   await expect(page.getByTestId("props")).toContainText("true");
   await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toHaveCount(0);
@@ -547,6 +562,7 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   await expect(page.getByTestId("pending-count")).toHaveText("0");
   await expect(page.getByTestId("generation")).toHaveText("1 · initial");
 
+  await openTask(page, "Renderer");
   await readOnly.click();
   await expect(readOnly).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toBeVisible();
@@ -569,6 +585,24 @@ test("the workbench stays operable on a mobile viewport", async ({ page }) => {
   expect(gridBox).not.toBeNull();
   expect(panelBox).not.toBeNull();
   expect(panelBox!.y).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height - 1);
+  await openTask(page, "Notes");
+  const mobileRailGeometry = await page.locator(".sw-vuewb-tasktabs").evaluate((navigator) => {
+    const events = document.querySelector<HTMLElement>("[data-testid='event-panel']");
+    const note = document.querySelector<HTMLTextAreaElement>("[data-testid='note-input']");
+    return {
+      navigatorClientWidth: navigator.clientWidth,
+      navigatorScrollWidth: navigator.scrollWidth,
+      eventHeight: events?.getBoundingClientRect().height ?? 0,
+      noteClientHeight: note?.clientHeight ?? 0,
+      documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+  expect(mobileRailGeometry.navigatorScrollWidth).toBeLessThanOrEqual(
+    mobileRailGeometry.navigatorClientWidth,
+  );
+  expect(mobileRailGeometry.eventHeight).toBeGreaterThanOrEqual(120);
+  expect(mobileRailGeometry.noteClientHeight).toBeGreaterThanOrEqual(90);
+  expect(mobileRailGeometry.documentOverflow).toBe(false);
 
   // The full governed flow works with touch-sized chrome.
   await commitCell(page, 4, 3, "Approved");
