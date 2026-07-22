@@ -2952,6 +2952,103 @@ body .sw-code-popover__accessible-signature {
   }
 }
 
+/* The engine preview is an inert reserved slot until scrolling shows intent.
+   Its loaded content remains an editorial cutaway, never a fake spreadsheet. */
+.sw-landing-engine-slot {
+  min-height: 18rem;
+  margin-top: clamp(2.5rem, 7vh, 4rem);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-demo-radius-3);
+  background: color-mix(in srgb, var(--sw-accent) 5%, var(--sw-surface-1));
+  box-shadow: var(--sw-shadow);
+}
+
+.sw-landing-engine-slot__reserved,
+.sw-landing-engine-slot__placeholder,
+.sw-landing-engine-teaser {
+  min-height: 18rem;
+}
+
+.sw-landing-engine-slot__reserved,
+.sw-landing-engine-slot__placeholder {
+  display: grid;
+  align-content: center;
+  max-width: 50rem;
+  padding: clamp(1.5rem, 5vw, 3rem);
+}
+
+.sw-landing-engine-slot__reserved h2,
+.sw-landing-engine-teaser h2 {
+  max-width: 20ch;
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: 650 clamp(1.55rem, 3.5vw, 2.4rem) / 1.08 var(--sw-font-display);
+  letter-spacing: -0.03em;
+}
+
+.sw-landing-engine-slot__reserved > p:not(.sw-section-eyebrow),
+.sw-landing-engine-teaser__copy > p:not(.sw-section-eyebrow) {
+  max-width: 38rem;
+  margin: 1rem 0 0;
+  color: var(--sw-fg-muted);
+  line-height: 1.6;
+}
+
+.sw-landing-engine-slot__link,
+.sw-landing-engine-teaser__link {
+  width: fit-content;
+  margin-top: 1.25rem;
+  color: var(--sw-accent-strong);
+  font: 650 var(--sw-type-sm) / 1.4 var(--sw-font-mono);
+  text-underline-offset: 0.25em;
+}
+
+.sw-landing-engine-teaser {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.9fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: center;
+  padding: clamp(1.5rem, 5vw, 3rem);
+}
+
+.sw-landing-engine-teaser__steps {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-border);
+  list-style: none;
+}
+
+.sw-landing-engine-teaser__steps li {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr);
+  gap: 0.2rem 0.7rem;
+  padding: 0.85rem 1rem;
+  background: var(--sw-surface-1);
+}
+
+.sw-landing-engine-teaser__steps span {
+  grid-row: 1 / span 2;
+  color: var(--sw-accent-strong);
+  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+}
+
+.sw-landing-engine-teaser__steps strong {
+  color: var(--sw-fg-strong);
+  font: 650 0.95rem / 1.3 var(--sw-font-display);
+}
+
+.sw-landing-engine-teaser__steps p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-sm);
+  line-height: 1.45;
+}
+
 /* Benchmark showoff: the ratio ladder shares one log scale so the widening
    gap is the visual; the aside carries the 1M-row absolutes and capture
    provenance. Both sit in the same panel family as the hero stage. */
@@ -3416,6 +3513,10 @@ body .sw-code-popover__accessible-signature {
 
 @media (max-width: 64rem) {
   .sw-bench-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sw-landing-engine-teaser {
     grid-template-columns: 1fr;
   }
 

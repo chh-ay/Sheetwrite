@@ -320,7 +320,7 @@ export function LandingSpreadsheet() {
           <span>
             <i /> Cached rows
           </span>
-          <span className="sw-workbook-stage__engine">JS → WASM → paint</span>
+          <span className="sw-workbook-stage__engine">work sent to the calculation engine</span>
         </footer>
         <figcaption>
           A static Sheetwrite composition: formula dependencies, selection, and resident-window

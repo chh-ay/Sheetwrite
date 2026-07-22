@@ -126,6 +126,10 @@
   translate: 0 -2px;
 }
 
+.sw-hub-launch[data-owner="engine"] {
+  --sw-hub-accent: var(--sw-accent);
+}
+
 .sw-hub-launch[data-owner="performance"] {
   --sw-hub-accent: var(--sw-demo-warn);
 }
@@ -191,6 +195,58 @@
   text-transform: uppercase;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Engine: a compact read-only cutaway, not a substitute Grid. */
+.sw-hub-engine-lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1fr) 2rem minmax(0, 1fr);
+  gap: 0.4rem;
+  align-items: center;
+  margin: auto 0;
+}
+
+.sw-hub-engine-lanes > span {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-surface-1);
+}
+
+.sw-hub-engine-lanes small {
+  color: var(--sw-accent-strong);
+  font: 650 0.58rem / 1.2 var(--sw-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sw-hub-engine-lanes code {
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font: 500 0.58rem / 1.3 var(--sw-font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sw-hub-engine-lanes > i {
+  position: relative;
+  height: 1px;
+  background: var(--sw-accent);
+}
+
+.sw-hub-engine-lanes > i::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-top: 1px solid var(--sw-accent);
+  border-right: 1px solid var(--sw-accent);
+  transform: translateY(-50%) rotate(45deg);
 }
 
 /* Performance: million-row telemetry — readouts over frame-timing bars. */

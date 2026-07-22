@@ -17,8 +17,8 @@ assertCapabilityInventory(CAPABILITY_INVENTORY, CAPABILITY_OWNERS);
 export const Route = createFileRoute("/showcases/")({
   head: () => ({
     meta: pageMeta(
-      "Showcases — evaluate Sheetwrite by capability",
-      "Every public Sheetwrite capability with its owning live showcase: editing, formulas, validation, million-row scale, XLSX/CSV exchange, IndexedDB persistence, offline sync, and collaboration.",
+      "Showcases — evaluate Sheetwrite by feature",
+      "Every public Sheetwrite feature with its owning live example: editing, formulas, validation, million-row scale, XLSX/CSV exchange, IndexedDB persistence, offline sync, and collaboration.",
     ),
     links: [{ rel: "stylesheet", href: hubStylesheet }],
   }),
@@ -27,8 +27,9 @@ export const Route = createFileRoute("/showcases/")({
 
 const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]));
 
-/** Launch order for the four capability scenes: measured scale leads. */
+/** Launch order for the five feature scenes: the live engine view leads. */
 const SCENE_ORDER = [
+  "engine",
   "performance",
   "database",
   "interoperability",
@@ -39,6 +40,8 @@ type SceneOwnerId = (typeof SCENE_ORDER)[number];
 
 /** One concise line per scene, distilled from the owner's responsibility. */
 const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
+  engine:
+    "One paged formula Grid with real requests, checked results, drawing state, and host saves.",
   performance: "A million paged rows, Worker and main-thread rendering, measured medians.",
   database: "Snapshot load, append-only IndexedDB commits, compaction, reload recovery.",
   interoperability: "XLSX/Excel and CSV/TSV against independent fixtures, with explicit warnings.",
@@ -64,6 +67,31 @@ interface HubBenchData {
 
 const TELEMETRY_BAR_IDS = Array.from({ length: 16 }, (_, index) => `telemetry-${index + 1}`);
 const EXCHANGE_CELL_IDS = Array.from({ length: 9 }, (_, index) => `exchange-${index + 1}`);
+
+/** Live engine cutaway: one row of work moving through three owned lanes. */
+function EngineScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--engine">
+      <span className="sw-hub-engine-lanes">
+        <span>
+          <small>Grid</small>
+          <code>edit D24001</code>
+        </span>
+        <i />
+        <span>
+          <small>Calculation</small>
+          <code>E24001 = 25</code>
+        </span>
+        <i />
+        <span>
+          <small>Host</small>
+          <code>saved v1</code>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">jump · edit · undo · draw · save</span>
+    </span>
+  );
+}
 
 /** Million-row telemetry: paged-row counter, median readout, frame bars. */
 function PerformanceScene({ medianMs }: Readonly<{ medianMs?: number }>) {
@@ -188,6 +216,8 @@ function CollaborationScene() {
 
 function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs?: number }>) {
   switch (id) {
+    case "engine":
+      return <EngineScene />;
     case "performance":
       return <PerformanceScene medianMs={medianMs} />;
     case "database":
@@ -233,7 +263,7 @@ function ShowcaseHub() {
 
         <section aria-labelledby="hub-scenes" className="sw-hub__scenes">
           <h2 id="hub-scenes">Live feature examples</h2>
-          <p>Four editable examples that run in your browser.</p>
+          <p>Five editable examples that run in your browser.</p>
           <ul className="sw-hub-scenes">
             {SCENE_ORDER.map((id) => {
               const owner = OWNER_BY_ID.get(id);
@@ -246,8 +276,8 @@ function ShowcaseHub() {
                       <strong>{owner.label}</strong>
                       <span className="sw-hub-launch__summary">{SCENE_SUMMARY[id]}</span>
                       <span className="sw-hub__owner-count">
-                        {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} owned
-                        capabilities →
+                        {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} features
+                        →
                       </span>
                     </span>
                   </Link>
@@ -279,8 +309,7 @@ function ShowcaseHub() {
                       </span>
                     ) : null}
                     <span className="sw-hub__owner-count">
-                      {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} owned
-                      capabilities →
+                      {CAPABILITY_INVENTORY.filter((c) => c.primary === owner.id).length} features →
                     </span>
                   </Link>
                 </li>

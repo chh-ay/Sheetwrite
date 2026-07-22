@@ -22,16 +22,16 @@ test("hub launches every owning showcase without errors", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(siteUrl("/showcases/"));
 
-  await expect(page.locator("main h1")).toHaveText("Every capability, live and verified.");
+  await expect(page.locator("main h1")).toHaveText("Every feature, live and tested.");
   // The Showcases link is page-current on the hub itself.
   await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
 
-  // The visual launcher leads with the four capability scenes — Performance
-  // first — and keeps the four framework adapters as a secondary rail.
-  await expect(page.locator(".sw-hub-scenes .sw-hub-launch")).toHaveCount(4);
+  // The visual launcher leads with the live engine view and four focused
+  // feature scenes, while framework adapters stay in the secondary rail.
+  await expect(page.locator(".sw-hub-scenes .sw-hub-launch")).toHaveCount(5);
   await expect(page.locator(".sw-hub-scenes .sw-hub-launch").first()).toHaveAttribute(
     "data-owner",
-    "performance",
+    "engine",
   );
   await expect(page.locator(".sw-hub-rail .sw-hub-rail__item")).toHaveCount(4);
 

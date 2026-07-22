@@ -81,6 +81,7 @@ const REQUIRED_CAPABILITY_IDS = [
   "collab.presence",
   "collab.conflicts",
   "collab.recovery",
+  "lifecycle.engine-events",
   "lifecycle.vanilla",
   "lifecycle.react",
   "lifecycle.vue",

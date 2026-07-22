@@ -16,6 +16,7 @@ export type CapabilityOwnerId =
   | "svelte"
   | "database"
   | "interoperability"
+  | "engine"
   | "performance"
   | "collaboration";
 
@@ -126,6 +127,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     kind: "capability",
   },
   {
+    id: "engine",
+    label: "Live engine view",
+    href: "/showcases/engine/",
+    routeFile: "docs/src/routes/showcases.engine.tsx",
+    responsibility:
+      "One real paged formula Grid with bounded request, result, formula, resource, drawing, and host-save events.",
+    kind: "capability",
+  },
+  {
     id: "performance",
     label: "Performance & scale",
     href: "/showcases/performance/",
@@ -146,6 +156,7 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
 ];
 
 const ENGINE_SCENARIO = "docs/src/showcases/scenarios/engine.ts";
+const ENGINE_LIVE_SCENARIO = "docs/src/showcases/scenarios/engine-live.ts";
 const ANALYTICS_SCENARIO = "docs/src/showcases/scenarios/analytics.ts";
 const BUSINESS_SCENARIO = "docs/src/showcases/scenarios/business.ts";
 const OFFLINE_SCENARIO = "docs/src/showcases/scenarios/offline.ts";
@@ -160,6 +171,7 @@ const VUE_SPEC = "test/browser/vue-workbench.spec.ts";
 const SVELTE_SPEC = "test/browser/svelte-workbench.spec.ts";
 const INTEROP_SPEC = "test/browser/showcase-interoperability.spec.ts";
 const PERFORMANCE_SPEC = "test/browser/showcase-performance.spec.ts";
+const ENGINE_LIVE_SPEC = "test/browser/showcase-engine.spec.ts";
 const DATABASE_COLLAB_SPEC = "test/browser/database-collaboration.spec.ts";
 const LIFECYCLE_SPEC = "test/browser/framework-lifecycle.spec.ts";
 
@@ -863,6 +875,22 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: [COLLABORATION_PROTOCOL],
     boundary:
       "The in-page server is illustrative; auth, transport, durable server storage, and deployment are host-owned.",
+  },
+
+  {
+    id: "lifecycle.engine-events",
+    title: "Live engine events",
+    area: "lifecycle",
+    primary: "engine",
+    interaction:
+      "Jump, edit, undo, change the drawing path, and save; the working Grid changes before its bounded text record updates.",
+    scope: "browser+worker",
+    accessibility:
+      "Every visual lane has matching text, and play, pause, step, reset, and speed controls work from the keyboard.",
+    testPath: ENGINE_LIVE_SPEC,
+    sharedModules: [ENGINE_LIVE_SCENARIO],
+    boundary:
+      "Sheetwrite reports Grid work; the host decides when to save and what an acknowledgement means.",
   },
 
   // ── Framework lifecycle ──────────────────────────────────────────────────

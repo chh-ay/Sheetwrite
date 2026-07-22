@@ -140,8 +140,8 @@ test("site root serves the product landing", async ({ page }) => {
   // Benchmark section publishes real generated numbers, never placeholders.
   const benchStats = page.locator("#benchmarks .sw-bench-stats li");
   await expect(benchStats.first()).toBeVisible();
-  await expect(page.locator("#benchmarks")).toContainText("Read the full protocol.");
-  // Capability navigation: four owned proofs and four adapter workbenches link out.
+  await expect(page.locator("#benchmarks")).toContainText("See how we measured it.");
+  // Feature navigation: four focused proofs and four adapter workbenches link out.
   await expect(page.locator("main a[data-proof]")).toHaveCount(4);
   await expect(page.locator("main a[data-framework]")).toHaveCount(4);
   expect(errors.page).toEqual([]);

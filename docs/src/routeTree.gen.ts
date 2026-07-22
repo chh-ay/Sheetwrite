@@ -23,6 +23,7 @@ import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
 import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
+import { Route as ShowcasesEngineRouteImport } from './routes/showcases.engine'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
 import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
 import { Route as DocsProofRouteImport } from './routes/docs.proof'
@@ -100,6 +101,11 @@ const ShowcasesInteroperabilityRoute =
     path: '/showcases/interoperability',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ShowcasesEngineRoute = ShowcasesEngineRouteImport.update({
+  id: '/showcases/engine',
+  path: '/showcases/engine',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
   id: '/showcases/database',
   path: '/showcases/database',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/engine': typeof ShowcasesEngineRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
+    | '/showcases/engine'
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
+    | '/showcases/engine'
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
+    | '/showcases/engine'
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
@@ -267,6 +279,7 @@ export interface RootRouteChildren {
   DocsProofRoute: typeof DocsProofRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
+  ShowcasesEngineRoute: typeof ShowcasesEngineRoute
   ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
@@ -379,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShowcasesInteroperabilityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcases/engine': {
+      id: '/showcases/engine'
+      path: '/showcases/engine'
+      fullPath: '/showcases/engine'
+      preLoaderRoute: typeof ShowcasesEngineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/showcases/database': {
       id: '/showcases/database'
       path: '/showcases/database'
@@ -427,6 +447,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsProofRoute: DocsProofRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
+  ShowcasesEngineRoute: ShowcasesEngineRoute,
   ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   TestCollaborationRoute: TestCollaborationRoute,

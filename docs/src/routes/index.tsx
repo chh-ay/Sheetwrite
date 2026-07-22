@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { InstallCommand } from "../components/InstallCommand.js";
 import { LandingSpreadsheet } from "../components/LandingSpreadsheet.js";
+import { LazyEngineTeaser } from "../components/LazyEngineTeaser.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
@@ -180,6 +181,8 @@ function Landing() {
             ) : null}
           </div>
         </section>
+
+        <LazyEngineTeaser />
 
         <section aria-labelledby="benchmarks-title" className="sw-landing-bench" id="benchmarks">
           <header className="sw-section-head">

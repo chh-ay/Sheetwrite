@@ -31,6 +31,7 @@
   --sw-header-height: 4rem;
   --sw-sidebar-width: 17.5rem;
   --sw-content-width: 51rem;
+  --sw-engine-max-width: 90rem;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
   --font-mono: var(--sw-font-mono);
