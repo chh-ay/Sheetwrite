@@ -1,4 +1,10 @@
-import type { DataSourcePage, Grid, RowData, Workbook } from "@sheetwrite/core";
+import type {
+  DataSourceColumnBand,
+  DataSourcePage,
+  Grid,
+  RowData,
+  Workbook,
+} from "@sheetwrite/core";
 import { createGrid, initSheetwrite, type SheetwriteStore } from "@sheetwrite/core";
 import { installDatasourceClockForTest } from "@sheetwrite/core/testing";
 import { createFileRoute } from "@tanstack/react-router";
@@ -13,6 +19,13 @@ const ROW_HEIGHT = 20;
 const REPETITIONS = 5;
 const CACHE_BYTES = 12 * 1024;
 const COLUMN_COUNT = 6;
+const TRACE_BANDS: readonly DataSourceColumnBand[] = [
+  {
+    start: 0,
+    end: COLUMN_COUNT,
+    keys: Array.from({ length: COLUMN_COUNT }, (_, column) => `c${column}`),
+  },
+];
 const REQUEST_MULTIPLIER_LIMIT = 3;
 const ACTIVE_REQUEST_LIMIT = 6;
 
@@ -84,17 +97,32 @@ function traceWorkbook(): Workbook {
   };
 }
 
-function rows(start: number, end: number): RowData[] {
+function traceValue(key: string, row: number): RowData[string] {
+  switch (key) {
+    case "c0":
+      return row;
+    case "c1":
+      return `sensor-${row % 97}`;
+    case "c2":
+      return `region-${row % 5}`;
+    case "c3":
+      return `status-${row % 3}`;
+    case "c4":
+      return `payload-${row}`;
+    case "c5":
+      return `checksum-${Math.imul(row + 1, 2654435761) >>> 0}`;
+    default:
+      return null;
+  }
+}
+
+function rows(start: number, end: number, columns: readonly DataSourceColumnBand[]): RowData[] {
+  const keys = columns.flatMap((band) => band.keys);
   return Array.from({ length: end - start }, (_, offset) => {
     const row = start + offset;
-    return {
-      c0: row,
-      c1: `sensor-${row % 97}`,
-      c2: `region-${row % 5}`,
-      c3: `status-${row % 3}`,
-      c4: `payload-${row}`,
-      c5: `checksum-${Math.imul(row + 1, 2654435761) >>> 0}`,
-    };
+    const pageRow: RowData = {};
+    for (const key of keys) pageRow[key] = traceValue(key, row);
+    return pageRow;
   });
 }
 
@@ -145,17 +173,18 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
     grid = createGrid(host, {
       workbook: traceWorkbook(),
       datasource: {
-        getRows({ start, end, signal }) {
+        capabilities: { protocol: 2, columns: "windowed" },
+        getRows({ start, end, columns, signal }) {
           requests += 1;
           requestedRows += end - start;
           activeRequests.add(signal);
           const result = Promise.withResolvers<DataSourcePage>();
           const cancel = clock.schedule(() => {
-            const pageRows = rows(start, end);
+            const pageRows = rows(start, end, columns);
             rowsServed += pageRows.length;
             bytesServed += new TextEncoder().encode(JSON.stringify(pageRows)).byteLength;
             activeRequests.delete(signal);
-            result.resolve({ start, rows: pageRows });
+            result.resolve({ protocol: 2, start, columns, rows: pageRows });
           });
           signal.addEventListener(
             "abort",
@@ -238,7 +267,7 @@ async function runRepetition(repetition: number): Promise<RendererPrefetchRepeti
     const demandedStart = Math.min(...demandedRows);
     const demandedEnd = Math.max(...demandedRows) + 1;
     const demandedBytes = new TextEncoder().encode(
-      JSON.stringify(rows(demandedStart, demandedEnd)),
+      JSON.stringify(rows(demandedStart, demandedEnd, TRACE_BANDS)),
     ).byteLength;
 
     visibleStart = 3_000;

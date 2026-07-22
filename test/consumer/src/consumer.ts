@@ -73,8 +73,9 @@ const canonicalOperation: DocumentOp = {
   value: { kind: "literal", value: 1 },
 };
 const canonicalDatasource: DataSource = {
+  capabilities: { protocol: 2, columns: "windowed" },
   async getRows(request: DataSourceRequest) {
-    return { start: request.start, rows: [] };
+    return { protocol: 2, start: request.start, columns: request.columns, rows: [] };
   },
 };
 const canonicalTableExporter: XlsxTableExportBackend = {

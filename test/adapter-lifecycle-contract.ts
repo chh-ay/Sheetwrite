@@ -126,11 +126,18 @@ export function makeConformanceData(label = "Row"): ColumnarData {
 
 export function makeConformanceDatasource(label: string): DataSource {
   return {
-    getRows: async ({ start, end }) => ({
+    capabilities: { protocol: 2, columns: "windowed" },
+    getRows: async ({ start, end, columns }) => ({
+      protocol: 2,
       start,
-      rows: Array.from({ length: end - start }, (_, offset) => ({
-        name: `${label} ${start + offset + 1}`,
-      })),
+      columns,
+      rows: Array.from({ length: end - start }, (_, offset) => {
+        const row: DataSourcePage["rows"][number] = {};
+        for (const key of columns.flatMap((band) => band.keys)) {
+          row[key] = key === "name" ? `${label} ${start + offset + 1}` : null;
+        }
+        return row;
+      }),
     }),
   };
 }
@@ -338,6 +345,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const exportEvents: Array<GridEvents["export-error"]> = [];
       const datasourceFailure = new Error("adapter datasource failure");
       const datasource: DataSource = {
+        capabilities: { protocol: 2, columns: "windowed" },
         async getRows() {
           throw datasourceFailure;
         },
@@ -412,6 +420,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         ...initialProps(recorder),
         data: undefined,
         datasource: {
+          capabilities: { protocol: 2, columns: "windowed" },
           getRows() {
             requests += 1;
             if (requests === 1) throw datasourceFailure;
@@ -447,12 +456,14 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       let staleRequests = 0;
       let currentRequests = 0;
       const staleDatasource: DataSource = {
+        capabilities: { protocol: 2, columns: "windowed" },
         getRows() {
           staleRequests += 1;
           return staleRequest.promise;
         },
       };
       const currentDatasource: DataSource = {
+        capabilities: { protocol: 2, columns: "windowed" },
         getRows() {
           currentRequests += 1;
           return currentRequest.promise;
@@ -495,6 +506,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       await mounted.render({
         ...props,
         datasource: {
+          capabilities: { protocol: 2, columns: "windowed" },
           getRows() {
             unmountedRequests += 1;
             return unmountedRequest.promise;

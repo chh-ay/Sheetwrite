@@ -44,7 +44,8 @@ describe("shared adapter option policy", () => {
       workbook: makeWorkbook(2),
       data: { rowCount: 0, columns: {} },
       datasource: {
-        getRows: async ({ start }) => ({ start, rows: [] }),
+        capabilities: { protocol: 2, columns: "windowed" },
+        getRows: async ({ start, columns }) => ({ protocol: 2, start, columns, rows: [] }),
       },
       datasourceStorage: { mode: "paged" },
       renderer: "worker",
