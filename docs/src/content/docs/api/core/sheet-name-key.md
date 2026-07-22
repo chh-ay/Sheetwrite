@@ -9,7 +9,7 @@ NFC and locale-independent Unicode lowercase key used for worksheet-name identit
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sheet-name.ts#L31</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sheet-name.ts#L36</code></dd></div>
 </dl>
 
 ## Declaration

@@ -9,6 +9,8 @@ Sheetwrite evaluates formulas in the Rust/WASM calculation engine. Formula sourc
 
 Sheetwrite intentionally implements a coherent spreadsheet subset. It does **not** claim full Google Sheets or Excel formula parity.
 
+See the [generated executable compatibility matrix](/docs/reference/compatibility-matrix/) for evidence-linked operator, spill, preservation, and unsupported boundaries.
+
 ## Authoring formulas
 
 A formula is a `CellValue` with `kind: "formula"`. The leading `=` is optional at the storage API, although UI input conventionally includes it.

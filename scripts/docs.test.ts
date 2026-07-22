@@ -2,9 +2,11 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { COMPATIBILITY_FIXTURES } from "../docs/src/showcases/compatibility.js";
 import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
+  collectCompatibilityDigestIssues,
   contentPathForRoute,
   entrySlug,
   expectedGeneratedFiles,
@@ -81,6 +83,33 @@ describe("documentation generation", () => {
     expect(files.some((file) => file.path.endsWith("/api/core/grid.md"))).toBe(true);
     const inventory = files.find((file) => file.path.endsWith("package-entry-points.md"));
     expect(inventory?.content).toContain("supported");
+  });
+
+  it("generates a public compatibility projection without executable test paths", async () => {
+    const files = await expectedGeneratedFiles(manifest);
+    const matrix = files.find((file) => file.path.endsWith("compatibility-matrix.md"));
+    const data = files.find((file) => file.path.endsWith("/compatibility.json"));
+    expect(matrix?.content).toContain("not a percentage or a blanket Excel");
+    expect(matrix?.content).toContain("`formula-engine-vectors`");
+    expect(matrix?.content).not.toContain("packages/wasm/src/tests.rs");
+    expect(matrix?.content).not.toContain("test/browser/showcase-interoperability.spec.ts");
+    const projected = JSON.parse(data?.content ?? "{}") as {
+      records: Array<Record<string, unknown>>;
+      fixtures: Array<Record<string, unknown>>;
+    };
+    expect(projected.records[0]).not.toHaveProperty("evidence");
+    expect(projected.fixtures[0]).not.toHaveProperty("path");
+    expect(data?.content).not.toContain("/test/");
+    expect(data?.content).not.toContain("packages/wasm/src/tests");
+  });
+
+  it("fails closed when a compatibility fixture digest drifts", async () => {
+    const fixtures = COMPATIBILITY_FIXTURES.map((fixture, index) =>
+      index === 0 || !fixture.sha256 ? fixture : { ...fixture, sha256: "0".repeat(64) },
+    );
+    expect(await collectCompatibilityDigestIssues(undefined, fixtures)).toContainEqual(
+      expect.stringContaining("compatibility fixture digest mismatch:"),
+    );
   });
 
   it("resolves every moved guide to generated content with one named installation consolidation", async () => {

@@ -38,8 +38,8 @@ function collectErrors(page: Page): BootErrors {
   return errors;
 }
 
-async function bootInterop(page: Page): Promise<void> {
-  await page.goto(ROUTE);
+async function bootInterop(page: Page, url = ROUTE): Promise<void> {
+  await page.goto(url);
   await page.waitForSelector(".sw-si-grid canvas", { state: "attached", timeout: 15_000 });
   await expect
     .poll(() => page.locator('[data-testid="interop-status"]').textContent(), {
@@ -84,6 +84,60 @@ test("interoperability page boots, verifies fixture checksums in-browser, and pr
   await expect(sheetsRow).toContainText("genuine Google Sheets-exported workbook");
   await expect(sheetsRow).toContainText("Not yet verified from Google Sheets bytes");
 
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("@portability compatibility lab deep-links exact boundaries and filters the executable inventory", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await bootInterop(page, `${ROUTE}?compatibility=producer.google-sheets`);
+
+  const detail = page.getByTestId("compatibility-detail");
+  await expect(detail).toContainText("Pinned public Google Sheets export");
+  await expect(detail).toContainText("unverified-producer-evidence");
+  await expect(detail).toContainText("No Google Sheets import or resave behavior is claimed.");
+  await expect(detail).toContainText("/docs/reference/compatibility-matrix/#sources");
+
+  const cases = [
+    ["formula.portable-operators", "supported", "evaluated"],
+    ["xlsx.rich-workbook", "partial", "warning"],
+    ["worksheet.very-hidden", "roundtrip-only", "preserved"],
+    ["clipboard.delimited", "partial", "flattened"],
+    ["formula.let-lambda", "unsupported", "unsupported"],
+  ] as const;
+  for (const [id, status, result] of cases) {
+    await page.getByTestId(`compatibility-${id}`).click();
+    await expect(detail).toHaveAttribute("data-status", status);
+    await expect(detail).toHaveAttribute("data-result", result);
+  }
+
+  await page.getByTestId("compatibility-status-filter").selectOption("unsupported");
+  const unsupported = page.locator(".sw-si-compat__records button");
+  expect(await unsupported.count()).toBeGreaterThan(0);
+  for (const button of await unsupported.all()) {
+    await expect(button).toHaveAttribute("data-status", "unsupported");
+  }
+
+  await page.getByTestId("compatibility-status-filter").selectOption("all");
+  await page.getByTestId("compatibility-area-filter").selectOption("formula");
+  const formulas = page.locator(".sw-si-compat__records button");
+  expect(await formulas.count()).toBeGreaterThan(0);
+  for (const button of await formulas.all()) {
+    await expect(button).toContainText("formula /");
+  }
+  await page.getByTestId("compatibility-dialect-filter").selectOption("excel");
+  for (const button of await formulas.all()) {
+    await expect(button).toContainText("/ excel");
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });

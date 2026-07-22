@@ -2983,7 +2983,7 @@
               "owners": [
                 "src/sheet-name.ts"
               ],
-              "source": "src/sheet-name.ts#L5",
+              "source": "src/sheet-name.ts#L10",
               "jsDocTags": [],
               "documentation": "Stable reason codes returned by worksheet-name validation.",
               "memberDocs": []
@@ -2995,7 +2995,7 @@
               "owners": [
                 "src/sheet-name.ts"
               ],
-              "source": "src/sheet-name.ts#L31",
+              "source": "src/sheet-name.ts#L36",
               "jsDocTags": [],
               "documentation": "NFC and locale-independent Unicode lowercase key used for worksheet-name identity.",
               "memberDocs": []
@@ -3007,7 +3007,7 @@
               "owners": [
                 "src/sheet-name.ts"
               ],
-              "source": "src/sheet-name.ts#L13",
+              "source": "src/sheet-name.ts#L18",
               "jsDocTags": [],
               "documentation": "Successful canonical name or an actionable validation failure.",
               "memberDocs": []
@@ -4006,7 +4006,7 @@
               "owners": [
                 "src/sheet-name.ts"
               ],
-              "source": "src/sheet-name.ts#L42",
+              "source": "src/sheet-name.ts#L47",
               "jsDocTags": [],
               "documentation": "Validate and canonicalize a SpreadsheetML worksheet name.\n\nLength is measured in UTF-16 code units, matching SpreadsheetML and JavaScript\nstring length. Callers renaming an existing sheet should omit that sheet's\ncurrent name from `existingNames`.",
               "memberDocs": []

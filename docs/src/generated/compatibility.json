@@ -1,0 +1,454 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "formula.portable-operators",
+      "label": "Portable arithmetic, comparison, concatenation, and percent operators",
+      "area": "formula",
+      "dialect": "shared",
+      "status": "supported",
+      "resultMode": "evaluated",
+      "semantics": "Parses and evaluates +, -, *, /, ^, &, comparisons, unary signs, and postfix percent with deterministic coercion and errors.",
+      "divergence": "This is a declared portable subset, not every Excel, Sheets, or OpenFormula coercion edge.",
+      "fixtureIds": [
+        "formula-engine-vectors",
+        "formula-document-vectors"
+      ],
+      "importBehavior": "Formula source is preserved and evaluated when every token is in the portable subset.",
+      "exportBehavior": "Canonical formula source is emitted to XLSX without cached-value fabrication.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://docs.oasis-open.org/office/OpenDocument/v1.3/os/part4-formula/OpenDocument-v1.3-os-part4-formula.html"
+    },
+    {
+      "id": "formula.dynamic-arrays",
+      "label": "FILTER, SORT, UNIQUE, and bounded spill ranges",
+      "area": "formula",
+      "dialect": "shared",
+      "status": "partial",
+      "resultMode": "evaluated",
+      "semantics": "FILTER, SORT, UNIQUE, direct range arrays, spill ownership, resizing, obstruction, history, and dependency invalidation are evaluated.",
+      "divergence": "No implicit-intersection operator, spill-reference # syntax, multi-key SORT, or general Excel/Sheets dynamic-array family is claimed.",
+      "fixtureIds": [
+        "formula-engine-vectors",
+        "formula-document-vectors"
+      ],
+      "importBehavior": "Recognized formulas evaluate; unknown dynamic-array syntax remains preserved source with an explicit formula error.",
+      "exportBehavior": "Anchor formula source is exported; derived spill cells are not serialized as invented formulas.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531"
+    },
+    {
+      "id": "formula.let-lambda",
+      "label": "LET, LAMBDA, and reusable named functions",
+      "area": "formula",
+      "dialect": "excel",
+      "status": "unsupported",
+      "resultMode": "unsupported",
+      "semantics": "Formula source is retained but these functions are not evaluated.",
+      "divergence": "No approximation or JavaScript execution fallback is provided.",
+      "fixtureIds": [
+        "formula-engine-vectors"
+      ],
+      "importBehavior": "Source is preserved; evaluation returns an explicit unsupported-name error.",
+      "exportBehavior": "Preserved source may be emitted, without a fabricated cached result.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999"
+    },
+    {
+      "id": "reference.cross-sheet-stable-id",
+      "label": "Quoted cross-sheet references through stable worksheet identity",
+      "area": "reference",
+      "dialect": "shared",
+      "status": "supported",
+      "resultMode": "evaluated",
+      "semantics": "Cross-sheet references resolve by stable sheet handle and survive rename and reorder with canonical quoting.",
+      "divergence": "External workbook links and 3-D references are unsupported.",
+      "fixtureIds": [
+        "formula-engine-vectors",
+        "worksheet-xlsx-vectors"
+      ],
+      "importBehavior": "Native same-workbook references map to stable worksheet IDs.",
+      "exportBehavior": "References are rendered using the current canonical sheet name and quoting rules.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/"
+    },
+    {
+      "id": "worksheet.lifecycle",
+      "label": "Create, rename, reorder, hide, unhide, remove, and active fallback",
+      "area": "worksheet",
+      "dialect": "shared",
+      "status": "supported",
+      "resultMode": "evaluated",
+      "semantics": "Stable IDs, canonical names, ordinary visibility, active fallback, history, rebase, persistence, and session export share one lifecycle.",
+      "divergence": "veryHidden is host-managed and cannot be revealed through the stock tab strip.",
+      "fixtureIds": [
+        "worksheet-lifecycle-vectors",
+        "worksheet-xlsx-vectors"
+      ],
+      "importBehavior": "Valid names and visibility are retained; invalid all-hidden workbooks fail or select a visible fallback as specified.",
+      "exportBehavior": "Current Grid active state and ordinary visibility are emitted without mutating shared navigation history.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/"
+    },
+    {
+      "id": "worksheet.very-hidden",
+      "label": "veryHidden worksheet preservation",
+      "area": "worksheet",
+      "dialect": "excel",
+      "status": "roundtrip-only",
+      "resultMode": "preserved",
+      "semantics": "veryHidden metadata remains formula-addressable and survives snapshot/XLSX round trips.",
+      "divergence": "Stock worksheet tabs intentionally do not expose or unhide it.",
+      "fixtureIds": [
+        "worksheet-xlsx-vectors",
+        "worksheet-lifecycle-vectors"
+      ],
+      "importBehavior": "The visibility token is retained as host-only state.",
+      "exportBehavior": "The token is emitted when retained by the canonical workbook.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://learn.microsoft.com/en-us/office/vba/api/excel.xlsheetvisibility"
+    },
+    {
+      "id": "xlsx.basic-values",
+      "label": "Independent XLSX strings, numbers, dates, and whitespace",
+      "area": "xlsx-import",
+      "dialect": "openformula",
+      "status": "supported",
+      "resultMode": "evaluated",
+      "semantics": "A checksum-locked LibreOffice workbook imports the declared scalar and format subset without warnings.",
+      "divergence": "Producer evidence covers this fixture and version, not all LibreOffice documents.",
+      "fixtureIds": [
+        "libreoffice-positive",
+        "interop-browser-contract"
+      ],
+      "importBehavior": "Expected normalized cells import with zero warnings.",
+      "exportBehavior": "Equivalent Sheetwrite scalar cells export through the optional XLSX package.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "/docs/reference/compatibility-matrix/#sources"
+    },
+    {
+      "id": "xlsx.rich-workbook",
+      "label": "Styles, merges, validation, notes, panes, names, and hidden sheets",
+      "area": "xlsx-import",
+      "dialect": "openformula",
+      "status": "partial",
+      "resultMode": "warning",
+      "semantics": "A checksum-locked LibreOffice workbook imports the declared rich subset and exact warning boundary.",
+      "divergence": "Hidden worksheet visibility produces the recorded unsupported-feature warning for the legacy fixture path.",
+      "fixtureIds": [
+        "libreoffice-rich",
+        "interop-browser-contract"
+      ],
+      "importBehavior": "Supported native parts normalize into the workbook; unsupported parts emit structured warnings.",
+      "exportBehavior": "Canonical supported parts export; unknown OOXML parts are not promised lossless preservation.",
+      "warningCode": "unsupported-feature",
+      "lastVerifiedProtocolVersion": 3,
+      "source": "/docs/reference/compatibility-matrix/#sources"
+    },
+    {
+      "id": "xlsx.shared-formulas",
+      "label": "ECMA-376 shared formula master and translated slaves",
+      "area": "xlsx-import",
+      "dialect": "excel",
+      "status": "supported",
+      "resultMode": "evaluated",
+      "semantics": "Shared formula records expand into canonical per-cell formula source with translated relative references.",
+      "divergence": "Export writes canonical ordinary formulas rather than promising the producer's shared-record packing.",
+      "fixtureIds": [
+        "ecma-shared-formula"
+      ],
+      "importBehavior": "Master/slave records import as three exact formula sources.",
+      "exportBehavior": "Equivalent formulas export semantically, not byte-for-byte or record-for-record.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/"
+    },
+    {
+      "id": "validation.native-subset",
+      "label": "Native data-validation subset",
+      "area": "validation",
+      "dialect": "excel",
+      "status": "partial",
+      "resultMode": "warning",
+      "semantics": "Declared comparison and list validations round-trip through the canonical validation model.",
+      "divergence": "Unsupported operators or extension forms are dropped with exact structured warnings.",
+      "fixtureIds": [
+        "xlsx-conformance-vectors"
+      ],
+      "importBehavior": "Supported rules normalize; unsupported rules do not masquerade as supported validation.",
+      "exportBehavior": "Supported canonical rules emit native validation records.",
+      "warningCode": "unsupported-validation",
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/"
+    },
+    {
+      "id": "xlsx.tables-charts-macros",
+      "label": "Tables, charts, macros, pivots, slicers, and Power Query",
+      "area": "xlsx-import",
+      "dialect": "excel",
+      "status": "warning",
+      "resultMode": "warning",
+      "semantics": "Known unsupported OOXML parts are detected and reported rather than evaluated.",
+      "divergence": "These application features are not imported into a parallel object model and are not claimed to round-trip losslessly.",
+      "fixtureIds": [
+        "xlsx-conformance-vectors"
+      ],
+      "importBehavior": "Known parts emit exact unsupported-feature warnings; unsafe packages fail closed.",
+      "exportBehavior": "Sheetwrite does not fabricate these parts.",
+      "warningCode": "unsupported-feature",
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/"
+    },
+    {
+      "id": "clipboard.delimited",
+      "label": "CSV/TSV and browser clipboard interchange",
+      "area": "clipboard",
+      "dialect": "shared",
+      "status": "partial",
+      "resultMode": "flattened",
+      "semantics": "Delimited export/import and HTML/plain clipboard paths preserve the declared scalar, formula, reference, and style subset with injection neutralization.",
+      "divergence": "CSV/TSV cannot represent workbook structure, formulas with cached semantics, or rich OOXML features.",
+      "fixtureIds": [
+        "clipboard-vectors",
+        "interop-browser-contract"
+      ],
+      "importBehavior": "Bounded delimited text becomes typed columnar data; over-limit input fails explicitly.",
+      "exportBehavior": "Leading formula-like text is neutralized and only the selected/active rectangular data is emitted.",
+      "warningCode": null,
+      "lastVerifiedProtocolVersion": 3,
+      "source": "https://www.rfc-editor.org/rfc/rfc4180"
+    },
+    {
+      "id": "producer.microsoft-excel",
+      "label": "Pinned Microsoft Excel-produced corpus",
+      "area": "xlsx-import",
+      "dialect": "excel",
+      "status": "partial",
+      "resultMode": "warning",
+      "semantics": "Five producer/version/checksum records are scheduled against the optional XLSX reader.",
+      "divergence": "The workbook bytes are not redistributed; absent scheduled bytes remain unverified and cannot support a blanket Excel claim.",
+      "fixtureIds": [
+        "external-producer-manifest"
+      ],
+      "importBehavior": "Checksum-matched supplied or scheduled bytes execute exact normalized expectations and warnings.",
+      "exportBehavior": "No Excel resave claim is made without separately captured producer evidence.",
+      "warningCode": "unverified-producer-evidence",
+      "lastVerifiedProtocolVersion": 3,
+      "source": "/docs/reference/compatibility-matrix/#sources"
+    },
+    {
+      "id": "producer.google-sheets",
+      "label": "Pinned public Google Sheets export",
+      "area": "xlsx-import",
+      "dialect": "google-sheets",
+      "status": "warning",
+      "resultMode": "warning",
+      "semantics": "One non-redistributed public export has pinned URL, producer, checksum, expected subset, and warning boundary.",
+      "divergence": "The local checkout contains metadata only; most Google Sheets workbook behaviors remain explicitly unverified.",
+      "fixtureIds": [
+        "external-producer-manifest",
+        "interop-browser-contract"
+      ],
+      "importBehavior": "Scheduled checksum-matched bytes may verify the declared export only; missing bytes display unverified status.",
+      "exportBehavior": "No Google Sheets import or resave behavior is claimed.",
+      "warningCode": "unverified-producer-evidence",
+      "lastVerifiedProtocolVersion": 3,
+      "source": "/docs/reference/compatibility-matrix/#sources"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "formula-engine-vectors",
+      "kind": "original-test",
+      "producer": "Sheetwrite",
+      "producerVersion": "v0.3 protocol 3",
+      "license": "MIT",
+      "provenance": "Original parser, evaluator, dependency, and spill vectors maintained in this repository.",
+      "expected": [
+        "operators",
+        "quoted references",
+        "FILTER/SORT/UNIQUE spills",
+        "explicit errors"
+      ],
+      "expectedWarnings": []
+    },
+    {
+      "id": "formula-document-vectors",
+      "kind": "original-test",
+      "producer": "Sheetwrite",
+      "producerVersion": "v0.3 protocol 3",
+      "license": "MIT",
+      "provenance": "Original document, clipboard, history, snapshot, and spill lifecycle vectors.",
+      "expected": [
+        "spill ownership",
+        "copy",
+        "history",
+        "snapshot",
+        "dependency invalidation"
+      ],
+      "expectedWarnings": []
+    },
+    {
+      "id": "worksheet-lifecycle-vectors",
+      "kind": "original-test",
+      "producer": "Sheetwrite",
+      "producerVersion": "v0.3 protocol 3",
+      "license": "MIT",
+      "provenance": "Original stable-ID worksheet lifecycle and active-session export vectors.",
+      "expected": [
+        "rename",
+        "reorder",
+        "visibility",
+        "active fallback",
+        "undo",
+        "rebase"
+      ],
+      "expectedWarnings": []
+    },
+    {
+      "id": "worksheet-xlsx-vectors",
+      "kind": "original-test",
+      "producer": "Sheetwrite",
+      "producerVersion": "v0.3 protocol 3",
+      "license": "MIT",
+      "provenance": "Original in-memory OOXML packages authored from ECMA-376 worksheet structures.",
+      "expected": [
+        "canonical names",
+        "quoted references",
+        "visibility",
+        "activeTab",
+        "visible-sheet invariant"
+      ],
+      "expectedWarnings": []
+    },
+    {
+      "id": "libreoffice-positive",
+      "kind": "independent-xlsx",
+      "producer": "LibreOffice",
+      "producerVersion": "26.2.4.2 build 64a984c51f4702dbd3710b13428c673a2f1292e7",
+      "license": "Fixture generated from repository-owned CSV input",
+      "provenance": "Headless LibreOffice conversion; command and source checksum are recorded in fixtures/manifest.json.",
+      "sha256": "cb7cba1a9a804d7115f69da5730a3186b8ea343eb959eb1e8c3e7b95d9ec3a65",
+      "expected": [
+        "strings",
+        "numbers",
+        "date-formatted numbers",
+        "whitespace",
+        "multiple rows"
+      ],
+      "expectedWarnings": []
+    },
+    {
+      "id": "libreoffice-rich",
+      "kind": "independent-xlsx",
+      "producer": "LibreOffice",
+      "producerVersion": "26.2.4.2 build 64a984c51f4702dbd3710b13428c673a2f1292e7",
+      "license": "Fixture generated from repository-owned UNO script",
+      "provenance": "Produced independently through LibreOffice UNO; generator checksum is recorded in fixtures/manifest.json.",
+      "sha256": "75fb643cafcbe660caaff5062423403a592fc483d3dedf8e76ad9b3a006883c2",
+      "expected": [
+        "formulas",
+        "styles",
+        "merges",
+        "validation",
+        "notes",
+        "freeze panes",
+        "named range"
+      ],
+      "expectedWarnings": [
+        "unsupported-feature: hidden worksheet visibility"
+      ]
+    },
+    {
+      "id": "ecma-shared-formula",
+      "kind": "spec-xlsx",
+      "producer": "Hand-authored ECMA-376 package",
+      "producerVersion": "fflate 0.8.3",
+      "license": "MIT",
+      "provenance": "Implementation-neutral shared-formula master/slave XML; generator checksum is recorded in fixtures/manifest.json.",
+      "sha256": "330da901b938e598948c13e8f1e0530b4691a67c4c23c4841c866d9bd74468a5",
+      "expected": [
+        "shared formula master",
+        "two translated slaves"
+      ],
+      "expectedWarnings": []
+    },
+    {
+      "id": "xlsx-conformance-vectors",
+      "kind": "original-test",
+      "producer": "Sheetwrite",
+      "producerVersion": "v0.3 protocol 3",
+      "license": "MIT with pinned upstream vector attribution in external-case-mapping.json",
+      "provenance": "Retyped implementation-neutral OOXML vectors; no upstream workbook bytes are redistributed.",
+      "expected": [
+        "formats",
+        "merges",
+        "validation warnings",
+        "notes",
+        "views",
+        "defined names"
+      ],
+      "expectedWarnings": [
+        "exact structured unsupported-feature warnings"
+      ]
+    },
+    {
+      "id": "external-producer-manifest",
+      "kind": "manifest",
+      "producer": "Apache POI corpus and public Google Sheets export",
+      "producerVersion": "POI commit 913c78891bd0cd20945b050c63abfb8c66c88009",
+      "license": "Apache-2.0 for POI corpus metadata; Google workbook is not redistributed",
+      "provenance": "Pinned producer/version/checksum records; byte execution is scheduled or supplied through SHEETWRITE_EXTERNAL_XLSX_DIR.",
+      "expected": [
+        "five Excel-family records",
+        "one Google Sheets record",
+        "explicit unverified features"
+      ],
+      "expectedWarnings": [
+        "producer claims remain partial until checksum-locked bytes execute"
+      ]
+    },
+    {
+      "id": "clipboard-vectors",
+      "kind": "original-test",
+      "producer": "Sheetwrite",
+      "producerVersion": "v0.3 protocol 3",
+      "license": "MIT",
+      "provenance": "Original clipboard and delimited-text security/round-trip vectors.",
+      "expected": [
+        "plain text",
+        "HTML",
+        "formulas",
+        "refs",
+        "styles",
+        "injection neutralization"
+      ],
+      "expectedWarnings": []
+    },
+    {
+      "id": "interop-browser-contract",
+      "kind": "original-test",
+      "producer": "Sheetwrite",
+      "producerVersion": "v0.3 protocol 3",
+      "license": "MIT",
+      "provenance": "Real-browser contract over the optional XLSX package and public Grid APIs.",
+      "expected": [
+        "fixture import",
+        "round trip",
+        "warnings",
+        "limits",
+        "package isolation"
+      ],
+      "expectedWarnings": [
+        "unsupported behavior remains visible"
+      ]
+    }
+  ]
+}

@@ -21,6 +21,7 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import compatibilityData from "../generated/compatibility.json";
 import { pageMeta } from "../lib/seo.js";
 import {
   ADVERSARIAL_FIXTURES,
@@ -74,7 +75,16 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
  */
 const CANVAS_THEME: Partial<Theme> = { rowHeight: 30 };
 
+type CompatibilityRecord = (typeof compatibilityData.records)[number];
+type CompatibilityFilter = "all" | CompatibilityRecord["status"];
+
+const COMPATIBILITY_AREAS = [...new Set(compatibilityData.records.map((record) => record.area))];
+const COMPATIBILITY_DIALECTS = [
+  ...new Set(compatibilityData.records.map((record) => record.dialect)),
+];
+
 const SECTIONS = [
+  { id: "contract", label: "Compatibility contract" },
   { id: "xlsx", label: "XLSX round-trip" },
   { id: "fixtures", label: "Independent fixtures" },
   { id: "warnings", label: "Fidelity warnings" },
@@ -143,6 +153,18 @@ function InteroperabilityRoute() {
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>(SECTIONS[0].id);
   const [fixtureLoad, setFixtureLoad] = useState<FixtureLoad | null>(null);
+  const [compatibilityStatus, setCompatibilityStatus] = useState<CompatibilityFilter>("all");
+  const [compatibilityArea, setCompatibilityArea] = useState("all");
+  const [compatibilityDialect, setCompatibilityDialect] = useState("all");
+  const [selectedCompatibilityId, setSelectedCompatibilityId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("compatibility");
+    if (compatibilityData.records.some((record) => record.id === requested)) {
+      setSelectedCompatibilityId(requested);
+      document.getElementById("contract")?.scrollIntoView();
+    }
+  }, []);
 
   const fixtureBytes = useCallback(async (fixture: InteropFixture): Promise<Uint8Array> => {
     const cached = bytesCache.current.get(fixture.file);
@@ -443,6 +465,15 @@ function InteroperabilityRoute() {
   };
 
   const injectionCsvLine = csvPreview?.split(/\r?\n/).find((line) => line.includes("OP-1045"));
+  const visibleCompatibility = compatibilityData.records.filter(
+    (record) =>
+      (compatibilityStatus === "all" || record.status === compatibilityStatus) &&
+      (compatibilityArea === "all" || record.area === compatibilityArea) &&
+      (compatibilityDialect === "all" || record.dialect === compatibilityDialect),
+  );
+  const selectedCompatibility =
+    visibleCompatibility.find((record) => record.id === selectedCompatibilityId) ??
+    visibleCompatibility[0];
   const activeIndex = Math.max(
     0,
     SECTIONS.findIndex((section) => section.id === activeSection),
@@ -482,6 +513,142 @@ function InteroperabilityRoute() {
         <p aria-live="polite" className="sw-si-status" data-testid="interop-status" role="status">
           {status}
         </p>
+
+        <section aria-labelledby="contract-title" className="sw-si-section" id="contract">
+          <h2 id="contract-title">Executable compatibility contract</h2>
+          <p>
+            Every row below comes from the same fail-closed inventory as the generated{" "}
+            <a href="/docs/reference/compatibility-matrix/">documentation matrix</a>. Status means
+            only what the named fixture and semantic vector establish — never blanket Excel, Google
+            Sheets, LibreOffice, or OpenFormula parity.
+          </p>
+          <fieldset className="sw-si-compat__filters">
+            <legend>Filter compatibility records</legend>
+            <label>
+              Status
+              <select
+                data-testid="compatibility-status-filter"
+                onChange={(event) =>
+                  setCompatibilityStatus(event.currentTarget.value as CompatibilityFilter)
+                }
+                value={compatibilityStatus}
+              >
+                <option value="all">All statuses</option>
+                <option value="supported">Supported</option>
+                <option value="partial">Partial</option>
+                <option value="roundtrip-only">Round-trip only</option>
+                <option value="warning">Warning</option>
+                <option value="unsupported">Unsupported</option>
+              </select>
+            </label>
+            <label>
+              Area
+              <select
+                data-testid="compatibility-area-filter"
+                onChange={(event) => setCompatibilityArea(event.currentTarget.value)}
+                value={compatibilityArea}
+              >
+                <option value="all">All areas</option>
+                {COMPATIBILITY_AREAS.map((area) => (
+                  <option key={area} value={area}>
+                    {area}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Dialect
+              <select
+                data-testid="compatibility-dialect-filter"
+                onChange={(event) => setCompatibilityDialect(event.currentTarget.value)}
+                value={compatibilityDialect}
+              >
+                <option value="all">All dialects</option>
+                {COMPATIBILITY_DIALECTS.map((dialect) => (
+                  <option key={dialect} value={dialect}>
+                    {dialect}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span aria-live="polite" className="sw-si-compat__count">
+              {visibleCompatibility.length}/{compatibilityData.records.length} records
+            </span>
+          </fieldset>
+          <div className="sw-si-compat">
+            <ul aria-label="Compatibility records" className="sw-si-compat__records">
+              {visibleCompatibility.map((record) => (
+                <li key={record.id}>
+                  <button
+                    aria-pressed={selectedCompatibility?.id === record.id}
+                    data-result={record.resultMode}
+                    data-status={record.status}
+                    data-testid={`compatibility-${record.id}`}
+                    onClick={() => setSelectedCompatibilityId(record.id)}
+                    type="button"
+                  >
+                    <span>
+                      {record.area} / {record.dialect}
+                    </span>
+                    <strong>{record.label}</strong>
+                    <small>
+                      {record.status} · {record.resultMode}
+                    </small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {selectedCompatibility ? (
+              <article
+                className="sw-si-compat__detail"
+                data-result={selectedCompatibility.resultMode}
+                data-status={selectedCompatibility.status}
+                data-testid="compatibility-detail"
+              >
+                <p className="sw-si-compat__mode">
+                  <span>{selectedCompatibility.status}</span>
+                  <span>{selectedCompatibility.resultMode}</span>
+                </p>
+                <h3>{selectedCompatibility.label}</h3>
+                <p>{selectedCompatibility.semantics}</p>
+                <dl>
+                  <div>
+                    <dt>Import</dt>
+                    <dd>{selectedCompatibility.importBehavior}</dd>
+                  </div>
+                  <div>
+                    <dt>Export</dt>
+                    <dd>{selectedCompatibility.exportBehavior}</dd>
+                  </div>
+                  <div>
+                    <dt>Known boundary</dt>
+                    <dd>{selectedCompatibility.divergence}</dd>
+                  </div>
+                  <div>
+                    <dt>Evidence fixtures</dt>
+                    <dd>{selectedCompatibility.fixtureIds.join(", ")}</dd>
+                  </div>
+                  <div>
+                    <dt>Source</dt>
+                    <dd>
+                      <a href={selectedCompatibility.source}>{selectedCompatibility.source}</a>
+                    </dd>
+                  </div>
+                  {selectedCompatibility.warningCode && (
+                    <div>
+                      <dt>Warning code</dt>
+                      <dd>
+                        <code>{selectedCompatibility.warningCode}</code>
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </article>
+            ) : (
+              <p className="sw-si-empty">No records match both filters.</p>
+            )}
+          </div>
+        </section>
 
         <section aria-labelledby="xlsx-title" className="sw-si-section" id="xlsx">
           <h2 id="xlsx-title">XLSX round-trip workbench</h2>

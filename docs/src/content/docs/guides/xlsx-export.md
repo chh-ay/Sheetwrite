@@ -25,6 +25,8 @@ await grid.exportXlsx("sales.xlsx");
 
 `toXlsxWorkbook` and `fromXlsxWorkbook` preserve supported worksheets, formula source, styles, merges, dimensions, frozen panes, names, and Sheetwrite metadata. Unsupported Excel features may be flattened or dropped and are reported through the structured `onWarning` callback (`XlsxWorkbookWarning`); callers must surface warnings when fidelity matters. Both directions build the complete workbook representation in memory; budget accordingly for large files.
 
+The [generated executable compatibility matrix](/docs/reference/compatibility-matrix/) distinguishes evaluated, preserved, flattened, warning, and unsupported behavior by fixture and producer evidence.
+
 ## Resource limits
 
 Every table and workbook path shares one resource contract, `XlsxWorkbookOptions`:

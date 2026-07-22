@@ -1,0 +1,70 @@
+---
+title: "Executable compatibility matrix"
+description: "Evidence-linked formula, workbook, clipboard, and XLSX compatibility boundaries."
+---
+
+# Executable compatibility matrix
+
+This matrix is generated from a typed, fail-closed inventory. It describes only the checked corpus and declared semantics; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.
+
+Result modes distinguish **evaluated** formulas/structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.
+
+| Feature | Area | Dialect | Status | Result | Import | Export | Known boundary | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [Portable arithmetic, comparison, concatenation, and percent operators](/showcases/interoperability/?compatibility=formula.portable-operators) | `formula` | `shared` | **supported** | evaluated | Formula source is preserved and evaluated when every token is in the portable subset. | Canonical formula source is emitted to XLSX without cached-value fabrication. | This is a declared portable subset, not every Excel, Sheets, or OpenFormula coercion edge. | `formula-engine-vectors`<br />`formula-document-vectors` |
+| [FILTER, SORT, UNIQUE, and bounded spill ranges](/showcases/interoperability/?compatibility=formula.dynamic-arrays) | `formula` | `shared` | **partial** | evaluated | Recognized formulas evaluate; unknown dynamic-array syntax remains preserved source with an explicit formula error. | Anchor formula source is exported; derived spill cells are not serialized as invented formulas. | No implicit-intersection operator, spill-reference # syntax, multi-key SORT, or general Excel/Sheets dynamic-array family is claimed. | `formula-engine-vectors`<br />`formula-document-vectors` |
+| [LET, LAMBDA, and reusable named functions](/showcases/interoperability/?compatibility=formula.let-lambda) | `formula` | `excel` | **unsupported** | unsupported | Source is preserved; evaluation returns an explicit unsupported-name error. | Preserved source may be emitted, without a fabricated cached result. | No approximation or JavaScript execution fallback is provided. | `formula-engine-vectors` |
+| [Quoted cross-sheet references through stable worksheet identity](/showcases/interoperability/?compatibility=reference.cross-sheet-stable-id) | `reference` | `shared` | **supported** | evaluated | Native same-workbook references map to stable worksheet IDs. | References are rendered using the current canonical sheet name and quoting rules. | External workbook links and 3-D references are unsupported. | `formula-engine-vectors`<br />`worksheet-xlsx-vectors` |
+| [Create, rename, reorder, hide, unhide, remove, and active fallback](/showcases/interoperability/?compatibility=worksheet.lifecycle) | `worksheet` | `shared` | **supported** | evaluated | Valid names and visibility are retained; invalid all-hidden workbooks fail or select a visible fallback as specified. | Current Grid active state and ordinary visibility are emitted without mutating shared navigation history. | veryHidden is host-managed and cannot be revealed through the stock tab strip. | `worksheet-lifecycle-vectors`<br />`worksheet-xlsx-vectors` |
+| [veryHidden worksheet preservation](/showcases/interoperability/?compatibility=worksheet.very-hidden) | `worksheet` | `excel` | **roundtrip-only** | preserved | The visibility token is retained as host-only state. | The token is emitted when retained by the canonical workbook. | Stock worksheet tabs intentionally do not expose or unhide it. | `worksheet-xlsx-vectors`<br />`worksheet-lifecycle-vectors` |
+| [Independent XLSX strings, numbers, dates, and whitespace](/showcases/interoperability/?compatibility=xlsx.basic-values) | `xlsx-import` | `openformula` | **supported** | evaluated | Expected normalized cells import with zero warnings. | Equivalent Sheetwrite scalar cells export through the optional XLSX package. | Producer evidence covers this fixture and version, not all LibreOffice documents. | `libreoffice-positive`<br />`interop-browser-contract` |
+| [Styles, merges, validation, notes, panes, names, and hidden sheets](/showcases/interoperability/?compatibility=xlsx.rich-workbook) | `xlsx-import` | `openformula` | **partial** | warning | Supported native parts normalize into the workbook; unsupported parts emit structured warnings. | Canonical supported parts export; unknown OOXML parts are not promised lossless preservation. | Hidden worksheet visibility produces the recorded unsupported-feature warning for the legacy fixture path. | `libreoffice-rich`<br />`interop-browser-contract` |
+| [ECMA-376 shared formula master and translated slaves](/showcases/interoperability/?compatibility=xlsx.shared-formulas) | `xlsx-import` | `excel` | **supported** | evaluated | Master/slave records import as three exact formula sources. | Equivalent formulas export semantically, not byte-for-byte or record-for-record. | Export writes canonical ordinary formulas rather than promising the producer's shared-record packing. | `ecma-shared-formula` |
+| [Native data-validation subset](/showcases/interoperability/?compatibility=validation.native-subset) | `validation` | `excel` | **partial** | warning | Supported rules normalize; unsupported rules do not masquerade as supported validation. | Supported canonical rules emit native validation records. | Unsupported operators or extension forms are dropped with exact structured warnings. | `xlsx-conformance-vectors` |
+| [Tables, charts, macros, pivots, slicers, and Power Query](/showcases/interoperability/?compatibility=xlsx.tables-charts-macros) | `xlsx-import` | `excel` | **warning** | warning | Known parts emit exact unsupported-feature warnings; unsafe packages fail closed. | Sheetwrite does not fabricate these parts. | These application features are not imported into a parallel object model and are not claimed to round-trip losslessly. | `xlsx-conformance-vectors` |
+| [CSV/TSV and browser clipboard interchange](/showcases/interoperability/?compatibility=clipboard.delimited) | `clipboard` | `shared` | **partial** | flattened | Bounded delimited text becomes typed columnar data; over-limit input fails explicitly. | Leading formula-like text is neutralized and only the selected/active rectangular data is emitted. | CSV/TSV cannot represent workbook structure, formulas with cached semantics, or rich OOXML features. | `clipboard-vectors`<br />`interop-browser-contract` |
+| [Pinned Microsoft Excel-produced corpus](/showcases/interoperability/?compatibility=producer.microsoft-excel) | `xlsx-import` | `excel` | **partial** | warning | Checksum-matched supplied or scheduled bytes execute exact normalized expectations and warnings. | No Excel resave claim is made without separately captured producer evidence. | The workbook bytes are not redistributed; absent scheduled bytes remain unverified and cannot support a blanket Excel claim. | `external-producer-manifest` |
+| [Pinned public Google Sheets export](/showcases/interoperability/?compatibility=producer.google-sheets) | `xlsx-import` | `google-sheets` | **warning** | warning | Scheduled checksum-matched bytes may verify the declared export only; missing bytes display unverified status. | No Google Sheets import or resave behavior is claimed. | The local checkout contains metadata only; most Google Sheets workbook behaviors remain explicitly unverified. | `external-producer-manifest`<br />`interop-browser-contract` |
+
+## Warning boundaries
+
+| Record | Warning code | Meaning |
+| --- | --- | --- |
+| `xlsx.rich-workbook` | `unsupported-feature` | A checksum-locked LibreOffice workbook imports the declared rich subset and exact warning boundary. |
+| `validation.native-subset` | `unsupported-validation` | Declared comparison and list validations round-trip through the canonical validation model. |
+| `xlsx.tables-charts-macros` | `unsupported-feature` | Known unsupported OOXML parts are detected and reported rather than evaluated. |
+| `producer.microsoft-excel` | `unverified-producer-evidence` | Five producer/version/checksum records are scheduled against the optional XLSX reader. |
+| `producer.google-sheets` | `unverified-producer-evidence` | One non-redistributed public export has pinned URL, producer, checksum, expected subset, and warning boundary. |
+
+## Fixture and provenance ledger
+
+| Fixture ID | Kind | Producer/version | Provenance | Digest | Expected normalized state | Expected warnings |
+| --- | --- | --- | --- | --- | --- | --- |
+| `formula-engine-vectors` | `original-test` | Sheetwrite v0.3 protocol 3 | Original parser, evaluator, dependency, and spill vectors maintained in this repository. | source-controlled test/manifest | operators; quoted references; FILTER/SORT/UNIQUE spills; explicit errors | none |
+| `formula-document-vectors` | `original-test` | Sheetwrite v0.3 protocol 3 | Original document, clipboard, history, snapshot, and spill lifecycle vectors. | source-controlled test/manifest | spill ownership; copy; history; snapshot; dependency invalidation | none |
+| `worksheet-lifecycle-vectors` | `original-test` | Sheetwrite v0.3 protocol 3 | Original stable-ID worksheet lifecycle and active-session export vectors. | source-controlled test/manifest | rename; reorder; visibility; active fallback; undo; rebase | none |
+| `worksheet-xlsx-vectors` | `original-test` | Sheetwrite v0.3 protocol 3 | Original in-memory OOXML packages authored from ECMA-376 worksheet structures. | source-controlled test/manifest | canonical names; quoted references; visibility; activeTab; visible-sheet invariant | none |
+| `libreoffice-positive` | `independent-xlsx` | LibreOffice 26.2.4.2 build 64a984c51f4702dbd3710b13428c673a2f1292e7 | Headless LibreOffice conversion; command and source checksum are recorded in fixtures/manifest.json. | `cb7cba1a9a804d7115f69da5730a3186b8ea343eb959eb1e8c3e7b95d9ec3a65` | strings; numbers; date-formatted numbers; whitespace; multiple rows | none |
+| `libreoffice-rich` | `independent-xlsx` | LibreOffice 26.2.4.2 build 64a984c51f4702dbd3710b13428c673a2f1292e7 | Produced independently through LibreOffice UNO; generator checksum is recorded in fixtures/manifest.json. | `75fb643cafcbe660caaff5062423403a592fc483d3dedf8e76ad9b3a006883c2` | formulas; styles; merges; validation; notes; freeze panes; named range | unsupported-feature: hidden worksheet visibility |
+| `ecma-shared-formula` | `spec-xlsx` | Hand-authored ECMA-376 package fflate 0.8.3 | Implementation-neutral shared-formula master/slave XML; generator checksum is recorded in fixtures/manifest.json. | `330da901b938e598948c13e8f1e0530b4691a67c4c23c4841c866d9bd74468a5` | shared formula master; two translated slaves | none |
+| `xlsx-conformance-vectors` | `original-test` | Sheetwrite v0.3 protocol 3 | Retyped implementation-neutral OOXML vectors; no upstream workbook bytes are redistributed. | source-controlled test/manifest | formats; merges; validation warnings; notes; views; defined names | exact structured unsupported-feature warnings |
+| `external-producer-manifest` | `manifest` | Apache POI corpus and public Google Sheets export POI commit 913c78891bd0cd20945b050c63abfb8c66c88009 | Pinned producer/version/checksum records; byte execution is scheduled or supplied through SHEETWRITE_EXTERNAL_XLSX_DIR. | source-controlled test/manifest | five Excel-family records; one Google Sheets record; explicit unverified features | producer claims remain partial until checksum-locked bytes execute |
+| `clipboard-vectors` | `original-test` | Sheetwrite v0.3 protocol 3 | Original clipboard and delimited-text security/round-trip vectors. | source-controlled test/manifest | plain text; HTML; formulas; refs; styles; injection neutralization | none |
+| `interop-browser-contract` | `original-test` | Sheetwrite v0.3 protocol 3 | Real-browser contract over the optional XLSX package and public Grid APIs. | source-controlled test/manifest | fixture import; round trip; warnings; limits; package isolation | unsupported behavior remains visible |
+
+## Sources
+
+- `formula.portable-operators`: [spec/source](https://docs.oasis-open.org/office/OpenDocument/v1.3/os/part4-formula/OpenDocument-v1.3-os-part4-formula.html)
+- `formula.dynamic-arrays`: [spec/source](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531)
+- `formula.let-lambda`: [spec/source](https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999)
+- `reference.cross-sheet-stable-id`: [spec/source](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/)
+- `worksheet.lifecycle`: [spec/source](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/)
+- `worksheet.very-hidden`: [spec/source](https://learn.microsoft.com/en-us/office/vba/api/excel.xlsheetvisibility)
+- `xlsx.basic-values`: [`packages/xlsx/test/fixtures/manifest.json`](https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/test/fixtures/manifest.json)
+- `xlsx.rich-workbook`: [`packages/xlsx/test/fixtures/manifest.json`](https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/test/fixtures/manifest.json)
+- `xlsx.shared-formulas`: [spec/source](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/)
+- `validation.native-subset`: [spec/source](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/)
+- `xlsx.tables-charts-macros`: [spec/source](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/)
+- `clipboard.delimited`: [spec/source](https://www.rfc-editor.org/rfc/rfc4180)
+- `producer.microsoft-excel`: [`packages/xlsx/test/fixtures/external-corpus.json`](https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/test/fixtures/external-corpus.json)
+- `producer.google-sheets`: [`packages/xlsx/test/fixtures/external-corpus.json`](https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/test/fixtures/external-corpus.json)

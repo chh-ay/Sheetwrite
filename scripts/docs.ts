@@ -16,6 +16,16 @@ import {
   collectMissingCapabilityFiles,
 } from "../docs/src/showcases/capability-validation.js";
 import {
+  COMPATIBILITY_FIXTURES,
+  COMPATIBILITY_INVENTORY,
+  type CompatibilityFixture,
+  type CompatibilityRecord,
+} from "../docs/src/showcases/compatibility.js";
+import {
+  collectCompatibilityIssues,
+  collectMissingCompatibilityFiles,
+} from "../docs/src/showcases/compatibility-validation.js";
+import {
   type ApiEntryPoint,
   type ApiExport,
   type ApiPackage,
@@ -127,8 +137,8 @@ export const ADAPTER_DOC_CONTRACT = {
     "edit-begin",
     "edit-commit",
     "search",
-    "command-state-change",
     "active-sheet-change",
+    "command-state-change",
     "ready",
     "initialization-error",
   ],
@@ -1752,7 +1762,102 @@ async function renderEvidencePage(): Promise<string> {
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
+function compatibilityCell(value: string): string {
+  return value.replaceAll("|", "\\|").replaceAll("\n", " ").trim();
+}
+
+function compatibilitySource(source: string): string {
+  return source.startsWith("https://")
+    ? `[spec/source](${source})`
+    : `[\`${source}\`](https://github.com/chh-ay/sheetwrite/blob/main/${source})`;
+}
+
+function publicCompatibilitySource(source: string): string {
+  return source.startsWith("https://") ? source : "/docs/reference/compatibility-matrix/#sources";
+}
+
+export function renderCompatibilityMatrix(
+  records: readonly CompatibilityRecord[] = COMPATIBILITY_INVENTORY,
+  fixtures: readonly CompatibilityFixture[] = COMPATIBILITY_FIXTURES,
+): string {
+  const lines = [
+    "---",
+    'title: "Executable compatibility matrix"',
+    'description: "Evidence-linked formula, workbook, clipboard, and XLSX compatibility boundaries."',
+    "---",
+    "",
+    "# Executable compatibility matrix",
+    "",
+    "This matrix is generated from a typed, fail-closed inventory. It describes only the checked corpus and declared semantics; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.",
+    "",
+    "Result modes distinguish **evaluated** formulas/structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.",
+    "",
+    "| Feature | Area | Dialect | Status | Result | Import | Export | Known boundary | Evidence |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...records.map((record) => {
+      const evidence = record.fixtureIds.map((id) => `\`${id}\``).join("<br />");
+      return `| [${compatibilityCell(record.label)}](/showcases/interoperability/?compatibility=${encodeURIComponent(record.id)}) | \`${record.area}\` | \`${record.dialect}\` | **${record.status}** | ${record.resultMode} | ${compatibilityCell(record.importBehavior)} | ${compatibilityCell(record.exportBehavior)} | ${compatibilityCell(record.divergence)} | ${evidence} |`;
+    }),
+    "",
+    "## Warning boundaries",
+    "",
+    "| Record | Warning code | Meaning |",
+    "| --- | --- | --- |",
+    ...records
+      .filter((record) => record.warningCode !== null)
+      .map(
+        (record) =>
+          `| \`${record.id}\` | \`${record.warningCode}\` | ${compatibilityCell(record.semantics)} |`,
+      ),
+    "",
+    "## Fixture and provenance ledger",
+    "",
+    "| Fixture ID | Kind | Producer/version | Provenance | Digest | Expected normalized state | Expected warnings |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...fixtures.map(
+      (fixture) =>
+        `| \`${fixture.id}\` | \`${fixture.kind}\` | ${compatibilityCell(`${fixture.producer} ${fixture.producerVersion}`)} | ${compatibilityCell(fixture.provenance)} | ${fixture.sha256 ? `\`${fixture.sha256}\`` : "source-controlled test/manifest"} | ${compatibilityCell(fixture.expected.join("; "))} | ${compatibilityCell(fixture.expectedWarnings.join("; ") || "none")} |`,
+    ),
+    "",
+    "## Sources",
+    "",
+    ...records.map((record) => `- \`${record.id}\`: ${compatibilitySource(record.source)}`),
+    "",
+  ];
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+export async function collectCompatibilityDigestIssues(
+  root: string = repositoryRoot,
+  fixtures: readonly CompatibilityFixture[] = COMPATIBILITY_FIXTURES,
+): Promise<string[]> {
+  const issues: string[] = [];
+  for (const fixture of fixtures) {
+    if (!fixture.sha256) continue;
+    try {
+      const bytes = await readFile(join(root, fixture.path));
+      const actual = createHash("sha256").update(bytes).digest("hex");
+      if (actual !== fixture.sha256) {
+        issues.push(
+          `compatibility fixture digest mismatch: ${fixture.id} expected=${fixture.sha256} actual=${actual}`,
+        );
+      }
+    } catch {
+      issues.push(`missing compatibility fixture for digest: ${fixture.path}`);
+    }
+  }
+  return issues;
+}
+
 export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promise<ExpectedFile[]> {
+  const compatibilityIssues = [
+    ...collectCompatibilityIssues(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES),
+    ...collectMissingCompatibilityFiles(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES, (path) =>
+      existsSync(join(repositoryRoot, path)),
+    ),
+    ...(await collectCompatibilityDigestIssues()),
+  ];
+  if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
@@ -1796,6 +1901,9 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     exportCount,
     symbolPageCount: exportCount,
     apiSha256: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
+    compatibilitySha256: createHash("sha256")
+      .update(JSON.stringify([COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES]))
+      .digest("hex"),
   };
   return [
     ...apiFiles,
@@ -1806,6 +1914,21 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     {
       path: join(contentRoot, "reference/moved-guides.md"),
       content: renderMovedGuides(),
+    },
+    {
+      path: join(contentRoot, "reference/compatibility-matrix.md"),
+      content: renderCompatibilityMatrix(),
+    },
+    {
+      path: join(generatedDataRoot, "compatibility.json"),
+      content: stableJson({
+        schemaVersion: 1,
+        records: COMPATIBILITY_INVENTORY.map(({ evidence: _evidence, source, ...record }) => ({
+          ...record,
+          source: publicCompatibilitySource(source),
+        })),
+        fixtures: COMPATIBILITY_FIXTURES.map(({ path: _path, ...fixture }) => fixture),
+      }),
     },
     {
       path: join(contentRoot, "guides/performance-resources.md"),
@@ -2175,18 +2298,17 @@ async function validateMarkdown(
         continue;
       }
       const [targetWithoutFragment = "", fragment] = rawTarget.split("#", 2);
+      const [targetRoute = ""] = targetWithoutFragment.split("?", 1);
       let targetPath: string | undefined;
-      if (targetWithoutFragment === "") targetPath = document.path;
-      else if (targetWithoutFragment.startsWith("/docs/")) {
-        targetPath = contentPathForRoute(targetWithoutFragment, documents);
-      } else if (/^\/(?:vanilla|react|vue|svelte)\/?$/.test(targetWithoutFragment)) {
-        targetPath = join(
-          repositoryRoot,
-          `docs/src/routes/${targetWithoutFragment.replace(/^\//, "").replace(/\/$/, "")}.tsx`,
-        );
-      } else if (targetWithoutFragment.startsWith("/")) {
+      if (targetRoute === "") targetPath = document.path;
+      else if (targetRoute.startsWith("/docs/")) {
+        targetPath = contentPathForRoute(targetRoute, documents);
+      } else if (targetRoute.startsWith("/") && !targetRoute.includes("..")) {
+        const routeSlug = targetRoute.replace(/^\//, "").replace(/\/$/, "").replaceAll("/", ".");
+        targetPath = join(repositoryRoot, `docs/src/routes/${routeSlug || "index"}.tsx`);
+      } else if (targetRoute.startsWith("/")) {
         failures.push(
-          `${posix(relative(repositoryRoot, document.path))} links unknown internal route ${rawTarget}`,
+          `${posix(relative(repositoryRoot, document.path))} links invalid internal route ${rawTarget}`,
         );
         continue;
       } else {
