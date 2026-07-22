@@ -714,7 +714,7 @@ mod tests {
         irr_values.push_range(Value::text("ignored")).unwrap();
         irr_values.push_range(Value::Bool(true)).unwrap();
         irr_values.push_range(Value::Number(121.0)).unwrap();
-        irr_values.finish_arg().unwrap();
+        irr_values.finish_arg(1, 5).unwrap();
         assert_close(result_number(Func::Irr, &irr_values), 0.21);
 
         assert_error(
