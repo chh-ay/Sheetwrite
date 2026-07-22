@@ -252,7 +252,22 @@ fn ast_is_volatile(ast: &Ast) -> bool {
     }
 }
 
+fn ast_contains_let(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::Let, _) => true,
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_let),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_contains_let(left) || ast_contains_let(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_let(inner),
+        _ => false,
+    }
+}
+
 fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
+    if !ast_contains_let(ast) {
+        return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
+    }
     let expanded = expand_let_reachable_ast(ast).ok();
     let metadata = expanded.as_ref().unwrap_or(ast);
     (ReadSet::from_ast(metadata, formula_sheet), ast_is_volatile(metadata))
