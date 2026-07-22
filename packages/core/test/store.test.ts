@@ -24,6 +24,9 @@ import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
 
+const ALL_SOURCE_COLUMN_BANDS = [{ start: 0, end: 3, keys: ["name", "amount", "city"] }] as const;
+const NAME_SOURCE_COLUMN_BAND = [{ start: 0, end: 1, keys: ["name"] }] as const;
+
 beforeAll(async () => {
   await initSheetwrite();
 });
@@ -1082,7 +1085,7 @@ describe("datasource row hydration", () => {
       changes += 1;
     });
 
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       {
         name: { kind: "literal", value: "rich" },
         amount: {
@@ -1101,7 +1104,7 @@ describe("datasource row hydration", () => {
     });
     expect(store.getRefTarget(addr(0, 2))).toEqual(addr(1, 0));
     expect(store.getCell(addr(0, 2)).resolved).toBeNull();
-    store.loadRows("s1", 1, [{ name: "later source" }]);
+    store.loadPage("s1", 1, NAME_SOURCE_COLUMN_BAND, [{ name: "later source" }]);
     expect(store.getCell(addr(0, 2)).resolved).toBe("later source");
     expect(changes).toBe(0);
     store.dispose();
@@ -1537,7 +1540,7 @@ describe("paged datasource storage", () => {
       chunkRows: 4,
       cacheBytes: 1_000_000,
     });
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "source zero", amount: 1, city: "A" },
       { name: "source target", amount: 2, city: "B" },
     ]);
@@ -1563,9 +1566,10 @@ describe("paged datasource storage", () => {
     store.acknowledgeOperations([literal]);
 
     const revisionAddresses = new Set<object>();
-    store.loadRows(
+    store.loadPage(
       "s1",
       0,
+      ALL_SOURCE_COLUMN_BANDS,
       [
         { name: "stale literal", amount: 3, city: "stale ref" },
         { name: "server target", amount: 4, city: "server" },
@@ -1591,6 +1595,140 @@ describe("paged datasource storage", () => {
       resolved: "server target",
       style: { underline: true },
     });
+    store.dispose();
+  });
+
+  it("hydrates disjoint bands without marking the physical holes in their bounding rectangle", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 2,
+      cacheBytes: 1_000_000,
+    });
+    store.loadPage(
+      "s1",
+      0,
+      [
+        { start: 0, end: 1, keys: ["name"] },
+        { start: 2, end: 3, keys: ["city"] },
+      ],
+      [
+        { name: "alpha", city: "A" },
+        { name: "beta", city: null },
+      ],
+    );
+
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [2])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [2, 0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [1])).toBe(false);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0, 1, 2])).toBe(false);
+    expect(
+      store.isRangeFullyLoaded({
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 1, col: 2 },
+      }),
+    ).toBe(false);
+    expect(store.getVisibleWindow("s1", { start: 0, end: 2 }, [2, 0]).values).toEqual([
+      "A",
+      "alpha",
+      "",
+      "beta",
+    ]);
+    expect(store.getCellLoadState(addr(0, 1))).toBe("unloaded");
+    expect(store.getCellLoadState(addr(1, 1))).toBe("unloaded");
+    expect(store.getPagedStats("s1")).toMatchObject({
+      chunks: 2,
+      loadedCells: 4,
+      dirtyCells: 0,
+    });
+    store.dispose();
+  });
+
+  it("rejects malformed rectangular pages atomically without marking any target cell loaded", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1_000_000,
+    });
+    const expectRowUnloaded = (row: number) => {
+      for (const col of [0, 1, 2]) {
+        expect(store.getCellLoadState(addr(row, col))).toBe("unloaded");
+      }
+    };
+
+    expect(() =>
+      store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "missing", amount: 1 }]),
+    ).toThrow(/omits declared cell data/);
+    expectRowUnloaded(0);
+
+    expect(() =>
+      store.loadPage("s1", 1, NAME_SOURCE_COLUMN_BAND, [{ name: "extra", amount: null }]),
+    ).toThrow(/undeclared cell data/);
+    expectRowUnloaded(1);
+
+    expect(() =>
+      store.loadPage(
+        "s1",
+        2,
+        [
+          { start: 2, end: 3, keys: ["city"] },
+          { start: 0, end: 1, keys: ["name"] },
+        ],
+        [{ name: "reordered", city: "C" }],
+      ),
+    ).toThrow(/invalid column bounds/);
+    expectRowUnloaded(2);
+
+    expect(() =>
+      store.loadPage(
+        "s1",
+        3,
+        [
+          { start: 0, end: 2, keys: ["name", "amount"] },
+          { start: 1, end: 3, keys: ["amount", "city"] },
+        ],
+        [{ name: "overlap", amount: 3, city: "D" }],
+      ),
+    ).toThrow(/invalid column bounds/);
+    expectRowUnloaded(3);
+    expect(store.queryCapability("s1")).toEqual({
+      status: "incomplete",
+      loadedCells: 0,
+      totalCells: 12,
+    });
+    store.dispose();
+  });
+
+  it("keeps whole-sheet reads and unloaded formula dependencies incomplete after a partial page", () => {
+    const store = new SheetwriteStore(makeWorkbook(2), undefined, {
+      storage: "paged",
+      chunkRows: 2,
+      cacheBytes: 1_000_000,
+    });
+    store.loadPage(
+      "s1",
+      0,
+      [{ start: 1, end: 2, keys: ["amount"] }],
+      [{ amount: 10 }, { amount: null }],
+    );
+
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [1])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0, 1, 2])).toBe(false);
+    expect(store.queryCapability("s1")).toEqual({
+      status: "incomplete",
+      loadedCells: 2,
+      totalCells: 6,
+    });
+    expect(() => store.aggregate("s1", 1, "sum")).toThrow(/has unloaded datasource cells/);
+    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
+
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 2), value: { kind: "formula", src: "=A1" } }],
+    });
+    expect(store.getCell(addr(0, 2)).resolved).toBe("#LOADING!");
+    expect(store.queryCapability("s1").status).toBe("incomplete");
+    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
     store.dispose();
   });
 
@@ -1650,10 +1788,22 @@ describe("paged datasource storage", () => {
     });
     const revisionAddresses = new Set<object>();
     try {
-      store.loadRows("s1", 0, page, (address) => {
-        revisionAddresses.add(address);
-        return false;
-      });
+      store.loadPage(
+        "s1",
+        0,
+        [
+          {
+            start: 0,
+            end: columnCount,
+            keys: workbook.sheets[0]!.columns.map(({ key }) => key),
+          },
+        ],
+        page,
+        (address) => {
+          revisionAddresses.add(address);
+          return false;
+        },
+      );
       expect(blockCrossings).toBe(1);
       expect(recomputeCrossings).toBe(1);
       expect(scalarCrossings).toBe(0);
@@ -1697,7 +1847,7 @@ describe("paged datasource storage", () => {
       maxTransferredArrayLength: 0,
     });
 
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "a", amount: 1, city: "A" },
       { name: "b", amount: 2, city: "B" },
       { name: "c", amount: 3, city: "C" },
@@ -1741,13 +1891,15 @@ describe("paged datasource storage", () => {
     expect(() => store.aggregate("s1", 1, "sum")).toThrow(/has unloaded datasource cells/);
     expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
 
-    store.loadRows("s1", 0, [{ name: "zero", amount: 1, city: "A" }]);
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "zero", amount: 1, city: "A" }]);
     store.applyTransaction({
       patches: [{ op: "set", addr: addr(0, 1), value: { kind: "literal", value: 99 } }],
     });
-    store.loadRows("s1", 0, [{ name: "stale", amount: 2, city: "stale" }]);
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "stale", amount: 2, city: "stale" }]);
     for (const row of [4, 8, 12]) {
-      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "B" }]);
+      store.loadPage("s1", row, ALL_SOURCE_COLUMN_BANDS, [
+        { name: `row-${row}`, amount: row, city: "B" },
+      ]);
     }
 
     expect(store.getCell(addr(0, 1)).resolved).toBe(99);
@@ -1778,7 +1930,9 @@ describe("paged datasource storage", () => {
 
     store.applyTransaction({ patches: [operation] });
     for (const row of [0, 4, 8, 12, 16]) {
-      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "B" }]);
+      store.loadPage("s1", row, ALL_SOURCE_COLUMN_BANDS, [
+        { name: `row-${row}`, amount: row, city: "B" },
+      ]);
     }
     expect(store.getCellLoadState(operation.addr)).toBe("local-edit");
     expect(store.getPagedStats("s1").dirtyCells).toBe(1);
@@ -1786,7 +1940,9 @@ describe("paged datasource storage", () => {
     store.acknowledgeOperations([operation]);
     expect(store.getPagedStats("s1").dirtyCells).toBe(0);
     for (const row of [20, 24, 28, 32, 36]) {
-      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "C" }]);
+      store.loadPage("s1", row, ALL_SOURCE_COLUMN_BANDS, [
+        { name: `row-${row}`, amount: row, city: "C" },
+      ]);
     }
     expect(store.getCellLoadState(operation.addr)).toBe("unloaded");
     store.dispose();
@@ -1808,7 +1964,7 @@ describe("paged datasource storage", () => {
     expect(store.getCellLoadState(addr(0, 2))).toBe("local-edit");
     expect(store.getCellLoadState(addr(1, 2))).toBe("local-edit");
 
-    store.loadRows("s1", 5000, [{ name: null, amount: 41, city: null }]);
+    store.loadPage("s1", 5000, ALL_SOURCE_COLUMN_BANDS, [{ name: null, amount: 41, city: null }]);
     expect(store.getCell(addr(0, 2)).resolved).toBe(42);
     expect(store.getCell(addr(1, 2)).resolved).toBe(41);
     expect(store.getCellLoadState(addr(0, 2))).toBe("local-edit");
@@ -1882,7 +2038,7 @@ describe("paged datasource storage", () => {
       chunkRows: 4,
       cacheBytes: 1_000_000,
     });
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "alpha", amount: 3, city: "A" },
       { name: "beta", amount: 1, city: "B" },
       { name: "alphabet", amount: 2, city: "C" },
@@ -2083,7 +2239,7 @@ it("accounts for structural row and column ordering before admitting writes", ()
       storage: "paged" as const,
       dirtyCellLimit: 1,
     });
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "A", amount: 1, city: "A" },
       { name: "B", amount: 2, city: "B" },
       { name: "C", amount: 3, city: "C" },
@@ -2232,7 +2388,7 @@ it("counts rectangular rewrites and overlaps by distinct newly dirty cells", () 
       storage: "paged" as const,
       dirtyCellLimit: 2,
     });
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "A", amount: 1, city: "A" },
       { name: "B", amount: 2, city: "B" },
       { name: "C", amount: 3, city: "C" },

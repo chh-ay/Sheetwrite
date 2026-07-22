@@ -2457,6 +2457,64 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
 }
 
 #[test]
+fn columns_fully_loaded_tracks_disjoint_columns_holes_bounds_and_sparse_accounting() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(3, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
+    store.set_column_numbers(sheet, 2, 0, &[5.0, 6.0, 7.0, 8.0], 0);
+    store.end_page_load();
+
+    assert!(store.columns_fully_loaded(sheet, 0, 4, &[0]));
+    assert!(store.columns_fully_loaded(sheet, 0, 4, &[2]));
+    assert!(store.columns_fully_loaded(sheet, 0, 4, &[2, 0]));
+    assert!(!store.columns_fully_loaded(sheet, 0, 4, &[1]));
+    assert!(!store.columns_fully_loaded(sheet, 0, 4, &[0, 1, 2]));
+    assert!(!store.columns_fully_loaded(sheet, 0, 5, &[0]));
+    assert!(!store.columns_fully_loaded(sheet, 0, 9, &[0]));
+    assert!(!store.columns_fully_loaded(sheet, 0, 4, &[3]));
+    assert!(!store.columns_fully_loaded(usize::MAX, 0, 4, &[0]));
+    assert!(store.columns_fully_loaded(sheet, 2, 2, &[0, 1, 2]));
+    assert!(store.columns_fully_loaded(sheet, 0, 8, &[]));
+
+    let stats = store.paged_stats(sheet);
+    assert_eq!(stats[0], 2.0);
+    assert_eq!(stats[1], 8.0);
+    assert_eq!(stats[2], 0.0);
+    assert_eq!(stats[4], 0.0);
+}
+
+#[test]
+fn columns_fully_loaded_reflects_clean_eviction_and_dirty_pinning() {
+    let mut store = CellStore::new();
+    let sheet =
+        store.add_paged_sheet(2, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[1.0], 0);
+    store.set_column_numbers(sheet, 1, 0, &[2.0], 0);
+    store.end_page_load();
+    assert!(store.columns_fully_loaded(sheet, 0, 1, &[0, 1]));
+    assert_eq!(store.paged_stats(sheet)[1], 2.0);
+
+    store.set_number(sheet, 0, 0, 10.0, 0);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 8192, &[3.0], 0);
+    store.set_column_numbers(sheet, 0, 12288, &[4.0], 0);
+    store.end_page_load();
+
+    assert!(store.columns_fully_loaded(sheet, 0, 1, &[0]));
+    assert!(!store.columns_fully_loaded(sheet, 0, 1, &[1]));
+    assert_eq!(store.cell_state(sheet, 0, 0), 3);
+    assert_eq!(store.cell_state(sheet, 0, 1), 0);
+    assert_eq!(store.paged_stats(sheet)[2], 1.0);
+
+    store.mark_range_clean(sheet, 0, 1, 0, 1);
+    assert_eq!(store.paged_stats(sheet)[2], 0.0);
+}
+
+#[test]
 fn paged_formulas_propagate_loading_until_dependencies_arrive() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(2, 6000, 4096, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
