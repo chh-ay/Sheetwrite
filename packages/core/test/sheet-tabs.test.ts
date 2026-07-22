@@ -160,10 +160,11 @@ describe("SheetTabs", () => {
 
     tabButtons(host)[1]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
-    expect(input.closest('[role="tablist"]')).toBe(host.querySelector('[role="tablist"]'));
-    expect(
-      [...input.parentElement!.children].map((child) => child.getAttribute("data-sheet-id")),
-    ).toEqual(["a", "b", "c"]);
+    expect(input.closest('[role="tablist"]')).toBeNull();
+    const placeholder = host.querySelector<HTMLButtonElement>('[data-rename-placeholder="b"]')!;
+    expect(placeholder.closest('[role="tablist"]')).toBe(host.querySelector('[role="tablist"]'));
+    expect(placeholder.getAttribute("role")).toBe("tab");
+    expect(placeholder.getAttribute("aria-selected")).toBe("true");
     inputText(input, "Revenue");
     key(input, "Enter");
     expect(renames).toEqual([["b", "Revenue"]]);
@@ -297,7 +298,12 @@ describe("SheetTabs", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     const tablist = host.querySelector<HTMLElement>('[role="tablist"]')!;
     expect(tablist.getAttribute("aria-label")).toBe("Sheets");
-    expect([...tablist.children].every((child) => child.getAttribute("role") === "tab")).toBe(true);
+    expect(
+      [...tablist.children].every((child) => child.getAttribute("role") === "presentation"),
+    ).toBe(true);
+    expect(tablist.querySelectorAll(':scope > [role="presentation"] > [role="tab"]')).toHaveLength(
+      3,
+    );
     expect(trigger.closest('[role="tablist"]')).toBeNull();
     trigger.focus();
     key(trigger, "ArrowDown");

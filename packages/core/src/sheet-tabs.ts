@@ -42,6 +42,22 @@ interface LifecycleFeedback {
 
 let nextErrorId = 0;
 
+function createTabIcon(pathData: string): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.classList.add("sheetwrite-tab-icon");
+  svg.setAttribute("viewBox", "0 0 20 20");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", pathData);
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-width", "2");
+  svg.appendChild(path);
+  return svg;
+}
+
 function feedbackFrom(result: SheetLifecycleResult): Omit<LifecycleFeedback, "sheet"> | null {
   const issues =
     result.status === "rejected"
@@ -218,12 +234,14 @@ export class SheetTabs {
     const visible = this.visibleSheets();
     const hidden = this.hiddenSheets();
     const fragment = document.createDocumentFragment();
+    const tabstrip = document.createElement("div");
+    tabstrip.className = "sheetwrite-tabstrip";
     const tablist = document.createElement("div");
     tablist.className = "sheetwrite-tablist";
     tablist.setAttribute("role", "tablist");
     tablist.setAttribute("aria-label", this.label);
     let renameInput: HTMLInputElement | null = null;
-    let activeSheet: SheetTabRecord | null = null;
+    let activeOptions: HTMLElement | null = null;
     this.rendering = true;
     this.buttons = [];
     this.buttonIds = [];
@@ -233,19 +251,30 @@ export class SheetTabs {
       const { sheet, workbookIndex } = visible[visibleIndex]!;
       const active = sheet.id === this.activeId;
       const editing = this.editing?.id === sheet.id;
+      const item = document.createElement("div");
+      item.className = "sheetwrite-tab-item";
+      item.setAttribute("role", "presentation");
       if (editing) {
         renameInput = this.createRenameInput(sheet, active);
-        tablist.appendChild(renameInput);
+        const placeholder = this.createTab(sheet, active, workbookIndex);
+        placeholder.classList.add("sheetwrite-tab-placeholder");
+        placeholder.dataset.renamePlaceholder = sheet.id;
+        placeholder.tabIndex = -1;
+        item.appendChild(placeholder);
       } else {
-        tablist.appendChild(this.createTab(sheet, active, workbookIndex));
+        item.appendChild(this.createTab(sheet, active, workbookIndex));
+        if (active && !this.readOnly && this.hasSheetOptions(visible.length)) {
+          item.classList.add("sheetwrite-tab-item-with-options");
+          activeOptions = this.createOptions(sheet, visible.length);
+        }
       }
-      if (active) activeSheet = sheet;
+      tablist.appendChild(item);
     }
 
-    fragment.appendChild(tablist);
-    if (!renameInput && activeSheet && !this.readOnly && this.hasSheetOptions(visible.length)) {
-      fragment.appendChild(this.createOptions(activeSheet, visible.length));
-    }
+    tabstrip.appendChild(tablist);
+    if (renameInput) tabstrip.appendChild(renameInput);
+    if (activeOptions) tabstrip.appendChild(activeOptions);
+    fragment.appendChild(tabstrip);
 
     if (!this.readOnly && this.onAdd) fragment.appendChild(this.createAddButton());
     if (!this.readOnly && this.onUnhide && hidden.length > 0) {
@@ -254,6 +283,30 @@ export class SheetTabs {
     if (this.feedback) fragment.appendChild(this.createError(this.feedback));
 
     this.host.replaceChildren(fragment);
+    if (renameInput) {
+      const placeholder = this.host.querySelector<HTMLElement>(
+        `[data-rename-placeholder="${CSS.escape(renameInput.dataset.sheetId ?? "")}"]`,
+      );
+      if (placeholder) {
+        const stripRect = tabstrip.getBoundingClientRect();
+        const placeholderRect = placeholder.getBoundingClientRect();
+        renameInput.style.left = `${placeholderRect.left - stripRect.left}px`;
+        renameInput.style.top = `${placeholderRect.top - stripRect.top}px`;
+        renameInput.style.width = `${placeholderRect.width}px`;
+        renameInput.style.height = `${placeholderRect.height}px`;
+      }
+    }
+    if (activeOptions) {
+      const activeTab = this.buttonFor(this.activeId);
+      if (activeTab) {
+        const stripRect = tabstrip.getBoundingClientRect();
+        const tabRect = activeTab.getBoundingClientRect();
+        activeOptions.style.left = `${tabRect.right - stripRect.left - 28}px`;
+        activeOptions.style.top = `${tabRect.top - stripRect.top}px`;
+        activeOptions.style.width = "28px";
+        activeOptions.style.height = `${tabRect.height}px`;
+      }
+    }
     this.rendering = false;
 
     const editedInput = this.host.querySelector<HTMLInputElement>(".sheetwrite-tab-input");
@@ -405,7 +458,7 @@ export class SheetTabs {
     trigger.setAttribute("aria-haspopup", "menu");
     trigger.setAttribute("aria-expanded", String(this.menuSheetId === sheet.id));
     trigger.setAttribute("aria-controls", this.menuId);
-    trigger.textContent = "⋯";
+    trigger.appendChild(createTabIcon("M4 10h.01M10 10h.01M16 10h.01"));
     trigger.addEventListener("click", () => {
       if (this.menuSheetId === sheet.id) this.closeMenu(true);
       else this.openMenu(sheet.id);
@@ -487,8 +540,9 @@ export class SheetTabs {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sheetwrite-tab-add";
-    button.textContent = "Add sheet";
+    button.appendChild(createTabIcon("M10 4v12M4 10h12"));
     button.setAttribute("aria-label", "Add sheet");
+    button.title = "Add sheet";
     button.setAttribute("aria-keyshortcuts", "Shift+F11");
     button.addEventListener("click", () => this.performLifecycle(this.activeId, this.onAdd!));
     return button;
