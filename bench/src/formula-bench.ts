@@ -51,8 +51,6 @@ export const FORMULA_PROTOCOL = "formula-benchmark-v2";
 const TIMING_REGRESSION_RATIO = 1.25;
 const TIMING_REGRESSION_FLOOR_MS = 0.1;
 const STORE_MEMORY_SCHEMA = 3;
-export const SEQUENCE_BLOCKER =
-  "FormulaArraysWT: SEQUENCE roots are not classified as dynamic arrays, so the anchor evaluates without spill installation";
 export const PRELIMINARY_BLOCKER =
   "preliminary capture has no schema-v2 baseline with attributed per-workload allocation samples";
 export const FORMULA_GATE_TOLERANCE =
@@ -229,11 +227,12 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
   );
+  keys.push(formulaWorkloadKey({ id: "spill-sequence-admission", size: smoke ? 1_000 : 100_000 }));
   return keys;
 }
 
 export function expectedFormulaBlockedWorkloadKeys(): string[] {
-  return [formulaWorkloadKey({ id: "spill-sequence-admission", size: 100_000 })];
+  return [];
 }
 
 export function expectedFormulaMemoryKeys(mode: BenchmarkMode): string[] {
@@ -298,6 +297,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
       return `12:${size + 1}`;
+    case "spill-sequence-admission":
+      return `1:${size}:0`;
     default:
       throw new Error(`formula benchmark has no expected output for workload=${id};size=${size}`);
   }
@@ -758,6 +759,19 @@ function spillFilterResizeFixture(count: number): TimedFixture {
   };
 }
 
+function spillSequenceAdmissionFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(1, count);
+  store.setFormula(sheet, 0, 0, `=SEQUENCE(${count})`, 0);
+  return {
+    store,
+    run: () => store.recompute(sheet),
+    check: () =>
+      `${numberAt(store, sheet, 0, 0)}:${numberAt(store, sheet, count - 1, 0)}:${store.spillAnchorRow(sheet, count - 1, 0)}`,
+    dispose: () => store.free(),
+  };
+}
+
 function sumProductVectorFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
@@ -1048,20 +1062,14 @@ function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
       () => incrementalDependencyClosureFixture(range),
       samples,
     ),
+    collectFixture(
+      "spill-sequence-admission",
+      smoke ? 1_000 : 100_000,
+      () => spillSequenceAdmissionFixture(smoke ? 1_000 : 100_000),
+      samples,
+    ),
   );
   return results;
-}
-
-function blockedWorkloads(): FormulaBlockedWorkload[] {
-  return [
-    {
-      id: "spill-sequence-admission",
-      size: 100_000,
-      status: "blocked",
-      owner: "FormulaArraysWT",
-      reason: SEQUENCE_BLOCKER,
-    },
-  ];
 }
 
 function probeMemory(formulas: number): FormulaMemoryResult {
@@ -1449,22 +1457,6 @@ function validateFormulaEvidence(
   if (!Array.isArray(result.blockedWorkloads)) {
     throw new Error("formula blockedWorkloads must be an array");
   }
-  for (const blocked of result.blockedWorkloads) {
-    exactObjectKeys(
-      blocked,
-      ["id", "size", "status", "owner", "reason"],
-      "formula blocked workload",
-    );
-    if (
-      blocked.status !== "blocked" ||
-      blocked.owner !== "FormulaArraysWT" ||
-      blocked.reason !== SEQUENCE_BLOCKER
-    ) {
-      throw new Error(
-        "formula blocked workload does not preserve the exact SEQUENCE capability blocker",
-      );
-    }
-  }
   validateExactMatrix(
     "formula blocked workload",
     expectedFormulaBlockedWorkloadKeys(),
@@ -1538,6 +1530,7 @@ function validateFormulaEvidence(
       "percentile-covariance",
       "let-reuse-edit",
       "incremental-dependency-closure-edit",
+      "spill-sequence-admission",
     ]) {
       const key = formulaWorkloadKey({ id, size: 100_000 });
       const workload = result.workloads.find((candidate) => formulaWorkloadKey(candidate) === key)!;
@@ -1720,7 +1713,7 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
       correctness: CORRECTNESS_METHOD,
     },
     workloads,
-    blockedWorkloads: blockedWorkloads(),
+    blockedWorkloads: [],
     memory,
     gates: {
       passed: Boolean(baseline),

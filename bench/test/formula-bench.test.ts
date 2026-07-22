@@ -14,7 +14,6 @@ import {
   FORMULA_SOURCE_FILES,
   formulaSourceDigest,
   PRELIMINARY_BLOCKER,
-  SEQUENCE_BLOCKER,
   TIMING_METHOD,
   validateFormulaBenchmark,
   validateFormulaRegression,
@@ -105,15 +104,7 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): CompleteFormulaBenchm
         output: expectedFormulaOutput(id, size),
       };
     }),
-    blockedWorkloads: [
-      {
-        id: "spill-sequence-admission",
-        size: 100_000,
-        status: "blocked",
-        owner: "FormulaArraysWT",
-        reason: SEQUENCE_BLOCKER,
-      },
-    ],
+    blockedWorkloads: [],
     memory: expectedFormulaMemoryKeys(mode).map((key) => ({
       formulas: Number(key.slice("memory=formulas=".length)),
       wasmDeltaBytes: 1024,
@@ -333,19 +324,19 @@ describe("formula benchmark schema", () => {
     expect(() => validateFormulaBenchmark(unbounded)).toThrow("artifact exceeded");
   });
 
-  it("keeps SEQUENCE admission explicitly blocked without passable sample fields", () => {
-    expect(expectedFormulaBlockedWorkloadKeys()).toEqual([
+  it("requires SEQUENCE admission as a measured full workload", () => {
+    expect(expectedFormulaBlockedWorkloadKeys()).toEqual([]);
+    expect(expectedFormulaWorkloadKeys("full")).toContain(
       "workload=spill-sequence-admission;size=100000",
-    ]);
-    const missing = formulaFixture();
-    missing.blockedWorkloads = [];
+    );
+
+    const missing = formulaFixture("full");
+    missing.workloads = missing.workloads.filter(
+      (workload) => workload.id !== "spill-sequence-admission",
+    );
     expect(() => validateFormulaBenchmark(missing)).toThrow(
       "missing workload=spill-sequence-admission;size=100000",
     );
-
-    const disguised = formulaFixture();
-    Object.assign(disguised.blockedWorkloads[0]!, { samplesMs: [1, 2] });
-    expect(() => validateFormulaBenchmark(disguised)).toThrow("must contain exactly");
   });
 
   it("rejects preliminary evidence when used as a passing gate", () => {
