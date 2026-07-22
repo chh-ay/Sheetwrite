@@ -1274,12 +1274,13 @@ impl CellStore {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
-            } else if let Some(result) =
-                self.eval_dynamic_array(arg, sheet, affected, memo, visiting, depth + 1)
-            {
+            } else if ast_produces_array(arg) {
+                let result = self
+                    .eval_dynamic_array(arg, sheet, affected, memo, visiting, depth + 1)
+                    .ok_or(FormulaError::Value);
                 let matrix = match result {
-                    Ok(matrix) => matrix,
-                    Err(error) => return Value::Error(error),
+                    Ok(Ok(matrix)) => matrix,
+                    Ok(Err(error)) | Err(error) => return Value::Error(error),
                 };
                 if let Err(error) = matrix.validate_copies(2) {
                     return Value::Error(error);
