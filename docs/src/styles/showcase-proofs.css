@@ -636,8 +636,8 @@
 }
 
 [data-proof="database"] .sw-proofs-page__hero {
-  grid-template-columns: minmax(0, 1.7fr) minmax(20rem, 1fr);
-  gap: calc(var(--sw-demo-space-4) * 2);
+  grid-template-columns: 1fr;
+  gap: var(--sw-demo-space-3);
   margin-bottom: var(--sw-demo-space-4);
 }
 
@@ -651,8 +651,29 @@
   line-height: 1.5;
 }
 
+[data-proof="database"] .sw-proofs-page__facts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border: 0;
+  border-block: 1px solid var(--sw-border);
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
 [data-proof="database"] .sw-proofs-page__facts > div {
-  padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
+  min-width: 0;
+  padding: var(--sw-demo-space-3) var(--sw-demo-space-4);
+  background: transparent;
+}
+
+[data-proof="database"] .sw-proofs-page__facts > div + div {
+  border-inline-start: 1px solid var(--sw-border);
+}
+
+[data-proof="database"] .sw-proofs-page__facts dd {
+  font-size: clamp(var(--sw-type-sm), 1vw, var(--sw-type-base));
+  white-space: nowrap;
 }
 
 .sw-dbx {
@@ -785,6 +806,9 @@
   align-items: stretch;
   width: 100%;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .sw-dbx__primary-actions,
@@ -1364,6 +1388,28 @@
 
 /* ---------- responsive ---------- */
 
+@media (max-width: 64rem) {
+  [data-proof="database"] .sw-proofs-page__facts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  [data-proof="database"] .sw-proofs-page__facts > div {
+    border-block-start: 1px solid var(--sw-border);
+  }
+
+  [data-proof="database"] .sw-proofs-page__facts > div + div {
+    border-inline-start: 0;
+  }
+
+  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(-n + 2) {
+    border-block-start: 0;
+  }
+
+  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(even) {
+    border-inline-start: 1px solid var(--sw-border);
+  }
+}
+
 @media (max-width: 60rem) {
   .sw-proofs-page__hero {
     grid-template-columns: 1fr;
@@ -1444,7 +1490,16 @@
   }
 
   [data-proof="database"] .sw-proofs-page__facts {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+  }
+
+  [data-proof="database"] .sw-proofs-page__facts > div,
+  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(even) {
+    border-inline-start: 0;
+  }
+
+  [data-proof="database"] .sw-proofs-page__facts > div:nth-child(n + 2) {
+    border-block-start: 1px solid var(--sw-border);
   }
 
   .sw-dbx__statusbar {

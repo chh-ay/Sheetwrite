@@ -7,6 +7,7 @@ import {
   rebaseDocumentOperations,
   SyncCoordinator,
   type SyncStateSnapshot,
+  type Theme,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 import "@sheetwrite/core/styles.css";
@@ -60,6 +61,45 @@ function createMutationId(): string {
 
 function formatBytes(bytes: number): string {
   return bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${bytes} B`;
+}
+
+function resolveDatabaseGridTheme(host: HTMLElement): Partial<Theme> {
+  const mode = document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  host.dataset.gridTheme = mode;
+
+  const probe = document.createElement("span");
+  probe.ariaHidden = "true";
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  host.append(probe);
+  const resolveColor = (value: string): string => {
+    probe.style.color = value;
+    return getComputedStyle(probe).color;
+  };
+  const token = (name: string): string => resolveColor(`var(${name})`);
+  const mix = (name: string, amount: number): string =>
+    resolveColor(`color-mix(in srgb, var(${name}) ${amount}%, transparent)`);
+  probe.style.font = "500 13px var(--sw-font-body)";
+  const font = getComputedStyle(probe).font;
+  const theme: Partial<Theme> = {
+    bg: token("--sw-surface-1"),
+    fg: token("--sw-fg"),
+    gridLine: token("--sw-border"),
+    headerBg: token("--sw-surface-2"),
+    headerFg: token("--sw-accent-strong"),
+    selection: mix("--sw-accent", 14),
+    selectionBorder: token("--sw-accent"),
+    searchMatch: mix("--sw-demo-warn", 25),
+    searchActiveMatch: token("--sw-demo-warn"),
+    highlight: mix("--sw-accent", 20),
+    font,
+  };
+  probe.remove();
+  return theme;
+}
+
+function mountDatabaseGrid(host: HTMLElement, snapshot: unknown): Grid {
+  return createGridFromSnapshot(host, snapshot, { theme: resolveDatabaseGridTheme(host) });
 }
 
 /** Attaches the storage-gauge and sync-event listeners one session needs. */
@@ -135,7 +175,7 @@ async function openSession(
   });
   const snapshot = await adapter.load(DATABASE_DOCUMENT_ID);
   host.replaceChildren();
-  const grid = createGridFromSnapshot(host, snapshot);
+  const grid = mountDatabaseGrid(host, snapshot);
   const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE });
   const link = new ShowcaseNetworkLink(adapter);
   const sync = new SyncCoordinator(grid, link, {
@@ -272,7 +312,11 @@ export default function DatabaseShowcase() {
   }, [boot]);
 
   useEffect(() => {
-    const observer = new MutationObserver(() => sessionRef.current?.grid.replaceTheme({}));
+    const observer = new MutationObserver(() => {
+      const session = sessionRef.current;
+      const host = hostRef.current;
+      if (session && host) session.grid.replaceTheme(resolveDatabaseGridTheme(host));
+    });
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["data-theme"],
@@ -413,7 +457,7 @@ export default function DatabaseShowcase() {
 
     const latest = await session.adapter.load(DATABASE_DOCUMENT_ID);
     host.replaceChildren();
-    const grid = createGridFromSnapshot(host, latest);
+    const grid = mountDatabaseGrid(host, latest);
     const sync = new SyncCoordinator(grid, session.link, {
       documentId: DATABASE_DOCUMENT_ID,
       serverVersion: latest.version ?? 0,
@@ -531,7 +575,7 @@ export default function DatabaseShowcase() {
             IndexedDB.
           </span>
         </p>
-        <div aria-label="Durability actions" className="sw-dbx__controls" role="group">
+        <fieldset aria-label="Durability actions" className="sw-dbx__controls">
           <div className="sw-dbx__primary-actions">
             <button
               aria-label="Edit next amount by 1 — Commit sample edit"
@@ -585,7 +629,7 @@ export default function DatabaseShowcase() {
               Reopen session
             </button>
           </div>
-        </div>
+        </fieldset>
       </div>
 
       <div className="sw-dbx__workspace">
