@@ -1,12 +1,23 @@
 import { readFile } from "node:fs/promises";
 
-export interface WorkflowStep {
+interface WorkflowStepBase {
   readonly id?: string;
   readonly name?: string;
-  readonly run?: string;
-  readonly uses?: string;
+  readonly if?: string;
   readonly with?: Readonly<Record<string, unknown>>;
 }
+
+export interface RunWorkflowStep extends WorkflowStepBase {
+  readonly run: string;
+  readonly uses?: never;
+}
+
+export interface ActionWorkflowStep extends WorkflowStepBase {
+  readonly run?: never;
+  readonly uses: string;
+}
+
+export type WorkflowStep = RunWorkflowStep | ActionWorkflowStep;
 
 export interface WorkflowJob {
   readonly name?: string;
@@ -81,15 +92,31 @@ function parseStep(value: unknown, label: string): WorkflowStep {
   optionalString(value.id, `${label}.id`);
   optionalString(value.name, `${label}.name`);
   optionalString(value.run, `${label}.run`);
+  optionalString(value.if, `${label}.if`);
   optionalString(value.uses, `${label}.uses`);
   optionalRecord(value.with, `${label}.with`);
-  if (value.run === undefined && value.uses === undefined) {
-    throw new Error(`${label} must define run or uses`);
+  if (value.run !== undefined) {
+    if (value.uses !== undefined) {
+      throw new Error(`${label} cannot define both run and uses`);
+    }
+    return {
+      id: value.id,
+      name: value.name,
+      run: value.run,
+      if: value.if,
+      with: value.with,
+    };
   }
-  if (value.run !== undefined && value.uses !== undefined) {
-    throw new Error(`${label} cannot define both run and uses`);
+  if (value.uses !== undefined) {
+    return {
+      id: value.id,
+      name: value.name,
+      if: value.if,
+      uses: value.uses,
+      with: value.with,
+    };
   }
-  return value as unknown as WorkflowStep;
+  throw new Error(`${label} must define run or uses`);
 }
 
 function parseJob(value: unknown, label: string): WorkflowJob {

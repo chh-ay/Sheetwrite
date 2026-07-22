@@ -199,6 +199,12 @@ function stringMap(value: unknown): JsonObject {
   return isObject(value) ? value : {};
 }
 
+function objectProperty(object: JsonObject, key: unknown): JsonObject | undefined {
+  if (typeof key !== "string") return undefined;
+  const value = object[key];
+  return isObject(value) ? value : undefined;
+}
+
 function sortedDifference(left: ReadonlySet<string>, right: ReadonlySet<string>): string[] {
   return [...left].filter((entry) => !right.has(entry)).sort();
 }
@@ -230,8 +236,18 @@ export function extractParserSpellings(source: string): string[] {
     const arm = line.match(
       /^\s*((?:"[A-Z][A-Z0-9.]*"\s*(?:\|\s*)?)+)=>\s*Some\(Func::[A-Za-z0-9_]+\),\s*$/,
     );
-    if (!arm?.[1]) throw new Error(`unrecognized formula parser arm: ${line.trim()}`);
-    const names = [...arm[1].matchAll(/"([A-Z][A-Z0-9.]*)"/g)].map((match) => match[1]);
+    const armSource = arm?.[1];
+    if (armSource === undefined) {
+      throw new Error(`unrecognized formula parser arm: ${line.trim()}`);
+    }
+    const names: string[] = [];
+    for (const match of armSource.matchAll(/"([A-Z][A-Z0-9.]*)"/g)) {
+      const name = match[1];
+      if (name === undefined) {
+        throw new Error(`unrecognized formula parser spelling: ${line.trim()}`);
+      }
+      names.push(name);
+    }
     if (names.length === 0) throw new Error(`empty formula parser arm: ${line.trim()}`);
     spellings.push(...names);
   }
@@ -243,9 +259,16 @@ export function extractAssistSpellings(source: string): string[] {
   const match = source.match(
     /export const FORMULA_FUNCTIONS:\s*readonly string\[\]\s*=\s*\[([\s\S]*?)\n\s*\];/,
   );
-  if (!match?.[1]) throw new Error("formula assist registry not found");
-  const body = match[1];
-  const names = [...body.matchAll(/"([A-Z][A-Z0-9.]*)"/g)].map((entry) => entry[1]);
+  const body = match?.[1];
+  if (body === undefined) throw new Error("formula assist registry not found");
+  const names: string[] = [];
+  for (const entry of body.matchAll(/"([A-Z][A-Z0-9.]*)"/g)) {
+    const name = entry[1];
+    if (name === undefined) {
+      throw new Error("formula assist registry contains an invalid literal");
+    }
+    names.push(name);
+  }
   const residue = body.replaceAll(/"[A-Z][A-Z0-9.]*"/g, "").replaceAll(/[\s,]/g, "");
   if (residue.length > 0 || names.length === 0) {
     throw new Error("formula assist registry contains non-literal entries");
@@ -303,12 +326,8 @@ function validateReferencesAndNames(inventory: JsonObject, issues: string[]): vo
         issues.push(`${path}.${field}: unknown profile ${String(reference)}`);
       }
     }
-    const implementation =
-      typeof entry.implementation === "string" && isObject(implementations[entry.implementation])
-        ? implementations[entry.implementation]
-        : undefined;
-    const parser =
-      implementation && isObject(implementation.parser) ? implementation.parser : undefined;
+    const implementation = objectProperty(implementations, entry.implementation);
+    const parser = implementation ? objectProperty(implementation, "parser") : undefined;
     if (parser?.status !== "implemented") {
       issues.push(`${path}.implementation: parser spelling is not marked implemented`);
     }
@@ -350,11 +369,8 @@ function expectedAssistNames(inventory: JsonObject, issues: string[]): Set<strin
   const implementations = stringMap(inventory.implementationProfiles);
   const functions = Array.isArray(inventory.functions) ? inventory.functions.filter(isObject) : [];
   for (const [index, entry] of functions.entries()) {
-    const profile =
-      typeof entry.implementation === "string" && isObject(implementations[entry.implementation])
-        ? implementations[entry.implementation]
-        : undefined;
-    const assist = profile && isObject(profile.assist) ? profile.assist : undefined;
+    const profile = objectProperty(implementations, entry.implementation);
+    const assist = profile ? objectProperty(profile, "assist") : undefined;
     if (assist?.status === "implemented") {
       for (const spelling of namesFromFunction(entry)) expected.add(spelling);
     } else if (assist?.status !== "missing" && assist?.status !== "declared") {

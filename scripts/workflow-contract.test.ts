@@ -52,6 +52,11 @@ describe("CI and release workflow contracts", () => {
     expect(Object.keys(parsed.ci.jobs).length).toBeGreaterThan(1);
     expect(Object.keys(parsed.release.jobs)).toEqual(["identity", "publish"]);
     expect(Object.keys(parsed.version.jobs)).toEqual(["version"]);
+    const conditionalStep = parseWorkflowContract(
+      "jobs:\n  check:\n    steps:\n      - uses: owner/action@0123456789012345678901234567890123456789\n        if: always()",
+      "conditional fixture",
+    ).jobs.check?.steps?.[0];
+    expect(conditionalStep?.if).toBe("always()");
 
     expect(() => parseWorkflowContract("jobs: []", "fixture")).toThrow(
       "fixture.jobs must be a non-empty object",
@@ -65,6 +70,12 @@ describe("CI and release workflow contracts", () => {
         "fixture",
       ),
     ).toThrow("cannot define both run and uses");
+    expect(() =>
+      parseWorkflowContract(
+        "jobs:\n  check:\n    steps:\n      - run: echo ok\n        if: []",
+        "fixture",
+      ),
+    ).toThrow("fixture.jobs.check.steps[0].if must be a string");
   });
 
   it("requires every third-party workflow action to use its reviewed commit SHA", () => {

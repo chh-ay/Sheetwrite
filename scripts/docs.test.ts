@@ -100,6 +100,9 @@ describe("documentation generation", () => {
     const files = await expectedGeneratedFiles(manifest);
     const matrix = files.find((file) => file.path.endsWith("compatibility-matrix.md"));
     const data = files.find((file) => file.path.endsWith("/compatibility.json"));
+    if (!matrix || !data) {
+      throw new Error("generated compatibility outputs are missing");
+    }
     expect(matrix?.content).toContain("not a percentage or a blanket Excel");
     expect(matrix?.content).toContain("`formula-engine-vectors`");
     expect(matrix?.content).not.toContain("packages/wasm/src/tests.rs");
@@ -109,18 +112,18 @@ describe("documentation generation", () => {
         resolve(import.meta.dir, "../docs/src/content/docs/reference/compatibility-matrix.md"),
         "utf8",
       ),
-    ).toBe(matrix?.content);
+    ).toBe(matrix.content);
     expect(
       await readFile(resolve(import.meta.dir, "../docs/src/generated/compatibility.json"), "utf8"),
-    ).toBe(data?.content);
-    const projected = JSON.parse(data?.content ?? "{}") as {
+    ).toBe(data.content);
+    const projected = JSON.parse(data.content) as {
       records: Array<Record<string, unknown>>;
       fixtures: Array<Record<string, unknown>>;
     };
     expect(projected.records[0]).not.toHaveProperty("evidence");
     expect(projected.fixtures[0]).not.toHaveProperty("path");
-    expect(data?.content).not.toContain("/test/");
-    expect(data?.content).not.toContain("packages/wasm/src/tests");
+    expect(data.content).not.toContain("/test/");
+    expect(data.content).not.toContain("packages/wasm/src/tests");
   });
 
   it("fails closed when a compatibility fixture digest drifts", async () => {
