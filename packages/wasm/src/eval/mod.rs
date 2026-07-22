@@ -733,6 +733,23 @@ impl CellStore {
         result
     }
 
+    /// Evaluate a parsed conditional-format expression at one target cell.
+    /// Referenced formula cells use their recomputed cache; the origin guard
+    /// gives zero-argument ROW/COLUMN the target cell's coordinates.
+    pub(crate) fn eval_conditional_ast(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        row: u32,
+        col: u32,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+    ) -> EvalResult {
+        let affected = HashSet::new();
+        let _origin = FormulaOriginGuard::push((row, col));
+        self.eval_ast(ast, sheet, &affected, memo, visiting, 0)
+    }
+
     pub(crate) fn eval_ast(
         &self,
         ast: &Ast,
@@ -770,7 +787,9 @@ impl CellStore {
                 depth + 1,
             ),
             Ast::SheetCell(..) | Ast::InvalidRef => Value::Error(FormulaError::Ref),
-            Ast::Name(_) | Ast::UnknownFunc(..) => Value::Error(FormulaError::Name),
+            Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
+                Value::Error(FormulaError::Name)
+            }
             Ast::NamedRange(named)
                 if named.row_start == named.row_end && named.col_start == named.col_end =>
             {
@@ -784,9 +803,20 @@ impl CellStore {
                     depth + 1,
                 )
             }
-            Ast::NamedRange(_) | Ast::Range(..) | Ast::AbsRange(..) | Ast::SheetRange(..) => {
-                Value::Error(FormulaError::Value)
-            }
+            Ast::Structured(reference) if reference.row_start == reference.row_end => self.eval_at(
+                reference.sheet as usize,
+                reference.row_start as usize,
+                reference.col as usize,
+                affected,
+                memo,
+                visiting,
+                depth + 1,
+            ),
+            Ast::Structured(_)
+            | Ast::NamedRange(_)
+            | Ast::Range(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetRange(..) => Value::Error(FormulaError::Value),
             Ast::Neg(expr) => match number_from_value(&self.eval_ast(
                 expr,
                 sheet,
@@ -1253,6 +1283,13 @@ impl CellStore {
                     named.col_start,
                     named.row_end,
                     named.col_end,
+                )),
+                Ast::Structured(reference) => Some(CellRange::new(
+                    reference.sheet,
+                    reference.row_start,
+                    reference.col,
+                    reference.row_end,
+                    reference.col,
                 )),
                 _ => None,
             };

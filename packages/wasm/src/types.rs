@@ -1,8 +1,8 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast, Func,
-    RefFlags, SheetRef,
+    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows,
+    update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
 use crate::eval::expand_let_reachable_ast;
 use crate::memory::MemoryOwnerStats;
@@ -196,6 +196,13 @@ impl ReadSet {
                 named.row_end,
                 named.col_end,
             )),
+            Ast::Structured(reference) => self.push_range(CellRange::new(
+                reference.sheet,
+                reference.row_start,
+                reference.col,
+                reference.row_end,
+                reference.col,
+            )),
             Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
                 for arg in args {
                     self.collect(arg, formula_sheet);
@@ -215,6 +222,7 @@ impl ReadSet {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
+            | Ast::UnresolvedStructured(_)
             | Ast::Num(_) => {}
         }
     }
@@ -428,6 +436,28 @@ impl FormulaEntry {
             return false;
         };
         if !invalidate_sheet_refs(ast, handle) {
+            return false;
+        }
+        self.source = serialize(ast);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.volatile = volatile;
+        true
+    }
+
+    pub(crate) fn update_table<F>(
+        &mut self,
+        table_id: &str,
+        formula_sheet: u32,
+        resolve: &F,
+    ) -> bool
+    where
+        F: Fn(&StructuredRef) -> Option<StructuredRef>,
+    {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !update_structured_refs(ast, table_id, resolve) {
             return false;
         }
         self.source = serialize(ast);

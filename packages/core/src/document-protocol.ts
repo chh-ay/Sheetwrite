@@ -1,4 +1,9 @@
 import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
+import {
+  assertWorkbookTables,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  validWorkbookTable,
+} from "./workbook-table.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
   DocumentOp,
@@ -7,6 +12,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "./types/document.js";
+import type { WorkbookTable } from "./types/table.js";
 import type { TransactionResourceLimits } from "./types/transaction.js";
 
 /** Current workbook snapshot schema version accepted by Sheetwrite. */
@@ -270,6 +276,7 @@ const SHEET_METADATA_ARRAY_KEYS = [
   "sortKeys",
   "filters",
   "rowGroups",
+  "tables",
   "cells",
 ] as const;
 
@@ -570,6 +577,7 @@ function preflightSnapshotResources(
   }
 
   let denseCells = 0;
+  let tableCount = 0;
   for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
     const sheet = arrayDataValue(sheets, sheetIndex);
     if (!isPlainRecord(sheet)) continue;
@@ -627,6 +635,39 @@ function preflightSnapshotResources(
         );
       }
       metadataEntries += entries.length;
+      if (key === "tables") {
+        tableCount += entries.length;
+        if (tableCount > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
+          return {
+            path: `${path}.tables`,
+            code: "resource-limit",
+            message: `Workbook table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables} exceeded by ${tableCount}`,
+          };
+        }
+        for (let tableIndex = 0; tableIndex < entries.length; tableIndex++) {
+          const table = arrayDataValue(entries, tableIndex);
+          if (!isPlainRecord(table)) continue;
+          const columns = ownValue(table, "columns");
+          if (!Array.isArray(columns)) continue;
+          if (columns.length > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable) {
+            return resourceValidationError(
+              "maxMetadataEntries",
+              DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable,
+              columns.length,
+              `${path}.tables[${tableIndex}].columns`,
+            );
+          }
+          if (columns.length > limits.maxMetadataEntries - metadataEntries) {
+            return resourceValidationError(
+              "maxMetadataEntries",
+              limits.maxMetadataEntries,
+              metadataEntries + columns.length,
+              `${path}.tables[${tableIndex}].columns`,
+            );
+          }
+          metadataEntries += columns.length;
+        }
+      }
     }
   }
   return undefined;
@@ -645,6 +686,7 @@ export function assertWorkbookAllocationLimits(
   if (workbook.sheets.length > limits.maxSheets) {
     throw new SnapshotResourceError("maxSheets", limits.maxSheets, workbook.sheets.length);
   }
+  assertWorkbookTables(workbook.sheets);
 
   let denseCells = 0;
   let metadataEntries = workbook.namedRanges?.length ?? 0;
@@ -695,7 +737,9 @@ export function assertWorkbookAllocationLimits(
       (sheet.notes?.length ?? 0) +
       (sheet.sortKeys?.length ?? 0) +
       (sheet.filters?.length ?? 0) +
-      (sheet.rowGroups?.length ?? 0);
+      (sheet.rowGroups?.length ?? 0) +
+      (sheet.tables?.length ?? 0) +
+      (sheet.tables?.reduce((count, table) => count + table.columns.length, 0) ?? 0);
     if (metadataEntries > limits.maxMetadataEntries) {
       throw new SnapshotResourceError(
         "maxMetadataEntries",
@@ -1112,6 +1156,88 @@ function validateFilterShape(
   }
 }
 
+const TABLE_UNSUPPORTED_FEATURES = [
+  "auto-filter",
+  "sort-state",
+  "calculated-columns",
+  "totals-functions",
+  "query-table",
+  "external-data",
+  "extensions",
+] as const;
+
+function validateWorkbookTableColumnShape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const column = recordAt(value, path, errors);
+  if (!column) return;
+  requireString(column, "id", path, errors, true);
+  requireString(column, "name", path, errors, true);
+  optionalString(column, "totalsRowLabel", path, errors);
+}
+
+function validateWorkbookTableShape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+  partial = false,
+): void {
+  const table = recordAt(value, path, errors);
+  if (!table) return;
+  if (partial) optionalString(table, "name", path, errors);
+  else {
+    requireString(table, "id", path, errors, true);
+    requireString(table, "name", path, errors, true);
+  }
+  const range = ownValue(table, "range");
+  if (range !== undefined || !partial) validateRangeShape(range, `${path}.range`, errors);
+  const columnsValue = ownValue(table, "columns");
+  if (columnsValue !== undefined || !partial) {
+    const columns = arrayAt(columnsValue, `${path}.columns`, errors);
+    columns?.forEach((column, index) => {
+      validateWorkbookTableColumnShape(column, `${path}.columns[${index}]`, errors);
+    });
+  }
+  for (const key of ["headerRow", "totalsRow"]) {
+    const flag = ownValue(table, key);
+    if (flag === undefined && partial) continue;
+    if (typeof flag !== "boolean") invalid(errors, `${path}.${key}`, `${key} must be a boolean`);
+  }
+  const styleValue = ownValue(table, "style");
+  if (styleValue !== undefined && styleValue !== null) {
+    const stylePath = `${path}.style`;
+    const style = recordAt(styleValue, stylePath, errors);
+    if (style) {
+      optionalString(style, "name", stylePath, errors);
+      for (const key of [
+        "showFirstColumn",
+        "showLastColumn",
+        "showRowStripes",
+        "showColumnStripes",
+      ]) {
+        optionalBoolean(style, key, stylePath, errors);
+      }
+    }
+  } else if (!partial && styleValue === null) {
+    invalid(errors, `${path}.style`, "Table style may not be null");
+  }
+  const unsupportedValue = ownValue(table, "unsupportedFeatures");
+  if (unsupportedValue !== undefined) {
+    const features = arrayAt(unsupportedValue, `${path}.unsupportedFeatures`, errors);
+    features?.forEach((feature, index) => {
+      if (!TABLE_UNSUPPORTED_FEATURES.includes(feature as never)) {
+        invalid(
+          errors,
+          `${path}.unsupportedFeatures[${index}]`,
+          "Unsupported table feature is invalid",
+        );
+      }
+    });
+  }
+}
+
 function validateSheetShape(value: unknown, path: string, errors: DocumentValidationError[]): void {
   const sheet = recordAt(value, path, errors);
   if (!sheet) return;
@@ -1255,6 +1381,11 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     if (typeof collapsed !== "boolean") {
       invalid(errors, `${groupPath}.collapsed`, "collapsed must be a boolean");
     }
+  });
+
+  const tables = optionalArray(sheet, "tables", path, errors);
+  tables?.forEach((table, index) => {
+    validateWorkbookTableShape(table, `${path}.tables[${index}]`, errors);
   });
 
   const blocks = arrayAt(ownValue(sheet, "cells"), `${path}.cells`, errors);
@@ -1647,6 +1778,18 @@ export function validateDocumentOperationShape(
       }
       break;
     }
+    case "addTable":
+      validateWorkbookTableShape(ownValue(operation, "table"), `${path}.table`, errors);
+      break;
+    case "updateTable":
+      validateOperationSheetId(operation, path, errors);
+      requireString(operation, "tableId", path, errors, true);
+      validateWorkbookTableShape(ownValue(operation, "patch"), `${path}.patch`, errors, true);
+      break;
+    case "removeTable":
+      validateOperationSheetId(operation, path, errors);
+      requireString(operation, "tableId", path, errors, true);
+      break;
     case "setSheetMeta": {
       validateOperationSheetId(operation, path, errors);
       const patchPath = `${path}.patch`;
@@ -1992,6 +2135,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   const ids = new Set<string>();
   const orders = new Set<number>();
   const normalizedSheets: SheetSnapshot[] = [];
+  const acceptedTables: WorkbookTable[] = [];
 
   for (let sheetIndex = 0; sheetIndex < validated.sheets.length; sheetIndex++) {
     const sheet = validated.sheets[sheetIndex]!;
@@ -2230,6 +2374,19 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       filterColumns.add(column);
     }
 
+    for (let index = 0; index < (sheet.tables?.length ?? 0); index++) {
+      const table = sheet.tables![index]!;
+      if (!validWorkbookTable(table, sheet, acceptedTables)) {
+        invalid(
+          errors,
+          `${path}.tables[${index}]`,
+          "Workbook table must have unique stable IDs/names, canonical in-bounds non-overlapping range, and one unique column identity per range column",
+        );
+      } else {
+        acceptedTables.push(table);
+      }
+    }
+
     const normalizedSheet: SheetSnapshot = {
       ...sheet,
       merges: merges.length > 0 ? merges : undefined,
@@ -2244,6 +2401,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         : undefined,
       filters: sheet.filters ? [...sheet.filters].sort((a, b) => a[0] - b[0]) : undefined,
       rowMeta: sheet.rowMeta ? [...sheet.rowMeta].sort((a, b) => a[0] - b[0]) : undefined,
+      tables: sheet.tables
+        ? [...sheet.tables]
+            .sort((a, b) => a.id.localeCompare(b.id))
+            .map((table) => structuredClone(table))
+        : undefined,
       cells: sheet.cells.map((block) => ({
         ...block,
         cells: [...block.cells].sort(
@@ -2257,6 +2419,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (normalizedSheet.notes === undefined) delete normalizedSheet.notes;
     if (normalizedSheet.filters === undefined) delete normalizedSheet.filters;
     if (normalizedSheet.rowMeta === undefined) delete normalizedSheet.rowMeta;
+    if (normalizedSheet.tables === undefined) delete normalizedSheet.tables;
     normalizedSheets.push(normalizedSheet);
   }
 
@@ -2382,6 +2545,8 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "setRangeStyle":
     case "clearRange":
       return operation.range.sheet;
+    case "addTable":
+      return operation.table.range.sheet;
     case "addRows":
     case "removeRows":
     case "moveRows":
@@ -2401,6 +2566,8 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "removeValidationRule":
     case "setProtectedRange":
     case "removeProtectedRange":
+    case "updateTable":
+    case "removeTable":
       return operation.sheet;
     case "addSheet":
       return operation.sheet.id;

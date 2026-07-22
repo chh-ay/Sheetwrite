@@ -111,6 +111,7 @@ function addSheetSnapshotIssue(
     notes: snapshot.notes,
     sortKeys: snapshot.sortKeys,
     filters: snapshot.filters,
+    tables: snapshot.tables,
   };
   if (
     (snapshot.frozenRows !== undefined && snapshot.frozenRows > snapshot.rowCount) ||
@@ -481,6 +482,8 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setRangeStyle":
     case "clearRange":
       return patch.range.sheet;
+    case "addTable":
+      return patch.table.range.sheet;
     case "setNamedRange":
     case "removeNamedRange":
       return null;

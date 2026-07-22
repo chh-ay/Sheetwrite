@@ -458,6 +458,34 @@ pub struct NamedRangeRef {
     pub row_end: u32,
     pub col_end: u32,
 }
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TableSection {
+    Body,
+    Headers,
+    Totals,
+    CurrentRow,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnresolvedStructuredRef {
+    pub table_name: Option<String>,
+    pub column_name: String,
+    pub section: TableSection,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StructuredRef {
+    pub table_id: String,
+    pub table_name: String,
+    pub column_id: String,
+    pub column_name: String,
+    pub sheet: u32,
+    pub row_start: u32,
+    pub row_end: u32,
+    pub col: u32,
+    pub section: TableSection,
+    pub qualified: bool,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
@@ -467,6 +495,8 @@ pub enum Ast {
     Missing,
     Name(String),
     NamedRange(NamedRangeRef),
+    UnresolvedStructured(UnresolvedStructuredRef),
+    Structured(StructuredRef),
     Cell(u32, u32, RefFlags),
     SheetCell(UnresolvedSheetRef, u32, u32, RefFlags),
     AbsCell(SheetRef, u32, u32, RefFlags),
@@ -489,6 +519,18 @@ impl Ast {
         match self {
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
+            Ast::UnresolvedStructured(value) => {
+                if let Some(name) = &value.table_name {
+                    add_string_memory(name, out);
+                }
+                add_string_memory(&value.column_name, out);
+            }
+            Ast::Structured(value) => {
+                add_string_memory(&value.table_id, out);
+                add_string_memory(&value.table_name, out);
+                add_string_memory(&value.column_id, out);
+                add_string_memory(&value.column_name, out);
+            }
             Ast::SheetCell(sheet, ..) | Ast::SheetRange(sheet, ..) => {
                 add_string_memory(&sheet.name, out);
             }
@@ -637,6 +679,7 @@ enum Tok<'a> {
     Num(f64),
     Str(String),
     Ident(Cow<'a, str>, bool),
+    Structured(String),
     Op(char),
     LParen,
     RParen,
@@ -728,15 +771,47 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
         } else if bytes[i..].starts_with(b"#REF!") {
             toks.push(Tok::InvalidRef);
             i += 5;
-        } else if c == b'$' || c == b'_' || c.is_ascii_alphabetic() {
+        } else if c == b'[' {
             let start = i;
-            while i < bytes.len()
-                && (bytes[i].is_ascii_alphanumeric()
-                    || bytes[i] == b'$'
-                    || bytes[i] == b'_'
-                    || bytes[i] == b'.')
-            {
+            let mut depth = 0usize;
+            while i < bytes.len() {
+                match bytes[i] {
+                    b'[' => depth += 1,
+                    b']' => {
+                        if depth == 0 {
+                            return Err("unexpected ]".into());
+                        }
+                        depth -= 1;
+                    }
+                    _ => {}
+                }
                 i += 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            if depth != 0 {
+                return Err("unterminated structured reference".into());
+            }
+            toks.push(Tok::Structured(src[start..i].to_string()));
+        } else if c == b'$'
+            || c == b'_'
+            || c == b'\\'
+            || c.is_ascii_alphabetic()
+            || (!c.is_ascii()
+                && src[i..]
+                    .chars()
+                    .next()
+                    .is_some_and(char::is_alphabetic))
+        {
+            let start = i;
+            while i < bytes.len() {
+                let ch = src[i..].chars().next().expect("valid UTF-8 source");
+                if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
+                    i += ch.len_utf8();
+                } else {
+                    break;
+                }
             }
             toks.push(Tok::Ident(Cow::Borrowed(&src[start..i]), false));
         } else if c == b'!' {
@@ -790,6 +865,41 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
     }
 
     Ok(toks)
+}
+
+fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, String> {
+    if !raw.starts_with('[') || !raw.ends_with(']') {
+        return Err("malformed structured reference".into());
+    }
+    let (section, column_name) = if raw.starts_with("[[") && raw.ends_with("]]") {
+        let inner = &raw[2..raw.len() - 2];
+        let Some((selector, column)) = inner.split_once("],[") else {
+            return Err("structured reference requires one section and one column".into());
+        };
+        let section = if selector.eq_ignore_ascii_case("#Headers") {
+            TableSection::Headers
+        } else if selector.eq_ignore_ascii_case("#Totals") {
+            TableSection::Totals
+        } else {
+            return Err("unsupported structured-reference section".into());
+        };
+        (section, column)
+    } else {
+        let inner = &raw[1..raw.len() - 1];
+        if let Some(column) = inner.strip_prefix('@') {
+            (TableSection::CurrentRow, column)
+        } else {
+            (TableSection::Body, inner)
+        }
+    };
+    if column_name.is_empty() {
+        return Err("structured reference column is empty".into());
+    }
+    Ok(Ast::UnresolvedStructured(UnresolvedStructuredRef {
+        table_name,
+        column_name: column_name.to_string(),
+        section,
+    }))
 }
 
 struct Parser<'a> {
@@ -921,6 +1031,7 @@ impl<'a> Parser<'a> {
                 }
             }
             Some(Tok::Ident(name, quoted)) => self.ident_at(name, quoted, depth),
+            Some(Tok::Structured(raw)) => parse_structured_ref(raw, None),
             Some(Tok::InvalidRef) => Ok(Ast::InvalidRef),
             other => Err(if other.is_some() {
                 "unexpected token".into()
@@ -937,6 +1048,13 @@ impl<'a> Parser<'a> {
         depth: usize,
     ) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
+        if let Some(Tok::Structured(_)) = self.peek() {
+            let Some(Tok::Structured(raw)) = self.next() else {
+                unreachable!("peeked structured token");
+            };
+            return parse_structured_ref(raw, Some(name.into_owned()));
+        }
+
 
         if let Some(Tok::Bang) = self.peek() {
             let _ = self.next();
@@ -1245,6 +1363,197 @@ where
         other => other,
     }
 }
+pub fn resolve_structured_refs<F>(
+    ast: Ast,
+    formula_sheet: u32,
+    formula_row: u32,
+    formula_col: u32,
+    resolve: &F,
+) -> Ast
+where
+    F: Fn(&UnresolvedStructuredRef, u32, u32, u32) -> Option<StructuredRef>,
+{
+    match ast {
+        Ast::UnresolvedStructured(reference) => resolve(
+            &reference,
+            formula_sheet,
+            formula_row,
+            formula_col,
+        )
+        .map_or(Ast::UnresolvedStructured(reference), Ast::Structured),
+        Ast::Func(func, args) => Ast::Func(
+            func,
+            args.into_iter()
+                .map(|arg| {
+                    resolve_structured_refs(
+                        arg,
+                        formula_sheet,
+                        formula_row,
+                        formula_col,
+                        resolve,
+                    )
+                })
+                .collect(),
+        ),
+        Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
+            name,
+            args.into_iter()
+                .map(|arg| {
+                    resolve_structured_refs(
+                        arg,
+                        formula_sheet,
+                        formula_row,
+                        formula_col,
+                        resolve,
+                    )
+                })
+                .collect(),
+        ),
+        Ast::Bin(op, left, right) => Ast::Bin(
+            op,
+            Box::new(resolve_structured_refs(
+                *left,
+                formula_sheet,
+                formula_row,
+                formula_col,
+                resolve,
+            )),
+            Box::new(resolve_structured_refs(
+                *right,
+                formula_sheet,
+                formula_row,
+                formula_col,
+                resolve,
+            )),
+        ),
+        Ast::Cmp(op, left, right) => Ast::Cmp(
+            op,
+            Box::new(resolve_structured_refs(
+                *left,
+                formula_sheet,
+                formula_row,
+                formula_col,
+                resolve,
+            )),
+            Box::new(resolve_structured_refs(
+                *right,
+                formula_sheet,
+                formula_row,
+                formula_col,
+                resolve,
+            )),
+        ),
+        Ast::Neg(inner) => Ast::Neg(Box::new(resolve_structured_refs(
+            *inner,
+            formula_sheet,
+            formula_row,
+            formula_col,
+            resolve,
+        ))),
+        Ast::Pos(inner) => Ast::Pos(Box::new(resolve_structured_refs(
+            *inner,
+            formula_sheet,
+            formula_row,
+            formula_col,
+            resolve,
+        ))),
+        Ast::Percent(inner) => Ast::Percent(Box::new(resolve_structured_refs(
+            *inner,
+            formula_sheet,
+            formula_row,
+            formula_col,
+            resolve,
+        ))),
+        other => other,
+    }
+}
+
+
+/// Translate relative A1 references from one formula origin to another.
+///
+/// Conditional-format expressions store one parsed AST at the rule range's
+/// top-left. Window evaluation clones that bounded AST and applies the target
+/// cell delta here; absolute row/column markers remain fixed.
+pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
+    if !translate_relative_refs_inner(ast, row_delta, col_delta) {
+        *ast = Ast::InvalidRef;
+    }
+}
+
+fn translated_coordinate(value: u32, delta: i64, absolute: bool) -> Option<u32> {
+    if absolute {
+        return Some(value);
+    }
+    let translated = i64::from(value).checked_add(delta)?;
+    u32::try_from(translated).ok()
+}
+
+fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) -> bool {
+    match ast {
+        Ast::Cell(row, col, flags)
+        | Ast::SheetCell(_, row, col, flags)
+        | Ast::AbsCell(_, row, col, flags) => {
+            let (Some(next_row), Some(next_col)) = (
+                translated_coordinate(*row, row_delta, flags.row_abs),
+                translated_coordinate(*col, col_delta, flags.col_abs),
+            ) else {
+                return false;
+            };
+            *row = next_row;
+            *col = next_col;
+            true
+        }
+        Ast::Range(r0, c0, r1, c1, flags)
+        | Ast::SheetRange(_, r0, c0, r1, c1, flags)
+        | Ast::AbsRange(_, r0, c0, r1, c1, flags) => {
+            let (Some(next_r0), Some(next_c0), Some(next_r1), Some(next_c1)) = (
+                translated_coordinate(*r0, row_delta, flags.start.row_abs),
+                translated_coordinate(*c0, col_delta, flags.start.col_abs),
+                translated_coordinate(*r1, row_delta, flags.end.row_abs),
+                translated_coordinate(*c1, col_delta, flags.end.col_abs),
+            ) else {
+                return false;
+            };
+            *r0 = next_r0;
+            *c0 = next_c0;
+            *r1 = next_r1;
+            *c1 = next_c1;
+            true
+        }
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+            for arg in args {
+                if !translate_relative_refs_inner(arg, row_delta, col_delta) {
+                    *arg = Ast::InvalidRef;
+                }
+            }
+            true
+        }
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            if !translate_relative_refs_inner(left, row_delta, col_delta) {
+                **left = Ast::InvalidRef;
+            }
+            if !translate_relative_refs_inner(right, row_delta, col_delta) {
+                **right = Ast::InvalidRef;
+            }
+            true
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            if !translate_relative_refs_inner(inner, row_delta, col_delta) {
+                **inner = Ast::InvalidRef;
+            }
+            true
+        }
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::InvalidRef => true,
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Axis {
@@ -1315,6 +1624,27 @@ fn rewrite_axis(
                 *end = shifted_end;
             } else {
                 *ast = Ast::InvalidRef;
+            }
+        }
+        Ast::Structured(reference) if reference.sheet == edited_sheet => {
+            match axis {
+                Axis::Row => {
+                    if let Some((start, end)) =
+                        shift_range(reference.row_start, reference.row_end, at, delta)
+                    {
+                        reference.row_start = start;
+                        reference.row_end = end;
+                    } else {
+                        *ast = Ast::InvalidRef;
+                    }
+                }
+                Axis::Col => {
+                    if let Some(col) = shift_index(reference.col, at, delta) {
+                        reference.col = col;
+                    } else {
+                        *ast = Ast::InvalidRef;
+                    }
+                }
             }
         }
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
@@ -1434,12 +1764,45 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
     changed
 }
 
+pub(crate) fn update_structured_refs<F>(
+    ast: &mut Ast,
+    table_id: &str,
+    resolve: &F,
+) -> bool
+where
+    F: Fn(&StructuredRef) -> Option<StructuredRef>,
+{
+    if let Ast::Structured(reference) = ast {
+        if reference.table_id == table_id {
+            *ast = resolve(reference).map_or(Ast::InvalidRef, Ast::Structured);
+            return true;
+        }
+    }
+    let mut changed = false;
+    match ast {
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+            for arg in args {
+                changed |= update_structured_refs(arg, table_id, resolve);
+            }
+        }
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            changed |= update_structured_refs(left, table_id, resolve);
+            changed |= update_structured_refs(right, table_id, resolve);
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            changed |= update_structured_refs(inner, table_id, resolve);
+        }
+        _ => {}
+    }
+    changed
+}
+
 /// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
 pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
     let invalid = matches!(
         ast,
         Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) if sheet.handle == handle
-    );
+    ) || matches!(ast, Ast::Structured(reference) if reference.sheet == handle);
     if invalid {
         *ast = Ast::InvalidRef;
         return true;
@@ -1464,6 +1827,40 @@ pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
     changed
 }
 
+fn write_structured_ref(
+    table_name: Option<&str>,
+    column_name: &str,
+    section: TableSection,
+    out: &mut String,
+) {
+    if let Some(name) = table_name {
+        out.push_str(name);
+    }
+    match section {
+        TableSection::Body => {
+            out.push('[');
+            out.push_str(column_name);
+            out.push(']');
+        }
+        TableSection::CurrentRow => {
+            out.push_str("[@");
+            out.push_str(column_name);
+            out.push(']');
+        }
+        TableSection::Headers | TableSection::Totals => {
+            out.push_str("[[");
+            out.push_str(if section == TableSection::Headers {
+                "#Headers"
+            } else {
+                "#Totals"
+            });
+            out.push_str("],[");
+            out.push_str(column_name);
+            out.push_str("]]");
+        }
+    }
+}
+
 fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
         Ast::Num(value) => out.push_str(&value.to_string()),
@@ -1475,6 +1872,18 @@ fn write_ast(ast: &Ast, out: &mut String) {
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
         Ast::NamedRange(named) => out.push_str(&named.name),
+        Ast::UnresolvedStructured(reference) => write_structured_ref(
+            reference.table_name.as_deref(),
+            &reference.column_name,
+            reference.section,
+            out,
+        ),
+        Ast::Structured(reference) => write_structured_ref(
+            reference.qualified.then_some(reference.table_name.as_str()),
+            &reference.column_name,
+            reference.section,
+            out,
+        ),
         Ast::Cell(row, col, flags) => write_a1(*row, *col, *flags, out),
         Ast::SheetCell(sheet, row, col, flags) => {
             write_sheet_name(&sheet.name, sheet.quoted, out);

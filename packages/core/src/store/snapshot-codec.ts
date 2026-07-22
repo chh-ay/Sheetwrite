@@ -51,6 +51,7 @@ export function decodeWorkbookSnapshot(
         sortKeys: cloneJsonValue(source.sortKeys),
         filters: cloneJsonValue(source.filters),
         rowGroups: cloneJsonValue(source.rowGroups),
+        tables: cloneJsonValue(source.tables),
       };
     }),
   };
@@ -137,6 +138,7 @@ export class StoreSnapshotCodec {
         ...(sheet.sortKeys?.length ? { sortKeys: cloneJsonValue(sheet.sortKeys) } : {}),
         ...(sheet.filters?.length ? { filters: cloneJsonValue(sheet.filters) } : {}),
         ...(sheet.rowGroups?.length ? { rowGroups: cloneJsonValue(sheet.rowGroups) } : {}),
+        ...(sheet.tables?.length ? { tables: cloneJsonValue(sheet.tables) } : {}),
         cells:
           cells.length > 0
             ? [

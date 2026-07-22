@@ -34,6 +34,20 @@ export type RecomputingCellStore = CellStore & {
     colEnd: number,
   ): boolean;
   removeNamedRange(name: string, scope: number): boolean;
+  setTable(
+    id: string,
+    name: string,
+    sheet: number,
+    rowStart: number,
+    colStart: number,
+    rowEnd: number,
+    colEnd: number,
+    headerRow: boolean,
+    totalsRow: boolean,
+    columnIds: string[],
+    columnNames: string[],
+  ): boolean;
+  removeTable(id: string): boolean;
   setColumnStringsPacked(
     sheet: number,
     col: number,

@@ -281,6 +281,23 @@ function transformDirectTarget(
       if (mapped) operation.namedRange.range = mapped;
       return null;
     }
+    case "addTable": {
+      const mapped = transformRange(operation.table.range, change);
+      if (!mapped && operation.table.range.sheet === change.sheet) {
+        return overlappingStructure(operation.op);
+      }
+      if (mapped) operation.table.range = mapped;
+      return null;
+    }
+    case "updateTable": {
+      if (operation.patch.range === undefined) return null;
+      const mapped = transformRange(operation.patch.range, change);
+      if (!mapped && operation.patch.range.sheet === change.sheet) {
+        return overlappingStructure(operation.op);
+      }
+      if (mapped) operation.patch.range = mapped;
+      return null;
+    }
     case "setSheetMeta":
       if (operation.sheet === change.sheet) {
         return {
@@ -298,6 +315,7 @@ function transformDirectTarget(
     case "removeValidationRule":
     case "removeProtectedRange":
     case "removeNamedRange":
+    case "removeTable":
       return null;
   }
 }
@@ -356,6 +374,11 @@ function transformSheetSnapshot(
   for (const block of sheet.cells) {
     const failure = transformSnapshotCells(block.cells, change);
     if (failure) return failure;
+  }
+  for (const table of sheet.tables ?? []) {
+    const mapped = transformRange(table.range, change);
+    if (!mapped && table.range.sheet === change.sheet) return overlappingStructure("addTable");
+    if (mapped) table.range = mapped;
   }
   return null;
 }
@@ -544,6 +567,8 @@ function operationTouchesSheet(operation: DocumentOp, sheet: string): boolean {
     case "setRangeStyle":
     case "clearRange":
       return operation.range.sheet === sheet;
+    case "addTable":
+      return operation.table.range.sheet === sheet;
     case "setNamedRange":
       return operation.namedRange.range.sheet === sheet || operation.namedRange.scope === sheet;
     case "removeNamedRange":
@@ -612,6 +637,10 @@ function mutationRanges(operation: DocumentOp): Range[] {
       return [operation.protectedRange.range];
     case "setNamedRange":
       return [operation.namedRange.range];
+    case "addTable":
+      return [operation.table.range];
+    case "updateTable":
+      return operation.patch.range ? [operation.patch.range] : [];
     default:
       return [];
   }
@@ -633,6 +662,11 @@ function operationIdentity(operation: DocumentOp): string {
       return `name:${operation.namedRange.scope ?? ""}:${operation.namedRange.name.toLowerCase()}`;
     case "removeNamedRange":
       return `name:${operation.scope ?? ""}:${operation.name.toLowerCase()}`;
+    case "addTable":
+      return `table:${operation.table.id}`;
+    case "updateTable":
+    case "removeTable":
+      return `table:${operation.tableId}`;
     case "setSheetMeta":
       return `sheet-meta:${operation.sheet}`;
     default:

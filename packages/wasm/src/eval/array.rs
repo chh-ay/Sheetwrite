@@ -33,7 +33,7 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 
 pub(super) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
-        Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) => true,
+        Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -98,7 +98,7 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
-            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) => Some(
+            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => Some(
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
             ),
@@ -187,7 +187,7 @@ impl CellStore {
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
-            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) => {
+            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
             }
             Ast::Func(Func::Let, args) => {

@@ -210,6 +210,53 @@ function rebasePatches(
       }
       continue;
     }
+    if (patch.op === "addTable") {
+      const start = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.start });
+      const end = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.end });
+      if (
+        start &&
+        end &&
+        start.sheet === end.sheet &&
+        end.col - start.col + 1 === patch.table.columns.length
+      ) {
+        out.push({
+          ...patch,
+          table: {
+            ...patch.table,
+            range: {
+              sheet: start.sheet,
+              start: { row: start.row, col: start.col },
+              end: { row: end.row, col: end.col },
+            },
+          },
+        });
+      }
+      continue;
+    }
+    if (patch.op === "updateTable" && patch.patch.range) {
+      const start = mapAddr({ sheet: patch.patch.range.sheet, ...patch.patch.range.start });
+      const end = mapAddr({ sheet: patch.patch.range.sheet, ...patch.patch.range.end });
+      if (
+        start &&
+        end &&
+        start.sheet === end.sheet &&
+        (patch.patch.columns === undefined ||
+          end.col - start.col + 1 === patch.patch.columns.length)
+      ) {
+        out.push({
+          ...patch,
+          patch: {
+            ...patch.patch,
+            range: {
+              sheet: start.sheet,
+              start: { row: start.row, col: start.col },
+              end: { row: end.row, col: end.col },
+            },
+          },
+        });
+      }
+      continue;
+    }
     out.push(patch);
   }
   return out;

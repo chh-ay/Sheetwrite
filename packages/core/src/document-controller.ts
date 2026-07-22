@@ -22,6 +22,7 @@ import type {
   SnapshotCell,
 } from "./types/document.js";
 import type { Store } from "./types/store.js";
+import type { WorkbookTablePatch } from "./types/table.js";
 import type {
   ApplyTransactionResult,
   GridTransaction,
@@ -401,6 +402,46 @@ export class DocumentController {
             ]
           : [];
       }
+      case "addTable":
+        return [
+          {
+            op: "removeTable",
+            sheet: patch.table.range.sheet,
+            tableId: patch.table.id,
+          },
+        ];
+      case "updateTable": {
+        const table = this.sheetById(patch.sheet)?.tables?.find(
+          (candidate) => candidate.id === patch.tableId,
+        );
+        if (!table) return [];
+        const previous: WorkbookTablePatch = {};
+        if (patch.patch.name !== undefined) previous.name = table.name;
+        if (patch.patch.range !== undefined) previous.range = structuredClone(table.range);
+        if (patch.patch.columns !== undefined) previous.columns = structuredClone(table.columns);
+        if (patch.patch.headerRow !== undefined) previous.headerRow = table.headerRow;
+        if (patch.patch.totalsRow !== undefined) previous.totalsRow = table.totalsRow;
+        if (patch.patch.style !== undefined) {
+          previous.style = table.style ? structuredClone(table.style) : null;
+        }
+        if (patch.patch.unsupportedFeatures !== undefined) {
+          previous.unsupportedFeatures = structuredClone(table.unsupportedFeatures ?? []);
+        }
+        return [
+          {
+            op: "updateTable",
+            sheet: patch.sheet,
+            tableId: patch.tableId,
+            patch: previous,
+          },
+        ];
+      }
+      case "removeTable": {
+        const table = this.sheetById(patch.sheet)?.tables?.find(
+          (candidate) => candidate.id === patch.tableId,
+        );
+        return table ? [{ op: "addTable", table: structuredClone(table) }] : [];
+      }
       case "setSheetMeta": {
         const sheet = this.sheetById(patch.sheet);
         if (!sheet) return [];
@@ -674,6 +715,7 @@ export class DocumentController {
       sortKeys: structuredClone(sheet.sortKeys),
       filters: structuredClone(sheet.filters),
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
+      tables: structuredClone(sheet.tables),
       cells:
         cells.length === 0
           ? []

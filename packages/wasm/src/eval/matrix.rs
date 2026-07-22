@@ -160,6 +160,13 @@ pub(super) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
             named.row_end,
             named.col_end,
         )),
+        Ast::Structured(reference) => Some(CellRange::new(
+            reference.sheet,
+            reference.row_start,
+            reference.col,
+            reference.row_end,
+            reference.col,
+        )),
         _ => None,
     }
 }

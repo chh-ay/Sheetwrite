@@ -224,6 +224,9 @@ export class StoreMutationPolicy {
         return [fullSheetRange(sheet)];
       }
       case "addSheet":
+      case "addTable":
+      case "updateTable":
+      case "removeTable":
       case "setSheetMeta":
       case "removeValidationRule":
       case "setProtectedRange":

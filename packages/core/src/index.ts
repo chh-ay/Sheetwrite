@@ -147,6 +147,16 @@ export {
   sheetNameKey,
   validateSheetName,
 } from "./sheet-name.js";
+export {
+  assertWorkbookTables,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  type WorkbookTableNameIssueCode,
+  type WorkbookTableNameValidationResult,
+  type WorkbookTableResourceLimits,
+  validateWorkbookTableName,
+  validWorkbookTable,
+  workbookTableNameKey,
+} from "./workbook-table.js";
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 export {
   DEFAULT_SYNC_COORDINATOR_LIMITS,
@@ -269,4 +279,10 @@ export type {
   VisibleWindowView,
   Workbook,
   WorkbookSnapshot,
+  WorkbookTable,
+  WorkbookTableColumn,
+  WorkbookTableId,
+  WorkbookTablePatch,
+  WorkbookTableStyle,
+  WorkbookTableUnsupportedFeature,
 } from "./types.js";

@@ -22,6 +22,11 @@ import {
 } from "../resource-accounting.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
+import {
+  assertWorkbookTables,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  validWorkbookTable,
+} from "../workbook-table.js";
 import type {
   CellFormat,
   CellScalar,
@@ -48,6 +53,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
+import type { WorkbookTable, WorkbookTableColumn } from "../types/table.js";
 import type {
   CellLoadState,
   ClipboardWindowView,
@@ -237,6 +243,7 @@ export class StoreDataEngine {
     if (data && options.storage === "paged") {
       throw new Error("Sheetwrite: ColumnarData requires dense storage");
     }
+    assertWorkbookTables(workbook.sheets);
     this.workbook = workbook;
     this.storageOptions = options;
     this.wasm = new CellStore() as RecomputingCellStore;
@@ -256,6 +263,14 @@ export class StoreDataEngine {
       this.handles.set(sheet.id, handle);
       this.sheetIdsByHandle[handle] = sheet.id;
       this.syncSpillBlockers(sheet);
+    }
+    for (const sheet of workbook.sheets) {
+      for (const table of sheet.tables ?? []) {
+        if (!this.syncTable(table)) {
+          this.wasm.free();
+          throw new Error(`invalid workbook table: ${table.id}`);
+        }
+      }
     }
     for (const namedRange of workbook.namedRanges ?? []) {
       if (!this.syncNamedRange(namedRange)) {
@@ -477,6 +492,67 @@ export class StoreDataEngine {
 
   private namedRangeScope(scope: SheetId | undefined): number {
     return scope === undefined ? -1 : this.handleOf(scope);
+  }
+
+  private syncTable(table: WorkbookTable): boolean {
+    const range = normalizedRange(table.range);
+    const textBytes =
+      (table.id.length +
+        table.name.length +
+        table.columns.reduce((total, column) => total + column.id.length + column.name.length, 0)) *
+      2;
+    this.boundaryAccounting.record(
+      this.resourceOperation ?? "edit",
+      "js-to-wasm",
+      textBytes,
+      "scalar",
+    );
+    return this.wasm.setTable(
+      table.id,
+      table.name,
+      this.handleOf(range.sheet),
+      range.start.row,
+      range.start.col,
+      range.end.row,
+      range.end.col,
+      table.headerRow,
+      table.totalsRow,
+      table.columns.map((column) => column.id),
+      table.columns.map((column) => column.name),
+    );
+  }
+  private insertedTableColumns(
+    table: WorkbookTable,
+    columns: readonly Column[],
+  ): WorkbookTableColumn[] {
+    const ids = new Set(table.columns.map((column) => column.id));
+    const names = new Set(
+      table.columns.map((column) => column.name.normalize("NFC").toUpperCase()),
+    );
+    return columns.map((column, index) => {
+      const fallback = `Column${table.columns.length + index + 1}`;
+      const rawId = column.key || fallback;
+      let id = rawId.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength);
+      for (let suffix = 2; ids.has(id); suffix++) {
+        const marker = `_${suffix}`;
+        id = `${rawId.slice(
+          0,
+          DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength - marker.length,
+        )}${marker}`;
+      }
+      ids.add(id);
+      const rawName = (column.header || fallback).normalize("NFC");
+      let name = rawName.slice(0, DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength);
+      for (let suffix = 2; names.has(name.toUpperCase()); suffix++) {
+        const marker = `_${suffix}`;
+        name = `${rawName.slice(
+          0,
+          DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxNameLength - marker.length,
+        )}${marker}`;
+      }
+      names.add(name.toUpperCase());
+      return { id, name };
+    });
   }
 
   private syncNamedRange(namedRange: NamedRangeSnapshot): boolean {
@@ -1726,6 +1802,8 @@ export class StoreDataEngine {
           patch.op === "clearRange"
         ) {
           touchedSheets.add(patch.range.sheet);
+        } else if (patch.op === "addTable") {
+          touchedSheets.add(patch.table.range.sheet);
         } else if (
           patch.op !== "setNamedRange" &&
           patch.op !== "removeNamedRange" &&
@@ -2005,8 +2083,10 @@ export class StoreDataEngine {
         }
         this.wasm.insertCols(this.handleOf(patch.sheet), patch.at, patch.columns.length);
         meta.columns.splice(patch.at, 0, ...patch.columns);
-        this.rebaseSheetCols(patch.sheet, (col) =>
-          col >= patch.at ? col + patch.columns.length : col,
+        this.rebaseSheetCols(
+          patch.sheet,
+          (col) => (col >= patch.at ? col + patch.columns.length : col),
+          { at: patch.at, delta: patch.columns.length, inserted: patch.columns },
         );
         return true;
       }
@@ -2022,8 +2102,10 @@ export class StoreDataEngine {
         }
         this.wasm.removeCols(this.handleOf(patch.sheet), patch.at, patch.count);
         meta.columns.splice(patch.at, patch.count);
-        this.rebaseSheetCols(patch.sheet, (col) =>
-          col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
+        this.rebaseSheetCols(
+          patch.sheet,
+          (col) => (col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count),
+          { at: patch.at, delta: -patch.count },
         );
         return true;
       }
@@ -2214,6 +2296,58 @@ export class StoreDataEngine {
         }
         sheet.visibility = patch.visibility;
         if (fallback) this.workbook.activeSheet = fallback;
+        return true;
+      }
+      case "addTable": {
+        const sheet = this.workbook.sheets.find(
+          (candidate) => candidate.id === patch.table.range.sheet,
+        );
+        if (!sheet) return false;
+        const existing = this.workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
+        if (
+          existing.length >= DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables ||
+          !validWorkbookTable(patch.table, sheet, existing)
+        ) {
+          return false;
+        }
+        const table = structuredClone(patch.table);
+        if (!this.syncTable(table)) return false;
+        sheet.tables = [...(sheet.tables ?? []), table];
+        return true;
+      }
+      case "updateTable": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        const index = sheet?.tables?.findIndex((table) => table.id === patch.tableId) ?? -1;
+        const current = index >= 0 ? sheet!.tables![index] : undefined;
+        if (!sheet || !current) return false;
+        const candidate: WorkbookTable = {
+          ...current,
+          ...patch.patch,
+          id: current.id,
+          style:
+            patch.patch.style === null
+              ? undefined
+              : patch.patch.style === undefined
+                ? current.style
+                : patch.patch.style,
+        };
+        const existing = this.workbook.sheets.flatMap((candidateSheet) =>
+          (candidateSheet.tables ?? []).filter((table) => table.id !== current.id),
+        );
+        if (!validWorkbookTable(candidate, sheet, existing)) return false;
+        const next = structuredClone(candidate);
+        if (next.style === undefined) delete next.style;
+        if (!this.syncTable(next)) return false;
+        const tables = [...sheet.tables!];
+        tables[index] = next;
+        sheet.tables = tables;
+        return true;
+      }
+      case "removeTable": {
+        const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
+        const index = sheet?.tables?.findIndex((table) => table.id === patch.tableId) ?? -1;
+        if (!sheet || index < 0 || !this.wasm.removeTable(patch.tableId)) return false;
+        sheet.tables = [...sheet.tables!.slice(0, index), ...sheet.tables!.slice(index + 1)];
         return true;
       }
       case "setSheetMeta": {
@@ -2569,10 +2703,6 @@ export class StoreDataEngine {
     );
     if (!name.ok) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
-    const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
-    this.wasm.setSheetName(handle, snapshot.id, name.name);
-    this.handles.set(snapshot.id, handle);
-    this.sheetIdsByHandle[handle] = snapshot.id;
     const sheet: Sheet = {
       id: snapshot.id,
       name: name.name,
@@ -2589,14 +2719,27 @@ export class StoreDataEngine {
       sortKeys: cloneJsonValue(snapshot.sortKeys),
       filters: cloneJsonValue(snapshot.filters),
       rowGroups: snapshot.rowGroups?.map((group) => ({ ...group })),
+      tables: structuredClone(snapshot.tables),
       rowHeights: new Map(),
       hiddenRows: new Set(),
     };
+    try {
+      assertWorkbookTables([...this.workbook.sheets, sheet]);
+    } catch {
+      return false;
+    }
+    const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
+    this.wasm.setSheetName(handle, snapshot.id, name.name);
+    this.handles.set(snapshot.id, handle);
+    this.sheetIdsByHandle[handle] = snapshot.id;
     for (const [row, meta] of snapshot.rowMeta ?? []) {
       if (meta.height !== undefined) sheet.rowHeights!.set(row, meta.height);
       if (meta.hidden) sheet.hiddenRows!.add(row);
     }
     this.workbook.sheets.splice(snapshot.order, 0, sheet);
+    for (const table of sheet.tables ?? []) {
+      if (!this.syncTable(table)) return false;
+    }
     for (const block of snapshot.cells) {
       if (
         !this.applyPatch(
@@ -2711,6 +2854,25 @@ export class StoreDataEngine {
         return row === null ? null : { ...note, addr: { ...note.addr, row } };
       })
       .filter((note): note is NonNullable<Sheet["notes"]>[number] => note !== null);
+    const tables: WorkbookTable[] = [];
+    for (const table of meta.tables ?? []) {
+      const span = remapSpan(table.range.start.row, table.range.end.row, remap);
+      if (!span) {
+        this.wasm.removeTable(table.id);
+        continue;
+      }
+      const next = {
+        ...table,
+        range: {
+          ...table.range,
+          start: { ...table.range.start, row: span[0] },
+          end: { ...table.range.end, row: span[1] },
+        },
+      };
+      tables.push(next);
+      this.syncTable(next);
+    }
+    meta.tables = tables;
     if (meta.frozenRows) {
       const boundary = remapSpan(0, meta.frozenRows - 1, remap);
       meta.frozenRows = boundary ? boundary[1] + 1 : 0;
@@ -2734,7 +2896,11 @@ export class StoreDataEngine {
     this.view.rowsChanged(sheet);
   }
 
-  private rebaseSheetCols(sheet: SheetId, remap: (col: number) => number | null): void {
+  private rebaseSheetCols(
+    sheet: SheetId,
+    remap: (col: number) => number | null,
+    edit: { at: number; delta: number; inserted?: readonly Column[] },
+  ): void {
     const meta = this.sheetMeta(sheet);
     meta.merges = meta.merges
       ?.map((merge) => {
@@ -2771,6 +2937,40 @@ export class StoreDataEngine {
         return col === null ? null : { ...note, addr: { ...note.addr, col } };
       })
       .filter((note): note is NonNullable<Sheet["notes"]>[number] => note !== null);
+    const tables: WorkbookTable[] = [];
+    for (const table of meta.tables ?? []) {
+      const span = remapSpan(table.range.start.col, table.range.end.col, remap);
+      if (!span) {
+        this.wasm.removeTable(table.id);
+        continue;
+      }
+      let columns = table.columns;
+      if (edit.delta > 0 && edit.at > table.range.start.col && edit.at <= table.range.end.col) {
+        const added = this.insertedTableColumns(table, edit.inserted ?? []);
+        const offset = edit.at - table.range.start.col;
+        columns = [...columns.slice(0, offset), ...added, ...columns.slice(offset)];
+      } else if (edit.delta < 0) {
+        columns = columns.filter(
+          (_column, offset) => remap(table.range.start.col + offset) !== null,
+        );
+      }
+      if (columns.length !== span[1] - span[0] + 1) {
+        this.wasm.removeTable(table.id);
+        continue;
+      }
+      const next = {
+        ...table,
+        columns,
+        range: {
+          ...table.range,
+          start: { ...table.range.start, col: span[0] },
+          end: { ...table.range.end, col: span[1] },
+        },
+      };
+      tables.push(next);
+      this.syncTable(next);
+    }
+    meta.tables = tables;
     if (meta.frozenCols) {
       const boundary = remapSpan(0, meta.frozenCols - 1, remap);
       meta.frozenCols = boundary ? boundary[1] + 1 : 0;

@@ -2,8 +2,16 @@
 // No runtime values live here.
 
 import type { SheetNameIssueCode } from "../sheet-name.js";
-import type { CellScalar, CellStyle, CellValue, Column, ConditionalFormatRule } from "./cell.js";
+import type {
+  CellHyperlink,
+  CellScalar,
+  CellStyle,
+  CellValue,
+  Column,
+  ConditionalFormatRule,
+} from "./cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
+import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
 
 /** Native worksheet visibility preserved across workbook snapshots and tab rendering. */
 export type SheetVisibility = "visible" | "hidden" | "veryHidden";
@@ -28,6 +36,8 @@ export interface Sheet {
   rowGroups?: RowGroup[];
   /** Conditional styles folded into the bulk render-window style dictionary. */
   conditionalFormats?: ConditionalFormatRule[];
+  /** Stable, serializable range hyperlinks; external URLs pass the shared safety policy. */
+  hyperlinks?: CellHyperlink[];
   /** Serializable data-entry rules evaluated at the local mutation barrier. */
   validationRules?: DataValidationRule[];
   /** Client-side protected-range policy metadata; never server authorization. */
@@ -44,6 +54,8 @@ export interface Sheet {
   frozenRows?: number;
   /** Leading columns pinned left of the scrolling body (0/undefined = none). */
   frozenCols?: number;
+  /** Native workbook tables anchored to this stable worksheet identity. */
+  tables?: WorkbookTable[];
 }
 
 // ── Views: sorting, filtering, hidden rows, grouping ─────────────────────────
@@ -314,12 +326,14 @@ export interface SheetSnapshot {
   rowMeta?: Array<[row: number, meta: RowMetadata]>;
   merges?: MergeRange[];
   conditionalFormats?: ConditionalFormatRule[];
+  hyperlinks?: CellHyperlink[];
   validationRules?: DataValidationRule[];
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
   sortKeys?: SortKey[];
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
+  tables?: WorkbookTable[];
   cells: CellBlock[];
 }
 
@@ -357,6 +371,9 @@ export type DocumentOp =
   | { op: "renameSheet"; sheet: SheetId; name: string }
   | { op: "moveSheet"; sheet: SheetId; to: number }
   | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility }
+  | { op: "addTable"; table: WorkbookTable }
+  | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch }
+  | { op: "removeTable"; sheet: SheetId; tableId: string }
   | {
       op: "setSheetMeta";
       sheet: SheetId;
@@ -371,6 +388,8 @@ export type DocumentOp =
     }
   | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule }
   | { op: "removeValidationRule"; sheet: SheetId; id: string }
+  | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink }
+  | { op: "removeHyperlink"; sheet: SheetId; id: string }
   | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange }
   | { op: "removeProtectedRange"; sheet: SheetId; id: string }
   | { op: "setNote"; addr: CellAddress; text: string | null }
