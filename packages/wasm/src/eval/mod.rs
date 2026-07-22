@@ -26,7 +26,7 @@ use crate::types::{
     KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
-use array::dynamic_recompute_within_limit;
+use array::{ast_produces_array, dynamic_recompute_within_limit};
 use criteria::{aggregate_if, extreme_if, Criterion};
 pub(crate) use dependency::DepIndex;
 use dependency::{build_dep_index, collect_affected_formulas, seed_dependency_depth_errors};
@@ -297,7 +297,13 @@ impl CellStore {
             .dep_index
             .as_ref()
             .is_some_and(|index| !index.has_dynamic_arrays)
-        {
+            && !affected.iter().any(|key| {
+                self.sheets
+                    .get(key.sheet as usize)
+                    .and_then(|sheet| sheet.formulas.get(&key.local()))
+                    .and_then(|entry| entry.ast.as_ref())
+                    .is_some_and(ast_produces_array)
+            }) {
             for key in &affected {
                 let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
             }

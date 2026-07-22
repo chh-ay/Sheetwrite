@@ -2,12 +2,14 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::calc::{Ast, Func};
+use crate::calc::Ast;
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
     AbsCellKey, CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT,
 };
+
+use super::array::ast_produces_array;
 
 pub(crate) struct DepIndex {
     exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>>,
@@ -137,15 +139,7 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         for (&formula_cell, entry) in &sheet.formulas {
-            has_dynamic_arrays |= matches!(
-                entry.ast.as_ref(),
-                Some(
-                    Ast::Range(..)
-                        | Ast::AbsRange(..)
-                        | Ast::NamedRange(..)
-                        | Ast::Func(Func::Filter | Func::Sort | Func::Unique, _)
-                )
-            );
+            has_dynamic_arrays |= entry.ast.as_ref().is_some_and(ast_produces_array);
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
                 exact_dependents.entry(cell).or_default().push(formula_abs);
