@@ -329,11 +329,11 @@ impl RootSample {
     }
 
     fn converged(self) -> bool {
-        self.value == 0.0
-            || (self.value.is_finite()
-                && self.scale.is_finite()
-                && self.scale > 0.0
-                && self.value.abs() <= ROOT_VALUE_REL_TOLERANCE * self.scale)
+        self.value.is_finite()
+            && self.scale.is_finite()
+            && self.scale > 0.0
+            && (self.value == 0.0
+                || self.value.abs() <= ROOT_VALUE_REL_TOLERANCE * self.scale)
     }
 }
 
@@ -873,5 +873,12 @@ mod tests {
             );
             assert_close(result_number(Func::Irr, &values), expected_rate);
         }
+
+        let underflow_regression =
+            irr_args([0.0, 0.0, 1.0, -2.0], Some(ROOT_X_MAX.exp_m1()));
+        assert_close(
+            result_number(Func::Irr, &underflow_regression),
+            1.0,
+        );
     }
 }
