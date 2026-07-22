@@ -173,6 +173,40 @@ export const COMPATIBILITY_FIXTURES: readonly CompatibilityFixture[] = [
     expectedWarnings: ["exact structured unsupported-feature warnings"],
   },
   {
+    id: "workbook-table-vectors",
+    kind: "original-test",
+    path: "packages/xlsx/test/workbook-table.test.ts",
+    producer: "Sheetwrite",
+    producerVersion: "v0.3 protocol 3",
+    license: "MIT; original vectors derived from ECMA-376 5th edition",
+    provenance:
+      "Original minimal OOXML table packages with ECMA-376 clause URLs and archive checksums; no producer test suite is copied.",
+    expected: [
+      "stable table and column IDs",
+      "structured references",
+      "native table parts",
+      "unsupported table metadata warnings",
+    ],
+    expectedWarnings: ["exact unsupported table feature warnings"],
+  },
+  {
+    id: "hyperlink-conditional-vectors",
+    kind: "original-test",
+    path: "packages/xlsx/test/hyperlink-conditional.test.ts",
+    producer: "Sheetwrite",
+    producerVersion: "v0.3 protocol 3",
+    license: "MIT; original vectors derived from ECMA-376 5th edition",
+    provenance:
+      "Original minimal OPC/SpreadsheetML vectors with ECMA-376 clause URLs and archive checksums.",
+    expected: [
+      "HTTPS and mailto links",
+      "stable internal links",
+      "bounded conditional formats",
+      "round-trip style and stop precedence",
+    ],
+    expectedWarnings: ["unsafe hyperlink and unsupported conditional-format warnings"],
+  },
+  {
     id: "external-producer-manifest",
     kind: "manifest",
     path: "packages/xlsx/test/fixtures/external-corpus.json",
@@ -456,16 +490,91 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     lastVerifiedProtocolVersion: 3,
   },
   {
-    id: "xlsx.tables-charts-macros",
-    label: "Tables, charts, macros, pivots, slicers, and Power Query",
+    id: "table.native-subset",
+    label: "Native workbook tables and structured references",
     area: "xlsx-import",
     dialect: "excel",
-    status: "warning",
+    status: "partial",
     resultMode: "warning",
-    semantics: "Known unsupported OOXML parts are detected and reported rather than evaluated.",
+    semantics:
+      "Stable table and column identities, body/header/totals/current-row structured references, structural rewrites, and the declared ECMA-376 table subset are implemented.",
+    divergence:
+      "Auto-filter state, sort state, calculated columns, totals functions, query tables, external data, and extensions remain explicit unsupported metadata.",
+    source: "https://ecma-international.org/publications-and-standards/standards/ecma-376/",
+    evidence: [
+      "packages/core/test/workbook-table.test.ts",
+      "packages/wasm/src/tests.rs",
+      "packages/xlsx/test/workbook-table.test.ts",
+    ],
+    fixtureIds: ["workbook-table-vectors"],
+    importBehavior:
+      "The bounded native table subset imports with stable identities; unsupported table features emit exact warnings.",
+    exportBehavior:
+      "Canonical supported tables emit native worksheet relationships and table parts without fabricating unsupported features.",
+    warningCode: "unsupported-feature",
+    lastVerifiedProtocolVersion: 3,
+  },
+  {
+    id: "hyperlink.safe-subset",
+    label: "Host-safe external and internal hyperlinks",
+    area: "xlsx-import",
+    dialect: "excel",
+    status: "partial",
+    resultMode: "warning",
+    semantics:
+      "Absolute HTTPS/mailto targets and stable same-workbook sheet/range targets round-trip with bounded display and style metadata.",
+    divergence:
+      "Activation remains host-owned; unsafe schemes, malformed ranges, package traversal, and over-limit metadata fail closed or emit exact warnings.",
+    source: "https://ecma-international.org/publications-and-standards/standards/ecma-376/",
+    evidence: [
+      "packages/core/test/hyperlink.test.ts",
+      "packages/xlsx/test/hyperlink-conditional.test.ts",
+      "packages/xlsx/test/external-conformance.test.ts",
+    ],
+    fixtureIds: ["hyperlink-conditional-vectors"],
+    importBehavior:
+      "Safe external and internal targets normalize without fetching; unsafe or malformed targets never enter the snapshot.",
+    exportBehavior:
+      "Safe external targets emit OPC relationships and internal targets emit stable worksheet locations.",
+    warningCode: "hyperlink",
+    lastVerifiedProtocolVersion: 3,
+  },
+  {
+    id: "conditional-format.native-subset",
+    label: "Bounded native conditional formatting",
+    area: "style",
+    dialect: "excel",
+    status: "partial",
+    resultMode: "warning",
+    semantics:
+      "Ordered formula, comparison, contains-text, and blank predicates evaluate dependency-scoped styles with stop-if-true precedence and a 32-rule sheet limit.",
+    divergence:
+      "Color scales, data bars, icon sets, extended conditional formatting, and other undeclared rule kinds are not approximated.",
+    source: "https://ecma-international.org/publications-and-standards/standards/ecma-376/",
+    evidence: [
+      "packages/core/test/conditional-format.test.ts",
+      "packages/wasm/src/tests.rs",
+      "packages/xlsx/test/hyperlink-conditional.test.ts",
+    ],
+    fixtureIds: ["hyperlink-conditional-vectors"],
+    importBehavior:
+      "Supported rules normalize in priority order; unsupported and over-limit rules emit exact warnings.",
+    exportBehavior:
+      "Supported rules emit native differential styles and conditional-format records.",
+    warningCode: "format-loss",
+    lastVerifiedProtocolVersion: 3,
+  },
+  {
+    id: "xlsx.advanced-unsupported",
+    label: "Charts, macros, pivots, slicers, Power Query, and external data",
+    area: "xlsx-import",
+    dialect: "excel",
+    status: "unsupported",
+    resultMode: "unsupported",
+    semantics: "Known undeclared OOXML application parts are detected rather than evaluated.",
     divergence:
       "These application features are not imported into a parallel object model and are not claimed to round-trip losslessly.",
-    source: "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/",
+    source: "https://ecma-international.org/publications-and-standards/standards/ecma-376/",
     evidence: [
       "packages/xlsx/test/external-conformance.test.ts",
       "packages/xlsx/test/ooxml-fidelity.test.ts",
@@ -473,7 +582,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     fixtureIds: ["xlsx-conformance-vectors"],
     importBehavior:
       "Known parts emit exact unsupported-feature warnings; unsafe packages fail closed.",
-    exportBehavior: "Sheetwrite does not fabricate these parts.",
+    exportBehavior: "Sheetwrite does not fabricate these application parts.",
     warningCode: "unsupported-feature",
     lastVerifiedProtocolVersion: 3,
   },

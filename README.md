@@ -97,11 +97,15 @@ import {
 `grid.exportXlsx()` and framework toolbar XLSX actions use the table backend and
 therefore require registration. `toXlsxTable` / `fromXlsxTable` provide
 first-row-header, first-sheet interchange; `toXlsxWorkbook` /
-`fromXlsxWorkbook` preserve multi-sheet snapshots and formula source through
-the in-memory workbook backend. Calling any XLSX function without registration
-throws an error naming the exact package and registration import. CSV and TSV
-remain core-only. See [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
-for limits and compatibility.
+`fromXlsxWorkbook` preserve multi-sheet snapshots, formula source, native
+workbook tables and structured references, safe HTTPS/mailto or internal
+hyperlinks, and the declared bounded conditional-format subset. Unsupported
+OOXML table/format extensions emit structured warnings instead of silently
+flattening into supported behavior. Calling any XLSX function without
+registration throws an error naming the exact package and registration import.
+CSV and TSV remain core-only. See [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
+and the [executable compatibility matrix](https://sheetwrite.vercel.app/docs/reference/compatibility-matrix/)
+for exact limits and evidence.
 
 ## Persistence
 
@@ -140,6 +144,23 @@ presence, comments, and revisions.
 | `@sheetwrite/vue` | Vue `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/wasm` | Internal Rust/WASM engine; normally transitive |
+
+
+## v0.3 roadmap status
+
+Implemented on the development branch: complete worksheet lifecycle operations,
+the expanded portable formula kernel, native workbook tables and structured
+references, host-safe hyperlinks, bounded conditional formatting, and a
+source/provenance-checked 2,350-case conformance corpus. These are Sheetwrite
+contracts; they are not a blanket Excel or Google Sheets compatibility claim.
+
+The v0.3 release remains gated on fresh authenticated Excel and Google Sheets
+observations, cross-producer workbook round trips, unchanged delivery-size
+ceilings, the measured billion-cell architecture decision, stable row-model and
+executable-onboarding work, and the final product-showcase/browser verification.
+See the [executable compatibility matrix](https://sheetwrite.vercel.app/docs/reference/compatibility-matrix/)
+for implemented subsets, warnings, unsupported behavior, producer versions,
+and evidence.
 
 ## Releases
 
