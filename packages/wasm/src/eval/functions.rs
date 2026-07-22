@@ -1,5 +1,7 @@
 //! Shared bounded argument accumulation and thin scalar-family dispatch.
 
+use std::mem::MaybeUninit;
+
 use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
@@ -14,7 +16,7 @@ pub(super) struct FuncValue {
     pub(super) from_range: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct FuncArg {
     end: u32,
     rows: u32,
@@ -25,7 +27,7 @@ struct FuncArg {
 #[derive(Debug)]
 pub(super) struct FuncAccumulator {
     values: Vec<FuncValue>,
-    args: [FuncArg; MAX_FUNCTION_ARGS],
+    args: [MaybeUninit<FuncArg>; MAX_FUNCTION_ARGS],
     arg_count: usize,
 }
 
@@ -33,9 +35,20 @@ impl Default for FuncAccumulator {
     fn default() -> Self {
         Self {
             values: Vec::new(),
-            args: [FuncArg::default(); MAX_FUNCTION_ARGS],
+            args: [MaybeUninit::uninit(); MAX_FUNCTION_ARGS],
             arg_count: 0,
         }
+    }
+}
+
+impl FuncAccumulator {
+    fn arg_metadata(&self, index: usize) -> Option<&FuncArg> {
+        if index >= self.arg_count {
+            return None;
+        }
+        // SAFETY: `finish_arg_with_missing` writes each slot before increasing
+        // `arg_count`, and no method reads at or beyond that initialized prefix.
+        Some(unsafe { self.args.get_unchecked(index).assume_init_ref() })
     }
 }
 
@@ -79,20 +92,20 @@ impl FuncAccumulator {
             return Err(FormulaError::Value);
         }
         let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
-        let start = if self.arg_count == 0 {
-            0
-        } else {
-            self.args[self.arg_count - 1].end as usize
-        };
+        let start = self
+            .arg_count
+            .checked_sub(1)
+            .and_then(|index| self.arg_metadata(index))
+            .map_or(0, |argument| argument.end as usize);
         if cells != self.values.len().saturating_sub(start) {
             return Err(FormulaError::Value);
         }
-        self.args[self.arg_count] = FuncArg {
+        self.args[self.arg_count].write(FuncArg {
             end: u32::try_from(self.values.len()).map_err(|_| FormulaError::Num)?,
             rows: u32::try_from(rows).map_err(|_| FormulaError::Num)?,
             cols: u32::try_from(cols).map_err(|_| FormulaError::Num)?,
             missing,
-        };
+        });
         self.arg_count += 1;
         Ok(())
     }
@@ -110,27 +123,22 @@ impl FuncAccumulator {
     }
 
     pub(super) fn arg(&self, index: usize) -> Option<&[FuncValue]> {
-        if index >= self.arg_count {
-            return None;
-        }
-        let argument = self.args[index];
-        let start = if index == 0 {
-            0
-        } else {
-            self.args[index - 1].end as usize
-        };
+        let argument = *self.arg_metadata(index)?;
+        let start = index
+            .checked_sub(1)
+            .and_then(|previous| self.arg_metadata(previous))
+            .map_or(0, |previous| previous.end as usize);
         Some(&self.values[start..argument.end as usize])
     }
 
     pub(super) fn arg_shape(&self, index: usize) -> Option<(usize, usize)> {
-        (index < self.arg_count).then(|| {
-            let argument = self.args[index];
+        self.arg_metadata(index).map(|argument| {
             (argument.rows as usize, argument.cols as usize)
         })
     }
 
     pub(super) fn arg_missing(&self, index: usize) -> bool {
-        index < self.arg_count && self.args[index].missing
+        self.arg_metadata(index).is_some_and(|argument| argument.missing)
     }
 
     pub(super) fn arg_value(&self, index: usize) -> Option<&Value> {
@@ -141,7 +149,8 @@ impl FuncAccumulator {
         let start = if index == 0 {
             0
         } else if index <= self.arg_count {
-            self.args[index - 1].end as usize
+            self.arg_metadata(index - 1)
+                .map_or(self.values.len(), |argument| argument.end as usize)
         } else {
             self.values.len()
         };
@@ -158,22 +167,6 @@ struct NumericAggregate {
 }
 
 pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
-    if let Some(result) = math::apply(func, values) {
-        return result;
-    }
-    if let Some(result) = text::apply(func, values) {
-        return result;
-    }
-    if let Some(result) = date::apply(func, values) {
-        return result;
-    }
-    if let Some(result) = statistics::apply(func, values) {
-        return result;
-    }
-    if let Some(result) = financial::apply(func, values) {
-        return result;
-    }
-
     match func {
         Func::Count => Value::number(count_numeric(values) as f64),
         Func::CountA => Value::number(
@@ -207,6 +200,108 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
             Err(error) => Value::Error(error),
         },
         Func::Na if values.arg_count() == 0 => Value::Error(FormulaError::Na),
+        Func::Abs
+        | Func::Sqrt
+        | Func::Round
+        | Func::RoundUp
+        | Func::RoundDown
+        | Func::Mod
+        | Func::Pow
+        | Func::Power
+        | Func::Floor
+        | Func::Ceiling
+        | Func::Int
+        | Func::Trunc
+        | Func::Sign
+        | Func::Pi
+        | Func::Product
+        | Func::SumProduct
+        | Func::Exp
+        | Func::Ln
+        | Func::Log
+        | Func::Log10
+        | Func::MRound
+        | Func::Even
+        | Func::Odd
+        | Func::Quotient
+        | Func::Gcd
+        | Func::Lcm
+        | Func::Subtotal => math::apply(func, values)
+            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        Func::Len
+        | Func::Left
+        | Func::Right
+        | Func::Mid
+        | Func::Concat
+        | Func::Concatenate
+        | Func::Upper
+        | Func::Lower
+        | Func::Trim
+        | Func::Text
+        | Func::Exact
+        | Func::TextJoin
+        | Func::Substitute
+        | Func::Replace
+        | Func::Find
+        | Func::Search
+        | Func::Value
+        | Func::Clean
+        | Func::Rept
+        | Func::Char
+        | Func::Code
+        | Func::Unicode
+        | Func::UniChar
+        | Func::Proper
+        | Func::NumberValue => text::apply(func, values)
+            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        Func::Date
+        | Func::DateValue
+        | Func::Day
+        | Func::Month
+        | Func::Year
+        | Func::Time
+        | Func::TimeValue
+        | Func::Hour
+        | Func::Minute
+        | Func::Second
+        | Func::Days
+        | Func::EDate
+        | Func::EOMonth
+        | Func::Weekday
+        | Func::WeekNum
+        | Func::Workday
+        | Func::NetworkDays
+        | Func::YearFrac
+        | Func::Days360 => date::apply(func, values)
+            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        Func::Median
+        | Func::ModeSngl
+        | Func::Large
+        | Func::Small
+        | Func::RankEq
+        | Func::PercentileInc
+        | Func::QuartileInc
+        | Func::StdevS
+        | Func::StdevP
+        | Func::VarS
+        | Func::VarP
+        | Func::GeoMean
+        | Func::Correl
+        | Func::CovarianceS
+        | Func::CovarianceP
+        | Func::CountBlank
+        | Func::MaxIfs
+        | Func::MinIfs => statistics::apply(func, values)
+            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        Func::Pv
+        | Func::Fv
+        | Func::Pmt
+        | Func::Npv
+        | Func::Irr
+        | Func::Rate
+        | Func::Ipmt
+        | Func::Ppmt => financial::apply(func, values)
+            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
         _ => Value::Error(FormulaError::Value),
     }
 }
@@ -386,4 +481,52 @@ pub(super) fn treats_cell_as_reference(func: Func) -> bool {
             | Func::Npv
             | Func::Irr
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::types::{FormulaError, Value};
+
+    use super::{FuncAccumulator, MAX_FUNCTION_ARGS};
+
+    #[test]
+    fn accumulator_tracks_only_the_initialized_argument_prefix_at_capacity() {
+        let mut values = FuncAccumulator::default();
+        for index in 0..MAX_FUNCTION_ARGS {
+            let from_range = index % 2 == 0;
+            if from_range {
+                values.push_range(Value::number(index as f64)).unwrap();
+            } else {
+                values.push_scalar(Value::number(index as f64)).unwrap();
+            }
+            values
+                .finish_arg_with_missing(1, 1, index % 3 == 0)
+                .unwrap();
+        }
+
+        assert_eq!(values.arg_count(), MAX_FUNCTION_ARGS);
+        assert_eq!(values.entries().len(), MAX_FUNCTION_ARGS);
+        for index in 0..MAX_FUNCTION_ARGS {
+            let argument = values.arg(index).unwrap();
+            assert_eq!(argument.len(), 1);
+            assert_eq!(argument[0].value, Value::number(index as f64));
+            assert_eq!(argument[0].from_range, index % 2 == 0);
+            assert_eq!(values.arg_shape(index), Some((1, 1)));
+            assert_eq!(values.arg_missing(index), index % 3 == 0);
+        }
+
+        assert!(values.arg(MAX_FUNCTION_ARGS).is_none());
+        assert_eq!(values.arg_shape(MAX_FUNCTION_ARGS), None);
+        assert!(!values.arg_missing(MAX_FUNCTION_ARGS));
+        assert!(values.entries_from_arg(MAX_FUNCTION_ARGS).is_empty());
+
+        values.push_scalar(Value::number(255.0)).unwrap();
+        assert_eq!(
+            values.finish_arg_with_missing(1, 1, false),
+            Err(FormulaError::Value)
+        );
+        assert_eq!(values.arg_count(), MAX_FUNCTION_ARGS);
+        assert!(values.arg(MAX_FUNCTION_ARGS).is_none());
+        assert_eq!(values.arg_shape(MAX_FUNCTION_ARGS), None);
+    }
 }
