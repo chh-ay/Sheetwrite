@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   validateMatchedEvidence,
   type MatchedFormulaEvidence,
-} from "../src/matched-formula-evidence.ts";
+} from "../src/matched-formula-evidence.js";
 
 function sha256(path: URL): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -49,7 +49,7 @@ describe("matched formula evidence contract", () => {
     [
       "median samples",
       (value: MatchedFormulaEvidence) =>
-        (value.workloads["independent-parse-load/1000"].raw.baselineMs[0] += 1),
+        (value.workloads["independent-parse-load/1000"]!.raw.baselineMs[0]! += 1),
     ],
     ["bootstrap seed", (value: MatchedFormulaEvidence) => (value.bootstrap.seed += 1)],
   ] as const) {
