@@ -1723,6 +1723,11 @@ describe("paged datasource storage", () => {
     expectRowUnloaded(2);
 
     expect(() =>
+      store.loadPage("s1", 2, [{ start: 0, end: 1, keys: ["city"] }], [{ city: "wrong-position" }]),
+    ).toThrow(/invalid column keys/);
+    expectRowUnloaded(2);
+
+    expect(() =>
       store.loadPage(
         "s1",
         3,
