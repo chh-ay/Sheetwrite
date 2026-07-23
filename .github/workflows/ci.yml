@@ -61,10 +61,13 @@ jobs:
           test "$(npm --version)" = "$NPM_VERSION"
           test "$(rustc --version | cut -d' ' -f2)" = "$RUST_VERSION"
       - name: Changeset status
+        if: github.event_name != 'pull_request' || github.head_ref != 'changeset-release/develop'
         run: bun run changeset:status -- --since=origin/develop
       - name: Install checksum-pinned wasm-pack
         run: bun scripts/install-wasm-pack.ts
       - name: Tooling contracts
+        env:
+          SKIP_CHANGESET_STATUS: ${{ github.event_name == 'pull_request' && github.head_ref == 'changeset-release/develop' }}
         run: bun run test:tooling
       - name: Import cycles
         run: bun run check:cycles

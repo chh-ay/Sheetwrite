@@ -1,10 +1,10 @@
 # @sheetwrite/core
 
-## 0.4.0
+## 0.3.0
 
 ### Minor Changes
 
-- e551eb0: Add the canonical `SheetwriteError` envelope and stable error codes across initialization, Grid events, persistence, synchronization, collaboration, delimited text, and optional XLSX boundaries. Framework initialization callbacks now receive the same typed error class, and XLSX cancellation preserves the original abort reason as `cause`.
+- e551eb0: Introduce the canonical `SheetwriteError` envelope and stable error codes across initialization, data sources, rendering, persistence, synchronization, collaboration, and import/export boundaries, with serialization-safe context and explicit retryability.
 
 ## 0.2.0
 

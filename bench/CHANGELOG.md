@@ -5,7 +5,7 @@
 ### Patch Changes
 
 - Updated dependencies [e551eb0]
-  - @sheetwrite/core@0.4.0
+  - @sheetwrite/core@0.3.0
 
 ## 0.0.1
 

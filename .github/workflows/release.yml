@@ -105,7 +105,7 @@ jobs:
         id: size-history
         if: steps.publish.outputs.verified != '[]'
         run: |
-          VERSION="$(node -p "require('./package.json').version")"
+          VERSION="$(node -p "require('./packages/core/package.json').version")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           bun run size:record --version="$VERSION"
           bun run docs:generate

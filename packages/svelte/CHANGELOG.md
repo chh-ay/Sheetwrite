@@ -1,15 +1,15 @@
 # @sheetwrite/svelte
 
-## 0.4.0
+## 0.3.0
 
 ### Minor Changes
 
-- e551eb0: Add the canonical `SheetwriteError` envelope and stable error codes across initialization, Grid events, persistence, synchronization, collaboration, delimited text, and optional XLSX boundaries. Framework initialization callbacks now receive the same typed error class, and XLSX cancellation preserves the original abort reason as `cause`.
+- e551eb0: Normalize initialization failures into canonical `SheetwriteError` values for `onInitializationError`, including cross-realm error envelopes and retained causes.
 
 ### Patch Changes
 
 - Updated dependencies [e551eb0]
-  - @sheetwrite/core@0.4.0
+  - @sheetwrite/core@0.3.0
 
 ## 0.2.0
 

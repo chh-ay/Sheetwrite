@@ -243,6 +243,7 @@ describe("changeset workspace contract", () => {
   });
 
   it("runs the canonical Changesets status command", () => {
+    if (process.env.SKIP_CHANGESET_STATUS === "true") return;
     const root = resolve(import.meta.dir, "..");
     const result = Bun.spawnSync(
       ["bun", "run", "changeset:status", "--", "--since=origin/develop"],

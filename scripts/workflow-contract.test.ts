@@ -113,6 +113,23 @@ describe("CI and release workflow contracts", () => {
     ).toThrow("action is not reviewed");
   });
 
+  it("allows the generated version pull request to consume its changesets", () => {
+    const changesetStatus = workflows().ci.jobs.preflight?.steps?.find(
+      (step) => step.name === "Changeset status",
+    );
+    expect(changesetStatus?.run).toBe("bun run changeset:status -- --since=origin/develop");
+    expect(changesetStatus?.if).toBe(
+      "github.event_name != 'pull_request' || github.head_ref != 'changeset-release/develop'",
+    );
+    const toolingContracts = workflows().ci.jobs.preflight?.steps?.find(
+      (step) => step.name === "Tooling contracts",
+    );
+    expect(toolingContracts?.env?.SKIP_CHANGESET_STATUS).toBe(
+      "$" +
+        "{{ github.event_name == 'pull_request' && github.head_ref == 'changeset-release/develop' }}",
+    );
+  });
+
   it("keeps each workflow's required toolchain versions in parity", () => {
     const parsed = workflows();
     for (const [name, workflow] of Object.entries(parsed)) {

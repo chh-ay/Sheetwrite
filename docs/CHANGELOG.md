@@ -5,11 +5,11 @@
 ### Patch Changes
 
 - Updated dependencies [e551eb0]
-  - @sheetwrite/core@0.4.0
-  - @sheetwrite/react@0.4.0
-  - @sheetwrite/vue@0.4.0
-  - @sheetwrite/svelte@0.4.0
-  - @sheetwrite/xlsx@0.4.0
+  - @sheetwrite/core@0.3.0
+  - @sheetwrite/react@0.3.0
+  - @sheetwrite/vue@0.3.0
+  - @sheetwrite/svelte@0.3.0
+  - @sheetwrite/xlsx@0.3.0
 
 ## 0.0.1
 
