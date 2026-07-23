@@ -10,7 +10,7 @@
 .sw-proofs-page {
   width: min(74rem, 100% - clamp(2rem, 6vw, 5rem));
   margin-inline: auto;
-  padding-block: clamp(2.5rem, 6vh, 4.5rem) clamp(3rem, 8vh, 5rem);
+  padding-block: 0.75rem clamp(3rem, 8vh, 5rem);
   color: var(--sw-fg);
   font-family: var(--sw-font-body);
 }

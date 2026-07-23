@@ -1,6 +1,6 @@
 ---
-title: Events and errors
-description: Stable failure envelopes, event direction, recovery, validation, and incomplete-data behavior.
+title: Error handling
+description: Typed failures, stable codes, recovery paths, event direction, validation, and incomplete-data behavior.
 ---
 
 ## Event direction
@@ -74,14 +74,43 @@ Normal mutation denials remain `mutation-rejected` results/events, and
 incomplete paged queries retain their explicit capability/result contracts;
 they are not converted into generic exceptions.
 
-## Validation and persistence failures
+## Typed error index
 
-- `SnapshotValidationError` is a `SheetwriteError` with `code: "invalid-snapshot"` and rejects malformed workbook snapshots rather than hydrating partial state.
-- `SnapshotResourceError` reports bounded snapshot allocation failures.
-- `PersistenceError` classifies host load/commit failures while retaining the original `cause`.
-- `IndexedDbPendingCommitStorageError` classifies durable pending-queue failures from `@sheetwrite/core/browser`.
-- `IncompleteDataError` means an operation requires datasource cells that paged storage has not loaded; load the required pages or avoid a full-sheet operation.
-- `DelimitedTextResourceError` and `XlsxResourceError` retain their resource/limit/actual fields while sharing the canonical envelope.
+Start with [`SheetwriteError`](/docs/api/core/sheetwrite-error/) and
+[`isSheetwriteError`](/docs/api/core/is-sheetwrite-error/). Branch on the stable
+`code` and `operation` fields; use the boundary-specific classes below only when
+their structured fields are needed.
+
+The complete enums are [`SheetwriteErrorCode`](/docs/api/core/sheetwrite-error-code/)
+and [`SheetwriteErrorOperation`](/docs/api/core/sheetwrite-error-operation/);
+their runtime value sets are
+[`SHEETWRITE_ERROR_CODES`](/docs/api/core/sheetwrite-error-codes/) and
+[`SHEETWRITE_ERROR_OPERATIONS`](/docs/api/core/sheetwrite-error-operations/).
+
+<div class="error-catalog">
+<a href="/docs/api/core/snapshot-validation-error/"><code>SnapshotValidationError</code><span>Malformed workbook snapshot; inspect path-qualified <code>errors</code>.</span></a>
+<a href="/docs/api/core/snapshot-resource-error/"><code>SnapshotResourceError</code><span>Workbook construction exceeded a configured resource ceiling.</span></a>
+<a href="/docs/api/core/incomplete-data-error/"><code>IncompleteDataError</code><span>A query needs datasource pages that are not loaded yet.</span></a>
+<a href="/docs/api/core/delimited-text-options-error/"><code>DelimitedTextOptionsError</code><span>A CSV/TSV resource-limit option is invalid.</span></a>
+<a href="/docs/api/core/delimited-text-resource-error/"><code>DelimitedTextResourceError</code><span>CSV/TSV parsing or encoding exceeded a declared limit.</span></a>
+<a href="/docs/api/core/xlsx-resource-error/"><code>XlsxResourceError</code><span>XLSX import or export exceeded a codec resource ceiling.</span></a>
+<a href="/docs/api/core/persistence-error/"><code>PersistenceError</code><span>Host load, commit, or recovery failed with a stable persistence code.</span></a>
+<a href="/docs/api/core-browser/indexed-db-pending-commit-storage-error/"><code>IndexedDbPendingCommitStorageError</code><span>Browser durable-queue storage is unavailable, blocked, aborted, corrupt, or over quota.</span></a>
+<a href="/docs/api/core/sync-protocol-error/"><code>SyncProtocolError</code><span>Remote synchronization input is malformed or exceeds a protocol bound.</span></a>
+<a href="/docs/api/core/sync-pending-capacity-error/"><code>SyncPendingCapacityError</code><span>The durable local queue cannot reserve capacity for another transaction.</span></a>
+</div>
+
+## Recovery by boundary
+
+- `SnapshotValidationError` rejects malformed workbooks before partial hydration. Inspect its path-qualified `errors`; fix or reject the source instead of retrying unchanged bytes.
+- `SnapshotResourceError` reports bounded workbook construction. Reduce the document or explicitly raise the named host-controlled ceiling.
+- `DelimitedTextOptionsError` rejects an invalid CSV/TSV ceiling before work starts. Correct the option; retrying the same configuration cannot succeed.
+- `DelimitedTextResourceError` and `XlsxResourceError` retain `resource`, `limit`, and `actual`. Reduce the input/output or explicitly change the applicable limit.
+- `IncompleteDataError` identifies datasource pages required by the operation. Load those pages or use a visible-window operation; do not treat unloaded cells as empty.
+- `PersistenceError` retains the host load/commit `cause`; its code distinguishes aborted work, invalid snapshots, resource limits, missing state, and rejected commits.
+- `IndexedDbPendingCommitStorageError` distinguishes unavailable, blocked, aborted, corrupt, and quota-limited browser storage.
+- `SyncProtocolError` rejects malformed or resource-violating remote input. Fix the producer; do not replay the same payload.
+- `SyncPendingCapacityError` rejects a new local transaction before it can exceed the durable queue ceiling. Drain or reconcile pending work before retrying.
 
 Worker startup and capability failures switch to the canvas renderer and emit `renderer-fallback`; observe `grid.rendererKind` to report the active renderer, not the requested option.
 

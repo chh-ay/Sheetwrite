@@ -261,7 +261,7 @@ function PerformanceRoute() {
             },
           },
           renderer,
-          overscan: SCALE_OVERSCAN,
+          overscan: evictionStress ? 0 : SCALE_OVERSCAN,
           ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
         });
         gridRef.current = grid;

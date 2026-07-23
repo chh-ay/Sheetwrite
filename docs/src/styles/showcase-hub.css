@@ -10,7 +10,7 @@
 .sw-hub {
   width: min(calc(100% - 3rem), 92.5rem);
   margin-inline: auto;
-  padding: clamp(2.75rem, 7vh, 4.75rem) 0 3rem;
+  padding: clamp(1.5rem, 3vh, 2rem) 0 3rem;
 }
 
 .sw-hub :is(a, button, summary):focus-visible {
@@ -22,7 +22,7 @@
 /* Give the launcher a real opening beat before the proof gallery. */
 .sw-hub__hero {
   display: block;
-  padding-bottom: clamp(1.75rem, 4vh, 3rem);
+  padding-bottom: 1rem;
   border-bottom: 1px solid var(--sw-border);
 }
 
@@ -108,7 +108,7 @@
 
 /* Keep the section hierarchy readable before the dense proof controls. */
 .sw-hub__scenes {
-  margin-top: clamp(2rem, 4vh, 3rem);
+  margin-top: 1.25rem;
 }
 
 .sw-hub__section-heading {
@@ -146,7 +146,7 @@
   gap: var(--sw-demo-space-3);
   align-items: center;
   justify-content: space-between;
-  margin: clamp(2rem, 4vh, 3rem) 0;
+  margin: 1.25rem 0;
 }
 
 .sw-hub__filters {
@@ -313,13 +313,13 @@
   min-width: 0;
   width: 100%;
   margin-top: auto;
-  overflow: hidden;
+  overflow: visible;
   color: var(--sw-demo-muted);
   font: 600 0.75rem / 1.35 var(--sw-font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  text-overflow: clip;
 }
 
 .sw-hub-framework-scene {
@@ -596,6 +596,24 @@
 }
 
 /* Tablet is a stable two-column gallery. */
+@media (min-width: 80rem) and (min-height: 56rem) {
+  .sw-hub {
+    padding-top: 3rem;
+  }
+
+  .sw-hub__hero {
+    padding-bottom: 1.75rem;
+  }
+
+  .sw-hub__scenes {
+    margin-top: 2.25rem;
+  }
+
+  .sw-hub__toolbar {
+    margin-block: 1.5rem;
+  }
+}
+
 @media (max-width: 79.999rem) {
   .sw-hub-scenes {
     grid-template-columns: repeat(2, minmax(0, 1fr));

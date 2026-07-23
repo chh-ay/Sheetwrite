@@ -231,7 +231,7 @@ export default function ReactWorkbench() {
         </div>
 
         <details className="sw-rwb-tools">
-          <summary aria-label="Secondary tools" role="button">
+          <summary aria-label="Secondary tools">
             <span>Secondary tools</span>
             <small>Find & replace · native editing · data exchange · runtime</small>
           </summary>

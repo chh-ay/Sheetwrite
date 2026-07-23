@@ -9,7 +9,7 @@ Sheetwrite evaluates formulas in the Rust/WASM calculation engine. Formula sourc
 
 Sheetwrite intentionally implements a coherent spreadsheet subset. It does **not** claim full Google Sheets or Excel formula parity.
 
-See the generated [formula function contract](/docs/reference/formula-functions/) for the complete inventory-derived function table and the [detailed compatibility results](/docs/reference/compatibility-matrix/) for checked operator, spill, preservation, and unsupported boundaries.
+See the generated [formula function contract](/docs/reference/formula-functions/) for the complete inventory-derived function table and the [detailed compatibility results](/docs/reference/compatibility-results/) for checked operator, spill, preservation, and unsupported boundaries.
 
 ## Authoring formulas
 

@@ -1,4 +1,6 @@
-import EngineLandingTeaser from "./EngineLandingTeaser.js";
+import { lazy, Suspense } from "react";
+
+const EngineLandingTeaser = lazy(() => import("./EngineLandingTeaser.js"));
 
 /**
  * Keeps the landing page's engine callout static and engine-free. The live
@@ -7,7 +9,9 @@ import EngineLandingTeaser from "./EngineLandingTeaser.js";
 export function LazyEngineTeaser() {
   return (
     <section aria-labelledby="landing-engine-title" className="sw-landing-engine-slot">
-      <EngineLandingTeaser />
+      <Suspense fallback={null}>
+        <EngineLandingTeaser />
+      </Suspense>
     </section>
   );
 }

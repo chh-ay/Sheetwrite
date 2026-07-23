@@ -28,7 +28,7 @@
   .sw-sp-page {
     width: min(var(--sw-sp-page-width), calc(100% - var(--sw-sp-space-6)));
     margin-inline: auto;
-    padding-block: clamp(2.5rem, 6vh, 4.5rem) var(--sw-sp-space-8);
+    padding-block: 0.75rem var(--sw-sp-space-8);
   }
 
   .sw-sp-kicker {
@@ -252,6 +252,7 @@
   .sw-sp-stage-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--sw-sp-instrument-width);
+    align-items: start;
     min-width: 0;
     background: var(--sw-surface-1);
   }
@@ -332,6 +333,7 @@
     flex: 1 1 var(--sw-sp-grid-height);
     touch-action: pan-x pan-y;
     overscroll-behavior: contain;
+    scroll-margin-top: calc(var(--sw-header-height) + var(--sw-sp-space-3));
   }
 
   .sw-sp-instrument {

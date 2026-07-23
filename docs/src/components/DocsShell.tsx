@@ -108,7 +108,11 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
           </h1>
           <span>{description}</span>
         </header>
-        <article className="sw-prose">{children}</article>
+        <article
+          className={`sw-prose${activeHref === "/docs/reference/compatibility-limits/" ? " sw-prose--resource-limits" : ""}`}
+        >
+          {children}
+        </article>
         <TableOfContents />
         <footer className="sw-document__footer" data-pagefind-ignore>
           <span>Sheetwrite is MIT licensed.</span>

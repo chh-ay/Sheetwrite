@@ -25,8 +25,9 @@ export default function HostRowsShowcase() {
   const grid = useRef<Grid | null>(null);
   const nextId = useRef(4);
   const denyNext = useRef(false);
+  const logSequence = useRef(0);
   const [entities, setEntities] = useState(() => new Map(initialRows.map((row) => [row.id, row])));
-  const [log, setLog] = useState<string[]>([]);
+  const [log, setLog] = useState<Array<{ id: number; text: string }>>([]);
   const input = useMemo(() => {
     const value = createSimpleGridInput({
       columns,
@@ -54,7 +55,13 @@ export default function HostRowsShowcase() {
 
   const applyProjection = (projection: RowBridgeProjection<string>) => {
     setLog((entries) =>
-      [`${projection.status} · ${projection.transaction.id}`, ...entries].slice(0, 8),
+      [
+        {
+          id: logSequence.current++,
+          text: `${projection.status} · ${projection.transaction.id}`,
+        },
+        ...entries,
+      ].slice(0, 8),
     );
     setEntities((current) => {
       const next = new Map(current);
@@ -186,8 +193,8 @@ export default function HostRowsShowcase() {
         <div>
           <h2>Delta log</h2>
           <ol data-testid="host-delta-log">
-            {log.map((entry, index) => (
-              <li key={`${entry}-${index}`}>{entry}</li>
+            {log.map((entry) => (
+              <li key={entry.id}>{entry.text}</li>
             ))}
           </ol>
         </div>

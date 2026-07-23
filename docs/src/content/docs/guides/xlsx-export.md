@@ -34,7 +34,7 @@ Hyperlinks retain stable IDs in Sheetwrite metadata. Internal destinations use s
 
 Conditional rules are evaluated in array order. Earlier rules have style precedence, and a matching `stopIfTrue` prevents later rules from entering the main/Worker match mask. Formula predicates are anchored at the rule range's top-left: relative A1 references move per target cell while `$`-absolute components stay fixed. One sheet admits at most 32 rules (the deterministic `u32` renderer mask), and one predicate formula is limited to 8,192 characters. SpreadsheetML `cellIs`, blank/text, and expression rules round-trip with priority and stop behavior. Color scales, data bars, icon sets, and unrepresentable differential styles remain in neither the live model nor the renderer; import emits a deterministic `format-loss` warning naming the exact dropped rule kind.
 
-The [detailed compatibility results](/docs/reference/compatibility-matrix/) distinguish evaluated, preserved, flattened, warning, and unsupported behavior by checked test file and producing application.
+The [detailed compatibility results](/docs/reference/compatibility-results/) distinguish evaluated, preserved, flattened, warning, and unsupported behavior by checked test file and producing application.
 
 ## Resource limits
 
