@@ -269,6 +269,37 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
     );
   });
 
+  it("drops malformed, unsafe, and over-budget conditional rules independently", async () => {
+    const warnings: XlsxWorkbookWarning[] = [];
+    const oversizedFormula = `=${"A".repeat(8_192)}`;
+    const rules = [
+      '<cfRule type="cellIs" priority="-1" operator="equal"><formula>1</formula></cfRule>',
+      '<cfRule type="cellIs" priority="2" operator="between"><formula>1</formula></cfRule>',
+      `<cfRule type="expression" priority="3"><formula>${oversizedFormula}</formula></cfRule>`,
+      '<cfRule type="expression" priority="4"><formula>[1]Sheet1!A1</formula></cfRule>',
+      '<cfRule type="containsBlanks" priority="5" dxfId="bad"/>',
+      '<cfRule type="containsBlanks" priority="6" dxfId="999"/>',
+    ].join("");
+    const bytes = originalEcmaVector({
+      conditionalFormatting: `<conditionalFormatting sqref="A1">${rules}</conditionalFormatting>`,
+    });
+
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes, {
+      onWarning: (warning) => warnings.push(warning),
+    });
+
+    expect(imported.sheets[0]!.conditionalFormats).toBeUndefined();
+    expect(warnings.map((warning) => warning.message)).toEqual(
+      expect.arrayContaining([
+        "Excel conditional-format rule has an invalid priority and was dropped",
+        "Excel conditional-format rule type cellIs is unsupported and was dropped",
+        "Excel conditional-format formula exceeds 8192 characters and was dropped",
+        "External-data conditional-format formula was dropped",
+        "Excel conditional-format rule type containsBlanks has an invalid differential style and was dropped",
+      ]),
+    );
+  });
+
   it("caps oversized hyperlinks and reports extension loss exactly", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const hyperlinks = Array.from(

@@ -81,12 +81,16 @@ async function bootScale(page: Page): Promise<void> {
 }
 
 async function readWindow(page: Page): Promise<WindowReadout> {
-  const [windowText, rowText, columnText, selected] = await Promise.all([
-    page.getByTestId("scale-window-a1").textContent(),
-    page.getByTestId("scale-window-rows").textContent(),
-    page.getByTestId("scale-window-columns").textContent(),
-    page.getByTestId("scale-current-a1").textContent(),
-  ]);
+  const { windowText, rowText, columnText, selected } = await page.evaluate(() => {
+    const text = (testId: string): string | null =>
+      document.querySelector(`[data-testid="${testId}"]`)?.textContent ?? null;
+    return {
+      windowText: text("scale-window-a1"),
+      rowText: text("scale-window-rows"),
+      columnText: text("scale-window-columns"),
+      selected: text("scale-current-a1"),
+    };
+  });
   const windowMatch = windowText?.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
   const rowMatch = rowText?.trim().match(/^(\d+)–(\d+)$/);
   const columnMatch = columnText?.trim().match(/^([A-Z]+)–([A-Z]+)$/);
