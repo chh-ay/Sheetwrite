@@ -229,6 +229,8 @@ export function renderToolbarItems(
     return button;
   };
 
+  const colorPickDisposers: Array<() => void> = [];
+
   const addColorInput = (
     suffix: string,
     title: string,
@@ -239,7 +241,28 @@ export function renderToolbarItems(
     input.className = `sheetwrite-tb-color sheetwrite-tb-${suffix}`;
     input.title = title;
     if (title) input.setAttribute("aria-label", title);
-    input.addEventListener("change", () => onPick(input.value));
+
+    let timer: number | undefined;
+    let lastCommitted: string | undefined;
+    const commit = (): void => {
+      timer = undefined;
+      if (input.value === lastCommitted) return;
+      lastCommitted = input.value;
+      onPick(input.value);
+    };
+    const schedule = (): void => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(commit, 150);
+    };
+    const flush = (): void => {
+      if (timer === undefined) return;
+      window.clearTimeout(timer);
+      commit();
+    };
+    input.addEventListener("input", schedule);
+    input.addEventListener("change", schedule);
+    input.addEventListener("blur", flush);
+    colorPickDisposers.push(() => window.clearTimeout(timer));
 
     bar.appendChild(input);
     return input;
@@ -315,9 +338,14 @@ export function renderToolbarItems(
     }
   };
   update();
-  return typeof grid.on === "function"
-    ? grid.on("command-state-change", (event) => update(event.states))
-    : () => {};
+  const disposeState =
+    typeof grid.on === "function"
+      ? grid.on("command-state-change", (event) => update(event.states))
+      : () => {};
+  return () => {
+    disposeState();
+    for (const dispose of colorPickDisposers) dispose();
+  };
 }
 
 /**

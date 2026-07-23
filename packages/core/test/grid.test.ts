@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 import { SnapshotResourceError, validateTransactionResources } from "../src/document-protocol.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
@@ -807,32 +807,44 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
     store.dispose();
   });
-  it("commits a color picker value once when the picker closes", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-    const commits: unknown[] = [];
-    const unsubscribe = grid.on("change", (event) => commits.push(event));
-    const colorInput = host.querySelector(".sheetwrite-tb-fillColor");
-    expect(colorInput).toBeInstanceOf(HTMLInputElement);
-    if (!(colorInput instanceof HTMLInputElement)) throw new Error("fill-color input not mounted");
+  it("commits a color picker value once after a stream of native picker events", () => {
+    jest.useFakeTimers();
+    try {
+      const workbook = makeWorkbook(10);
+      const store = new SheetwriteStore(workbook, makeColumnarData(10));
+      const host = mountHost();
+      const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      const commits: unknown[] = [];
+      const unsubscribe = grid.on("change", (event) => commits.push(event));
+      const colorInput = host.querySelector(".sheetwrite-tb-fillColor");
+      expect(colorInput).toBeInstanceOf(HTMLInputElement);
+      if (!(colorInput instanceof HTMLInputElement)) {
+        throw new Error("fill-color input not mounted");
+      }
 
-    for (const color of ["#113355", "#446688", "#aa5533"]) {
-      colorInput.value = color;
-      colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+      for (const color of ["#113355", "#446688", "#aa5533"]) {
+        colorInput.value = color;
+        colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+        colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      expect(commits).toHaveLength(0);
+      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBeUndefined();
+
+      jest.advanceTimersByTime(150);
+      expect(commits).toHaveLength(1);
+      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBe("#aa5533");
+
+      colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+      jest.advanceTimersByTime(150);
+      expect(commits).toHaveLength(1);
+
+      unsubscribe();
+      grid.destroy();
+      store.dispose();
+    } finally {
+      jest.useRealTimers();
     }
-    expect(commits).toHaveLength(0);
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBeUndefined();
-
-    colorInput.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(commits).toHaveLength(1);
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBe("#aa5533");
-
-    unsubscribe();
-    grid.destroy();
-    store.dispose();
   });
   it("forwards every Grid event through the shared controller", () => {
     const workbook = makeWorkbook(10);
