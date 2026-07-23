@@ -4,9 +4,51 @@ import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "..");
+const PACKAGE_SIZE_HISTORY_PREFIX = "automation/package-size-history-";
+const REQUIRED_PACKAGE_SIZE_HISTORY_FILES = new Set([
+  "docs/src/content/docs/guides/performance-resources.md",
+  "scripts/size-history.json",
+]);
+const ALLOWED_PACKAGE_SIZE_HISTORY_FILES = new Set([
+  ...REQUIRED_PACKAGE_SIZE_HISTORY_FILES,
+  "docs/src/generated/docs-contract.json",
+]);
 
 export function releaseVersionFromHeadRef(headRef: string | undefined): string | undefined {
   return headRef !== undefined && STABLE_VERSION.test(headRef) ? headRef : undefined;
+}
+export function packageSizeHistoryVersionFromHeadRef(
+  headRef: string | undefined,
+): string | undefined {
+  if (headRef === undefined || !headRef.startsWith(PACKAGE_SIZE_HISTORY_PREFIX)) return undefined;
+  const version = headRef.slice(PACKAGE_SIZE_HISTORY_PREFIX.length);
+  return STABLE_VERSION.test(version) ? version : undefined;
+}
+export function isGeneratedPackageSizeHistoryChange(paths: readonly string[]): boolean {
+  const uniquePaths = new Set(paths);
+  return (
+    uniquePaths.size === paths.length &&
+    [...REQUIRED_PACKAGE_SIZE_HISTORY_FILES].every((path) => uniquePaths.has(path)) &&
+    paths.every((path) => ALLOWED_PACKAGE_SIZE_HISTORY_FILES.has(path))
+  );
+}
+
+async function changedFilesSinceDevelop(): Promise<string[]> {
+  const child = Bun.spawn(["git", "diff", "--name-only", "origin/develop...HEAD"], {
+    cwd: REPOSITORY_ROOT,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  if (exitCode !== 0) throw new Error(`Unable to inspect package size history diff: ${stderr}`);
+  return stdout
+    .split("\n")
+    .map((path) => path.trim())
+    .filter((path) => path.length > 0);
 }
 
 export function validateReleasePackageVersions(version: string, root = REPOSITORY_ROOT): void {
@@ -29,6 +71,19 @@ async function main(): Promise<void> {
     validateReleasePackageVersions(releaseVersion);
     console.log(`Release package versions match branch ${releaseVersion}`);
     return;
+  }
+  const packageSizeHistoryVersion = packageSizeHistoryVersionFromHeadRef(
+    process.env.GITHUB_HEAD_REF,
+  );
+  if (packageSizeHistoryVersion !== undefined) {
+    validateReleasePackageVersions(packageSizeHistoryVersion);
+    if (isGeneratedPackageSizeHistoryChange(await changedFilesSinceDevelop())) {
+      console.log(`Package size history versions match branch ${packageSizeHistoryVersion}`);
+      return;
+    }
+    console.log(
+      "Package size history branch contains non-generated changes; requiring a changeset",
+    );
   }
   const child = Bun.spawn(["bun", "run", "changeset:status", "--", "--since=origin/develop"], {
     cwd: REPOSITORY_ROOT,

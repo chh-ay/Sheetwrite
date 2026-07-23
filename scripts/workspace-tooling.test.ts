@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { releaseVersionFromHeadRef, validateReleasePackageVersions } from "./changeset-ci.js";
+import {
+  isGeneratedPackageSizeHistoryChange,
+  packageSizeHistoryVersionFromHeadRef,
+  releaseVersionFromHeadRef,
+  validateReleasePackageVersions,
+} from "./changeset-ci.js";
 import {
   assertUniqueOrderedNodes,
   PACKAGE_BUILD_NODES,
@@ -246,6 +251,40 @@ describe("changeset workspace contract", () => {
   it("runs the release-aware Changesets status command", () => {
     expect(releaseVersionFromHeadRef("0.3.1")).toBe("0.3.1");
     expect(releaseVersionFromHeadRef("feature/docs")).toBeUndefined();
+    expect(packageSizeHistoryVersionFromHeadRef("automation/package-size-history-0.3.1")).toBe(
+      "0.3.1",
+    );
+    expect(packageSizeHistoryVersionFromHeadRef("automation/package-size-history-next")).toBe(
+      undefined,
+    );
+    expect(
+      isGeneratedPackageSizeHistoryChange([
+        "docs/src/content/docs/guides/performance-resources.md",
+        "scripts/size-history.json",
+      ]),
+    ).toBeTrue();
+    expect(
+      isGeneratedPackageSizeHistoryChange([
+        "docs/src/content/docs/guides/performance-resources.md",
+        "docs/src/generated/docs-contract.json",
+        "scripts/size-history.json",
+      ]),
+    ).toBeTrue();
+    expect(
+      isGeneratedPackageSizeHistoryChange([
+        "docs/src/content/docs/guides/performance-resources.md",
+        "scripts/changeset-ci.ts",
+        "scripts/size-history.json",
+      ]),
+    ).toBeFalse();
+    expect(isGeneratedPackageSizeHistoryChange(["scripts/size-history.json"])).toBeFalse();
+    expect(
+      isGeneratedPackageSizeHistoryChange([
+        "docs/src/content/docs/guides/performance-resources.md",
+        "scripts/size-history.json",
+        "scripts/size-history.json",
+      ]),
+    ).toBeFalse();
     expect(() => validateReleasePackageVersions("0.3.1")).not.toThrow();
     expect(() => validateReleasePackageVersions("0.3.2")).toThrow(
       "Release branch 0.3.2 requires @sheetwrite/wasm@0.3.2",
