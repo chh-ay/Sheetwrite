@@ -271,6 +271,7 @@ async function datasourceRevisionWorkload(
     const grid = createGrid(document.createElement("div"), {
       workbook: workbook(rows),
       datasource: {
+        capabilities: { protocol: 2, columns: "windowed" },
         getRows: (nextRequest) => {
           request = nextRequest;
           return pending.promise;
@@ -325,7 +326,7 @@ async function datasourceRevisionWorkload(
     store.applyTransaction({ patches: operations });
     const before = grid.getMutationRevisionStats();
     const storeStats = store.getRangeMutationAllocationStats();
-    pending.resolve({ start: request.start, rows: [] });
+    pending.resolve({ protocol: 2, start: request.start, columns: request.columns, rows: [] });
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();

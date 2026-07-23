@@ -9,7 +9,7 @@ Case, whole-cell, sheet, and column constraints for grid search.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L301</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L388</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

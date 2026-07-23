@@ -9,7 +9,7 @@ Conservative defaults that retain the million-row paged-sheet contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L128</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L168</code></dd></div>
 </dl>
 
 ## Declaration

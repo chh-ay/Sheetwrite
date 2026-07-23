@@ -9,7 +9,7 @@ Queue, version, connection, or error transition emitted by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L202</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L217</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>12</span>
@@ -108,7 +108,7 @@ Queue, version, connection, or error transition emitted by synchronization.
 ```ts generated
 {
   type: "storage-error";
-  error: unknown;
+  error: SheetwriteError;
   clientMutationId?: string;
 }
 ```
@@ -117,7 +117,11 @@ Queue, version, connection, or error transition emitted by synchronization.
 <div class="api-variant">
 
 ```ts generated
-{ type: "error"; error: unknown; clientMutationId?: string }
+{
+  type: "error";
+  error: SheetwriteError;
+  clientMutationId?: string;
+}
 ```
 
 </div>
@@ -183,12 +187,12 @@ export type SyncCoordinatorEvent =
     }
   | {
       type: "storage-error";
-      error: unknown;
+      error: SheetwriteError;
       clientMutationId?: string;
     }
   | {
       type: "error";
-      error: unknown;
+      error: SheetwriteError;
       clientMutationId?: string;
     };
 ```

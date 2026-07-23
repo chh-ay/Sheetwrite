@@ -12,7 +12,7 @@ verbatim, and empty cells become `null`.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L327</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L369</code></dd></div>
 </dl>
 
 ## Declaration

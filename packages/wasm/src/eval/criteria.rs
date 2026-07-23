@@ -115,6 +115,17 @@ fn wildcard_tokens(pattern: &str) -> Option<Vec<WildcardToken>> {
     has_pattern_syntax.then_some(tokens)
 }
 
+pub(super) fn wildcard_matches_pattern(pattern: &str, candidate: &Value) -> bool {
+    let Some(text) = criterion_text(candidate) else {
+        return false;
+    };
+    if let Some(tokens) = wildcard_tokens(pattern) {
+        wildcard_matches(&tokens, &text)
+    } else {
+        text.eq_ignore_ascii_case(pattern)
+    }
+}
+
 fn wildcard_matches(pattern: &[WildcardToken], value: &str) -> bool {
     let text: Vec<char> = value.to_lowercase().chars().collect();
     let (mut pattern_index, mut text_index) = (0usize, 0usize);
@@ -193,6 +204,22 @@ pub(super) fn aggregate_if(
 ) -> Result<(f64, u64), FormulaError> {
     let mut sum = 0.0;
     let mut count = 0;
+    if let [(range, criterion)] = criteria {
+        for (value, candidate) in sum_range.values.iter().zip(&range.values) {
+            if !criterion.matches(candidate) {
+                continue;
+            }
+            match value {
+                Value::Number(value) => {
+                    sum += value;
+                    count += 1;
+                }
+                Value::Error(error) => return Err(*error),
+                Value::Text(_) | Value::Bool(_) | Value::Blank => {}
+            }
+        }
+        return Ok((sum, count));
+    }
     for (index, value) in sum_range.values.iter().enumerate() {
         if !criteria
             .iter()
@@ -210,4 +237,35 @@ pub(super) fn aggregate_if(
         }
     }
     Ok((sum, count))
+}
+
+pub(super) fn extreme_if(
+    value_range: &EvalMatrix,
+    criteria: &[(&EvalMatrix, &Criterion)],
+    maximum: bool,
+) -> Result<f64, FormulaError> {
+    let mut found = None;
+    for (index, value) in value_range.values.iter().enumerate() {
+        if !criteria
+            .iter()
+            .all(|(range, criterion)| criterion.matches(&range.values[index]))
+        {
+            continue;
+        }
+        match value {
+            Value::Number(value) if value.is_finite() => {
+                found = Some(found.map_or(*value, |current: f64| {
+                    if maximum {
+                        current.max(*value)
+                    } else {
+                        current.min(*value)
+                    }
+                }));
+            }
+            Value::Number(_) => return Err(FormulaError::Num),
+            Value::Error(error) => return Err(*error),
+            Value::Text(_) | Value::Bool(_) | Value::Blank => {}
+        }
+    }
+    Ok(found.unwrap_or(0.0))
 }

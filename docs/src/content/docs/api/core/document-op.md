@@ -9,10 +9,10 @@ Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L313</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L374</code></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>27</span>
+## Variants <span class="api-count" data-pagefind-ignore>33</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -203,6 +203,43 @@ Exhaustive serializable operation union for workbook mutations.
 
 ```ts generated
 {
+  op: "setSheetVisibility";
+  sheet: SheetId;
+  visibility: SheetVisibility;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "addTable"; table: WorkbookTable }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "updateTable";
+  sheet: SheetId;
+  tableId: string;
+  patch: WorkbookTablePatch;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeTable"; sheet: SheetId; tableId: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
   op: "setSheetMeta";
   sheet: SheetId;
   patch: {
@@ -232,6 +269,24 @@ Exhaustive serializable operation union for workbook mutations.
 
 ```ts generated
 { op: "removeValidationRule"; sheet: SheetId; id: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "setHyperlink";
+  sheet: SheetId;
+  hyperlink: CellHyperlink;
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ op: "removeHyperlink"; sheet: SheetId; id: string }
 ```
 
 </div>
@@ -389,6 +444,26 @@ export type DocumentOp =
       to: number;
     }
   | {
+      op: "setSheetVisibility";
+      sheet: SheetId;
+      visibility: SheetVisibility;
+    }
+  | {
+      op: "addTable";
+      table: WorkbookTable;
+    }
+  | {
+      op: "updateTable";
+      sheet: SheetId;
+      tableId: string;
+      patch: WorkbookTablePatch;
+    }
+  | {
+      op: "removeTable";
+      sheet: SheetId;
+      tableId: string;
+    }
+  | {
       op: "setSheetMeta";
       sheet: SheetId;
       patch: {
@@ -407,6 +482,16 @@ export type DocumentOp =
     }
   | {
       op: "removeValidationRule";
+      sheet: SheetId;
+      id: string;
+    }
+  | {
+      op: "setHyperlink";
+      sheet: SheetId;
+      hyperlink: CellHyperlink;
+    }
+  | {
+      op: "removeHyperlink";
       sheet: SheetId;
       id: string;
     }

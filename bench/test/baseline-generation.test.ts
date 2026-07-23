@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { relative, resolve } from "node:path";
 import { parseControlledBaseline } from "../src/controlled-baseline.js";
 import { generateBaseline } from "../src/generate-baseline.js";
 import { makeRenderArtifact, TEST_RUNNER } from "./gate-fixtures.js";
+
+const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 
 describe("reviewed controlled baseline generation", () => {
   let directory = "";
@@ -12,7 +13,9 @@ describe("reviewed controlled baseline generation", () => {
   let approvedPath = "";
 
   beforeAll(() => {
-    directory = mkdtempSync(resolve(tmpdir(), "sheetwrite-baseline-"));
+    const candidateRoot = resolve(REPOSITORY_ROOT, "bench/results/candidates");
+    mkdirSync(candidateRoot, { recursive: true });
+    directory = mkdtempSync(resolve(candidateRoot, "baseline-generation-"));
     rawPath = resolve(directory, "raw.json");
     approvedPath = resolve(directory, "approved.json");
     writeFileSync(rawPath, `${JSON.stringify(makeRenderArtifact({ rounds: 10 }), null, 2)}\n`);
@@ -42,7 +45,8 @@ describe("reviewed controlled baseline generation", () => {
       JSON.parse(readFileSync(firstPath, "utf8")) as unknown,
     );
     expect(candidate.source.rounds).toBe(10);
-    expect(candidate.source.rawArtifact).toBe(rawPath);
+    expect(candidate.source.rawArtifact).toBe(relative(REPOSITORY_ROOT, rawPath));
+    expect(candidate.source.rawSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(candidate.cells.every((cell) => cell.samplesMs.length === 30)).toBe(true);
   });
 

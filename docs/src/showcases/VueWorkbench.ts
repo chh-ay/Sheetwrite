@@ -10,6 +10,7 @@ import type {
   Selection,
 } from "@sheetwrite/core";
 import { cellA1, MemoryPersistenceAdapter, SyncCoordinator } from "@sheetwrite/core";
+import workerUrl from "@sheetwrite/core/worker?worker&url";
 import type { GridReadyEvent } from "@sheetwrite/vue";
 import { SheetwriteGrid } from "@sheetwrite/vue";
 import { FileSpreadsheet, ShieldCheck } from "lucide-vue-next";
@@ -45,6 +46,16 @@ declare global {
 
 type HostRole = "reviewer" | "finance-lead";
 type FeedKind = "event" | "rejected" | "lifecycle" | "sync";
+type TaskId =
+  | "validation"
+  | "protection"
+  | "change"
+  | "notes"
+  | "formatting"
+  | "sheets"
+  | "persistence"
+  | "renderer";
+type ChallengeState = "ready" | "rejected" | "authorized" | "accepted";
 
 interface FeedEntry {
   key: number;
@@ -57,6 +68,18 @@ interface FeedEntry {
 const GRID_CONFIG = { toolbar: true } as const;
 const FEED_LIMIT = 9;
 const ARCHIVE_SHEET_ID = "archive";
+const CHALLENGE_CELL: CellAddress = { sheet: "orders", row: 0, col: 6 };
+const CHALLENGE_VALUE = 999;
+const TASKS: ReadonlyArray<{ id: TaskId; label: string }> = [
+  { id: "validation", label: "Validation" },
+  { id: "protection", label: "Protection" },
+  { id: "change", label: "Change" },
+  { id: "notes", label: "Notes" },
+  { id: "formatting", label: "Formatting" },
+  { id: "sheets", label: "Sheets" },
+  { id: "persistence", label: "Persistence" },
+  { id: "renderer", label: "Renderer" },
+];
 
 const integer = new Intl.NumberFormat("en-US");
 
@@ -75,6 +98,7 @@ const App = defineComponent({
     const workbook = shallowRef(createBusinessWorkbook());
     const data = shallowRef(createBusinessData());
     const mutationPolicy = ref<"atomic" | "partial">("atomic");
+    const rendererMode = ref<"canvas" | "worker">("canvas");
 
     // Live adapter inputs — plain reactive state, no Grid replacement.
     const readOnly = ref(false);
@@ -105,6 +129,9 @@ const App = defineComponent({
     const syncBusy = ref(false);
 
     const feed = ref<FeedEntry[]>([]);
+    const activeTask = ref<TaskId>("protection");
+    const challengeState = ref<ChallengeState>("ready");
+    const challengeIssue = ref("Protected totals require the finance-lead role.");
 
     const gridOf = () => gridComponent.value?.grid ?? null;
     let sync: SyncCoordinator | null = null;
@@ -115,16 +142,21 @@ const App = defineComponent({
 
     /**
      * Host permission policy: stable identity, reactive decision. The barrier
-     * consults it for every operation intersecting a protected range, so sheet
-     * chrome (rename/move) stays open to reviewers while protected cell
-     * content requires the finance-lead role.
+     * consults it for every operation intersecting a protected range. Workbook
+     * chrome remains available to reviewers, while protected cell content
+     * requires the finance-lead role.
      */
     const protectionResolver: ProtectionResolver = (request) => {
-      if (request.protectedRange.permissionKey !== "orders:totals") return "deny";
-      if (role.value === "finance-lead") return "allow";
-      return request.operation.op === "renameSheet" || request.operation.op === "moveSheet"
-        ? "allow"
-        : "deny";
+      switch (request.operation.op) {
+        case "addSheet":
+        case "renameSheet":
+        case "moveSheet":
+        case "setSheetVisibility":
+          return "allow";
+        default:
+          if (request.protectedRange.permissionKey !== "orders:totals") return "deny";
+          return role.value === "finance-lead" ? "allow" : "deny";
+      }
     };
 
     function pushFeed(kind: FeedKind, code: string, detail: string): void {
@@ -250,20 +282,22 @@ const App = defineComponent({
       offRejected?.();
       offRejected = grid.on("mutation-rejected", ({ issues }) => {
         for (const issue of issues) {
-          pushFeed(
-            "rejected",
-            "grid.on(mutation-rejected)",
+          const detail =
             issue.kind === "validation"
               ? `${issue.ruleId} · ${issue.message}`
               : issue.kind === "protection"
                 ? `${issue.protectedRangeId} · ${issue.message}`
-                : issue.message,
-          );
+                : issue.message;
+          pushFeed("rejected", "grid.on(mutation-rejected)", detail);
+          challengeIssue.value = detail;
         }
+        challengeState.value = "rejected";
+        activeTask.value = "protection";
         refreshInspector();
       });
       bindHostPersistence(grid);
       refreshWorkbook();
+      grid.setSelection({ kind: "cell", addr: CHALLENGE_CELL });
       refreshInspector();
       pushFeed("lifecycle", "@ready", `generation ${event.generation} (${event.reason})`);
     }
@@ -277,11 +311,52 @@ const App = defineComponent({
       refreshSync();
       refreshWorkbook();
       refreshInspector();
+      const committedChallenge = event.transaction.patches.some(
+        (patch) =>
+          patch.op === "set" &&
+          patch.addr.sheet === CHALLENGE_CELL.sheet &&
+          patch.addr.row === CHALLENGE_CELL.row &&
+          patch.addr.col === CHALLENGE_CELL.col &&
+          patch.value.kind === "literal" &&
+          patch.value.value === CHALLENGE_VALUE,
+      );
+      if (role.value === "finance-lead" && committedChallenge) {
+        challengeState.value = "accepted";
+        challengeIssue.value = `orders!G1 changed from 8 to ${CHALLENGE_VALUE}; host commit queued.`;
+        activeTask.value = "protection";
+      }
     }
 
     function onSelectionChange(value: Selection | null): void {
       selected.value = value?.kind === "cell" ? value.addr : null;
       refreshInspector();
+    }
+
+    function setRole(next: HostRole): void {
+      role.value = next;
+      if (next === "finance-lead" && challengeState.value === "rejected") {
+        challengeState.value = "authorized";
+        challengeIssue.value =
+          "Finance lead authorized. Commit the same G1 override to prove the policy changed.";
+      }
+      refreshInspector();
+    }
+
+    function commitChallenge(): void {
+      const grid = gridOf();
+      if (!grid || !ready.value) return;
+      grid.setActiveSheet("orders");
+      grid.setSelection({ kind: "cell", addr: CHALLENGE_CELL });
+      grid.scrollToCell(CHALLENGE_CELL);
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: CHALLENGE_CELL,
+            value: { kind: "literal", value: CHALLENGE_VALUE },
+          },
+        ],
+      });
     }
 
     async function syncToHost(): Promise<void> {
@@ -319,7 +394,7 @@ const App = defineComponent({
     function addArchiveSheet(): void {
       const grid = gridOf();
       if (!grid || sheets.value.some((sheet) => sheet.id === ARCHIVE_SHEET_ID)) return;
-      const id = grid.addSheet({
+      const result = grid.addSheet({
         id: ARCHIVE_SHEET_ID,
         name: "Archive FY25",
         rowCount: 20,
@@ -328,26 +403,35 @@ const App = defineComponent({
           { key: "closed", header: "Closed", width: 140, type: "text" },
         ],
       });
-      grid.setActiveSheet(id);
+      if (result.status === "applied") grid.setActiveSheet(result.sheet);
     }
 
     function openSuppliers(): void {
       gridOf()?.setActiveSheet("suppliers");
     }
 
-    function togglePolicy(): void {
-      if (!ready.value || pendingCount.value > 0) return;
+    function resetGridInput(code: string, detail: string): void {
       ready.value = false;
-      mutationPolicy.value = mutationPolicy.value === "atomic" ? "partial" : "atomic";
-      // Reset-bound inputs are regenerated together so the replacement Grid
-      // re-ingests pristine scenario data in one adapter reset.
+      challengeState.value = "ready";
+      challengeIssue.value = "Protected totals require the finance-lead role.";
       workbook.value = createBusinessWorkbook();
       data.value = createBusinessData();
-      pushFeed(
-        "lifecycle",
+      pushFeed("lifecycle", code, detail);
+    }
+
+    function togglePolicy(): void {
+      if (!ready.value || pendingCount.value > 0) return;
+      mutationPolicy.value = mutationPolicy.value === "atomic" ? "partial" : "atomic";
+      resetGridInput(
         ":mutation-policy",
         `${mutationPolicy.value} — reset-bound input, grid rebuilds`,
       );
+    }
+
+    function setRenderer(next: "canvas" | "worker"): void {
+      if (!ready.value || pendingCount.value > 0 || rendererMode.value === next) return;
+      rendererMode.value = next;
+      resetGridInput(":renderer", `${next} — reset-bound input, grid rebuilds`);
     }
 
     let themeObserver: MutationObserver | null = null;
@@ -386,17 +470,79 @@ const App = defineComponent({
       ]),
     ];
 
+    function taskTab(task: (typeof TASKS)[number], index: number) {
+      const active = activeTask.value === task.id;
+      return h(
+        "button",
+        {
+          id: `vue-task-${task.id}`,
+          type: "button",
+          role: "tab",
+          tabindex: active ? 0 : -1,
+          "aria-selected": active,
+          "aria-controls": `vue-panel-${task.id}`,
+          onClick: () => {
+            activeTask.value = task.id;
+          },
+          onKeydown: (event: KeyboardEvent) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const next =
+              event.key === "Home"
+                ? 0
+                : event.key === "End"
+                  ? TASKS.length - 1
+                  : (index + (event.key === "ArrowRight" ? 1 : -1) + TASKS.length) % TASKS.length;
+            activeTask.value = TASKS[next]!.id;
+            requestAnimationFrame(() =>
+              document.getElementById(`vue-task-${TASKS[next]!.id}`)?.focus(),
+            );
+          },
+        },
+        task.label,
+      );
+    }
+
+    function panelAttrs(id: TaskId) {
+      return {
+        id: `vue-panel-${id}`,
+        class: "sw-vuewb-taskpanel",
+        role: "tabpanel",
+        "aria-labelledby": `vue-task-${id}`,
+        hidden: activeTask.value !== id,
+      };
+    }
+
+    const eventFeed = () =>
+      h(
+        "ol",
+        { class: "sw-vuewb-feed", "data-testid": "feed", "aria-label": "Adapter events" },
+        feed.value.length > 0
+          ? feed.value.map((entry) =>
+              h("li", { key: entry.key, "data-kind": entry.kind }, [
+                h("code", entry.code),
+                h("span", entry.detail),
+              ]),
+            )
+          : [
+              h("li", { "data-kind": "event" }, [
+                h("code", "feed"),
+                h("span", "Interact with the workbook to populate this feed."),
+              ]),
+            ],
+      );
+
     return () =>
       h("section", { class: "sw-demo-app sw-vuewb-app", "data-framework": "vue" }, [
-        h("main", { class: "sw-demo-main" }, [
-          h("header", { class: "sw-demo-controlbar" }, [
+        h("main", { class: "sw-demo-main sw-vuewb-main" }, [
+          h("header", { class: "sw-demo-controlbar sw-vuewb-controlbar" }, [
             h("div", { class: "sw-demo-controlbar__identity" }, [
               h("span", { class: "sw-demo-product__mark", "aria-hidden": "true" }, [
                 h(FileSpreadsheet, { size: 16 }),
               ]),
               h("div", [
-                h("h2", "Order operations"),
-                h("span", `${integer.format(BUSINESS_ROWS)} governed orders`),
+                h("h2", "Governed purchase orders"),
+                h("span", `${integer.format(BUSINESS_ROWS)} live rows · challenge G1`),
               ]),
             ]),
             h(
@@ -407,62 +553,38 @@ const App = defineComponent({
                 "aria-label": "Workbench configuration",
               },
               [
-                h("label", { class: "sw-vuewb-role" }, [
-                  h("span", { class: "sw-visually-hidden" }, "Host role"),
-                  h(
-                    "select",
-                    {
-                      "data-testid": "role",
-                      "aria-label": "Host role",
-                      value: role.value,
-                      onChange: (event: Event) => {
-                        role.value = (event.target as HTMLSelectElement).value as HostRole;
-                        refreshInspector();
+                h("fieldset", { class: "sw-vuewb-role", "aria-label": "Host role" }, [
+                  h("legend", "Acting as"),
+                  (["reviewer", "finance-lead"] as const).map((candidate) =>
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "aria-pressed": role.value === candidate,
+                        "data-testid": `role-${candidate}`,
+                        onClick: () => setRole(candidate),
                       },
-                    },
-                    [
-                      h("option", { value: "reviewer" }, "Reviewer"),
-                      h("option", { value: "finance-lead" }, "Finance lead"),
-                    ],
+                      candidate === "reviewer" ? "Reviewer" : "Finance lead",
+                    ),
                   ),
                 ]),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    "data-testid": "readonly",
-                    "aria-pressed": readOnly.value,
-                    onClick: () => {
-                      readOnly.value = !readOnly.value;
-                      pushFeed("event", ":read-only", String(readOnly.value));
-                    },
-                  },
-                  "Read only",
-                ),
-                h(
-                  "button",
-                  {
-                    type: "button",
-                    "data-testid": "mutation-policy",
-                    disabled: !ready.value || pendingCount.value > 0,
-                    title:
-                      pendingCount.value > 0
-                        ? "Sync pending commits first — this input rebuilds the Grid."
-                        : "Reset-bound adapter input: toggling replaces the Grid.",
-                    onClick: togglePolicy,
-                  },
-                  `Policy: ${mutationPolicy.value}`,
-                ),
               ],
             ),
             h(
               "span",
-              { class: "sw-demo-controlbar__state", role: "status", "data-state": "ready" },
-              [h(ShieldCheck, { size: 14, "aria-hidden": "true" }), " Governed workbook"],
+              {
+                class: "sw-demo-controlbar__state",
+                role: "status",
+                "data-state": challengeState.value === "accepted" ? "accepted" : "ready",
+              },
+              [
+                h(ShieldCheck, { size: 14, "aria-hidden": "true" }),
+                challengeState.value === "accepted" ? " Override committed" : " Policy enforced",
+              ],
             ),
           ]),
           h("div", { class: "sw-vuewb-workspace" }, [
-            h("div", { class: "sw-demo-grid" }, [
+            h("div", { class: "sw-demo-grid sw-vuewb-grid" }, [
               h(SheetwriteGrid, {
                 ref: gridComponent,
                 workbook: workbook.value,
@@ -471,6 +593,8 @@ const App = defineComponent({
                 readOnly: readOnly.value,
                 mutationPolicy: mutationPolicy.value,
                 protectionResolver,
+                renderer: rendererMode.value,
+                workerUrl: rendererMode.value === "worker" ? workerUrl : undefined,
                 config: GRID_CONFIG,
                 style: "height: 100%",
                 onReady,
@@ -491,16 +615,173 @@ const App = defineComponent({
                 },
               }),
             ]),
-            h("aside", { class: "sw-vuewb-panel", "aria-label": "Workbench panels" }, [
-              h("section", { class: "sw-vuewb-section" }, [
-                h("div", { class: "sw-vuewb-section__head" }, [h("h3", "Cell inspector")]),
+            h("aside", { class: "sw-vuewb-panel", "aria-label": "Policy and workbook tasks" }, [
+              h(
+                "nav",
+                { class: "sw-vuewb-tasktabs", role: "tablist", "aria-label": "Workbook tasks" },
+                [...TASKS.map(taskTab)],
+              ),
+              h("section", panelAttrs("validation"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Validation"),
+                    h("p", "The selected cell resolves its workbook rule before any commit."),
+                  ]),
+                ]),
+                h("dl", { class: "sw-vuewb-inspector" }, inspectorRows()),
+                h(
+                  "div",
+                  {
+                    class: "sw-vuewb-task-summary",
+                    "data-state": selectedRule.value ? "active" : "idle",
+                  },
+                  [
+                    h(
+                      "strong",
+                      selectedRule.value ? selectedRule.value.id : "No rule on this cell",
+                    ),
+                    h(
+                      "span",
+                      selectedRule.value
+                        ? `${selectedRule.value.policy} validation is enforced at the mutation barrier.`
+                        : "Select a Status or Quantity cell to inspect its validation contract.",
+                    ),
+                  ],
+                ),
+              ]),
+              h("section", panelAttrs("protection"), [
+                h("div", { class: "sw-vuewb-challenge__head" }, [
+                  h("span", "ONE LIVE CHALLENGE"),
+                  h("strong", "Override the protected G1 total"),
+                  h(
+                    "p",
+                    "Attempt as Reviewer, authorize Finance lead, then commit the same mutation.",
+                  ),
+                ]),
                 h(
                   "dl",
                   { class: "sw-vuewb-inspector", "data-testid": "inspector" },
                   inspectorRows(),
                 ),
+                h(
+                  "output",
+                  {
+                    class: "sw-vuewb-policy-result",
+                    "data-testid": "policy-result",
+                    "data-state": challengeState.value,
+                    role: challengeState.value === "rejected" ? "alert" : "status",
+                    "aria-live": "polite",
+                  },
+                  [
+                    h(
+                      "strong",
+                      challengeState.value === "accepted"
+                        ? "Accepted"
+                        : challengeState.value === "rejected"
+                          ? "Rejected"
+                          : challengeState.value === "authorized"
+                            ? "Role changed"
+                            : "Protected",
+                    ),
+                    h("span", challengeIssue.value),
+                  ],
+                ),
+                h("ol", { class: "sw-vuewb-steps", "aria-label": "Protected edit workflow" }, [
+                  h("li", { "data-state": challengeState.value === "ready" ? "current" : "done" }, [
+                    h("span", "1"),
+                    h("div", [h("strong", "Attempt"), h("small", "Write 999 to G1")]),
+                  ]),
+                  h(
+                    "li",
+                    {
+                      "data-state":
+                        challengeState.value === "rejected"
+                          ? "current"
+                          : challengeState.value === "authorized" ||
+                              challengeState.value === "accepted"
+                            ? "done"
+                            : "waiting",
+                    },
+                    [
+                      h("span", "2"),
+                      h("div", [h("strong", "Authorize"), h("small", "Finance lead")]),
+                    ],
+                  ),
+                  h(
+                    "li",
+                    { "data-state": challengeState.value === "accepted" ? "done" : "waiting" },
+                    [
+                      h("span", "3"),
+                      h("div", [h("strong", "Commit"), h("small", "Queue mutation")]),
+                    ],
+                  ),
+                ]),
+                h("div", { class: "sw-vuewb-challenge__actions" }, [
+                  h(
+                    "button",
+                    {
+                      type: "button",
+                      "data-testid": "challenge-attempt",
+                      disabled:
+                        !ready.value || readOnly.value || challengeState.value === "accepted",
+                      onClick: commitChallenge,
+                    },
+                    role.value === "reviewer" ? "Attempt 999 as reviewer" : "Commit 999 override",
+                  ),
+                  h(
+                    "button",
+                    {
+                      type: "button",
+                      "data-testid": "challenge-authorize",
+                      "data-variant": "primary",
+                      disabled:
+                        role.value === "finance-lead" || challengeState.value === "accepted",
+                      onClick: () => setRole("finance-lead"),
+                    },
+                    "Authorize finance lead",
+                  ),
+                ]),
+              ]),
+              h("section", panelAttrs("change"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Change"),
+                    h("p", "Policy outcome and host work stay causally adjacent."),
+                  ]),
+                ]),
+                h("div", { class: "sw-vuewb-task-summary", "data-state": challengeState.value }, [
+                  h(
+                    "strong",
+                    challengeState.value === "accepted"
+                      ? "Mutation queued"
+                      : challengeState.value === "rejected"
+                        ? "Mutation rejected"
+                        : "Awaiting governed edit",
+                  ),
+                  h("span", challengeIssue.value),
+                ]),
+                h("dl", { class: "sw-vuewb-change-meters" }, [
+                  h("div", [h("dt", "Cell"), h("dd", selectedLabel.value)]),
+                  h("div", [h("dt", "Pending"), h("dd", String(pendingCount.value))]),
+                  h("div", [h("dt", "Host"), h("dd", `v${serverVersion.value}`)]),
+                ]),
+              ]),
+              h("section", panelAttrs("notes"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Notes"),
+                    h("p", `Selected ${selectedLabel.value} · ${accessLabel.value.text}`),
+                  ]),
+                ]),
+                h(
+                  "dl",
+                  { class: "sw-vuewb-inspector sw-vuewb-inspector--compact" },
+                  inspectorRows(),
+                ),
                 h("div", { class: "sw-vuewb-note" }, [
+                  h("label", { for: "vue-cell-note" }, "Selected-cell note"),
                   h("textarea", {
+                    id: "vue-cell-note",
                     "data-testid": "note-input",
                     "aria-label": "Cell note",
                     placeholder:
@@ -532,13 +813,34 @@ const App = defineComponent({
                           selected.value === null || readOnly.value || noteStored.value === null,
                         onClick: () => saveNote(true),
                       },
-                      "Clear note",
+                      "Clear",
                     ),
                   ]),
                 ]),
               ]),
-              h("section", { class: "sw-vuewb-section" }, [
-                h("div", { class: "sw-vuewb-section__head" }, [h("h3", "Workbook")]),
+              h("section", panelAttrs("formatting"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Format the live selection"),
+                    h(
+                      "p",
+                      "Use the Grid toolbar above the rows; style commits enter the same host queue.",
+                    ),
+                  ]),
+                ]),
+                h("dl", { class: "sw-vuewb-inspector" }, inspectorRows()),
+                h("p", { class: "sw-vuewb-taskhint" }, [
+                  h("strong", "Try this: "),
+                  "select Supplier, press Bold, then inspect Pending in the Persistence task.",
+                ]),
+              ]),
+              h("section", panelAttrs("sheets"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Sheet operations"),
+                    h("p", "Rename, add, or open through the public Grid API."),
+                  ]),
+                ]),
                 h("div", { class: "sw-vuewb-workbook" }, [
                   h(
                     "p",
@@ -599,9 +901,12 @@ const App = defineComponent({
                   ]),
                 ]),
               ]),
-              h("section", { class: "sw-vuewb-section" }, [
+              h("section", panelAttrs("persistence"), [
                 h("div", { class: "sw-vuewb-section__head" }, [
-                  h("h3", "Host persistence"),
+                  h("div", [
+                    h("h3", "Host persistence"),
+                    h("p", "Local document changes stay pending until acknowledged."),
+                  ]),
                   h("a", { href: "/showcases/database/" }, "Durable proof →"),
                 ]),
                 h("div", { class: "sw-vuewb-persist" }, [
@@ -650,40 +955,97 @@ const App = defineComponent({
                   ),
                 ]),
               ]),
-              h("section", { class: "sw-vuewb-section" }, [
-                h("div", { class: "sw-vuewb-section__head" }, [h("h3", "Vue bindings")]),
-                h("dl", { class: "sw-vuewb-props", "data-testid": "props" }, [
-                  h("div", [h("dt", ":read-only"), h("dd", String(readOnly.value))]),
-                  h("div", [h("dt", ":mutation-policy"), h("dd", mutationPolicy.value)]),
-                  h("div", [h("dt", ":protection-resolver"), h("dd", role.value)]),
-                  h("div", [h("dt", ":workbook"), h("dd", `generation ${generation.value}`)]),
+              h("section", panelAttrs("renderer"), [
+                h("div", { class: "sw-vuewb-section__head" }, [
+                  h("div", [
+                    h("h3", "Renderer and adapter"),
+                    h("p", "Renderer changes rebuild the Vue-owned Grid; live props do not."),
+                  ]),
                 ]),
                 h(
-                  "ol",
-                  { class: "sw-vuewb-feed", "data-testid": "feed", "aria-label": "Adapter events" },
-                  feed.value.length > 0
-                    ? feed.value.map((entry) =>
-                        h("li", { key: entry.key, "data-kind": entry.kind }, [
-                          h("code", entry.code),
-                          h("span", entry.detail),
-                        ]),
-                      )
-                    : [
-                        h("li", { "data-kind": "event" }, [
-                          h("code", "feed"),
-                          h("span", "Interact with the workbook to populate this feed."),
-                        ]),
-                      ],
+                  "div",
+                  { class: "sw-vuewb-renderers", role: "group", "aria-label": "Renderer mode" },
+                  [
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "aria-pressed": rendererMode.value === "canvas",
+                        disabled: !ready.value || pendingCount.value > 0,
+                        onClick: () => setRenderer("canvas"),
+                      },
+                      "Canvas · main thread",
+                    ),
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "aria-pressed": rendererMode.value === "worker",
+                        disabled: !ready.value || pendingCount.value > 0,
+                        onClick: () => setRenderer("worker"),
+                      },
+                      "Worker · off thread",
+                    ),
+                  ],
                 ),
+                h("details", { class: "sw-vuewb-disclosure" }, [
+                  h("summary", "Adapter settings"),
+                  h("div", { class: "sw-vuewb-settings" }, [
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "data-testid": "readonly",
+                        "aria-pressed": readOnly.value,
+                        onClick: () => {
+                          readOnly.value = !readOnly.value;
+                          pushFeed("event", ":read-only", String(readOnly.value));
+                        },
+                      },
+                      "Read only",
+                    ),
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "data-testid": "mutation-policy",
+                        disabled: !ready.value || pendingCount.value > 0,
+                        title:
+                          pendingCount.value > 0
+                            ? "Sync pending commits first — this input rebuilds the Grid."
+                            : "Reset-bound adapter input: toggling replaces the Grid.",
+                        onClick: togglePolicy,
+                      },
+                      `Policy: ${mutationPolicy.value}`,
+                    ),
+                  ]),
+                ]),
+                h("details", { class: "sw-vuewb-disclosure" }, [
+                  h("summary", "Vue bindings"),
+                  h("dl", { class: "sw-vuewb-props", "data-testid": "props" }, [
+                    h("div", [h("dt", ":read-only"), h("dd", String(readOnly.value))]),
+                    h("div", [h("dt", ":mutation-policy"), h("dd", mutationPolicy.value)]),
+                    h("div", [h("dt", ":protection-resolver"), h("dd", role.value)]),
+                    h("div", [h("dt", ":renderer"), h("dd", rendererMode.value)]),
+                    h("div", [h("dt", ":workbook"), h("dd", `generation ${generation.value}`)]),
+                  ]),
+                ]),
+              ]),
+              h("section", { class: "sw-vuewb-eventrail", "data-testid": "event-panel" }, [
+                h("header", [
+                  h("strong", "Adapter events"),
+                  h("span", `${feed.value.length} recent · Vue + Grid`),
+                ]),
+                eventFeed(),
               ]),
             ]),
           ]),
           h("footer", { class: "sw-demo-status sw-demo-status--metrics" }, [
             h("span", `Selection · ${selectedLabel.value}`),
-            h("span", `Sheets · ${sheets.value.length}`),
+            h("span", `Role · ${role.value}`),
             h("span", `Pending · ${pendingCount.value}`),
             h("span", `Host · v${serverVersion.value}`),
-            h("span", `Gen ${generation.value} · ${readyReason.value}`),
+            h("span", `${rendererMode.value} · gen ${generation.value}`),
           ]),
         ]),
       ]);

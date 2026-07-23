@@ -9,10 +9,10 @@ Schema and default presentation for one workbook column.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L86</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L107</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>10</span>
+## Members <span class="api-count" data-pagefind-ignore>11</span>
 
 <div class="api-member-list">
 
@@ -26,7 +26,7 @@ key: string;
 </details>
 
 <details class="api-member" id="column-header" data-pagefind-weight="1">
-<summary><code>header</code> <span class="api-member-summary">Schema label written by table exports; the canvas header displays positional column letters.</span></summary>
+<summary><code>header</code> <span class="api-member-summary">Schema label used by table exports and data-grid presentation headers.</span></summary>
 
 ```ts generated
 header: string;
@@ -72,7 +72,7 @@ numberLocale?: string;
 </details>
 
 <details class="api-member" id="column-header-style" data-pagefind-weight="1">
-<summary><code>headerStyle</code> <span class="api-member-summary">Overrides theme styling for the painted column-letter header.</span></summary>
+<summary><code>headerStyle</code> <span class="api-member-summary">Overrides theme styling for the painted column header.</span></summary>
 
 ```ts generated
 headerStyle?: CellStyle;
@@ -106,6 +106,15 @@ renderer?: string;
 ```
 
 </details>
+
+<details class="api-member" id="column-editor" data-pagefind-weight="1">
+<summary><code>editor</code> <span class="api-member-summary">Name of a registered custom editor (see GridOptions.editors).</span></summary>
+
+```ts generated
+editor?: string;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -125,6 +134,7 @@ export interface Column {
   cellStyle?: CellStyle;
   visible?: boolean;
   renderer?: string;
+  editor?: string;
 }
 ```
 

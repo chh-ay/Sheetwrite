@@ -8,6 +8,7 @@ import {
   type PersistenceAdapter,
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
+  type SheetwriteStore,
   SyncCoordinator,
   SyncProtocolError,
   type VersionedOperation,
@@ -174,10 +175,14 @@ function setValue(value: number) {
   };
 }
 
-function mountGrid(version = 4, rowCount = 2) {
+function mountGrid(version = 4, rowCount = 2, paged = false) {
   const host = document.createElement("div");
   document.body.appendChild(host);
-  return createGridFromSnapshot(host, snapshot(version, rowCount));
+  return createGridFromSnapshot(host, snapshot(version, rowCount), {
+    ...(paged
+      ? { datasourceStorage: { mode: "paged" as const, chunkRows: 4, cacheBytes: 104 } }
+      : {}),
+  });
 }
 
 describe("durable offline sync", () => {
@@ -382,6 +387,47 @@ describe("durable offline sync", () => {
     expect(coordinator.pendingCount).toBe(0);
     expect(storage.records.has("remove-m1")).toBe(false);
     expect(events.filter((event) => event === "acknowledged")).toHaveLength(1);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("orders following remote versions behind durable echo removal", async () => {
+    const storage = new FakePendingStorage();
+    storage.removeGate = deferred<void>();
+    const adapter = new ControlledAdapter(snapshot());
+    const grid = mountGrid();
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      createMutationId: () => "ordered-echo-m1",
+    });
+    await coordinator.ready();
+    grid.applyTransaction({ patches: [setValue(5)] });
+    await coordinator.ready();
+
+    const echo = coordinator.handleResponse({
+      status: "applied",
+      version: 5,
+      clientMutationId: "ordered-echo-m1",
+    });
+    while (storage.removals.length === 0) await Promise.resolve();
+    let followingApplied = false;
+    const following = coordinator
+      .applyVersionedOperation({ version: 6, operations: [setValue(6)] })
+      .then(() => {
+        followingApplied = true;
+      });
+    await Promise.resolve();
+
+    expect(followingApplied).toBe(false);
+    expect(coordinator.serverVersion).toBe(4);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(5);
+
+    storage.removeGate.resolve(undefined);
+    await Promise.all([echo, following]);
+    expect(coordinator.serverVersion).toBe(6);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(6);
     coordinator.destroy();
     grid.destroy();
   });
@@ -658,6 +704,47 @@ describe("durable offline sync", () => {
     expect(storage.records.size).toBe(300);
     reopened.destroy();
     reopenedGrid.destroy();
+  });
+
+  it("restores durable paged edits as dirty until their exact mutation is acknowledged", async () => {
+    const storage = new FakePendingStorage();
+    storage.records.set("paged-m1", {
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "paged-m1",
+      operations: [setValue(9)],
+    });
+    const adapter = new ControlledAdapter(snapshot(4, 100));
+    adapter.responders.push(async (request) => ({
+      status: "applied",
+      version: 5,
+      clientMutationId: request.clientMutationId,
+    }));
+    const grid = mountGrid(4, 100, true);
+    const coordinator = new SyncCoordinator(grid, adapter, {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      initialConnection: "offline",
+    });
+
+    await coordinator.ready();
+    expect((grid.store as SheetwriteStore).getPagedStats("s1")).toMatchObject({
+      chunks: 0,
+      loadedCells: 1,
+      dirtyCells: 1,
+      allocatedBytes: 0,
+    });
+    coordinator.setOnline(true);
+    await coordinator.flush();
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
+    expect((grid.store as SheetwriteStore).getPagedStats("s1")).toMatchObject({
+      chunks: 1,
+      dirtyCells: 0,
+    });
+
+    coordinator.destroy();
+    grid.destroy();
   });
 
   it("rejects oversized durable queues before cloning or partially restoring", async () => {

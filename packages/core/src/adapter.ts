@@ -1,3 +1,49 @@
+import type { SheetwriteError } from "./errors.js";
+
+export {
+  isSheetwriteError,
+  SHEETWRITE_ERROR_CODES,
+  SHEETWRITE_ERROR_OPERATIONS,
+  SheetwriteError,
+  type SheetwriteErrorCode,
+  type SheetwriteErrorContext,
+  type SheetwriteErrorEnvelope,
+  type SheetwriteErrorOperation,
+} from "./errors.js";
+
+export {
+  createRowBridge,
+  RowBridge,
+  type RowBridgeCell,
+  type RowBridgeClearDelta,
+  type RowBridgeColumn,
+  type RowBridgeDelta,
+  type RowBridgeFillDelta,
+  type RowBridgeHandler,
+  type RowBridgeHostActionDelta,
+  type RowBridgeId,
+  type RowBridgeInsertContext,
+  type RowBridgeMetadataDelta,
+  type RowBridgeOptions,
+  type RowBridgePasteDelta,
+  type RowBridgeProjection,
+  type RowBridgeRangeDelta,
+  type RowBridgeReconciliationInput,
+  type RowBridgeReconciliationStatus,
+  type RowBridgeRowStructureDelta,
+  type RowBridgeTransaction,
+  type RowBridgeUnprojectableDelta,
+  rowBridgeTransactionId,
+} from "./row-bridge.js";
+
+import {
+  createRowBridge,
+  type RowBridgeHandler,
+  type RowBridgeId,
+  type RowBridge as RowBridgeInstance,
+  type RowBridgeOptions,
+} from "./row-bridge.js";
+
 import type {
   CellFormat,
   CellScalar,
@@ -27,10 +73,13 @@ export const GRID_OPTION_POLICY = {
   datasourceStorage: "reset",
   renderer: "reset",
   workerUrl: "reset",
+  presentation: "reset",
   renderers: "reset",
+  editors: "reset",
   protectionResolver: "reset",
   mutationPolicy: "reset",
   transactionResourceLimits: "reset",
+  hyperlinkActivation: "reset",
   theme: "live",
   readOnly: "live",
   config: "live",
@@ -54,9 +103,11 @@ export interface GridReadyEvent {
 }
 
 /** Framework-neutral readiness, change, and error callbacks shared by adapters. */
-export interface GridAdapterEventHandlers {
+export interface GridAdapterEventHandlers<Id extends RowBridgeId = RowBridgeId> {
   /** Receives every committed Grid change, including its applied transaction. */
   onGridChange?: (event: ChangeEvent) => void;
+  /** Receives projected host-row effects when a row bridge is attached. */
+  onRowDelta?: RowBridgeHandler<Id>;
   /** Receives the current selection, or `null` after it is cleared. */
   onSelectionChange?: (selection: Selection | null) => void;
   /** Receives visible row bounds and vertical scroll offset after scrolling. */
@@ -69,10 +120,20 @@ export interface GridAdapterEventHandlers {
   onSearch?: (result: GridEvents["search"]) => void;
   /** Fires after the visible sheet changes. */
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  /** Receives observable undo/redo and formatting command state. */
+  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
+  /** Receives structured issues when a Grid mutation is rejected. */
+  onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+  /** Fires when worker rendering falls back to the main-thread canvas renderer. */
+  onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+  /** Receives failed datasource requests and their errors. */
+  onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+  /** Receives failures from built-in XLSX export actions. */
+  onExportError?: (event: GridEvents["export-error"]) => void;
   /** Fires after the adapter publishes a ready Grid generation. */
   onReady?: (event: GridReadyEvent) => void;
   /** Receives a WASM initialization failure while the adapter remains mounted. */
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
 }
 
 /** Optional explicit WASM source and initialization error callback for adapters. */
@@ -80,7 +141,7 @@ export interface SheetwriteInitializationProps {
   /** Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins. */
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
   /** Called when WASM initialization fails while the adapter is mounted. */
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
 }
 
 /** Explicit width and height accepted by framework adapters. */
@@ -161,7 +222,7 @@ export const DEFAULT_SIMPLE_COLUMN_WIDTH = 120;
 export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   /** Non-empty row-object key, unique within the column list. */
   key: keyof Row & string;
-  /** Schema header label used by exports. */
+  /** Semantic title painted in data-grid mode and written by table exports. */
   title: string;
   /** Unzoomed width in CSS pixels; defaults to 120. */
   width?: number;
@@ -169,8 +230,10 @@ export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   type?: CellFormat;
   /** Excel number-format code used for number, date, or currency display. */
   numberFormat?: string;
-  /** Style applied to the painted column-letter header. */
+  /** Style applied to the painted column header. */
   headerStyle?: CellStyle;
+  /** Name of a custom editor registered through `GridOptions.editors`. */
+  editor?: string;
   /** Base style merged beneath cell-specific styles. */
   cellStyle?: CellStyle;
   /** Set to `false` to exclude the column from the live view and table exports. */
@@ -178,16 +241,40 @@ export interface SimpleColumn<Row extends Record<string, CellScalar>> {
 }
 
 /** Framework-neutral simple columns, rows, sizing, and grid options. */
-export interface SimpleSheetwriteOptions<Row extends Record<string, CellScalar>> {
+export interface SimpleSheetwriteOptions<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> {
   columns: readonly SimpleColumn<Row>[];
   defaultRows: readonly Row[];
   sheetName?: string;
+  /** Opt-in stable data-row identity extractor. */
+  getRowId?: (row: Row, index: number) => Id;
+  /** Optional identity factory for rows inserted by the Grid. */
+  createRowId?: RowBridgeOptions<Row, Id>["createRowId"];
+}
+
+/** Creates the optional row bridge for a simple data-first input. */
+export function createSimpleRowBridge<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+>(options: SimpleSheetwriteOptions<Row, Id>): RowBridgeInstance<Id> | undefined {
+  if (!options.getRowId) return undefined;
+  const bridge = createRowBridge({
+    columns: options.columns,
+    defaultRows: options.defaultRows,
+    getRowId: options.getRowId,
+    ...(options.createRowId === undefined ? {} : { createRowId: options.createRowId }),
+  });
+  return bridge as unknown as RowBridgeInstance<Id>;
 }
 
 /** Normalized workbook and columnar data produced from simple adapter props. */
 export interface SimpleGridInput {
   workbook: Workbook;
   data: ColumnarData;
+  /** Simple row-object input always opts into semantic data-grid presentation. */
+  presentation: "data-grid";
 }
 
 /** Converts simple columns and row objects into canonical workbook and columnar input. */
@@ -197,6 +284,7 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
   const keys = new Set<string>();
   const columns = options.columns.map((column) => {
     if (!column.key) throw new Error("Sheetwrite: every simple column requires a non-empty key");
+    if (!column.title) throw new Error("Sheetwrite: every simple column requires a title");
     if (keys.has(column.key)) {
       throw new Error(`Sheetwrite: duplicate simple column key "${column.key}"`);
     }
@@ -209,6 +297,7 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
       numberFormat: column.numberFormat,
       headerStyle: column.headerStyle,
       cellStyle: column.cellStyle,
+      editor: column.editor,
       visible: column.visible,
     };
   });
@@ -235,5 +324,6 @@ export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
       ],
     },
     data: { rowCount: options.defaultRows.length, columns: dataColumns },
+    presentation: "data-grid",
   };
 }

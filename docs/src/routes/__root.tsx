@@ -12,9 +12,11 @@ const THEME_SCRIPT =
   'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
 
 const SITE_URL = "https://sheetwrite.vercel.app";
+const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV";
 const SITE_DESCRIPTION =
-  "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters.";
-const SOCIAL_IMAGE_ALT = "Sheetwrite spreadsheet grid showing typed web data";
+  "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
+const SOCIAL_IMAGE_ALT =
+  "Sheetwrite multi-sheet workbook with selected formula cell and sheet tabs";
 const STRUCTURED_DATA = JSON.stringify({
   "@context": "https://schema.org",
   "@graph": [
@@ -66,7 +68,10 @@ export const Route = createRootRoute({
         { property: "og:type", content: "website" },
         { property: "og:site_name", content: "Sheetwrite" },
         { property: "og:locale", content: "en_US" },
-        { property: "og:title", content: "Sheetwrite — TypeScript spreadsheet engine" },
+        {
+          property: "og:title",
+          content: SITE_TITLE,
+        },
         { property: "og:description", content: SITE_DESCRIPTION },
         { property: "og:url", content: canonical },
         { property: "og:image", content: `${SITE_URL}/og-sheetwrite.webp` },
@@ -74,11 +79,14 @@ export const Route = createRootRoute({
         { property: "og:image:height", content: "630" },
         { property: "og:image:alt", content: SOCIAL_IMAGE_ALT },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:title", content: "Sheetwrite — TypeScript spreadsheet engine" },
+        {
+          name: "twitter:title",
+          content: SITE_TITLE,
+        },
         { name: "twitter:description", content: SITE_DESCRIPTION },
         { name: "twitter:image", content: `${SITE_URL}/og-sheetwrite.webp` },
         { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT },
-        { title: "Sheetwrite" },
+        { title: SITE_TITLE },
       ],
       scripts: [{ type: "application/ld+json", children: STRUCTURED_DATA }],
     };

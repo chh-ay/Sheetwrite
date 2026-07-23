@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   dateToSerial,
+  SheetwriteError,
   type WorkbookSnapshot,
   XlsxResourceError,
   type XlsxWorkbookWarning,
@@ -644,10 +645,18 @@ describe("pinned external XLSX behavioral vectors", () => {
       { onWarning: capture.onWarning },
     );
     expect(imported.sheets[0]!.notes?.[0]?.text).toBe("resolved parent");
-    expect(capture.warnings.map((warning) => warning.code)).toEqual([
-      "external-relationship",
-      "hyperlink",
+    expect(imported.sheets[0]!.hyperlinks).toEqual([
+      {
+        id: "xlsx-hyperlink-1-1",
+        range: {
+          sheet: imported.sheets[0]!.id,
+          start: { row: 0, col: 0 },
+          end: { row: 0, col: 0 },
+        },
+        target: { kind: "external", url: "https://invalid.example/never-fetch" },
+      },
     ]);
+    expect(capture.warnings).toEqual([]);
   });
 
   it("ports cases 40-41: rejects malformed or missing XML and ignores declared unknown extensions", async () => {
@@ -820,7 +829,7 @@ describe("local deterministic and adversarial XLSX gates", () => {
     );
   });
 
-  it("propagates exact abort reasons during central-directory, shared-string, and export-part stages", async () => {
+  it("preserves exact abort reasons as canonical causes across codec stages", async () => {
     const centralReason = new Error("abort during central directory");
     let centralChecks = 0;
     const centralSignal = {
@@ -839,7 +848,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
       );
       throw new Error("expected central-directory abort");
     } catch (error) {
-      expect(error).toBe(centralReason);
+      expect(error).toBeInstanceOf(SheetwriteError);
+      expect(error).toMatchObject({
+        code: "aborted",
+        operation: "xlsx-import",
+      });
+      expect((error as SheetwriteError).cause).toBe(centralReason);
       expect(centralChecks).toBe(3);
     }
 
@@ -871,7 +885,8 @@ describe("local deterministic and adversarial XLSX gates", () => {
       );
       throw new Error("expected shared-string abort");
     } catch (error) {
-      expect(error).toBe(sharedReason);
+      expect(error).toBeInstanceOf(SheetwriteError);
+      expect((error as SheetwriteError).cause).toBe(sharedReason);
       expect(sharedChecks).toBe(16);
       expect(sharedWarnings).toEqual([]);
     }
@@ -895,7 +910,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
       });
       throw new Error("expected export-part abort");
     } catch (error) {
-      expect(error).toBe(exportReason);
+      expect(error).toBeInstanceOf(SheetwriteError);
+      expect(error).toMatchObject({
+        code: "aborted",
+        operation: "xlsx-export",
+      });
+      expect((error as SheetwriteError).cause).toBe(exportReason);
       expect(exportChecks).toBe(3);
       expect(exportWarnings).toEqual([]);
     }

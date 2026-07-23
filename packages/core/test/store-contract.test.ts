@@ -28,12 +28,17 @@ function runFacadeContract(storage: "dense" | "paged"): void {
   });
   if (storage === "paged") {
     expect(store.queryCapability("s1").status).toBe("incomplete");
-    store.loadRows("s1", 0, [
-      { name: "", amount: 0, city: "" },
-      { name: "", amount: 0, city: "" },
-      { name: "", amount: 0, city: "" },
-      { name: "", amount: 0, city: "" },
-    ]);
+    store.loadPage(
+      "s1",
+      0,
+      [{ start: 0, end: 3, keys: ["name", "amount", "city"] }],
+      [
+        { name: null, amount: 0, city: null },
+        { name: null, amount: 0, city: null },
+        { name: null, amount: 0, city: null },
+        { name: null, amount: 0, city: null },
+      ],
+    );
   }
   expect(store.queryCapability("s1")).toEqual({ status: "complete" });
 

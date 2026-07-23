@@ -47,18 +47,39 @@ export interface CellStyle {
   border?: CellBorders;
 }
 
+/** Browser-safe external target or stable workbook-internal range target. */
+export type HyperlinkTarget =
+  | { kind: "external"; url: string }
+  | { kind: "internal"; range: Range };
+
+/** Bounded serializable hyperlink metadata applied to one cell or range. */
+export interface CellHyperlink {
+  /** Stable identity used by operations, history, and collaboration rebase. */
+  id: string;
+  range: Range;
+  target: HyperlinkTarget;
+  /** Optional accessible/OOXML display label; cell values remain authoritative. */
+  display?: string;
+  /** Optional override merged over the deterministic blue/underline link style. */
+  style?: CellStyle;
+}
+
 /** Predicate used to decide whether a conditional format applies. */
 export type ConditionalFormatPredicate =
   | { kind: "greaterThan"; value: number }
   | { kind: "lessThan"; value: number }
   | { kind: "equal"; value: CellScalar }
-  | { kind: "contains"; text: string; matchCase?: boolean };
+  | { kind: "contains"; text: string; matchCase?: boolean }
+  /** Boolean formula anchored at the rule range's top-left; relative A1 refs shift per cell. */
+  | { kind: "formula"; source: string };
 
 /** Ordered condition and style applied to a cell range. */
 export interface ConditionalFormatRule {
   range: Range;
   when: ConditionalFormatPredicate;
   style: CellStyle;
+  /** Stop evaluating lower-precedence rules for a cell when this rule matches. */
+  stopIfTrue?: boolean;
 }
 
 /**
@@ -86,7 +107,7 @@ export type CellValue =
 export interface Column {
   /** Non-empty key, unique within the sheet, used to map input and datasource values. */
   key: string;
-  /** Schema label written by table exports; the canvas header displays positional column letters. */
+  /** Schema label used by table exports and data-grid presentation headers. */
   header: string;
   /** Unzoomed column width in CSS pixels. */
   width: number;
@@ -96,7 +117,7 @@ export interface Column {
   numberFormat?: string;
   /** Explicit BCP 47 locale for separators; omitted keeps the deterministic default. */
   numberLocale?: string;
-  /** Overrides theme styling for the painted column-letter header. */
+  /** Overrides theme styling for the painted column header. */
   headerStyle?: CellStyle;
   /** Base style merged beneath each cell's own style. */
   cellStyle?: CellStyle;
@@ -104,4 +125,6 @@ export interface Column {
   visible?: boolean;
   /** Name of a registered custom cell renderer (see `Grid.defineCellRenderer`). */
   renderer?: string;
+  /** Name of a registered custom editor (see `GridOptions.editors`). */
+  editor?: string;
 }

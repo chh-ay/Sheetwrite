@@ -9,7 +9,7 @@ Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L249</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L396</code></dd></div>
 </dl>
 
 ## Declaration
@@ -17,14 +17,21 @@ Simple framework adapter props for columns and default row objects.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
-  SheetwriteGridProps,
-  "workbook" | "data" | "datasource" | "height" | "fill"
+export type SheetwriteProps<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> = Omit<
+  SheetwriteGridProps<Id>,
+  "workbook" | "data" | "datasource" | "height" | "fill" | "rowBridge"
 > &
   GridSizeProps & {
     columns: readonly SimpleColumn<Row>[];
     defaultRows: readonly Row[];
     sheetName?: string;
+    getRowId?: (row: Row, index: number) => Id;
+    createRowId?: Parameters<
+      typeof createSimpleRowBridge<Row, Id>
+    >[0]["createRowId"];
   };
 ```
 

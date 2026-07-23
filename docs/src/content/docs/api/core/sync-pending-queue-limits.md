@@ -9,7 +9,7 @@ Aggregate ceilings for local commits retained until durable acknowledgement.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L94</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L102</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -17,7 +17,7 @@ Aggregate ceilings for local commits retained until durable acknowledgement.
 <div class="api-member-list">
 
 <details class="api-member" id="sync-pending-queue-limits-max-pending-commits" data-pagefind-weight="1">
-<summary><code>maxPendingCommits</code> <span class="api-member-summary">Maximum number of pending local commits, including synchronous reservations.</span></summary>
+<summary><code>maxPendingCommits</code> <span class="api-member-summary">Pending local commits, including synchronous reservations; defaults to 10,000.</span></summary>
 
 ```ts generated
 maxPendingCommits: number;
@@ -26,7 +26,7 @@ maxPendingCommits: number;
 </details>
 
 <details class="api-member" id="sync-pending-queue-limits-max-pending-operations" data-pagefind-weight="1">
-<summary><code>maxPendingOperations</code> <span class="api-member-summary">Maximum aggregate DocumentOp count across pending local commits.</span></summary>
+<summary><code>maxPendingOperations</code> <span class="api-member-summary">Aggregate DocumentOp count across pending commits; defaults to 100,000.</span></summary>
 
 ```ts generated
 maxPendingOperations: number;
@@ -35,7 +35,7 @@ maxPendingOperations: number;
 </details>
 
 <details class="api-member" id="sync-pending-queue-limits-max-pending-encoded-bytes" data-pagefind-weight="1">
-<summary><code>maxPendingEncodedBytes</code> <span class="api-member-summary">Maximum aggregate UTF-8 bytes across JSON-encoded pending operation arrays.</span></summary>
+<summary><code>maxPendingEncodedBytes</code> <span class="api-member-summary">Aggregate UTF-8 bytes across pending operation arrays; defaults to 128 MiB.</span></summary>
 
 ```ts generated
 maxPendingEncodedBytes: number;

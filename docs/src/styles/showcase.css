@@ -1056,14 +1056,16 @@
     position: sticky;
     z-index: 50;
     top: 0;
+    isolation: isolate;
     display: grid;
+    width: 100%;
     min-height: var(--sw-header-height);
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 2rem;
     align-items: center;
     padding: 0.75rem clamp(1rem, 4vw, 4rem);
     border-bottom: 1px solid var(--sw-border);
-    background: color-mix(in srgb, var(--sw-surface-0) 94%, transparent);
+    background: var(--sw-surface-0);
   }
 
   .sw-showcase-nav a {

@@ -11,7 +11,7 @@ click throws.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L182</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L181</code></dd></div>
 </dl>
 
 ## Declaration

@@ -9,7 +9,7 @@ Optional resource ceilings for an in-memory delimited-text operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L20</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L21</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>
@@ -17,12 +17,13 @@ Optional resource ceilings for an in-memory delimited-text operation.
 <div class="api-member-list">
 
 <details class="api-member" id="delimited-text-options-resource-limits" data-pagefind-weight="1">
-<summary><code>resourceLimits</code></summary>
+<summary><code>resourceLimits</code> <span class="api-member-summary">Positive safe-integer overrides merged over DEFAULTDELIMITEDTEXTRESOURCELIMITS.</span></summary>
 
 ```ts generated
 resourceLimits?: Partial<DelimitedTextResourceLimits>;
 ```
 
+<p class="api-member-doc">Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`.</p>
 </details>
 </div>
 

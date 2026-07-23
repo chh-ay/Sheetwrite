@@ -13,10 +13,10 @@ the owning `CellStore`, so snapshots must only be restored into that store.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L249</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L337</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>6</span>
+## Members <span class="api-count" data-pagefind-ignore>8</span>
 
 <div class="api-member-list">
 
@@ -65,6 +65,24 @@ kinds: () => Uint8Array;
 
 </details>
 
+<details class="api-member" id="range-snapshot-reference-offsets" data-pagefind-weight="1">
+<summary><code>referenceOffsets</code></summary>
+
+```ts generated
+referenceOffsets: () => Uint32Array;
+```
+
+</details>
+
+<details class="api-member" id="range-snapshot-reference-targets" data-pagefind-weight="1">
+<summary><code>referenceTargets</code></summary>
+
+```ts generated
+referenceTargets: () => Uint32Array;
+```
+
+</details>
+
 <details class="api-member" id="range-snapshot-style-ids" data-pagefind-weight="1">
 <summary><code>styleIds</code></summary>
 
@@ -87,6 +105,8 @@ class RangeSnapshot {
   formulaSources: () => string[];
   free: () => void;
   kinds: () => Uint8Array;
+  referenceOffsets: () => Uint32Array;
+  referenceTargets: () => Uint32Array;
   styleIds: () => Uint32Array;
 }
 ```

@@ -1,8 +1,11 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows, Ast, Func,
+    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows,
+    update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
+use crate::eval::expand_let_reachable_ast;
+use crate::memory::MemoryOwnerStats;
 use std::rc::Rc;
 
 pub(crate) const KIND_EMPTY: u8 = 0;
@@ -12,7 +15,9 @@ pub(crate) const KIND_BOOL: u8 = 3;
 pub(crate) const KIND_FORMULA: u8 = 4;
 
 pub(crate) const NO_STRING: u32 = u32::MAX;
+/// Bounds dependency/evaluation recursion; deeper formulas resolve to `#NUM!`.
 pub(crate) const FORMULA_RECURSION_LIMIT: usize = 256;
+/// Bounds one materialized formula range; larger ranges resolve to `#NUM!`.
 pub(crate) const RANGE_CELL_LIMIT: u64 = 1_000_000;
 
 pub(crate) type CellKey = (u32, u32);
@@ -52,6 +57,8 @@ pub(crate) enum FormulaError {
     Value,
     Name,
     Na,
+    Spill,
+    Calc,
     Loading,
 }
 
@@ -65,6 +72,8 @@ impl FormulaError {
             FormulaError::Value => "#VALUE!",
             FormulaError::Name => "#NAME?",
             FormulaError::Na => "#N/A",
+            FormulaError::Spill => "#SPILL!",
+            FormulaError::Calc => "#CALC!",
             FormulaError::Loading => "#LOADING!",
         }
     }
@@ -79,7 +88,9 @@ impl FormulaError {
             FormulaError::Value => 4,
             FormulaError::Name => 5,
             FormulaError::Na => 6,
-            FormulaError::Loading => 7,
+            FormulaError::Spill => 7,
+            FormulaError::Calc => 8,
+            FormulaError::Loading => 9,
         }
     }
 }
@@ -185,6 +196,13 @@ impl ReadSet {
                 named.row_end,
                 named.col_end,
             )),
+            Ast::Structured(reference) => self.push_range(CellRange::new(
+                reference.sheet,
+                reference.row_start,
+                reference.col,
+                reference.row_end,
+                reference.col,
+            )),
             Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
                 for arg in args {
                     self.collect(arg, formula_sheet);
@@ -194,7 +212,9 @@ impl ReadSet {
                 self.collect(left, formula_sheet);
                 self.collect(right, formula_sheet);
             }
-            Ast::Neg(inner) => self.collect(inner, formula_sheet),
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                self.collect(inner, formula_sheet);
+            }
             Ast::SheetCell(..)
             | Ast::SheetRange(..)
             | Ast::InvalidRef
@@ -202,6 +222,7 @@ impl ReadSet {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
+            | Ast::UnresolvedStructured(_)
             | Ast::Num(_) => {}
         }
     }
@@ -224,6 +245,7 @@ pub(crate) enum FormulaValueKind {
     Number,
     Text,
     Bool,
+    Blank,
 }
 
 fn ast_is_volatile(ast: &Ast) -> bool {
@@ -233,12 +255,41 @@ fn ast_is_volatile(ast: &Ast) -> bool {
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_is_volatile(left) || ast_is_volatile(right)
         }
-        Ast::Neg(inner) => ast_is_volatile(inner),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_volatile(inner),
         _ => false,
     }
 }
 
-/// Stored formula metadata: parsed AST, precomputed read-set, and last error.
+fn ast_contains_let(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::Let, _) => true,
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_let),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_contains_let(left) || ast_contains_let(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_let(inner),
+        _ => false,
+    }
+}
+
+fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
+    if !ast_contains_let(ast) {
+        return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
+    }
+    let expanded = expand_let_reachable_ast(ast).ok();
+    let metadata = expanded.as_ref().unwrap_or(ast);
+    (ReadSet::from_ast(metadata, formula_sheet), ast_is_volatile(metadata))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PersistedSourceKind {
+    Formula,
+    Reference,
+}
+
+/// Stored derived-cell metadata: parsed formulas and plain references share the
+/// same Rust-owned read-set/dependency graph, while retaining distinct
+/// persistence kinds at the ABI boundary.
 #[derive(Clone, Debug)]
 pub(crate) struct FormulaEntry {
     pub(crate) ast: Option<Ast>,
@@ -247,20 +298,74 @@ pub(crate) struct FormulaEntry {
     pub(crate) error: Option<FormulaError>,
     pub(crate) value_kind: FormulaValueKind,
     pub(crate) volatile: bool,
+    pub(crate) source_kind: PersistedSourceKind,
 }
 
 impl FormulaEntry {
-    pub(crate) fn parsed(ast: Ast, sheet: u32) -> Self {
-        let source = serialize(&ast);
-        let reads = ReadSet::from_ast(&ast, sheet);
-        let volatile = ast_is_volatile(&ast);
+    #[cfg(test)]
+    pub(crate) fn parsed(ast: Ast, sheet: u32, source: &str) -> Self {
+        Self::parsed_source(ast, sheet, source.to_string())
+    }
+
+    pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
+        let (reads, volatile) = formula_metadata(&ast, sheet);
         Self {
             ast: Some(ast),
-            source,
+            source: source.to_string(),
             reads,
             error: None,
             value_kind: FormulaValueKind::Number,
             volatile,
+            source_kind: PersistedSourceKind::Formula,
+        }
+    }
+
+    pub(crate) fn reference(target: AbsCellKey, target_name: &str, formula_sheet: u32) -> Self {
+        let ast = Ast::AbsCell(
+            SheetRef {
+                handle: target.sheet,
+                name: target_name.to_string(),
+                quoted: false,
+            },
+            target.row,
+            target.col,
+            RefFlags::default(),
+        );
+        Self {
+            reads: ReadSet::from_ast(&ast, formula_sheet),
+            ast: Some(ast),
+            source: String::new(),
+            error: None,
+            value_kind: FormulaValueKind::Blank,
+            volatile: false,
+            source_kind: PersistedSourceKind::Reference,
+        }
+    }
+
+    pub(crate) fn is_formula(&self) -> bool {
+        self.source_kind == PersistedSourceKind::Formula
+    }
+
+    pub(crate) fn is_reference(&self) -> bool {
+        self.source_kind == PersistedSourceKind::Reference
+    }
+
+    pub(crate) fn reference_target(&self, formula_sheet: u32) -> Option<AbsCellKey> {
+        if !self.is_reference() {
+            return None;
+        }
+        match self.ast.as_ref()? {
+            Ast::Cell(row, col, _) => Some(AbsCellKey {
+                sheet: formula_sheet,
+                row: *row,
+                col: *col,
+            }),
+            Ast::AbsCell(sheet, row, col, _) => Some(AbsCellKey {
+                sheet: sheet.handle,
+                row: *row,
+                col: *col,
+            }),
+            _ => None,
         }
     }
 
@@ -276,6 +381,7 @@ impl FormulaEntry {
             error: Some(error),
             value_kind: FormulaValueKind::Number,
             volatile: false,
+            source_kind: PersistedSourceKind::Formula,
         }
     }
 
@@ -289,7 +395,9 @@ impl FormulaEntry {
         if let Some(ast) = &mut self.ast {
             shift_rows(ast, at, delta, formula_sheet, edited_sheet);
             self.source = serialize(ast);
-            self.reads = ReadSet::from_ast(ast, formula_sheet);
+            let (reads, volatile) = formula_metadata(ast, formula_sheet);
+            self.reads = reads;
+            self.volatile = volatile;
         }
     }
 
@@ -303,7 +411,9 @@ impl FormulaEntry {
         if let Some(ast) = &mut self.ast {
             shift_cols(ast, at, delta, formula_sheet, edited_sheet);
             self.source = serialize(ast);
-            self.reads = ReadSet::from_ast(ast, formula_sheet);
+            let (reads, volatile) = formula_metadata(ast, formula_sheet);
+            self.reads = reads;
+            self.volatile = volatile;
         }
     }
 
@@ -315,7 +425,9 @@ impl FormulaEntry {
             return false;
         }
         self.source = serialize(ast);
-        self.reads = ReadSet::from_ast(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.volatile = volatile;
         true
     }
 
@@ -327,8 +439,61 @@ impl FormulaEntry {
             return false;
         }
         self.source = serialize(ast);
-        self.reads = ReadSet::from_ast(ast, formula_sheet);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.volatile = volatile;
         true
+    }
+
+    pub(crate) fn update_table<F>(
+        &mut self,
+        table_id: &str,
+        formula_sheet: u32,
+        resolve: &F,
+    ) -> bool
+    where
+        F: Fn(&StructuredRef) -> Option<StructuredRef>,
+    {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !update_structured_refs(ast, table_id, resolve) {
+            return false;
+        }
+        self.source = serialize(ast);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.volatile = volatile;
+        true
+    }
+
+    /// Heap allocations owned by this formula entry. The inline entry is
+    /// accounted by the formula hash-table bucket that stores it.
+    pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
+        out.add_payload(self.source.len(), self.source.capacity());
+        out.add_payload(
+            self.reads
+                .cells
+                .len()
+                .saturating_mul(std::mem::size_of::<AbsCellKey>()),
+            self.reads
+                .cells
+                .capacity()
+                .saturating_mul(std::mem::size_of::<AbsCellKey>()),
+        );
+        out.add_payload(
+            self.reads
+                .ranges
+                .len()
+                .saturating_mul(std::mem::size_of::<CellRange>()),
+            self.reads
+                .ranges
+                .capacity()
+                .saturating_mul(std::mem::size_of::<CellRange>()),
+        );
+        if let Some(ast) = &self.ast {
+            ast.heap_memory_stats(out);
+        }
     }
 }
 
@@ -385,6 +550,21 @@ impl StringPool {
             len: s.len() as u32,
         });
         id
+    }
+
+    pub(crate) fn shrink_to_fit(&mut self) {
+        self.bytes.shrink_to_fit();
+        self.spans.shrink_to_fit();
+    }
+}
+
+impl StringPool {
+    pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
+        let mut utf8 = MemoryOwnerStats::default();
+        utf8.add_vec::<u8>(self.bytes.len(), self.bytes.capacity());
+        let mut spans = MemoryOwnerStats::default();
+        spans.add_vec::<PoolSpan>(self.spans.len(), self.spans.capacity());
+        (utf8, spans)
     }
 }
 

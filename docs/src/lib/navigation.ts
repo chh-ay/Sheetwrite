@@ -25,6 +25,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     items: [
       { label: "Runtime ownership", href: "/docs/concepts/runtime-ownership/" },
       { label: "Adapter lifecycle", href: "/docs/frameworks/lifecycle/" },
+      { label: "Error handling", href: "/docs/reference/events-errors/" },
     ],
   },
   {
@@ -56,8 +57,8 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     items: [
       { label: "API contract", href: "/docs/reference/api-contract/" },
       { label: "Document operations", href: "/docs/reference/document-operations/" },
-      { label: "Events and errors", href: "/docs/reference/events-errors/" },
       { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },
+      { label: "Compatibility results", href: "/docs/reference/compatibility-results/" },
       { label: "Moved guides", href: "/docs/reference/moved-guides/" },
     ],
   },

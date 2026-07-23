@@ -18,6 +18,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `workbook` | `Workbook` | — (required) | Sheets, columns, row counts, and the `activeSheet` id. |
+| `presentation` | `"spreadsheet" \| "data-grid"` | `"spreadsheet"` | Positional A/B/C headers or semantic `Column.header` labels. Addressing and data rows are unchanged. |
 | `data` | `ColumnarData` | `undefined` | Eager, in-memory, column-major values. Pass this **or** `datasource`. |
 | `datasource` | `DataSource` | `undefined` | Lazy, paged async source; rows fetched per visible window. |
 | `datasourceStorage` | `DataSourceStorageOptions` | `{ mode: "dense" }` | Use `{ mode: "paged", chunkRows?, cacheBytes? }` for allocation-lazy datasource storage. |
@@ -28,16 +29,18 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `protectionResolver` | `ProtectionResolver` | `undefined` | Host callback for protected local mutations; no resolver means deny. Client-side UX policy only, never server authorization. |
 | `mutationPolicy` | `"atomic" \| "partial"` | `"atomic"` | Reject the whole local transaction on a denied protected operation, or apply allowed operations and report denied ones. |
 | `renderers` | `Record<string, CellRenderer>` | `{}` | Custom cell renderers registered up front; reference one by name via `Column.renderer`. Also see `defineCellRenderer`. |
-| `overscan` | `number` | `6` | Rows rendered above and below the viewport to absorb fast scrolls. |
+| `editors` | `Record<string, CellEditor>` | `{}` | Host-owned cell editors registered up front; reference one by name via `Column.editor`. |
+| `overscan` | `number` | `6` | Row and visible-column positions painted on each viewport edge; `0` disables the buffer. |
 | `minColumns` | `number` | workbook width | Minimum rendered/store column count, including empty spreadsheet padding columns. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar (see below). Omit for no toolbar. |
 
 Framework adapters classify every `GridOptions` field centrally. `workbook`,
-`data`, `datasource`, `datasourceStorage`, `protectionResolver`, and
-`mutationPolicy` create an `input-reset`; `renderer`, `workerUrl`, and `renderers`
-create a `renderer-reset`. `theme`, `readOnly`, `config`, `overscan`, and
-`minColumns` update the existing grid live. Readiness includes the resulting
-generation and reset reason.
+`data`, `datasource`, `datasourceStorage`, `presentation`, `editors`,
+`protectionResolver`, `mutationPolicy`, and `transactionResourceLimits` create
+an `input-reset`; `renderer`, `workerUrl`, and `renderers` create a
+`renderer-reset`. `theme`, `readOnly`, `config`, `overscan`, and `minColumns`
+update the existing grid live. Readiness includes the resulting generation and
+reset reason.
 
 Framework adapters also accept `wasmSource`. Initialization is process-wide and
 first-source-wins: concurrent calls using the same source share one attempt, while
@@ -47,6 +50,211 @@ during the attempt. Changing `wasmSource` after readiness warns and keeps the li
 grid, selection, edits, generation, and ready-event count unchanged. A true
 initialization failure remains observable through `onInitializationError` and a
 later source can retry it.
+
+## Spreadsheet and data-grid presentation
+
+`presentation: "spreadsheet"` is the backward-compatible default. It paints and
+announces positional column headers (`A`, `B`, `C`, …). Use
+`presentation: "data-grid"` when the columns describe row-object fields:
+
+```ts prelude="core" partial="requires surrounding host state" title="Semantic data-grid headers"
+const workbook: Workbook = {
+  activeSheet: "people",
+  sheets: [{
+    id: "people",
+    name: "People",
+    rowCount: people.length,
+    columns: [
+      { key: "name", header: "Customer name", width: 220, type: "text" },
+      { key: "status", header: "Account status", width: 160, type: "text" },
+    ],
+  }],
+};
+
+const grid = createGrid(host, {
+  workbook,
+  data,
+  presentation: "data-grid",
+});
+```
+
+The semantic header occupies the same header band as `A/B/C`; it does **not**
+consume row 0. Cell addresses, formulas, selections, row numbers, clipboard
+payloads, CSV/XLSX schema labels, mutation events, and datasource ranges keep
+their existing zero-based data coordinates. Table exports use `Column.header`
+in both presentation modes. The data-first `Sheetwrite` components select
+`"data-grid"` automatically because every `SimpleColumn` requires a `title`.
+
+Presentation is construction-bound. Changing it through a framework adapter
+replaces the grid with `reason: "input-reset"` rather than renaming columns or
+moving data in place.
+
+## Host-supplied editors
+
+Set `Column.editor` to a key in `GridOptions.editors`. A custom editor takes
+precedence over the built-in validation-list editor. If the key is absent,
+Sheetwrite falls back to validation editing or its stock text/date editor.
+
+```ts prelude="core" partial="requires surrounding host state" title="Synchronous select editor"
+const statusEditor: CellEditor = {
+  mount(host, context) {
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", context.label);
+    for (const value of ["Prospect", "Active", "Paused"]) {
+      select.add(new Option(value, value));
+    }
+    select.value = context.text;
+    host.appendChild(select);
+    select.focus();
+
+    return {
+      update(next) {
+        select.setAttribute("aria-label", next.label);
+        select.value = next.text;
+      },
+      reposition(rect) {
+        select.style.width = `${rect.width}px`;
+        select.style.height = `${rect.height}px`;
+      },
+      commit() {
+        return select.value;
+      },
+      cancel() {},
+      destroy() {
+        select.remove();
+      },
+    };
+  },
+};
+
+const grid = createGrid(host, {
+  workbook,
+  data,
+  presentation: "data-grid",
+  editors: { status: statusEditor },
+});
+```
+
+The returned value is parsed with the column's normal type and committed through
+the same document transaction as stock editing. That preserves protection,
+validation, mutation policy, undo/redo, change events, and edit-commit events.
+An asynchronous commit remains bound to the data row captured at `mount`, even
+when sorting or `clearView()` moves that row before the promise settles. If a
+filter removes the row from the view, Sheetwrite cancels and aborts the pending
+edit instead of retargeting another row. Returning a rejected promise,
+`undefined`, or a non-string value from untyped JavaScript cancels without a
+mutation. Enter commits and moves down, Tab/Shift+Tab commit and move
+horizontally, and Escape cancels. Focus returns to the grid after commit or
+cancel.
+
+For remote choices, use the editor-owned `AbortSignal`; never let a late request
+write into a destroyed editor:
+
+```ts prelude="core" partial="requires surrounding host state" title="Abortable async autocomplete"
+const assigneeAutocomplete: CellEditor = {
+  mount(host, context) {
+    const input = document.createElement("input");
+    const list = document.createElement("datalist");
+    list.id = `assignees-${context.address.row}-${context.address.col}`;
+    input.setAttribute("list", list.id);
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-label", context.label);
+    input.value = context.initialInput ?? context.text;
+    host.append(input, list);
+    input.focus();
+
+    void fetch(`/api/people?q=${encodeURIComponent(input.value)}`, {
+      signal: context.signal,
+    })
+      .then((response) => response.json() as Promise<Array<{ id: string; name: string }>>)
+      .then((people) => {
+        if (context.signal.aborted) return;
+        list.replaceChildren(
+          ...people.map((person) => {
+            const option = document.createElement("option");
+            option.value = person.name;
+            option.dataset.id = person.id;
+            return option;
+          }),
+        );
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
+      });
+
+    return {
+      update(next) {
+        input.setAttribute("aria-label", next.label);
+      },
+      reposition(rect) {
+        input.style.width = `${rect.width}px`;
+      },
+      async commit() {
+        await Promise.resolve();
+        return input.value;
+      },
+      cancel() {},
+      destroy() {
+        input.remove();
+        list.remove();
+      },
+    };
+  },
+};
+```
+
+One retained wrapper and one `CellEditorInstance` exist per active edit:
+
+| Hook / value | Guarantee |
+| --- | --- |
+| `mount(host, context)` | Runs once. The host is positioned over the active cell. |
+| `context.address` / `viewAddress` | Canonical data-row and current displayed-row snapshots. They are readonly and mutating a JavaScript object received by the editor cannot retarget the edit. |
+| `context.value` / `text` / `initialInput` | Resolved scalar, formatted text, and optional typed character. |
+| `context.label` | Accessible name derived from semantic/positional header plus row number. |
+| `context.signal` | Aborted before the editor's `cancel()` or `destroy()` hook on cancel, commit, reset, or unmount. |
+| `context.commit()` / `cancel()` | Optional editor-driven completion using the canonical path. A non-string commit from untyped JavaScript cancels safely. |
+| `update(context)` | External value, theme, zoom, view permutation, or geometry-sensitive state changed without replacing ownership. |
+| `reposition(rect)` | The active cell moved or resized. |
+| `commit()` | May return input synchronously or asynchronously; duplicate completion is ignored. |
+| `cancel()` | Notification before a host-requested cancellation; the signal is already aborted. |
+| `destroy()` | Runs exactly once; late async work must observe the aborted signal. A thrown hook error is reported without interrupting Sheetwrite's DOM, listener, or store cleanup. |
+
+`editors` is construction-bound so React/Vue/Svelte resets safely abort and
+destroy an active editor before publishing the new grid generation. All adapters
+accept the same registry:
+
+```tsx prelude="react" partial="requires React component state" title="React"
+<SheetwriteGrid
+  ref={gridRef}
+  workbook={workbook}
+  data={data}
+  presentation="data-grid"
+  editors={{ status: statusEditor, assignee: assigneeAutocomplete }}
+  onCommandStateChange={({ states }) => setCommandStates(states)}
+/>
+```
+
+```vue prelude="vue" partial="requires Vue component state" title="Vue"
+<SheetwriteGrid
+  ref="gridComponent"
+  :workbook="workbook"
+  :data="data"
+  presentation="data-grid"
+  :editors="{ status: statusEditor, assignee: assigneeAutocomplete }"
+  @command-state-change="({ states }) => commandStates = states"
+/>
+```
+
+```svelte prelude="svelte" partial="requires Svelte component state" title="Svelte"
+<SheetwriteGrid
+  bind:grid
+  {workbook}
+  {data}
+  presentation="data-grid"
+  editors={{ status: statusEditor, assignee: assigneeAutocomplete }}
+  onCommandStateChange={(event: GridEvents["command-state-change"]) => commandStates = event.states}
+/>
+```
 
 ### Datasource pages
 
@@ -103,6 +311,7 @@ bounds clean cached chunks, while dirty chunks remain pinned until
 acknowledgement. Full-sheet queries and exports report incomplete data until all
 required pages are loaded. `Store.queryCapability(sheet)` and
 `getCellLoadState(addr)` expose that state.
+Default chunk/cache values and eviction behavior are listed in [Compatibility and limits](/docs/reference/compatibility-limits/#rendering-interaction-and-paged-data).
 
 
 ### Serializable documents
@@ -129,17 +338,38 @@ server-sequenced reference—not as durable storage. Adapter methods accept
 `AbortSignal`; transport failures use `PersistenceError`, while version
 conflicts are typed commit responses that retain local work.
 
-A `CellRenderer` paints (or returns a DOM node for) a single cell:
+A `CellRenderer` paints or retains a DOM node for each cell in the rendered
+window. When `dom` is present, it owns the cell content (the canvas still paints
+the cell background, border, headers, and grid lines):
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 interface CellRenderer {
   canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
   dom?(c: CellPaintContext): HTMLElement;
+  update?(element: HTMLElement, c: CellPaintContext): void;
+  destroy?(element: HTMLElement): void;
 }
 ```
 
-Custom renderers are **not** available under `renderer: "worker"` (functions can
-not be transferred to the worker).
+`dom` creates an element when a cell enters the bounded rendered window.
+`update` receives that same element after values, styles, theme, zoom, size, or
+scroll geometry change. `destroy` runs immediately before the element leaves
+the window, is replaced by a newly registered renderer, or its grid is reset or
+destroyed. Implement `update` to preserve focus and element-local state. A
+legacy renderer with only `dom` is recreated when its value, style, theme, or
+size changes, but not for a pure scroll.
+
+DOM cells are clipped to the viewport and frozen pane that owns them. A merged
+range produces one node for its anchor, not one node per covered cell. Plain
+renderer output stays hidden from assistive technology because the compact ARIA
+mirror already exposes its cell value. To make a renderer explicitly
+interactive, return a native control (or add a non-negative `tabindex`), give it
+an accessible name, and set `element.style.pointerEvents = "auto"`. Keyboard
+events from that control stay with the control instead of moving the grid.
+
+With `renderer: "worker"`, `canvas` hooks cannot cross the Worker boundary.
+`dom`, `update`, and `destroy` still run on the main thread in the retained
+overlay.
 
 ## GridConfig (toolbar)
 
@@ -179,6 +409,42 @@ Direct `grid.exportXlsx(...)` calls reject on failure; built-in toolbar and
 context-menu actions report the same failure through one `export-error` event.
 
 Every control acts on the current selection — see [Interaction](/docs/guides/interaction/).
+
+### Host-owned command state
+
+Host chrome can use `grid.actions` without duplicating selection/history logic.
+Query one command with `grid.getCommandState(name)` or subscribe to the complete
+snapshot through `command-state-change` (`onCommandStateChange` in React/Svelte,
+`@command-state-change` in Vue):
+
+```ts prelude="core" partial="requires host toolbar elements" title="Accessible host toolbar"
+const update = (bold: GridCommandState, undo: GridCommandState) => {
+  undoButton.disabled = undo.disabled;
+  boldButton.disabled = bold.disabled;
+  boldButton.setAttribute(
+    "aria-pressed",
+    bold.activity === "mixed" ? "mixed" : String(bold.activity === "active"),
+  );
+};
+
+update(grid.getCommandState("bold"), grid.getCommandState("undo"));
+const stop = grid.on("command-state-change", ({ states }) => {
+  update(states.bold, states.undo);
+});
+
+boldButton.addEventListener("click", () => grid.actions.toggleBold());
+undoButton.addEventListener("click", () => grid.actions.undo());
+
+// Run during host teardown.
+stop();
+```
+
+`disabled` accounts for read-only mode, empty selections, and undo/redo history.
+Formatting commands report `activity: "inactive" | "active" | "mixed"` across
+the current selection. The built-in toolbar uses the same contract, including
+native `disabled` and `aria-pressed="mixed"`. Aggregation is bounded; very large
+selections conservatively report `mixed` rather than forcing an unbounded cell
+walk.
 
 ### Feature flags
 

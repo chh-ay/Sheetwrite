@@ -9,7 +9,7 @@ Disposable controller for the framework-neutral spreadsheet shell.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/shell/spreadsheet-shell.ts#L34</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/shell/spreadsheet-shell.ts#L35</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>

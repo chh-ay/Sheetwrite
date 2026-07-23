@@ -9,12 +9,75 @@ Advanced framework adapter props for workbook data or datasource ownership.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L40</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/react/src/index.tsx#L73</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>30</span>
+## Members <span class="api-count" data-pagefind-ignore>40</span>
 
 <div class="api-member-list">
+
+<details class="api-member" id="sheetwrite-grid-props-row-bridge" data-pagefind-weight="1">
+<summary><code>rowBridge</code> <span class="api-member-summary">Projects canonical changes to host-owned row identities.</span></summary>
+
+```ts generated
+rowBridge?: RowBridge<Id>;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-row-delta" data-pagefind-weight="1">
+<summary><code>onRowDelta</code> <span class="api-member-summary">Receives one accepted or reconciled row projection.</span></summary>
+
+```ts generated
+onRowDelta?: RowBridgeHandler<Id>;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-mutation-rejected" data-pagefind-weight="1">
+<summary><code>onMutationRejected</code> <span class="api-member-summary">Receives structured issues when a Grid mutation is rejected.</span></summary>
+
+```ts generated
+onMutationRejected?: GridAdapterEventHandlers["onMutationRejected"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-renderer-fallback" data-pagefind-weight="1">
+<summary><code>onRendererFallback</code> <span class="api-member-summary">Fires when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+onRendererFallback?: GridAdapterEventHandlers["onRendererFallback"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-datasource-error" data-pagefind-weight="1">
+<summary><code>onDatasourceError</code> <span class="api-member-summary">Receives failed datasource requests and their errors.</span></summary>
+
+```ts generated
+onDatasourceError?: GridAdapterEventHandlers["onDatasourceError"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-export-error" data-pagefind-weight="1">
+<summary><code>onExportError</code> <span class="api-member-summary">Receives failures from built-in XLSX export actions.</span></summary>
+
+```ts generated
+onExportError?: GridAdapterEventHandlers["onExportError"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-on-ready" data-pagefind-weight="1">
+<summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
+
+```ts generated
+onReady?: GridAdapterEventHandlers["onReady"];
+```
+
+</details>
 
 <details class="api-member" id="sheetwrite-grid-props-class-name" data-pagefind-weight="1">
 <summary><code>className</code> <span class="api-member-summary">Additional class appended to the required sheetwrite host class.</span></summary>
@@ -124,6 +187,19 @@ can't be constructed, the grid falls back to the main-thread canvas
 renderer and emits `renderer-fallback` once.</p>
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-presentation" data-pagefind-weight="1">
+<summary><code>presentation</code> <span class="api-member-summary">Header presentation. Spreadsheet mode (default) paints positional A/B/C labels; data-grid mode paints each column's semantic header.</span></summary>
+
+```ts generated
+presentation?: GridPresentation;
+```
+
+<p class="api-member-doc">Header presentation. Spreadsheet mode (default) paints positional A/B/C
+labels; data-grid mode paints each column's semantic `header`. Cell
+addressing, row indices, clipboard values, formulas, and exports are
+unchanged in both modes.</p>
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-theme" data-pagefind-weight="1">
 <summary><code>theme</code> <span class="api-member-summary">Overrides merged over the default theme and host CSS custom properties.</span></summary>
 
@@ -140,6 +216,18 @@ theme?: Partial<Theme>;
 readOnly?: boolean;
 ```
 
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-hyperlink-activation" data-pagefind-weight="1">
+<summary><code>hyperlinkActivation</code> <span class="api-member-summary">Hyperlink activation never opens a browser URL.</span></summary>
+
+```ts generated
+hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
+```
+
+<p class="api-member-doc">Hyperlink activation never opens a browser URL. `event-only` (default)
+emits a safe resolved target; `internal-navigation` additionally moves to
+stable internal destinations; `disabled` rejects every activation request.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-protection-resolver" data-pagefind-weight="1">
@@ -180,13 +268,24 @@ renderers?: Record<string, CellRenderer>;
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-editors" data-pagefind-weight="1">
+<summary><code>editors</code> <span class="api-member-summary">Named custom editors resolved from each column's editor field.</span></summary>
+
+```ts generated
+editors?: Record<string, CellEditor>;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-overscan" data-pagefind-weight="1">
-<summary><code>overscan</code> <span class="api-member-summary">Rows rendered above/below the viewport to absorb fast scrolls.</span></summary>
+<summary><code>overscan</code> <span class="api-member-summary">Extra row and visible-column positions painted on each viewport edge.</span></summary>
 
 ```ts generated
 overscan?: number;
 ```
 
+<p class="api-member-doc">Extra row and visible-column positions painted on each viewport edge.
+Defaults to 6; use 0 to disable the buffer.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-min-columns" data-pagefind-weight="1">
@@ -270,11 +369,11 @@ onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
 
 </details>
 
-<details class="api-member" id="sheetwrite-grid-props-on-ready" data-pagefind-weight="1">
-<summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
+<details class="api-member" id="sheetwrite-grid-props-on-command-state-change" data-pagefind-weight="1">
+<summary><code>onCommandStateChange</code> <span class="api-member-summary">Receives observable undo/redo and formatting command state.</span></summary>
 
 ```ts generated
-onReady?: (event: GridReadyEvent) => void;
+onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
 ```
 
 </details>
@@ -283,7 +382,7 @@ onReady?: (event: GridReadyEvent) => void;
 <summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 
 ```ts generated
-onInitializationError?: (error: unknown) => void;
+onInitializationError?: (error: SheetwriteError) => void;
 ```
 
 </details>
@@ -304,10 +403,14 @@ wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SheetwriteGridProps extends Omit<
-  HTMLAttributes<HTMLDivElement>,
-  keyof GridAdapterEventHandlers | "children"
-> {
+export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
+  rowBridge?: RowBridge<Id>;
+  onRowDelta?: RowBridgeHandler<Id>;
+  onMutationRejected?: GridAdapterEventHandlers["onMutationRejected"];
+  onRendererFallback?: GridAdapterEventHandlers["onRendererFallback"];
+  onDatasourceError?: GridAdapterEventHandlers["onDatasourceError"];
+  onExportError?: GridAdapterEventHandlers["onExportError"];
+  onReady?: GridAdapterEventHandlers["onReady"];
   className?: string;
   style?: CSSProperties;
   fallback?: ReactNode;
@@ -319,12 +422,15 @@ export interface SheetwriteGridProps extends Omit<
   datasourceStorage?: DataSourceStorageOptions;
   renderer?: "canvas" | "worker";
   workerUrl?: string | URL;
+  presentation?: GridPresentation;
   theme?: Partial<Theme>;
   readOnly?: boolean;
+  hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
   transactionResourceLimits?: Partial<TransactionResourceLimits>;
   renderers?: Record<string, CellRenderer>;
+  editors?: Record<string, CellEditor>;
   overscan?: number;
   minColumns?: number;
   config?: GridConfig;
@@ -335,8 +441,8 @@ export interface SheetwriteGridProps extends Omit<
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
-  onReady?: (event: GridReadyEvent) => void;
-  onInitializationError?: (error: unknown) => void;
+  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 }
 ```

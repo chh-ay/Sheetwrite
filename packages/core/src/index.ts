@@ -35,6 +35,10 @@ export {
   type RevisionSummary,
   type VersionedCommentEvent,
 } from "./collaboration.js";
+export {
+  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
+  MAX_CONDITIONAL_FORMAT_RULES,
+} from "./conditional-format.js";
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
   DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
@@ -61,6 +65,18 @@ export {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "./document-protocol.js";
+export {
+  isSheetwriteError,
+  SHEETWRITE_ERROR_CODES,
+  SHEETWRITE_ERROR_OPERATIONS,
+  SheetwriteError,
+  type SheetwriteErrorCode,
+  type SheetwriteErrorContext,
+  type SheetwriteErrorContextValue,
+  type SheetwriteErrorEnvelope,
+  type SheetwriteErrorOperation,
+  type SheetwriteErrorOptions,
+} from "./errors.js";
 export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   downloadBytes,
@@ -90,6 +106,27 @@ export {
   isSheetwriteReady,
   resolveThemeFromCss,
 } from "./grid.js";
+export {
+  cloneCellHyperlink,
+  createHyperlinkId,
+  hyperlinkAt,
+  isSafeExternalHyperlink,
+  isValidCellHyperlink,
+  isValidHyperlinkId,
+  MAX_HYPERLINK_DISPLAY_LENGTH,
+  MAX_HYPERLINK_ID_LENGTH,
+  MAX_HYPERLINK_TARGET_LENGTH,
+  MAX_HYPERLINKS_PER_SHEET,
+  type ResolvedHyperlinkTarget,
+  resolveHyperlinkTarget,
+  sanitizeCellHyperlink,
+  sanitizeHyperlinkStyle,
+} from "./hyperlink.js";
+export {
+  type LegacyRowLoader,
+  type LegacyRowPage,
+  legacyFullWidthDataSource,
+} from "./legacy-full-width-datasource.js";
 export { formatNumber } from "./number-format.js";
 export {
   createGridFromSnapshot,
@@ -105,6 +142,59 @@ export {
   rebaseDocumentOperations,
 } from "./rebase.js";
 export { REF_CYCLE } from "./reference.js";
+export {
+  assertRuntimeResourceSnapshot,
+  type BoundaryDirection,
+  type BoundaryOperationStats,
+  type BoundaryTransferKind,
+  createRuntimeResourceSnapshot,
+  decodeStoreMemoryStats,
+  diffRuntimeResourcePhases,
+  emptyStoreMemoryStats,
+  observeRuntimeMemory,
+  RUNTIME_RESOURCE_SCHEMA_VERSION,
+  type RuntimeMemoryObservation,
+  type RuntimeResourceOperation,
+  type RuntimeResourcePhase,
+  type RuntimeResourcePhaseDelta,
+  type RuntimeResourceSnapshot,
+  STORE_MEMORY_HASH_ESTIMATE_VERSION,
+  STORE_MEMORY_PROTOCOL_VERSION,
+  type StoreMemoryBreakdown,
+  type TransientResourcePeak,
+  WASM_MEMORY_OWNERS,
+  type WasmMemoryOwner,
+} from "./resource-accounting.js";
+export {
+  createRowBridge,
+  RowBridge,
+  type RowBridgeCell,
+  type RowBridgeClearDelta,
+  type RowBridgeColumn,
+  type RowBridgeDelta,
+  type RowBridgeFillDelta,
+  type RowBridgeHandler,
+  type RowBridgeHostActionDelta,
+  type RowBridgeId,
+  type RowBridgeInsertContext,
+  type RowBridgeMetadataDelta,
+  type RowBridgeOptions,
+  type RowBridgePasteDelta,
+  type RowBridgeProjection,
+  type RowBridgeRangeDelta,
+  type RowBridgeReconciliationInput,
+  type RowBridgeReconciliationStatus,
+  type RowBridgeRowStructureDelta,
+  type RowBridgeTransaction,
+  type RowBridgeUnprojectableDelta,
+  rowBridgeTransactionId,
+} from "./row-bridge.js";
+export {
+  type SheetNameIssueCode,
+  type SheetNameValidationResult,
+  sheetNameKey,
+  validateSheetName,
+} from "./sheet-name.js";
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 export {
   DEFAULT_SYNC_COORDINATOR_LIMITS,
@@ -133,7 +223,13 @@ export type {
   CellBorder,
   CellBorders,
   CellChange,
+  CellEditor,
+  CellEditorContext,
+  CellEditorInstance,
+  CellEditorNavigation,
+  CellEditorRect,
   CellFormat,
+  CellHyperlink,
   CellInputSnapshot,
   CellLoadState,
   CellNote,
@@ -154,6 +250,8 @@ export type {
   ContextMenuItems,
   DataCell,
   DataSource,
+  DataSourceCapabilities,
+  DataSourceColumnBand,
   DataSourcePage,
   DataSourceRequest,
   DataSourceStorageOptions,
@@ -163,11 +261,16 @@ export type {
   DocumentOp,
   Grid,
   GridActions,
+  GridCommandName,
+  GridCommandState,
+  GridCommandStateChangeEvent,
   GridConfig,
   GridEvents,
   GridOptions,
+  GridPresentation,
   GridTransaction,
   HighlightRange,
+  HyperlinkTarget,
   MergeRange,
   MutationIssue,
   MutationPolicyMode,
@@ -189,6 +292,7 @@ export type {
   RemoteOperationSource,
   ReplaceResult,
   ResolvedCell,
+  ResourceOwnerBytes,
   RowData,
   RowGroup,
   RowMetadata,
@@ -197,6 +301,8 @@ export type {
   Selection,
   Sheet,
   SheetId,
+  SheetLifecycleIssueCode,
+  SheetLifecycleResult,
   SheetSnapshot,
   SheetVisibility,
   SnapshotCell,
@@ -216,4 +322,20 @@ export type {
   VisibleWindowView,
   Workbook,
   WorkbookSnapshot,
+  WorkbookTable,
+  WorkbookTableColumn,
+  WorkbookTableId,
+  WorkbookTablePatch,
+  WorkbookTableStyle,
+  WorkbookTableUnsupportedFeature,
 } from "./types.js";
+export {
+  assertWorkbookTables,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  validateWorkbookTableName,
+  validWorkbookTable,
+  type WorkbookTableNameIssueCode,
+  type WorkbookTableNameValidationResult,
+  type WorkbookTableResourceLimits,
+  workbookTableNameKey,
+} from "./workbook-table.js";

@@ -21,12 +21,14 @@ const packageManifest = JSON.parse(readFileSync(resolve(root, "package.json"), "
 const rustToolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
 const versionWorkflow = readFileSync(resolve(root, ".github/workflows/version.yml"), "utf8");
+const releaseWorkflow = readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8");
 const parsedWorkflow = parseWorkflowContract(workflow, "CI workflow");
 const parsedVersionWorkflow = parseWorkflowContract(versionWorkflow, "version workflow");
+const parsedReleaseWorkflow = parseWorkflowContract(releaseWorkflow, "release workflow");
 const nodeVersion = readFileSync(resolve(root, ".node-version"), "utf8").trim();
 const WORKFLOW_BUN_VERSION = "$" + "{{ env.BUN_VERSION }}";
 const WORKFLOW_NODE_VERSION = "$" + "{{ env.NODE_VERSION }}";
-const sizeBudget = JSON.parse(readFileSync(resolve(root, "scripts/size-budgets.json"), "utf8")) as {
+const sizeReport = JSON.parse(readFileSync(resolve(root, "scripts/size-report.json"), "utf8")) as {
   readonly toolchain?: Readonly<Record<string, string>>;
 };
 
@@ -62,8 +64,8 @@ describe("contributor and CI toolchain contract", () => {
     expect(workflow).toContain('npm install --global "npm@$NPM_VERSION"');
     expect(workflow).toContain('test "$(node --version)" = "v$NODE_VERSION"');
     expect(workflow).toContain('test "$(npm --version)" = "$NPM_VERSION"');
-    expect(sizeBudget.toolchain?.node).toBe(NODE_VERSION);
-    expect(sizeBudget.toolchain?.npm).toBe(NPM_VERSION);
+    expect(sizeReport.toolchain?.node).toBe(NODE_VERSION);
+    expect(sizeReport.toolchain?.npm).toBe(NPM_VERSION);
   });
 
   it("pins Rust, its WASM target, wasm-pack, cargo-audit, and coverage tooling", () => {
@@ -86,6 +88,7 @@ describe("contributor and CI toolchain contract", () => {
       assertReviewedActionPins([
         { name: "CI", workflow: parsedWorkflow },
         { name: "version", workflow: parsedVersionWorkflow },
+        { name: "release", workflow: parsedReleaseWorkflow },
       ]),
     ).not.toThrow();
     expect(workflow).not.toMatch(
@@ -112,6 +115,10 @@ describe("contributor and CI toolchain contract", () => {
     );
     expect(artifactBuilders).toHaveLength(1);
     const artifactBuild = artifactBuilders[0]!;
+    expect(commandsFor(artifactBuild)).toContain("bun run compatibility:validate");
+    expect(commandsFor(artifactBuild)).toContain(
+      "bun run compatibility:check -- --allow-unclaimed",
+    );
 
     const requiredNeeds = needsOf("required");
     expect(new Set(requiredNeeds)).toEqual(
@@ -146,9 +153,29 @@ describe("contributor and CI toolchain contract", () => {
     expect(commands.match(/release:prepare/g)).toHaveLength(1);
     expect(commands).toContain("verify:packed -- --artifacts");
     expect(commands).toContain("verify:bundlers -- --artifacts");
-    expect(commands).toContain("size-report.ts check --artifacts");
+    expect(commands).toContain("size-report.ts report --artifacts");
     expect(commands).toContain("test:coverage");
     expect(commands).toContain("test:browser");
+  });
+
+  it("requires a full matched comparison on the pinned performance runner", () => {
+    const jobs = parsedWorkflow.jobs ?? {};
+    const controlled = jobs["controlled-performance"];
+    expect(controlled?.["runs-on"]).toBe("sheetwrite-perf-i9-12900h-cachyos");
+    expect(controlled?.needs).toBe("artifact-build");
+    const commands = controlled?.steps?.flatMap((step) => (step.run ? [step.run] : [])).join("\n");
+    expect(commands).toContain("--rounds 10");
+    expect(commands).toContain("src/check.ts");
+    expect(commands).toContain("--power-mode balanced");
+    expect(commands).toContain("--concurrency 1");
+    expect(commands).not.toContain("--report-only");
+    expect(commands).not.toContain("bench:verify");
+    const upload = controlled?.steps?.find((step) =>
+      step.uses?.startsWith("actions/upload-artifact@"),
+    );
+    expect(upload?.if).toBe("always()");
+    expect(upload?.with?.path).toContain("render-fresh.json");
+    expect(JSON.stringify(jobs.required)).toContain("controlled-performance");
   });
 
   it("gates the exact docs artifact without weakening Required CI", () => {
@@ -168,8 +195,8 @@ describe("contributor and CI toolchain contract", () => {
     expect(docsCommand).toContain("docs:generate");
     expect(docsCommand).not.toContain("docs:check");
     expect(docsCommand).toContain("@sheetwrite/docs-start' build");
-    expect(JSON.stringify(jobs["delivery-size"])).toContain("delivery-size-evidence");
-    expect(JSON.stringify(jobs["docs-build"])).toContain("delivery-size-evidence");
+    expect(JSON.stringify(jobs["delivery-size"])).toContain("size-evidence");
+    expect(JSON.stringify(jobs["docs-build"])).toContain("size-evidence");
 
     const requiredCommand = jobs.required?.steps?.find((step) =>
       step.run?.includes('test "$PREFLIGHT" = success'),

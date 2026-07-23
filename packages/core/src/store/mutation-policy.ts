@@ -185,6 +185,14 @@ export class StoreMutationPolicy {
             end: { row: patch.merge.r1, col: patch.merge.c1 },
           },
         ];
+      case "setHyperlink":
+        return [normalizedRange(patch.hyperlink.range)];
+      case "removeHyperlink": {
+        const hyperlink = this.sheet(patch.sheet)?.hyperlinks?.find(
+          (candidate) => candidate.id === patch.id,
+        );
+        return hyperlink ? [normalizedRange(hyperlink.range)] : [];
+      }
       case "setValidationRule":
         return [normalizedRange(patch.rule.range)];
       case "setColumn": {
@@ -217,12 +225,16 @@ export class StoreMutationPolicy {
       case "moveColumns":
       case "removeSheet":
       case "renameSheet":
-      case "moveSheet": {
+      case "moveSheet":
+      case "setSheetVisibility": {
         const sheet = this.sheet(patch.sheet);
         if (!sheet || sheet.rowCount === 0 || sheet.columns.length === 0) return [];
         return [fullSheetRange(sheet)];
       }
       case "addSheet":
+      case "addTable":
+      case "updateTable":
+      case "removeTable":
       case "setSheetMeta":
       case "removeValidationRule":
       case "setProtectedRange":

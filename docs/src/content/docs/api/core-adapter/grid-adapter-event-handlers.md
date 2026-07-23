@@ -9,10 +9,10 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L57</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L106</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>9</span>
+## Members <span class="api-count" data-pagefind-ignore>15</span>
 
 <div class="api-member-list">
 <h3 id="ongridchange" class="api-search-anchor">onGridChange</h3>
@@ -21,6 +21,15 @@ Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 ```ts generated
 onGridChange?: (event: ChangeEvent) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-row-delta" data-pagefind-weight="1">
+<summary><code>onRowDelta</code> <span class="api-member-summary">Receives projected host-row effects when a row bridge is attached.</span></summary>
+
+```ts generated
+onRowDelta?: RowBridgeHandler<Id>;
 ```
 
 </details>
@@ -79,6 +88,51 @@ onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
 
 </details>
 
+<details class="api-member" id="grid-adapter-event-handlers-on-command-state-change" data-pagefind-weight="1">
+<summary><code>onCommandStateChange</code> <span class="api-member-summary">Receives observable undo/redo and formatting command state.</span></summary>
+
+```ts generated
+onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-mutation-rejected" data-pagefind-weight="1">
+<summary><code>onMutationRejected</code> <span class="api-member-summary">Receives structured issues when a Grid mutation is rejected.</span></summary>
+
+```ts generated
+onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-renderer-fallback" data-pagefind-weight="1">
+<summary><code>onRendererFallback</code> <span class="api-member-summary">Fires when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-datasource-error" data-pagefind-weight="1">
+<summary><code>onDatasourceError</code> <span class="api-member-summary">Receives failed datasource requests and their errors.</span></summary>
+
+```ts generated
+onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+```
+
+</details>
+
+<details class="api-member" id="grid-adapter-event-handlers-on-export-error" data-pagefind-weight="1">
+<summary><code>onExportError</code> <span class="api-member-summary">Receives failures from built-in XLSX export actions.</span></summary>
+
+```ts generated
+onExportError?: (event: GridEvents["export-error"]) => void;
+```
+
+</details>
+
 <details class="api-member" id="grid-adapter-event-handlers-on-ready" data-pagefind-weight="1">
 <summary><code>onReady</code> <span class="api-member-summary">Fires after the adapter publishes a ready Grid generation.</span></summary>
 
@@ -92,7 +146,7 @@ onReady?: (event: GridReadyEvent) => void;
 <summary><code>onInitializationError</code> <span class="api-member-summary">Receives a WASM initialization failure while the adapter remains mounted.</span></summary>
 
 ```ts generated
-onInitializationError?: (error: unknown) => void;
+onInitializationError?: (error: SheetwriteError) => void;
 ```
 
 </details>
@@ -104,16 +158,24 @@ onInitializationError?: (error: unknown) => void;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface GridAdapterEventHandlers {
+export interface GridAdapterEventHandlers<
+  Id extends RowBridgeId = RowBridgeId,
+> {
   onGridChange?: (event: ChangeEvent) => void;
+  onRowDelta?: RowBridgeHandler<Id>;
   onSelectionChange?: (selection: Selection | null) => void;
   onViewportChange?: (event: GridEvents["scroll"]) => void;
   onEditBegin?: (event: GridEvents["edit-begin"]) => void;
   onEditCommit?: (event: GridEvents["edit-commit"]) => void;
   onSearch?: (result: GridEvents["search"]) => void;
   onActiveSheetChange?: (event: GridEvents["active-sheet"]) => void;
+  onCommandStateChange?: (event: GridEvents["command-state-change"]) => void;
+  onMutationRejected?: (event: GridEvents["mutation-rejected"]) => void;
+  onRendererFallback?: (event: GridEvents["renderer-fallback"]) => void;
+  onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
+  onExportError?: (event: GridEvents["export-error"]) => void;
   onReady?: (event: GridReadyEvent) => void;
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
 }
 ```
 

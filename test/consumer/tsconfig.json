@@ -5,10 +5,18 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
+    "jsx": "react-jsx",
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["svelte", "vite/client"]
   },
-  "include": ["src/consumer.ts", "src/App.svelte", "src/svelte-main.ts"]
+  "include": [
+    "src/consumer.ts",
+    "src/lifecycle.ts",
+    "src/react-main.tsx",
+    "src/vue-main.ts",
+    "src/App.svelte",
+    "src/svelte-main.ts"
+  ]
 }

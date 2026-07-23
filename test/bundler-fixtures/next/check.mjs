@@ -52,7 +52,7 @@ const evidence = {
   version: packageManifest.dependencies.next,
   assets,
 };
-const evidencePath = resolve(repositoryRoot, "test-results/delivery-size/bundlers/next.json");
+const evidencePath = resolve(repositoryRoot, "test-results/bundlers/next.json");
 await mkdir(resolve(evidencePath, ".."), { recursive: true });
 await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 console.log("Next.js size manifest:", relative(process.cwd(), evidencePath));

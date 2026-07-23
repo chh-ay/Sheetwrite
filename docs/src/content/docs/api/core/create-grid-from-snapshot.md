@@ -10,7 +10,7 @@ the hydrated store just like one created through `createGrid`.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L48</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L46</code></dd></div>
 </dl>
 
 ## Declaration

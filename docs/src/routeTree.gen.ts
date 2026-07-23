@@ -17,9 +17,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
+import { Route as TestSemanticGridRouteImport } from './routes/test.semantic-grid'
+import { Route as TestRenderersRouteImport } from './routes/test.renderers'
+import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
 import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
+import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
+import { Route as ShowcasesEngineRouteImport } from './routes/showcases.engine'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
 import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
 import { Route as DocsProofRouteImport } from './routes/docs.proof'
@@ -66,6 +71,21 @@ const TestXlsxRoute = TestXlsxRouteImport.update({
   path: '/test/xlsx',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestSemanticGridRoute = TestSemanticGridRouteImport.update({
+  id: '/test/semantic-grid',
+  path: '/test/semantic-grid',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestRenderersRoute = TestRenderersRouteImport.update({
+  id: '/test/renderers',
+  path: '/test/renderers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestPrefetchRoute = TestPrefetchRouteImport.update({
+  id: '/test/prefetch',
+  path: '/test/prefetch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestCollaborationRoute = TestCollaborationRouteImport.update({
   id: '/test/collaboration',
   path: '/test/collaboration',
@@ -82,6 +102,16 @@ const ShowcasesInteroperabilityRoute =
     path: '/showcases/interoperability',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ShowcasesHostRowsRoute = ShowcasesHostRowsRouteImport.update({
+  id: '/showcases/host-rows',
+  path: '/showcases/host-rows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesEngineRoute = ShowcasesEngineRouteImport.update({
+  id: '/showcases/engine',
+  path: '/showcases/engine',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
   id: '/showcases/database',
   path: '/showcases/database',
@@ -119,9 +149,14 @@ export interface FileRoutesByFullPath {
   '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/engine': typeof ShowcasesEngineRoute
+  '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/prefetch': typeof TestPrefetchRoute
+  '/test/renderers': typeof TestRenderersRoute
+  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -137,9 +172,14 @@ export interface FileRoutesByTo {
   '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/engine': typeof ShowcasesEngineRoute
+  '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/prefetch': typeof TestPrefetchRoute
+  '/test/renderers': typeof TestRenderersRoute
+  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs': typeof DocsIndexRoute
   '/showcases': typeof ShowcasesIndexRoute
@@ -156,9 +196,14 @@ export interface FileRoutesById {
   '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
+  '/showcases/engine': typeof ShowcasesEngineRoute
+  '/showcases/host-rows': typeof ShowcasesHostRowsRoute
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/prefetch': typeof TestPrefetchRoute
+  '/test/renderers': typeof TestRenderersRoute
+  '/test/semantic-grid': typeof TestSemanticGridRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
   '/showcases/': typeof ShowcasesIndexRoute
@@ -176,9 +221,14 @@ export interface FileRouteTypes {
     | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
+    | '/showcases/engine'
+    | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/prefetch'
+    | '/test/renderers'
+    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -194,9 +244,14 @@ export interface FileRouteTypes {
     | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
+    | '/showcases/engine'
+    | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/prefetch'
+    | '/test/renderers'
+    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs'
     | '/showcases'
@@ -212,9 +267,14 @@ export interface FileRouteTypes {
     | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
+    | '/showcases/engine'
+    | '/showcases/host-rows'
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/prefetch'
+    | '/test/renderers'
+    | '/test/semantic-grid'
     | '/test/xlsx'
     | '/docs/'
     | '/showcases/'
@@ -231,9 +291,14 @@ export interface RootRouteChildren {
   DocsProofRoute: typeof DocsProofRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
+  ShowcasesEngineRoute: typeof ShowcasesEngineRoute
+  ShowcasesHostRowsRoute: typeof ShowcasesHostRowsRoute
   ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
+  TestPrefetchRoute: typeof TestPrefetchRoute
+  TestRenderersRoute: typeof TestRenderersRoute
+  TestSemanticGridRoute: typeof TestSemanticGridRoute
   TestXlsxRoute: typeof TestXlsxRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ShowcasesIndexRoute: typeof ShowcasesIndexRoute
@@ -298,6 +363,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestXlsxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/test/semantic-grid': {
+      id: '/test/semantic-grid'
+      path: '/test/semantic-grid'
+      fullPath: '/test/semantic-grid'
+      preLoaderRoute: typeof TestSemanticGridRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/renderers': {
+      id: '/test/renderers'
+      path: '/test/renderers'
+      fullPath: '/test/renderers'
+      preLoaderRoute: typeof TestRenderersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/prefetch': {
+      id: '/test/prefetch'
+      path: '/test/prefetch'
+      fullPath: '/test/prefetch'
+      preLoaderRoute: typeof TestPrefetchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/test/collaboration': {
       id: '/test/collaboration'
       path: '/test/collaboration'
@@ -317,6 +403,20 @@ declare module '@tanstack/react-router' {
       path: '/showcases/interoperability'
       fullPath: '/showcases/interoperability'
       preLoaderRoute: typeof ShowcasesInteroperabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/host-rows': {
+      id: '/showcases/host-rows'
+      path: '/showcases/host-rows'
+      fullPath: '/showcases/host-rows'
+      preLoaderRoute: typeof ShowcasesHostRowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/engine': {
+      id: '/showcases/engine'
+      path: '/showcases/engine'
+      fullPath: '/showcases/engine'
+      preLoaderRoute: typeof ShowcasesEngineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/database': {
@@ -367,9 +467,14 @@ const rootRouteChildren: RootRouteChildren = {
   DocsProofRoute: DocsProofRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
+  ShowcasesEngineRoute: ShowcasesEngineRoute,
+  ShowcasesHostRowsRoute: ShowcasesHostRowsRoute,
   ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   TestCollaborationRoute: TestCollaborationRoute,
+  TestPrefetchRoute: TestPrefetchRoute,
+  TestRenderersRoute: TestRenderersRoute,
+  TestSemanticGridRoute: TestSemanticGridRoute,
   TestXlsxRoute: TestXlsxRoute,
   DocsIndexRoute: DocsIndexRoute,
   ShowcasesIndexRoute: ShowcasesIndexRoute,

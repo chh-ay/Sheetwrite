@@ -135,6 +135,31 @@ describe("WorkerRenderer", () => {
     ]);
   });
 
+  it("preserves resolved hyperlink and conditional styles through the Worker payload", () => {
+    const renderer = new WorkerRenderer();
+    const worker = new RecordingWorker();
+    Reflect.set(renderer, "worker", worker);
+    const view = makePackedView();
+    view.styles = [
+      {},
+      {
+        color: "#0563C1",
+        underline: true,
+        backgroundColor: "#00FF00",
+        bold: true,
+      },
+    ];
+
+    renderer.paint(view);
+
+    const posted = worker.messages[0]!.message as {
+      styles: VisibleWindowView["styles"];
+      styleIds: Uint32Array;
+    };
+    expect(posted.styles[1]).toEqual(view.styles[1]);
+    expect(Array.from(posted.styleIds)).toEqual([0, 1]);
+  });
+
   it("copies packed frames into a SharedArrayBuffer when opted in", () => {
     const renderer = new WorkerRenderer(undefined, { sharedMemory: true });
     const worker = new RecordingWorker();

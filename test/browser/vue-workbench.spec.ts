@@ -12,6 +12,7 @@ import { siteUrl } from "./playwright.config.js";
 declare global {
   interface Window {
     __sheetwriteVueWorkbench?: { grid: Grid };
+    __sheetwriteVuePaintFonts?: string[];
   }
 }
 
@@ -79,6 +80,10 @@ async function openWorkbench(page: Page): Promise<void> {
   });
 }
 
+async function openTask(page: Page, name: string): Promise<void> {
+  await page.getByRole("tab", { name, exact: true }).click();
+}
+
 function cellValue(page: Page, sheet: string, row: number, col: number) {
   return page.evaluate(
     ([s, r, c]) =>
@@ -110,6 +115,7 @@ async function commitCell(page: Page, row: number, col: number, text: string): P
 
 test("boots the governed business workbook, paints, and stays accessible", async ({ page }) => {
   const errors = collectErrors(page);
+  await page.setViewportSize({ width: 1568, height: 869 });
   await openWorkbench(page);
 
   // The frozen PO column stays out of the ARIA mirror window, so the first
@@ -161,19 +167,51 @@ test("boots the governed business workbook, paints, and stays accessible", async
   expect(model.bannerBold).toBe(true);
   expect(model.total0).toBe(8); // =E1*F1 evaluated by the engine
 
-  // Host persistence and lifecycle state are visible, labeled text.
+  // The governed workflow, not generic controls, is the first visible task.
+  const taskTabs = page.getByRole("tablist", { name: "Workbook tasks" });
+  await expect(taskTabs).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Protection" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByTestId("policy-result")).toContainText(
+    "Protected totals require the finance-lead role.",
+  );
+  const taskGeometry = await taskTabs.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(taskGeometry.scrollWidth).toBeLessThanOrEqual(taskGeometry.clientWidth);
+  const gridBox = await page.locator(`${APP} .sw-demo-grid`).boundingBox();
+  const panelBox = await page.locator(`${APP} .sw-vuewb-panel`).boundingBox();
+  expect(gridBox).not.toBeNull();
+  expect(panelBox).not.toBeNull();
+  expect(gridBox!.y).toBeLessThan(869);
+  expect(gridBox!.width).toBeGreaterThan(panelBox!.width * 2);
+  expect(gridBox!.height).toBeGreaterThan(500);
+  const eventBox = await page.getByTestId("event-panel").boundingBox();
+  expect(eventBox).not.toBeNull();
+  expect(eventBox!.height).toBeGreaterThanOrEqual(120);
+
+  // Host persistence and lifecycle state remain explicit, labeled text.
   await expect(page.getByTestId("generation")).toHaveText("1 · initial");
   await expect(page.getByTestId("workbook-state")).toHaveText("2 sheet(s) · active orders");
 
   // Accessible names for every interactive surface.
   await expect(page.getByRole("toolbar", { name: "Workbench configuration" })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Host role" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Host role" })).toBeVisible();
   await expect(page.getByRole("toolbar", { name: "Spreadsheet formatting" })).toBeVisible();
+  await expect(page.locator("select")).toHaveCount(0);
   await expect(page.getByRole("tablist", { name: "Sheets" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Orders sheet" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Suppliers sheet" })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Cell note" })).toBeAttached();
-  await expect(page.getByRole("list", { name: "Adapter events" })).toBeAttached();
+  await openTask(page, "Notes");
+  const noteEditor = page.getByRole("textbox", { name: "Cell note" });
+  await expect(noteEditor).toBeVisible();
+  expect(await noteEditor.evaluate((element) => element.clientHeight)).toBeGreaterThanOrEqual(90);
+  await expect(page.getByRole("heading", { name: "Cell notes", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Notes", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("list", { name: "Adapter events" })).toBeVisible();
   await expect(page.getByTestId("persistence")).toHaveAttribute("aria-live", "polite");
 
   expect(errors.page).toEqual([]);
@@ -193,6 +231,7 @@ test("a valid status edit commits, queues, and syncs to the host adapter", async
   await expect(page.getByTestId("mutation-policy")).toBeDisabled();
   await expect(page.getByTestId("feed")).toContainText("@grid-change");
 
+  await openTask(page, "Persistence");
   await page.getByTestId("sync").click();
   await expect(page.getByTestId("persistence")).toHaveAttribute("data-state", "synced");
   await expect(page.getByTestId("persistence")).toContainText("All changes on host · v1");
@@ -223,26 +262,32 @@ test("an off-list status is rejected at the barrier as a structured issue", asyn
   expect(errors.console).toEqual([]);
 });
 
-test("protected totals obey the reactive host role resolver", async ({ page }) => {
+test("protected totals show rejection, role correction, and accepted mutation in one journey", async ({
+  page,
+}) => {
   const errors = collectErrors(page);
   await openWorkbench(page);
 
-  // Reviewer: the inspector reports the lock and the resolver denies the edit.
-  await page.evaluate(() => {
-    const grid = window.__sheetwriteVueWorkbench!.grid;
-    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 0, col: 6 } });
-  });
   const inspector = page.getByTestId("inspector");
+  await expect(inspector).toContainText("orders!G1");
   await expect(inspector).toContainText("locked · Computed totals");
-  await commitCell(page, 0, 6, "999");
-  await expect(page.getByTestId("feed")).toContainText(PROTECTION_ID);
+
+  await page.getByTestId("challenge-attempt").click();
+  const result = page.getByTestId("policy-result");
+  await expect(result).toHaveAttribute("data-state", "rejected");
+  await expect(result).toContainText(PROTECTION_ID);
+  await expect(result).toContainText("Rejected");
   expect(await cellValue(page, "orders", 0, 6)).toBe(8);
   await expect(page.getByTestId("pending-count")).toHaveText("0");
 
-  // Finance lead: same stable resolver, new reactive decision.
-  await page.getByRole("combobox", { name: "Host role" }).selectOption("finance-lead");
+  await page.getByTestId("challenge-authorize").click();
+  await expect(page.getByTestId("role-finance-lead")).toHaveAttribute("aria-pressed", "true");
   await expect(inspector).toContainText("override allowed (finance lead)");
-  await commitCell(page, 0, 6, "999");
+  await expect(result).toHaveAttribute("data-state", "authorized");
+
+  await page.getByTestId("challenge-attempt").click();
+  await expect(result).toHaveAttribute("data-state", "accepted");
+  await expect(result).toContainText("orders!G1 changed from 8 to 999");
   await expect.poll(() => cellValue(page, "orders", 0, 6)).toBe(999);
   await expect(page.getByTestId("pending-count")).toHaveText("1");
 
@@ -258,6 +303,7 @@ test("cell notes flow through the document model and the host pipeline", async (
     const grid = window.__sheetwriteVueWorkbench!.grid;
     grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 2, col: 3 } });
   });
+  await openTask(page, "Notes");
   const note = page.getByRole("textbox", { name: "Cell note" });
   await expect(note).toHaveValue(SEEDED_NOTE);
 
@@ -282,6 +328,7 @@ test("cell notes flow through the document model and the host pipeline", async (
     .toBeNull();
   await expect(page.getByTestId("pending-count")).toHaveText("2");
 
+  await openTask(page, "Persistence");
   await page.getByTestId("sync").click();
   await expect(page.getByTestId("persistence")).toContainText("All changes on host · v2");
 
@@ -294,6 +341,7 @@ test("workbook and sheet operations stay reactive through the public API", async
   await openWorkbench(page);
 
   // Rename the active sheet from host UI.
+  await openTask(page, "Sheets");
   const rename = page.getByRole("textbox", { name: "Active sheet name" });
   await expect(rename).toHaveValue("Orders");
   await rename.fill("Purchase orders");
@@ -314,8 +362,122 @@ test("workbook and sheet operations stay reactive through the public API", async
 
   // Sheet workflow is document work: it syncs to the host like any edit.
   await expect(page.getByTestId("pending-count")).toHaveText("2");
+  await openTask(page, "Persistence");
   await page.getByTestId("sync").click();
   await expect(page.getByTestId("persistence")).toContainText("All changes on host · v2");
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("@portability native tabs expose the complete accessible worksheet lifecycle", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openWorkbench(page);
+
+  const ordersOptions = page.getByRole("button", { name: "Options for Orders sheet" });
+  await ordersOptions.focus();
+  await page.keyboard.press("ArrowDown");
+  const renameOption = page.getByRole("menuitem", { name: "Rename Orders sheet" });
+  await expect(renameOption).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(ordersOptions).toBeFocused();
+  await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
+  await ordersOptions.click();
+  await page.getByRole("menuitem", { name: "Rename Orders sheet" }).click();
+  const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
+  await editor.fill("Suppliers");
+  await editor.press("Enter");
+  await expect(page.locator(`${GRID} [role="alert"][data-code="duplicate"]`)).toHaveText(
+    "Sheet name duplicates another sheet case-insensitively",
+  );
+  await expect(editor).toBeFocused();
+  await expect(page.getByTestId("pending-count")).toHaveText("0");
+
+  await editor.fill("Purchase orders");
+  await editor.press("Enter");
+  await expect(page.getByRole("tab", { name: "Purchase orders sheet" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add sheet", exact: true }).click();
+  const added = page.getByRole("tab", { name: "Sheet 3 sheet" });
+  await expect(added).toBeVisible();
+  await expect(added).toHaveAttribute("aria-selected", "true");
+
+  await added.focus();
+  await page.keyboard.press("Control+Shift+ArrowLeft");
+  expect(
+    await page.evaluate(() =>
+      window.__sheetwriteVueWorkbench!.grid.store.getWorkbook().sheets.map((sheet) => sheet.name),
+    ),
+  ).toEqual(["Purchase orders", "Sheet 3", "Suppliers"]);
+
+  await page.getByRole("button", { name: "Options for Sheet 3 sheet" }).click();
+  await page.getByRole("menuitem", { name: "Hide Sheet 3 sheet" }).click();
+  await expect(added).toHaveCount(0);
+  const unhide = page.getByLabel("Unhide sheet");
+  await expect(unhide).toBeVisible();
+  await unhide.click();
+  await page
+    .getByRole("group", { name: "Hidden sheets" })
+    .getByRole("button", { name: "Sheet 3" })
+    .click();
+  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Sheet 3 sheet" }).click();
+  await page.getByRole("button", { name: "Options for Sheet 3 sheet" }).click();
+  await page.getByRole("menuitem", { name: "Remove Sheet 3 sheet" }).click();
+  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Suppliers sheet" }).click();
+  expect(
+    await page.evaluate(
+      () => window.__sheetwriteVueWorkbench!.grid.exportSnapshot().workbook.activeSheet,
+    ),
+  ).toBe("suppliers");
+  await expect(page.getByTestId("pending-count")).toHaveText("6");
+  await openTask(page, "Persistence");
+  await page.getByTestId("sync").click();
+  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v6");
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("@portability native worksheet controls remain operable at 390×844", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = collectErrors(page);
+  await openWorkbench(page);
+
+  await page.getByRole("button", { name: "Options for Orders sheet" }).click();
+  await page.getByRole("menuitem", { name: "Rename Orders sheet" }).click();
+  const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
+  await editor.fill("Enterprise purchase orders");
+  await editor.press("Enter");
+  await expect(page.getByRole("tab", { name: "Enterprise purchase orders sheet" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add sheet", exact: true }).click();
+  const sheet3 = page.getByRole("tab", { name: "Sheet 3 sheet" });
+  await expect(sheet3).toBeVisible();
+  await sheet3.focus();
+  await page.keyboard.press("Control+Shift+H");
+  const unhideSheet = page.getByLabel("Unhide sheet");
+  await expect(unhideSheet).toBeVisible();
+  await unhideSheet.click();
+  await page
+    .getByRole("group", { name: "Hidden sheets" })
+    .getByRole("button", { name: "Sheet 3" })
+    .click();
+  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
+
+  const overflow = await page.locator(".sheetwrite-tabbar").evaluate((bar) => ({
+    clientWidth: bar.clientWidth,
+    scrollWidth: bar.scrollWidth,
+    documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  }));
+  expect(overflow.clientWidth).toBeGreaterThan(0);
+  expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth);
+  expect(overflow.documentOverflow).toBe(false);
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -324,10 +486,25 @@ test("workbook and sheet operations stay reactive through the public API", async
 test("toolbar formatting commits live styles through the grid", async ({ page }) => {
   const errors = collectErrors(page);
   await openWorkbench(page);
+  await page.evaluate(() => {
+    window.__sheetwriteVuePaintFonts = [];
+    const canvas = document.querySelector<HTMLCanvasElement>(".sw-vuewb-grid canvas");
+    const context = canvas?.getContext("2d");
+    if (!context) throw new Error("Vue workbench canvas context unavailable");
+    const originalFillText = context.fillText.bind(context);
+    context.fillText = (text: string, x: number, y: number, maxWidth?: number): void => {
+      if (text === "Kampot Mills") window.__sheetwriteVuePaintFonts?.push(context.font);
+      if (maxWidth === undefined) originalFillText(text, x, y);
+      else originalFillText(text, x, y, maxWidth);
+    };
+  });
 
   await page.evaluate(() => {
     const grid = window.__sheetwriteVueWorkbench!.grid;
     grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 1 } });
+  });
+  await page.evaluate(() => {
+    window.__sheetwriteVuePaintFonts = [];
   });
   await page.getByRole("button", { name: "Bold", exact: true }).click();
   await expect
@@ -344,6 +521,56 @@ test("toolbar formatting commits live styles through the grid", async ({ page })
     .toBe(true);
   // Style commits are pending host work like any other document operation.
   await expect(page.getByTestId("pending-count")).toHaveText("1");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVuePaintFonts?.some(
+            (font) => /\bbold\b/.test(font) && !/\bbold\s+(?:[1-9]\d{0,2}|1000)\b/.test(font),
+          ) ?? false,
+      ),
+    )
+    .toBe(true);
+
+  await page.evaluate(() => {
+    window.__sheetwriteVuePaintFonts = [];
+  });
+  await page.getByRole("button", { name: "Italic", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueWorkbench!.grid.store.getCell({
+            sheet: "orders",
+            row: 1,
+            col: 1,
+          }).style.italic ?? false,
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVuePaintFonts?.some(
+            (font) =>
+              /\bitalic\s+bold\b/.test(font) && !/\bbold\s+(?:[1-9]\d{0,2}|1000)\b/.test(font),
+          ) ?? false,
+      ),
+    )
+    .toBe(true);
+  await expect(page.getByTestId("pending-count")).toHaveText("2");
+
+  const colorInput = page.locator(".sheetwrite-tb-fillColor");
+  await colorInput.evaluate((input: HTMLInputElement) => {
+    for (const color of ["#224466", "#668844", "#aa5533"]) {
+      input.value = color;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  });
+  await expect(page.getByTestId("pending-count")).toHaveText("2");
+  await colorInput.dispatchEvent("change");
+  await expect(page.getByTestId("pending-count")).toHaveText("3");
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -359,9 +586,12 @@ test("mutation policy is reset-bound: the grid rebuilds and persistence rebinds"
   await commitCell(page, 4, 3, "Approved");
   await expect(page.getByTestId("pending-count")).toHaveText("1");
   await expect(page.getByTestId("mutation-policy")).toBeDisabled();
+  await openTask(page, "Persistence");
   await page.getByTestId("sync").click();
   await expect(page.getByTestId("persistence")).toContainText("All changes on host · v1");
 
+  await openTask(page, "Renderer");
+  await page.getByText("Adapter settings", { exact: true }).click();
   await page.getByTestId("mutation-policy").click();
   await expect(page.getByTestId("generation")).toHaveText("2 · input-reset", {
     timeout: 15_000,
@@ -381,12 +611,17 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   const errors = collectErrors(page);
   await openWorkbench(page);
 
+  await openTask(page, "Renderer");
+  await page.getByText("Adapter settings", { exact: true }).click();
   const readOnly = page.getByTestId("readonly");
   await readOnly.click();
   await expect(readOnly).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(GRID)).toHaveAttribute("aria-readonly", "true");
+  await openTask(page, "Notes");
   await expect(page.getByRole("textbox", { name: "Cell note" })).toBeDisabled();
   await expect(page.getByTestId("props")).toContainText("true");
+  await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Options for / })).toHaveCount(0);
 
   // Mutation is disabled while navigation stays alive; no reset happened. The
   // editor must not even open (commitCell would strand Enter on the toggle).
@@ -400,8 +635,11 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   await expect(page.getByTestId("pending-count")).toHaveText("0");
   await expect(page.getByTestId("generation")).toHaveText("1 · initial");
 
+  await openTask(page, "Renderer");
   await readOnly.click();
   await expect(readOnly).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Add sheet", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Options for Orders sheet" })).toBeVisible();
   await commitCell(page, 4, 3, "Approved");
   await expect.poll(() => cellValue(page, "orders", 4, 3)).toBe("Approved");
 
@@ -420,10 +658,29 @@ test("the workbench stays operable on a mobile viewport", async ({ page }) => {
   expect(gridBox).not.toBeNull();
   expect(panelBox).not.toBeNull();
   expect(panelBox!.y).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height - 1);
+  await openTask(page, "Notes");
+  const mobileRailGeometry = await page.locator(".sw-vuewb-tasktabs").evaluate((navigator) => {
+    const events = document.querySelector<HTMLElement>("[data-testid='event-panel']");
+    const note = document.querySelector<HTMLTextAreaElement>("[data-testid='note-input']");
+    return {
+      navigatorClientWidth: navigator.clientWidth,
+      navigatorScrollWidth: navigator.scrollWidth,
+      eventHeight: events?.getBoundingClientRect().height ?? 0,
+      noteClientHeight: note?.clientHeight ?? 0,
+      documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+  expect(mobileRailGeometry.navigatorScrollWidth).toBeLessThanOrEqual(
+    mobileRailGeometry.navigatorClientWidth,
+  );
+  expect(mobileRailGeometry.eventHeight).toBeGreaterThanOrEqual(120);
+  expect(mobileRailGeometry.noteClientHeight).toBeGreaterThanOrEqual(90);
+  expect(mobileRailGeometry.documentOverflow).toBe(false);
 
   // The full governed flow works with touch-sized chrome.
   await commitCell(page, 4, 3, "Approved");
   await expect(page.getByTestId("pending-count")).toHaveText("1");
+  await openTask(page, "Persistence");
   await page.getByTestId("sync").scrollIntoViewIfNeeded();
   await page.getByTestId("sync").click();
   await expect(page.getByTestId("persistence")).toContainText("All changes on host · v1");

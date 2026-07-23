@@ -3,28 +3,6 @@ import { assertResource, checkAbort, type XlsxCodecContext } from "./resources.j
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const ENCODER = new TextEncoder();
 const XML_NAME = /^[A-Za-z_][A-Za-z\d_.:-]*/;
-const INVALID_WORKSHEET_NAME_CHARACTERS: Readonly<Record<string, true>> = {
-  "\\": true,
-  "/": true,
-  "*": true,
-  "?": true,
-  ":": true,
-  "[": true,
-  "]": true,
-};
-
-/** Whether a decoded worksheet name satisfies SpreadsheetML's lexical limits. */
-export function isValidXlsxWorksheetName(name: string): boolean {
-  if (name.length === 0 || name.length > 31 || name.startsWith("'") || name.endsWith("'")) {
-    return false;
-  }
-  for (const character of name) {
-    if (character.charCodeAt(0) < 0x20 || INVALID_WORKSHEET_NAME_CHARACTERS[character] === true) {
-      return false;
-    }
-  }
-  return true;
-}
 
 export interface XmlElement {
   readonly name: string;
@@ -194,7 +172,7 @@ export function parseXml(bytes: Uint8Array, part: string, context: XlsxCodecCont
   };
 
   while (cursor < xml.length) {
-    if ((elementCount & 4_095) === 0) checkAbort(context.options);
+    if ((elementCount & 4_095) === 0) checkAbort(context);
     const open = xml.indexOf("<", cursor);
     if (open < 0) {
       appendText(xml.slice(cursor));
@@ -381,7 +359,7 @@ export class XmlBuffer {
   }
 
   finish(): Uint8Array {
-    checkAbort(this.context.options);
+    checkAbort(this.context);
     return ENCODER.encode(this.#parts.join(""));
   }
 }

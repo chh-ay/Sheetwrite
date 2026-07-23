@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, readdir, readFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
@@ -53,6 +53,7 @@ export interface ApiIssue {
     | "manifest-drift"
     | "unclassified-entry"
     | "wrong-owner"
+    | "unstable-error-contract"
     | "unresolved-entry";
   message: string;
   package?: string;
@@ -552,6 +553,25 @@ function resolvedSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
   return current;
 }
 
+function unstableErrorContract(apiExport: ApiExport): string | null {
+  if (
+    /\berror\??:\s*(?:unknown|Error)\b/.test(apiExport.signature) ||
+    /\(\s*_?error:\s*(?:unknown|Error)\b/.test(apiExport.signature)
+  ) {
+    return `${apiExport.name} exposes an untyped error boundary; use SheetwriteError`;
+  }
+  if (
+    apiExport.kind === "class" &&
+    apiExport.name !== "SheetwriteError" &&
+    /\bextends (?:Error|RangeError|TypeError|AggregateError|EvalError|ReferenceError|SyntaxError|URIError|DOMException)\b/.test(
+      apiExport.signature,
+    )
+  ) {
+    return `${apiExport.name} extends Error directly; public failures must extend SheetwriteError`;
+  }
+  return null;
+}
+
 function analyzeEntry(
   packageName: string,
   packageRoot: string,
@@ -577,6 +597,7 @@ function analyzeEntry(
     strict: true,
     target: ts.ScriptTarget.ES2022,
   });
+
   const sourceFile = program.getSourceFile(entry.source);
   if (sourceFile === undefined) {
     issues.push({
@@ -709,6 +730,16 @@ function analyzeEntry(
         symbol: apiExport.name,
       });
     }
+    const errorContractIssue = unstableErrorContract(apiExport);
+    if (entry.classification === "supported" && errorContractIssue !== null) {
+      issues.push({
+        code: "unstable-error-contract",
+        message: `${packageName} ${entry.subpath} export ${errorContractIssue}`,
+        package: packageName,
+        entryPoint: entry.subpath,
+        symbol: apiExport.name,
+      });
+    }
   }
 
   return {
@@ -778,17 +809,62 @@ export function validateManifest(value: unknown): ApiIssue[] {
   }
   return [];
 }
-export const PUBLIC_API_BASELINE_SHA256 =
-  "a24ebbb874f9ff87ea80290931e52111f613840a9e1fdf0570f7e096f62a6a7d";
+export interface PublicApiBaseline {
+  schemaVersion: 1;
+  manifestFormatVersion: PublicApiManifest["formatVersion"];
+  sha256: string;
+}
+
+const PUBLIC_API_BASELINE_PATH = "scripts/public-api-baseline.json";
 
 export function publicApiDigest(manifest: PublicApiManifest): string {
   return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
 }
 
-export function checkManifestBaseline(
+export function parsePublicApiBaseline(value: unknown): PublicApiBaseline {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("schemaVersion" in value) ||
+    value.schemaVersion !== 1 ||
+    !("manifestFormatVersion" in value) ||
+    value.manifestFormatVersion !== 2 ||
+    !("sha256" in value) ||
+    typeof value.sha256 !== "string" ||
+    !/^[0-9a-f]{64}$/.test(value.sha256)
+  ) {
+    throw new TypeError("Invalid public API baseline artifact");
+  }
+  return {
+    schemaVersion: 1,
+    manifestFormatVersion: 2,
+    sha256: value.sha256,
+  };
+}
+
+export async function readPublicApiBaseline(repositoryRoot: string): Promise<PublicApiBaseline> {
+  const path = join(repositoryRoot, PUBLIC_API_BASELINE_PATH);
+  return parsePublicApiBaseline(JSON.parse(await readFile(path, "utf8")));
+}
+
+export async function writePublicApiBaseline(
+  repositoryRoot: string,
   manifest: PublicApiManifest,
-  expected = PUBLIC_API_BASELINE_SHA256,
-): ApiIssue[] {
+): Promise<PublicApiBaseline> {
+  const baseline: PublicApiBaseline = {
+    schemaVersion: 1,
+    manifestFormatVersion: manifest.formatVersion,
+    sha256: publicApiDigest(manifest),
+  };
+  const path = join(repositoryRoot, PUBLIC_API_BASELINE_PATH);
+  const temporaryPath = `${path}.tmp`;
+  await mkdir(join(path, ".."), { recursive: true });
+  await writeFile(temporaryPath, `${JSON.stringify(baseline, null, 2)}\n`);
+  await rename(temporaryPath, path);
+  return baseline;
+}
+
+export function checkManifestBaseline(manifest: PublicApiManifest, expected: string): ApiIssue[] {
   const actual = publicApiDigest(manifest);
   return actual === expected
     ? []
@@ -900,8 +976,8 @@ function formatIssues(issues: readonly ApiIssue[]): string {
 if (import.meta.main) {
   const mode = process.argv[2];
   const repositoryRoot = resolve(process.argv[3] ?? join(import.meta.dir, ".."));
-  if (mode !== "report" && mode !== "check") {
-    throw new Error("Usage: bun scripts/public-api.ts <report|check> [repository-root]");
+  if (mode !== "report" && mode !== "check" && mode !== "baseline") {
+    throw new Error("Usage: bun scripts/public-api.ts <report|check|baseline> [repository-root]");
   }
   const result = await analyzePublicApi(repositoryRoot);
   if (mode === "report") {
@@ -916,8 +992,13 @@ if (import.meta.main) {
       throw new Error(formatIssues(result.issues));
     }
     process.stdout.write(`${JSON.stringify(result.manifest, null, 2)}\n`);
+  } else if (mode === "baseline") {
+    if (result.issues.length > 0) throw new Error(formatIssues(result.issues));
+    const baseline = await writePublicApiBaseline(repositoryRoot, result.manifest);
+    console.log(`Public API baseline updated: ${baseline.sha256}`);
   } else {
-    const issues = [...result.issues, ...checkManifestBaseline(result.manifest)];
+    const baseline = await readPublicApiBaseline(repositoryRoot);
+    const issues = [...result.issues, ...checkManifestBaseline(result.manifest, baseline.sha256)];
     if (issues.length > 0) throw new Error(formatIssues(issues));
     console.log("Public API policy check passed");
   }

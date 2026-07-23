@@ -2,7 +2,16 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
 import { DEFAULT_THEME, initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
-import { act, createRef, StrictMode } from "react";
+import {
+  act,
+  Component,
+  createRef,
+  type ReactElement,
+  type ReactNode,
+  StrictMode,
+  Suspense,
+  startTransition,
+} from "react";
 import { createRoot } from "react-dom/client";
 import {
   type AdapterConformanceProps,
@@ -51,6 +60,25 @@ function makeWorkbook(extraSheet = false): Workbook {
   return workbook;
 }
 
+class LifecycleErrorBoundary extends Component<
+  { children: ReactNode; onError(error: unknown): void },
+  { error: unknown }
+> {
+  override state: { error: unknown } = { error: null };
+
+  static getDerivedStateFromError(error: unknown): { error: unknown } {
+    return { error };
+  }
+
+  override componentDidCatch(error: unknown): void {
+    this.props.onError(error);
+  }
+
+  override render(): ReactNode {
+    return this.state.error === null ? this.props.children : <div data-lifecycle-error-boundary />;
+  }
+}
+
 async function mountConformanceGrid(props: AdapterConformanceProps): Promise<MountedAdapter> {
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -90,6 +118,46 @@ async function mountConformanceGrid(props: AdapterConformanceProps): Promise<Mou
 runSharedAdapterLifecycleContract("React", mountConformanceGrid);
 
 describe("SheetwriteGrid React lifecycle", () => {
+  it("renders on the server without layout-effect diagnostics", async () => {
+    const source = new URL("../src/index.tsx", import.meta.url).pathname;
+    const script = `
+      import { createElement } from "react";
+      import { renderToString } from "react-dom/server";
+      import { SheetwriteGrid } from ${JSON.stringify(source)};
+      const errors = [];
+      console.error = (...args) => errors.push(args.map(String).join(" "));
+      const workbook = {
+        activeSheet: "sheet",
+        sheets: [{
+          id: "sheet",
+          name: "Sheet",
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+        }],
+      };
+      const html = renderToString(createElement(SheetwriteGrid, {
+        workbook,
+        onViewportChange() {},
+      }));
+      process.stdout.write(JSON.stringify({ errors, html }));
+    `;
+    const process = Bun.spawn(["bun", "-e", script], {
+      cwd: new URL("../../../", import.meta.url).pathname,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+      process.exited,
+    ]);
+
+    expect(exitCode, stderr).toBe(0);
+    const result = JSON.parse(stdout) as { errors: string[]; html: string };
+    expect(result.errors).toEqual([]);
+    expect(result.html).toContain('class="sheetwrite"');
+  });
+
   it("publishes, replaces, transfers, and clears the forwarded Grid ref", async () => {
     const workbook = makeWorkbook();
     const host = document.createElement("div");
@@ -203,6 +271,7 @@ describe("SheetwriteGrid React lifecycle", () => {
 
   it("forwards active-sheet through onActiveSheetChange, reading the live callback", async () => {
     const workbook = makeWorkbook(true);
+
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
@@ -240,6 +309,163 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(events).toEqual([{ sheet: "sheet2" }]);
     expect(swapped).toEqual([{ sheet: "sheet" }]);
 
+    await act(async () => root.unmount());
+  });
+
+  for (const failurePoint of ["ref", "ready"] as const) {
+    it(`cleans a controller when the host ${failurePoint} callback throws and remounts`, async () => {
+      const workbook = makeWorkbook();
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      const root = createRoot(host);
+      const failure = new Error(`throwing ${failurePoint} callback`);
+      const caught: unknown[] = [];
+      const publishedRef = createRef<Grid>();
+      const callbackRefValues: Array<Grid | null> = [];
+      let failedGrid: Grid | null = null;
+      let destroyCalls = 0;
+      let staleSelectionCalls = 0;
+
+      const captureFailedGrid = (grid: Grid): void => {
+        failedGrid = grid;
+        const originalDestroy = grid.destroy.bind(grid);
+        grid.destroy = () => {
+          destroyCalls += 1;
+          originalDestroy();
+        };
+      };
+      const throwingRef = (grid: Grid | null): void => {
+        callbackRefValues.push(grid);
+        if (!grid) return;
+        captureFailedGrid(grid);
+        throw failure;
+      };
+
+      const originalError = console.error;
+      console.error = () => {};
+      try {
+        await act(async () => {
+          root.render(
+            <LifecycleErrorBoundary onError={(error) => caught.push(error)}>
+              <SheetwriteGrid
+                ref={failurePoint === "ref" ? throwingRef : publishedRef}
+                workbook={workbook}
+                onSelectionChange={() => {
+                  staleSelectionCalls += 1;
+                }}
+                onReady={({ grid }) => {
+                  if (failurePoint !== "ready") return;
+                  captureFailedGrid(grid);
+                  throw failure;
+                }}
+              />
+            </LifecycleErrorBoundary>,
+          );
+        });
+      } finally {
+        console.error = originalError;
+      }
+
+      expect(caught).toEqual([failure]);
+      expect(failedGrid).not.toBeNull();
+      expect(destroyCalls).toBe(1);
+      expect(publishedRef.current).toBeNull();
+      if (failurePoint === "ref") {
+        expect(callbackRefValues).toEqual([null, failedGrid, null]);
+      }
+      expect(host.querySelector(".sheetwrite")).toBeNull();
+
+      failedGrid!.setSelection({ kind: "cell", addr: { sheet: "sheet", row: 1, col: 0 } });
+      expect(staleSelectionCalls).toBe(0);
+
+      const remountedRef = createRef<Grid>();
+      let remountedSelections = 0;
+      await act(async () => {
+        root.render(
+          <LifecycleErrorBoundary key="remounted" onError={(error) => caught.push(error)}>
+            <SheetwriteGrid
+              ref={remountedRef}
+              workbook={workbook}
+              onSelectionChange={() => {
+                remountedSelections += 1;
+              }}
+            />
+          </LifecycleErrorBoundary>,
+        );
+      });
+      expect(remountedRef.current).not.toBeNull();
+      expect(remountedRef.current).not.toBe(failedGrid);
+      expect(host.querySelectorAll(".sheetwrite")).toHaveLength(1);
+      remountedRef.current!.setSelection({
+        kind: "cell",
+        addr: { sheet: "sheet", row: 2, col: 0 },
+      });
+      expect(remountedSelections).toBe(1);
+      expect(destroyCalls).toBe(1);
+
+      await act(async () => root.unmount());
+    });
+  }
+
+  it("does not publish callbacks from a concurrent render that is later abandoned", async () => {
+    const workbook = makeWorkbook();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const gridRef = createRef<Grid>();
+    const calls: string[] = [];
+    const suspended = Promise.withResolvers<void>();
+    let suspendedRenders = 0;
+
+    function SuspendAfterGrid({ active }: { active: boolean }): ReactElement | null {
+      if (!active) return null;
+      suspendedRenders += 1;
+      throw suspended.promise;
+    }
+
+    function Harness({ callback, suspend }: { callback: string; suspend: boolean }): ReactElement {
+      return (
+        <Suspense fallback={null}>
+          <SheetwriteGrid
+            ref={gridRef}
+            workbook={workbook}
+            onViewportChange={() => calls.push(callback)}
+          />
+          <SuspendAfterGrid active={suspend} />
+        </Suspense>
+      );
+    }
+
+    await act(async () => {
+      root.render(<Harness callback="committed" suspend={false} />);
+    });
+    const committedGrid = gridRef.current!;
+    calls.length = 0;
+
+    await act(async () => {
+      startTransition(() => {
+        root.render(<Harness callback="abandoned" suspend />);
+      });
+      await Promise.resolve();
+    });
+    expect(suspendedRenders).toBeGreaterThan(0);
+    expect(gridRef.current).toBe(committedGrid);
+
+    calls.length = 0;
+    committedGrid.refresh();
+    expect(calls).toContain("committed");
+    expect(calls).not.toContain("abandoned");
+
+    await act(async () => {
+      root.render(<Harness callback="replacement" suspend={false} />);
+    });
+    expect(gridRef.current).toBe(committedGrid);
+    calls.length = 0;
+    committedGrid.refresh();
+    expect(calls).toContain("replacement");
+    expect(calls).not.toContain("committed");
+
+    suspended.resolve();
     await act(async () => root.unmount());
   });
 

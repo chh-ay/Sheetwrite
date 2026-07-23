@@ -12,7 +12,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { readReleaseManifestDigest, verifyReleaseArtifacts } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
@@ -51,21 +51,16 @@ export interface Metric {
   owner: string;
 }
 
-export interface BudgetLine {
-  unit: MetricUnit;
-  baseline: number;
-  maximum: number;
-  category: string;
-  owner: string;
-  rationale: string;
+export interface SizeReleaseSnapshot {
+  version: string;
+  capturedAt?: string;
+  source: string;
+  metrics: Record<string, Pick<Metric, "actual" | "unit">>;
 }
 
-export interface BudgetManifest {
-  schemaVersion: number;
-  tool: { name: string; version: string };
-  protocolVersion: number;
-  toolchain: Record<string, string>;
-  budgets: Record<string, BudgetLine>;
+export interface SizeHistory {
+  schemaVersion: 1;
+  releases: SizeReleaseSnapshot[];
 }
 
 export interface BundlerAsset {
@@ -122,15 +117,6 @@ export interface SizeReport {
   reproduction: string;
 }
 
-export interface BudgetFailure {
-  key: string;
-  message: string;
-  actual?: number;
-  limit?: number;
-  delta?: number;
-  owner?: string;
-}
-
 interface PackageManifest {
   name: string;
   version: string;
@@ -145,9 +131,9 @@ interface PackedPackage {
 }
 
 const repositoryRoot = resolve(import.meta.dir, "..");
-const evidenceRoot = join(repositoryRoot, "test-results/delivery-size");
-const reportPath = join(evidenceRoot, "size-report.json");
-const budgetPath = join(repositoryRoot, "scripts/size-budgets.json");
+const bundlerEvidenceRoot = join(repositoryRoot, "test-results/bundlers");
+const reportPath = join(import.meta.dir, "size-report.json");
+const historyPath = join(import.meta.dir, "size-history.json");
 const xlsxCodecPackages: Record<string, true> = {
   fflate: true,
 };
@@ -385,85 +371,6 @@ export function validateBundlerEvidence(value: unknown): BundlerEvidence {
   return { schemaVersion: SIZE_PROTOCOL_VERSION, bundler, version: candidate.version, assets };
 }
 
-export function compareBudgets(
-  report: Pick<SizeReport, "protocolVersion" | "tool" | "toolchain" | "metrics">,
-  manifest: BudgetManifest,
-): BudgetFailure[] {
-  const failures: BudgetFailure[] = [];
-  if (manifest.schemaVersion !== SIZE_PROTOCOL_VERSION) {
-    failures.push({
-      key: "$schemaVersion",
-      message: `budget schema ${manifest.schemaVersion} does not match ${SIZE_PROTOCOL_VERSION}`,
-    });
-  }
-  if (manifest.protocolVersion !== report.protocolVersion) {
-    failures.push({
-      key: "$protocolVersion",
-      message: `budget protocol ${manifest.protocolVersion} does not match report ${report.protocolVersion}`,
-    });
-  }
-  if (manifest.tool.name !== report.tool.name || manifest.tool.version !== report.tool.version) {
-    failures.push({
-      key: "$tool",
-      message: `budget tool ${manifest.tool.name}@${manifest.tool.version} does not match report ${report.tool.name}@${report.tool.version}`,
-    });
-  }
-  const toolchainKeys = new Set([
-    ...Object.keys(report.toolchain),
-    ...Object.keys(manifest.toolchain),
-  ]);
-  for (const key of [...toolchainKeys].sort()) {
-    if (manifest.toolchain[key] !== report.toolchain[key]) {
-      failures.push({
-        key: `$toolchain.${key}`,
-        message: `budget toolchain ${manifest.toolchain[key] ?? "missing"} does not match report ${
-          report.toolchain[key] ?? "missing"
-        }`,
-      });
-    }
-  }
-  const keys = new Set([...Object.keys(report.metrics), ...Object.keys(manifest.budgets)]);
-  for (const key of [...keys].sort()) {
-    const metric = report.metrics[key];
-    const budget = manifest.budgets[key];
-    if (metric === undefined) {
-      failures.push({ key, message: "required budget metric is missing from the report" });
-      continue;
-    }
-    if (budget === undefined) {
-      failures.push({ key, message: "measured metric has no reviewed absolute budget" });
-      continue;
-    }
-    if (!isNonNegativeInteger(metric.actual)) {
-      failures.push({ key, message: `measurement is non-finite or malformed: ${metric.actual}` });
-      continue;
-    }
-    if (
-      !isNonNegativeInteger(budget.baseline) ||
-      !isNonNegativeInteger(budget.maximum) ||
-      budget.maximum < budget.baseline
-    ) {
-      failures.push({ key, message: "budget baseline or maximum is malformed" });
-      continue;
-    }
-    if (metric.unit !== budget.unit) {
-      failures.push({ key, message: `unit mismatch: report=${metric.unit} budget=${budget.unit}` });
-      continue;
-    }
-    if (metric.actual > budget.maximum) {
-      failures.push({
-        key,
-        message: "absolute ceiling exceeded",
-        actual: metric.actual,
-        limit: budget.maximum,
-        delta: metric.actual - budget.maximum,
-        owner: budget.owner,
-      });
-    }
-  }
-  return failures;
-}
-
 function processEnvironment(): Record<string, string> {
   const environment: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
@@ -694,7 +601,7 @@ async function loadBundlerEvidence(
   }
   const evidence: BundlerEvidence[] = [];
   for (const bundler of ["vite", "webpack", "next"] as const) {
-    const path = join(evidenceRoot, "bundlers", `${bundler}.json`);
+    const path = join(bundlerEvidenceRoot, `${bundler}.json`);
     evidence.push(validateBundlerEvidence(await readJson<unknown>(path)));
   }
   return evidence;
@@ -922,71 +829,199 @@ async function buildSizeReport(
         .sort((left, right) => left.name.localeCompare(right.name)),
       closures: closures.sort((left, right) => left.name.localeCompare(right.name)),
       bundlers,
-      reproduction: "bun run size:check",
+      reproduction: "bun run size:report",
     };
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
 }
 
-function defaultMaximum(metric: Metric): number {
-  if (metric.actual === 0) return 0;
-  if (metric.unit === "count") return metric.actual + 2;
-  return metric.actual + Math.max(1024, Math.ceil(metric.actual * 0.05));
+export function formatMetricDisplay(
+  metric: Pick<Metric, "actual" | "unit">,
+): readonly [value: string, unit: string] {
+  if (metric.unit === "count") return [metric.actual.toLocaleString("en-US"), "count"];
+  if (metric.actual >= 1024 ** 3) return [(metric.actual / 1024 ** 3).toFixed(2), "GiB"];
+  if (metric.actual >= 1024 ** 2) return [(metric.actual / 1024 ** 2).toFixed(2), "MiB"];
+  if (metric.actual >= 1024) return [(metric.actual / 1024).toFixed(1), "KiB"];
+  return [metric.actual.toLocaleString("en-US"), "B"];
 }
 
-export function candidateManifest(report: SizeReport): BudgetManifest {
-  const budgets: Record<string, BudgetLine> = {};
-  for (const [key, metric] of Object.entries(report.metrics)) {
-    budgets[key] = {
-      unit: metric.unit,
-      baseline: metric.actual,
-      maximum: defaultMaximum(metric),
-      category: metric.category,
-      owner: metric.owner,
-      rationale:
-        metric.actual === 0
-          ? "Zero-growth isolation invariant; any presence requires design review."
-          : metric.unit === "count"
-            ? "Approved clean baseline with at most two additional files or packages."
-            : "Approved clean baseline plus the larger of five percent or 1 KiB.",
-    };
-  }
-  return {
-    schemaVersion: SIZE_PROTOCOL_VERSION,
-    tool: { name: SIZE_TOOL_NAME, version: SIZE_TOOL_VERSION },
-    protocolVersion: SIZE_PROTOCOL_VERSION,
-    toolchain: report.toolchain,
-    budgets,
-  };
+export function formatMetricDelta(
+  current: Pick<Metric, "actual" | "unit">,
+  previous: Pick<Metric, "actual" | "unit"> | undefined,
+): readonly [change: string, percentage: string] {
+  if (previous === undefined || previous.unit !== current.unit) return ["not tracked", "—"];
+  const delta = current.actual - previous.actual;
+  const [magnitude, unit] = formatMetricDisplay({ actual: Math.abs(delta), unit: current.unit });
+  const change = delta === 0 ? `0 ${unit}` : `${delta > 0 ? "+" : "-"}${magnitude} ${unit}`;
+  const percentage =
+    previous.actual === 0
+      ? current.actual === 0
+        ? "0.0%"
+        : "new"
+      : `${delta >= 0 ? "+" : ""}${((delta / previous.actual) * 100).toFixed(1)}%`;
+  return [change, percentage];
 }
 
-function formatTable(report: SizeReport): string {
+export function formatTable(report: SizeReport): string {
   const rows = ["metric\tactual\tunit"];
   for (const [key, metric] of Object.entries(report.metrics)) {
-    rows.push(`${key}\t${metric.actual}\t${metric.unit}`);
+    const [value, unit] = formatMetricDisplay(metric);
+    rows.push(`${key}\t${value}\t${unit}`);
   }
   return rows.join("\n");
 }
 
+export function formatReleaseComparison(
+  current: Record<string, Pick<Metric, "actual" | "unit">>,
+  baseline: SizeReleaseSnapshot,
+): string {
+  const rows = [`metric\tcurrent\tunit\tchange vs v${baseline.version}\tchange %`];
+  for (const [key, previous] of Object.entries(baseline.metrics)) {
+    const metric = current[key];
+    if (metric === undefined || metric.unit !== previous.unit) continue;
+    const [value, unit] = formatMetricDisplay(metric);
+    const [change, percentage] = formatMetricDelta(metric, previous);
+    rows.push(`${key}\t${value}\t${unit}\t${change}\t${percentage}`);
+  }
+  return rows.join("\n");
+}
+
+export function formatSizeHistory(history: SizeHistory): string {
+  const rows: string[] = [];
+  for (let index = 1; index < history.releases.length; index += 1) {
+    const previous = history.releases[index - 1]!;
+    const current = history.releases[index]!;
+    rows.push(`v${previous.version} → v${current.version}`);
+    rows.push(formatReleaseComparison(current.metrics, previous));
+  }
+  return rows.length === 0
+    ? "No release-to-release size comparison is available."
+    : rows.join("\n\n");
+}
+
+function assertReleaseVersion(version: string): void {
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error(`Invalid release version: ${version}`);
+  }
+}
+
+export async function capturePublishedRelease(version: string): Promise<SizeReleaseSnapshot> {
+  assertReleaseVersion(version);
+  const metrics: SizeReleaseSnapshot["metrics"] = {};
+  for (const directory of packageDirectories) {
+    const manifest = JSON.parse(
+      await readFile(join(repositoryRoot, directory, "package.json"), "utf8"),
+    ) as PackageManifest;
+    const metadataResponse = await fetch(
+      `https://registry.npmjs.org/${encodeURIComponent(manifest.name)}/${encodeURIComponent(version)}`,
+    );
+    if (!metadataResponse.ok) {
+      throw new Error(`Published package not found: ${manifest.name}@${version}`);
+    }
+    const metadata = (await metadataResponse.json()) as {
+      dist?: { fileCount?: number; tarball?: string; unpackedSize?: number };
+      version?: string;
+    };
+    if (
+      metadata.version !== version ||
+      !metadata.dist?.tarball ||
+      !isNonNegativeInteger(metadata.dist.fileCount) ||
+      !isNonNegativeInteger(metadata.dist.unpackedSize)
+    ) {
+      throw new Error(`Incomplete registry size metadata: ${manifest.name}@${version}`);
+    }
+    const tarballResponse = await fetch(metadata.dist.tarball);
+    if (!tarballResponse.ok) throw new Error(`Cannot download ${manifest.name}@${version}`);
+    const prefix = `package.${manifest.name}`;
+    metrics[`${prefix}.tarballBytes`] = {
+      actual: (await tarballResponse.arrayBuffer()).byteLength,
+      unit: "bytes",
+    };
+    metrics[`${prefix}.unpackedBytes`] = {
+      actual: metadata.dist.unpackedSize,
+      unit: "bytes",
+    };
+    metrics[`${prefix}.fileCount`] = {
+      actual: metadata.dist.fileCount,
+      unit: "count",
+    };
+  }
+  return {
+    version,
+    capturedAt: new Date().toISOString(),
+    source: "npm registry published artifacts",
+    metrics,
+  };
+}
+export function validateSizeHistory(value: unknown): SizeHistory {
+  if (typeof value !== "object" || value === null) throw new Error("Invalid size history");
+  const candidate = value as Partial<SizeHistory>;
+  if (candidate.schemaVersion !== 1 || !Array.isArray(candidate.releases)) {
+    throw new Error("Invalid size history schema");
+  }
+  const versions = new Set<string>();
+  for (const release of candidate.releases) {
+    if (
+      typeof release !== "object" ||
+      release === null ||
+      typeof release.version !== "string" ||
+      typeof release.source !== "string" ||
+      typeof release.metrics !== "object" ||
+      release.metrics === null
+    ) {
+      throw new Error("Invalid size history release");
+    }
+    if (versions.has(release.version))
+      throw new Error(`Duplicate size release: ${release.version}`);
+    versions.add(release.version);
+    for (const [key, metric] of Object.entries(release.metrics)) {
+      if (
+        typeof key !== "string" ||
+        typeof metric !== "object" ||
+        metric === null ||
+        !Number.isFinite(metric.actual) ||
+        (metric.unit !== "bytes" && metric.unit !== "count")
+      ) {
+        throw new Error(`Invalid size history metric: ${release.version}/${key}`);
+      }
+    }
+  }
+  return candidate as SizeHistory;
+}
+
+async function readSizeHistory(): Promise<SizeHistory> {
+  return validateSizeHistory(await readJson<unknown>(historyPath));
+}
+
+async function recordRelease(history: SizeHistory, release: SizeReleaseSnapshot): Promise<void> {
+  if (history.releases.some((entry) => entry.version === release.version)) {
+    throw new Error(`Size history already contains v${release.version}`);
+  }
+  const updated: SizeHistory = {
+    schemaVersion: 1,
+    releases: [...history.releases, release],
+  };
+  await writeFile(historyPath, `${JSON.stringify(updated, null, 2)}\n`);
+  await runCommand(["bunx", "biome", "format", "--write", historyPath]);
+}
+
 async function writeReport(report: SizeReport): Promise<void> {
-  await mkdir(dirname(reportPath), { recursive: true });
-  await rm(join(evidenceRoot, "failure.json"), { force: true });
+  await rm(join(import.meta.dir, "size-report-failure.json"), { force: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   await runCommand(["bunx", "biome", "format", "--write", reportPath]);
 }
 
 async function writeFailure(error: unknown): Promise<void> {
-  await mkdir(dirname(reportPath), { recursive: true });
   const message = error instanceof Error ? error.message : String(error);
   await writeFile(
-    join(evidenceRoot, "failure.json"),
+    join(import.meta.dir, "size-report-failure.json"),
     `${JSON.stringify(
       {
         schemaVersion: SIZE_PROTOCOL_VERSION,
         tool: { name: SIZE_TOOL_NAME, version: SIZE_TOOL_VERSION },
         error: message,
-        reproduction: "bun run size:check",
+        reproduction: "bun run size:report",
       },
       null,
       2,
@@ -1006,63 +1041,56 @@ async function cli(): Promise<void> {
   const reuseBundlers = process.argv.includes("--reuse-bundlers");
   const artifactDirectory = optionValue("--artifacts");
   try {
+    if (mode !== "report" && mode !== "history" && mode !== "record") {
+      throw new Error(`Unknown size-report mode: ${mode}`);
+    }
+    const history = await readSizeHistory();
+    if (mode === "history") {
+      console.log(formatSizeHistory(history));
+      return;
+    }
+    if (mode === "record") {
+      const version = optionValue("--version");
+      if (version === undefined) throw new Error("record mode requires --version");
+      if (history.releases.some((release) => release.version === version)) {
+        console.log(
+          `Published v${version} is already present in ${relative(repositoryRoot, historyPath)}`,
+        );
+        return;
+      }
+      const release = await capturePublishedRelease(version);
+      await recordRelease(history, release);
+      console.log(`Recorded published v${version} in ${relative(repositoryRoot, historyPath)}`);
+      return;
+    }
     if (artifactDirectory?.startsWith("--")) {
       throw new Error("--artifacts requires a directory");
     }
     const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
     if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
-      throw new Error("Artifact-only size verification requires --artifacts");
+      throw new Error("Artifact-only size reporting requires --artifacts");
     }
     if (
       requiredArtifacts !== undefined &&
       (artifactDirectory === undefined || resolve(artifactDirectory) !== resolve(requiredArtifacts))
     ) {
-      throw new Error("Size verification artifact input differs from the canonical artifact set");
+      throw new Error("Size report artifact input differs from the canonical artifact set");
     }
     const report = await buildSizeReport(reuseBundlers, artifactDirectory);
     await writeReport(report);
     console.log(formatTable(report));
+    const baseline = history.releases.at(-1);
+    if (baseline !== undefined) {
+      console.log(
+        `\nCurrent workspace vs latest published release:\n${formatReleaseComparison(report.metrics, baseline)}`,
+      );
+    }
     console.log(`JSON report: ${relative(repositoryRoot, reportPath)}`);
     if (artifactDirectory !== undefined) {
       console.log(
         `Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifactDirectory)}`,
       );
     }
-    if (mode === "report") return;
-    if (mode === "candidate") {
-      const outputArgument = process.argv.find((argument) => argument.startsWith("--output="));
-      const output = resolve(
-        outputArgument?.slice("--output=".length) ??
-          join(tmpdir(), "sheetwrite-size-budgets-candidate.json"),
-      );
-      const temporaryDirectory = resolve(tmpdir());
-      if (!output.startsWith(`${temporaryDirectory}${sep}`)) {
-        throw new Error(
-          "Candidate budgets may only be written beneath the operating-system temporary directory",
-        );
-      }
-      await mkdir(dirname(output), { recursive: true });
-      await writeFile(output, `${JSON.stringify(candidateManifest(report), null, 2)}\n`);
-      console.log(`Candidate budget manifest: ${output}`);
-      return;
-    }
-    if (mode !== "check") throw new Error(`Unknown size-report mode: ${mode}`);
-    const budgetArgument = process.argv.find((argument) => argument.startsWith("--budget="));
-    const selectedBudgetPath = resolve(budgetArgument?.slice("--budget=".length) ?? budgetPath);
-    const manifest = await readJson<BudgetManifest>(selectedBudgetPath);
-    const failures = compareBudgets(report, manifest);
-    if (failures.length > 0) {
-      for (const failure of failures) {
-        const details =
-          failure.actual === undefined
-            ? ""
-            : ` actual=${failure.actual} limit=${failure.limit} delta=+${failure.delta} owner=${failure.owner}`;
-        console.error(`SIZE FAILURE ${failure.key}:${details} ${failure.message}`);
-      }
-      console.error("Reproduce with: bun run size:check");
-      throw new Error(`${failures.length} delivery size budget failure(s)`);
-    }
-    console.log("All delivery size budgets passed");
   } catch (error) {
     await writeFailure(error);
     throw error;

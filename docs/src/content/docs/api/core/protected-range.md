@@ -9,7 +9,7 @@ Serializable client UX policy. A host resolver decides whether a local mutation 
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L152</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L186</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

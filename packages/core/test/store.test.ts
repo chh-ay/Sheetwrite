@@ -24,6 +24,9 @@ import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const addr = (row: number, col: number) => ({ sheet: "s1", row, col });
 
+const ALL_SOURCE_COLUMN_BANDS = [{ start: 0, end: 3, keys: ["name", "amount", "city"] }] as const;
+const NAME_SOURCE_COLUMN_BAND = [{ start: 0, end: 1, keys: ["name"] }] as const;
+
 beforeAll(async () => {
   await initSheetwrite();
 });
@@ -71,6 +74,24 @@ describe("SheetwriteStore", () => {
 
     expect(store.getCell(addr(2, 1)).resolved).toBe(20.5);
     expect(store.aggregate("s1", 1, "sum")).toBe(31.5);
+  });
+
+  it("releases admitted string-arena slack after bounded columnar ingest", () => {
+    const store = new SheetwriteStore(makeWorkbook(3_000), makeColumnarData(3_000));
+    const snapshot = store.getRuntimeResourceSnapshot("ingest", "settled");
+    const strings = snapshot.wasm.owners.filter((owner) =>
+      owner.owner.startsWith("wasm.string-pool."),
+    );
+    expect(strings).toHaveLength(2);
+    for (const owner of strings) {
+      expect(owner.allocatedBytes).toBe(owner.logicalBytes);
+    }
+    expect(snapshot.boundary.find((entry) => entry.operation === "ingest")).toMatchObject({
+      ffiCalls: 3,
+      bulkCalls: 1,
+      scalarCalls: 2,
+    });
+    store.dispose();
   });
 
   it("returns a row-major bulk window without per-cell reads", () => {
@@ -1064,7 +1085,7 @@ describe("datasource row hydration", () => {
       changes += 1;
     });
 
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       {
         name: { kind: "literal", value: "rich" },
         amount: {
@@ -1083,7 +1104,7 @@ describe("datasource row hydration", () => {
     });
     expect(store.getRefTarget(addr(0, 2))).toEqual(addr(1, 0));
     expect(store.getCell(addr(0, 2)).resolved).toBeNull();
-    store.loadRows("s1", 1, [{ name: "later source" }]);
+    store.loadPage("s1", 1, NAME_SOURCE_COLUMN_BAND, [{ name: "later source" }]);
     expect(store.getCell(addr(0, 2)).resolved).toBe("later source");
     expect(changes).toBe(0);
     store.dispose();
@@ -1519,7 +1540,7 @@ describe("paged datasource storage", () => {
       chunkRows: 4,
       cacheBytes: 1_000_000,
     });
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "source zero", amount: 1, city: "A" },
       { name: "source target", amount: 2, city: "B" },
     ]);
@@ -1545,9 +1566,10 @@ describe("paged datasource storage", () => {
     store.acknowledgeOperations([literal]);
 
     const revisionAddresses = new Set<object>();
-    store.loadRows(
+    store.loadPage(
       "s1",
       0,
+      ALL_SOURCE_COLUMN_BANDS,
       [
         { name: "stale literal", amount: 3, city: "stale ref" },
         { name: "server target", amount: 4, city: "server" },
@@ -1576,7 +1598,188 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 
-  it("crosses the WASM boundary once per wide-page column plus rich exceptions", () => {
+  it("hydrates disjoint bands without marking the physical holes in their bounding rectangle", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 2,
+      cacheBytes: 1_000_000,
+    });
+    store.loadPage(
+      "s1",
+      0,
+      [
+        { start: 0, end: 1, keys: ["name"] },
+        { start: 2, end: 3, keys: ["city"] },
+      ],
+      [
+        { name: "alpha", city: "A" },
+        { name: "beta", city: null },
+      ],
+    );
+
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [2])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [2, 0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [1])).toBe(false);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0, 1, 2])).toBe(false);
+    expect(
+      store.isRangeFullyLoaded({
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 1, col: 2 },
+      }),
+    ).toBe(false);
+    expect(store.getVisibleWindow("s1", { start: 0, end: 2 }, [2, 0]).values).toEqual([
+      "A",
+      "alpha",
+      "",
+      "beta",
+    ]);
+    expect(store.getCellLoadState(addr(0, 1))).toBe("unloaded");
+    expect(store.getCellLoadState(addr(1, 1))).toBe("unloaded");
+    expect(store.getPagedStats("s1")).toMatchObject({
+      chunks: 2,
+      loadedCells: 4,
+      dirtyCells: 0,
+    });
+    store.dispose();
+  });
+
+  it("keeps separately hydrated rectangles correlated by both row and column coverage", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 2,
+      cacheBytes: 1_000_000,
+    });
+    store.loadPage("s1", 0, NAME_SOURCE_COLUMN_BAND, [{ name: "r0" }, { name: "r1" }]);
+    store.loadPage(
+      "s1",
+      1,
+      [{ start: 2, end: 3, keys: ["city"] }],
+      [{ city: "r1" }, { city: "r2" }],
+    );
+
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 1, 3, [2])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 1, 2, [2, 0])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 3, [2, 0])).toBe(false);
+    expect(store.getCellLoadState(addr(0, 2))).toBe("unloaded");
+    expect(store.getCellLoadState(addr(2, 0))).toBe("unloaded");
+    expect(
+      store.isRangeFullyLoaded({
+        sheet: "s1",
+        start: { row: 1, col: 0 },
+        end: { row: 1, col: 2 },
+      }),
+    ).toBe(false);
+    expect(
+      store.isRangeFullyLoaded({
+        sheet: "s1",
+        start: { row: 0, col: 0 },
+        end: { row: 2, col: 2 },
+      }),
+    ).toBe(false);
+    expect(store.getPagedStats("s1")).toMatchObject({
+      chunks: 3,
+      loadedCells: 4,
+      dirtyCells: 0,
+    });
+    store.dispose();
+  });
+
+  it("rejects malformed rectangular pages atomically without marking any target cell loaded", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1_000_000,
+    });
+    const expectRowUnloaded = (row: number) => {
+      for (const col of [0, 1, 2]) {
+        expect(store.getCellLoadState(addr(row, col))).toBe("unloaded");
+      }
+    };
+
+    expect(() =>
+      store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "missing", amount: 1 }]),
+    ).toThrow(/omits declared cell data/);
+    expectRowUnloaded(0);
+
+    expect(() =>
+      store.loadPage("s1", 1, NAME_SOURCE_COLUMN_BAND, [{ name: "extra", amount: null }]),
+    ).toThrow(/undeclared cell data/);
+    expectRowUnloaded(1);
+
+    expect(() =>
+      store.loadPage(
+        "s1",
+        2,
+        [
+          { start: 2, end: 3, keys: ["city"] },
+          { start: 0, end: 1, keys: ["name"] },
+        ],
+        [{ name: "reordered", city: "C" }],
+      ),
+    ).toThrow(/invalid column bounds/);
+    expectRowUnloaded(2);
+
+    expect(() =>
+      store.loadPage("s1", 2, [{ start: 0, end: 1, keys: ["city"] }], [{ city: "wrong-position" }]),
+    ).toThrow(/invalid column keys/);
+    expectRowUnloaded(2);
+
+    expect(() =>
+      store.loadPage(
+        "s1",
+        3,
+        [
+          { start: 0, end: 2, keys: ["name", "amount"] },
+          { start: 1, end: 3, keys: ["amount", "city"] },
+        ],
+        [{ name: "overlap", amount: 3, city: "D" }],
+      ),
+    ).toThrow(/invalid column bounds/);
+    expectRowUnloaded(3);
+    expect(store.queryCapability("s1")).toEqual({
+      status: "incomplete",
+      loadedCells: 0,
+      totalCells: 12,
+    });
+    store.dispose();
+  });
+
+  it("keeps whole-sheet reads and unloaded formula dependencies incomplete after a partial page", () => {
+    const store = new SheetwriteStore(makeWorkbook(2), undefined, {
+      storage: "paged",
+      chunkRows: 2,
+      cacheBytes: 1_000_000,
+    });
+    store.loadPage(
+      "s1",
+      0,
+      [{ start: 1, end: 2, keys: ["amount"] }],
+      [{ amount: 10 }, { amount: null }],
+    );
+
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [1])).toBe(true);
+    expect(store.areColumnsFullyLoaded("s1", 0, 2, [0, 1, 2])).toBe(false);
+    expect(store.queryCapability("s1")).toEqual({
+      status: "incomplete",
+      loadedCells: 2,
+      totalCells: 6,
+    });
+    expect(() => store.aggregate("s1", 1, "sum")).toThrow(/has unloaded datasource cells/);
+    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
+
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 2), value: { kind: "formula", src: "=A1" } }],
+    });
+    expect(store.getCell(addr(0, 2)).resolved).toBe("#LOADING!");
+    expect(store.queryCapability("s1").status).toBe("incomplete");
+    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
+    store.dispose();
+  });
+
+  it("crosses the WASM boundary O(1) times for a wide mixed page without scalar calls", () => {
     const columnCount = 96;
     const rowCount = 256;
     const workbook = makeWorkbook(rowCount);
@@ -1592,26 +1795,37 @@ describe("paged datasource storage", () => {
     page[0]!.c0 = { kind: "formula", src: "=1+1" };
     page[1]!.c1 = { value: { kind: "literal", value: 7 }, style: { bold: true } };
 
+    const originalSparseBlock = CellStore.prototype.setSparseBlock;
+    const originalRecompute = CellStore.prototype.recomputeChanged;
     const originalNumbers = CellStore.prototype.hydratePageNumbers;
     const originalCellState = CellStore.prototype.cellState;
     const originalSetFormula = CellStore.prototype.setFormula;
     const originalSetNumber = CellStore.prototype.setNumber;
-    let columnCrossings = 0;
-    let exceptionCrossings = 0;
+    let blockCrossings = 0;
+    let recomputeCrossings = 0;
+    let scalarCrossings = 0;
+    CellStore.prototype.setSparseBlock = function (...args) {
+      blockCrossings += 1;
+      return originalSparseBlock.apply(this, args);
+    };
+    CellStore.prototype.recomputeChanged = function (...args) {
+      recomputeCrossings += 1;
+      return originalRecompute.apply(this, args);
+    };
     CellStore.prototype.hydratePageNumbers = function (...args) {
-      columnCrossings += 1;
+      scalarCrossings += 1;
       return originalNumbers.apply(this, args);
     };
     CellStore.prototype.cellState = function (...args) {
-      exceptionCrossings += 1;
+      scalarCrossings += 1;
       return originalCellState.apply(this, args);
     };
     CellStore.prototype.setFormula = function (...args) {
-      exceptionCrossings += 1;
+      scalarCrossings += 1;
       return originalSetFormula.apply(this, args);
     };
     CellStore.prototype.setNumber = function (...args) {
-      exceptionCrossings += 1;
+      scalarCrossings += 1;
       return originalSetNumber.apply(this, args);
     };
     const store = new SheetwriteStore(workbook, undefined, {
@@ -1621,12 +1835,25 @@ describe("paged datasource storage", () => {
     });
     const revisionAddresses = new Set<object>();
     try {
-      store.loadRows("s1", 0, page, (address) => {
-        revisionAddresses.add(address);
-        return false;
-      });
-      expect(columnCrossings).toBe(columnCount);
-      expect(exceptionCrossings).toBe(4);
+      store.loadPage(
+        "s1",
+        0,
+        [
+          {
+            start: 0,
+            end: columnCount,
+            keys: workbook.sheets[0]!.columns.map(({ key }) => key),
+          },
+        ],
+        page,
+        (address) => {
+          revisionAddresses.add(address);
+          return false;
+        },
+      );
+      expect(blockCrossings).toBe(1);
+      expect(recomputeCrossings).toBe(1);
+      expect(scalarCrossings).toBe(0);
       expect(revisionAddresses.size).toBe(1);
       expect(store.getFormula(addr(0, 0))).toBe("=1+1");
       expect(store.getCell(addr(1, 1))).toMatchObject({
@@ -1634,6 +1861,8 @@ describe("paged datasource storage", () => {
         style: { bold: true },
       });
     } finally {
+      CellStore.prototype.setSparseBlock = originalSparseBlock;
+      CellStore.prototype.recomputeChanged = originalRecompute;
       CellStore.prototype.hydratePageNumbers = originalNumbers;
       CellStore.prototype.cellState = originalCellState;
       CellStore.prototype.setFormula = originalSetFormula;
@@ -1665,7 +1894,7 @@ describe("paged datasource storage", () => {
       maxTransferredArrayLength: 0,
     });
 
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "a", amount: 1, city: "A" },
       { name: "b", amount: 2, city: "B" },
       { name: "c", amount: 3, city: "C" },
@@ -1695,6 +1924,7 @@ describe("paged datasource storage", () => {
       loadedCells: 0,
       dirtyCells: 0,
       allocatedBytes: 0,
+      dirtyAllocatedBytes: 0,
       fullyLoaded: false,
     });
     expect(store.getCellLoadState(addr(0, 0))).toBe("unloaded");
@@ -1708,13 +1938,15 @@ describe("paged datasource storage", () => {
     expect(() => store.aggregate("s1", 1, "sum")).toThrow(/has unloaded datasource cells/);
     expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
 
-    store.loadRows("s1", 0, [{ name: "zero", amount: 1, city: "A" }]);
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "zero", amount: 1, city: "A" }]);
     store.applyTransaction({
       patches: [{ op: "set", addr: addr(0, 1), value: { kind: "literal", value: 99 } }],
     });
-    store.loadRows("s1", 0, [{ name: "stale", amount: 2, city: "stale" }]);
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "stale", amount: 2, city: "stale" }]);
     for (const row of [4, 8, 12]) {
-      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "B" }]);
+      store.loadPage("s1", row, ALL_SOURCE_COLUMN_BANDS, [
+        { name: `row-${row}`, amount: row, city: "B" },
+      ]);
     }
 
     expect(store.getCell(addr(0, 1)).resolved).toBe(99);
@@ -1745,7 +1977,9 @@ describe("paged datasource storage", () => {
 
     store.applyTransaction({ patches: [operation] });
     for (const row of [0, 4, 8, 12, 16]) {
-      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "B" }]);
+      store.loadPage("s1", row, ALL_SOURCE_COLUMN_BANDS, [
+        { name: `row-${row}`, amount: row, city: "B" },
+      ]);
     }
     expect(store.getCellLoadState(operation.addr)).toBe("local-edit");
     expect(store.getPagedStats("s1").dirtyCells).toBe(1);
@@ -1753,7 +1987,9 @@ describe("paged datasource storage", () => {
     store.acknowledgeOperations([operation]);
     expect(store.getPagedStats("s1").dirtyCells).toBe(0);
     for (const row of [20, 24, 28, 32, 36]) {
-      store.loadRows("s1", row, [{ name: `row-${row}`, amount: row, city: "C" }]);
+      store.loadPage("s1", row, ALL_SOURCE_COLUMN_BANDS, [
+        { name: `row-${row}`, amount: row, city: "C" },
+      ]);
     }
     expect(store.getCellLoadState(operation.addr)).toBe("unloaded");
     store.dispose();
@@ -1775,7 +2011,7 @@ describe("paged datasource storage", () => {
     expect(store.getCellLoadState(addr(0, 2))).toBe("local-edit");
     expect(store.getCellLoadState(addr(1, 2))).toBe("local-edit");
 
-    store.loadRows("s1", 5000, [{ name: null, amount: 41, city: null }]);
+    store.loadPage("s1", 5000, ALL_SOURCE_COLUMN_BANDS, [{ name: null, amount: 41, city: null }]);
     expect(store.getCell(addr(0, 2)).resolved).toBe(42);
     expect(store.getCell(addr(1, 2)).resolved).toBe(41);
     expect(store.getCellLoadState(addr(0, 2))).toBe("local-edit");
@@ -1817,9 +2053,10 @@ describe("paged datasource storage", () => {
       ],
     });
     expect(store.getPagedStats("s1")).toMatchObject({
-      chunks: 1,
+      chunks: 0,
       loadedCells: 1,
       dirtyCells: 1,
+      allocatedBytes: 0,
     });
     store.dispose();
   });
@@ -1848,7 +2085,7 @@ describe("paged datasource storage", () => {
       chunkRows: 4,
       cacheBytes: 1_000_000,
     });
-    store.loadRows("s1", 0, [
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
       { name: "alpha", amount: 3, city: "A" },
       { name: "beta", amount: 1, city: "B" },
       { name: "alphabet", amount: 2, city: "C" },
@@ -1862,6 +2099,1034 @@ describe("paged datasource storage", () => {
     expect(store.searchCells("s1", "beta")).toEqual([addr(1, 0)]);
     store.dispose();
   });
+  it("rejects dirty-capacity overflow atomically before formula/ref bookkeeping or events", () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged",
+      chunkRows: 4,
+      cacheBytes: 1024,
+      dirtyCellLimit: 1,
+    });
+    let events = 0;
+    store.on("change", () => {
+      events += 1;
+    });
+
+    const rejected = store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=1+1" } },
+        { op: "set", addr: addr(1, 0), value: { kind: "ref", target: addr(2, 0) } },
+      ],
+    });
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 2, max: 1 }],
+    });
+    expect(store.getFormula(addr(0, 0))).toBeNull();
+    expect(store.getRefTarget(addr(1, 0))).toBeNull();
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    expect(events).toBe(0);
+
+    const applied = store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=1+1" } }],
+    });
+    expect(applied).toMatchObject({ status: "applied", epoch: 1 });
+    const secondRejected = store.applyTransaction({
+      patches: [{ op: "set", addr: addr(1, 0), value: { kind: "ref", target: addr(2, 0) } }],
+    });
+    expect(secondRejected).toMatchObject({ status: "rejected", epoch: 1 });
+    expect(store.getFormula(addr(0, 0))).toBe("=1+1");
+    expect(store.getRefTarget(addr(1, 0))).toBeNull();
+    expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+    expect(events).toBe(1);
+    store.dispose();
+  });
+
+  it("applies the post-policy subset when it fits the dirty-cell limit", () => {
+    const workbook = makeWorkbook(4);
+    workbook.sheets[0]!.validationRules = [
+      {
+        id: "amount-limit",
+        range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 3, col: 1 } },
+        condition: { kind: "number", min: 0, max: 10 },
+        policy: "reject",
+        allowBlank: false,
+      },
+    ];
+    const store = new SheetwriteStore(workbook, undefined, {
+      storage: "paged",
+      dirtyCellLimit: 1,
+      mutationPolicy: "partial",
+    });
+    const outcome = store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 20 } },
+        { op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=2+2" } },
+      ],
+    });
+    expect(outcome.status).toBe("applied");
+    expect(outcome.status === "applied" ? outcome.transaction.patches : []).toHaveLength(1);
+    expect(outcome.status === "applied" ? outcome.rejections : []).toHaveLength(1);
+    expect(store.getCellLoadState(addr(0, 1))).toBe("unloaded");
+    expect(store.getFormula(addr(0, 0))).toBe("=2+2");
+    expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+    store.dispose();
+  });
+});
+it("bounds hostile bulk ranges before enumeration or WASM mutation", () => {
+  const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  const cyclic: Record<string, unknown> = { op: "set" };
+  cyclic.self = cyclic;
+  const throwingAccessor = Object.defineProperty({}, "op", {
+    enumerable: true,
+    get: () => {
+      throw new Error("hostile getter");
+    },
+  });
+  const throwingAddr = Object.defineProperty(
+    { op: "set", value: { kind: "literal", value: 1 } },
+    "addr",
+    {
+      enumerable: true,
+      get: () => {
+        throw new Error("hostile addr getter");
+      },
+    },
+  );
+  const throwingRow = Object.defineProperty({ sheet: "s1", col: 0 }, "row", {
+    enumerable: true,
+    get: () => {
+      throw new Error("hostile row getter");
+    },
+  });
+  const throwingStartRow = Object.defineProperty({ col: 0 }, "row", {
+    enumerable: true,
+    get: () => {
+      throw new Error("hostile range row getter");
+    },
+  });
+  const throwingRangeRow = {
+    op: "setRangeStyle",
+    range: {
+      sheet: "s1",
+      start: throwingStartRow,
+      end: { row: 0, col: 0 },
+    },
+    style: { bold: true },
+  };
+
+  for (const patch of [
+    1,
+    { op: "setRangeStyle", range: {}, style: { bold: true } },
+    { op: "set", addr: addr(0, 0), value: { kind: "literal", value: Number.NaN } },
+    cyclic,
+    throwingAccessor,
+    throwingAddr,
+    { op: "set", addr: throwingRow, value: { kind: "literal", value: 1 } },
+    throwingRangeRow,
+  ] as const) {
+    expect(
+      store.applyTransaction({
+        patches: [patch as unknown as DocumentOp],
+      }),
+    ).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+    });
+  }
+
+  const malformed = store.applyTransaction({
+    patches: [
+      {
+        op: "setBlock",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        block: { rowCount: 0xffff_ffff, colCount: 1, values: [] },
+      } as DocumentOp,
+    ],
+  });
+  expect(malformed).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+
+  const started = performance.now();
+  const huge = store.applyTransaction({
+    patches: [
+      {
+        op: "clearRange",
+        range: {
+          sheet: "s1",
+          start: { row: 0, col: 0 },
+          end: { row: 0xffff_ffff, col: 0 },
+        },
+      },
+    ],
+  });
+  expect(performance.now() - started).toBeLessThan(100);
+  expect(huge).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", max: 1 }],
+  });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    documentOperations: 0,
+    ffiCalls: 0,
+  });
+  store.dispose();
+});
+
+it("accounts for structural row and column ordering before admitting writes", () => {
+  const makeLimited = () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged" as const,
+      dirtyCellLimit: 1,
+    });
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
+      { name: "A", amount: 1, city: "A" },
+      { name: "B", amount: 2, city: "B" },
+      { name: "C", amount: 3, city: "C" },
+      { name: "D", amount: 4, city: "D" },
+    ]);
+    return store;
+  };
+
+  const addedRow = makeLimited();
+  addedRow.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "dirty" } }],
+  });
+  const rejectedRow = addedRow.applyTransaction({
+    patches: [
+      { op: "addRows", sheet: "s1", at: 0, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "gap" } },
+    ],
+  });
+  expect(rejectedRow).toMatchObject({ status: "rejected", epoch: 1 });
+  expect(addedRow.getWorkbook().sheets[0]!.rowCount).toBe(4);
+  expect(addedRow.getCell(addr(0, 0)).resolved).toBe("dirty");
+  addedRow.dispose();
+
+  const removedRow = makeLimited();
+  removedRow.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "removed" } }],
+  });
+  const admittedRow = removedRow.applyTransaction({
+    patches: [
+      { op: "removeRows", sheet: "s1", at: 0, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "replacement" } },
+    ],
+  });
+  expect(admittedRow).toMatchObject({ status: "applied", epoch: 2 });
+  expect(removedRow.getWorkbook().sheets[0]!.rowCount).toBe(3);
+  expect(removedRow.getCell(addr(0, 0)).resolved).toBe("replacement");
+  removedRow.dispose();
+
+  const addedColumn = makeLimited();
+  addedColumn.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "dirty" } }],
+  });
+  const rejectedColumn = addedColumn.applyTransaction({
+    patches: [
+      {
+        op: "addColumns",
+        sheet: "s1",
+        at: 0,
+        columns: [{ key: "inserted", header: "Inserted", width: 100, type: "text" }],
+      },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "gap" } },
+    ],
+  });
+  expect(rejectedColumn).toMatchObject({ status: "rejected", epoch: 1 });
+  expect(addedColumn.getWorkbook().sheets[0]!.columns[0]!.key).toBe("name");
+  expect(addedColumn.getCell(addr(0, 0)).resolved).toBe("dirty");
+  addedColumn.dispose();
+
+  const removedColumn = makeLimited();
+  removedColumn.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "removed" } }],
+  });
+  const admittedColumn = removedColumn.applyTransaction({
+    patches: [
+      { op: "removeColumns", sheet: "s1", at: 0, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "replacement" } },
+    ],
+  });
+  expect(admittedColumn).toMatchObject({ status: "applied", epoch: 2 });
+  expect(removedColumn.getWorkbook().sheets[0]!.columns[0]!.key).toBe("amount");
+  expect(removedColumn.getCell(addr(0, 0)).resolved).toBe("replacement");
+  removedColumn.dispose();
+  const outOfBoundsRow = makeLimited();
+  const rejectedOutOfBoundsRow = outOfBoundsRow.applyTransaction({
+    patches: [
+      { op: "removeRows", sheet: "s1", at: 4, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "must-not-apply" } },
+    ],
+  });
+  expect(rejectedOutOfBoundsRow).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+  expect(outOfBoundsRow.getCell(addr(0, 0)).resolved).toBe("A");
+  outOfBoundsRow.dispose();
+
+  const outOfBoundsColumn = makeLimited();
+  const rejectedOutOfBoundsColumn = outOfBoundsColumn.applyTransaction({
+    patches: [
+      { op: "removeColumns", sheet: "s1", at: 3, count: 1 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "must-not-apply" } },
+    ],
+  });
+  expect(rejectedOutOfBoundsColumn).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+  expect(outOfBoundsColumn.getCell(addr(0, 0)).resolved).toBe("A");
+  outOfBoundsColumn.dispose();
+
+  const distantRebase = makeLimited();
+  distantRebase.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "dirty" } }],
+  });
+  const distantRow = 2_100_000;
+  const admittedDistantRebase = distantRebase.applyTransaction({
+    patches: [
+      { op: "addRows", sheet: "s1", at: 0, count: distantRow },
+      {
+        op: "set",
+        addr: addr(distantRow, 0),
+        value: { kind: "literal", value: "still-dirty" },
+      },
+    ],
+  });
+  expect(admittedDistantRebase).toMatchObject({ status: "applied", epoch: 2 });
+  expect(distantRebase.getCell(addr(distantRow, 0)).resolved).toBe("still-dirty");
+  expect(distantRebase.getPagedStats("s1").dirtyCells).toBe(1);
+  const distinctGap = distantRebase.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "overflow" } }],
+  });
+  expect(distinctGap).toMatchObject({ status: "rejected", epoch: 2 });
+  expect(distantRebase.getPagedStats("s1").dirtyCells).toBe(1);
+  distantRebase.dispose();
+  const negativeCount = makeLimited();
+  const rejectedNegativeCount = negativeCount.applyTransaction({
+    patches: [
+      { op: "addRows", sheet: "s1", at: 0, count: -1 } as DocumentOp,
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "must-not-apply" } },
+    ],
+  });
+  expect(rejectedNegativeCount).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+  });
+  expect(negativeCount.getCell(addr(0, 0)).resolved).toBe("A");
+  negativeCount.dispose();
+});
+
+it("counts rectangular rewrites and overlaps by distinct newly dirty cells", () => {
+  const makeLoaded = () => {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+      storage: "paged" as const,
+      dirtyCellLimit: 2,
+    });
+    store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [
+      { name: "A", amount: 1, city: "A" },
+      { name: "B", amount: 2, city: "B" },
+      { name: "C", amount: 3, city: "C" },
+      { name: "D", amount: 4, city: "D" },
+    ]);
+    return store;
+  };
+  const range = {
+    sheet: "s1",
+    start: { row: 0, col: 0 },
+    end: { row: 0, col: 1 },
+  };
+
+  const existing = makeLoaded();
+  existing.applyTransaction({
+    patches: [
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "first" } },
+      { op: "set", addr: addr(0, 1), value: { kind: "literal", value: "second" } },
+    ],
+  });
+  const rewritten = existing.applyTransaction({
+    patches: [{ op: "setRangeStyle", range, style: { bold: true } }],
+  });
+  expect(rewritten).toMatchObject({ status: "applied", epoch: 2 });
+  expect(existing.getPagedStats("s1").dirtyCells).toBe(2);
+  existing.dispose();
+
+  const overlapping = makeLoaded();
+  const admittedOverlap = overlapping.applyTransaction({
+    patches: [
+      { op: "setRangeStyle", range, style: { bold: true } },
+      { op: "clearRange", range, contents: true, style: false },
+    ],
+  });
+  expect(admittedOverlap).toMatchObject({ status: "applied", epoch: 1 });
+  expect(overlapping.getPagedStats("s1").dirtyCells).toBe(2);
+  overlapping.dispose();
+});
+
+it("rejects mixed clear/set growth atomically at the dirty limit", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  store.applyTransaction({
+    patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "kept" } }],
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "clearRange",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      },
+      { op: "set", addr: addr(1, 0), value: { kind: "literal", value: "overflow" } },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "rejected", epoch: 1 });
+  expect(store.getCell(addr(0, 0)).resolved).toBe("kept");
+  expect(store.getCellLoadState(addr(1, 0))).toBe("unloaded");
+  expect(store.getPagedStats("s1").dirtyCells).toBe(1);
+  store.dispose();
+});
+
+it("rejects unknown operation and reference sheets before policy or engine access", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+  const missing = "missing";
+  const range = {
+    sheet: missing,
+    start: { row: 0, col: 0 },
+    end: { row: 0, col: 0 },
+  };
+  const operations: DocumentOp[] = [
+    {
+      op: "setRange",
+      range,
+      cells: [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 1 } }],
+    },
+    {
+      op: "setBlock",
+      range,
+      block: { rowCount: 1, colCount: 1, values: [1] },
+    },
+    { op: "setRangeStyle", range, style: { bold: true } },
+    { op: "clearRange", range },
+    { op: "addRows", sheet: missing, at: 0, count: 1 },
+    {
+      op: "set",
+      addr: { sheet: missing, row: 0, col: 0 },
+      value: { kind: "formula", src: "=1+1" },
+    },
+    {
+      op: "set",
+      addr: addr(0, 0),
+      value: { kind: "ref", target: { sheet: missing, row: 0, col: 0 } },
+    },
+    {
+      op: "setRange",
+      range: { ...range, sheet: "s1" },
+      cells: [
+        {
+          rowOffset: 0,
+          colOffset: 0,
+          value: { kind: "ref", target: { sheet: missing, row: 0, col: 0 } },
+        },
+      ],
+    },
+    {
+      op: "setBlock",
+      range: { ...range, sheet: "s1" },
+      block: {
+        rowCount: 1,
+        colCount: 1,
+        values: [null],
+        refs: [[0, { sheet: missing, row: 0, col: 0 }]],
+      },
+    },
+  ];
+  for (const operation of operations) {
+    expect(store.applyTransaction({ patches: [operation] })).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "invalid-operation", operationIndex: 0 }],
+    });
+  }
+  expect(store.getCellLoadState(addr(0, 0))).toBe("unloaded");
+  store.dispose();
+});
+
+it("preflights new-sheet snapshot cells and later writes against one dirty limit", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+    storage: "paged",
+    dirtyCellLimit: 2,
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s2",
+          name: "Second",
+          order: 1,
+          rowCount: 3,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [
+            {
+              startRow: 0,
+              startCol: 0,
+              rowCount: 2,
+              colCount: 1,
+              cells: [
+                { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "first" } },
+                { rowOffset: 1, colOffset: 0, value: { kind: "literal", value: "second" } },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s2", row: 2, col: 0 },
+        value: { kind: "literal", value: "overflow" },
+      },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 3, max: 2 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  store.dispose();
+});
+
+it("preflights inbound clean ref rewrites before removing their target sheet", () => {
+  const workbook = makeWorkbook(1_002);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  const remote = store.applyTransaction(
+    {
+      patches: [
+        {
+          op: "set",
+          addr: addr(0, 0),
+          value: { kind: "ref", target: { sheet: "s2", row: 0, col: 0 } },
+        },
+        {
+          op: "set",
+          addr: addr(1, 0),
+          value: { kind: "ref", target: { sheet: "s2", row: 0, col: 0 } },
+        },
+        ...Array.from({ length: 1_000 }, (_, offset) => ({
+          op: "set" as const,
+          addr: addr(offset + 2, 0),
+          value: { kind: "ref" as const, target: addr(0, 1) },
+        })),
+      ],
+    },
+    { source: "remote" },
+  );
+  expect(remote).toMatchObject({ status: "applied", epoch: 1 });
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.resetRangeMutationAllocationStats();
+
+  const removed = store.applyTransaction({
+    patches: [{ op: "removeSheet", sheet: "s2" }],
+  });
+  expect(removed).toMatchObject({
+    status: "rejected",
+    epoch: 1,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 2, max: 1 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s2"]);
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 2,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("does not clone unrelated refs for an accepted terminal sheet removal", () => {
+  const refCount = 2_000;
+  const workbook = makeWorkbook(refCount + 1);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  const third = structuredClone(workbook.sheets[0]!);
+  third.id = "s3";
+  third.name = "Third";
+  workbook.sheets.push(second, third);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  expect(
+    store.applyTransaction(
+      {
+        patches: Array.from({ length: refCount }, (_, row) => ({
+          op: "set" as const,
+          addr: addr(row, 0),
+          value: {
+            kind: "ref" as const,
+            target: { sheet: "s3", row: 0, col: 1 },
+          },
+        })),
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  expect(store.applyTransaction({ patches: [{ op: "removeSheet", sheet: "s2" }] })).toMatchObject({
+    status: "applied",
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s3"]);
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("fails closed before retaining an oversized ref graph for later removal", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  expect(
+    store.applyTransaction(
+      {
+        patches: [0, 1].map((row) => ({
+          op: "set" as const,
+          addr: addr(row, 0),
+          value: { kind: "ref" as const, target: addr(2, 1) },
+        })),
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "set", addr: addr(3, 0), value: { kind: "literal", value: "local" } },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 1,
+    issues: [
+      {
+        kind: "resource-limit",
+        resource: "paged-reference-simulation",
+        actual: 2,
+        max: 1,
+      },
+    ],
+  });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("does not apply the ref simulation cap to an engine-skipped mutation", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  expect(
+    store.applyTransaction(
+      {
+        patches: [0, 1].map((row) => ({
+          op: "set" as const,
+          addr: addr(row, 0),
+          value: { kind: "ref" as const, target: addr(2, 1) },
+        })),
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "set", addr: addr(99, 0), value: { kind: "literal", value: "skipped" } },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 2 });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("caps transaction-created refs before virtual retention grows past its limit", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "set",
+        addr: addr(0, 0),
+        value: { kind: "ref", target: addr(2, 1) },
+      },
+      {
+        op: "set",
+        addr: addr(1, 0),
+        value: { kind: "ref", target: addr(2, 1) },
+      },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [
+      {
+        kind: "resource-limit",
+        resource: "paged-reference-simulation",
+        actual: 2,
+        max: 1,
+      },
+    ],
+  });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 1,
+  });
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.dispose();
+});
+
+it("caps refs created by an added sheet before a later removal", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+    storage: "paged",
+    referenceSimulationLimit: 1,
+  });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s2",
+          name: "Second",
+          order: 1,
+          rowCount: 2,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [
+            {
+              startRow: 0,
+              startCol: 0,
+              rowCount: 2,
+              colCount: 1,
+              cells: [
+                {
+                  rowOffset: 0,
+                  colOffset: 0,
+                  value: { kind: "ref", target: addr(0, 0) },
+                },
+                {
+                  rowOffset: 1,
+                  colOffset: 0,
+                  value: { kind: "ref", target: addr(1, 0) },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      { op: "removeSheet", sheet: "s1" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [
+      {
+        kind: "resource-limit",
+        resource: "paged-reference-simulation",
+        actual: 2,
+        max: 1,
+      },
+    ],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  store.dispose();
+});
+
+it("requires a positive safe reference simulation limit", () => {
+  for (const referenceSimulationLimit of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    expect(
+      () =>
+        new SheetwriteStore(makeWorkbook(4), undefined, {
+          storage: "paged",
+          referenceSimulationLimit,
+        }),
+    ).toThrow("referenceSimulationLimit must be a positive safe integer");
+  }
+});
+
+it("rebases clean refs before counting a later target-sheet removal", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, {
+    storage: "paged",
+    dirtyCellLimit: 1,
+  });
+  expect(
+    store.applyTransaction(
+      {
+        patches: [
+          {
+            op: "set",
+            addr: addr(0, 0),
+            value: { kind: "ref", target: { sheet: "s2", row: 0, col: 0 } },
+          },
+        ],
+      },
+      { source: "remote" },
+    ),
+  ).toMatchObject({ status: "applied" });
+
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "moveRows", sheet: "s1", from: 0, count: 1, to: 2 },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "local" } },
+      { op: "removeSheet", sheet: "s2" },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 1,
+    issues: [{ kind: "resource-limit", resource: "paged-dirty-cells", actual: 2, max: 1 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1", "s2"]);
+  expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+  store.dispose();
+});
+
+it("does not scan or clone a large clean ref graph for an ordinary cell edit", () => {
+  const refCount = 2_000;
+  const store = new SheetwriteStore(makeWorkbook(refCount + 2), undefined, {
+    storage: "paged",
+  });
+  const remote = store.applyTransaction(
+    {
+      patches: Array.from({ length: refCount }, (_, row) => ({
+        op: "set" as const,
+        addr: addr(row, 0),
+        value: {
+          kind: "ref" as const,
+          target: addr(refCount, 1),
+        },
+      })),
+    },
+    { source: "remote" },
+  );
+  expect(remote).toMatchObject({ status: "applied" });
+  store.resetRangeMutationAllocationStats();
+
+  expect(
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: addr(refCount + 1, 2),
+          value: { kind: "literal", value: "local" },
+        },
+      ],
+    }),
+  ).toMatchObject({ status: "applied" });
+  expect(store.getRangeMutationAllocationStats()).toMatchObject({
+    admissionReferenceEntriesScanned: 0,
+    admissionReferenceMapsMaterialized: 0,
+  });
+  store.dispose();
+});
+
+it("keeps virtual sheet membership aligned when addSheet snapshots are semantically invalid", () => {
+  const baseSheet = {
+    id: "s2",
+    name: "Second",
+    order: 1,
+    rowCount: 2,
+    columns: [{ key: "value", header: "Value", width: 100, type: "text" as const }],
+    cells: [],
+  };
+  const invalidSheets = [
+    {
+      ...baseSheet,
+      columns: [
+        ...baseSheet.columns,
+        { key: "value", header: "Duplicate", width: 100, type: "text" as const },
+      ],
+    },
+    { ...baseSheet, order: 2 },
+    { ...baseSheet, frozenRows: 3 },
+  ];
+  const expectedCodes = ["invalid-sheet", "invalid-position", "invalid-sheet"] as const;
+  for (const [index, sheet] of invalidSheets.entries()) {
+    const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+    const outcome = store.applyTransaction({
+      patches: [
+        { op: "addSheet", sheet },
+        {
+          op: "setRange",
+          range: { sheet: "s2", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+          cells: [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "unsafe" } }],
+        },
+      ],
+    });
+    expect(outcome).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ kind: "sheet-lifecycle", code: expectedCodes[index], operationIndex: 0 }],
+    });
+    expect(store.getWorkbook().sheets.map((candidate) => candidate.id)).toEqual(["s1"]);
+    store.dispose();
+  }
+});
+
+it("keeps lifecycle names aligned when rename collides with another sheet id", () => {
+  const workbook = makeWorkbook(4);
+  const second = structuredClone(workbook.sheets[0]!);
+  second.id = "s2";
+  second.name = "Second";
+  workbook.sheets.push(second);
+  const store = new SheetwriteStore(workbook, undefined, { storage: "paged" });
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "renameSheet", sheet: "s1", name: "s2" },
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s3",
+          name: "Sheet 1",
+          order: 2,
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [],
+        },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s3", row: 0, col: 0 },
+        value: { kind: "literal", value: "unsafe" },
+      },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
+  expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
+    ["s1", "s2"],
+    ["s2", "Second"],
+    ["s3", "Sheet 1"],
+  ]);
+  expect(store.getCell({ sheet: "s3", row: 0, col: 0 }).resolved).toBe("unsafe");
+  store.dispose();
+});
+
+it("keeps lifecycle names aligned after a new sheet name shadows an existing id", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+  const outcome = store.applyTransaction({
+    patches: [
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s2",
+          name: "s1",
+          order: 1,
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [],
+        },
+      },
+      { op: "renameSheet", sheet: "s1", name: "Primary" },
+      {
+        op: "addSheet",
+        sheet: {
+          id: "s3",
+          name: "Sheet 1",
+          order: 2,
+          rowCount: 1,
+          columns: [{ key: "value", header: "Value", width: 100, type: "text" }],
+          cells: [],
+        },
+      },
+      {
+        op: "set",
+        addr: { sheet: "s3", row: 0, col: 0 },
+        value: { kind: "literal", value: "unsafe" },
+      },
+    ],
+  });
+  expect(outcome).toMatchObject({ status: "applied", epoch: 1 });
+  expect(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name])).toEqual([
+    ["s1", "Primary"],
+    ["s2", "s1"],
+    ["s3", "Sheet 1"],
+  ]);
+  expect(store.getCell({ sheet: "s3", row: 0, col: 0 }).resolved).toBe("unsafe");
+  store.dispose();
+});
+
+it("retains last-sheet membership when removeSheet is a no-op", () => {
+  const store = new SheetwriteStore(makeWorkbook(4), undefined, { storage: "paged" });
+  const outcome = store.applyTransaction({
+    patches: [
+      { op: "removeSheet", sheet: "s1" },
+      { op: "set", addr: addr(0, 0), value: { kind: "literal", value: "kept" } },
+    ],
+  });
+  expect(outcome).toMatchObject({
+    status: "rejected",
+    epoch: 0,
+    issues: [{ kind: "sheet-lifecycle", code: "last-visible-sheet", operationIndex: 0 }],
+  });
+  expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["s1"]);
+  expect(store.getCell(addr(0, 0)).resolved).not.toBe("kept");
+  store.dispose();
 });
 
 describe("validation, protection, and notes metadata", () => {

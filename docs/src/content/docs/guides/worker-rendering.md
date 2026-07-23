@@ -90,8 +90,9 @@ if (grid.rendererKind() !== "worker") {
 
 The worker is constructed **first**, before the canvas is transferred. If
 construction throws — no `OffscreenCanvas` support, or a bundler/security
-restriction on the worker URL — the grid silently falls back to the main-thread
-`CanvasRenderer`. You always get a working grid; worker rendering is an
+restriction on the worker URL — the grid switches to the main-thread
+`CanvasRenderer` and emits one `renderer-fallback` event with a
+`SheetwriteError`. You still get a working grid; worker rendering is an
 enhancement, never a hard requirement.
 
 ## Limitation: no custom renderers

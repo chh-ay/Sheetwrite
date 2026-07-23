@@ -617,6 +617,9 @@ fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
             let Some(key) = key_for_index(sheet, index) else {
                 return 0;
             };
+            if formula_error_at(sheet, key).is_some() {
+                return 2;
+            }
             let Some(entry) = sheet.formulas.get(&key) else {
                 return 0;
             };
@@ -627,6 +630,7 @@ fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
                     FormulaValueKind::Number => 1,
                     FormulaValueKind::Text => 2,
                     FormulaValueKind::Bool => 3,
+                    FormulaValueKind::Blank => 0,
                 }
             }
         }
@@ -1133,6 +1137,12 @@ impl<'a> ComparableCell<'a> {
                 } else if sheet
                     .formulas
                     .get(&key)
+                    .is_some_and(|entry| entry.value_kind == FormulaValueKind::Blank)
+                {
+                    ComparableCell::Empty
+                } else if sheet
+                    .formulas
+                    .get(&key)
                     .is_some_and(|entry| entry.value_kind == FormulaValueKind::Bool)
                 {
                     ComparableCell::Bool(sheet.num_at(index) != 0.0)
@@ -1173,6 +1183,13 @@ impl<'a> ComparableCell<'a> {
                 } else {
                     // SAFETY: caller guarantees `index` is valid for all cell vectors.
                     let bits = unsafe { sheet.payload_unchecked(index) };
+                    if sheet
+                        .formulas
+                        .get(&key)
+                        .is_some_and(|entry| entry.value_kind == FormulaValueKind::Blank)
+                    {
+                        return ComparableCell::Empty;
+                    }
                     if sheet
                         .formulas
                         .get(&key)

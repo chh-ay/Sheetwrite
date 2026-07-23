@@ -9,7 +9,7 @@ Pending commit paired with its current synchronization status.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L88</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L92</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

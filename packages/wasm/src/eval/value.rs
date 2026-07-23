@@ -25,6 +25,7 @@ pub(super) fn cached_formula_value(
             .map(Value::text)
             .unwrap_or(Value::Error(FormulaError::Ref)),
         FormulaValueKind::Bool => Value::Bool(sheet.num_at(index) != 0.0),
+        FormulaValueKind::Blank => Value::Blank,
     }
 }
 
@@ -272,7 +273,7 @@ mod tests {
     fn reads_each_cached_formula_value_kind_and_prior_errors() {
         let mut sheet = SheetData::new(1, 1);
         let mut strings = StringPool::new();
-        let mut entry = FormulaEntry::parsed(Ast::Num(0.0), 0);
+        let mut entry = FormulaEntry::parsed(Ast::Num(0.0), 0, "=0");
 
         entry.error = Some(FormulaError::Ref);
         assert_eq!(

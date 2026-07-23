@@ -1,6 +1,6 @@
 import type { DocumentOp, MutationIssue } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
-import type { ApplyTransactionResult } from "./types/transaction.js";
+import type { ApplyTransactionResult, Transaction } from "./types/transaction.js";
 
 export interface GridTransactionAdmissionReservation {
   cancel(): void;
@@ -16,6 +16,15 @@ export interface GridTransactionAdmissionGuard {
 }
 
 const guardsByGrid = new WeakMap<Grid, Set<GridTransactionAdmissionGuard>>();
+const storageRevisionByTransaction = new WeakMap<Transaction, bigint>();
+
+export function setTransactionStorageRevision(transaction: Transaction, revision: bigint): void {
+  storageRevisionByTransaction.set(transaction, revision);
+}
+
+export function transactionStorageRevision(transaction: Transaction): bigint | undefined {
+  return storageRevisionByTransaction.get(transaction);
+}
 const EMPTY_RESERVATION: GridTransactionAdmissionReservation = Object.freeze({
   cancel: () => {},
   finish: () => {},

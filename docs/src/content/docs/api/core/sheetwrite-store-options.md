@@ -9,10 +9,10 @@ Storage layout plus snapshot and transaction resource ceilings for one store.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L55</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L67</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-member-list">
 
@@ -35,7 +35,7 @@ transactionResourceLimits?: Partial<TransactionResourceLimits>;
 </details>
 
 <details class="api-member" id="sheetwrite-store-options-storage" data-pagefind-weight="1">
-<summary><code>storage</code></summary>
+<summary><code>storage</code> <span class="api-member-summary">Storage engine; defaults to eager dense allocation.</span></summary>
 
 ```ts generated
 storage?: "dense" | "paged";
@@ -44,7 +44,7 @@ storage?: "dense" | "paged";
 </details>
 
 <details class="api-member" id="sheetwrite-store-options-chunk-rows" data-pagefind-weight="1">
-<summary><code>chunkRows</code></summary>
+<summary><code>chunkRows</code> <span class="api-member-summary">Paged row chunk size; defaults to 4,096 and is normalized to a power of two.</span></summary>
 
 ```ts generated
 chunkRows?: number;
@@ -53,10 +53,30 @@ chunkRows?: number;
 </details>
 
 <details class="api-member" id="sheetwrite-store-options-cache-bytes" data-pagefind-weight="1">
-<summary><code>cacheBytes</code></summary>
+<summary><code>cacheBytes</code> <span class="api-member-summary">Per-sheet clean-chunk budget; defaults to 32 MiB.</span></summary>
 
 ```ts generated
 cacheBytes?: number;
+```
+
+<p class="api-member-doc">Per-sheet clean-chunk budget; defaults to 32 MiB. Dirty and pinned chunks may exceed it.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-options-dirty-cell-limit" data-pagefind-weight="1">
+<summary><code>dirtyCellLimit</code> <span class="api-member-summary">Maximum sparse local edits retained outside the clean page cache.</span></summary>
+
+```ts generated
+dirtyCellLimit?: number;
+```
+
+<p class="api-member-doc">Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000 cells; further edits reject atomically.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-options-reference-simulation-limit" data-pagefind-weight="1">
+<summary><code>referenceSimulationLimit</code> <span class="api-member-summary">Maximum clean references retained for exact multi-operation remove-sheet simulation.</span></summary>
+
+```ts generated
+referenceSimulationLimit?: number;
 ```
 
 </details>
@@ -92,6 +112,8 @@ export interface SheetwriteStoreOptions {
   storage?: "dense" | "paged";
   chunkRows?: number;
   cacheBytes?: number;
+  dirtyCellLimit?: number;
+  referenceSimulationLimit?: number;
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
 }

@@ -4,7 +4,20 @@ description: "Freshness-gated benchmark and package-size evidence for Sheetwrite
 ---
 Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.
 
-## Render benchmark: Sheetwrite vs Handsontable
+## Matched regression gate
+
+The release gate does not treat a competitor comparison or a smoke ceiling as regression evidence. On the controlled performance runner it captures ten fresh matched rounds, retains every raw sample, and compares the fresh artifact with the committed baseline. Any unapproved slowdown fails the required CI job.
+
+```sh verify title="Zero-regression benchmark"
+bun run --filter @sheetwrite/bench bench:render:prepare
+cd bench
+bun run src/render-driver.ts --rounds 10 --output results/render-fresh.json --markdown-output results/render-fresh.md
+bun run src/check.ts --baseline results/render-baseline.json --fresh results/render-fresh.json --power-mode balanced --concurrency 1
+```
+
+A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.
+
+## Render benchmark
 
 <div class="evidence-available"><strong>Validated evidence.</strong> 1100/1120 engine/scenario/round runs completed across 4 workbook sizes; every completed run passed its correctness checkpoints; 20 runs did not finish and are shown as such.</div>
 
@@ -662,6 +675,18 @@ bun run --filter @sheetwrite/bench bench:render:prepare
 bun run --filter @sheetwrite/bench bench:render:scale
 ```
 
+## Runtime resource ownership
+
+The performance showcase at `/showcases/performance#resource-ownership` renders the public [`RuntimeResourceSnapshot`](/docs/api/core/runtime-resource-snapshot/) protocol directly. It keeps exclusive-owner logical bytes, allocated capacity, WASM committed pages, and independent browser runtime observations in separate buckets; committed pages are never summed into live payload. Bulk-edit before/settled deltas use [`diffRuntimeResourcePhases`](/docs/api/core/diff-runtime-resource-phases/) and omit unchanged owners.
+
+The UI and this reference share [`RUNTIME_RESOURCE_SCHEMA_VERSION`](/docs/api/core/runtime-resource-schema-version/). Detailed peak phases remain in the validated benchmark artifact rather than being presented as measurements from the visitor's browser.
+
+Reproduce and validate the full owner/operation matrix with:
+
+```sh verify title="Runtime resource evidence"
+bun run --filter @sheetwrite/bench bench:resource
+```
+
 ## Data engine benchmark
 
 <div class="evidence-available"><strong>Validated evidence.</strong> Head-to-head store operations at the sizes both engines complete headlessly; Sheetwrite additionally scales to 1M rows below.</div>
@@ -932,27 +957,95 @@ bun run --filter @sheetwrite/bench bench:formula
 
 ## Delivery size
 
-<div class="evidence-available"><strong>Validated evidence.</strong> Package tarball and bundler-output sizes, gated by absolute budgets in CI.</div>
-
-<dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Captured</dt><dd>2026-07-19 10:35 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>848e46a0f350</code> clean worktree</dd></div>
-<div><dt>Raw artifact</dt><dd><code>test-results/delivery-size/size-report.json</code></dd></div>
-</dl>
-
-| Package | Tarball | Unpacked |
-| --- | ---: | ---: |
-| `@sheetwrite/core` | 372.4 KiB | 1958.3 KiB |
-| `@sheetwrite/react` | 7.0 KiB | 22.0 KiB |
-| `@sheetwrite/svelte` | 5.2 KiB | 14.6 KiB |
-| `@sheetwrite/vue` | 8.6 KiB | 28.5 KiB |
-| `@sheetwrite/wasm` | 180.5 KiB | 490.4 KiB |
-| `@sheetwrite/xlsx` | 75.0 KiB | 366.1 KiB |
-
-A minimal Vite app that renders a grid ships 85.6 KiB of gzipped JavaScript.
-
-Reproduce with:
-
-```sh verify title="Delivery size evidence"
-bun run size:report
-```
+<section class="size-history" aria-label="Published package size history">
+<p class="size-history__intro">Registry measurements for every published release. Each delta is measured against the release immediately before it.</p>
+<details class="size-history__release" data-current="true" open>
+<summary class="size-history__release-head">
+<span class="size-history__version-step"><span>v0.1.0</span><svg class="size-history__arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M9 4.5 12.5 8 9 11.5"/></svg><strong>v0.2.0</strong></span>
+<time datetime="2026-07-22T20:08:51.366Z">Measured Jul 22, 2026</time>
+<svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+</summary>
+<div class="size-history__table-wrap">
+<table class="size-history__table">
+<thead><tr><th scope="col">Package</th><th scope="col">Tarball</th><th scope="col">Installed</th></tr></thead>
+<tbody>
+<tr>
+<th scope="row"><code>@sheetwrite/wasm</code></th>
+<td>180.4 KiB<small data-direction="increase"><span>+8.2 KiB</span><span>+4.7%</span></small></td>
+<td>489.9 KiB<small data-direction="increase"><span>+22.3 KiB</span><span>+4.8%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/core</code></th>
+<td>372.4 KiB<small data-direction="increase"><span>+40.0 KiB</span><span>+12.0%</span></small></td>
+<td>1.91 MiB<small data-direction="increase"><span>+209.9 KiB</span><span>+12.0%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/xlsx</code></th>
+<td>75.0 KiB<small data-direction="increase"><span>+53.7 KiB</span><span>+252.2%</span></small></td>
+<td>366.1 KiB<small data-direction="increase"><span>+273.1 KiB</span><span>+293.7%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/react</code></th>
+<td>7.0 KiB<small data-direction="increase"><span>+30 B</span><span>+0.4%</span></small></td>
+<td>22.0 KiB<small data-direction="increase"><span>+134 B</span><span>+0.6%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/vue</code></th>
+<td>8.6 KiB<small data-direction="decrease"><span>-24 B</span><span>-0.3%</span></small></td>
+<td>28.5 KiB<small data-direction="decrease"><span>-5.5 KiB</span><span>-16.3%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/svelte</code></th>
+<td>5.2 KiB<small data-direction="increase"><span>+66 B</span><span>+1.2%</span></small></td>
+<td>14.5 KiB<small data-direction="increase"><span>+296 B</span><span>+2.0%</span></small></td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+<details class="size-history__release">
+<summary class="size-history__release-head">
+<span class="size-history__version-step"><strong>v0.1.0</strong></span>
+<time datetime="2026-07-22T20:08:45.607Z">Measured Jul 22, 2026</time>
+<svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+</summary>
+<div class="size-history__table-wrap">
+<table class="size-history__table">
+<thead><tr><th scope="col">Package</th><th scope="col">Tarball</th><th scope="col">Installed</th></tr></thead>
+<tbody>
+<tr>
+<th scope="row"><code>@sheetwrite/wasm</code></th>
+<td>172.3 KiB</td>
+<td>467.6 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/core</code></th>
+<td>332.5 KiB</td>
+<td>1.71 MiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/xlsx</code></th>
+<td>21.3 KiB</td>
+<td>93.0 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/react</code></th>
+<td>7.0 KiB</td>
+<td>21.9 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/vue</code></th>
+<td>8.6 KiB</td>
+<td>34.0 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/svelte</code></th>
+<td>5.2 KiB</td>
+<td>14.2 KiB</td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+<footer class="size-history__footer"><span>Increase</span><span>Decrease</span><code>scripts/size-history.json</code></footer>
+</section>

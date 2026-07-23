@@ -9,10 +9,10 @@ Advanced Vue adapter props for workbook data or datasource ownership.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L51</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L56</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>22</span>
 
 <div class="api-member-list">
 
@@ -52,6 +52,15 @@ datasourceStorage?: DataSourceStorageOptions;
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-row-bridge" data-pagefind-weight="1">
+<summary><code>rowBridge</code> <span class="api-member-summary">Optional projection from canonical data-space operations to host row IDs.</span></summary>
+
+```ts generated
+rowBridge?: RowBridge<Id>;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-renderer" data-pagefind-weight="1">
 <summary><code>renderer</code> <span class="api-member-summary">Paint backend; defaults to main-thread canvas.</span></summary>
 
@@ -66,6 +75,15 @@ renderer?: GridOptions["renderer"];
 
 ```ts generated
 workerUrl?: GridOptions["workerUrl"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-presentation" data-pagefind-weight="1">
+<summary><code>presentation</code> <span class="api-member-summary">Positional spreadsheet or semantic data-grid headers.</span></summary>
+
+```ts generated
+presentation?: GridOptions["presentation"];
 ```
 
 </details>
@@ -115,11 +133,29 @@ transactionResourceLimits?: GridOptions["transactionResourceLimits"];
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-props-hyperlink-activation" data-pagefind-weight="1">
+<summary><code>hyperlinkActivation</code> <span class="api-member-summary">Controls link activation: emit an event, also navigate internally, or disable it.</span></summary>
+
+```ts generated
+hyperlinkActivation?: GridOptions["hyperlinkActivation"];
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-props-renderers" data-pagefind-weight="1">
 <summary><code>renderers</code> <span class="api-member-summary">Named custom renderers registered when the Grid is created.</span></summary>
 
 ```ts generated
 renderers?: Record<string, CellRenderer>;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-props-editors" data-pagefind-weight="1">
+<summary><code>editors</code> <span class="api-member-summary">Named custom editors registered when the Grid is created.</span></summary>
+
+```ts generated
+editors?: GridOptions["editors"];
 ```
 
 </details>
@@ -185,19 +221,23 @@ fill?: boolean;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SheetwriteGridProps {
+export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   workbook: Workbook;
   data?: ColumnarData;
   datasource?: DataSource;
   datasourceStorage?: DataSourceStorageOptions;
+  rowBridge?: RowBridge<Id>;
   renderer?: GridOptions["renderer"];
   workerUrl?: GridOptions["workerUrl"];
+  presentation?: GridOptions["presentation"];
   theme?: Partial<Theme>;
   readOnly?: boolean;
   protectionResolver?: GridOptions["protectionResolver"];
   mutationPolicy?: GridOptions["mutationPolicy"];
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
+  hyperlinkActivation?: GridOptions["hyperlinkActivation"];
   renderers?: Record<string, CellRenderer>;
+  editors?: GridOptions["editors"];
   overscan?: number;
   minColumns?: number;
   config?: GridOptions["config"];

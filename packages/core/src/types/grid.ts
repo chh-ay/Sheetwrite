@@ -1,12 +1,22 @@
 // Grid configuration, events, actions, search, and imperative API contracts.
 // No runtime values live here.
 
+import type { SheetwriteError } from "../errors.js";
+import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
+import type {
+  RuntimeMemoryObservation,
+  RuntimeResourceOperation,
+  RuntimeResourcePhase,
+  RuntimeResourceSnapshot,
+} from "../resource-accounting.js";
 import type {
   CellAlign,
   CellFormat,
+  CellHyperlink,
   CellScalar,
   CellStyle,
   CellValue,
+  Column,
   ConditionalFormatRule,
 } from "./cell.js";
 import type {
@@ -34,6 +44,7 @@ import type {
   ProtectedRange,
   ProtectionResolver,
   RowGroup,
+  SheetVisibility,
   SortKey,
   Workbook,
   WorkbookSnapshot,
@@ -48,6 +59,47 @@ import type {
   TransactionResourceLimits,
 } from "./transaction.js";
 
+/** Selection movement applied after a successful editor commit. */
+export type CellEditorNavigation = "down" | "right" | "left" | "none";
+
+/** Viewport-relative geometry of the cell currently owned by an editor. */
+export interface CellEditorRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Immutable state and guarded completion callbacks for one mounted editor. */
+export interface CellEditorContext {
+  readonly grid: Grid;
+  readonly address: Readonly<CellAddress>;
+  readonly viewAddress: Readonly<CellAddress>;
+  readonly column: Readonly<Column>;
+  readonly value: CellScalar;
+  readonly text: string;
+  readonly initialInput: string | undefined;
+  readonly selectAll: boolean;
+  readonly label: string;
+  readonly signal: AbortSignal;
+  commit(value: string, navigation?: CellEditorNavigation): void;
+  cancel(): void;
+}
+
+/** Retained lifecycle returned by a custom editor's mount method. */
+export interface CellEditorInstance {
+  update(context: CellEditorContext): void;
+  reposition(rect: CellEditorRect): void;
+  commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>;
+  cancel(): void;
+  destroy(): void;
+}
+
+/** Framework-neutral named editor definition registered through GridOptions.editors. */
+export interface CellEditor {
+  mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance;
+}
+
 /**
  * How a clipboard action ended. Permission failures are OUTCOMES, not
  * exceptions: the returned promise never rejects.
@@ -60,6 +112,9 @@ import type {
  *   a read-only grid on paste).
  */
 export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty";
+
+/** Header semantics used by the retained canvas and accessibility mirror. */
+export type GridPresentation = "spreadsheet" | "data-grid";
 
 /** Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`. */
 export interface GridActions {
@@ -125,6 +180,20 @@ export type ToolbarActionName =
   | "undo"
   | "redo"
   | "separator";
+
+/** Built-in command names accepted by state queries and change events. */
+export type GridCommandName = Exclude<ToolbarActionName, "separator">;
+
+/** Observable availability and selection-derived activity for one command. */
+export interface GridCommandState {
+  readonly disabled: boolean;
+  readonly activity: "inactive" | "active" | "mixed";
+}
+
+/** Complete command-state snapshot emitted whenever availability or activity can change. */
+export interface GridCommandStateChangeEvent {
+  readonly states: Readonly<Record<GridCommandName, GridCommandState>>;
+}
 
 /** Text, DOM node, or node factory used as toolbar icon content. */
 export type ToolbarIcon = string | Node | (() => Node);
@@ -274,10 +343,23 @@ export interface GridOptions {
    * renderer and emits `renderer-fallback` once.
    */
   workerUrl?: string | URL;
+  /**
+   * Header presentation. Spreadsheet mode (default) paints positional A/B/C
+   * labels; data-grid mode paints each column's semantic `header`. Cell
+   * addressing, row indices, clipboard values, formulas, and exports are
+   * unchanged in both modes.
+   */
+  presentation?: GridPresentation;
   /** Overrides merged over the default theme and host CSS custom properties. */
   theme?: Partial<Theme>;
   /** Disables mutating interactions while preserving navigation and selection. */
   readOnly?: boolean;
+  /**
+   * Hyperlink activation never opens a browser URL. `event-only` (default)
+   * emits a safe resolved target; `internal-navigation` additionally moves to
+   * stable internal destinations; `disabled` rejects every activation request.
+   */
+  hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
   /**
    * Host-owned client UX permission check. Servers must independently authorize
    * every submitted operation; this resolver is not an authentication boundary.
@@ -289,7 +371,12 @@ export interface GridOptions {
   transactionResourceLimits?: Partial<TransactionResourceLimits>;
   /** Custom cell renderers registered up front; also see `Grid.defineCellRenderer`. */
   renderers?: Record<string, CellRenderer>;
-  /** Rows rendered above/below the viewport to absorb fast scrolls. */
+  /** Named custom editors resolved from each column's `editor` field. */
+  editors?: Record<string, CellEditor>;
+  /**
+   * Extra row and visible-column positions painted on each viewport edge.
+   * Defaults to 6; use 0 to disable the buffer.
+   */
   overscan?: number;
   /** Render at least this many columns (empty padding columns past the data, like a spreadsheet). */
   minColumns?: number;
@@ -343,25 +430,48 @@ export interface CellInputSnapshot {
   readonly format: CellFormat;
 }
 
+/** Actionable transaction outcome for a stable sheet lifecycle target. */
+export type SheetLifecycleResult = ApplyTransactionResult & { readonly sheet: SheetId };
+
+/** Host-safe activation payload emitted only after final target validation. */
+export interface HyperlinkActivationEvent {
+  readonly address: CellAddress;
+  readonly hyperlink: CellHyperlink;
+  readonly target: ResolvedHyperlinkTarget;
+}
+
 /** Payload map for events emitted by a Grid. */
 export interface GridEvents {
   change: ChangeEvent;
   selection: { selection: Selection | null };
-  scroll: { scrollTop: number; firstRow: number; lastRow: number };
+  scroll: {
+    scrollTop: number;
+    firstRow: number;
+    lastRow: number;
+    scrollLeft: number;
+    firstVisibleColumn: number | null;
+    lastVisibleColumn: number | null;
+  };
   "edit-begin": { addr: CellAddress };
   "edit-commit": { addr: CellAddress; value: CellValue };
   search: SearchResult;
+  /** Command availability or formatting activity changed. */
+  "command-state-change": GridCommandStateChangeEvent;
   "mutation-rejected": { issues: MutationIssue[] };
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
+  "hyperlink-activate": HyperlinkActivationEvent;
   /**
    * Emitted once when the worker renderer could not be constructed and the
    * grid fell back to the main-thread canvas renderer.
    */
-  "renderer-fallback": { requested: "worker"; error: unknown };
-  "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: unknown };
+  "renderer-fallback": { requested: "worker"; error: SheetwriteError };
+  "datasource-error": {
+    request: Omit<DataSourceRequest, "signal">;
+    error: SheetwriteError;
+  };
   /** Built-in toolbar/context-menu export failed after its action was dispatched. */
-  "export-error": { format: "xlsx"; error: unknown };
+  "export-error": { format: "xlsx"; error: SheetwriteError };
 }
 
 /** Imperative grid handle for document commands, events, rendering, and teardown. */
@@ -369,6 +479,14 @@ export interface Grid {
   readonly store: Store;
   /** Imperative action surface for binding custom toolbars/menus. */
   readonly actions: GridActions;
+  /** Versioned coarse runtime ownership snapshot, including datasource state. */
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot;
+  /** Query undo/redo availability and formatting active/mixed/disabled state. */
+  getCommandState(command: GridCommandName): GridCommandState;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   /**
@@ -440,8 +558,8 @@ export interface Grid {
   /** Active column filters on the active sheet, keyed by column index. */
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
   /**
-   * Distinct resolved values of a column (Rust scan), capped at `limit`
-   * (default 1000) — the data source for a filter-by-values UI.
+   * Distinct resolved values of a column in first-seen order. Defaults to
+   * 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
    */
   distinctValues(col: number, limit?: number): CellScalar[];
   /** Hide the given data rows (composes with filters/sort). */
@@ -499,13 +617,23 @@ export interface Grid {
   removeRows(at: number, count?: number): void;
   insertColumns(at: number, count?: number): void;
   removeColumns(at: number, count?: number): void;
-  /** Add a sheet with a stable ID and make it available to the tab bar. */
-  addSheet(input: AddSheetInput): SheetId;
-  /** Remove a sheet; at least one sheet always remains. */
-  removeSheet(id: SheetId): void;
-  renameSheet(id: SheetId, name: string): void;
-  moveSheet(id: SheetId, toIndex: number): void;
+  /** Add a sheet with a stable ID and return its actionable transaction outcome. */
+  addSheet(input: AddSheetInput): SheetLifecycleResult;
+  /** Remove a sheet while preserving at least one visible worksheet. */
+  removeSheet(id: SheetId): SheetLifecycleResult;
+  renameSheet(id: SheetId, name: string): SheetLifecycleResult;
+  moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+  /** Set host-visible worksheet state; stock UI never offers `veryHidden`. */
+  setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+  setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult;
+  removeHyperlink(id: string): ApplyTransactionResult;
+  getHyperlink(addr: CellAddress): CellHyperlink | null;
+  /**
+   * Validate and emit a host-owned activation event. External targets are never
+   * opened by Sheetwrite; internal navigation occurs only under the explicit policy.
+   */
+  activateHyperlink(addr: CellAddress): boolean;
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
@@ -514,8 +642,8 @@ export interface Grid {
   setNote(addr: CellAddress, text: string | null): ApplyTransactionResult;
   getNote(addr: CellAddress): string | null;
   /**
-   * Live-update the render window overscan (rows/cols painted beyond the
-   * viewport); `undefined` restores the default.
+   * Live-update the render window overscan (row/column positions painted past
+   * each edge); `undefined` restores the default of 6.
    */
   setOverscan(overscan?: number): void;
   /**

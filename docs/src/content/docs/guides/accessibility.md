@@ -33,11 +33,12 @@ Alongside the host the grid appends a visually-hidden `<div class="sheetwrite-ar
 with a unique id (`sheetwrite-grid-<n>`) and `role="rowgroup"`. It contains:
 
 - A **header row** — `role="row"`, `aria-rowindex="1"` — whose cells are
-  `role="columnheader"` with a 1-based `aria-colindex` and the column letter
-  (`A`, `B`, …) as text.
+  `role="columnheader"` with a 1-based `aria-colindex`. Spreadsheet presentation
+  uses the positional column letter (`A`, `B`, …); data-grid presentation uses
+  the semantic `Column.header`.
 - One **data row** per visible row — `role="row"` with `aria-rowindex` set to the
-  true row position (data row + 2, leaving index 1 for the letter header). Its
-  cells are `role="gridcell"` with a 1-based `aria-colindex`, a stable id
+  true row position (data row + 2, leaving index 1 for the header). Its cells are
+  `role="gridcell"` with a 1-based `aria-colindex`, a stable id
   (`<gridId>-<row>-<col>`), and the cell's value as text.
 - Every visible cell covered by the current cell/range/multi selection carries
   `aria-selected="true"`. A row selection marks its visible row; a column
@@ -67,9 +68,24 @@ Sketch of the emitted structure:
 
 As keyboard or pointer input changes the selection, `aria-selected` and the
 host's `aria-activedescendant` update. Scrolling rebuilds the visible mirror.
+Horizontal virtualization does not renumber the mirror: if the visible window
+starts at sheet column G, its header and cells use `aria-colindex="7"`. Frozen
+and scrolling columns likewise keep their absolute one-based sheet positions.
 A focused cell note is connected through `aria-describedby` to hidden plain text.
 Validation list and checkbox editors use real `listbox` / `option` and `checkbox`
 semantics, with the rule help text as their accessible label.
+Host-supplied editors receive a `context.label` composed from that same
+semantic/positional header and row number. Core applies it to the retained editor
+wrapper and to the first focusable control when the editor did not provide its
+own name. Commit, cancel, reset, and unmount return focus to the grid; teardown
+aborts the editor signal before removing its DOM.
+
+Custom DOM renderer output uses the same mirror for its default cell value.
+Non-semantic renderer elements are hidden from assistive technology to avoid a
+duplicate announcement. A renderer can expose an explicitly interactive,
+labelled control; its keyboard events remain with that control, its element is
+retained across scroll and geometry updates, and focus returns to the grid if
+virtualization or renderer replacement removes it.
 
 ## Limitation: the mirror reflects the visible window
 

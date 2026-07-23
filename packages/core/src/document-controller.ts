@@ -5,9 +5,11 @@ import {
 import {
   type HistoryAction,
   type HistoryPart,
+  type HistoryResourceStats,
   materializeHistoryAction,
   UndoManager,
 } from "./history.js";
+import { cloneCellHyperlink } from "./hyperlink.js";
 import type { SheetwriteStore } from "./store.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
 import type { CellValue, Column } from "./types/cell.js";
@@ -21,6 +23,7 @@ import type {
   SnapshotCell,
 } from "./types/document.js";
 import type { Store } from "./types/store.js";
+import type { WorkbookTablePatch } from "./types/table.js";
 import type {
   ApplyTransactionResult,
   GridTransaction,
@@ -79,6 +82,7 @@ export class DocumentController {
       {
         source: "remote",
         commitReason: options.commitReason ?? "api",
+        localReplay: options.localReplay,
       },
     );
   }
@@ -185,6 +189,14 @@ export class DocumentController {
     return outcome;
   }
 
+  get canUndo(): boolean {
+    return this.history.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return this.history.canRedo;
+  }
+
   undo(): void {
     const action = this.history.undo();
     if (!action) return;
@@ -205,6 +217,10 @@ export class DocumentController {
       this.history.restoreRedo();
       throw error;
     }
+  }
+
+  getHistoryResourceStats(): HistoryResourceStats {
+    return this.history.getResourceStats();
   }
 
   destroy(): void {
@@ -375,6 +391,58 @@ export class DocumentController {
           .sheets.findIndex((sheet) => sheet.id === patch.sheet);
         return from < 0 ? [] : [{ op: "moveSheet", sheet: patch.sheet, to: from }];
       }
+      case "setSheetVisibility": {
+        const sheet = this.sheetById(patch.sheet);
+        return sheet
+          ? [
+              {
+                op: "setSheetVisibility",
+                sheet: patch.sheet,
+                visibility: sheet.visibility ?? "visible",
+              },
+            ]
+          : [];
+      }
+      case "addTable":
+        return [
+          {
+            op: "removeTable",
+            sheet: patch.table.range.sheet,
+            tableId: patch.table.id,
+          },
+        ];
+      case "updateTable": {
+        const table = this.sheetById(patch.sheet)?.tables?.find(
+          (candidate) => candidate.id === patch.tableId,
+        );
+        if (!table) return [];
+        const previous: WorkbookTablePatch = {};
+        if (patch.patch.name !== undefined) previous.name = table.name;
+        if (patch.patch.range !== undefined) previous.range = structuredClone(table.range);
+        if (patch.patch.columns !== undefined) previous.columns = structuredClone(table.columns);
+        if (patch.patch.headerRow !== undefined) previous.headerRow = table.headerRow;
+        if (patch.patch.totalsRow !== undefined) previous.totalsRow = table.totalsRow;
+        if (patch.patch.style !== undefined) {
+          previous.style = table.style ? structuredClone(table.style) : null;
+        }
+        if (patch.patch.unsupportedFeatures !== undefined) {
+          previous.unsupportedFeatures = structuredClone(table.unsupportedFeatures ?? []);
+        }
+        return [
+          {
+            op: "updateTable",
+            sheet: patch.sheet,
+            tableId: patch.tableId,
+            patch: previous,
+          },
+        ];
+      }
+      case "removeTable": {
+        const table = this.sheetById(patch.sheet)?.tables?.find(
+          (candidate) => candidate.id === patch.tableId,
+        );
+        return table ? [{ op: "addTable", table: structuredClone(table) }] : [];
+      }
       case "setSheetMeta": {
         const sheet = this.sheetById(patch.sheet);
         if (!sheet) return [];
@@ -390,7 +458,7 @@ export class DocumentController {
               conditionalFormats:
                 patch.patch.conditionalFormats === undefined
                   ? undefined
-                  : (sheet.conditionalFormats?.map((rule) => ({ ...rule })) ?? []),
+                  : structuredClone(sheet.conditionalFormats ?? []),
               rowGroups:
                 patch.patch.rowGroups === undefined
                   ? undefined
@@ -406,6 +474,22 @@ export class DocumentController {
             },
           },
         ];
+      }
+      case "setHyperlink": {
+        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
+          (hyperlink) => hyperlink.id === patch.hyperlink.id,
+        );
+        return previous
+          ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
+          : [{ op: "removeHyperlink", sheet: patch.sheet, id: patch.hyperlink.id }];
+      }
+      case "removeHyperlink": {
+        const previous = this.sheetById(patch.sheet)?.hyperlinks?.find(
+          (hyperlink) => hyperlink.id === patch.id,
+        );
+        return previous
+          ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
+          : [];
       }
       case "setValidationRule": {
         const previous = this.sheetById(patch.sheet)?.validationRules?.find(
@@ -499,6 +583,7 @@ export class DocumentController {
     return {
       kind: "rangeSnapshot",
       range: snapshot.range,
+      byteLength: snapshot.byteLength,
       toPatch: (target) => snapshot.toDocumentOp(target),
       dispose: () => snapshot.dispose(),
     };
@@ -641,12 +726,14 @@ export class DocumentController {
       rowMeta,
       merges: sheet.merges?.map((candidate) => ({ ...candidate })),
       conditionalFormats: sheet.conditionalFormats?.map((rule) => ({ ...rule })),
+      hyperlinks: sheet.hyperlinks?.map(cloneCellHyperlink),
       validationRules: structuredClone(sheet.validationRules),
       protectedRanges: structuredClone(sheet.protectedRanges),
       notes: structuredClone(sheet.notes),
       sortKeys: structuredClone(sheet.sortKeys),
       filters: structuredClone(sheet.filters),
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
+      tables: structuredClone(sheet.tables),
       cells:
         cells.length === 0
           ? []
@@ -672,6 +759,15 @@ export class DocumentController {
           if (this.options.store.getFormula(addr) || this.options.store.getRefTarget(addr)) {
             patches.push(this.snapshotCell(addr));
           }
+        }
+      }
+      for (const hyperlink of sheet.hyperlinks ?? []) {
+        if (hyperlink.target.kind === "internal" && hyperlink.target.range.sheet === removedSheet) {
+          patches.push({
+            op: "setHyperlink",
+            sheet: sheet.id,
+            hyperlink: cloneCellHyperlink(hyperlink),
+          });
         }
       }
     }

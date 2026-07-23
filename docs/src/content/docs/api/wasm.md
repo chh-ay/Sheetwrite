@@ -8,20 +8,21 @@ description: "API reference for @sheetwrite/wasm."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./loader.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>11</dd></div>
+<div><dt>Exports</dt><dd>12</dd></div>
 </dl>
 
 Source entry: `packages/wasm/loader.d.ts`
 
 ## Exported symbols
 
-### Classes <span class="api-count" data-pagefind-ignore>5</span>
+### Classes <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/wasm/cell-out/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellOut</code></span><span class="api-symbol-card__desc">Result of a single-cell read.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/cell-store/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>CellStore</code></span><span class="api-symbol-card__desc">The workbook-wide store: every sheet, one string pool.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/distinct-column/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>DistinctColumn</code></span><span class="api-symbol-card__desc">Distinct-value scan result for one column: parallel kind/number/text arrays whose buffers are surrendered once through the take accessors.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/range-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>RangeSnapshot</code></span><span class="api-symbol-card__desc">Opaque, store-local history payload for one dense rectangular cell block.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/source-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SourceSnapshot</code></span><span class="api-symbol-card__desc">Compact serializable projection of persisted derived-cell sources in one range.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
 

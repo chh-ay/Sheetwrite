@@ -83,6 +83,16 @@ The adapter initializes WASM after client mount. Use a client-only boundary when
   </TabItem>
 </Tabs>
 
+## Server-rendered host boundaries
+
+The adapter host, its `Grid`, and WASM initialization are client-owned. Server rendering may produce surrounding layout and fallback content, but it must not instantiate a Sheetwrite component or call `createGrid`.
+
+**Next.js App Router:** put the adapter import and component in a module whose first directive is `"use client"`. Import `@sheetwrite/react/styles.css` once from the root layout. The production fixture builds a static Next route, hydrates it in Chromium, then proves ready, edit, input reset, and unmount using the adapter's zero-argument initializer.
+
+**Nuxt:** render `@sheetwrite/vue` from a `.client.vue` component or inside Nuxt's `<ClientOnly>` boundary, and load `@sheetwrite/vue/styles.css` through the app-level `css` configuration. Nuxt is not currently in the release runtime matrix, so this boundary is required and server-side component execution is not claimed as supported.
+
+**SvelteKit:** make the containing route client-rendered with `export const ssr = false`, or create the adapter only from `onMount` when the rest of the route must stay server-rendered. Import `@sheetwrite/svelte/styles.css` from the client-owned component or app stylesheet. SvelteKit is not currently in the release runtime matrix; direct SSR of the adapter is not claimed as supported.
+
 ## Runtime initialization
 
 Zero-argument `initSheetwrite()` is canonical for the imperative package. It is re-entrant: concurrent calls share one initialization, retries work after failure, and repeats after success are no-ops. Framework adapters call the same initializer on mount.

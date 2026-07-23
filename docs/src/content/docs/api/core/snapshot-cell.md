@@ -9,7 +9,7 @@ Serializable cell value and optional style inside a snapshot block.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L246</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L305</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

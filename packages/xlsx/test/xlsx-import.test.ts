@@ -556,16 +556,28 @@ describe("workbook OOXML fidelity", () => {
     const imported = await fromXlsxWorkbook(bytes, {
       onWarning: (warning) => warnings.push(warning),
     });
-    expect(warnings.map((warning) => warning.code).sort()).toEqual([
-      "external-relationship",
-      "hyperlink",
-      "rich-text",
+    expect(warnings).toEqual([
+      {
+        code: "rich-text",
+        message: "Rich text formatting was flattened",
+        part: "xl/sharedStrings.xml",
+      },
     ]);
-    expect(warnings.every((warning) => warning.message.length > 0)).toBe(true);
     expect(imported.sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
       kind: "literal",
       value: "rich text",
     });
+    expect(imported.sheets[0]!.hyperlinks).toEqual([
+      {
+        id: "xlsx-hyperlink-1-1",
+        range: {
+          sheet: imported.sheets[0]!.id,
+          start: { row: 0, col: 0 },
+          end: { row: 0, col: 0 },
+        },
+        target: { kind: "external", url: "https://sheetwrite.example" },
+      },
+    ]);
     expect(imported.sheets[0]!.validationRules?.[0]).toMatchObject({
       condition: { kind: "number", min: 0, max: 10 },
       policy: "reject",
@@ -593,7 +605,11 @@ describe("bounded and corrupt XLSX inputs", () => {
         throw new Error(`Expected ${file} to fail`);
       } catch (error) {
         expect(error).toBeInstanceOf(XlsxResourceError);
-        expect(error).toMatchObject({ code: "XLSX_RESOURCE_LIMIT", resource, operation: "import" });
+        expect(error).toMatchObject({
+          code: "xlsx-resource-limit",
+          resource,
+          operation: "xlsx-import",
+        });
       }
     }
   });
@@ -623,8 +639,20 @@ describe("bounded and corrupt XLSX inputs", () => {
       fromXlsxWorkbook(positive, { resourceLimits: { maxXmlDepth: 1.5 } }),
     ).rejects.toThrow("maxXmlDepth must be a positive integer");
     await expect(
+      fromXlsxWorkbook(positive, {
+        resourceLimits: { maxRowsPerSheet: Number.MAX_SAFE_INTEGER + 1 },
+      }),
+    ).rejects.toThrow("maxRowsPerSheet must be a positive integer");
+    await expect(
       fromXlsxWorkbook(positive, { resourceLimits: { maxXmlTextBytes: 4 } }),
     ).rejects.toThrow(XlsxResourceError);
+    await expect(
+      fromXlsxWorkbook(
+        manualWorkbook(
+          '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2:C3"/><sheetData/></worksheet>',
+        ),
+      ),
+    ).rejects.toThrow("range A1:B2:C3 is invalid");
     await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toThrow(
       XlsxResourceError,
     );

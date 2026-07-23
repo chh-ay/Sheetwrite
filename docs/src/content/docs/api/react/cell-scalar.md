@@ -9,7 +9,7 @@ A scalar that can be displayed directly.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/cell.d.ts#L71</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/cell.d.ts#L97</code></dd></div>
 </dl>
 
 ## Declaration

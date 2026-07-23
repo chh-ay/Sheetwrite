@@ -12,7 +12,7 @@ a currency `numberFormat` (e.g. `$#,##0.00`).
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L70</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L91</code></dd></div>
 </dl>
 
 ## Declaration

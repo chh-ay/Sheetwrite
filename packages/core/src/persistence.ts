@@ -4,6 +4,7 @@ import {
   SnapshotValidationError,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
+import { SheetwriteError } from "./errors.js";
 import { GridImpl } from "./grid.js";
 import { SheetwriteStore } from "./store.js";
 import type { WorkbookSnapshot } from "./types/document.js";
@@ -30,14 +31,11 @@ export type PersistenceErrorCode =
   | "commit-rejected";
 
 /** Typed failure raised by persistence and synchronization flows. */
-export class PersistenceError extends Error {
-  constructor(
-    readonly code: PersistenceErrorCode,
-    message: string,
-    options?: ErrorOptions,
-  ) {
-    super(message, options);
-    this.name = "PersistenceError";
+export class PersistenceError extends SheetwriteError {
+  override readonly name = "PersistenceError";
+
+  constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions) {
+    super(code, "persistence", message, { cause: options?.cause });
   }
 }
 
@@ -57,6 +55,7 @@ export function createGridFromSnapshot(
       storage: gridOptions.datasourceStorage?.mode ?? "dense",
       chunkRows: gridOptions.datasourceStorage?.chunkRows,
       cacheBytes: gridOptions.datasourceStorage?.cacheBytes,
+      dirtyCellLimit: gridOptions.datasourceStorage?.dirtyCellLimit,
       protectionResolver: gridOptions.protectionResolver,
       mutationPolicy: gridOptions.mutationPolicy,
       snapshotResourceLimits,

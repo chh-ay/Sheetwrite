@@ -9,7 +9,7 @@ Phase reported by a typed delimited-text resource failure.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L37</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L49</code></dd></div>
 </dl>
 
 ## Declaration

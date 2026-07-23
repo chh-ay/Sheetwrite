@@ -1,12 +1,23 @@
 /// <reference types="vite/client" />
-import { initSheetwrite } from "@sheetwrite/core";
-import "@sheetwrite/core/styles.css";
-import wasmUrl from "@sheetwrite/wasm/wasm?url";
-import { mount } from "svelte";
+import type { Grid } from "@sheetwrite/core";
+import "@sheetwrite/svelte/styles.css";
+import { mount, unmount } from "svelte";
 import App from "./App.svelte";
+import { assertUnmounted, markPassed } from "./lifecycle.js";
 
-// Build-only fixture entry: `vite build` resolves the `svelte` export
-// condition, compiles the raw component source from the tarball, and links
-// `@sheetwrite/core/adapter`. It is never executed.
-await initSheetwrite(wasmUrl);
-mount(App, { target: document.getElementById("app")! });
+const target = document.getElementById("app");
+if (!target) throw new Error("Packed Svelte consumer is missing #app");
+
+const component = mount(App, {
+  target,
+  props: {
+    onComplete(getGrid: () => Grid | undefined) {
+      queueMicrotask(() => {
+        void unmount(component).then(() => {
+          assertUnmounted(target, getGrid());
+          markPassed("svelte");
+        });
+      });
+    },
+  },
+});

@@ -9,7 +9,7 @@ Path-qualified schema failure found while validating an untrusted snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L185</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L235</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -25,20 +25,20 @@ constructor(errors: readonly DocumentValidationError[]);
 
 </details>
 
-<details class="api-member" id="snapshot-validation-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
-
-```ts generated
-code: "invalid-snapshot";
-```
-
-</details>
-
 <details class="api-member" id="snapshot-validation-error-errors" data-pagefind-weight="1">
 <summary><code>errors</code></summary>
 
 ```ts generated
-errors: readonly DocumentValidationError[]
+errors: readonly DocumentValidationError[];
+```
+
+</details>
+
+<details class="api-member" id="snapshot-validation-error-name" data-pagefind-weight="1">
+<summary><code>name</code></summary>
+
+```ts generated
+name: "SnapshotValidationError"
 ```
 
 </details>
@@ -50,10 +50,10 @@ errors: readonly DocumentValidationError[]
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class SnapshotValidationError extends Error {
+class SnapshotValidationError extends SheetwriteError {
   constructor(errors: readonly DocumentValidationError[]);
-  code: "invalid-snapshot";
   errors: readonly DocumentValidationError[];
+  name: "SnapshotValidationError";
 }
 ```
 

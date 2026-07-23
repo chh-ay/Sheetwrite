@@ -1,19 +1,15 @@
 /**
- * Performance and scale scenario — capability owner for
- * `/showcases/performance/`.
- *
- * Framework-neutral: owns the deterministic million-row and wide-page
- * datasets, the instrumented datasource, the paged-store/WASM measurement
- * protocols, and the committed benchmark evidence (with provenance) that the
- * route and its browser spec both consume. Every number shown live is
- * measured in the visitor's browser through public APIs; every static number
- * comes from a committed benchmark artifact and is labeled with its capture
- * provenance. Nothing here invents a figure.
+ * Deterministic protocol-2 datasource and measured evidence for the interactive
+ * scale showcase. Live values are collected from datasource, Grid, Store, and
+ * runtime diagnostics; committed values retain their checked-artifact source.
  */
 
 import type {
   AggregateOp,
+  DataCell,
   DataSource,
+  DataSourceColumnBand,
+  DataSourcePage,
   DataSourceStorageOptions,
   Grid,
   PagedStoreStats,
@@ -24,38 +20,72 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 import { IncompleteDataError, SheetwriteStore, toCsv } from "@sheetwrite/core";
+import interactionResults from "../../../../bench/results/interaction-results.json";
 import pagedResults from "../../../../bench/results/paged-results.json";
 import landingBench from "../../generated/landing-bench.json";
-import { SHOWCASE_THEME } from "../revenue.js";
 
-// ── Dataset geometry ─────────────────────────────────────────────────────────
+export const FEED_SHEET = "scale" satisfies SheetId;
+export const SCALE_ROWS = 1_000_000;
+export const SCALE_COLUMNS = 1_000;
+export const SCALE_LOGICAL_CELLS = SCALE_ROWS * SCALE_COLUMNS;
+export const FEED_ROWS = SCALE_ROWS;
+export const SCALE_SHEETS = {
+  [FEED_SHEET]: {
+    id: FEED_SHEET,
+    label: "Billion-address sheet",
+    rowCount: SCALE_ROWS,
+    columnCount: SCALE_COLUMNS,
+  },
+} as const;
 
-export const FEED_SHEET: SheetId = "feed";
-export const WIDE_SHEET: SheetId = "wide";
-export const FEED_ROWS = 1_000_000;
-export const WIDE_ROWS = 250_000;
-export const WIDE_METRIC_COLUMNS = 120;
 export const SCALE_THEME: Partial<Theme> = {
-  font: SHOWCASE_THEME.font,
-  rowHeight: SHOWCASE_THEME.rowHeight,
-  headerHeight: SHOWCASE_THEME.headerHeight,
-  rowHeaderWidth: SHOWCASE_THEME.rowHeaderWidth,
+  font: '500 13px "Inter Variable", Inter, system-ui, sans-serif',
+  rowHeight: 30,
+  headerHeight: 34,
+  rowHeaderWidth: 72,
 };
 
-/** Clean-chunk budget kept deliberately small so cache churn is observable. */
+/** Product-default 32 MiB clean-page budget; sparse local edits are accounted separately. */
 export const SCALE_STORAGE: Required<DataSourceStorageOptions> = {
   mode: "paged",
   chunkRows: 4096,
-  cacheBytes: 8 * 1024 * 1024,
+  cacheBytes: 32 * 1024 * 1024,
+  dirtyCellLimit: 1_000_000,
 };
 
-/** Visible latency for every page after the first, so lazy loading is observable. */
+/** Explicit opt-in mode for demonstrating clean-tile eviction; never the product default. */
+export const SCALE_EVICTION_STRESS_STORAGE: Required<DataSourceStorageOptions> = {
+  ...SCALE_STORAGE,
+  cacheBytes: 1024 * 1024,
+};
+
+/** Deliberate source latency after first paint, kept visible in the diagnostics. */
 export const PAGE_LATENCY_MS = 90;
 
-const REGIONS = ["eu-west", "us-east", "ap-south", "sa-east", "af-north"] as const;
-const STATUSES = ["ok", "ok", "ok", "degraded", "alert"] as const;
+const GENERATION_SLICE_ROWS = 256;
+const REGIONS = ["North America", "EMEA", "APAC", "Latin America"] as const;
+const ACCOUNTS = [
+  "Enterprise · 4100",
+  "Commercial · 4200",
+  "Digital · 4300",
+  "Services · 4400",
+] as const;
+const FINANCIAL_COLUMNS = [
+  { header: "Period", width: 104, type: "text" },
+  { header: "Account", width: 152, type: "text" },
+  { header: "Region", width: 124, type: "text" },
+  { header: "Revenue", width: 116, type: "currency" },
+  { header: "COGS", width: 108, type: "currency" },
+  { header: "Gross profit", width: 124, type: "currency" },
+  { header: "Operating expenses", width: 148, type: "currency" },
+  { header: "EBITDA", width: 112, type: "currency" },
+  { header: "EBITDA margin", width: 128, type: "number" },
+  { header: "Forecast revenue", width: 140, type: "currency" },
+  { header: "Variance", width: 112, type: "currency" },
+  { header: "Plan status", width: 112, type: "text" },
+] as const;
+const encoder = new TextEncoder();
 
-/** Deterministic per-row hash so any page of one million rows is reproducible. */
 function rowHash(row: number, salt: number): number {
   let hash = (row + 1) * 2654435761 + salt * 40503;
   hash = Math.imul(hash ^ (hash >>> 16), 2246822519);
@@ -64,22 +94,91 @@ function rowHash(row: number, salt: number): number {
   return hash >>> 0;
 }
 
-export function feedRowAt(row: number): RowData {
+export function scaleColumnKey(column: number): string {
+  return `c${column}`;
+}
+
+interface FinancialRow {
+  period: string;
+  account: string;
+  region: string;
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  operatingExpenses: number;
+  ebitda: number;
+  ebitdaMargin: number;
+  forecastRevenue: number;
+  variance: number;
+  status: string;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function financialRowAt(row: number): FinancialRow {
   const hash = rowHash(row, 1);
+  const fiscalYear = 2024 + (Math.floor(row / 12) % 5);
+  const period = `FY${fiscalYear} P${String((row % 12) + 1).padStart(2, "0")}`;
+  const revenue = roundMoney(90_000 + (hash % 360_000) + (row % 12) * 4_500);
+  const cogs = roundMoney(revenue * (0.36 + (rowHash(row, 2) % 9) / 100));
+  const grossProfit = roundMoney(revenue - cogs);
+  const operatingExpenses = roundMoney(revenue * (0.24 + (rowHash(row, 3) % 8) / 100));
+  const ebitda = roundMoney(grossProfit - operatingExpenses);
+  const ebitdaMargin = Math.round((ebitda / revenue) * 10_000) / 10_000;
+  const forecastRate = ((rowHash(row, 4) % 1_701) - 700) / 10_000;
+  const forecastRevenue = roundMoney(revenue / (1 + forecastRate));
+  const variance = roundMoney(revenue - forecastRevenue);
+  const varianceRate = variance / forecastRevenue;
+
   return {
-    id: row + 1,
-    sensor: `S-${String(hash % 4096).padStart(4, "0")}`,
-    region: REGIONS[hash % REGIONS.length] ?? "eu-west",
-    reading: Math.round((hash % 100_000) / 100 + (row % 7)) / 10,
-    peak: Math.round((rowHash(row, 2) % 120_000) / 100) / 10,
-    status: STATUSES[rowHash(row, 3) % STATUSES.length] ?? "ok",
+    period,
+    account: ACCOUNTS[Math.floor(row / 12) % ACCOUNTS.length] ?? ACCOUNTS[0],
+    region: REGIONS[hash % REGIONS.length] ?? REGIONS[0],
+    revenue,
+    cogs,
+    grossProfit,
+    operatingExpenses,
+    ebitda,
+    ebitdaMargin,
+    forecastRevenue,
+    variance,
+    status: varianceRate > 0.03 ? "Ahead" : varianceRate < -0.03 ? "Watch" : "On plan",
   };
 }
 
-export function wideRowAt(row: number): RowData {
-  const out: RowData = { id: row + 1 };
-  for (let column = 0; column < WIDE_METRIC_COLUMNS; column++) {
-    out[`m${column}`] = (rowHash(row, column + 16) % 100_000) / 100;
+function scaleCellAt(row: number, column: number, financial: FinancialRow): DataCell {
+  const sheetRow = row + 1;
+  if (column === 0) return financial.period;
+  if (column === 1) return financial.account;
+  if (column === 2) return financial.region;
+  if (column === 3) return financial.revenue;
+  if (column === 4) return financial.cogs;
+  if (column === 5) return { kind: "formula", src: `=D${sheetRow}-E${sheetRow}` };
+  if (column === 6) return financial.operatingExpenses;
+  if (column === 7) return { kind: "formula", src: `=F${sheetRow}-G${sheetRow}` };
+  if (column === 8) {
+    return { kind: "formula", src: `=IF(D${sheetRow}=0,0,H${sheetRow}/D${sheetRow})` };
+  }
+  if (column === 9) return financial.forecastRevenue;
+  if (column === 10) return { kind: "formula", src: `=D${sheetRow}-J${sheetRow}` };
+  if (column === 11) return financial.status;
+
+  const horizon = column - (FINANCIAL_COLUMNS.length - 1);
+  const seasonalRate = ((rowHash(row, column + 1) % 201) - 100) / 10_000;
+  const growthRate = horizon * 0.0015 + seasonalRate;
+  return { kind: "formula", src: `=J${sheetRow}*(1+${growthRate})` };
+}
+
+export function scaleRowAt(row: number, bands: readonly DataSourceColumnBand[]): RowData {
+  const out: RowData = {};
+  const financial = financialRowAt(row);
+  for (const band of bands) {
+    for (let offset = 0; offset < band.keys.length; offset += 1) {
+      const key = band.keys[offset];
+      if (key !== undefined) out[key] = scaleCellAt(row, band.start + offset, financial);
+    }
   }
   return out;
 }
@@ -90,93 +189,176 @@ export function createScaleWorkbook(): Workbook {
     sheets: [
       {
         id: FEED_SHEET,
-        name: "Telemetry feed",
-        rowCount: FEED_ROWS,
-        columns: [
-          { key: "id", header: "ID", width: 84, type: "number" },
-          { key: "sensor", header: "Sensor", width: 100, type: "text" },
-          { key: "region", header: "Region", width: 104, type: "text" },
-          { key: "reading", header: "Reading", width: 104, type: "number" },
-          { key: "peak", header: "Peak", width: 104, type: "number" },
-          { key: "status", header: "Status", width: 96, type: "text" },
-        ],
-      },
-      {
-        id: WIDE_SHEET,
-        name: "Wide metrics",
-        rowCount: WIDE_ROWS,
-        columns: [
-          { key: "id", header: "ID", width: 84, type: "number" },
-          ...Array.from({ length: WIDE_METRIC_COLUMNS }, (_, column) => ({
-            key: `m${column}`,
-            header: `M${String(column).padStart(3, "0")}`,
-            width: 76,
-            type: "number" as const,
-          })),
-        ],
+        name: SCALE_SHEETS[FEED_SHEET].label,
+        rowCount: SCALE_ROWS,
+        columns: Array.from({ length: SCALE_COLUMNS }, (_, column) => {
+          const financialColumn = FINANCIAL_COLUMNS[column];
+          return {
+            key: scaleColumnKey(column),
+            header:
+              financialColumn?.header ??
+              `Forecast M+${String(column - (FINANCIAL_COLUMNS.length - 1)).padStart(3, "0")}`,
+            width: financialColumn?.width ?? 116,
+            type: financialColumn?.type ?? ("currency" as const),
+            ...(column === 8 ? { numberFormat: "0.0%" } : {}),
+          };
+        }),
       },
     ],
   };
 }
 
-// ── Instrumented datasource ──────────────────────────────────────────────────
+export interface DatasourceTile {
+  id: number;
+  sheet: SheetId;
+  start: number;
+  end: number;
+  columns: readonly DataSourceColumnBand[];
+  cells: number;
+  requestBytes: number;
+  returnedBytes: number;
+  latencyMs: number | null;
+  state: "requested" | "returned" | "aborted";
+}
 
 export interface DatasourceTelemetry {
   requests: number;
-  rowsServed: number;
-  cellsServed: number;
+  requestedCells: number;
+  requestBytes: number;
+  returnedRows: number;
+  returnedCells: number;
+  returnedBytes: number;
   aborted: number;
-  lastPage: { sheet: SheetId; start: number; end: number; latencyMs: number } | null;
+  lastRequest: DatasourceTile | null;
+  lastReturn: DatasourceTile | null;
+  recentTiles: readonly DatasourceTile[];
 }
 
 export function emptyTelemetry(): DatasourceTelemetry {
-  return { requests: 0, rowsServed: 0, cellsServed: 0, aborted: 0, lastPage: null };
+  return {
+    requests: 0,
+    requestedCells: 0,
+    requestBytes: 0,
+    returnedRows: 0,
+    returnedCells: 0,
+    returnedBytes: 0,
+    aborted: 0,
+    lastRequest: null,
+    lastReturn: null,
+    recentTiles: [],
+  };
 }
 
 /**
- * Serve deterministic pages for both sheets with observable latency. The
- * first request resolves immediately so boot never paints an empty canvas.
- * Aborted requests stop work and are counted — that is the contract hosts
- * should implement too.
+ * Windowed source: every row contains only the exact sorted column bands in the
+ * request. Generation yields between small row slices so a distant page cannot
+ * monopolize the main thread.
  */
 export function createScaleDataSource(
   onUpdate: (telemetry: Readonly<DatasourceTelemetry>) => void,
 ): DataSource {
   const telemetry = emptyTelemetry();
   let firstRequest = true;
+  let nextTileId = 1;
+
+  const publish = () => onUpdate({ ...telemetry, recentTiles: [...telemetry.recentTiles] });
+  const replaceTile = (next: DatasourceTile) => {
+    telemetry.recentTiles = telemetry.recentTiles.map((tile) =>
+      tile.id === next.id ? next : tile,
+    );
+  };
+
   return {
-    getRows({ sheet, start, end, signal, revision }) {
-      const { promise, resolve, reject } = Promise.withResolvers<{
-        start: number;
-        rows: RowData[];
-        revision: number;
-      }>();
+    capabilities: { protocol: 2, columns: "windowed" },
+    getRows(request) {
+      const { protocol, sheet, start, end, columns, signal, revision } = request;
+      const requestedColumns = columns.reduce((count, band) => count + band.keys.length, 0);
+      const cells = (end - start) * requestedColumns;
+      const requestBytes = encoder.encode(
+        JSON.stringify({ protocol, sheet, start, end, columns, revision }),
+      ).byteLength;
+      const tile: DatasourceTile = {
+        id: nextTileId,
+        sheet,
+        start,
+        end,
+        columns,
+        cells,
+        requestBytes,
+        returnedBytes: 0,
+        latencyMs: null,
+        state: "requested",
+      };
+      nextTileId += 1;
+      telemetry.requests += 1;
+      telemetry.requestedCells += cells;
+      telemetry.requestBytes += requestBytes;
+      telemetry.lastRequest = tile;
+      telemetry.recentTiles = [tile, ...telemetry.recentTiles].slice(0, 256);
+      publish();
+
       const latency = firstRequest ? 0 : PAGE_LATENCY_MS;
       firstRequest = false;
-      telemetry.requests += 1;
       const startedAt = performance.now();
-      const timer = setTimeout(() => {
-        const rows: RowData[] = [];
-        for (let row = start; row < end; row++) {
-          rows.push(sheet === WIDE_SHEET ? wideRowAt(row) : feedRowAt(row));
+
+      const { promise, resolve, reject } = Promise.withResolvers<DataSourcePage>();
+      const rows: RowData[] = [];
+      let cursor = start;
+      let returnedBytes = 2;
+      let timer = 0;
+      let settled = false;
+
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        const abortedTile: DatasourceTile = {
+          ...tile,
+          latencyMs: performance.now() - startedAt,
+          state: "aborted",
+        };
+        telemetry.aborted += 1;
+        replaceTile(abortedTile);
+        publish();
+        reject(new DOMException("Datasource request aborted", "AbortError"));
+      };
+
+      const generate = () => {
+        if (signal.aborted) {
+          abort();
+          return;
         }
-        const columns = sheet === WIDE_SHEET ? WIDE_METRIC_COLUMNS + 1 : 6;
-        telemetry.rowsServed += rows.length;
-        telemetry.cellsServed += rows.length * columns;
-        telemetry.lastPage = { sheet, start, end, latencyMs: performance.now() - startedAt };
-        onUpdate(telemetry);
-        resolve({ start, rows, revision });
-      }, latency);
-      signal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timer);
-          telemetry.aborted += 1;
-          onUpdate(telemetry);
-          reject(new DOMException("Datasource request aborted", "AbortError"));
-        },
-        { once: true },
-      );
+        const sliceEnd = Math.min(cursor + GENERATION_SLICE_ROWS, end);
+        for (; cursor < sliceEnd; cursor += 1) {
+          const row = scaleRowAt(cursor, columns);
+          const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
+          returnedBytes += rowBytes + (rows.length === 0 ? 0 : 1);
+          rows.push(row);
+        }
+        if (cursor < end) {
+          timer = window.setTimeout(generate, 0);
+          return;
+        }
+
+        settled = true;
+        signal.removeEventListener("abort", abort);
+        const returnedTile: DatasourceTile = {
+          ...tile,
+          returnedBytes,
+          latencyMs: performance.now() - startedAt,
+          state: "returned",
+        };
+        telemetry.returnedRows += rows.length;
+        telemetry.returnedCells += cells;
+        telemetry.returnedBytes += returnedBytes;
+        telemetry.lastReturn = returnedTile;
+        replaceTile(returnedTile);
+        publish();
+        resolve({ protocol: 2, start, columns, rows, revision });
+      };
+
+      signal.addEventListener("abort", abort, { once: true });
+      timer = window.setTimeout(generate, latency);
       return promise;
     },
   };
@@ -417,6 +599,43 @@ export const PAGED_EVIDENCE = {
   firstPage: statOf(pagedResults.timings["first-page"]),
   distantPage: statOf(pagedResults.timings["distant-page"]),
   probes: pagedResults.probes,
+} as const;
+
+function sampleMedian(values: readonly number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.floor(sorted.length / 2)]!;
+}
+
+/** Committed five-sample interaction, memory, and cold-route evidence. */
+export const INTERACTION_EVIDENCE = {
+  source: "bench/results/interaction-results.json",
+  protocol: `${interactionResults.matrixId} (protocol v${interactionResults.protocolVersion})`,
+  capture: interactionResults.source,
+  prefetch: interactionResults.directionalPrefetch,
+  before: {
+    lookupMedianNs: sampleMedian(interactionResults.viewIndex.baseline.lookupMedianNsSamples),
+    viewIndexBytes: interactionResults.viewIndex.baseline.retainedBytes,
+    dirty100Bytes: interactionResults.sparseDirty.baseline100Bytes,
+    coldOwnedLongTaskMs: sampleMedian(
+      interactionResults.coldRoute.before.sheetwriteLongTaskMsSamples,
+    ),
+  },
+  after: {
+    lookupMedianNs: sampleMedian(interactionResults.viewIndex.packed.lookupMedianNsSamples),
+    viewIndexBytes: interactionResults.viewIndex.packed.retainedBytes,
+    dirty100Bytes: interactionResults.sparseDirty.dirty100Bytes,
+    coldOwnedLongTaskMs: sampleMedian(
+      interactionResults.coldRoute.after.sheetwriteLongTaskMsSamples,
+    ),
+  },
+  gains: {
+    lookup: interactionResults.viewIndex.medianLookupImprovementRatio,
+    heap: interactionResults.viewIndex.retainedHeapReductionRatio,
+    sparse: interactionResults.sparseDirty.dirty100ReductionRatio,
+    coldUsable: interactionResults.coldRoute.medianUsableImprovementRatio,
+  },
+  coldUnattributedLongTaskMs:
+    interactionResults.coldRoute.after.reportedUnattributedLongTaskMsSamples,
 } as const;
 
 /**

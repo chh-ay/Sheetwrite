@@ -13,7 +13,7 @@ synchronous API returns one in-memory string and fetches at most
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L91</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L92</code></dd></div>
 </dl>
 
 ## Declaration

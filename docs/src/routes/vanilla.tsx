@@ -5,7 +5,7 @@ import VanillaWorkbench from "../showcases/VanillaWorkbench.js";
 import vanillaStylesheet from "../styles/vanilla-workbench.css?url";
 
 const description =
-  "Framework-free host code owns create, reset, and destroy: renderer selection, Worker fallback, a host-served page source, and workbook operations, all through the public core API.";
+  "Create a real Grid, edit it, switch a construction-bound option, and tear it down. The adjacent instrument shows exactly which renderer, datasource, and workbook the host owns.";
 
 /** Construction-bound options are deep-linkable; defaults stay out of the URL. */
 interface VanillaSearch {
@@ -58,9 +58,9 @@ function VanillaWorkbenchRoute() {
             "A failed Worker boot emits renderer-fallback and keeps painting on the main thread — requested vs. active is always visible.",
         },
       ]}
-      prompt="Switch the renderer to Web Worker and the data path to Paged source — then destroy and re-create the grid. The URL follows the construction options."
+      prompt="Edit B2, switch Main thread to Web Worker, then destroy and create the Grid. Watch the adjacent generation instrument prove each ownership boundary."
       sourcePath="docs/src/showcases/vanilla-workbench.ts"
-      title="Drive the engine without an adapter."
+      title="Own every Grid generation."
     >
       <VanillaWorkbench
         renderer={search.renderer ?? "canvas"}

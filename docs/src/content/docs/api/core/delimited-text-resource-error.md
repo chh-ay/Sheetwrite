@@ -9,10 +9,10 @@ Stable resource-limit failure raised before the next oversized parse or encode a
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L40</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L52</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -30,15 +30,6 @@ constructor(resource: keyof DelimitedTextResourceLimits, limit: number, actual: 
 
 ```ts generated
 actual: number;
-```
-
-</details>
-
-<details class="api-member" id="delimited-text-resource-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
-
-```ts generated
-code: "DELIMITED_TEXT_RESOURCE_LIMIT";
 ```
 
 </details>
@@ -61,15 +52,6 @@ name: "DelimitedTextResourceError";
 
 </details>
 
-<details class="api-member" id="delimited-text-resource-error-operation" data-pagefind-weight="1">
-<summary><code>operation</code></summary>
-
-```ts generated
-operation: DelimitedTextOperation;
-```
-
-</details>
-
 <details class="api-member" id="delimited-text-resource-error-resource" data-pagefind-weight="1">
 <summary><code>resource</code></summary>
 
@@ -86,7 +68,7 @@ resource: keyof DelimitedTextResourceLimits
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class DelimitedTextResourceError extends RangeError {
+class DelimitedTextResourceError extends SheetwriteError {
   constructor(
     resource: keyof DelimitedTextResourceLimits,
     limit: number,
@@ -94,10 +76,8 @@ class DelimitedTextResourceError extends RangeError {
     operation: DelimitedTextOperation,
   );
   actual: number;
-  code: "DELIMITED_TEXT_RESOURCE_LIMIT";
   limit: number;
   name: "DelimitedTextResourceError";
-  operation: DelimitedTextOperation;
   resource: keyof DelimitedTextResourceLimits;
 }
 ```

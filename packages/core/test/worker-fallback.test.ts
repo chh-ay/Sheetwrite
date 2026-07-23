@@ -185,8 +185,15 @@ describe("worker renderer fallback observability", () => {
       await Promise.resolve();
 
       expect(grid.rendererKind()).toBe("canvas");
-      expect(events).toEqual([{ requested: "worker", error: failure }]);
-      expect(host.querySelectorAll("canvas")).toHaveLength(1);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        requested: "worker",
+        error: {
+          code: "renderer-fallback",
+          operation: "renderer-worker",
+          message: failure.message,
+        },
+      });
       expect(worker.terminations).toBe(1);
 
       worker.fail(new Error("duplicate failure"));

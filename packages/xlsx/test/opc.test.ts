@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { OpcPackage } from "../src/opc.js";
-import { createCodecContext } from "../src/resources.js";
+import { createCodecContext, xlsxFailure } from "../src/resources.js";
 import { rawZip } from "./raw-opc.js";
 
 describe("OPC package metadata", () => {
@@ -17,5 +17,26 @@ describe("OPC package metadata", () => {
     expect(packageFile.contentType("custom/fallback.XML")).toBe("application/xml");
     expect(packageFile.contentType("custom/extensionless")).toBeUndefined();
     expect(new TextDecoder().decode(packageFile.read("custom/data.bin"))).toBe("binary");
+  });
+
+  it("rejects unknown limits and preserves structural backend failures", () => {
+    expect(() =>
+      createCodecContext("import", {
+        resourceLimits: { unknownLimit: 1 } as never,
+      }),
+    ).toThrow("unknown XLSX resource limit unknownLimit");
+
+    const source = {
+      name: "SheetwriteError",
+      code: "xlsx-import-failed",
+      operation: "xlsx-import",
+      message: "cross-realm failure",
+      context: { format: "xlsx" },
+      retryable: false,
+    };
+    const normalized = xlsxFailure(source, "import", "test");
+    expect(normalized).not.toBe(source);
+    expect(normalized).toMatchObject(source);
+    expect(normalized.cause).toBe(source);
   });
 });

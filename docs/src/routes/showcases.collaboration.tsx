@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { pageMeta } from "../lib/seo.js";
 import CollaborationShowcase from "../showcases/CollaborationShowcase.js";
 import { ProofPage } from "../showcases/ProofPage.js";
+import collaborationStylesheet from "../styles/showcase-collaboration.css?url";
 import proofStylesheet from "../styles/showcase-proofs.css?url";
 
 const description =
@@ -9,8 +10,11 @@ const description =
 
 export const Route = createFileRoute("/showcases/collaboration")({
   head: () => ({
-    meta: pageMeta("Collaboration protocol — Sheetwrite", description),
-    links: [{ rel: "stylesheet", href: proofStylesheet }],
+    meta: pageMeta("Live collaboration — Sheetwrite", description),
+    links: [
+      { rel: "stylesheet", href: proofStylesheet },
+      { rel: "stylesheet", href: collaborationStylesheet },
+    ],
   }),
   component: CollaborationProofRoute,
 });
@@ -20,7 +24,7 @@ function CollaborationProofRoute() {
     <ProofPage
       boundary={[
         {
-          concern: "Sequencing protocol",
+          concern: "Commit ordering",
           owner: "sheetwrite",
           detail:
             "SyncCoordinator: optimistic local commits, ordered acknowledgements, echo deduplication, gap buffering, and fail-closed input limits.",
@@ -35,7 +39,7 @@ function CollaborationProofRoute() {
           concern: "Transport",
           owner: "host",
           detail:
-            "The in-page server here stands in for your WebSocket or realtime channel. Sheetwrite ships protocol contracts, not network code.",
+            "The in-page server here stands in for your WebSocket or realtime channel. Sheetwrite defines the messages and ordering rules, but ships no network code.",
         },
         {
           concern: "Durable server storage",
@@ -51,9 +55,9 @@ function CollaborationProofRoute() {
         },
       ]}
       boundaryContract="PersistenceAdapter + RemoteOperationSource"
-      boundaryLede="Everything moving on this page is the real collaboration protocol running in your browser tab. The server is deliberately illustrative — the responsibilities below never move into Sheetwrite."
+      boundaryLede="Everything moving on this page is the real collaboration flow running in your browser tab. The server is deliberately illustrative — the responsibilities below never move into Sheetwrite."
       description={description}
-      eyebrow="CAPABILITY / COLLABORATION PROTOCOL"
+      eyebrow="CAPABILITY / LIVE COLLABORATION"
       facts={[
         { label: "Clients", value: "Two, fully isolated" },
         { label: "Ordering", value: "Server-sequenced versions" },
@@ -62,10 +66,10 @@ function CollaborationProofRoute() {
       ]}
       guideHref="/docs/guides/collaboration/"
       guideLabel="Read the collaboration guide"
-      prompt="Take Bram offline, queue a few edits, and reconnect. Then hold a broadcast on Ana, commit from the server, and watch her conflict recover."
+      prompt="Use the sequencing lane: take Bram offline, queue one real Grid edit, then reconnect and watch both clients converge."
       slug="collaboration"
       sourcePath="docs/src/showcases/collaboration-protocol.ts"
-      title="Two clients, one protocol, no lost updates."
+      title="Two clients, one shared history, no lost updates."
       verification={[
         {
           title: "Convergence under ordering",
@@ -80,7 +84,7 @@ function CollaborationProofRoute() {
         {
           title: "Offline is a first-class state",
           detail:
-            "An offline client keeps committing into its durable IndexedDB queue; reconnecting drains the queue in order through the same protocol.",
+            "An offline client keeps committing into its durable IndexedDB queue; reconnecting drains the queue in order through the same synchronization flow.",
         },
         {
           title: "Gaps and conflicts stay explicit",

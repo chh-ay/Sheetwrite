@@ -17,17 +17,15 @@ coverage/
 # Local agent and audit working files
 plans/
 
-# Browser-test output (Playwright) - except the tracked size evidence artifact
-test-results/*
-!test-results/delivery-size/
-test-results/delivery-size/*
-!test-results/delivery-size/size-report.json
+# Browser-test output (Playwright)
+test-results/
 playwright-report/
 
 # Bench baseline replay scratch and fresh gate captures (promoted copies are tracked)
 bench/results/candidates/
 bench/results/render-fresh.json
 bench/results/render-fresh.md
+.formula-evidence/
 
 # Editor / OS
 .DS_Store

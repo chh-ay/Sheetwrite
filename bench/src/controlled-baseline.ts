@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { isAbsolute, normalize, resolve } from "node:path";
 import type { ControlledRunnerFingerprint, HarnessFingerprint } from "./gate-protocol.js";
-import { MATRIX_IDS, validateExactMatrix } from "./gate-protocol.js";
+import { fingerprintMismatches, MATRIX_IDS, validateExactMatrix } from "./gate-protocol.js";
 import { validateRenderGateArtifact } from "./render-gate.js";
 import {
   RENDER_PROTOCOL_VERSION,
@@ -9,10 +12,14 @@ import {
 } from "./render-protocol.js";
 import { summarizeFinite } from "./stats.js";
 
-export const CONTROLLED_BASELINE_SCHEMA_VERSION = 1 as const;
+export const CONTROLLED_BASELINE_SCHEMA_VERSION = 2 as const;
 export const CONTROLLED_BASELINE_MINIMUM_ROUNDS = 10;
-export const DEFAULT_REGRESSION_RATIO_LIMIT = 1.2;
-export const DEFAULT_TIMER_FLOOR_MS = 0.05;
+export const CONTROLLED_COMPARISON_POLICY = {
+  method: "independent-bootstrap-median-delta",
+  familywiseConfidenceLevel: 0.99,
+  resamples: 20_000,
+  maximumRegressionMs: 0,
+} as const;
 
 export interface ControlledBaselineCell {
   readonly key: string;
@@ -20,17 +27,17 @@ export interface ControlledBaselineCell {
   readonly medianMs: number;
   readonly p95Ms: number;
   readonly observedMadMs: number;
-  readonly ratioLimit: number;
-  readonly absoluteFloorMs: number;
 }
 
 export interface ControlledRenderBaseline {
   readonly schemaVersion: typeof CONTROLLED_BASELINE_SCHEMA_VERSION;
   readonly renderProtocolVersion: typeof RENDER_PROTOCOL_VERSION;
   readonly matrixId: typeof MATRIX_IDS.render.full;
+  readonly comparison: typeof CONTROLLED_COMPARISON_POLICY;
   readonly source: {
     readonly commit: string;
     readonly rawArtifact: string;
+    readonly rawSha256: string;
     readonly rounds: number;
   };
   readonly harness: HarnessFingerprint;
@@ -83,6 +90,7 @@ export function buildControlledBaseline(
   harness: HarnessFingerprint,
   runner: ControlledRunnerFingerprint,
   rawArtifact: string,
+  rawSha256: string,
 ): ControlledRenderBaseline {
   const parsed = value as Partial<RenderBenchmarkArtifact>;
   const rounds = parsed.metadata?.rounds;
@@ -102,8 +110,6 @@ export function buildControlledBaseline(
         medianMs: summary.median,
         p95Ms: summary.p95,
         observedMadMs: summary.mad,
-        ratioLimit: DEFAULT_REGRESSION_RATIO_LIMIT,
-        absoluteFloorMs: Math.max(DEFAULT_TIMER_FLOOR_MS, summary.mad * 3),
       };
     })
     .sort((left, right) => left.key.localeCompare(right.key));
@@ -111,9 +117,11 @@ export function buildControlledBaseline(
     schemaVersion: CONTROLLED_BASELINE_SCHEMA_VERSION,
     renderProtocolVersion: RENDER_PROTOCOL_VERSION,
     matrixId: MATRIX_IDS.render.full,
+    comparison: CONTROLLED_COMPARISON_POLICY,
     source: {
       commit: artifact.metadata.commit,
       rawArtifact,
+      rawSha256,
       rounds: artifact.metadata.rounds,
     },
     harness,
@@ -127,6 +135,26 @@ function record(value: unknown, path: string): Record<string, unknown> {
     throw new TypeError(`${path} must be an object`);
   }
   return value as Record<string, unknown>;
+}
+
+function exactKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+  path: string,
+): void {
+  const expectedSet = new Set(expected);
+  const unexpected = Object.keys(value)
+    .filter((key) => !expectedSet.has(key))
+    .sort();
+  const missing = expected.filter((key) => !(key in value));
+  if (missing.length > 0 || unexpected.length > 0) {
+    throw new TypeError(
+      `${path} fields are not exact: ${[
+        ...missing.map((key) => `missing ${key}`),
+        ...unexpected.map((key) => `unexpected ${key}`),
+      ].join("; ")}`,
+    );
+  }
 }
 
 function text(value: unknown, path: string): string {
@@ -151,6 +179,11 @@ function positiveInteger(value: unknown, path: string): number {
 
 function parseHarness(value: unknown): HarnessFingerprint {
   const input = record(value, "baseline.harness");
+  exactKeys(
+    input,
+    ["digest", "protocol", "matrix", "dataset", "sampling", "schema", "sources"],
+    "baseline.harness",
+  );
   const sourceInput = record(input.sources, "baseline.harness.sources");
   const sources = Object.fromEntries(
     Object.entries(sourceInput).map(([path, digest]) => [
@@ -174,6 +207,11 @@ function parseHarness(value: unknown): HarnessFingerprint {
 
 function parseRunner(value: unknown): ControlledRunnerFingerprint {
   const input = record(value, "baseline.runner");
+  exactKeys(
+    input,
+    ["os", "arch", "cpu", "bun", "node", "browser", "powerMode", "concurrency"],
+    "baseline.runner",
+  );
   return {
     os: text(input.os, "baseline.runner.os"),
     arch: text(input.arch, "baseline.runner.arch"),
@@ -186,8 +224,56 @@ function parseRunner(value: unknown): ControlledRunnerFingerprint {
   };
 }
 
+function parseComparison(value: unknown): typeof CONTROLLED_COMPARISON_POLICY {
+  const input = record(value, "baseline.comparison");
+  exactKeys(
+    input,
+    ["method", "familywiseConfidenceLevel", "resamples", "maximumRegressionMs"],
+    "baseline.comparison",
+  );
+  for (const [key, expected] of Object.entries(CONTROLLED_COMPARISON_POLICY)) {
+    if (input[key] !== expected) {
+      throw new TypeError(
+        `baseline.comparison.${key} must be ${JSON.stringify(expected)}, observed ${JSON.stringify(input[key])}`,
+      );
+    }
+  }
+  return CONTROLLED_COMPARISON_POLICY;
+}
+
+function repositoryArtifactPath(value: unknown): string {
+  const path = text(value, "baseline.source.rawArtifact");
+  const normalized = normalize(path);
+  if (
+    isAbsolute(path) ||
+    normalized !== path ||
+    path.includes("\\") ||
+    path === ".." ||
+    path.startsWith("../")
+  ) {
+    throw new TypeError(
+      "baseline.source.rawArtifact must be a normalized repository-relative path",
+    );
+  }
+  return path;
+}
+
 export function parseControlledBaseline(value: unknown): ControlledRenderBaseline {
   const input = record(value, "baseline");
+  exactKeys(
+    input,
+    [
+      "schemaVersion",
+      "renderProtocolVersion",
+      "matrixId",
+      "comparison",
+      "source",
+      "harness",
+      "runner",
+      "cells",
+    ],
+    "baseline",
+  );
   if (input.schemaVersion !== CONTROLLED_BASELINE_SCHEMA_VERSION) {
     throw new TypeError(`stale controlled baseline schema: ${String(input.schemaVersion)}`);
   }
@@ -198,9 +284,15 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
     throw new TypeError(`stale controlled matrix: ${String(input.matrixId)}`);
   }
   const sourceInput = record(input.source, "baseline.source");
+  exactKeys(sourceInput, ["commit", "rawArtifact", "rawSha256", "rounds"], "baseline.source");
+  const rawSha256 = text(sourceInput.rawSha256, "baseline.source.rawSha256");
+  if (!/^[a-f0-9]{64}$/u.test(rawSha256)) {
+    throw new TypeError("baseline.source.rawSha256 must be a lowercase SHA-256 digest");
+  }
   const source = {
     commit: text(sourceInput.commit, "baseline.source.commit"),
-    rawArtifact: text(sourceInput.rawArtifact, "baseline.source.rawArtifact"),
+    rawArtifact: repositoryArtifactPath(sourceInput.rawArtifact),
+    rawSha256,
     rounds: positiveInteger(sourceInput.rounds, "baseline.source.rounds"),
   };
   if (source.rounds < CONTROLLED_BASELINE_MINIMUM_ROUNDS) {
@@ -213,6 +305,7 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
   const cells = input.cells.map((value, index): ControlledBaselineCell => {
     const path = `baseline.cells[${index}]`;
     const cell = record(value, path);
+    exactKeys(cell, ["key", "samplesMs", "medianMs", "p95Ms", "observedMadMs"], path);
     if (!Array.isArray(cell.samplesMs)) throw new TypeError(`${path}.samplesMs must be an array`);
     const samplesMs = cell.samplesMs.map((sample, sampleIndex) =>
       finite(sample, `${path}.samplesMs[${sampleIndex}]`),
@@ -224,14 +317,8 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
     const medianMs = finite(cell.medianMs, `${path}.medianMs`);
     const p95Ms = finite(cell.p95Ms, `${path}.p95Ms`);
     const observedMadMs = finite(cell.observedMadMs, `${path}.observedMadMs`);
-    const ratioLimit = finite(cell.ratioLimit, `${path}.ratioLimit`, 1);
-    const absoluteFloorMs = finite(cell.absoluteFloorMs, `${path}.absoluteFloorMs`);
-    if (ratioLimit <= 1) throw new TypeError(`${path}.ratioLimit must be greater than one`);
     if (medianMs !== summary.median || p95Ms !== summary.p95 || observedMadMs !== summary.mad) {
       throw new TypeError(`${path} statistics do not match raw samples`);
-    }
-    if (absoluteFloorMs < Math.max(DEFAULT_TIMER_FLOOR_MS, observedMadMs * 3)) {
-      throw new TypeError(`${path}.absoluteFloorMs does not cover observed noise`);
     }
     return {
       key: text(cell.key, `${path}.key`),
@@ -239,8 +326,6 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
       medianMs,
       p95Ms,
       observedMadMs,
-      ratioLimit,
-      absoluteFloorMs,
     };
   });
   validateExactMatrix(
@@ -252,11 +337,71 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
     schemaVersion: CONTROLLED_BASELINE_SCHEMA_VERSION,
     renderProtocolVersion: RENDER_PROTOCOL_VERSION,
     matrixId: MATRIX_IDS.render.full,
+    comparison: parseComparison(input.comparison),
     source,
     harness: parseHarness(input.harness),
     runner: parseRunner(input.runner),
     cells,
   };
+}
+
+export function validateControlledBaselineProvenance(
+  value: ControlledRenderBaseline,
+  repositoryRoot: string,
+): RenderBenchmarkArtifact {
+  const baseline = parseControlledBaseline(value);
+  const rawPath = resolve(repositoryRoot, baseline.source.rawArtifact);
+  const rawBytes = readFileSync(rawPath);
+  const digest = createHash("sha256").update(rawBytes).digest("hex");
+  if (digest !== baseline.source.rawSha256) {
+    throw new Error(
+      `baseline raw artifact checksum mismatch: expected ${baseline.source.rawSha256}, observed ${digest}`,
+    );
+  }
+  const artifact = validateRenderGateArtifact(
+    JSON.parse(rawBytes.toString("utf8")) as unknown,
+    "full",
+    {
+      rounds: baseline.source.rounds,
+    },
+  );
+  if (artifact.metadata.commit !== baseline.source.commit) {
+    throw new Error(
+      `baseline raw artifact commit mismatch: expected ${baseline.source.commit}, observed ${artifact.metadata.commit}`,
+    );
+  }
+  const artifactRunner = {
+    os: artifact.metadata.os,
+    arch: artifact.metadata.arch,
+    cpu: artifact.metadata.cpu,
+    bun: artifact.metadata.bunVersion,
+    node: artifact.metadata.nodeVersion,
+    browser: artifact.metadata.browserVersion,
+  };
+  const baselineRunner = {
+    os: baseline.runner.os,
+    arch: baseline.runner.arch,
+    cpu: baseline.runner.cpu,
+    bun: baseline.runner.bun,
+    node: baseline.runner.node,
+    browser: baseline.runner.browser,
+  };
+  const runnerMismatches = fingerprintMismatches(
+    baselineRunner,
+    artifactRunner,
+    "baseline raw runner",
+  );
+  if (runnerMismatches.length > 0) {
+    throw new Error(`baseline raw artifact runner mismatch:\n${runnerMismatches.join("\n")}`);
+  }
+  const rawSamples = samplesByControlledCell(artifact);
+  for (const cell of baseline.cells) {
+    const samples = rawSamples.get(cell.key);
+    if (!samples || JSON.stringify(samples) !== JSON.stringify(cell.samplesMs)) {
+      throw new Error(`baseline ${cell.key} samples do not match checked-in raw artifact`);
+    }
+  }
+  return artifact;
 }
 
 export function stableBaselineJson(value: ControlledRenderBaseline): string {

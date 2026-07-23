@@ -141,6 +141,31 @@ describe("pointer input: mouse parity", () => {
     expect(capture.released).toEqual([1]);
   });
 
+  it("focuses the grid on mouse selection so printable keys start editing", () => {
+    const { grid, scroller, workbook, host } = makeGrid();
+    let focusCalls = 0;
+    const nativeFocus = host.focus.bind(host);
+    host.focus = (options?: FocusOptions) => {
+      focusCalls += 1;
+      nativeFocus(options);
+    };
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    outside.focus();
+
+    scroller.dispatchEvent(pointer("pointerdown", { ...cellPoint(1, 1, workbook) }));
+    expect(focusCalls).toBe(1);
+
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Q", bubbles: true }));
+    const editor = host.querySelector("textarea.sheetwrite-editor");
+    expect(editor).toBeInstanceOf(HTMLTextAreaElement);
+    expect((editor as HTMLTextAreaElement).value).toBe("Q");
+    editor?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    grid.destroy();
+    outside.remove();
+  });
+
   it("drag on a column boundary commits a width patch", () => {
     const { store, scroller, workbook } = makeGrid();
     const boundaryX = DEFAULT_THEME.rowHeaderWidth + (workbook.sheets[0]?.columns[0]?.width ?? 0);

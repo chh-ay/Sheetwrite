@@ -9,7 +9,7 @@ Typed failure raised by persistence and synchronization flows.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L33</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L34</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -25,11 +25,11 @@ constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions)
 
 </details>
 
-<details class="api-member" id="persistence-error-code" data-pagefind-weight="1">
-<summary><code>code</code></summary>
+<details class="api-member" id="persistence-error-name" data-pagefind-weight="1">
+<summary><code>name</code></summary>
 
 ```ts generated
-code: PersistenceErrorCode
+name: "PersistenceError"
 ```
 
 </details>
@@ -41,13 +41,13 @@ code: PersistenceErrorCode
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class PersistenceError extends Error {
+class PersistenceError extends SheetwriteError {
   constructor(
     code: PersistenceErrorCode,
     message: string,
     options?: ErrorOptions,
   );
-  code: PersistenceErrorCode;
+  name: "PersistenceError";
 }
 ```
 

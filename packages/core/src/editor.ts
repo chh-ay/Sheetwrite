@@ -21,6 +21,8 @@ export interface BeginEditOptions {
   /** select all text (F2/double-click) vs place caret at end (typed char) */
   selectAll: boolean;
   rect: EditRect;
+  /** Accessible name derived from the semantic or positional column header. */
+  label: string;
   theme: Theme;
   onCommit: (value: string, navigate: EditNavigate) => void;
   onCancel: () => void;
@@ -64,6 +66,7 @@ export class EditController {
     ta.spellcheck = false;
     ta.wrap = "off";
     if (opts.type === "date") ta.placeholder = "yyyy-mm-dd";
+    ta.setAttribute("aria-label", opts.label);
     // Cosmetics live in styles.css (`.sheetwrite-editor`). The effective theme
     // (which may come from the `theme` option, not host CSS) is bridged as
     // inline CSS VARIABLES: the stylesheet rule resolves them, and host CSS can

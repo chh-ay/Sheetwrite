@@ -9,7 +9,7 @@ Ephemeral collaborator selection and activity update.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L14</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L15</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

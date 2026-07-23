@@ -97,11 +97,15 @@ import {
 `grid.exportXlsx()` and framework toolbar XLSX actions use the table backend and
 therefore require registration. `toXlsxTable` / `fromXlsxTable` provide
 first-row-header, first-sheet interchange; `toXlsxWorkbook` /
-`fromXlsxWorkbook` preserve multi-sheet snapshots and formula source through
-the in-memory workbook backend. Calling any XLSX function without registration
-throws an error naming the exact package and registration import. CSV and TSV
-remain core-only. See [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
-for limits and compatibility.
+`fromXlsxWorkbook` preserve multi-sheet snapshots, formula source, native
+workbook tables and structured references, safe HTTPS/mailto or internal
+hyperlinks, and the declared bounded conditional-format subset. Unsupported
+OOXML table/format extensions emit structured warnings instead of silently
+flattening into supported behavior. Calling any XLSX function without
+registration throws an error naming the exact package and registration import.
+CSV and TSV remain core-only. See [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
+and the [detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-results/)
+for the exact supported features, limits, and test evidence.
 
 ## Persistence
 
@@ -140,6 +144,23 @@ presence, comments, and revisions.
 | `@sheetwrite/vue` | Vue `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/wasm` | Internal Rust/WASM engine; normally transitive |
+
+
+## v0.3 roadmap status
+
+Implemented on the development branch: complete worksheet lifecycle operations,
+more portable formulas, native workbook tables and structured references, safe
+links, bounded conditional formatting, and 2,350 checked examples. Each example
+is either an original Sheetwrite test or links to the public specification it
+uses. The results show exactly what Sheetwrite does today; they do not claim
+blanket Excel or Google Sheets compatibility.
+
+The v0.3 release is still waiting on fresh test runs in Excel and Google Sheets,
+workbook save-and-open checks between apps, unchanged download-size limits, the
+measured decision on billion-cell sheets, stable row-model and executable
+onboarding work, and final browser checks for every product showcase. See the
+[detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-results/)
+for supported features, warnings, known limits, app versions, and test evidence.
 
 ## Releases
 
@@ -194,15 +215,8 @@ bun run build:examples
 bun run verify:packed
 bun run verify:bundlers
 bun run size:report
-bun run size:check
 ```
 
-Delivery-size budget increases require a standalone, reviewed
-`scripts/size-budgets.json` diff with the measured reason for every changed
-ceiling. Optional features belong in optional packages and lazy chunks; a
-stable optimization should lower its ceiling in the same change. Review
-packed declarations and source maps separately from browser raw, gzip, and
-Brotli transfer bytes. Never resolve a breach by removing required tests,
-types, licenses, provenance, or debugging artifacts.
+`size:report` records package, bundle, stylesheet, and WASM sizes without enforcing a release ceiling.
 
 The documentation site is available at [sheetwrite.vercel.app](https://sheetwrite.vercel.app/). See the [changelog](CHANGELOG.md), [support](SUPPORT.md), [security](SECURITY.md), and [contributing](CONTRIBUTING.md) policies in this repository.

@@ -1,4 +1,3 @@
-import { colToA1 } from "./a1.js";
 import type { CellRef } from "./selection.js";
 import type { Selection } from "./types/coordinates.js";
 import type { VisibleWindowView } from "./types/store.js";
@@ -13,6 +12,8 @@ export interface AriaMirrorDeps {
   rowCount: number;
   colCount: number;
   readOnly: boolean;
+  presentation: "spreadsheet" | "data-grid";
+  columnHeader: (col: number) => string;
   focusCell: () => CellRef | null;
   noteAt: (row: number, col: number) => string | null;
   selection: () => Selection | null;
@@ -27,6 +28,7 @@ export class AriaMirror {
   private readonly aria: HTMLDivElement;
   private readonly focusCell: () => CellRef | null;
   private readonly noteAt: (row: number, col: number) => string | null;
+  private readonly columnHeader: (col: number) => string;
   private readonly selection: () => Selection | null;
   private key = "";
   private version = 0;
@@ -48,6 +50,7 @@ export class AriaMirror {
     this.host = deps.host;
     this.focusCell = deps.focusCell;
     this.noteAt = deps.noteAt;
+    this.columnHeader = deps.columnHeader;
     this.selection = deps.selection;
 
     const aria = document.createElement("div");
@@ -64,8 +67,12 @@ export class AriaMirror {
     deps.host.setAttribute("aria-rowcount", String(deps.rowCount + 1));
     deps.host.setAttribute("aria-colcount", String(deps.colCount));
     if (deps.readOnly) deps.host.setAttribute("aria-readonly", "true");
-    if (!deps.host.hasAttribute("aria-label"))
-      deps.host.setAttribute("aria-label", "Spreadsheet grid");
+    if (!deps.host.hasAttribute("aria-label")) {
+      deps.host.setAttribute(
+        "aria-label",
+        deps.presentation === "data-grid" ? "Data grid" : "Spreadsheet grid",
+      );
+    }
     deps.scroller.setAttribute("aria-hidden", "true");
     deps.overlay.setAttribute("aria-hidden", "true");
     deps.viewport.querySelector("canvas")?.setAttribute("aria-hidden", "true");
@@ -134,8 +141,8 @@ export class AriaMirror {
       const cell = document.createElement("div");
       cell.setAttribute("role", "columnheader");
       if (selectedColumn === view.cols[cj]) cell.setAttribute("aria-selected", "true");
-      cell.setAttribute("aria-colindex", String(cj + 1));
-      cell.textContent = colToA1(view.cols[cj]!);
+      cell.setAttribute("aria-colindex", String(view.cols[cj]! + 1));
+      cell.textContent = this.columnHeader(view.cols[cj]!);
       headRow.appendChild(cell);
       this.headerCells.push(cell);
     }
@@ -151,7 +158,7 @@ export class AriaMirror {
         const col = view.cols[cj]!;
         const cell = document.createElement("div");
         cell.setAttribute("role", "gridcell");
-        cell.setAttribute("aria-colindex", String(cj + 1));
+        cell.setAttribute("aria-colindex", String(col + 1));
         cell.id = `${this.aria.id}-${row}-${col}`;
         const v = view.values[ri * nCols + cj] ?? null;
         if (v !== null) cell.textContent = String(v);
@@ -171,9 +178,9 @@ export class AriaMirror {
   }
 
   /**
-   * Same shape, shifted window: rewrite header labels, per-row `aria-rowindex`,
-   * and each gridcell's id / text / `aria-selected` on the retained nodes. Ids,
-   * roles, and `aria-colindex` (position-based) stay stable across the reuse.
+   * Same shape, shifted window: rewrite absolute header/cell column indices,
+   * labels, per-row `aria-rowindex`, ids, text, and selection state on the
+   * retained nodes.
    */
   private patchInPlace(
     view: VisibleWindowView,
@@ -190,7 +197,8 @@ export class AriaMirror {
       } else {
         this.headerCells[cj]!.removeAttribute("aria-selected");
       }
-      this.headerCells[cj]!.textContent = colToA1(view.cols[cj]!);
+      this.headerCells[cj]!.textContent = this.columnHeader(view.cols[cj]!);
+      this.headerCells[cj]!.setAttribute("aria-colindex", String(view.cols[cj]! + 1));
     }
 
     for (let ri = 0; ri < nRows; ri++) {
@@ -202,6 +210,7 @@ export class AriaMirror {
         const col = view.cols[cj]!;
         const cell = this.cellEls[ri * nCols + cj]!;
         cell.id = `${this.aria.id}-${row}-${col}`;
+        cell.setAttribute("aria-colindex", String(col + 1));
         const v = view.values[ri * nCols + cj] ?? null;
         cell.textContent = v !== null ? String(v) : "";
         const note = this.noteAt(row, col);

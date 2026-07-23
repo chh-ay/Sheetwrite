@@ -1,0 +1,411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sheetwrite.dev/schemas/formula-contract-v1.json",
+  "title": "Sheetwrite formula capability contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "parserRules",
+    "sources",
+    "families",
+    "signatureProfiles",
+    "semanticsProfiles",
+    "dialectProfiles",
+    "implementationProfiles",
+    "unsupportedCategories",
+    "functions",
+    "operators"
+  ],
+  "properties": {
+    "$schema": { "const": "./formula-contract.schema.json" },
+    "contract": { "const": "sheetwrite.formula-capabilities" },
+    "version": { "const": 1 },
+    "parserRules": { "$ref": "#/$defs/parserRules" },
+    "sources": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/source" }
+    },
+    "families": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/family" }
+    },
+    "signatureProfiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/signature" }
+    },
+    "semanticsProfiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/semantics" }
+    },
+    "dialectProfiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/dialects" }
+    },
+    "implementationProfiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/implementation" }
+    },
+    "unsupportedCategories": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/unsupportedCategory" }
+    },
+    "functions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/function" }
+    },
+    "operators": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/operator" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "path": {
+      "type": "string",
+      "pattern": "^(packages|test|scripts)/[A-Za-z0-9._/-]+$"
+    },
+    "parserRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourcePath", "dispatch", "caseSensitive", "spellingPattern"],
+      "properties": {
+        "sourcePath": { "$ref": "#/$defs/path" },
+        "dispatch": { "const": "lookup_func(name.as_ref())" },
+        "caseSensitive": { "const": false },
+        "spellingPattern": { "const": "^[A-Z][A-Z0-9.]*$" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "link"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "link": { "type": "string", "format": "uri", "pattern": "^https://" }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "source", "section"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "source": { "$ref": "#/$defs/id" },
+        "section": { "type": "string", "minLength": 1 }
+      }
+    },
+    "argument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "required", "default", "accepts", "repeat"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9]*$" },
+        "required": { "type": "boolean" },
+        "default": { "type": ["null", "boolean", "number", "string"] },
+        "accepts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["scalar", "range", "array", "name", "reference"] }
+        },
+        "repeat": { "enum": ["once", "zero-or-more", "one-or-more", "paired"] }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["arguments", "returns"],
+      "properties": {
+        "arguments": { "type": "array", "items": { "$ref": "#/$defs/argument" } },
+        "returns": { "enum": ["scalar", "reference", "array", "contextual"] }
+      }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scalar", "range", "array", "broadcast", "result"],
+      "properties": {
+        "scalar": { "enum": ["accepted", "rejected", "contextual"] },
+        "range": { "enum": ["accepted", "rejected", "contextual"] },
+        "array": { "enum": ["accepted", "rejected", "contextual"] },
+        "broadcast": { "enum": ["none", "scalar-to-array", "pairwise", "function-defined"] },
+        "result": { "enum": ["scalar", "reference", "array", "contextual"] }
+      }
+    },
+    "coercion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blank", "text", "boolean", "error"],
+      "properties": {
+        "blank": {
+          "enum": ["zero", "empty-text", "false", "ignored", "preserved", "function-defined"]
+        },
+        "text": {
+          "enum": [
+            "number-if-parseable",
+            "preserved",
+            "ignored-in-ranges",
+            "error",
+            "function-defined"
+          ]
+        },
+        "boolean": {
+          "enum": ["number", "preserved", "ignored-in-ranges", "error", "function-defined"]
+        },
+        "error": { "enum": ["propagate", "trap-selected", "function-defined"] }
+      }
+    },
+    "textRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case", "wildcard"],
+      "properties": {
+        "case": { "enum": ["sensitive", "insensitive", "function-defined", "not-applicable"] },
+        "wildcard": { "enum": ["supported", "literal", "function-defined", "not-applicable"] }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["locale", "dateSystem"],
+      "properties": {
+        "locale": {
+          "enum": [
+            "invariant",
+            "locale-aware",
+            "argument-selected",
+            "function-defined",
+            "not-applicable"
+          ]
+        },
+        "dateSystem": { "enum": ["excel-1900", "host-clock", "function-defined", "not-applicable"] }
+      }
+    },
+    "iteration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "maximum"],
+      "properties": {
+        "kind": { "enum": ["none", "bounded", "function-defined"] },
+        "maximum": { "type": ["null", "integer"], "minimum": 1 }
+      }
+    },
+    "numeric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tolerance", "domain", "iteration"],
+      "properties": {
+        "tolerance": { "enum": ["exact", "binary64", "function-defined", "not-applicable"] },
+        "domain": { "enum": ["all-inputs", "bounded", "function-defined", "not-applicable"] },
+        "iteration": { "$ref": "#/$defs/iteration" }
+      }
+    },
+    "calculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dependencies", "lazy", "spill", "fill", "copy", "structuralRewrite"],
+      "properties": {
+        "dependencies": { "enum": ["tracked", "dynamic", "contextual", "none"] },
+        "lazy": {
+          "enum": ["eager", "lazy-branches", "lazy-bindings", "function-defined", "not-applicable"]
+        },
+        "spill": { "enum": ["scalar", "array", "contextual"] },
+        "fill": { "enum": ["relative-reference-rewrite", "source-preserved", "function-defined"] },
+        "copy": { "enum": ["relative-reference-rewrite", "source-preserved", "function-defined"] },
+        "structuralRewrite": {
+          "enum": ["ast-reference-rewrite", "source-preserved", "function-defined"]
+        }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot", "history", "collaboration", "xlsxSource"],
+      "properties": {
+        "snapshot": {
+          "enum": ["formula-source", "computed-value", "unsupported", "function-defined"]
+        },
+        "history": {
+          "enum": ["formula-source", "computed-value", "unsupported", "function-defined"]
+        },
+        "collaboration": {
+          "enum": ["formula-source", "computed-value", "unsupported", "function-defined"]
+        },
+        "xlsxSource": {
+          "enum": [
+            "preserve-source",
+            "rewrite-on-structural-edit",
+            "unsupported",
+            "function-defined"
+          ]
+        }
+      }
+    },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shape",
+        "coercion",
+        "text",
+        "environment",
+        "numeric",
+        "calculation",
+        "persistence"
+      ],
+      "properties": {
+        "shape": { "$ref": "#/$defs/shape" },
+        "coercion": { "$ref": "#/$defs/coercion" },
+        "text": { "$ref": "#/$defs/textRules" },
+        "environment": { "$ref": "#/$defs/environment" },
+        "numeric": { "$ref": "#/$defs/numeric" },
+        "calculation": { "$ref": "#/$defs/calculation" },
+        "persistence": { "$ref": "#/$defs/persistence" }
+      }
+    },
+    "dialectStatus": { "enum": ["documented", "divergent", "unsupported", "unverified"] },
+    "dialects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["excel", "googleSheets", "openFormula", "divergences"],
+      "properties": {
+        "excel": { "$ref": "#/$defs/dialectStatus" },
+        "googleSheets": { "$ref": "#/$defs/dialectStatus" },
+        "openFormula": { "$ref": "#/$defs/dialectStatus" },
+        "divergences": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "componentEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "paths"],
+      "properties": {
+        "status": { "enum": ["implemented", "declared", "missing", "not-applicable"] },
+        "paths": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/path" } }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "paths"],
+      "properties": {
+        "status": {
+          "enum": ["behavior-tested", "registration-tested", "source-linked", "missing"]
+        },
+        "paths": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/path" } }
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parser", "evaluator", "assist", "evidence"],
+      "properties": {
+        "parser": { "$ref": "#/$defs/componentEvidence" },
+        "evaluator": { "$ref": "#/$defs/componentEvidence" },
+        "assist": { "$ref": "#/$defs/componentEvidence" },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "unsupportedCategory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "status",
+        "scope",
+        "examples",
+        "source",
+        "section",
+        "implementation",
+        "evidence",
+        "version"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "status": { "const": "unsupported" },
+        "scope": { "type": "string", "minLength": 1 },
+        "examples": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source": { "$ref": "#/$defs/id" },
+        "section": { "type": "string", "minLength": 1 },
+        "implementation": { "$ref": "#/$defs/componentEvidence" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "version": { "const": 1 }
+      }
+    },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical",
+        "aliases",
+        "family",
+        "contractStatus",
+        "signature",
+        "semantics",
+        "dialects",
+        "implementation",
+        "version"
+      ],
+      "properties": {
+        "canonical": { "type": "string", "pattern": "^[A-Z][A-Z0-9.]*$" },
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9.]*$" }
+        },
+        "family": { "$ref": "#/$defs/id" },
+        "contractStatus": { "enum": ["supported", "required-supported"] },
+        "signature": { "$ref": "#/$defs/id" },
+        "semantics": { "$ref": "#/$defs/id" },
+        "dialects": { "$ref": "#/$defs/id" },
+        "implementation": { "$ref": "#/$defs/id" },
+        "version": { "const": 1 }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical",
+        "token",
+        "fixity",
+        "family",
+        "contractStatus",
+        "source",
+        "section",
+        "version"
+      ],
+      "properties": {
+        "canonical": { "$ref": "#/$defs/id" },
+        "token": { "type": "string", "minLength": 1, "maxLength": 2 },
+        "fixity": { "enum": ["prefix", "infix", "postfix"] },
+        "family": { "const": "operator" },
+        "contractStatus": { "enum": ["supported", "required-supported"] },
+        "source": { "$ref": "#/$defs/id" },
+        "section": { "type": "string", "minLength": 1 },
+        "version": { "const": 1 }
+      }
+    }
+  }
+}

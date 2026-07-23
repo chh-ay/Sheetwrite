@@ -15,10 +15,10 @@ Lifetime: valid until the next store mutation or window refresh.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L29</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L45</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>14</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -148,6 +148,42 @@ ffiCalls?: number;
 ```
 
 </details>
+
+<details class="api-member" id="visible-window-view-ffi-boundary-calls" data-pagefind-weight="1">
+<summary><code>ffiBoundaryCalls</code> <span class="api-member-summary">Every wasm-bindgen method/accessor/free crossing used by diagnostics.</span></summary>
+
+```ts generated
+ffiBoundaryCalls?: number;
+```
+
+</details>
+
+<details class="api-member" id="visible-window-view-ffi-input-bytes" data-pagefind-weight="1">
+<summary><code>ffiInputBytes</code> <span class="api-member-summary">Exact copied input bytes for this packed boundary operation.</span></summary>
+
+```ts generated
+ffiInputBytes?: number;
+```
+
+</details>
+
+<details class="api-member" id="visible-window-view-ffi-output-bytes" data-pagefind-weight="1">
+<summary><code>ffiOutputBytes</code> <span class="api-member-summary">Exact copied output bytes for this packed boundary operation.</span></summary>
+
+```ts generated
+ffiOutputBytes?: number;
+```
+
+</details>
+
+<details class="api-member" id="visible-window-view-ffi-largest-transfer-bytes" data-pagefind-weight="1">
+<summary><code>ffiLargestTransferBytes</code> <span class="api-member-summary">Largest individual copied buffer/string payload in this operation.</span></summary>
+
+```ts generated
+ffiLargestTransferBytes?: number;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -174,6 +210,10 @@ export interface VisibleWindowView {
   stringPoolUpdateValues?: readonly string[];
   localStrings?: readonly string[];
   ffiCalls?: number;
+  ffiBoundaryCalls?: number;
+  ffiInputBytes?: number;
+  ffiOutputBytes?: number;
+  ffiLargestTransferBytes?: number;
 }
 ```
 

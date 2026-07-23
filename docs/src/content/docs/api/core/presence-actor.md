@@ -9,7 +9,7 @@ Public collaborator identity attached to presence updates.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L7</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L8</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

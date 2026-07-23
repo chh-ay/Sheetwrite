@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 import { SnapshotResourceError, validateTransactionResources } from "../src/document-protocol.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
@@ -18,8 +18,10 @@ import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.
 import type {
   CellScalar,
   ChangeEvent,
+  DataSourcePage,
   DataSourceRequest,
   DocumentOp,
+  GridEvents,
   RowData,
   Store,
   Workbook,
@@ -38,6 +40,7 @@ function makeFakeStore(
       throw new Error("Store.getCell must not be called in the render hot path");
     },
     getFormula: () => null,
+    getSpillAnchor: () => null,
     getRefTarget: () => null,
     recalculateVolatile: () => {},
     getVisibleWindow: (sheet, rows, cols) => {
@@ -70,6 +73,25 @@ function mountHost(): HTMLDivElement {
   Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
   document.body.appendChild(host);
   return host;
+}
+
+const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
+
+function coveredRow(request: DataSourceRequest, values: RowData = {}): RowData {
+  const row: RowData = {};
+  for (const band of request.columns) {
+    for (const key of band.keys) row[key] = values[key] ?? null;
+  }
+  return row;
+}
+
+function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSourcePage {
+  return {
+    protocol: 2,
+    start: request.start,
+    columns: request.columns,
+    rows: rows.map((row) => coveredRow(request, row)),
+  };
 }
 
 function expectEditor(host: HTMLElement): HTMLTextAreaElement {
@@ -239,12 +261,10 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: async (request: DataSourceRequest) => {
-          captured = request;
-          return {
-            start: request.start,
-            rows: [{ name: "Structured", amount: 7, city: "Paris" }],
-          };
+          captured ??= request;
+          return coveredPage(request, [{ name: "Structured", amount: 7, city: "Paris" }]);
         },
       },
     });
@@ -254,12 +274,43 @@ describe("Grid editing (Layer 3)", () => {
     if (!captured) throw new Error("datasource request was not issued");
     expect(captured).toMatchObject({
       sheet: "s1",
+      protocol: 2,
       start: 0,
       revision: 0,
     });
     expect(captured.end).toBeGreaterThan(captured.start);
+    expect(captured.columns).toEqual([{ start: 0, end: 3, keys: ["name", "amount", "city"] }]);
     expect(captured.signal).toBeInstanceOf(AbortSignal);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Structured");
+    grid.destroy();
+  });
+
+  it("keeps render overscan independent from the bounded datasource horizon", () => {
+    const requests: DataSourceRequest[] = [];
+    let paintedLastRow = -1;
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(200),
+      overscan: 50,
+      datasource: {
+        capabilities: WINDOWED_DATASOURCE,
+        getRows: (request) => {
+          requests.push(request);
+          return Promise.withResolvers<DataSourcePage>().promise;
+        },
+      },
+    });
+    grid.on("scroll", ({ lastRow }) => {
+      paintedLastRow = lastRow;
+    });
+    grid.refresh();
+
+    const visible = requests[0];
+    if (!visible) throw new Error("visible datasource request was not issued");
+    const requestedEnd = Math.max(...requests.map((request) => request.end));
+    expect(visible.start).toBe(0);
+    expect(requestedEnd).toBeLessThanOrEqual(visible.end * 3);
+    expect(paintedLastRow + 1).toBeGreaterThan(requestedEnd);
+
     grid.destroy();
   });
 
@@ -271,6 +322,7 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(host, {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: () => {
           requests++;
           return Promise.reject(new Error("load failed"));
@@ -279,11 +331,12 @@ describe("Grid editing (Layer 3)", () => {
     });
     grid.on("datasource-error", () => failed.resolve());
 
-    expect(requests).toBe(1);
+    const initialRequests = requests;
+    expect(initialRequests).toBeGreaterThan(1);
     await failed.promise;
 
     grid.refresh();
-    expect(requests).toBe(2);
+    expect(requests).toBeGreaterThan(initialRequests);
 
     grid.destroy();
   });
@@ -294,9 +347,10 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: async (request: DataSourceRequest) => {
           starts.push(request.start);
-          return { start: request.start, rows: [{ name: `row ${request.start}` }] };
+          return coveredPage(request, [{ name: `row ${request.start}` }]);
         },
       },
     });
@@ -307,7 +361,8 @@ describe("Grid editing (Layer 3)", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(starts.slice(0, 2)).toEqual([0, 1]);
+    expect(starts[0]).toBe(0);
+    expect(starts).toContain(1);
     grid.destroy();
   });
 
@@ -317,41 +372,65 @@ describe("Grid editing (Layer 3)", () => {
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: async (request: DataSourceRequest) => {
           requests += 1;
-          return { start: request.start + 1, rows: [{ name: "wrong range" }] };
+          return {
+            protocol: 2,
+            start: request.end,
+            columns: request.columns,
+            rows: [coveredRow(request, { name: "wrong range" })],
+          };
         },
       },
     });
-    const errors: unknown[] = [];
-    grid.on("datasource-error", (event) => errors.push(event.error));
+    const errors: GridEvents["datasource-error"][] = [];
+    const failed = Promise.withResolvers<void>();
+    grid.on("datasource-error", (event) => {
+      errors.push(event);
+      failed.resolve();
+    });
+    const initialRequests = requests;
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await failed.promise;
     grid.refresh();
+    await Promise.resolve();
 
-    expect(errors[0]).toBeInstanceOf(RangeError);
-    expect(requests).toBe(2);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(
+      errors.every(
+        ({ request, error }) =>
+          request.protocol === 2 &&
+          request.columns.length > 0 &&
+          error.code === "datasource-request-failed" &&
+          error.operation === "datasource-request" &&
+          error.cause instanceof RangeError,
+      ),
+    ).toBe(true);
+    expect(requests).toBeGreaterThan(initialRequests);
     grid.destroy();
   });
 
   it("preserves a newer local literal edit when a stale page resolves", async () => {
     const workbook = makeWorkbook(20);
-    const { promise, resolve } = Promise.withResolvers<{
-      start: number;
-      rows: RowData[];
-    }>();
+    const { promise, resolve } = Promise.withResolvers<DataSourcePage>();
+    let request: DataSourceRequest | undefined;
     const grid = new GridImpl(mountHost(), {
       workbook,
       datasource: {
-        getRows: () => promise,
+        capabilities: WINDOWED_DATASOURCE,
+        getRows: (next) => {
+          request ??= next;
+          return promise;
+        },
       },
     });
     const addr = { sheet: "s1", row: 0, col: 0 };
     grid.store.applyTransaction({
       patches: [{ op: "set", addr, value: { kind: "literal", value: "local" } }],
     });
-    resolve({ start: 0, rows: [{ name: "stale server" }] });
+    if (!request) throw new Error("datasource request was not issued");
+    resolve(coveredPage(request, [{ name: "stale server" }]));
     await promise;
     await Promise.resolve();
 
@@ -360,11 +439,12 @@ describe("Grid editing (Layer 3)", () => {
   });
 
   it("aborts an outstanding datasource request on destroy", () => {
-    const { promise } = Promise.withResolvers<{ start: number; rows: RowData[] }>();
+    const { promise } = Promise.withResolvers<DataSourcePage>();
     let signal: AbortSignal | undefined;
     const grid = new GridImpl(mountHost(), {
       workbook: makeWorkbook(20),
       datasource: {
+        capabilities: WINDOWED_DATASOURCE,
         getRows: (request: DataSourceRequest) => {
           signal = request.signal;
           return promise;
@@ -375,6 +455,29 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
 
     expect(signal?.aborted).toBe(true);
+  });
+
+  it("aborts active datasource rectangles when a structural change resets paging", () => {
+    const { promise } = Promise.withResolvers<DataSourcePage>();
+    const signals: AbortSignal[] = [];
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(20),
+      datasource: {
+        capabilities: WINDOWED_DATASOURCE,
+        getRows: (request) => {
+          signals.push(request.signal);
+          return promise;
+        },
+      },
+    });
+
+    expect(signals.length).toBeGreaterThan(0);
+    grid.store.applyTransaction({
+      patches: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }],
+    });
+
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    grid.destroy();
   });
 
   it("starts a new search at the current viewport and wraps when needed", () => {
@@ -684,6 +787,7 @@ describe("Grid editing (Layer 3)", () => {
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
     const host = mountHost();
     const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
 
     const colorInput = host.querySelector(".sheetwrite-tb-textColor");
     expect(colorInput).toBeInstanceOf(HTMLInputElement);
@@ -702,6 +806,45 @@ describe("Grid editing (Layer 3)", () => {
 
     grid.destroy();
     store.dispose();
+  });
+  it("commits a color picker value once after a stream of native picker events", () => {
+    jest.useFakeTimers();
+    try {
+      const workbook = makeWorkbook(10);
+      const store = new SheetwriteStore(workbook, makeColumnarData(10));
+      const host = mountHost();
+      const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      const commits: unknown[] = [];
+      const unsubscribe = grid.on("change", (event) => commits.push(event));
+      const colorInput = host.querySelector(".sheetwrite-tb-fillColor");
+      expect(colorInput).toBeInstanceOf(HTMLInputElement);
+      if (!(colorInput instanceof HTMLInputElement)) {
+        throw new Error("fill-color input not mounted");
+      }
+
+      for (const color of ["#113355", "#446688", "#aa5533"]) {
+        colorInput.value = color;
+        colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+        colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      expect(commits).toHaveLength(0);
+      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBeUndefined();
+
+      jest.advanceTimersByTime(150);
+      expect(commits).toHaveLength(1);
+      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBe("#aa5533");
+
+      colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+      jest.advanceTimersByTime(150);
+      expect(commits).toHaveLength(1);
+
+      unsubscribe();
+      grid.destroy();
+      store.dispose();
+    } finally {
+      jest.useRealTimers();
+    }
   });
   it("forwards every Grid event through the shared controller", () => {
     const workbook = makeWorkbook(10);
@@ -912,26 +1055,29 @@ describe("Grid store lifecycle", () => {
     store.dispose();
   });
   it("ignores a pending datasource result after destroying an owned store", async () => {
-    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<{
-      start: number;
-      rows: RowData[];
-    }>();
+    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<DataSourcePage>();
+    let request: DataSourceRequest | undefined;
     const datasource = {
-      getRows: () => pending,
+      capabilities: WINDOWED_DATASOURCE,
+      getRows: (next: DataSourceRequest) => {
+        request ??= next;
+        return pending;
+      },
     };
-    const loadRowsSpy = spyOn(SheetwriteStore.prototype, "loadRows");
+    const loadPageSpy = spyOn(SheetwriteStore.prototype, "loadPage");
     const grid = new GridImpl(mountHost(), {
       workbook: makeWorkbook(20),
       datasource,
     });
 
     grid.destroy();
-    resolveRows({ start: 0, rows: [{ name: "Too late" }] });
+    if (!request) throw new Error("datasource request was not issued");
+    resolveRows(coveredPage(request, [{ name: "Too late" }]));
     await pending;
     await Promise.resolve();
 
-    expect(loadRowsSpy).not.toHaveBeenCalled();
-    loadRowsSpy.mockRestore();
+    expect(loadPageSpy).not.toHaveBeenCalled();
+    loadPageSpy.mockRestore();
   });
 });
 
@@ -1193,7 +1339,8 @@ describe("Grid.setMinColumns", () => {
 
   it("keeps dense datasource storage by default and enables paging explicitly", () => {
     const datasource = {
-      getRows: async (request: { start: number }) => ({ start: request.start, rows: [] }),
+      capabilities: WINDOWED_DATASOURCE,
+      getRows: async (request: DataSourceRequest) => coveredPage(request, []),
     };
     const dense = new GridImpl(mountHost(), { workbook: makeWorkbook(5), datasource });
     const paged = new GridImpl(mountHost(), {
@@ -1232,7 +1379,11 @@ describe("Grid.setMinColumns", () => {
     );
     setXlsxTableExportBackend(backend);
     try {
-      await expect(grid.exportXlsx("fake.xlsx")).rejects.toBe(expected);
+      await expect(grid.exportXlsx("fake.xlsx")).rejects.toMatchObject({
+        code: "export-failed",
+        operation: "xlsx-export",
+        cause: expected,
+      });
       expect(receivedWorkbook).toBe(store.getWorkbook());
       expect(receivedStore).toBe(store);
       expect(actionErrors).toEqual([]);
@@ -1258,21 +1409,28 @@ describe("Grid.setMinColumns", () => {
       store,
     );
     const expected = new Error("built-in XLSX failure");
-    const events: Array<{ format: "xlsx"; error: unknown }> = [];
-    grid.on("export-error", (event) => events.push(event));
+    const events: Array<GridEvents["export-error"]> = [];
+    let nextEvent = Promise.withResolvers<void>();
+    grid.on("export-error", (event) => {
+      events.push(event);
+      nextEvent.resolve();
+    });
     setXlsxTableExportBackend(null as never);
     grid.actions.exportXlsx();
-    await Promise.resolve();
-    await Promise.resolve();
+    await nextEvent.promise;
     expect(events).toHaveLength(1);
-    expect(events[0]?.format).toBe("xlsx");
-    const missingBackendError = events[0]?.error;
-    expect(missingBackendError).toBeInstanceOf(Error);
-    if (!(missingBackendError instanceof Error)) throw new Error("Expected XLSX backend error");
-    expect(missingBackendError.message).toContain(
+    expect(events[0]).toMatchObject({
+      format: "xlsx",
+      error: {
+        code: "optional-backend-unavailable",
+        operation: "xlsx-export",
+      },
+    });
+    expect(events[0]!.error.message).toContain(
       "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
     );
     events.length = 0;
+    nextEvent = Promise.withResolvers<void>();
     setXlsxTableExportBackend({
       name: "rejecting-built-in-export",
       toXlsxTable: async () => {
@@ -1282,10 +1440,15 @@ describe("Grid.setMinColumns", () => {
 
     try {
       host.querySelector<HTMLButtonElement>('[title="Export XLSX"]')!.click();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(events).toEqual([{ format: "xlsx", error: expected }]);
+      await nextEvent.promise;
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        format: "xlsx",
+        error: { code: "export-failed", operation: "xlsx-export" },
+      });
+      expect(events[0]!.error.cause).toBe(expected);
 
+      nextEvent = Promise.withResolvers<void>();
       const viewport = host.querySelector<HTMLElement>(".sheetwrite-scroller")!;
       viewport.dispatchEvent(
         new MouseEvent("contextmenu", {
@@ -1295,12 +1458,15 @@ describe("Grid.setMinColumns", () => {
         }),
       );
       host.querySelector<HTMLElement>(".sheetwrite-context-menu-item")!.click();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(events).toEqual([
-        { format: "xlsx", error: expected },
-        { format: "xlsx", error: expected },
-      ]);
+      await nextEvent.promise;
+      expect(events).toHaveLength(2);
+      for (const event of events) {
+        expect(event.error).toMatchObject({
+          code: "export-failed",
+          operation: "xlsx-export",
+        });
+        expect(event.error.cause).toBe(expected);
+      }
     } finally {
       setXlsxTableExportBackend(null as never);
       grid.destroy();
@@ -1321,9 +1487,10 @@ describe("Grid.setMinColumns", () => {
       chunkRows: 4,
       cacheBytes: 1024,
     });
-    store.loadRows(
+    store.loadPage(
       "s1",
       0,
+      [{ start: 0, end: 3, keys: ["name", "amount", "city"] }],
       Array.from({ length: 5 }, (_, row) => ({
         name: `Customer ${row}`,
         amount: row * 10 + 0.5,
@@ -1342,7 +1509,11 @@ describe("Grid.setMinColumns", () => {
     try {
       expect(store.queryCapability("s1").status).toBe("complete");
       expect(store.queryCapability("inactive").status).toBe("incomplete");
-      await expect(grid.exportXlsx("active.xlsx")).rejects.toBe(reachedBackend);
+      await expect(grid.exportXlsx("active.xlsx")).rejects.toMatchObject({
+        code: "export-failed",
+        operation: "xlsx-export",
+        cause: reachedBackend,
+      });
 
       grid.setActiveSheet("inactive");
       await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(
@@ -1792,7 +1963,7 @@ describe("transactional document metadata", () => {
     grid.on("change", (event) => events.push(event));
 
     const notes = grid.addSheet({ id: "notes", name: "Notes", rowCount: 3 });
-    expect(notes).toBe("notes");
+    expect(notes.sheet).toBe("notes");
     expect(workbook.sheets.map((sheet) => sheet.id)).toEqual(["source", "summary", "notes"]);
     expect(events.at(-1)?.transaction.patches[0]?.op).toBe("addSheet");
     grid.undo();

@@ -9,7 +9,7 @@ Validation and allocation policy for an untrusted workbook snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L139</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L186</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -17,7 +17,7 @@ Validation and allocation policy for an untrusted workbook snapshot.
 <div class="api-member-list">
 
 <details class="api-member" id="snapshot-validation-options-storage" data-pagefind-weight="1">
-<summary><code>storage</code></summary>
+<summary><code>storage</code> <span class="api-member-summary">Allocation model used for capacity checks; defaults to dense.</span></summary>
 
 ```ts generated
 storage?: SnapshotStorageMode;
@@ -26,12 +26,13 @@ storage?: SnapshotStorageMode;
 </details>
 
 <details class="api-member" id="snapshot-validation-options-resource-limits" data-pagefind-weight="1">
-<summary><code>resourceLimits</code></summary>
+<summary><code>resourceLimits</code> <span class="api-member-summary">Non-negative safe-integer overrides merged over DEFAULTSNAPSHOTRESOURCELIMITS.</span></summary>
 
 ```ts generated
 resourceLimits?: Partial<SnapshotResourceLimits>;
 ```
 
+<p class="api-member-doc">Non-negative safe-integer overrides merged over `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`.</p>
 </details>
 </div>
 

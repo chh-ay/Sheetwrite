@@ -1,3 +1,5 @@
+export { installDatasourceClockForTest } from "./datasource-controller.js";
+
 // ── Test-environment helper (never import from production code) ─────────────
 
 /**

@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 
 use crate::types::{FormulaError, Value};
 
-use super::criteria::Criterion;
+use super::criteria::wildcard_matches_pattern;
 use super::value::{compare_values, number_from_value};
 
 pub(super) fn integer_arg(value: &Value) -> Result<i32, FormulaError> {
@@ -63,8 +63,7 @@ pub(super) fn find_match_index(
             let Value::Text(pattern) = key else {
                 return Ok(false);
             };
-            let criterion = Criterion::parse(Value::text(pattern.as_ref()));
-            return Ok(criterion.matches(&values[index]));
+            return Ok(wildcard_matches_pattern(pattern, &values[index]));
         }
         Ok(lookup_compare(&values[index], key)? == Ordering::Equal)
     };

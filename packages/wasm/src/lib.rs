@@ -15,6 +15,7 @@
 
 mod calc;
 mod eval;
+mod memory;
 mod query;
 mod sheet;
 mod store;

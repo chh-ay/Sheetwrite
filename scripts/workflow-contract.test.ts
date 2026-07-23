@@ -52,6 +52,11 @@ describe("CI and release workflow contracts", () => {
     expect(Object.keys(parsed.ci.jobs).length).toBeGreaterThan(1);
     expect(Object.keys(parsed.release.jobs)).toEqual(["identity", "publish"]);
     expect(Object.keys(parsed.version.jobs)).toEqual(["version"]);
+    const conditionalStep = parseWorkflowContract(
+      "jobs:\n  check:\n    steps:\n      - uses: owner/action@0123456789012345678901234567890123456789\n        if: always()",
+      "conditional fixture",
+    ).jobs.check?.steps?.[0];
+    expect(conditionalStep?.if).toBe("always()");
 
     expect(() => parseWorkflowContract("jobs: []", "fixture")).toThrow(
       "fixture.jobs must be a non-empty object",
@@ -65,6 +70,18 @@ describe("CI and release workflow contracts", () => {
         "fixture",
       ),
     ).toThrow("cannot define both run and uses");
+    expect(() =>
+      parseWorkflowContract(
+        "jobs:\n  check:\n    steps:\n      - run: echo ok\n        with:\n          mode: invalid",
+        "fixture",
+      ),
+    ).toThrow("fixture.jobs.check.steps[0].with is only valid for action steps");
+    expect(() =>
+      parseWorkflowContract(
+        "jobs:\n  check:\n    steps:\n      - run: echo ok\n        if: []",
+        "fixture",
+      ),
+    ).toThrow("fixture.jobs.check.steps[0].if must be a string");
   });
 
   it("requires every third-party workflow action to use its reviewed commit SHA", () => {
@@ -147,6 +164,17 @@ describe("CI and release workflow contracts", () => {
     );
     expect(packageManifest.scripts?.["test:browser:portability"]).toContain("--grep @portability");
 
+    expect(packageManifest.scripts?.["browser:install:chromium"]).toBe(
+      "playwright install --with-deps chromium",
+    );
+    for (const jobName of ["packed-consumers", "bundler-consumers", "delivery-size"]) {
+      expect(commands(workflows().ci.jobs[jobName]!)).toContain("bun run browser:install:chromium");
+    }
+
+    const controlledPerformance = workflows().ci.jobs["controlled-performance"]!;
+    expect(controlledPerformance["runs-on"]).toBe("sheetwrite-perf-i9-12900h-cachyos");
+    expect(commands(controlledPerformance)).toContain("bunx playwright install chromium");
+
     const projectByName = Object.fromEntries(
       (playwrightConfig.projects ?? []).map((project) => [project.name, project]),
     );
@@ -163,6 +191,7 @@ describe("CI and release workflow contracts", () => {
       actions: "read",
       contents: "write",
       "id-token": "write",
+      "pull-requests": "write",
     });
     expect(setupStep(publish, "actions/setup-node")?.with?.["node-version"]).toBe(
       WORKFLOW_NODE_VERSION,

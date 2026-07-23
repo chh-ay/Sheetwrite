@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import { CapabilityHero } from "./CapabilityHero.js";
 
 export interface ProofFact {
   label: string;
@@ -64,21 +65,7 @@ export function ProofPage({
     <div className="sw-showcase-frame">
       <SiteTopbar />
       <main className="sw-proofs-page" data-proof={slug}>
-        <header className="sw-proofs-page__hero">
-          <div>
-            <p className="sw-proofs-page__eyebrow">{eyebrow}</p>
-            <h1>{title}</h1>
-            <p className="sw-proofs-page__lede">{description}</p>
-          </div>
-          <dl aria-label="Scenario scope" className="sw-proofs-page__facts">
-            {facts.map((fact) => (
-              <div key={fact.label}>
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </header>
+        <CapabilityHero description={description} eyebrow={eyebrow} facts={facts} title={title} />
 
         <section aria-label={`${title} live scenario`} className="sw-proofs-page__stage">
           <div className="sw-proofs-page__viewport">{children}</div>

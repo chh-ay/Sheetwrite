@@ -9,7 +9,7 @@ Optional explicit WASM source and initialization error callback for adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L79</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L140</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -29,7 +29,7 @@ wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
 <summary><code>onInitializationError</code> <span class="api-member-summary">Called when WASM initialization fails while the adapter is mounted.</span></summary>
 
 ```ts generated
-onInitializationError?: (error: unknown) => void;
+onInitializationError?: (error: SheetwriteError) => void;
 ```
 
 </details>
@@ -43,7 +43,7 @@ onInitializationError?: (error: unknown) => void;
 ```ts generated
 export interface SheetwriteInitializationProps {
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
-  onInitializationError?: (error: unknown) => void;
+  onInitializationError?: (error: SheetwriteError) => void;
 }
 ```
 

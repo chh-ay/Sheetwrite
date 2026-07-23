@@ -1,5 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
-import { LIFECYCLE_CELL } from "../../docs/src/test-fixtures/framework-lifecycle/fixture.js";
+import {
+  LIFECYCLE_CELL,
+  LIFECYCLE_RESET_CELL,
+} from "../../docs/src/test-fixtures/framework-lifecycle/fixture.js";
 import { hasOpaqueForeground } from "./canvas-assertions.js";
 import { siteUrl } from "./playwright.config.js";
 
@@ -43,7 +46,7 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
 }
 
 for (const framework of ["react", "vue", "svelte"] as const) {
-  test(`framework lifecycle: ${framework} falls back, retries, becomes ready, and paints`, {
+  test(`framework lifecycle: ${framework} mounts, resets, destroys, and recovers errors`, {
     tag: "@portability",
   }, async ({ page }) => {
     const errors = collectErrors(page);
@@ -73,6 +76,25 @@ for (const framework of ["react", "vue", "svelte"] as const) {
         message: `${framework} lifecycle fixture did not paint a body cell`,
       })
       .toBe(true);
+
+    await page.locator("[data-lifecycle-reset]").click();
+    await expect(page.locator("[data-lifecycle-ready]")).toHaveText("2:input-reset");
+    await expect
+      .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
+        timeout: 15_000,
+        message: `${framework} lifecycle fixture did not expose its reset cell`,
+      })
+      .toContain(LIFECYCLE_RESET_CELL);
+    await expect
+      .poll(() => canvasBodyPainted(page), {
+        timeout: 15_000,
+        message: `${framework} lifecycle fixture did not repaint after reset`,
+      })
+      .toBe(true);
+
+    await page.locator("[data-lifecycle-unmount]").click();
+    await expect(page.locator(".sheetwrite")).toHaveCount(0);
+    await expect(page.locator(".sheetwrite canvas")).toHaveCount(0);
 
     await page.waitForTimeout(50);
     expect(errors.page).toEqual([]);

@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/wasm",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Sheetwrite columnar store and data engine (Rust/WASM).",
   "license": "MIT",

@@ -102,7 +102,7 @@ describe("canonical artifact consumer graph", () => {
     for (const command of [
       ["bun", "scripts/verify-packed-consumer.ts"],
       ["node", "test/bundler-fixtures/run.mjs"],
-      ["bun", "scripts/size-report.ts", "check", "--reuse-bundlers"],
+      ["bun", "scripts/size-report.ts", "report", "--reuse-bundlers"],
     ] as const) {
       const result = guardedRun(command);
       expect(result.exitCode).not.toBe(0);

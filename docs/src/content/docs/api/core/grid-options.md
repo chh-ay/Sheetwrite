@@ -9,10 +9,10 @@ Workbook, data, rendering, policy, and built-in UI options used to create a Grid
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L254</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L323</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>15</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -79,6 +79,19 @@ can't be constructed, the grid falls back to the main-thread canvas
 renderer and emits `renderer-fallback` once.</p>
 </details>
 
+<details class="api-member" id="grid-options-presentation" data-pagefind-weight="1">
+<summary><code>presentation</code> <span class="api-member-summary">Header presentation. Spreadsheet mode (default) paints positional A/B/C labels; data-grid mode paints each column's semantic header.</span></summary>
+
+```ts generated
+presentation?: GridPresentation;
+```
+
+<p class="api-member-doc">Header presentation. Spreadsheet mode (default) paints positional A/B/C
+labels; data-grid mode paints each column's semantic `header`. Cell
+addressing, row indices, clipboard values, formulas, and exports are
+unchanged in both modes.</p>
+</details>
+
 <details class="api-member" id="grid-options-theme" data-pagefind-weight="1">
 <summary><code>theme</code> <span class="api-member-summary">Overrides merged over the default theme and host CSS custom properties.</span></summary>
 
@@ -95,6 +108,18 @@ theme?: Partial<Theme>;
 readOnly?: boolean;
 ```
 
+</details>
+
+<details class="api-member" id="grid-options-hyperlink-activation" data-pagefind-weight="1">
+<summary><code>hyperlinkActivation</code> <span class="api-member-summary">Hyperlink activation never opens a browser URL.</span></summary>
+
+```ts generated
+hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
+```
+
+<p class="api-member-doc">Hyperlink activation never opens a browser URL. `event-only` (default)
+emits a safe resolved target; `internal-navigation` additionally moves to
+stable internal destinations; `disabled` rejects every activation request.</p>
 </details>
 
 <details class="api-member" id="grid-options-protection-resolver" data-pagefind-weight="1">
@@ -135,13 +160,24 @@ renderers?: Record<string, CellRenderer>;
 
 </details>
 
+<details class="api-member" id="grid-options-editors" data-pagefind-weight="1">
+<summary><code>editors</code> <span class="api-member-summary">Named custom editors resolved from each column's editor field.</span></summary>
+
+```ts generated
+editors?: Record<string, CellEditor>;
+```
+
+</details>
+
 <details class="api-member" id="grid-options-overscan" data-pagefind-weight="1">
-<summary><code>overscan</code> <span class="api-member-summary">Rows rendered above/below the viewport to absorb fast scrolls.</span></summary>
+<summary><code>overscan</code> <span class="api-member-summary">Extra row and visible-column positions painted on each viewport edge.</span></summary>
 
 ```ts generated
 overscan?: number;
 ```
 
+<p class="api-member-doc">Extra row and visible-column positions painted on each viewport edge.
+Defaults to 6; use 0 to disable the buffer.</p>
 </details>
 
 <details class="api-member" id="grid-options-min-columns" data-pagefind-weight="1">
@@ -176,12 +212,15 @@ export interface GridOptions {
   datasourceStorage?: DataSourceStorageOptions;
   renderer?: "canvas" | "worker";
   workerUrl?: string | URL;
+  presentation?: GridPresentation;
   theme?: Partial<Theme>;
   readOnly?: boolean;
+  hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
   protectionResolver?: ProtectionResolver;
   mutationPolicy?: MutationPolicyMode;
   transactionResourceLimits?: Partial<TransactionResourceLimits>;
   renderers?: Record<string, CellRenderer>;
+  editors?: Record<string, CellEditor>;
   overscan?: number;
   minColumns?: number;
   config?: GridConfig;

@@ -9,10 +9,10 @@ Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L79</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L103</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>51</span>
+## Members <span class="api-count" data-pagefind-ignore>59</span>
 
 <div class="api-member-list">
 
@@ -26,10 +26,10 @@ constructor(workbook: Workbook, data?: ColumnarData, options?: SheetwriteStoreOp
 </details>
 
 <details class="api-member" id="sheetwrite-store-acknowledge-operations" data-pagefind-weight="1">
-<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release paged dirty pins after server acknowledgement.</span></summary>
+<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release sparse paged edits after server acknowledgement.</span></summary>
 
 ```ts generated
-acknowledgeOperations: (operations: readonly DocumentOp[]) => void;
+acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: bigint) => void;
 ```
 
 </details>
@@ -55,6 +55,15 @@ applyTransaction: (tx: Transaction, reasonOrOptions?: CommitReason | Transaction
 This bypasses Grid read-only checks and Grid undo/redo history. Use
 `Grid.applyTransaction` for normal host-driven edits.
 Queued and flushed at a barrier — never reentrant.</p>
+</details>
+
+<details class="api-member" id="sheetwrite-store-are-columns-fully-loaded" data-pagefind-weight="1">
+<summary><code>areColumnsFullyLoaded</code></summary>
+
+```ts generated
+areColumnsFullyLoaded: (sheet: SheetId, startRow: number, endRow: number, columns: readonly number[]) => boolean;
+```
+
 </details>
 
 <details class="api-member" id="sheetwrite-store-can-apply-locally" data-pagefind-weight="1">
@@ -209,6 +218,15 @@ getFormula: (addr: CellAddress) => string | null;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-get-formula-matrix-resource-peak" data-pagefind-weight="1">
+<summary><code>getFormulaMatrixResourcePeak</code></summary>
+
+```ts generated
+getFormulaMatrixResourcePeak: () => TransientResourcePeak;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-get-paged-stats" data-pagefind-weight="1">
 <summary><code>getPagedStats</code></summary>
 
@@ -232,6 +250,24 @@ getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
 
 ```ts generated
 getRefTarget: (addr: CellAddress) => CellAddress | null;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-runtime-resource-snapshot" data-pagefind-weight="1">
+<summary><code>getRuntimeResourceSnapshot</code></summary>
+
+```ts generated
+getRuntimeResourceSnapshot: (operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation) => RuntimeResourceSnapshot;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-get-spill-anchor" data-pagefind-weight="1">
+<summary><code>getSpillAnchor</code> <span class="api-member-summary">Owning dynamic-array formula cell, or null when addr is not spilled.</span></summary>
+
+```ts generated
+getSpillAnchor: (addr: CellAddress) => CellAddress | null;
 ```
 
 </details>
@@ -308,11 +344,11 @@ isRangeFullyLoaded: (input: Range) => boolean;
 
 </details>
 
-<details class="api-member" id="sheetwrite-store-load-rows" data-pagefind-weight="1">
-<summary><code>loadRows</code></summary>
+<details class="api-member" id="sheetwrite-store-load-page" data-pagefind-weight="1">
+<summary><code>loadPage</code></summary>
 
 ```ts generated
-loadRows: (sheet: SheetId, start: number, rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void;
+loadPage: (sheet: SheetId, start: number, columns: readonly DataSourceColumnBand[], rows: readonly RowData[], protect?: (addr: CellAddress) => boolean) => void;
 ```
 
 </details>
@@ -364,11 +400,29 @@ renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-reset-formula-matrix-resource-peak" data-pagefind-weight="1">
+<summary><code>resetFormulaMatrixResourcePeak</code></summary>
+
+```ts generated
+resetFormulaMatrixResourcePeak: () => void;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-reset-range-mutation-allocation-stats" data-pagefind-weight="1">
 <summary><code>resetRangeMutationAllocationStats</code></summary>
 
 ```ts generated
 resetRangeMutationAllocationStats: () => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-reset-runtime-resource-accounting" data-pagefind-weight="1">
+<summary><code>resetRuntimeResourceAccounting</code></summary>
+
+```ts generated
+resetRuntimeResourceAccounting: () => void;
 ```
 
 </details>
@@ -405,6 +459,15 @@ searchCellsFlat: (sheet: SheetId, query: string, opts?: { matchCase?: boolean; w
 
 ```ts generated
 setColumnFilter: (sheet: SheetId, col: number, filter: ColumnFilter | null) => void;
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-store-set-detailed-change-capture" data-pagefind-weight="1">
+<summary><code>setDetailedChangeCapture</code> <span class="api-member-summary">Opt in to per-cell before/after capture for packed and clear operations.</span></summary>
+
+```ts generated
+setDetailedChangeCapture: (enabled: boolean) => void;
 ```
 
 </details>
@@ -483,6 +546,15 @@ viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
 
 </details>
 
+<details class="api-member" id="sheetwrite-store-with-resource-operation" data-pagefind-weight="1">
+<summary><code>withResourceOperation</code></summary>
+
+```ts generated
+withResourceOperation: <T>(operation: RuntimeResourceOperation, run: () => T) => T;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-store-from-snapshot" data-pagefind-weight="1">
 <summary><code>fromSnapshot</code></summary>
 
@@ -505,12 +577,21 @@ class SheetwriteStore implements Store {
     data?: ColumnarData,
     options?: SheetwriteStoreOptions,
   );
-  acknowledgeOperations: (operations: readonly DocumentOp[]) => void;
+  acknowledgeOperations: (
+    operations: readonly DocumentOp[],
+    storageRevision?: bigint,
+  ) => void;
   aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number;
   applyTransaction: (
     tx: Transaction,
     reasonOrOptions?: CommitReason | TransactionApplicationOptions,
   ) => ApplyTransactionResult;
+  areColumnsFullyLoaded: (
+    sheet: SheetId,
+    startRow: number,
+    endRow: number,
+    columns: readonly number[],
+  ) => boolean;
   canApplyLocally: (patch: DocumentOp) => boolean;
   captureRangeHistory: (input: Range) => CompactRangeHistory | null;
   clearView: (sheet: SheetId) => void;
@@ -551,9 +632,16 @@ class SheetwriteStore implements Store {
     cols: readonly number[],
   ) => VisibleWindowView;
   getFormula: (addr: CellAddress) => string | null;
+  getFormulaMatrixResourcePeak: () => TransientResourcePeak;
   getPagedStats: (sheet: SheetId) => PagedStoreStats;
   getRangeMutationAllocationStats: () => RangeMutationAllocationStats;
   getRefTarget: (addr: CellAddress) => CellAddress | null;
+  getRuntimeResourceSnapshot: (
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ) => RuntimeResourceSnapshot;
+  getSpillAnchor: (addr: CellAddress) => CellAddress | null;
   getVisibleWindow: (
     sheet: SheetId,
     rows: {
@@ -569,9 +657,10 @@ class SheetwriteStore implements Store {
   hideRows: (sheet: SheetId, rows: readonly number[]) => void;
   isPaged: (sheet: SheetId) => boolean;
   isRangeFullyLoaded: (input: Range) => boolean;
-  loadRows: (
+  loadPage: (
     sheet: SheetId,
     start: number,
+    columns: readonly DataSourceColumnBand[],
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ) => void;
@@ -580,7 +669,9 @@ class SheetwriteStore implements Store {
   recalculateVolatile: (now?: Date) => void;
   removeSheetFormulaIdentity: (sheet: SheetId) => boolean;
   renameSheetFormulaIdentity: (sheet: SheetId, name: string) => boolean;
+  resetFormulaMatrixResourcePeak: () => void;
   resetRangeMutationAllocationStats: () => void;
+  resetRuntimeResourceAccounting: () => void;
   rowGroups: (sheet: SheetId) => readonly RowGroup[];
   searchCells: (
     sheet: SheetId,
@@ -605,6 +696,7 @@ class SheetwriteStore implements Store {
     col: number,
     filter: ColumnFilter | null,
   ) => void;
+  setDetailedChangeCapture: (enabled: boolean) => void;
   setGroupCollapsed: (
     sheet: SheetId,
     start: number,
@@ -620,6 +712,10 @@ class SheetwriteStore implements Store {
   ungroupRows: (sheet: SheetId, start: number, end: number) => void;
   viewRowCount: (sheet: SheetId) => number;
   viewRowOf: (sheet: SheetId, dataRow: number) => number | null;
+  withResourceOperation: <T>(
+    operation: RuntimeResourceOperation,
+    run: () => T,
+  ) => T;
   static fromSnapshot: (
     input: unknown,
     options?: SheetwriteStoreOptions,

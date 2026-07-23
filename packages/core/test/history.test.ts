@@ -58,6 +58,7 @@ describe("UndoManager rejection recovery", () => {
             start: { row: 0, col: 0 },
             end: { row: 0, col: 0 },
           },
+          byteLength: 13,
           toPatch: (range) => ({
             op: "setBlock",
             range,
@@ -70,7 +71,19 @@ describe("UndoManager rejection recovery", () => {
       ],
       [setOperation],
     );
+    expect(history.getResourceStats()).toEqual({
+      undoEntries: 1,
+      redoEntries: 0,
+      retainedSnapshots: 1,
+      retainedSnapshotBytes: 13,
+    });
     history.clear();
     expect(disposals).toBe(1);
+    expect(history.getResourceStats()).toEqual({
+      undoEntries: 0,
+      redoEntries: 0,
+      retainedSnapshots: 0,
+      retainedSnapshotBytes: 0,
+    });
   });
 });

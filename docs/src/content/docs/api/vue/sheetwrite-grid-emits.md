@@ -9,12 +9,21 @@ Event payloads emitted by the Vue components, keyed by template event name.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L102</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L121</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>9</span>
+## Members <span class="api-count" data-pagefind-ignore>15</span>
 
 <div class="api-member-list">
+
+<details class="api-member" id="sheetwrite-grid-emits-row-delta" data-pagefind-weight="1">
+<summary><code>row-delta</code> <span class="api-member-summary">Projected host-row changes.</span></summary>
+
+```ts generated
+"row-delta": Parameters<RowBridgeHandler<Id>>[0];
+```
+
+</details>
 
 <details class="api-member" id="sheetwrite-grid-emits-grid-change" data-pagefind-weight="1">
 <summary><code>grid-change</code> <span class="api-member-summary">Committed Grid change, including its applied transaction.</span></summary>
@@ -70,11 +79,56 @@ search: GridEvents["search"];
 
 </details>
 
+<details class="api-member" id="sheetwrite-grid-emits-command-state-change" data-pagefind-weight="1">
+<summary><code>command-state-change</code> <span class="api-member-summary">Command availability or formatting activity changed.</span></summary>
+
+```ts generated
+"command-state-change": GridEvents["command-state-change"];
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-grid-emits-active-sheet-change" data-pagefind-weight="1">
 <summary><code>active-sheet-change</code> <span class="api-member-summary">The visible sheet changed.</span></summary>
 
 ```ts generated
 "active-sheet-change": GridEvents["active-sheet"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-emits-mutation-rejected" data-pagefind-weight="1">
+<summary><code>mutation-rejected</code> <span class="api-member-summary">A Grid mutation was rejected.</span></summary>
+
+```ts generated
+"mutation-rejected": GridEvents["mutation-rejected"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-emits-renderer-fallback" data-pagefind-weight="1">
+<summary><code>renderer-fallback</code> <span class="api-member-summary">Worker rendering fell back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+"renderer-fallback": GridEvents["renderer-fallback"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-emits-datasource-error" data-pagefind-weight="1">
+<summary><code>datasource-error</code> <span class="api-member-summary">A datasource request failed.</span></summary>
+
+```ts generated
+"datasource-error": GridEvents["datasource-error"];
+```
+
+</details>
+
+<details class="api-member" id="sheetwrite-grid-emits-export-error" data-pagefind-weight="1">
+<summary><code>export-error</code> <span class="api-member-summary">A built-in XLSX export action failed.</span></summary>
+
+```ts generated
+"export-error": GridEvents["export-error"];
 ```
 
 </details>
@@ -92,7 +146,7 @@ ready: GridReadyEvent;
 <summary><code>initialization-error</code> <span class="api-member-summary">WASM initialization failed while the component stayed mounted.</span></summary>
 
 ```ts generated
-"initialization-error": unknown;
+"initialization-error": SheetwriteError;
 ```
 
 </details>
@@ -104,16 +158,22 @@ ready: GridReadyEvent;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface SheetwriteGridEmits {
+export interface SheetwriteGridEmits<Id extends RowBridgeId = RowBridgeId> {
+  "row-delta": Parameters<RowBridgeHandler<Id>>[0];
   "grid-change": ChangeEvent;
   "selection-change": Selection | null;
   "viewport-change": GridEvents["scroll"];
   "edit-begin": GridEvents["edit-begin"];
   "edit-commit": GridEvents["edit-commit"];
   search: GridEvents["search"];
+  "command-state-change": GridEvents["command-state-change"];
   "active-sheet-change": GridEvents["active-sheet"];
+  "mutation-rejected": GridEvents["mutation-rejected"];
+  "renderer-fallback": GridEvents["renderer-fallback"];
+  "datasource-error": GridEvents["datasource-error"];
+  "export-error": GridEvents["export-error"];
   ready: GridReadyEvent;
-  "initialization-error": unknown;
+  "initialization-error": SheetwriteError;
 }
 ```
 

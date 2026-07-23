@@ -16,12 +16,37 @@ import {
   collectMissingCapabilityFiles,
 } from "../docs/src/showcases/capability-validation.js";
 import {
+  COMPATIBILITY_FIXTURES,
+  COMPATIBILITY_INVENTORY,
+  type CompatibilityFixture,
+  type CompatibilityRecord,
+} from "../docs/src/showcases/compatibility.js";
+import {
+  buildCompatibilityResults,
+  type CompatibilityResults,
+} from "../docs/src/showcases/compatibility-results.js";
+import {
+  collectCompatibilityIssues,
+  collectMissingCompatibilityFiles,
+} from "../docs/src/showcases/compatibility-validation.js";
+import { compareReviewedObservation } from "./conformance/compare.js";
+import { loadCorpus } from "./conformance/corpus.js";
+import { readConformanceManifest } from "./conformance/generate.js";
+import { runOffline } from "./conformance/offline.js";
+import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
+import {
   type ApiEntryPoint,
   type ApiExport,
   type ApiPackage,
   analyzePublicApi,
   type PublicApiManifest,
 } from "./public-api.js";
+import {
+  formatMetricDelta,
+  formatMetricDisplay,
+  type SizeHistory,
+  validateSizeHistory,
+} from "./size-report.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const contentRoot = join(repositoryRoot, "docs/src/content/docs");
@@ -93,12 +118,15 @@ export const ADAPTER_DOC_CONTRACT = {
     "data",
     "datasource",
     "datasourceStorage",
+    "presentation",
+    "editors",
     "renderer",
     "workerUrl",
     "renderers",
     "protectionResolver",
     "mutationPolicy",
     "transactionResourceLimits",
+    "hyperlinkActivation",
     "theme",
     "readOnly",
     "config",
@@ -114,6 +142,7 @@ export const ADAPTER_DOC_CONTRACT = {
     "onEditCommit",
     "onSearch",
     "onActiveSheetChange",
+    "onCommandStateChange",
     "onReady",
     "onInitializationError",
   ],
@@ -125,6 +154,7 @@ export const ADAPTER_DOC_CONTRACT = {
     "edit-commit",
     "search",
     "active-sheet-change",
+    "command-state-change",
     "ready",
     "initialization-error",
   ],
@@ -259,6 +289,34 @@ async function exists(path: string): Promise<boolean> {
 
 function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+let compatibilityResultsPromise: Promise<CompatibilityResults> | undefined;
+
+function compatibilityResults(): Promise<CompatibilityResults> {
+  compatibilityResultsPromise ??= (async () => {
+    const testDirectory = join(repositoryRoot, "test/conformance");
+    const paths = {
+      manifest: join(testDirectory, "corpus.manifest.json"),
+      inventory: join(testDirectory, "formula-contract.inventory.json"),
+      captures: join(repositoryRoot, "scripts/conformance/captures"),
+    };
+    const [corpus, manifest, packageJson] = await Promise.all([
+      loadCorpus(join(testDirectory, "corpus.json"), paths),
+      readConformanceManifest(paths.manifest),
+      readFile(join(repositoryRoot, "packages/core/package.json"), "utf8").then(
+        (content) => JSON.parse(content) as { version: string },
+      ),
+    ]);
+    const offline = await runOffline(corpus, paths);
+    return buildCompatibilityResults({
+      corpus,
+      manifest,
+      offline,
+      libraryVersion: packageJson.version,
+      compareObservation: compareReviewedObservation,
+    });
+  })();
+  return compatibilityResultsPromise;
 }
 
 export function entrySlug(packageName: string, subpath: string): string {
@@ -1000,25 +1058,6 @@ function validateFormulaArtifact(value: Record<string, unknown>): FormulaEvidenc
   return artifact as FormulaEvidence;
 }
 
-interface SizeEvidence {
-  schemaVersion: number;
-  meta: CaptureMeta;
-  metrics: Record<string, { actual: number; unit: string }>;
-  packages: Array<{ name: string; tarballBytes: number; unpackedBytes: number }>;
-}
-
-function validateSizeArtifact(value: Record<string, unknown>): SizeEvidence | string {
-  const artifact = value as unknown as Partial<SizeEvidence>;
-  if (!Number.isInteger(artifact.schemaVersion)) return "artifact lacks a size schema version";
-  if (!Array.isArray(artifact.packages) || artifact.packages.length === 0) {
-    return "artifact carries no package reports";
-  }
-  if (artifact.metrics === undefined || typeof artifact.metrics !== "object") {
-    return "artifact carries no metrics map";
-  }
-  return artifact as SizeEvidence;
-}
-
 const BENCH_SIZES = [1_000, 10_000, 100_000, 1_000_000] as const;
 const BENCH_ENGINE_LABELS = { sheetwrite: "Sheetwrite", handsontable: "Handsontable" } as const;
 type BenchEngine = keyof typeof BENCH_ENGINE_LABELS;
@@ -1450,7 +1489,7 @@ export function runCompletionSummary(results: ReadonlyArray<{ status: string }>)
   return { successes, total: results.length, failures: results.length - successes };
 }
 
-async function renderEvidencePage(): Promise<string> {
+export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Promise<string> {
   const scale = await loadEvidence(
     "bench/results/render-scale.json",
     "bun run --filter @sheetwrite/bench bench:render:scale",
@@ -1466,11 +1505,11 @@ async function renderEvidencePage(): Promise<string> {
     "bun run --filter @sheetwrite/bench bench:formula",
     validateFormulaArtifact,
   );
-  const sizeReport = await loadEvidence(
-    "test-results/delivery-size/size-report.json",
-    "bun run size:report",
-    validateSizeArtifact,
-  );
+  const sizeHistory =
+    sizeHistoryOverride ??
+    validateSizeHistory(
+      JSON.parse(await readFile(resolve(repositoryRoot, "scripts/size-history.json"), "utf8")),
+    );
   const pending: EvidenceState[] = [];
   const lines = [
     frontmatter(
@@ -1479,7 +1518,20 @@ async function renderEvidencePage(): Promise<string> {
     ).trimEnd(),
     "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.",
     "",
-    "## Render benchmark: Sheetwrite vs Handsontable",
+    "## Matched regression gate",
+    "",
+    "The release gate does not treat a competitor comparison or a smoke ceiling as regression evidence. On the controlled performance runner it captures ten fresh matched rounds, retains every raw sample, and compares the fresh artifact with the committed baseline. Any unapproved slowdown fails the required CI job.",
+    "",
+    '```sh verify title="Zero-regression benchmark"',
+    "bun run --filter @sheetwrite/bench bench:render:prepare",
+    "cd bench",
+    "bun run src/render-driver.ts --rounds 10 --output results/render-fresh.json --markdown-output results/render-fresh.md",
+    "bun run src/check.ts --baseline results/render-baseline.json --fresh results/render-fresh.json --power-mode balanced --concurrency 1",
+    "```",
+    "",
+    "A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.",
+    "",
+    "## Render benchmark",
     "",
   ];
   if ("evidence" in scale) {
@@ -1513,6 +1565,20 @@ async function renderEvidencePage(): Promise<string> {
   } else {
     pending.push(scale);
   }
+  lines.push(
+    "## Runtime resource ownership",
+    "",
+    "The performance showcase at `/showcases/performance#resource-ownership` renders the public [`RuntimeResourceSnapshot`](/docs/api/core/runtime-resource-snapshot/) protocol directly. It keeps exclusive-owner logical bytes, allocated capacity, WASM committed pages, and independent browser runtime observations in separate buckets; committed pages are never summed into live payload. Bulk-edit before/settled deltas use [`diffRuntimeResourcePhases`](/docs/api/core/diff-runtime-resource-phases/) and omit unchanged owners.",
+    "",
+    "The UI and this reference share [`RUNTIME_RESOURCE_SCHEMA_VERSION`](/docs/api/core/runtime-resource-schema-version/). Detailed peak phases remain in the validated benchmark artifact rather than being presented as measurements from the visitor's browser.",
+    "",
+    "Reproduce and validate the full owner/operation matrix with:",
+    "",
+    '```sh verify title="Runtime resource evidence"',
+    "bun run --filter @sheetwrite/bench bench:resource",
+    "```",
+    "",
+  );
   lines.push("## Data engine benchmark", "");
   if ("evidence" in data) {
     const { evidence, source } = data;
@@ -1684,40 +1750,85 @@ async function renderEvidencePage(): Promise<string> {
     pending.push(formula);
   }
   lines.push("## Delivery size", "");
-  if ("evidence" in sizeReport) {
-    const { evidence, source } = sizeReport;
-    lines.push(
-      '<div class="evidence-available"><strong>Validated evidence.</strong> Package tarball and bundler-output sizes, gated by absolute budgets in CI.</div>',
-      "",
-      '<dl class="bench-meta" data-pagefind-ignore>',
-      `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
-      `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
-      "</dl>",
-      "",
-      "| Package | Tarball | Unpacked |",
-      "| --- | ---: | ---: |",
+  const latestRelease = sizeHistory.releases.at(-1);
+  if (latestRelease !== undefined) {
+    const packageMetricKeys = Object.keys(latestRelease.metrics).filter((name) =>
+      name.endsWith(".tarballBytes"),
     );
-    for (const pkg of evidence.packages) {
+    lines.push(
+      '<section class="size-history" aria-label="Published package size history">',
+      '<p class="size-history__intro">Registry measurements for every published release. Each delta is measured against the release immediately before it.</p>',
+    );
+    for (let index = sizeHistory.releases.length - 1; index >= 0; index -= 1) {
+      const release = sizeHistory.releases[index];
+      if (release === undefined) continue;
+      const previous = sizeHistory.releases[index - 1];
+      const releaseDate =
+        release.capturedAt === undefined
+          ? "Date not recorded"
+          : new Intl.DateTimeFormat("en", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              timeZone: "UTC",
+            }).format(new Date(release.capturedAt));
+      const versionStep =
+        previous === undefined
+          ? `<strong>v${release.version}</strong>`
+          : `<span>v${previous.version}</span><svg class="size-history__arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M9 4.5 12.5 8 9 11.5"/></svg><strong>v${release.version}</strong>`;
       lines.push(
-        `| \`${pkg.name}\` | ${(pkg.tarballBytes / 1024).toFixed(1)} KiB | ${(pkg.unpackedBytes / 1024).toFixed(1)} KiB |`,
+        `<details class="size-history__release"${index === sizeHistory.releases.length - 1 ? ' data-current="true" open' : ""}>`,
+        '<summary class="size-history__release-head">',
+        `<span class="size-history__version-step">${versionStep}</span>`,
+        `<time${release.capturedAt === undefined ? "" : ` datetime="${release.capturedAt}"`}>${release.capturedAt === undefined ? releaseDate : `Measured ${releaseDate}`}</time>`,
+        '<svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>',
+        "</summary>",
+        '<div class="size-history__table-wrap">',
+        '<table class="size-history__table">',
+        '<thead><tr><th scope="col">Package</th><th scope="col">Tarball</th><th scope="col">Installed</th></tr></thead>',
+        "<tbody>",
       );
+      for (const key of packageMetricKeys) {
+        const packageName = key.slice("package.".length, -".tarballBytes".length);
+        const unpackedKey = `package.${packageName}.unpackedBytes`;
+        const tarball = release.metrics[key];
+        const unpacked = release.metrics[unpackedKey];
+        if (!tarball || !unpacked) continue;
+        const previousTarball = previous?.metrics[key];
+        const previousUnpacked = previous?.metrics[unpackedKey];
+        const tarballChange =
+          previousTarball === undefined ? undefined : formatMetricDelta(tarball, previousTarball);
+        const unpackedChange =
+          previousUnpacked === undefined
+            ? undefined
+            : formatMetricDelta(unpacked, previousUnpacked);
+        const tarballDirection =
+          previousTarball === undefined || tarball.actual === previousTarball.actual
+            ? "flat"
+            : tarball.actual > previousTarball.actual
+              ? "increase"
+              : "decrease";
+        const unpackedDirection =
+          previousUnpacked === undefined || unpacked.actual === previousUnpacked.actual
+            ? "flat"
+            : unpacked.actual > previousUnpacked.actual
+              ? "increase"
+              : "decrease";
+        lines.push(
+          "<tr>",
+          `<th scope="row"><code>${packageName}</code></th>`,
+          `<td>${formatMetricDisplay(tarball).join(" ")}${tarballChange ? `<small data-direction="${tarballDirection}"><span>${tarballChange[0]}</span><span>${tarballChange[1]}</span></small>` : ""}</td>`,
+          `<td>${formatMetricDisplay(unpacked).join(" ")}${unpackedChange ? `<small data-direction="${unpackedDirection}"><span>${unpackedChange[0]}</span><span>${unpackedChange[1]}</span></small>` : ""}</td>`,
+          "</tr>",
+        );
+      }
+      lines.push("</tbody>", "</table>", "</div>", "</details>");
     }
-    const coreGzip = evidence.metrics["bundler.vite.coreInitial.javascript.gzipBytes"];
-    const coreWasm = evidence.metrics["package.@sheetwrite/core.wasmBytes"];
     lines.push(
-      "",
-      `A minimal Vite app that renders a grid ships ${coreGzip ? `${(coreGzip.actual / 1024).toFixed(1)} KiB of gzipped JavaScript` : "the core entry"}${coreWasm && coreWasm.actual > 0 ? ` plus a ${(coreWasm.actual / 1024).toFixed(0)} KiB WASM data engine` : ""}.`,
-      "",
-      "Reproduce with:",
-      "",
-      '```sh verify title="Delivery size evidence"',
-      "bun run size:report",
-      "```",
+      '<footer class="size-history__footer"><span>Increase</span><span>Decrease</span><code>scripts/size-history.json</code></footer>',
+      "</section>",
       "",
     );
-  } else {
-    pending.push(sizeReport);
   }
   if (pending.length > 0) {
     lines.push(
@@ -1736,7 +1847,144 @@ async function renderEvidencePage(): Promise<string> {
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
+function compatibilityCell(value: string): string {
+  return value.replaceAll("|", "\\|").replaceAll("\n", " ").trim();
+}
+
+function compatibilitySource(source: string): string {
+  return source.startsWith("https://")
+    ? `[spec/source](${source})`
+    : `[checked source file](https://github.com/chh-ay/sheetwrite/blob/main/${source})`;
+}
+
+function publicCompatibilitySource(source: string): string {
+  return source.startsWith("https://") ? source : "/docs/reference/compatibility-results/#sources";
+}
+
+export function renderCompatibilityResults(
+  records: readonly CompatibilityRecord[] = COMPATIBILITY_INVENTORY,
+  fixtures: readonly CompatibilityFixture[] = COMPATIBILITY_FIXTURES,
+): string {
+  const lines = [
+    "---",
+    'title: "Detailed compatibility results"',
+    'description: "Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits."',
+    "---",
+    "",
+    "# Detailed compatibility results",
+    "",
+    "This page is generated from checked examples and evidence records. It states only what each named result proves; it is not a percentage or a blanket Excel, Google Sheets, LibreOffice, or OpenFormula compatibility claim.",
+    "",
+    "Result labels distinguish **evaluated** formulas or structures, **preserved** source or metadata, deliberately **flattened** interchange, explicit **warning** boundaries, and **unsupported** behavior.",
+    "",
+    '<section class="compat-results" aria-label="Checked compatibility results">',
+    ...records.flatMap((record) => {
+      const evidence = `${record.fixtureIds.length} checked evidence ${record.fixtureIds.length === 1 ? "record" : "records"}`;
+      return [
+        '<details class="compat-result">',
+        '<summary class="compat-result__summary">',
+        `<span class="compat-result__title">${html(record.label)}</span>`,
+        '<span class="compat-result__meta">',
+        `<code>${html(record.area)}</code>`,
+        `<code>${html(record.dialect)}</code>`,
+        `<span data-status="${record.status}">${record.status}</span>`,
+        "</span>",
+        '<svg class="compat-result__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>',
+        "</summary>",
+        '<div class="compat-result__body">',
+        "<dl>",
+        `<div><dt>Result</dt><dd>${html(record.resultMode)}</dd></div>`,
+        `<div><dt>Import</dt><dd>${html(record.importBehavior)}</dd></div>`,
+        `<div><dt>Export</dt><dd>${html(record.exportBehavior)}</dd></div>`,
+        `<div><dt>Known boundary</dt><dd>${html(record.divergence)}</dd></div>`,
+        `<div><dt>Evidence</dt><dd>${evidence}</dd></div>`,
+        "</dl>",
+        `<a href="/showcases/interoperability/?compatibility=${encodeURIComponent(record.id)}">Open the checked interactive result</a>`,
+        "</div>",
+        "</details>",
+      ];
+    }),
+    "</section>",
+    "",
+    "## Warning boundaries",
+    "",
+    "| Feature | Warning code | Meaning |",
+    "| --- | --- | --- |",
+    ...records
+      .filter((record) => record.warningCode !== null)
+      .map(
+        (record) =>
+          `| ${compatibilityCell(record.label)} | \`${record.warningCode}\` | ${compatibilityCell(record.semantics)} |`,
+      ),
+    "",
+    "<details>",
+    "<summary>Technical evidence file details and checksums</summary>",
+    "",
+    '<div class="compat-evidence-files">',
+    ...fixtures.flatMap((fixture) => [
+      '<article class="compat-evidence-file">',
+      "<header>",
+      `<code>${html(fixture.id)}</code>`,
+      `<span>${html(fixture.kind)}</span>`,
+      "</header>",
+      `<p>${html(`${fixture.producer} ${fixture.producerVersion}`)}</p>`,
+      "<dl>",
+      `<div><dt>Source</dt><dd>${html(fixture.provenance)}</dd></div>`,
+      `<div><dt>SHA-256</dt><dd><code>${fixture.sha256 ? html(fixture.sha256) : "source-controlled test or manifest"}</code></dd></div>`,
+      `<div><dt>Checked result</dt><dd>${html(fixture.expected.join("; "))}</dd></div>`,
+      `<div><dt>Warnings</dt><dd>${html(fixture.expectedWarnings.join("; ") || "none")}</dd></div>`,
+      "</dl>",
+      "</article>",
+    ]),
+    "</div>",
+    "",
+    "</details>",
+    "",
+    "## Exact sources",
+    "",
+    ...records.map(
+      (record) => `- ${compatibilityCell(record.label)}: ${compatibilitySource(record.source)}`,
+    ),
+    "",
+  ];
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+export async function collectCompatibilityDigestIssues(
+  root: string = repositoryRoot,
+  fixtures: readonly CompatibilityFixture[] = COMPATIBILITY_FIXTURES,
+): Promise<string[]> {
+  const issues: string[] = [];
+  for (const fixture of fixtures) {
+    if (!fixture.sha256) continue;
+    try {
+      const bytes = await readFile(join(root, fixture.path));
+      const actual = createHash("sha256").update(bytes).digest("hex");
+      if (actual !== fixture.sha256) {
+        issues.push(
+          `compatibility fixture digest mismatch: ${fixture.id} expected=${fixture.sha256} actual=${actual}`,
+        );
+      }
+    } catch {
+      issues.push(`missing compatibility fixture for digest: ${fixture.path}`);
+    }
+  }
+  return issues;
+}
+
 export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promise<ExpectedFile[]> {
+  const compatibilityIssues = [
+    ...collectCompatibilityIssues(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES),
+    ...collectMissingCompatibilityFiles(COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES, (path) =>
+      existsSync(join(repositoryRoot, path)),
+    ),
+    ...(await collectCompatibilityDigestIssues()),
+  ];
+  if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
+  const [formulaInventory, publishedCompatibilityResults] = await Promise.all([
+    loadFormulaContractInventory(repositoryRoot),
+    compatibilityResults(),
+  ]);
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
@@ -1780,6 +2028,12 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     exportCount,
     symbolPageCount: exportCount,
     apiSha256: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
+    compatibilitySha256: createHash("sha256")
+      .update(JSON.stringify([COMPATIBILITY_INVENTORY, COMPATIBILITY_FIXTURES]))
+      .digest("hex"),
+    formulaContractSha256: createHash("sha256")
+      .update(JSON.stringify(formulaInventory))
+      .digest("hex"),
   };
   return [
     ...apiFiles,
@@ -1790,6 +2044,29 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     {
       path: join(contentRoot, "reference/moved-guides.md"),
       content: renderMovedGuides(),
+    },
+    {
+      path: join(contentRoot, "reference/compatibility-results.md"),
+      content: renderCompatibilityResults(),
+    },
+    {
+      path: join(contentRoot, "reference/formula-functions.md"),
+      content: renderFormulaFunctionContract(formulaInventory),
+    },
+    {
+      path: join(generatedDataRoot, "compatibility.json"),
+      content: stableJson({
+        schemaVersion: 1,
+        records: COMPATIBILITY_INVENTORY.map(({ evidence: _evidence, source, ...record }) => ({
+          ...record,
+          source: publicCompatibilitySource(source),
+        })),
+        fixtures: COMPATIBILITY_FIXTURES.map(({ path: _path, ...fixture }) => fixture),
+      }),
+    },
+    {
+      path: join(generatedDataRoot, "compatibility-results.json"),
+      content: stableJson(publishedCompatibilityResults),
     },
     {
       path: join(contentRoot, "guides/performance-resources.md"),
@@ -2159,18 +2436,17 @@ async function validateMarkdown(
         continue;
       }
       const [targetWithoutFragment = "", fragment] = rawTarget.split("#", 2);
+      const [targetRoute = ""] = targetWithoutFragment.split("?", 1);
       let targetPath: string | undefined;
-      if (targetWithoutFragment === "") targetPath = document.path;
-      else if (targetWithoutFragment.startsWith("/docs/")) {
-        targetPath = contentPathForRoute(targetWithoutFragment, documents);
-      } else if (/^\/(?:vanilla|react|vue|svelte)\/?$/.test(targetWithoutFragment)) {
-        targetPath = join(
-          repositoryRoot,
-          `docs/src/routes/${targetWithoutFragment.replace(/^\//, "").replace(/\/$/, "")}.tsx`,
-        );
-      } else if (targetWithoutFragment.startsWith("/")) {
+      if (targetRoute === "") targetPath = document.path;
+      else if (targetRoute.startsWith("/docs/")) {
+        targetPath = contentPathForRoute(targetRoute, documents);
+      } else if (targetRoute.startsWith("/") && !targetRoute.includes("..")) {
+        const routeSlug = targetRoute.replace(/^\//, "").replace(/\/$/, "").replaceAll("/", ".");
+        targetPath = join(repositoryRoot, `docs/src/routes/${routeSlug || "index"}.tsx`);
+      } else if (targetRoute.startsWith("/")) {
         failures.push(
-          `${posix(relative(repositoryRoot, document.path))} links unknown internal route ${rawTarget}`,
+          `${posix(relative(repositoryRoot, document.path))} links invalid internal route ${rawTarget}`,
         );
         continue;
       } else {

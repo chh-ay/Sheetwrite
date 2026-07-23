@@ -165,6 +165,21 @@ describe("snapshot persistence boundary", () => {
     restored.dispose();
   });
 
+  it("preserves non-ASCII formula source through the packed snapshot boundary", () => {
+    const snapshot = richSnapshot();
+    snapshot.sheets[1]!.cells[0]!.cells[0]!.value = {
+      kind: "formula",
+      src: '="雪😀"',
+    };
+    const store = SheetwriteStore.fromSnapshot(snapshot);
+
+    expect(store.exportSnapshot().sheets[1]!.cells[0]!.cells[0]!.value).toEqual({
+      kind: "formula",
+      src: '="雪😀"',
+    });
+    store.dispose();
+  });
+
   it("mounts without a user change or undo entry and rejects invalid input cleanly", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
@@ -266,6 +281,147 @@ describe("snapshot persistence boundary", () => {
     }
     expect(error.code).toBe("resource-limit");
     expect(error.cause).toBeInstanceOf(SnapshotValidationError);
+  });
+
+  it("exports a sparse billion-cell snapshot without a dense source scan", () => {
+    const snapshot: WorkbookSnapshot = {
+      schemaVersion: 1,
+      workbook: { activeSheet: "large" },
+      sheets: [
+        {
+          id: "large",
+          name: "Large",
+          order: 0,
+          rowCount: 1_000_000,
+          columns: Array.from({ length: 1_000 }, (_, index) => ({
+            key: `c${index}`,
+            header: `C${index}`,
+            width: 80,
+            type: "number" as const,
+          })),
+          cells: [
+            {
+              startRow: 999_999,
+              startCol: 999,
+              rowCount: 1,
+              colCount: 1,
+              cells: [
+                {
+                  rowOffset: 0,
+                  colOffset: 0,
+                  value: { kind: "literal", value: 42 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const store = SheetwriteStore.fromSnapshot(snapshot, { storage: "paged" });
+
+    expect(store.queryCapability("large")).toEqual({ status: "complete" });
+    expect(store.exportSnapshot().sheets[0]!.cells).toEqual([
+      {
+        startRow: 0,
+        startCol: 0,
+        rowCount: 1_000_000,
+        colCount: 1_000,
+        cells: [
+          {
+            rowOffset: 999_999,
+            colOffset: 999,
+            value: { kind: "literal", value: 42 },
+          },
+        ],
+      },
+    ]);
+    expect(store.getPagedStats("large").dirtyCells).toBe(0);
+    store.dispose();
+  });
+
+  it("hydrates multi-cell paged snapshots as clean baseline below the local dirty limit", () => {
+    const snapshot: WorkbookSnapshot = {
+      schemaVersion: 1,
+      workbook: { activeSheet: "s1" },
+      sheets: [
+        {
+          id: "s1",
+          name: "Sheet 1",
+          order: 0,
+          rowCount: 4,
+          columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
+          cells: [
+            {
+              startRow: 0,
+              startCol: 0,
+              rowCount: 3,
+              colCount: 1,
+              cells: [
+                {
+                  rowOffset: 0,
+                  colOffset: 0,
+                  value: { kind: "literal", value: 3 },
+                  style: { bold: true },
+                },
+                { rowOffset: 1, colOffset: 0, value: { kind: "formula", src: "=A1+1" } },
+                {
+                  rowOffset: 2,
+                  colOffset: 0,
+                  value: { kind: "ref", target: { sheet: "s1", row: 0, col: 0 } },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const grid = createGridFromSnapshot(host, snapshot, {
+      datasourceStorage: { mode: "paged", chunkRows: 4, dirtyCellLimit: 1 },
+    });
+    const store = grid.store as SheetwriteStore;
+
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 })).toMatchObject({
+      resolved: 3,
+      style: { bold: true },
+    });
+    expect(store.getFormula({ sheet: "s1", row: 1, col: 0 })).toBe("=A1+1");
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(4);
+    expect(store.getRefTarget({ sheet: "s1", row: 2, col: 0 })).toEqual({
+      sheet: "s1",
+      row: 0,
+      col: 0,
+    });
+    expect(store.getPagedStats("s1")).toMatchObject({
+      loadedCells: 3,
+      dirtyCells: 0,
+    });
+    expect(store.getCellLoadState({ sheet: "s1", row: 0, col: 0 })).toBe("loaded-value");
+
+    const rejected = grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: 10 },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 0 },
+          value: { kind: "literal", value: 20 },
+        },
+      ],
+    });
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      epoch: 0,
+      issues: [{ resource: "paged-dirty-cells", actual: 2, max: 1 }],
+    });
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(3);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(4);
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    grid.destroy();
   });
 
   it("applies remote operations observably without local history", async () => {

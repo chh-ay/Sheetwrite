@@ -1,8 +1,38 @@
 // Workbook, view, validation, protection, snapshot, and operation contracts.
 // No runtime values live here.
 
-import type { CellScalar, CellStyle, CellValue, Column, ConditionalFormatRule } from "./cell.js";
+import type {
+  CellHyperlink,
+  CellScalar,
+  CellStyle,
+  CellValue,
+  Column,
+  ConditionalFormatRule,
+} from "./cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./coordinates.js";
+import type { WorkbookTable, WorkbookTablePatch } from "./table.js";
+
+/** Stable reason codes returned by worksheet-name validation. */
+export type SheetNameIssueCode =
+  | "blank"
+  | "too-long"
+  | "forbidden-character"
+  | "edge-apostrophe"
+  | "duplicate";
+
+/** Successful canonical name or an actionable validation failure. */
+export type SheetNameValidationResult =
+  | {
+      readonly ok: true;
+      readonly name: string;
+      readonly key: string;
+    }
+  | {
+      readonly ok: false;
+      readonly code: SheetNameIssueCode;
+      readonly name: string;
+      readonly key: string;
+    };
 
 /** Native worksheet visibility preserved across workbook snapshots and tab rendering. */
 export type SheetVisibility = "visible" | "hidden" | "veryHidden";
@@ -27,6 +57,8 @@ export interface Sheet {
   rowGroups?: RowGroup[];
   /** Conditional styles folded into the bulk render-window style dictionary. */
   conditionalFormats?: ConditionalFormatRule[];
+  /** Stable, serializable range hyperlinks; external URLs pass the shared safety policy. */
+  hyperlinks?: CellHyperlink[];
   /** Serializable data-entry rules evaluated at the local mutation barrier. */
   validationRules?: DataValidationRule[];
   /** Client-side protected-range policy metadata; never server authorization. */
@@ -43,6 +75,8 @@ export interface Sheet {
   frozenRows?: number;
   /** Leading columns pinned left of the scrolling body (0/undefined = none). */
   frozenCols?: number;
+  /** Native workbook tables anchored to this stable worksheet identity. */
+  tables?: WorkbookTable[];
 }
 
 // ── Views: sorting, filtering, hidden rows, grouping ─────────────────────────
@@ -200,6 +234,15 @@ export interface ProtectionRequest {
 /** Host-owned client UX permission callback for protected mutations. */
 export type ProtectionResolver = (request: ProtectionRequest) => "allow" | "deny";
 
+/** Stable lifecycle rejection codes suitable for inline sheet-management UI. */
+export type SheetLifecycleIssueCode =
+  | SheetNameIssueCode
+  | "duplicate-sheet-id"
+  | "sheet-not-found"
+  | "invalid-sheet"
+  | "invalid-position"
+  | "last-visible-sheet";
+
 /** Structured warning or rejection produced while applying an operation. */
 export type MutationIssue =
   | {
@@ -220,6 +263,12 @@ export type MutationIssue =
       message: string;
     }
   | {
+      kind: "invalid-operation";
+      severity: "error";
+      operationIndex: number;
+      message: string;
+    }
+  | {
       kind: "resource-limit";
       severity: "error";
       /** Resource dimension exceeded by the transaction or durable pending queue. */
@@ -228,11 +277,21 @@ export type MutationIssue =
         | "encoded-bytes"
         | "pending-commits"
         | "pending-operations"
-        | "pending-encoded-bytes";
+        | "pending-encoded-bytes"
+        | "paged-dirty-cells"
+        | "paged-reference-simulation";
       /** Count or incrementally observed encoded bytes at rejection. */
       actual: number;
       /** Configured inclusive ceiling for the resource. */
       max: number;
+      message: string;
+    }
+  | {
+      kind: "sheet-lifecycle";
+      severity: "error";
+      code: SheetLifecycleIssueCode;
+      sheet?: SheetId;
+      operationIndex: number;
       message: string;
     };
 
@@ -288,12 +347,14 @@ export interface SheetSnapshot {
   rowMeta?: Array<[row: number, meta: RowMetadata]>;
   merges?: MergeRange[];
   conditionalFormats?: ConditionalFormatRule[];
+  hyperlinks?: CellHyperlink[];
   validationRules?: DataValidationRule[];
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
   sortKeys?: SortKey[];
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
+  tables?: WorkbookTable[];
   cells: CellBlock[];
 }
 
@@ -330,6 +391,10 @@ export type DocumentOp =
   | { op: "removeSheet"; sheet: SheetId }
   | { op: "renameSheet"; sheet: SheetId; name: string }
   | { op: "moveSheet"; sheet: SheetId; to: number }
+  | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility }
+  | { op: "addTable"; table: WorkbookTable }
+  | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch }
+  | { op: "removeTable"; sheet: SheetId; tableId: string }
   | {
       op: "setSheetMeta";
       sheet: SheetId;
@@ -344,6 +409,8 @@ export type DocumentOp =
     }
   | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule }
   | { op: "removeValidationRule"; sheet: SheetId; id: string }
+  | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink }
+  | { op: "removeHyperlink"; sheet: SheetId; id: string }
   | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange }
   | { op: "removeProtectedRange"; sheet: SheetId; id: string }
   | { op: "setNote"; addr: CellAddress; text: string | null }

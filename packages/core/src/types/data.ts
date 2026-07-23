@@ -19,25 +19,53 @@ export interface ColumnarData {
   columns: Record<string, ArrayLike<CellScalar | CellValue>>;
 }
 
-/** Cancellable sheet and row interval requested from a DataSource. */
-export interface DataSourceRequest {
-  sheet: SheetId;
+/** One half-open run of workbook columns, in stable sheet order. */
+export interface DataSourceColumnBand {
+  /** Zero-based workbook column index of the first key. */
   start: number;
+  /** Exclusive workbook column index after the last key. */
   end: number;
+  /** Stable workbook column keys for every index in `[start, end)`. */
+  keys: readonly string[];
+}
+
+/** Cancellable sheet rectangle requested from a DataSource. */
+export interface DataSourceRequest {
+  /** Paging contract version. */
+  protocol: 2;
+  sheet: SheetId;
+  /** Inclusive row index. */
+  start: number;
+  /** Exclusive row index. */
+  end: number;
+  /** Exact visible, frozen, or prefetched column runs required by the Grid. */
+  columns: readonly DataSourceColumnBand[];
   signal: AbortSignal;
   revision: number;
 }
 
-/** One resolved row page returned by a DataSource. */
+/** One resolved rectangular page returned by a DataSource. */
 export interface DataSourcePage {
+  /** Paging contract version. */
+  protocol: 2;
+  /** Inclusive row index of the first returned row. */
   start: number;
+  /** Exact column runs represented by every returned row. */
+  columns: readonly DataSourceColumnBand[];
   rows: RowData[];
   revision?: string | number;
 }
 
-/** Host callback that asynchronously loads cancellable row pages. */
+/** Declares whether a source can load only the requested column runs. */
+export interface DataSourceCapabilities {
+  protocol: 2;
+  columns: "windowed" | "full-width";
+}
+
+/** Host callback that asynchronously loads cancellable rectangular pages. */
 export interface DataSource {
-  /** Loads the requested half-open row interval; implementations should stop work when its signal aborts. */
+  readonly capabilities: DataSourceCapabilities;
+  /** Loads the requested rows and columns; implementations should stop work when its signal aborts. */
   getRows(request: DataSourceRequest): Promise<DataSourcePage>;
 }
 
@@ -45,8 +73,10 @@ export interface DataSource {
 export interface DataSourceStorageOptions {
   /** Storage engine. Dense is the default. */
   mode?: "dense" | "paged";
-  /** Power-of-two row chunk size. Defaults to 4096. */
+  /** Paged row chunk size; defaults to 4,096 and is normalized to a power of two. */
   chunkRows?: number;
-  /** Clean-chunk cache budget. Dirty and visible chunks may exceed it. */
+  /** Per-sheet clean-chunk cache budget; defaults to 32 MiB. Sparse local edits are accounted separately; dirty and visible chunks may exceed it. */
   cacheBytes?: number;
+  /** Maximum sparse local edits retained outside the clean page cache. Defaults to 1,000,000. */
+  dirtyCellLimit?: number;
 }

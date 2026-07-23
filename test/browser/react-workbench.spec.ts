@@ -68,9 +68,25 @@ async function selectOption(page: Page, control: "Market" | "Segment", label: st
   await page.getByRole("option", { name: label }).click();
 }
 
-/** The grid's built-in toolbar also exposes Undo/Redo; scope to the host row. */
+/** Undo/Redo live beside the causal state rail, outside the Grid's own toolbar. */
 function editButton(page: Page, name: "Undo" | "Redo") {
-  return page.getByRole("toolbar", { name: "Editing controls" }).getByRole("button", { name });
+  return page.getByRole("toolbar", { name: "History controls" }).getByRole("button", { name });
+}
+
+async function openTools(page: Page): Promise<void> {
+  const shelf = page.locator("details.sw-rwb-tools");
+  if ((await shelf.getAttribute("open")) === null) {
+    await shelf.locator("summary").click();
+  }
+  await expect(shelf).toHaveAttribute("open", "");
+}
+
+async function closeTools(page: Page): Promise<void> {
+  const shelf = page.locator("details.sw-rwb-tools");
+  if ((await shelf.getAttribute("open")) !== null) {
+    await shelf.locator("summary").click();
+  }
+  await expect(shelf).not.toHaveAttribute("open", "");
 }
 
 async function canvasBodyPainted(page: Page): Promise<boolean> {
@@ -96,8 +112,33 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
 
 test.describe("react workbench — controlled analytics", () => {
   test("filters, aggregates, and derived summaries follow controlled state", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     const errors = collectErrors(page);
     await openWorkbench(page);
+
+    // The compact route lead gives the editable Grid and causal rail the first viewport.
+    const geometry = await page.evaluate(() => {
+      const grid = document
+        .querySelector(".sw-rwb-workspace > .sw-demo-grid")
+        ?.getBoundingClientRect();
+      const rail = document.querySelector(".sw-rwb-state")?.getBoundingClientRect();
+      if (!grid || !rail) return null;
+      return {
+        gridBottom: grid.bottom,
+        gridHeight: grid.height,
+        gridTop: grid.top,
+        gridWidth: grid.width,
+        railWidth: rail.width,
+      };
+    });
+    expect(geometry).not.toBeNull();
+    expect(geometry?.gridTop).toBeLessThan(900);
+    expect(geometry?.gridBottom).toBeGreaterThan(geometry?.gridTop ?? 0);
+    expect(geometry?.gridHeight).toBeGreaterThan(320);
+    expect(geometry?.gridWidth).toBeGreaterThan((geometry?.railWidth ?? 0) * 3);
+    await expect(
+      page.getByRole("complementary", { name: "Controlled analytics state" }),
+    ).toBeVisible();
 
     // Canonical boot state straight from the shared scenario contract.
     await expect(page.getByTestId("rows-visible")).toHaveText(en(ANALYTICS_ROWS));
@@ -133,7 +174,7 @@ test.describe("react workbench — controlled analytics", () => {
   test("search, replace-all, and undo/redo round-trip through grid history", async ({ page }) => {
     const errors = collectErrors(page);
     await openWorkbench(page);
-
+    await openTools(page);
     await page.getByLabel("Search accounts").fill("Account 000777");
     await page.getByLabel("Search accounts").press("Enter");
     await expect(page.getByTestId("matches")).toHaveText("1");
@@ -142,7 +183,7 @@ test.describe("react workbench — controlled analytics", () => {
     await page.getByRole("button", { name: "Replace all" }).click();
     await expect(page.getByTestId("activity")).toContainText("Replaced 1 cell");
     await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Keystone 000777");
-
+    await closeTools(page);
     await editButton(page, "Undo").click();
     await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Account 000777");
     await editButton(page, "Redo").click();
@@ -249,7 +290,7 @@ test.describe("react workbench — controlled analytics", () => {
   }) => {
     const errors = collectErrors(page);
     await openWorkbench(page);
-
+    await openTools(page);
     const csvDownload = page.waitForEvent("download");
     await page.getByRole("button", { name: "Export CSV" }).click();
     expect((await csvDownload).suggestedFilename()).toBe("analytics-pipeline.csv");
@@ -278,7 +319,7 @@ test.describe("react workbench — controlled analytics", () => {
     await expect(page.getByTestId("kpi-total")).toHaveAttribute("data-raw", String(imported), {
       timeout: 15_000,
     });
-
+    await closeTools(page);
     await editButton(page, "Undo").click();
     await expect(page.getByTestId("kpi-total")).toHaveAttribute("data-raw", String(TOTAL_ARR), {
       timeout: 15_000,
@@ -299,7 +340,7 @@ test.describe("react workbench — controlled analytics", () => {
   }) => {
     const errors = collectErrors(page);
     await openWorkbench(page);
-    await expect(page.getByTestId("ready-reason")).toHaveText("initial");
+    await openTools(page);
 
     // Controlled state set before the reset…
     await selectOption(page, "Market", "Tokyo");
@@ -347,22 +388,37 @@ test.describe("react workbench — controlled analytics", () => {
     await expectNoErrors(page, errors);
   });
 
-  test("mobile: workbench boots, filters, and stays operable at 375px", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 720 });
+  test("mobile: Grid leads controlled evidence and tools stay operable at 390px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     const errors = collectErrors(page);
     await openWorkbench(page);
 
     await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
     await expect(page.getByTestId("rows-visible")).toHaveText(en(ANALYTICS_ROWS));
 
+    const order = await page.evaluate(() => {
+      const grid = document.querySelector(".sw-rwb-workspace > .sw-demo-grid");
+      const state = document.querySelector(".sw-rwb-state");
+      const tools = document.querySelector(".sw-rwb-tools");
+      return {
+        gridTop: grid?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+        stateTop: state?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+        toolsTop: tools?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+      };
+    });
+    expect(order.gridTop).toBeLessThan(order.stateTop);
+    expect(order.gridTop).toBeLessThan(order.toolsTop);
+
     await selectOption(page, "Market", "Tokyo");
     await expect(page.getByTestId("rows-visible")).toHaveText(en(TOKYO_ROWS));
     await expect(page.getByTestId("kpi-market")).toHaveAttribute("data-raw", String(TOKYO_ARR));
 
-    // Derived summaries and workflow controls stay visible on small screens.
     await expect(page.getByTestId("kpi-total")).toBeVisible();
+    await expect(page.locator("details.sw-rwb-tools > summary")).toBeVisible();
+    await openTools(page);
     await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
-
     await expectNoErrors(page, errors);
   });
 
@@ -374,17 +430,25 @@ test.describe("react workbench — controlled analytics", () => {
 
     await expect(page.getByRole("toolbar", { name: "Query controls" })).toBeVisible();
     await expect(page.getByRole("toolbar", { name: "Editing controls" })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
+    await expect(page.getByRole("toolbar", { name: "History controls" })).toBeVisible();
 
-    // Related controls cluster into named groups inside each toolbar.
+    await expect(
+      page.getByRole("toolbar", { name: "Query controls" }).getByRole("group", { name: "Filters" }),
+    ).toBeVisible();
+    await expect(page.getByRole("group", { name: "Formula" })).toBeVisible();
+
+    await openTools(page);
+    await expect(page.getByRole("toolbar", { name: "Search and replace" })).toBeVisible();
+    await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
+    await expect(page.getByRole("toolbar", { name: "Grid lifecycle" })).toBeVisible();
     await expect(
       page
-        .getByRole("toolbar", { name: "Query controls" })
+        .getByRole("toolbar", { name: "Search and replace" })
         .getByRole("group", { name: "Account search" }),
     ).toBeVisible();
     await expect(
       page
-        .getByRole("toolbar", { name: "Editing controls" })
+        .getByRole("toolbar", { name: "Search and replace" })
         .getByRole("group", { name: "Replace" }),
     ).toBeVisible();
     await expect(

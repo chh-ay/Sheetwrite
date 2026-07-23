@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { InstallCommand } from "../components/InstallCommand.js";
+import { LandingSpreadsheet } from "../components/LandingSpreadsheet.js";
+import { LazyEngineTeaser } from "../components/LazyEngineTeaser.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
@@ -7,8 +9,8 @@ import { pageMeta } from "../lib/seo.js";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: pageMeta(
-      "Sheetwrite — TypeScript spreadsheet and data grid",
-      "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters. Get started.",
+      "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV",
+      "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.",
     ),
   }),
   component: Landing,
@@ -57,7 +59,7 @@ const CAPABILITY_PROOFS = [
     id: "collaboration",
     label: "Collaboration",
     href: "/showcases/collaboration/",
-    headline: "Two live clients converging through one shared protocol.",
+    headline: "Two live clients staying in sync through one shared server.",
   },
 ] as const;
 
@@ -139,6 +141,11 @@ function Landing() {
               Vanilla, React, Vue, and Svelte adapters. Your application owns the document, the
               persistence, and the chrome — the engine owns the speed.
             </p>
+          </div>
+          <div className="sw-hero-proof">
+            <LandingSpreadsheet />
+          </div>
+          <div className="sw-hero__conversion">
             <div className="sw-hero-actions">
               <a className="sw-cta" href="/docs/start/installation/">
                 Get started
@@ -150,65 +157,41 @@ function Landing() {
             <div className="sw-hero-install">
               <InstallCommand packageName="@sheetwrite/core" />
             </div>
-          </div>
-          <div className="sw-hero-proof">
-            <div className="sw-hero-panel" data-hero-panel>
-              <header className="sw-hero-panel__bar">
+            {evidence ? (
+              <dl className="sw-hero-facts" aria-label="Measured product evidence">
                 <div>
-                  <strong>sheetwrite</strong>
-                  <span>runtime contract</span>
+                  <dt>{evidence.heroStats.millionRowMedianMs} ms</dt>
+                  <dd>median interaction at one million rows</dd>
                 </div>
-                <span>MIT</span>
-              </header>
-              <dl className="sw-hero-manifest">
                 <div>
-                  <dt>document</dt>
+                  <dt>{evidence.heroStats.millionRowHeapMb} MB</dt>
+                  <dd>renderer heap in the same capture</dd>
+                </div>
+                <div>
+                  <dt>4</dt>
+                  <dd>first-party framework mounts</dd>
+                </div>
+                <div className="sw-hero-facts__provenance">
+                  <dt>Evidence</dt>
                   <dd>
-                    owned by your application — lifecycle, persistence, and product UI stay in your
-                    codebase
+                    Source <code>{evidence.capture.commit.slice(0, 7)}</code>
                   </dd>
-                </div>
-                <div>
-                  <dt>engine</dt>
-                  <dd>Rust/WASM columnar core — formulas, query scans, packed render windows</dd>
-                </div>
-                <div>
-                  <dt>rows</dt>
-                  <dd>
-                    <strong>1,000,000</strong> paged through a Worker host, with measured evidence
-                  </dd>
-                </div>
-                <div>
-                  <dt>sync</dt>
-                  <dd>durable IndexedDB commits and one shared collaboration protocol</dd>
-                </div>
-                <div>
-                  <dt>xlsx</dt>
-                  <dd>
-                    optional — <code>@sheetwrite/xlsx</code> workbook and table backends
-                  </dd>
-                </div>
-                <div>
-                  <dt>adapters</dt>
-                  <dd>first-party Vanilla, React, Vue, and Svelte</dd>
                 </div>
               </dl>
-              <footer className="sw-hero-panel__foot">
-                <span>TypeScript · Rust</span>
-                <span>every line has a live showcase below</span>
-              </footer>
-            </div>
+            ) : null}
           </div>
         </section>
 
+        <LazyEngineTeaser />
+
         <section aria-labelledby="benchmarks-title" className="sw-landing-bench" id="benchmarks">
           <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Protocol evidence</p>
+            <p className="sw-section-eyebrow">Results you can check</p>
             <h2 id="benchmarks-title">Measured, not promised</h2>
             {evidence ? (
               <p className="sw-section-lede">
-                Median speedups over Handsontable, rendered straight from checked-in protocol
-                artifacts. The gap widens as the data grows.
+                Median speedups over Handsontable, read directly from saved benchmark results. The
+                gap widens as the data grows.
               </p>
             ) : null}
           </header>
@@ -277,27 +260,26 @@ function Landing() {
                 </aside>
               </div>
               <p className="sw-bench-footnote">
-                Correctness checkpoints guard every interaction, and failures are recorded as
-                failures. <a href="/docs/guides/performance-resources/">Read the full protocol.</a>
+                Every interaction must return the correct result; failed runs stay failed.{" "}
+                <a href="/docs/guides/performance-resources/">See how we measured it.</a>
               </p>
             </>
           ) : (
             <p className="sw-bench-footnote">
-              Benchmark evidence is generated from local protocol artifacts. Run{" "}
-              <code>bun run --filter @sheetwrite/bench bench:render:scale</code> and{" "}
-              <code>bun run docs:generate</code> to publish real numbers here.
+              No saved benchmark results are available yet. Run{" "}
+              <code>bun run --filter @sheetwrite/bench bench:render:scale</code> and then{" "}
+              <code>bun run docs:generate</code> to publish measured numbers here.
             </p>
           )}
         </section>
 
         <section aria-labelledby="proofs-title" className="sw-landing-proofs">
           <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Capability showcases</p>
-            <h2 id="proofs-title">Evaluate by capability, not by demo.</h2>
+            <p className="sw-section-eyebrow">Live feature examples</p>
+            <h2 id="proofs-title">Try the work you need to do.</h2>
             <p className="sw-section-lede">
-              Every public capability has one owning live showcase, a required interaction, and an
-              executable browser contract.{" "}
-              <Link to="/showcases/">Browse the full capability index →</Link>
+              Every public feature has one live example, an action to try, and a browser test you
+              can run. <Link to="/showcases/">Browse every feature →</Link>
             </p>
           </header>
           <ol className="sw-proof-ledger">

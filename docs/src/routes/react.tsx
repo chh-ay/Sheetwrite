@@ -5,7 +5,7 @@ import { ShowcasePage } from "../showcases/ShowcasePage.js";
 import reactWorkbenchStylesheet from "../styles/react-workbench.css?url";
 
 const description =
-  "Drive a 100,000-row sales pipeline from controlled React state: filters, search and replace, formula entry with live recalculation, KPI formulas over a named range, undo/redo, CSV/XLSX workflows, and reset-safe reconciliation.";
+  "Filter the live 100,000-row pipeline or commit a formula. React keeps controlled rows, query state, KPI formulas, and Grid history in lockstep.";
 
 export const Route = createFileRoute("/react")({
   head: () => ({
@@ -44,9 +44,9 @@ function ReactWorkbenchRoute() {
             "CSV import lands as one undoable commit; CSV/XLSX exports hand off to the interoperability proofs.",
         },
       ]}
-      prompt="Filter a market, commit a formula, replace matched accounts, reload the dataset, or move rendering onto a Web Worker."
+      prompt="Filter a market, select an ARR cell, and commit a new value. Watch the visible rows, KPI rail, and Grid history reconcile together."
       sourcePath="docs/src/showcases/ReactWorkbench.tsx"
-      title="A 100,000-row operating view, driven by React."
+      title="Controlled analytics, without a shadow copy."
     >
       <ReactWorkbench />
     </ShowcasePage>

@@ -19,6 +19,12 @@ function docsUrl(path = ""): string {
   return siteUrl(`/docs/${path}`);
 }
 
+const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV";
+const SITE_DESCRIPTION =
+  "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
+const SOCIAL_IMAGE_ALT =
+  "Sheetwrite multi-sheet workbook with selected formula cell and sheet tabs";
+
 /** Interactive steps need attached listeners; the root component marks hydration. */
 async function waitForHydration(page: Page): Promise<void> {
   await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15_000 });
@@ -79,24 +85,44 @@ test("sidebar marks only the nearest documentation route as current", async ({ p
 
 test("site root serves the product landing", async ({ page }) => {
   const errors = collectErrors(page);
+  const wasmRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
+  });
   const response = await page.goto(siteUrl("/"));
   expect(response?.ok()).toBe(true);
   // Semantic contract: exactly one H1, and no live grid runtime on the landing.
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
-  await expect(page).toHaveTitle("Sheetwrite — TypeScript spreadsheet and data grid");
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
-    "content",
-    "Build fast, editable web spreadsheets with TypeScript, Canvas, Rust/WASM, and first-party React, Vue, Svelte, and vanilla JavaScript adapters. Get started.",
-  );
-  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
-    "content",
-    "Sheetwrite spreadsheet grid showing typed web data",
-  );
-  await expect(page.locator('meta[name="twitter:image:alt"]')).toHaveAttribute(
-    "content",
-    "Sheetwrite spreadsheet grid showing typed web data",
-  );
+  const productStory = page.getByTestId("landing-product-story");
+  await expect(productStory).toBeVisible();
+  await expect(productStory).toHaveAttribute("data-landing-phase", "resolve", { timeout: 10_000 });
+  await expect(productStory.getByText("Illustrative product view")).toBeVisible();
+  await expect(productStory.getByText(/static Sheetwrite composition/i)).toBeVisible();
+  expect(wasmRequests).toEqual([]);
+  await expect(page).toHaveTitle(SITE_TITLE);
+  for (const selector of [
+    'meta[name="description"]',
+    'meta[property="og:description"]',
+    'meta[name="twitter:description"]',
+  ]) {
+    await expect(page.locator(selector)).toHaveAttribute("content", SITE_DESCRIPTION);
+  }
+  for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
+    await expect(page.locator(selector)).toHaveAttribute("content", SITE_TITLE);
+  }
+  for (const selector of ['meta[property="og:image:alt"]', 'meta[name="twitter:image:alt"]']) {
+    await expect(page.locator(selector)).toHaveAttribute("content", SOCIAL_IMAGE_ALT);
+  }
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
+  const socialImageDimensions = await page.evaluate(async () => {
+    const image = new Image();
+    image.src = "/og-sheetwrite.webp";
+    await image.decode();
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  });
+  expect(socialImageDimensions).toEqual({ width: 1200, height: 630 });
   const structuredData = await page
     .locator('script[type="application/ld+json"]')
     .evaluateAll((scripts) => scripts.map((script) => JSON.parse(script.textContent ?? "null")));
@@ -114,8 +140,8 @@ test("site root serves the product landing", async ({ page }) => {
   // Benchmark section publishes real generated numbers, never placeholders.
   const benchStats = page.locator("#benchmarks .sw-bench-stats li");
   await expect(benchStats.first()).toBeVisible();
-  await expect(page.locator("#benchmarks")).toContainText("Read the full protocol.");
-  // Capability navigation: four owned proofs and four adapter workbenches link out.
+  await expect(page.locator("#benchmarks")).toContainText("See how we measured it.");
+  // Feature navigation: four focused proofs and four adapter workbenches link out.
   await expect(page.locator("main a[data-proof]")).toHaveCount(4);
   await expect(page.locator("main a[data-framework]")).toHaveCount(4);
   expect(errors.page).toEqual([]);
@@ -125,6 +151,184 @@ test("site root serves the product landing", async ({ page }) => {
   await page.goBack();
   await page.getByRole("link", { name: "Get started" }).click();
   await expect(page).toHaveURL(docsUrl("start/installation/"));
+});
+
+test("landing engine CTA and shared header stay stable across scroll and reflow", async ({
+  page,
+}) => {
+  const wasmRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\.wasm(?:$|\?)/.test(request.url())) wasmRequests.push(request.url());
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1568, height: 1027 });
+  await page.goto(siteUrl("/"));
+
+  const engineCallout = page.locator(".sw-landing-engine-slot");
+  await expect(
+    engineCallout.getByRole("heading", {
+      name: "Watch the Grid, the calculation engine, and your host agree.",
+    }),
+  ).toBeVisible();
+  await expect(
+    engineCallout.getByRole("link", { name: "Try the live engine view →" }),
+  ).toBeVisible();
+  await expect(engineCallout.locator('[role="status"]')).toHaveCount(0);
+  const initialCallout = await engineCallout.evaluate((section) => ({
+    height: section.getBoundingClientRect().height,
+    text: section.textContent,
+  }));
+  expect(
+    await engineCallout.evaluate((section) => section.getBoundingClientRect().top),
+  ).toBeGreaterThanOrEqual(await page.evaluate(() => window.innerHeight));
+  await page.evaluate(() => {
+    const callout = document.querySelector<HTMLElement>(".sw-landing-engine-slot");
+    if (!callout) throw new Error("landing engine callout is missing");
+    window.scrollTo(0, callout.offsetTop);
+  });
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect(engineCallout).toContainText("Watch the Grid");
+  expect(
+    await engineCallout.evaluate((section) => ({
+      height: section.getBoundingClientRect().height,
+      text: section.textContent,
+    })),
+  ).toEqual(initialCallout);
+
+  const scrolledHeader = await page.evaluate(() => {
+    const landing = document.querySelector<HTMLElement>(".sw-landing");
+    const topbar = document.querySelector<HTMLElement>(".sw-product-nav");
+    if (!landing || !topbar) throw new Error("landing chrome is missing");
+    return {
+      background: getComputedStyle(topbar).backgroundColor,
+      landingBackground: getComputedStyle(landing).backgroundColor,
+      top: topbar.getBoundingClientRect().top,
+    };
+  });
+  expect(scrolledHeader.top).toBe(0);
+  expect(scrolledHeader.background).toBe(scrolledHeader.landingBackground);
+
+  for (const viewport of [
+    { width: 1568, height: 1027 },
+    { width: 390, height: 844 },
+    { width: 320, height: 640 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const geometry = await page.evaluate(() => {
+      const topbar = document.querySelector<HTMLElement>(".sw-product-nav");
+      const hero = document.querySelector<HTMLElement>(".sw-hero");
+      const heading = document.querySelector<HTMLElement>(".sw-hero h1");
+      if (!topbar || !hero || !heading) throw new Error("landing header or hero is missing");
+      const topbarRect = topbar.getBoundingClientRect();
+      const heroRect = hero.getBoundingClientRect();
+      const headingRect = heading.getBoundingClientRect();
+      const childrenFit = Array.from(topbar.children).every((child) => {
+        const rect = child.getBoundingClientRect();
+        return rect.top >= topbarRect.top && rect.bottom <= topbarRect.bottom;
+      });
+      return {
+        childrenFit,
+        headingBottom: headingRect.bottom,
+        headingLeft: headingRect.left,
+        headingRight: headingRect.right,
+        headingTop: headingRect.top,
+        heroBottom: heroRect.bottom,
+        heroTop: heroRect.top,
+        pageWidth: document.documentElement.scrollWidth,
+        topbarBottom: topbarRect.bottom,
+        topbarLeft: topbarRect.left,
+        topbarRight: topbarRect.right,
+        topbarTop: topbarRect.top,
+      };
+    });
+    expect(geometry.pageWidth).toBe(viewport.width);
+    expect(geometry.topbarTop).toBe(0);
+    expect(geometry.topbarLeft).toBe(0);
+    expect(geometry.topbarRight).toBe(viewport.width);
+    expect(geometry.childrenFit).toBe(true);
+    expect(geometry.heroTop).toBeGreaterThanOrEqual(geometry.topbarBottom);
+    expect(geometry.headingTop).toBeGreaterThanOrEqual(geometry.heroTop);
+    expect(geometry.headingBottom).toBeLessThanOrEqual(geometry.heroBottom);
+    expect(geometry.headingLeft).toBeGreaterThanOrEqual(0);
+    expect(geometry.headingRight).toBeLessThanOrEqual(viewport.width);
+  }
+  expect(wasmRequests).toEqual([]);
+});
+
+test("landing choreography is bounded, replayable, and reduced-motion complete", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(siteUrl("/"));
+  await waitForHydration(page);
+  const story = page.getByTestId("landing-product-story");
+  await expect(story).toHaveAttribute("data-landing-phase", "resolve");
+  const reduced = await story.evaluate((root) => ({
+    resolved: root.style.getPropertyValue("--sw-landing-resolved"),
+    running: root
+      .getAnimations({ subtree: true })
+      .filter((animation) => animation.playState === "running").length,
+    nodes: root.querySelectorAll("*").length,
+  }));
+  expect(reduced.resolved).toBe("1");
+  expect(reduced.running).toBe(0);
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const box = await story.boundingBox();
+  if (!box) throw new Error("landing product story has no bounds");
+  await page.mouse.move(box.x + box.width * 0.78, box.y + box.height * 0.28);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-x"))),
+    )
+    .toBeGreaterThan(76);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-x"))),
+    )
+    .toBeLessThan(80);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-y"))),
+    )
+    .toBeGreaterThan(26);
+  await expect
+    .poll(() =>
+      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-y"))),
+    )
+    .toBeLessThan(30);
+  await story.getByRole("button", { name: "Replay visual explanation" }).click();
+  await expect(story).toHaveAttribute("data-landing-phase", /enter|select/);
+  await expect(story).toHaveAttribute("data-landing-running", "true");
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(story).toHaveAttribute("data-landing-running", "false");
+  await story.scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute("data-landing-running", "true");
+  expect(await story.locator("*").count()).toBe(reduced.nodes);
+  await page.goto(docsUrl("start/installation/"));
+  await expect(story).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () =>
+        document.getAnimations().filter((animation) => animation.playState === "running").length,
+    ),
+  ).toBe(0);
+});
+
+test.describe("landing coarse pointer", () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  test("landing remains operable without hover", async ({ page }) => {
+    await page.goto(siteUrl("/"));
+    const story = page.getByTestId("landing-product-story");
+    await expect(story.getByRole("button", { name: "Replay visual explanation" })).toBeVisible();
+    await story.getByRole("button", { name: "Replay visual explanation" }).click();
+    await expect(story).toHaveAttribute("data-landing-phase", /enter|select/);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
 });
 
 test.describe("documentation site", () => {
@@ -542,9 +746,16 @@ test.describe("documentation site", () => {
     expect(darkSurface.panel).not.toBe(darkSurface.signature);
   });
 
-  for (const width of [347, 700, 1568] as const) {
+  for (const [width, height] of [
+    [347, 855],
+    [700, 900],
+    // Equivalent CSS reflow boundary for 200% browser zoom on a 1440×1000 viewport.
+    [720, 500],
+    [1_280, 900],
+    [1_568, 1_000],
+  ] as const) {
     test(`documentation landing remains aligned at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 855 });
+      await page.setViewportSize({ width, height });
       await page.goto(siteUrl());
       await expect(page.locator("main h1")).toHaveCount(1);
       await expect(

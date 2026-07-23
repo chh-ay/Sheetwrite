@@ -1,4 +1,5 @@
 import { createGrid } from "./grid.js";
+import type { RowBridge, RowBridgeHandler, RowBridgeId } from "./row-bridge.js";
 import type { Selection } from "./types/coordinates.js";
 import type { Grid, GridConfig, GridEvents, GridOptions } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
@@ -13,9 +14,11 @@ import type { ChangeEvent } from "./types/transaction.js";
  * mutating the fields of the object it passed in, without recreating the grid.
  * Every field is optional; a missing callback simply drops that event.
  */
-export interface GridControllerHandlers {
+export interface GridControllerHandlers<Id extends RowBridgeId = RowBridgeId> {
   /** Forwarded from the grid's `change` event (a committed transaction). */
   onGridChange?(event: ChangeEvent): void;
+  /** Forwarded as a typed host-row projection when a bridge is attached. */
+  onRowDelta?(projection: Parameters<RowBridgeHandler<Id>>[0]): void;
 
   /** Forwarded from the grid's `selection` event; `null` when nothing is selected. */
   onSelectionChange?(selection: Selection | null): void;
@@ -30,9 +33,23 @@ export interface GridControllerHandlers {
 
   /** Forwarded whenever the active search result changes. */
   onSearch?(result: GridEvents["search"]): void;
+  /** Forwarded whenever command availability or formatting activity changes. */
+  onCommandStateChange?(event: GridEvents["command-state-change"]): void;
 
   /** Forwarded after the visible sheet changes. */
   onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
+
+  /** Forwarded when a Grid mutation is rejected. */
+  onMutationRejected?(event: GridEvents["mutation-rejected"]): void;
+
+  /** Forwarded when worker rendering falls back to the main-thread canvas renderer. */
+  onRendererFallback?(event: GridEvents["renderer-fallback"]): void;
+
+  /** Forwarded when a datasource request fails. */
+  onDatasourceError?(event: GridEvents["datasource-error"]): void;
+
+  /** Forwarded when a built-in XLSX export action fails. */
+  onExportError?(event: GridEvents["export-error"]): void;
 }
 
 /**
@@ -79,33 +96,42 @@ export interface GridController {
  *
  * ### Live handlers
  * `handlers` is held **by reference**, not copied. Every event reads the
- * object's *current* fields (`handlers.onGridChange?.(…)`), so a host swaps
- * callbacks across renders by **mutating the fields of the same object** it
- * passed in — never by replacing the object, which the controller would not
- * see. This is what lets a framework feed fresh closures each render without
- * tearing the grid down and rebuilding it.
+ * object's *current* fields (`handlers.onGridChange?.(…)`), so a host may swap
+ * callbacks without rebuilding the grid. Framework adapters must mutate the
+ * shared object only from their commit lifecycle; mutating it during render can
+ * expose callbacks from work that never commits.
  *
  * @param host     element the grid mounts into
  * @param options  grid options forwarded verbatim to {@link createGrid}
- * @param handlers mutable callback bag, read live on every event
+ * @param handlers mutable callback bag, read live on every event after host commit
  */
-export function createGridController(
+export function createGridController<Id extends RowBridgeId = RowBridgeId>(
   host: HTMLElement,
   options: GridOptions,
-  handlers: GridControllerHandlers,
+  handlers: GridControllerHandlers<Id>,
+  rowBridge?: RowBridge<Id>,
 ): GridController {
   const grid = createGrid(host, options);
+  grid.store.setDetailedChangeCapture?.(rowBridge !== undefined);
 
   // Each closure reads `handlers.*` lazily, so mutating a field on the passed
-  // object takes effect on the next event without re-subscribing.
   const unsubscribes: Array<() => void> = [
-    grid.on("change", (event) => handlers.onGridChange?.(event)),
+    grid.on("change", (event) => {
+      handlers.onGridChange?.(event);
+      const projection = rowBridge?.project(event);
+      if (projection) handlers.onRowDelta?.(projection);
+    }),
     grid.on("selection", (event) => handlers.onSelectionChange?.(event.selection)),
     grid.on("scroll", (event) => handlers.onViewportChange?.(event)),
     grid.on("edit-begin", (event) => handlers.onEditBegin?.(event)),
     grid.on("edit-commit", (event) => handlers.onEditCommit?.(event)),
     grid.on("search", (result) => handlers.onSearch?.(result)),
+    grid.on("command-state-change", (event) => handlers.onCommandStateChange?.(event)),
     grid.on("active-sheet", (event) => handlers.onActiveSheetChange?.(event)),
+    grid.on("mutation-rejected", (event) => handlers.onMutationRejected?.(event)),
+    grid.on("renderer-fallback", (event) => handlers.onRendererFallback?.(event)),
+    grid.on("datasource-error", (event) => handlers.onDatasourceError?.(event)),
+    grid.on("export-error", (event) => handlers.onExportError?.(event)),
   ];
 
   let destroyed = false;
@@ -117,6 +143,7 @@ export function createGridController(
       unsubscribe();
     }
 
+    grid.store.setDetailedChangeCapture?.(false);
     grid.destroy();
   };
 

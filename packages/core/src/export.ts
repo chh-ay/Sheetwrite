@@ -7,6 +7,7 @@ import {
   parseDelimitedText,
   resolveDelimitedTextResourceLimits,
 } from "./delimited-text.js";
+import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { IncompleteDataError } from "./store.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { Range } from "./types/coordinates.js";
@@ -128,8 +129,6 @@ export function toTsv(range: Range, store: Store, options: DelimitedTextOptions 
   return encodeDelimitedText(rows(), "\t", options, { operation: "export" });
 }
 
-// ── CSV / TSV import ─────────────────────────────────────────────────────────
-
 /**
  * Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,
  * bare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional
@@ -210,40 +209,65 @@ export function downloadBytes(bytes: Uint8Array | string, filename: string, mime
 
 /** Resource dimensions bounded by every XLSX import and export path. */
 export interface XlsxResourceLimits {
+  /** Compressed workbook input bytes; defaults to 32 MiB. */
   maxInputBytes: number;
+  /** Encoded workbook output bytes; defaults to 128 MiB. */
   maxOutputBytes: number;
+  /** ZIP archive entries; defaults to 1,024. */
   maxArchiveEntries: number;
+  /** Uncompressed bytes in any one ZIP entry; defaults to 64 MiB. */
   maxEntryUncompressedBytes: number;
+  /** Aggregate uncompressed ZIP entry bytes; defaults to 256 MiB. */
   maxTotalUncompressedBytes: number;
+  /** Uncompressed-to-compressed ratio for one ZIP entry; defaults to 100. */
   maxCompressionRatio: number;
+  /** Workbook worksheets; defaults to 256. */
   maxSheets: number;
+  /** Rows in any worksheet; defaults to 1,048,576. */
   maxRowsPerSheet: number;
+  /** Columns in any worksheet; defaults to 16,384. */
   maxColumnsPerSheet: number;
+  /** Cells accounted by the active conversion path; defaults to 1,000,000. */
   maxCells: number;
+  /** Aggregate merged ranges; defaults to 100,000. */
   maxMerges: number;
+  /** Shared-string table entries; defaults to 1,000,000. */
   maxSharedStrings: number;
+  /** Style-related records; defaults to 65,536. */
   maxStyles: number;
+  /** Elements in any one XML part; defaults to 2,000,000. */
   maxXmlElements: number;
+  /** Element nesting depth in any one XML part; defaults to 64. */
   maxXmlDepth: number;
+  /** Attributes on any one XML element; defaults to 128. */
   maxXmlAttributesPerElement: number;
+  /** UTF-8 text bytes in one XML element or attribute; defaults to 16 MiB. */
   maxXmlTextBytes: number;
 }
 
-/** Conservative defaults used by the optional XLSX codec. */
+/**
+ * Codec defaults combine SpreadsheetML worksheet dimensions with independent
+ * ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.
+ */
 export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object.freeze({
+  // Bound caller input and the single returned byte array.
   maxInputBytes: 32 * 1024 * 1024,
   maxOutputBytes: 128 * 1024 * 1024,
+  // Bound archive fan-out and decompression, including zip-bomb ratios.
   maxArchiveEntries: 1_024,
   maxEntryUncompressedBytes: 64 * 1024 * 1024,
   maxTotalUncompressedBytes: 256 * 1024 * 1024,
   maxCompressionRatio: 100,
+  // SpreadsheetML worksheet compatibility dimensions.
   maxSheets: 256,
   maxRowsPerSheet: 1_048_576,
   maxColumnsPerSheet: 16_384,
+  // Bound aggregate conversion collections.
   maxCells: 1_000_000,
   maxMerges: 100_000,
   maxSharedStrings: 1_000_000,
   maxStyles: 65_536,
+  // Bound each hand-parsed XML part independently.
   maxXmlElements: 2_000_000,
   maxXmlDepth: 64,
   maxXmlAttributesPerElement: 128,
@@ -251,17 +275,21 @@ export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object
 });
 
 /** Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data. */
-export class XlsxResourceError extends RangeError {
-  readonly code = "XLSX_RESOURCE_LIMIT";
+export class XlsxResourceError extends SheetwriteError {
+  override readonly name = "XlsxResourceError";
 
   constructor(
     readonly resource: keyof XlsxResourceLimits,
     readonly limit: number,
     readonly actual: number,
-    readonly operation: "import" | "export",
+    operation: "import" | "export",
   ) {
-    super(`Sheetwrite: XLSX ${operation} ${resource} limit is ${limit}; observed ${actual}`);
-    this.name = "XlsxResourceError";
+    super(
+      "xlsx-resource-limit",
+      `xlsx-${operation}`,
+      `Sheetwrite: XLSX ${operation} ${resource} limit is ${limit}; observed ${actual}`,
+      { context: { format: "xlsx", resource, limit, actual } },
+    );
   }
 }
 
@@ -280,20 +308,34 @@ export function setXlsxTableExportBackend(next: XlsxTableExportBackend): void {
   tableExportBackend = next;
 }
 
-function missingXlsxBackend(functionName: string): Error {
-  return new Error(
+function missingXlsxBackend(
+  functionName: string,
+  operation: "xlsx-import" | "xlsx-export",
+): SheetwriteError {
+  return new SheetwriteError(
+    "optional-backend-unavailable",
+    operation,
     `Sheetwrite: XLSX backend not registered. Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling ${functionName}.`,
+    { context: { backend: "xlsx", functionName }, retryable: false },
   );
 }
 
 /** Exports a table model through the registered optional XLSX backend. */
-export function toXlsxTable(
+export async function toXlsxTable(
   workbook: Workbook,
   store: Store,
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  if (!tableExportBackend) throw missingXlsxBackend("toXlsxTable");
-  return tableExportBackend.toXlsxTable(workbook, store, options);
+  const backend = tableExportBackend;
+  if (!backend) throw missingXlsxBackend("toXlsxTable", "xlsx-export");
+  try {
+    return await backend.toXlsxTable(workbook, store, options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+      backend: backend.name,
+      functionName: "toXlsxTable",
+    });
+  }
 }
 
 // ── xlsx import ──────────────────────────────────────────────────────────────
@@ -324,12 +366,20 @@ export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
  * Numbers stay numbers, date cells use the date-serial convention, strings are
  * verbatim, and empty cells become `null`.
  */
-export function fromXlsxTable(
+export async function fromXlsxTable(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,
 ): Promise<ColumnarData> {
-  if (!tableImportBackend) throw missingXlsxBackend("fromXlsxTable");
-  return tableImportBackend.fromXlsxTable(data, options);
+  const backend = tableImportBackend;
+  if (!backend) throw missingXlsxBackend("fromXlsxTable", "xlsx-import");
+  try {
+    return await backend.fromXlsxTable(data, options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+      backend: backend.name,
+      functionName: "fromXlsxTable",
+    });
+  }
 }
 
 // ── Workbook-level XLSX round-trip ───────────────────────────────────────────
@@ -357,9 +407,9 @@ export interface XlsxWorkbookWarning {
 export interface XlsxWorkbookOptions {
   /** Abort before or between bounded codec operations. */
   signal?: AbortSignal;
-  /** Maximum logical cells processed. Defaults to 1,000,000. */
+  /** Cells accounted by the active conversion path; defaults to 1,000,000. */
   maxCells?: number;
-  /** Overrides for all other XLSX resource dimensions. */
+  /** Positive overrides for every XLSX resource dimension except `maxCells`. */
   resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;
   onWarning?: (warning: XlsxWorkbookWarning) => void;
 }
@@ -388,19 +438,35 @@ function workbookSnapshotOf(
 }
 
 /** Formula-preserving, multi-sheet workbook export through the optional XLSX backend. */
-export function toXlsxWorkbook(
+export async function toXlsxWorkbook(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
-  if (!workbookBackend) throw missingXlsxBackend("toXlsxWorkbook");
-  return workbookBackend.toXlsxWorkbook(workbookSnapshotOf(input), options);
+  const backend = workbookBackend;
+  if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
+  try {
+    return await backend.toXlsxWorkbook(workbookSnapshotOf(input), options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+      backend: backend.name,
+      functionName: "toXlsxWorkbook",
+    });
+  }
 }
 
 /** Formula-preserving, multi-sheet workbook import through the optional XLSX backend. */
-export function fromXlsxWorkbook(
+export async function fromXlsxWorkbook(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
-  if (!workbookBackend) throw missingXlsxBackend("fromXlsxWorkbook");
-  return workbookBackend.fromXlsxWorkbook(data, options);
+  const backend = workbookBackend;
+  if (!backend) throw missingXlsxBackend("fromXlsxWorkbook", "xlsx-import");
+  try {
+    return await backend.fromXlsxWorkbook(data, options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+      backend: backend.name,
+      functionName: "fromXlsxWorkbook",
+    });
+  }
 }

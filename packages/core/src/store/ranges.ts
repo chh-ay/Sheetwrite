@@ -1,4 +1,4 @@
-import type { Column, ConditionalFormatRule } from "../types/cell.js";
+import type { Column } from "../types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type {
   ColumnFilter,
@@ -6,6 +6,7 @@ import type {
   DocumentOp,
   ProtectedRange,
   Sheet,
+  SheetVisibility,
   SortKey,
 } from "../types/document.js";
 
@@ -24,6 +25,30 @@ export function uniqueColumnKeys(columns: readonly Column[]): boolean {
     keys.add(column.key);
   }
   return true;
+}
+
+/** Right visible neighbor, then left; `removedIndex` retains ordering after removal. */
+export function visibleSheetNeighbor(
+  sheets: readonly { id: SheetId; visibility?: SheetVisibility }[],
+  source: SheetId,
+  removedIndex?: number,
+): SheetId | null {
+  const sourceIndex = sheets.findIndex((sheet) => sheet.id === source);
+  const rightStart =
+    sourceIndex >= 0
+      ? sourceIndex + 1
+      : Math.max(0, Math.min(removedIndex ?? sheets.length, sheets.length));
+  for (let index = rightStart; index < sheets.length; index++) {
+    const sheet = sheets[index]!;
+    if ((sheet.visibility ?? "visible") === "visible") return sheet.id;
+  }
+  const leftStart =
+    sourceIndex >= 0 ? sourceIndex - 1 : Math.min(rightStart - 1, sheets.length - 1);
+  for (let index = leftStart; index >= 0; index--) {
+    const sheet = sheets[index]!;
+    if ((sheet.visibility ?? "visible") === "visible") return sheet.id;
+  }
+  return null;
 }
 
 export function normalizedRange(range: Range): Range {
@@ -81,22 +106,6 @@ export function mergeCrossesFreeze(sheet: Sheet, merge: MergeRange): boolean {
     (merge.r0 < frozenRows && merge.r1 >= frozenRows) ||
     (merge.c0 < frozenCols && merge.c1 >= frozenCols)
   );
-}
-
-export function validConditionalRules(
-  sheet: Sheet,
-  rules: readonly ConditionalFormatRule[],
-): boolean {
-  return rules.every((rule) => {
-    if (rule.range.sheet !== sheet.id) return false;
-    const range = normalizedRange(rule.range);
-    return (
-      integerAt(range.start.row) &&
-      integerAt(range.start.col) &&
-      range.end.row < sheet.rowCount &&
-      range.end.col < sheet.columns.length
-    );
-  });
 }
 
 function validValidationComparison(value: unknown, textLength: boolean): boolean {
@@ -269,6 +278,8 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setRangeStyle":
     case "clearRange":
       return patch.range.sheet;
+    case "addTable":
+      return patch.table.range.sheet;
     case "setNamedRange":
     case "removeNamedRange":
       return null;

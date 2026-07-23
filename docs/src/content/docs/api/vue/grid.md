@@ -9,10 +9,10 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L289</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L375</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>81</span>
+## Members <span class="api-count" data-pagefind-ignore>88</span>
 
 <div class="api-member-list">
 
@@ -30,6 +30,24 @@ readonly store: Store;
 
 ```ts generated
 readonly actions: GridActions;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-runtime-resource-snapshot" data-pagefind-weight="1">
+<summary><code>getRuntimeResourceSnapshot</code> <span class="api-member-summary">Versioned coarse runtime ownership snapshot, including datasource state.</span></summary>
+
+```ts generated
+getRuntimeResourceSnapshot(operation: RuntimeResourceOperation, phase: RuntimeResourcePhase, runtime?: RuntimeMemoryObservation): RuntimeResourceSnapshot;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-command-state" data-pagefind-weight="1">
+<summary><code>getCommandState</code> <span class="api-member-summary">Query undo/redo availability and formatting active/mixed/disabled state.</span></summary>
+
+```ts generated
+getCommandState(command: GridCommandName): GridCommandState;
 ```
 
 </details>
@@ -261,12 +279,14 @@ getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
 </details>
 
 <details class="api-member" id="grid-distinct-values" data-pagefind-weight="1">
-<summary><code>distinctValues</code> <span class="api-member-summary">Distinct resolved values of a column (Rust scan), capped at limit (default 1000) — the data source for a filter-by-values UI.</span></summary>
+<summary><code>distinctValues</code> <span class="api-member-summary">Distinct resolved values of a column in first-seen order.</span></summary>
 
 ```ts generated
 distinctValues(col: number, limit?: number): CellScalar[];
 ```
 
+<p class="api-member-doc">Distinct resolved values of a column in first-seen order. Defaults to
+1,000 values for bounded filter menus; pass 0 to request an uncapped scan.</p>
 </details>
 
 <details class="api-member" id="grid-hide-rows" data-pagefind-weight="1">
@@ -504,19 +524,19 @@ removeColumns(at: number, count?: number): void;
 </details>
 
 <details class="api-member" id="grid-add-sheet" data-pagefind-weight="1">
-<summary><code>addSheet</code> <span class="api-member-summary">Add a sheet with a stable ID and make it available to the tab bar.</span></summary>
+<summary><code>addSheet</code> <span class="api-member-summary">Add a sheet with a stable ID and return its actionable transaction outcome.</span></summary>
 
 ```ts generated
-addSheet(input: AddSheetInput): SheetId;
+addSheet(input: AddSheetInput): SheetLifecycleResult;
 ```
 
 </details>
 
 <details class="api-member" id="grid-remove-sheet" data-pagefind-weight="1">
-<summary><code>removeSheet</code> <span class="api-member-summary">Remove a sheet; at least one sheet always remains.</span></summary>
+<summary><code>removeSheet</code> <span class="api-member-summary">Remove a sheet while preserving at least one visible worksheet.</span></summary>
 
 ```ts generated
-removeSheet(id: SheetId): void;
+removeSheet(id: SheetId): SheetLifecycleResult;
 ```
 
 </details>
@@ -525,7 +545,7 @@ removeSheet(id: SheetId): void;
 <summary><code>renameSheet</code></summary>
 
 ```ts generated
-renameSheet(id: SheetId, name: string): void;
+renameSheet(id: SheetId, name: string): SheetLifecycleResult;
 ```
 
 </details>
@@ -534,7 +554,16 @@ renameSheet(id: SheetId, name: string): void;
 <summary><code>moveSheet</code></summary>
 
 ```ts generated
-moveSheet(id: SheetId, toIndex: number): void;
+moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-set-sheet-visibility" data-pagefind-weight="1">
+<summary><code>setSheetVisibility</code> <span class="api-member-summary">Set host-visible worksheet state; stock UI never offers veryHidden.</span></summary>
+
+```ts generated
+setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
 ```
 
 </details>
@@ -546,6 +575,44 @@ moveSheet(id: SheetId, toIndex: number): void;
 setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
 ```
 
+</details>
+
+<details class="api-member" id="grid-set-hyperlink" data-pagefind-weight="1">
+<summary><code>setHyperlink</code></summary>
+
+```ts generated
+setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-remove-hyperlink" data-pagefind-weight="1">
+<summary><code>removeHyperlink</code></summary>
+
+```ts generated
+removeHyperlink(id: string): ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-hyperlink" data-pagefind-weight="1">
+<summary><code>getHyperlink</code></summary>
+
+```ts generated
+getHyperlink(addr: CellAddress): CellHyperlink | null;
+```
+
+</details>
+
+<details class="api-member" id="grid-activate-hyperlink" data-pagefind-weight="1">
+<summary><code>activateHyperlink</code> <span class="api-member-summary">Validate and emit a host-owned activation event.</span></summary>
+
+```ts generated
+activateHyperlink(addr: CellAddress): boolean;
+```
+
+<p class="api-member-doc">Validate and emit a host-owned activation event. External targets are never
+opened by Sheetwrite; internal navigation occurs only under the explicit policy.</p>
 </details>
 
 <details class="api-member" id="grid-set-validation-rule" data-pagefind-weight="1">
@@ -612,7 +679,7 @@ getNote(addr: CellAddress): string | null;
 </details>
 
 <details class="api-member" id="grid-set-overscan" data-pagefind-weight="1">
-<summary><code>setOverscan</code> <span class="api-member-summary">Live-update the render window overscan (rows/cols painted beyond the viewport); undefined restores the default.</span></summary>
+<summary><code>setOverscan</code> <span class="api-member-summary">Live-update the render window overscan (row/column positions painted past each edge); undefined restores the default of 6.</span></summary>
 
 ```ts generated
 setOverscan(overscan?: number): void;
@@ -796,6 +863,12 @@ destroy(): void;
 export interface Grid {
   readonly store: Store;
   readonly actions: GridActions;
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot;
+  getCommandState(command: GridCommandName): GridCommandState;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null;
@@ -848,11 +921,19 @@ export interface Grid {
   removeRows(at: number, count?: number): void;
   insertColumns(at: number, count?: number): void;
   removeColumns(at: number, count?: number): void;
-  addSheet(input: AddSheetInput): SheetId;
-  removeSheet(id: SheetId): void;
-  renameSheet(id: SheetId, name: string): void;
-  moveSheet(id: SheetId, toIndex: number): void;
+  addSheet(input: AddSheetInput): SheetLifecycleResult;
+  removeSheet(id: SheetId): SheetLifecycleResult;
+  renameSheet(id: SheetId, name: string): SheetLifecycleResult;
+  moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+  setSheetVisibility(
+    id: SheetId,
+    visibility: SheetVisibility,
+  ): SheetLifecycleResult;
   setConditionalFormats(rules: readonly ConditionalFormatRule[]): void;
+  setHyperlink(hyperlink: CellHyperlink): ApplyTransactionResult;
+  removeHyperlink(id: string): ApplyTransactionResult;
+  getHyperlink(addr: CellAddress): CellHyperlink | null;
+  activateHyperlink(addr: CellAddress): boolean;
   setValidationRule(rule: DataValidationRule): ApplyTransactionResult;
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;

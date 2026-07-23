@@ -6,6 +6,7 @@ export type HistoryPart =
   | {
       kind: "rangeSnapshot";
       range: Range;
+      byteLength: number;
       toPatch: (range: Range) => Extract<DocumentOp, { op: "setBlock" }>;
       dispose: () => void;
     };
@@ -17,6 +18,16 @@ interface UndoEntry {
   redo: DocumentOp[];
 }
 
+export interface HistoryResourceStats {
+  readonly undoEntries: number;
+  readonly redoEntries: number;
+  readonly retainedSnapshots: number;
+  readonly retainedSnapshotBytes: number;
+}
+
+/** Retains recent transaction-level undo resources without allowing unbounded history growth. */
+const DEFAULT_HISTORY_LIMIT = 200;
+
 /**
  * Bounded undo/redo over document transactions. Destructive bulk edits may
  * retain opaque store-local range resources, which are materialized into a
@@ -26,7 +37,7 @@ export class UndoManager {
   private readonly undoStack: UndoEntry[] = [];
   private readonly redoStack: UndoEntry[] = [];
 
-  constructor(private readonly limit = 200) {}
+  constructor(private readonly limit = DEFAULT_HISTORY_LIMIT) {}
 
   /** Record an applied edit. A fresh edit disposes the discarded redo stack. */
   push(undo: HistoryAction, redo: DocumentOp[]): void {
@@ -89,6 +100,27 @@ export class UndoManager {
 
   get canRedo(): boolean {
     return this.redoStack.length > 0;
+  }
+
+  /** On-demand aggregate; retained history never emits per-cell allocation events. */
+  getResourceStats(): HistoryResourceStats {
+    let retainedSnapshots = 0;
+    let retainedSnapshotBytes = 0;
+    for (const stack of [this.undoStack, this.redoStack]) {
+      for (const entry of stack) {
+        for (const part of entry.undo) {
+          if (part.kind !== "rangeSnapshot") continue;
+          retainedSnapshots += 1;
+          retainedSnapshotBytes += part.byteLength;
+        }
+      }
+    }
+    return {
+      undoEntries: this.undoStack.length,
+      redoEntries: this.redoStack.length,
+      retainedSnapshots,
+      retainedSnapshotBytes,
+    };
   }
 
   private rebase(mapAddr: (addr: CellAddress) => CellAddress | null): void {
@@ -173,6 +205,53 @@ function rebasePatches(
             sheet: start.sheet,
             start: { row: start.row, col: start.col },
             end: { row: end.row, col: end.col },
+          },
+        });
+      }
+      continue;
+    }
+    if (patch.op === "addTable") {
+      const start = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.start });
+      const end = mapAddr({ sheet: patch.table.range.sheet, ...patch.table.range.end });
+      if (
+        start &&
+        end &&
+        start.sheet === end.sheet &&
+        end.col - start.col + 1 === patch.table.columns.length
+      ) {
+        out.push({
+          ...patch,
+          table: {
+            ...patch.table,
+            range: {
+              sheet: start.sheet,
+              start: { row: start.row, col: start.col },
+              end: { row: end.row, col: end.col },
+            },
+          },
+        });
+      }
+      continue;
+    }
+    if (patch.op === "updateTable" && patch.patch.range) {
+      const start = mapAddr({ sheet: patch.patch.range.sheet, ...patch.patch.range.start });
+      const end = mapAddr({ sheet: patch.patch.range.sheet, ...patch.patch.range.end });
+      if (
+        start &&
+        end &&
+        start.sheet === end.sheet &&
+        (patch.patch.columns === undefined ||
+          end.col - start.col + 1 === patch.patch.columns.length)
+      ) {
+        out.push({
+          ...patch,
+          patch: {
+            ...patch.patch,
+            range: {
+              sheet: start.sheet,
+              start: { row: start.row, col: start.col },
+              end: { row: end.row, col: end.col },
+            },
           },
         });
       }

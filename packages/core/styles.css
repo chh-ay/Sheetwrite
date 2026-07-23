@@ -100,6 +100,16 @@
   z-index: 1;
 }
 
+.sheetwrite-dom-overlay {
+  z-index: 2;
+}
+
+.sheetwrite-dom-cell-bounds > * {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
 /* ── Formula assist (autocomplete popup) ──────────────────────────────────── */
 /* Owned by FormulaAssist (packages/core/src/formula-assist.ts). Colors come from
    --sheetwrite-assist-* custom properties, seeded from the active theme at
@@ -322,50 +332,302 @@
    from the active Theme; positioning stays inline because the bar reserves
    layout height). Override any rule from host CSS to restyle. */
 .sheetwrite-tabbar {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 3px;
+  padding: 3px 8px;
   box-sizing: border-box;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
   font: var(--sheetwrite-tab-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
   background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
   border-top: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
-.sheetwrite-tab {
+.sheetwrite-tabstrip {
+  position: relative;
+  display: flex;
   height: 100%;
-  border: none;
-  padding: 0 16px;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.sheetwrite-tablist {
+  display: flex;
+  height: 100%;
+  flex: 0 0 auto;
+  gap: 3px;
+  align-items: center;
+}
+
+.sheetwrite-tab-item {
+  position: relative;
+  display: inline-flex;
+  height: 100%;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.sheetwrite-tab {
+  position: relative;
+  height: 100%;
+  border: 1px solid transparent;
+  padding: 0 14px;
   cursor: pointer;
   white-space: nowrap;
-  border-radius: 4px 4px 0 0;
+  border-radius: 6px;
   font: inherit;
+  font-weight: 550;
   background: transparent;
   color: var(--sheetwrite-tab-fg, #5f6368);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 .sheetwrite-tab:hover:not(.sheetwrite-tab-active) {
+  border-color: var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
   background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
 }
 
-.sheetwrite-tab-active {
-  background: var(--sheetwrite-tab-active-bg, #e8f0fe);
-  color: var(--sheetwrite-tab-active-fg, #1a73e8);
-  box-shadow: inset 0 -2px 0 var(--sheetwrite-tab-active-fg, #1a73e8);
+.sheetwrite-tab:focus,
+.sheetwrite-tab-options-button:focus,
+.sheetwrite-tab-add:focus,
+.sheetwrite-tab-menu-item:focus,
+.sheetwrite-tab-unhide > button:focus {
+  outline: none;
 }
 
-.sheetwrite-tab-close {
+.sheetwrite-tab:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
+}
+
+.sheetwrite-tab-options-button:focus-visible,
+.sheetwrite-tab-add:focus-visible,
+.sheetwrite-tab-menu-item:focus-visible,
+.sheetwrite-tab-unhide > button:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
+}
+
+.sheetwrite-tab-active {
+  border-color: transparent;
+  background: var(--sheetwrite-tab-active-bg, #e8f0fe);
+  color: var(--sheetwrite-tab-active-fg, #1a73e8);
+  font-weight: 680;
+}
+
+.sheetwrite-tab-item-with-options > .sheetwrite-tab-active {
+  padding-right: 36px;
+}
+
+.sheetwrite-tab-options {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
   height: 100%;
-  border: none;
-  margin-inline-start: -14px;
-  padding: 0 8px 0 2px;
+}
+
+.sheetwrite-tabstrip > .sheetwrite-tab-options {
+  position: absolute;
+  z-index: 3;
+}
+
+.sheetwrite-tab-options-button,
+.sheetwrite-tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: calc(100% - 6px);
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: transparent;
   color: var(--sheetwrite-tab-fg, #5f6368);
   cursor: pointer;
   font: inherit;
 }
 
-.sheetwrite-tab-close:hover {
+.sheetwrite-tab-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.sheetwrite-tab-options-button {
+  min-width: 28px;
+  padding: 0 6px 2px;
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+.sheetwrite-tabstrip > .sheetwrite-tab-options .sheetwrite-tab-options-button {
+  height: 100%;
+  border: 0;
+  background: transparent;
   color: var(--sheetwrite-tab-active-fg, #1a73e8);
+}
+
+.sheetwrite-tab-add {
+  width: 30px;
+  padding: 0;
+  font-size: 1.05em;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.sheetwrite-tab-options-button:hover,
+.sheetwrite-tab-options-button[aria-expanded="true"],
+.sheetwrite-tab-add:hover {
+  border-color: var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
+  color: var(--sheetwrite-tab-active-fg, #1a73e8);
+}
+
+.sheetwrite-tab-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 9rem;
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 6px;
+  box-sizing: border-box;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+  color: var(--sheetwrite-tab-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-tab-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+}
+
+.sheetwrite-tab-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.sheetwrite-tab-menu-item:hover,
+.sheetwrite-tab-menu-item:focus-visible {
+  background: var(--sheetwrite-tab-hover-bg, #f8f9fa);
+}
+
+.sheetwrite-tab-menu-item-destructive {
+  color: var(--sheetwrite-error-fg, #b3261e);
+}
+
+.sheetwrite-tab-placeholder {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.sheetwrite-tab-input {
+  position: absolute;
+  z-index: 2;
+  min-width: 0;
+  max-width: min(16rem, 45vw);
+  cursor: text;
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--sheetwrite-tab-active-fg, #1a73e8);
+}
+
+.sheetwrite-tab-input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 2px var(--sheetwrite-error-fg, #b3261e);
+}
+
+.sheetwrite-tab-unhide > button[aria-invalid="true"] {
+  color: var(--sheetwrite-error-fg, #b3261e);
+}
+
+.sheetwrite-tab-unhide {
+  position: relative;
+  z-index: 7;
+  flex: none;
+  align-self: center;
+  height: calc(100% - 6px);
+  color: var(--sheetwrite-tab-fg, #5f6368);
+  font: inherit;
+}
+
+.sheetwrite-tab-unhide > button {
+  box-sizing: border-box;
+  height: 100%;
+  max-width: 10rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 6px;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sheetwrite-tab-unhide-menu {
+  position: absolute;
+  z-index: 6;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: grid;
+  min-width: 10rem;
+  max-height: 14rem;
+  padding: 4px;
+  overflow: auto;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 6px;
+  background: var(--sheetwrite-tab-bg, var(--sheetwrite-bg, #ffffff));
+  box-shadow: var(--sheetwrite-menu-shadow, 0 8px 24px rgb(60 64 67 / 20%));
+}
+
+.sheetwrite-tab-unhide-menu[popover] {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  margin: 0;
+}
+
+.sheetwrite-tab-unhide-menu[hidden] {
+  display: none;
+}
+
+.sheetwrite-tab-unhide-menu button {
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sheetwrite-tab-unhide-menu button:is(:hover, :focus-visible) {
+  background: var(--sheetwrite-menu-hover, #f1f3f4);
+}
+
+.sheetwrite-tab-error {
+  flex: none;
+  align-self: center;
+  max-width: min(18rem, 50vw);
+  overflow: hidden;
+  color: var(--sheetwrite-error-fg, #b3261e);
+  font-size: 0.85em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheetwrite-tab {
+    transition: none;
+  }
 }

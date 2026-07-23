@@ -9,10 +9,10 @@ Allocation and load statistics for one paged datasource sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L94</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L120</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -52,6 +52,15 @@ allocatedBytes: number;
 
 </details>
 
+<details class="api-member" id="paged-store-stats-dirty-allocated-bytes" data-pagefind-weight="1">
+<summary><code>dirtyAllocatedBytes</code> <span class="api-member-summary">Sparse local-edit overlay bytes, excluded from the clean chunk cache budget.</span></summary>
+
+```ts generated
+dirtyAllocatedBytes: number;
+```
+
+</details>
+
 <details class="api-member" id="paged-store-stats-fully-loaded" data-pagefind-weight="1">
 <summary><code>fullyLoaded</code></summary>
 
@@ -73,6 +82,7 @@ export interface PagedStoreStats {
   loadedCells: number;
   dirtyCells: number;
   allocatedBytes: number;
+  dirtyAllocatedBytes: number;
   fullyLoaded: boolean;
 }
 ```

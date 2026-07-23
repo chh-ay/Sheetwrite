@@ -8,6 +8,7 @@
 
 import type {
   DataSource,
+  DataSourcePage,
   Grid,
   GridConfig,
   GridOptions,
@@ -128,27 +129,22 @@ const WORKBENCH_GRID_CONFIG: GridConfig = {
 function createRevenuePageSource(onServed: (start: number, end: number) => void): DataSource {
   let firstRequest = true;
   return {
-    getRows({ start, end, signal, revision }) {
-      const { promise, resolve, reject } = Promise.withResolvers<{
-        start: number;
-        rows: RowData[];
-        revision: number;
-      }>();
+    capabilities: { protocol: 2, columns: "windowed" },
+    getRows({ start, end, columns, signal, revision }) {
+      const { promise, resolve, reject } = Promise.withResolvers<DataSourcePage>();
+      const requestedKeys = columns.flatMap((band) => band.keys);
       const latency = firstRequest ? 0 : PAGE_LATENCY_MS;
       firstRequest = false;
       const timer = setTimeout(() => {
         const rows: RowData[] = [];
         for (let row = start; row < end; row++) {
-          rows.push({
-            id: ENGINE_DATA.columns.id?.[row] ?? null,
-            date: ENGINE_DATA.columns.date?.[row] ?? null,
-            account: ENGINE_DATA.columns.account?.[row] ?? null,
-            city: ENGINE_DATA.columns.city?.[row] ?? null,
-            owner: ENGINE_DATA.columns.owner?.[row] ?? null,
-            arr: ENGINE_DATA.columns.arr?.[row] ?? null,
-          });
+          const pageRow: RowData = {};
+          for (const key of requestedKeys) {
+            pageRow[key] = ENGINE_DATA.columns[key]?.[row] ?? null;
+          }
+          rows.push(pageRow);
         }
-        resolve({ start, rows, revision });
+        resolve({ protocol: 2, start, columns, rows, revision });
         onServed(start, end);
       }, latency);
       signal.addEventListener(
@@ -356,7 +352,7 @@ export function addSummarySheet(grid: Grid): SheetId {
     return SUMMARY_SHEET;
   }
 
-  const id = grid.addSheet({
+  const result = grid.addSheet({
     id: SUMMARY_SHEET,
     name: "Summary",
     rowCount: 4,
@@ -365,6 +361,10 @@ export function addSummarySheet(grid: Grid): SheetId {
       { key: "value", header: "Value", width: 170, type: "currency", numberFormat: "$#,##0.00" },
     ],
   });
+  if (result.status !== "applied") {
+    throw new Error(`Unable to add the summary sheet (${result.status})`);
+  }
+  const id = result.sheet;
 
   // One undoable commit: labels plus cross-sheet aggregate formulas.
   const range = `${ENGINE_SHEET_REF}!F1:F${ENGINE_ROWS}`;

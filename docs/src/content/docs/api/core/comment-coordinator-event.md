@@ -9,7 +9,7 @@ State transition emitted by the comment coordinator.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L448</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L490</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>
@@ -54,7 +54,7 @@ State transition emitted by the comment coordinator.
 <div class="api-variant">
 
 ```ts generated
-{ type: "error"; error: unknown }
+{ type: "error"; error: SheetwriteError }
 ```
 
 </div>
@@ -88,7 +88,7 @@ export type CommentCoordinatorEvent =
     }
   | {
       type: "error";
-      error: unknown;
+      error: SheetwriteError;
     };
 ```
 

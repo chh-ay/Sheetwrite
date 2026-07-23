@@ -1,7 +1,15 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "@playwright/test";
 
-export const SITE_PORT = 4173;
+const requestedSitePort = Number(process.env.SHEETWRITE_TEST_PORT ?? 4173);
+if (
+  !Number.isSafeInteger(requestedSitePort) ||
+  requestedSitePort < 1 ||
+  requestedSitePort > 65_535
+) {
+  throw new Error(`Invalid SHEETWRITE_TEST_PORT: ${process.env.SHEETWRITE_TEST_PORT ?? ""}`);
+}
+export const SITE_PORT = requestedSitePort;
 export const SITE_BASE = "";
 export function siteUrl(path = "/"): string {
   const suffix = path.startsWith("/") ? path : `/${path}`;
@@ -40,8 +48,8 @@ export default defineConfig({
     cwd: fileURLToPath(new URL("../../", import.meta.url)),
     url: siteUrl(),
     timeout: 120_000,
-    // Concurrent local focused runs share one static dist server; CI must
-    // always start fresh so it can never bind a stale dist (hash-mismatch 500s).
-    reuseExistingServer: !process.env.CI,
+    // Each run owns a fresh server. Parallel worktrees must provide distinct
+    // SHEETWRITE_TEST_PORT values so one branch can never validate another's dist.
+    reuseExistingServer: false,
   },
 });

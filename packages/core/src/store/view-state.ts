@@ -1,11 +1,44 @@
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey, Workbook } from "../types/document.js";
+import type { ResourceOwnerBytes } from "../types/store.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
 const EMPTY_U32 = new Uint32Array(0);
 const EMPTY_FILTERS: ReadonlyMap<number, ColumnFilter> = new Map();
 const EMPTY_GROUPS: readonly RowGroup[] = [];
+const ABSENT_VIEW_ROW = 0xffff_ffff;
+
+type PackedRowIndexKind = "empty" | "sparse" | "dense";
+
+interface PackedRowIndex {
+  readonly kind: PackedRowIndexKind;
+  readonly storage: Uint32Array;
+  logicalRows: number;
+  valid: boolean;
+}
+
+interface PackedRowIndexShape {
+  readonly kind: PackedRowIndexKind;
+  readonly storageLength: number;
+}
+
+function packedIndexShape(logicalRows: number, survivors: number): PackedRowIndexShape {
+  if (survivors === 0) return { kind: "empty", storageLength: 0 };
+
+  const requiredSlots = survivors * 2;
+  if (requiredSlots < 0x8000_0000) {
+    let capacity = 1;
+    while (capacity < requiredSlots) capacity *= 2;
+    const storageLength = capacity * 2;
+    if (storageLength < logicalRows) return { kind: "sparse", storageLength };
+  }
+  return { kind: "dense", storageLength: logicalRows };
+}
+
+function hashDataRow(row: number): number {
+  return Math.imul(row ^ (row >>> 16), 0x045d_9f3b) >>> 0;
+}
 
 const COMPARE_OP: Record<"gt" | "gte" | "lt" | "lte" | "eq" | "neq", number> = {
   gt: 0,
@@ -26,7 +59,7 @@ interface ViewState {
 /** Owns the mutable view permutation and its query configuration. */
 export class StoreViewState {
   private readonly orderBySheet = new Map<SheetId, Uint32Array>();
-  private readonly rowIndexBySheet = new Map<SheetId, Map<number, number>>();
+  private readonly rowIndexBySheet = new Map<SheetId, PackedRowIndex>();
   private readonly stateBySheet = new Map<SheetId, ViewState>();
 
   constructor(
@@ -45,23 +78,42 @@ export class StoreViewState {
   }
 
   viewRowOf(sheet: SheetId, dataRow: number): number | null {
+    if (!Number.isInteger(dataRow) || dataRow < 0) return null;
+
     const order = this.orderBySheet.get(sheet);
     if (!order) {
       const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-      const inBounds =
-        meta !== undefined && Number.isInteger(dataRow) && dataRow >= 0 && dataRow < meta.rowCount;
-      return inBounds ? dataRow : null;
+      return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
     }
 
     let index = this.rowIndexBySheet.get(sheet);
-    if (!index) {
-      index = new Map();
-      for (let viewRow = 0; viewRow < order.length; viewRow++) {
-        index.set(order[viewRow]!, viewRow);
-      }
-      this.rowIndexBySheet.set(sheet, index);
+    if (!index?.valid) {
+      const meta = this.sheetMeta(sheet);
+      if (dataRow >= meta.rowCount) return null;
+      index = this.rebuildRowIndex(sheet, order, meta.rowCount, index);
     }
-    return index.get(dataRow) ?? null;
+    if (dataRow >= index.logicalRows || index.kind === "empty") return null;
+
+    if (index.kind === "dense") {
+      const viewRow = index.storage[dataRow]!;
+      return viewRow === ABSENT_VIEW_ROW ? null : viewRow;
+    }
+
+    const capacity = index.storage.length / 2;
+    const mask = capacity - 1;
+    let slot = hashDataRow(dataRow) & mask;
+    for (;;) {
+      const at = slot * 2;
+      const storedDataRow = index.storage[at]!;
+      if (storedDataRow === ABSENT_VIEW_ROW) return null;
+      if (storedDataRow === dataRow) return index.storage[at + 1]!;
+      slot = (slot + 1) & mask;
+    }
+  }
+
+  /** Retained packed backing bytes for focused resource attribution. */
+  inverseIndexByteLength(sheet: SheetId): number {
+    return this.rowIndexBySheet.get(sheet)?.storage.byteLength ?? 0;
   }
 
   columnFilters(sheet: SheetId): ReadonlyMap<number, ColumnFilter> {
@@ -132,6 +184,55 @@ export class StoreViewState {
     this.stateBySheet.delete(sheet);
     this.orderBySheet.delete(sheet);
     this.rowIndexBySheet.delete(sheet);
+  }
+
+  resourceOwners(): ResourceOwnerBytes[] {
+    let orderBytes = 0;
+    let orderEntries = 0;
+    for (const order of this.orderBySheet.values()) {
+      orderBytes += order.byteLength;
+      orderEntries += order.length;
+    }
+    let inverseBytes = 0;
+    let inverseEntries = 0;
+    for (const index of this.rowIndexBySheet.values()) {
+      inverseBytes += index.storage.byteLength;
+      inverseEntries += index.storage.length;
+    }
+    let configEntries = 0;
+    for (const state of this.stateBySheet.values()) {
+      configEntries +=
+        state.sortKeys.length + state.filters.size + state.hiddenRows.size + state.groups.length;
+    }
+    return [
+      {
+        owner: "js.view.order",
+        logicalBytes: orderBytes,
+        allocatedBytes: orderBytes,
+        entries: orderEntries,
+        measurement: "typed-array-byte-length",
+      },
+      {
+        owner: "js.view.inverse-index",
+        logicalBytes: inverseBytes,
+        allocatedBytes: inverseBytes,
+        entries: inverseEntries,
+        measurement: "typed-array-byte-length",
+      },
+      {
+        owner: "js.view.configuration",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        entries: configEntries,
+        measurement: "entry-count-only",
+      },
+    ];
+  }
+
+  dispose(): void {
+    this.stateBySheet.clear();
+    this.orderBySheet.clear();
+    this.rowIndexBySheet.clear();
   }
 
   distinctValues(sheet: SheetId, col: number, limit: number): CellScalar[] {
@@ -309,9 +410,96 @@ export class StoreViewState {
     return state;
   }
 
+  private rebuildRowIndex(
+    sheet: SheetId,
+    order: Uint32Array,
+    logicalRows: number,
+    reusable: PackedRowIndex | undefined,
+  ): PackedRowIndex {
+    if (logicalRows > ABSENT_VIEW_ROW || order.length > ABSENT_VIEW_ROW) {
+      throw new RangeError(
+        `sheet ${sheet} exceeds the packed inverse row limit of ${ABSENT_VIEW_ROW}`,
+      );
+    }
+
+    const shape = packedIndexShape(logicalRows, order.length);
+    let index = reusable;
+    if (!index || index.kind !== shape.kind || index.storage.length !== shape.storageLength) {
+      index = {
+        kind: shape.kind,
+        storage: shape.storageLength === 0 ? EMPTY_U32 : new Uint32Array(shape.storageLength),
+        logicalRows,
+        valid: false,
+      };
+      this.rowIndexBySheet.set(sheet, index);
+    } else {
+      index.logicalRows = logicalRows;
+    }
+
+    if (index.kind === "empty") {
+      index.valid = true;
+      return index;
+    }
+
+    index.storage.fill(ABSENT_VIEW_ROW);
+    if (index.kind === "dense") {
+      for (let viewRow = 0; viewRow < order.length; viewRow++) {
+        const dataRow = order[viewRow]!;
+        if (dataRow >= logicalRows) {
+          throw new RangeError(
+            `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
+          );
+        }
+        if (index.storage[dataRow] !== ABSENT_VIEW_ROW) {
+          throw new RangeError(
+            `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
+          );
+        }
+        index.storage[dataRow] = viewRow;
+      }
+    } else {
+      const capacity = index.storage.length / 2;
+      const mask = capacity - 1;
+      for (let viewRow = 0; viewRow < order.length; viewRow++) {
+        const dataRow = order[viewRow]!;
+        if (dataRow >= logicalRows) {
+          throw new RangeError(
+            `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
+          );
+        }
+        let slot = hashDataRow(dataRow) & mask;
+        for (;;) {
+          const at = slot * 2;
+          const storedDataRow = index.storage[at]!;
+          if (storedDataRow === dataRow) {
+            throw new RangeError(
+              `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
+            );
+          }
+          if (storedDataRow === ABSENT_VIEW_ROW) {
+            index.storage[at] = dataRow;
+            index.storage[at + 1] = viewRow;
+            break;
+          }
+          slot = (slot + 1) & mask;
+        }
+      }
+    }
+    index.valid = true;
+    return index;
+  }
+
   private setOrder(sheet: SheetId, order: Uint32Array): void {
     this.orderBySheet.set(sheet, order);
-    this.rowIndexBySheet.delete(sheet);
+    const index = this.rowIndexBySheet.get(sheet);
+    if (!index) return;
+
+    const shape = packedIndexShape(this.sheetMeta(sheet).rowCount, order.length);
+    if (index.kind !== shape.kind || index.storage.length !== shape.storageLength) {
+      this.rowIndexBySheet.delete(sheet);
+    } else {
+      index.valid = false;
+    }
   }
 
   private dropOrder(sheet: SheetId): void {

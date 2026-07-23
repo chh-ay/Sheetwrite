@@ -1,4 +1,5 @@
 import type {
+  CellHyperlink,
   CellScalar,
   CellStyle,
   CellValue,
@@ -12,8 +13,23 @@ import type {
   SheetSnapshot,
   SnapshotCell,
   WorkbookSnapshot,
+  WorkbookTable,
+  WorkbookTableUnsupportedFeature,
 } from "@sheetwrite/core";
-import { colToA1, dateToSerial, labelToCol } from "@sheetwrite/core";
+import {
+  colToA1,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  dateToSerial,
+  isSafeExternalHyperlink,
+  labelToCol,
+  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
+  MAX_CONDITIONAL_FORMAT_RULES,
+  MAX_HYPERLINK_DISPLAY_LENGTH,
+  MAX_HYPERLINKS_PER_SHEET,
+  sheetNameKey,
+  validateSheetName,
+  validateWorkbookTableName,
+} from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import {
@@ -27,7 +43,6 @@ import { type ParsedCellStyle, ParsedStyles } from "./styles.js";
 import {
   assertXmlRoot,
   decodeXstring,
-  isValidXlsxWorksheetName,
   type XmlElement,
   xmlAttribute,
   xmlBoolean,
@@ -61,6 +76,18 @@ interface ParsedValidation {
   readonly helpText?: string;
 }
 
+interface ParsedHyperlink {
+  readonly range: Omit<CellHyperlink["range"], "sheet">;
+  readonly target:
+    | { readonly kind: "external"; readonly url: string }
+    | {
+        readonly kind: "internal";
+        readonly sheetName: string;
+        readonly range: Omit<CellHyperlink["range"], "sheet">;
+      };
+  readonly display?: string;
+}
+
 interface ParsedSheet {
   readonly name: string;
   readonly state: string | undefined;
@@ -78,6 +105,10 @@ interface ParsedSheet {
   readonly rowGroups: NonNullable<SheetSnapshot["rowGroups"]>;
   readonly validations: ParsedValidation[];
   readonly notes: { row: number; col: number; text: string }[];
+  readonly hyperlinks: ParsedHyperlink[];
+  readonly tables: (Omit<WorkbookTable, "range"> & {
+    readonly range: Omit<WorkbookTable["range"], "sheet">;
+  })[];
   readonly hasRowOutlines: boolean;
   readonly hasUnsupportedValidation: boolean;
   readonly hasConditionalFormatting: boolean;
@@ -88,6 +119,8 @@ interface ParsedSheet {
   readonly hasAutoFilter: boolean;
   readonly hasValidationCollection: boolean;
   readonly hasComments: boolean;
+  readonly hasHyperlinks: boolean;
+  readonly hasConditionalFormatExtensions: boolean;
 }
 
 interface WorkbookSheetReference {
@@ -128,19 +161,25 @@ function strictDateSerial(value: string, address: string): number {
 }
 
 function parseUnsigned(value: string | undefined, description: string): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) return readerFailure(`${description} is invalid`);
+  const text = value?.trim() ?? "";
+  if (!/^\d+$/.test(text)) return readerFailure(`${description} is invalid`);
+  const parsed = Number(text);
+  if (!Number.isSafeInteger(parsed)) return readerFailure(`${description} is invalid`);
   return parsed;
 }
 
 function parseCellAddress(value: string): { row: number; col: number } {
   const match = /^\$?([A-Z]{1,3})\$?([1-9]\d*)$/i.exec(value);
   if (!match) return readerFailure(`cell reference ${value} is invalid`);
-  return { row: Number(match[2]) - 1, col: labelToCol(match[1]!) };
+  const row = Number(match[2]) - 1;
+  if (!Number.isSafeInteger(row)) return readerFailure(`cell reference ${value} is invalid`);
+  return { row, col: labelToCol(match[1]!) };
 }
 
 function parseRange(value: string): MergeRange {
-  const [startRaw, endRaw = startRaw] = value.split(":");
+  const parts = value.split(":");
+  if (parts.length > 2) return readerFailure(`range ${value} is invalid`);
+  const [startRaw, endRaw = startRaw] = parts;
   if (!startRaw || !endRaw) return readerFailure(`range ${value} is invalid`);
   const start = parseCellAddress(startRaw);
   const end = parseCellAddress(endRaw);
@@ -479,15 +518,30 @@ function parseConditionalFormats(
   root: XmlElement,
   styles: ParsedStyles,
   sheet: string,
+  context: XlsxCodecContext,
 ): { rules: ConditionalFormatRule[]; unsupported: boolean } {
-  const parsed: { priority: number; rule: ConditionalFormatRule }[] = [];
-  let unsupported = false;
+  const parsed: { priority: number; order: number; rule: ConditionalFormatRule }[] = [];
+  let sourceOrder = 0;
+  const dropped = (message: string): void =>
+    emitWarning(context, { code: "format-loss", message, sheet });
   for (const collection of xmlChildren(root, "conditionalFormatting")) {
     const ranges = (xmlAttribute(collection, "sqref") ?? "").trim().split(/\s+/).filter(Boolean);
     for (const element of xmlChildren(collection, "cfRule")) {
-      const type = xmlAttribute(element, "type");
+      const order = sourceOrder++;
+      const type = xmlAttribute(element, "type") ?? "(missing)";
+      if (type === "colorScale" || type === "dataBar" || type === "iconSet") {
+        dropped(`Excel conditional-format rule type ${type} is unsupported and was dropped`);
+        continue;
+      }
+      const rawPriority = xmlAttribute(element, "priority");
+      const priority = rawPriority === undefined ? Number.MAX_SAFE_INTEGER : Number(rawPriority);
+      if (!Number.isSafeInteger(priority) || priority < 0) {
+        dropped("Excel conditional-format rule has an invalid priority and was dropped");
+        continue;
+      }
       const operator = xmlAttribute(element, "operator");
-      const formula = xmlChild(element, "formula")?.text;
+      const rawFormula = xmlChild(element, "formula")?.text;
+      const formula = rawFormula === undefined ? undefined : decodeXstring(rawFormula.trim());
       let when: ConditionalFormatPredicate | undefined;
       if (type === "cellIs") {
         const value = conditionalScalar(formula);
@@ -507,18 +561,34 @@ function parseConditionalFormats(
         const text = xmlAttribute(element, "text");
         if (text !== undefined) when = { kind: "contains", text: decodeXstring(text) };
       } else if (type === "expression" && formula) {
-        const match = /^ISNUMBER\(FIND\("((?:[^"]|"")*)",[^)]+\)\)$/i.exec(formula.trim());
-        if (match) {
-          when = {
-            kind: "contains",
-            text: decodeXstring(match[1]!.replaceAll('""', '"')),
-            matchCase: true,
-          };
-        }
+        const match = /^ISNUMBER\(FIND\("((?:[^"]|"")*)",[^)]+\)\)$/i.exec(formula);
+        when = match
+          ? {
+              kind: "contains",
+              text: decodeXstring(match[1]!.replaceAll('""', '"')),
+              matchCase: true,
+            }
+          : { kind: "formula", source: formula.startsWith("=") ? formula : `=${formula}` };
+      }
+      if (!when || ranges.length === 0) {
+        dropped(`Excel conditional-format rule type ${type} is unsupported and was dropped`);
+        continue;
+      }
+      if (when.kind === "formula" && when.source.length > MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH) {
+        dropped(
+          `Excel conditional-format formula exceeds ${MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH} characters and was dropped`,
+        );
+        continue;
+      }
+      if (when.kind === "formula" && formulaContainsExternalReference(when.source)) {
+        dropped("External-data conditional-format formula was dropped");
+        continue;
       }
       const rawDxf = xmlAttribute(element, "dxfId");
-      if (!when || ranges.length === 0 || (rawDxf !== undefined && !/^\d+$/.test(rawDxf))) {
-        unsupported = true;
+      if (rawDxf !== undefined && !/^\d+$/.test(rawDxf)) {
+        dropped(
+          `Excel conditional-format rule type ${type} has an invalid differential style and was dropped`,
+        );
         continue;
       }
       let style: CellStyle = {};
@@ -526,14 +596,17 @@ function parseConditionalFormats(
         try {
           style = styles.differentialAt(Number(rawDxf));
         } catch {
-          unsupported = true;
+          dropped(
+            `Excel conditional-format rule type ${type} has an invalid differential style and was dropped`,
+          );
           continue;
         }
       }
       for (const rangeText of ranges) {
         const range = parseRange(rangeText);
         parsed.push({
-          priority: Number(xmlAttribute(element, "priority") ?? Number.MAX_SAFE_INTEGER),
+          priority,
+          order,
           rule: {
             range: {
               sheet,
@@ -542,13 +615,171 @@ function parseConditionalFormats(
             },
             when: structuredClone(when),
             style: structuredClone(style),
+            ...(xmlBoolean(xmlAttribute(element, "stopIfTrue")) ? { stopIfTrue: true } : {}),
           },
         });
       }
     }
   }
-  parsed.sort((left, right) => left.priority - right.priority);
-  return { rules: parsed.map((entry) => entry.rule), unsupported };
+  parsed.sort((left, right) => left.priority - right.priority || left.order - right.order);
+  if (parsed.length > MAX_CONDITIONAL_FORMAT_RULES) {
+    dropped(
+      `Excel conditional-format rule limit ${MAX_CONDITIONAL_FORMAT_RULES} was exceeded; later rules were dropped`,
+    );
+    parsed.length = MAX_CONDITIONAL_FORMAT_RULES;
+  }
+  return { rules: parsed.map((entry) => entry.rule), unsupported: false };
+}
+
+function xmlHasDescendant(element: XmlElement, localName: string): boolean {
+  return element.children.some(
+    (child) => xmlLocalName(child.name) === localName || xmlHasDescendant(child, localName),
+  );
+}
+
+function parseHyperlinkLocation(
+  value: string,
+  currentSheet: string,
+): { sheetName: string; range: Omit<CellHyperlink["range"], "sheet"> } | null {
+  const location = decodeXstring(value).replace(/^#/, "");
+  const separator = location.lastIndexOf("!");
+  let sheetName = currentSheet;
+  let rangeText = location;
+  if (separator >= 0) {
+    const rawSheet = location.slice(0, separator);
+    rangeText = location.slice(separator + 1);
+    if (rawSheet.startsWith("'") && rawSheet.endsWith("'")) {
+      sheetName = rawSheet.slice(1, -1).replaceAll("''", "'");
+    } else {
+      sheetName = rawSheet;
+    }
+  }
+  if (!sheetName || !rangeText) return null;
+  try {
+    const parsed = parseRange(rangeText.replaceAll("$", ""));
+    return {
+      sheetName,
+      range: {
+        start: { row: parsed.r0, col: parsed.c0 },
+        end: { row: parsed.r1, col: parsed.c1 },
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseHyperlinks(
+  collection: XmlElement | undefined,
+  relationships: readonly OpcRelationship[],
+  sheet: string,
+  context: XlsxCodecContext,
+): ParsedHyperlink[] {
+  if (!collection) return [];
+  const elements = xmlChildren(collection, "hyperlink");
+  if (elements.length > MAX_HYPERLINKS_PER_SHEET) {
+    emitWarning(context, {
+      code: "hyperlink",
+      message: `Excel hyperlink limit ${MAX_HYPERLINKS_PER_SHEET} was exceeded; later hyperlinks were dropped`,
+      sheet,
+    });
+  }
+  const result: ParsedHyperlink[] = [];
+  for (const element of elements.slice(0, MAX_HYPERLINKS_PER_SHEET)) {
+    const reference = xmlAttribute(element, "ref");
+    if (!reference) return readerFailure(`hyperlink in ${sheet} has no source range`);
+    const source = parseRange(reference);
+    const range = {
+      start: { row: source.r0, col: source.c0 },
+      end: { row: source.r1, col: source.c1 },
+    };
+    const relationshipId = xmlAttribute(element, "id");
+    const location = xmlAttribute(element, "location");
+    const display = xmlAttribute(element, "display");
+    if (display !== undefined && display.length > MAX_HYPERLINK_DISPLAY_LENGTH) {
+      emitWarning(context, {
+        code: "hyperlink",
+        message: `Excel hyperlink display text exceeds ${MAX_HYPERLINK_DISPLAY_LENGTH} characters and the hyperlink was dropped`,
+        sheet,
+        cell: reference,
+      });
+      continue;
+    }
+    if (xmlAttribute(element, "tooltip") !== undefined) {
+      emitWarning(context, {
+        code: "hyperlink",
+        message: "Hyperlink tooltip is unsupported and was dropped",
+        sheet,
+        cell: reference,
+      });
+    }
+    if (relationshipId && location) {
+      emitWarning(context, {
+        code: "hyperlink",
+        message: "Hyperlink combined relationship and location is unsupported and was dropped",
+        sheet,
+        cell: reference,
+      });
+      continue;
+    }
+    if (relationshipId) {
+      const relationship = relationships.find((candidate) => candidate.id === relationshipId);
+      if (!relationship || !relationshipTypeMatches(relationship.type, "hyperlink")) {
+        return readerFailure(`hyperlink relationship ${relationshipId} in ${sheet} is invalid`);
+      }
+      if (!relationship.external) {
+        emitWarning(context, {
+          code: "hyperlink",
+          message: "Internal package-part hyperlink relationships are unsupported and were dropped",
+          sheet,
+          cell: reference,
+          part: relationship.target,
+        });
+        continue;
+      }
+      if (!isSafeExternalHyperlink(relationship.target)) {
+        emitWarning(context, {
+          code: "hyperlink",
+          message:
+            "Hyperlink external target is not an absolute HTTPS or mailto URL and was dropped",
+          sheet,
+          cell: reference,
+        });
+        continue;
+      }
+      result.push({
+        range,
+        target: { kind: "external", url: relationship.target },
+        ...(display !== undefined ? { display: decodeXstring(display) } : {}),
+      });
+      continue;
+    }
+    if (location) {
+      const target = parseHyperlinkLocation(location, sheet);
+      if (!target) {
+        emitWarning(context, {
+          code: "hyperlink",
+          message: "Hyperlink internal location is malformed and was dropped",
+          sheet,
+          cell: reference,
+        });
+        continue;
+      }
+      result.push({
+        range,
+        target: { kind: "internal", ...target },
+        ...(display !== undefined ? { display: decodeXstring(display) } : {}),
+      });
+      continue;
+    }
+    emitWarning(context, {
+      code: "hyperlink",
+      message: "Hyperlink has no target and was dropped",
+      sheet,
+      cell: reference,
+    });
+  }
+  return result;
 }
 
 function parseSortKeys(
@@ -664,6 +895,163 @@ function parseColumns(
     }
   }
   return columns;
+}
+
+function parseTables(
+  packageFile: OpcPackage,
+  worksheetRoot: XmlElement,
+  relationships: readonly OpcRelationship[],
+  sheetName: string,
+  context: XlsxCodecContext,
+): ParsedSheet["tables"] {
+  const collection = xmlChild(worksheetRoot, "tableParts");
+  if (!collection) return [];
+  const parts = xmlChildren(collection, "tablePart");
+  if (parts.length > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
+    return readerFailure(
+      `worksheet ${sheetName} exceeds the workbook table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables}`,
+    );
+  }
+  const tables: ParsedSheet["tables"] = [];
+  for (const partElement of parts) {
+    const relationshipId = xmlAttribute(partElement, "id");
+    if (!relationshipId) return readerFailure(`tablePart in ${sheetName} has no relationship`);
+    const relationship = relationships.find((candidate) => candidate.id === relationshipId);
+    if (
+      !relationship ||
+      relationship.external ||
+      !relationshipTypeMatches(relationship.type, "table")
+    ) {
+      return readerFailure(`tablePart relationship ${relationshipId} in ${sheetName} is invalid`);
+    }
+    const root = packageFile.readXml(relationship.target);
+    assertXmlRoot(root, "table", MAIN_NAMESPACES, relationship.target);
+    const nativeId = parseUnsigned(xmlAttribute(root, "id"), "table id");
+    if (nativeId < 1) return readerFailure(`table id in ${relationship.target} is invalid`);
+    const rawName = xmlAttribute(root, "displayName") ?? xmlAttribute(root, "name");
+    if (!rawName) return readerFailure(`table name in ${relationship.target} is missing`);
+    const nameResult = validateWorkbookTableName(decodeXstring(rawName));
+    if (!nameResult.ok) {
+      return readerFailure(`table name ${JSON.stringify(rawName)} is invalid (${nameResult.code})`);
+    }
+    const ref = xmlAttribute(root, "ref");
+    if (!ref) return readerFailure(`table range in ${relationship.target} is missing`);
+    const parsed = parseRange(ref);
+    assertResource(context, "maxRowsPerSheet", parsed.r1 + 1);
+    assertResource(context, "maxColumnsPerSheet", parsed.c1 + 1);
+    const headerCount = xmlAttribute(root, "headerRowCount");
+    const totalsCount = xmlAttribute(root, "totalsRowCount");
+    const headerRow =
+      headerCount === undefined || parseUnsigned(headerCount, "header row count") === 1;
+    const totalsRow =
+      totalsCount !== undefined && parseUnsigned(totalsCount, "totals row count") === 1;
+    if (
+      (headerCount !== undefined && !["0", "1"].includes(headerCount)) ||
+      (totalsCount !== undefined && !["0", "1"].includes(totalsCount))
+    ) {
+      return readerFailure(
+        `table row metadata in ${relationship.target} exceeds the supported subset`,
+      );
+    }
+    const columnCollection = xmlChild(root, "tableColumns");
+    if (!columnCollection)
+      return readerFailure(`table columns in ${relationship.target} are missing`);
+    const declaredCount = parseUnsigned(
+      xmlAttribute(columnCollection, "count"),
+      "table column count",
+    );
+    if (declaredCount > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable) {
+      return readerFailure(
+        `table ${nameResult.name} exceeds the column limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxColumnsPerTable}`,
+      );
+    }
+    const columnElements = xmlChildren(columnCollection, "tableColumn");
+    if (columnElements.length !== declaredCount || parsed.c1 - parsed.c0 + 1 !== declaredCount) {
+      return readerFailure(`table ${nameResult.name} column count does not match its range`);
+    }
+    const columns = columnElements.map((column, index) => {
+      const id = parseUnsigned(xmlAttribute(column, "id"), "table column id");
+      const name = xmlAttribute(column, "name");
+      if (id < 1 || !name) return readerFailure(`table column ${index + 1} is invalid`);
+      return {
+        id: `xlsx-table-${nativeId}-column-${id}`,
+        name: decodeXstring(name),
+        ...(xmlAttribute(column, "totalsRowLabel") !== undefined
+          ? { totalsRowLabel: decodeXstring(xmlAttribute(column, "totalsRowLabel")!) }
+          : {}),
+      };
+    });
+    const unsupported = new Set<WorkbookTableUnsupportedFeature>();
+    const markUnsupported = (feature: WorkbookTableUnsupportedFeature, detail: string): void => {
+      if (unsupported.has(feature)) return;
+      unsupported.add(feature);
+      emitWarning(context, {
+        code: "unsupported-feature",
+        message: `${detail} was preserved as unsupported metadata on table ${nameResult.name} and was not activated`,
+        sheet: sheetName,
+        part: relationship.target,
+      });
+    };
+    const autoFilter = xmlChild(root, "autoFilter");
+    if (autoFilter) markUnsupported("auto-filter", "Excel table autoFilter");
+    if (xmlChild(autoFilter ?? root, "sortState")) {
+      markUnsupported("sort-state", "Excel table sortState");
+    }
+    if (
+      columnElements.some(
+        (column) =>
+          xmlChild(column, "calculatedColumnFormula") !== undefined ||
+          xmlChild(column, "calculatedColumnFormulaArray") !== undefined,
+      )
+    ) {
+      markUnsupported("calculated-columns", "Excel table calculated columns");
+    }
+    if (
+      columnElements.some(
+        (column) =>
+          xmlAttribute(column, "totalsRowFunction") !== undefined ||
+          xmlChild(column, "totalsRowFormula") !== undefined,
+      )
+    ) {
+      markUnsupported("totals-functions", "Excel table totals functions");
+    }
+    if (xmlAttribute(root, "connectionId") !== undefined) {
+      markUnsupported("external-data", "Excel table external-data binding");
+    }
+    if (xmlChild(root, "extLst")) markUnsupported("extensions", "Excel table extensions");
+    const tableRelationships = packageFile.relationships(relationship.target);
+    if (
+      tableRelationships.some((candidate) => relationshipTypeMatches(candidate.type, "queryTable"))
+    ) {
+      markUnsupported("query-table", "Excel query-table binding");
+    }
+    const styleElement = xmlChild(root, "tableStyleInfo");
+    const styleName = styleElement ? xmlAttribute(styleElement, "name") : undefined;
+    tables.push({
+      id: `xlsx-table-${nativeId}`,
+      name: nameResult.name,
+      range: {
+        start: { row: parsed.r0, col: parsed.c0 },
+        end: { row: parsed.r1, col: parsed.c1 },
+      },
+      columns,
+      headerRow,
+      totalsRow,
+      ...(styleElement
+        ? {
+            style: {
+              ...(styleName ? { name: decodeXstring(styleName) } : {}),
+              showFirstColumn: xmlBoolean(xmlAttribute(styleElement, "showFirstColumn")),
+              showLastColumn: xmlBoolean(xmlAttribute(styleElement, "showLastColumn")),
+              showRowStripes: xmlBoolean(xmlAttribute(styleElement, "showRowStripes")),
+              showColumnStripes: xmlBoolean(xmlAttribute(styleElement, "showColumnStripes")),
+            },
+          }
+        : {}),
+      ...(unsupported.size > 0 ? { unsupportedFeatures: [...unsupported] } : {}),
+    });
+  }
+  return tables;
 }
 
 function parseSheet(
@@ -943,40 +1331,56 @@ function parseSheet(
         parseValidation(validation, context, reference.name, date1904),
       )
     : [];
-  const conditional = parseConditionalFormats(root, styles, reference.name);
+  const conditional = parseConditionalFormats(root, styles, reference.name, context);
   const sort = parseSortKeys(root, Math.max(0, maxRow + 1));
   const relationships = packageFile.relationships(reference.relationship.target);
+  const hyperlinkCollection = xmlChild(root, "hyperlinks");
+  const hyperlinks = parseHyperlinks(hyperlinkCollection, relationships, reference.name, context);
+  for (const hyperlink of hyperlinks) {
+    maxRow = Math.max(maxRow, hyperlink.range.end.row);
+    maxCol = Math.max(maxCol, hyperlink.range.end.col);
+  }
+  for (const rule of conditional.rules) {
+    maxRow = Math.max(maxRow, rule.range.end.row);
+    maxCol = Math.max(maxCol, rule.range.end.col);
+  }
+  assertResource(context, "maxRowsPerSheet", maxRow + 1);
+  assertResource(context, "maxColumnsPerSheet", maxCol + 1);
+  const extensionList = xmlChild(root, "extLst");
+  const hasConditionalFormatExtensions =
+    extensionList !== undefined && xmlHasDescendant(extensionList, "conditionalFormattings");
+  if (hasConditionalFormatExtensions) {
+    emitWarning(context, {
+      code: "format-loss",
+      message: "Extended conditional formatting is unsupported and was dropped",
+      sheet: reference.name,
+    });
+  }
   const comments = parseComments(
     packageFile,
     reference.relationship.target,
     relationships,
     context,
   );
+  const tables = parseTables(packageFile, root, relationships, reference.name, context);
   for (const relationship of relationships) {
     if (
-      ["drawing", "image", "table", "pivotTable", "externalLink", "threadedComment"].some((kind) =>
+      ["comments", "vmlDrawing", "hyperlink", "table"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
       )
     ) {
-      emitWarning(context, {
-        code: relationshipTypeMatches(relationship.type, "externalLink")
-          ? "external-relationship"
-          : "unsupported-feature",
-        message: `Unsupported worksheet relationship ${relationship.type.slice(relationship.type.lastIndexOf("/") + 1)} was dropped`,
-        sheet: reference.name,
-        part: relationship.target,
-      });
+      continue;
     }
-  }
-  const hyperlinks = xmlChild(root, "hyperlinks");
-  if (hyperlinks) {
-    for (const hyperlink of xmlChildren(hyperlinks, "hyperlink"))
-      emitWarning(context, {
-        code: "hyperlink",
-        message: "Hyperlink target was dropped; display text was preserved",
-        sheet: reference.name,
-        cell: xmlAttribute(hyperlink, "ref"),
-      });
+    if (relationship.external) continue;
+    const kind = relationship.type.slice(relationship.type.lastIndexOf("/") + 1);
+    emitWarning(context, {
+      code: relationshipTypeMatches(relationship.type, "externalLink")
+        ? "external-relationship"
+        : "unsupported-feature",
+      message: `Unsupported worksheet relationship ${kind} was dropped`,
+      sheet: reference.name,
+      part: relationship.target,
+    });
   }
   return {
     name: reference.name,
@@ -995,7 +1399,9 @@ function parseSheet(
     conditionalFormats: conditional.rules,
     sortKeys: sort.keys,
     notes: comments.comments,
+    hyperlinks,
     hasUnsupportedValidation: Boolean(validationCollection && validations.length === 0),
+    tables,
     hasConditionalFormatting: root.children.some(
       (child) => xmlLocalName(child.name) === "conditionalFormatting",
     ),
@@ -1007,6 +1413,8 @@ function parseSheet(
     hasAutoFilter: Boolean(xmlChild(root, "autoFilter")),
     hasValidationCollection: Boolean(validationCollection),
     hasComments: comments.present,
+    hasHyperlinks: hyperlinkCollection !== undefined,
+    hasConditionalFormatExtensions,
   };
 }
 
@@ -1092,9 +1500,7 @@ function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnap
   for (const sheet of snapshot.sheets) {
     const meta =
       metadata.sheets.find(
-        (candidate) =>
-          candidate.name.normalize("NFC").toLowerCase() ===
-          sheet.name.normalize("NFC").toLowerCase(),
+        (candidate) => sheetNameKey(candidate.name) === sheetNameKey(sheet.name),
       ) ?? metadata.sheets.find((candidate) => candidate.order === sheet.order);
     if (!meta || sheet.cells.length === 0) continue;
     const cells = sheet.cells[0]!.cells;
@@ -1163,13 +1569,17 @@ function projectedConditionalStyle(style: CellStyle): string {
   return JSON.stringify(projected);
 }
 function conditionalPredicateFingerprint(predicate: ConditionalFormatPredicate): string {
-  return predicate.kind === "contains"
-    ? JSON.stringify({
-        kind: predicate.kind,
-        text: predicate.text,
-        matchCase: predicate.matchCase === true,
-      })
-    : JSON.stringify({ kind: predicate.kind, value: predicate.value });
+  if (predicate.kind === "contains") {
+    return JSON.stringify({
+      kind: predicate.kind,
+      text: predicate.text,
+      matchCase: predicate.matchCase === true,
+    });
+  }
+  if (predicate.kind === "formula") {
+    return JSON.stringify({ kind: predicate.kind, source: predicate.source });
+  }
+  return JSON.stringify({ kind: predicate.kind, value: predicate.value });
 }
 
 function reconcileConditionalFormats(
@@ -1187,6 +1597,7 @@ function reconcileConditionalFormats(
         sidecar.range.end.col === native.range.end.col &&
         conditionalPredicateFingerprint(sidecar.when) ===
           conditionalPredicateFingerprint(native.when) &&
+        sidecar.stopIfTrue === native.stopIfTrue &&
         projectedConditionalStyle(sidecar.style) === projectedConditionalStyle(native.style),
     );
     if (match === undefined || match < 0) return structuredClone(native);
@@ -1195,6 +1606,28 @@ function reconcileConditionalFormats(
       ...structuredClone(native),
       style: structuredClone(sidecarRules![match]!.style),
     };
+  });
+}
+
+function reconcileHyperlinks(
+  nativeLinks: readonly CellHyperlink[],
+  sidecarLinks: readonly CellHyperlink[] | undefined,
+): CellHyperlink[] {
+  const remaining = new Set(sidecarLinks?.map((_, index) => index) ?? []);
+  return nativeLinks.map((native) => {
+    const match = sidecarLinks?.findIndex(
+      (sidecar, index) =>
+        remaining.has(index) &&
+        sidecar.range.start.row === native.range.start.row &&
+        sidecar.range.start.col === native.range.start.col &&
+        sidecar.range.end.row === native.range.end.row &&
+        sidecar.range.end.col === native.range.end.col &&
+        sidecar.display === native.display &&
+        JSON.stringify(sidecar.target) === JSON.stringify(native.target),
+    );
+    if (match === undefined || match < 0) return structuredClone(native);
+    remaining.delete(match);
+    return structuredClone(sidecarLinks![match]!);
   });
 }
 
@@ -1241,16 +1674,35 @@ function externalNamedRanges(
       continue;
     }
     const sheetName = (match[1] ?? match[2] ?? "").replaceAll("''", "'");
-    const sheet = sheetIds.get(sheetName.normalize("NFC").toLowerCase());
-    if (!sheet) continue;
-    const parsed = parseRange(match[3]!);
+    const sheet = sheetIds.get(sheetNameKey(sheetName));
+    if (!sheet) {
+      emitWarning(context, {
+        code: "unsupported-feature",
+        message: `Defined name ${name} referenced missing worksheet ${sheetName} and was dropped`,
+      });
+      continue;
+    }
     const localSheetId = xmlAttribute(definition, "localSheetId");
-    const scopeIndex = localSheetId === undefined ? undefined : Number(localSheetId);
+    let scope: string | undefined;
+    if (localSheetId !== undefined) {
+      const scopeIndex = /^\d+$/.test(localSheetId) ? Number(localSheetId) : Number.NaN;
+      const scopeSheet =
+        Number.isSafeInteger(scopeIndex) && scopeIndex >= 0 ? sheets[scopeIndex] : undefined;
+      scope = scopeSheet ? sheetIds.get(sheetNameKey(scopeSheet.name)) : undefined;
+      if (!scope) {
+        emitWarning(context, {
+          code: "unsupported-feature",
+          message: `Defined name ${name} had invalid localSheetId ${localSheetId} and was dropped`,
+        });
+        continue;
+      }
+    }
+    const parsed = parseRange(match[3]!);
+    assertResource(context, "maxRowsPerSheet", parsed.r1 + 1);
+    assertResource(context, "maxColumnsPerSheet", parsed.c1 + 1);
     ranges.push({
       name,
-      ...(Number.isInteger(scopeIndex) && sheets[scopeIndex!]
-        ? { scope: sheetIds.get(sheets[scopeIndex!]!.name.normalize("NFC").toLowerCase()) }
-        : {}),
+      ...(scope ? { scope } : {}),
       range: {
         sheet,
         start: { row: parsed.r0, col: parsed.c0 },
@@ -1286,10 +1738,24 @@ export function readWorkbook(
     (relationship) => relationshipTypeMatches(relationship.type, "theme") && !relationship.external,
   )?.target;
   for (const relationship of workbookRelationships) {
+    if (
+      ["worksheet", "styles", "sharedStrings", "theme", "vbaProject"].some((kind) =>
+        relationshipTypeMatches(relationship.type, kind),
+      )
+    ) {
+      continue;
+    }
     if (relationshipTypeMatches(relationship.type, "externalLink")) {
       emitWarning(context, {
         code: "external-relationship",
         message: "External-link workbook graph was dropped",
+        part: relationship.target,
+      });
+    } else if (!relationship.external) {
+      const kind = relationship.type.slice(relationship.type.lastIndexOf("/") + 1);
+      emitWarning(context, {
+        code: "unsupported-feature",
+        message: `Unsupported workbook relationship ${kind} was dropped`,
         part: relationship.target,
       });
     }
@@ -1305,17 +1771,21 @@ export function readWorkbook(
   const sheetCollection = xmlChild(workbookRoot, "sheets");
   if (!sheetCollection) return readerFailure("workbook has no sheet collection");
   const references: WorkbookSheetReference[] = [];
-  const foldedSheetNames = new Set<string>();
+  const sheetNames: string[] = [];
   for (const element of xmlChildren(sheetCollection, "sheet")) {
     const rawName = xmlAttribute(element, "name");
     const relationshipId = xmlAttribute(element, "id");
-    if (!rawName || !relationshipId) return readerFailure("worksheet declaration is incomplete");
-    const name = decodeXstring(rawName);
-    const foldedName = name.normalize("NFC").toLowerCase();
-    if (!isValidXlsxWorksheetName(name) || foldedSheetNames.has(foldedName)) {
-      return readerFailure(`worksheet name ${JSON.stringify(name)} is unsafe or duplicated`);
+    if (rawName === undefined || !relationshipId) {
+      return readerFailure("worksheet declaration is incomplete");
     }
-    foldedSheetNames.add(foldedName);
+    const validatedName = validateSheetName(decodeXstring(rawName), sheetNames);
+    if (!validatedName.ok) {
+      return readerFailure(
+        `worksheet name ${JSON.stringify(validatedName.name)} is unsafe or duplicated (${validatedName.code})`,
+      );
+    }
+    const name = validatedName.name;
+    sheetNames.push(name);
     const relationship = packageFile.relationship(workbookPart, relationshipId);
     if (!relationshipTypeMatches(relationship.type, "worksheet")) {
       return readerFailure(`relationship ${relationshipId} is not a worksheet`);
@@ -1337,7 +1807,7 @@ export function readWorkbook(
   assertResource(context, "maxSheets", references.length - Math.min(1, metadataCandidates));
   const usage: ReaderResourceUsage = { cells: 0, merges: 0 };
   const parsedSheets = references.map((reference) => {
-    checkAbort(context.options);
+    checkAbort(context);
     return parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904);
   });
   let metadata: WorkbookSnapshot | null = null;
@@ -1355,34 +1825,64 @@ export function readWorkbook(
   assertResource(context, "maxSheets", sourceSheets.length);
   if (sourceSheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX workbook has no worksheets");
+  if (
+    sourceReferences.every(
+      (reference) => reference.state === "hidden" || reference.state === "veryHidden",
+    )
+  ) {
+    return readerFailure("workbook requires at least one visible worksheet");
+  }
   let sourceCellCount = 0;
+  let sourceTableCount = 0;
   for (const source of sourceSheets) {
     sourceCellCount += source.cells.length;
+    sourceTableCount += source.tables.length;
     assertResource(context, "maxCells", sourceCellCount);
+    if (sourceTableCount > DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables) {
+      return readerFailure(
+        `workbook exceeds the table limit ${DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxTables}`,
+      );
+    }
   }
   const usedIds = new Set<string>();
   const sheetIds = new Map<string, string>();
-  const sheets: SheetSnapshot[] = [];
-  for (let order = 0; order < sourceSheets.length; order++) {
-    const source = sourceSheets[order]!;
-    const exactMeta = metadata?.sheets.find(
-      (candidate) =>
-        candidate.name.normalize("NFC").toLowerCase() ===
-        source.name.normalize("NFC").toLowerCase(),
+  const resolvedMetadata = sourceSheets.map((source, order) => {
+    const exact = metadata?.sheets.find(
+      (candidate) => sheetNameKey(candidate.name) === sheetNameKey(source.name),
     );
-    const ordinalMeta = metadata?.sheets.find((candidate) => candidate.order === order);
-    const meta = exactMeta ?? ordinalMeta;
-    if (!exactMeta && ordinalMeta) {
+    const ordinal = metadata?.sheets.find((candidate) => candidate.order === order);
+    if (!exact && ordinal) {
       emitWarning(context, {
         code: "invalid-metadata",
         message: `Reconciled renamed worksheet ${source.name} to sidecar identity by stable ordinal`,
         sheet: source.name,
       });
     }
-    const id = meta?.id ?? uniqueSheetId(source.name, order, usedIds);
+    return exact ?? ordinal;
+  });
+  const resolvedIds = sourceSheets.map((source, order) => {
+    const id = resolvedMetadata[order]?.id ?? uniqueSheetId(source.name, order, usedIds);
     usedIds.add(id);
-    sheetIds.set(source.name.normalize("NFC").toLowerCase(), id);
-    const columnCount = Math.max(1, source.columnCount, meta?.columns.length ?? 0);
+    sheetIds.set(sheetNameKey(source.name), id);
+    return id;
+  });
+  const usedTableIds = new Set<string>();
+  const usedTableNames = new Set<string>();
+  const sheets: SheetSnapshot[] = [];
+  for (let order = 0; order < sourceSheets.length; order++) {
+    const source = sourceSheets[order]!;
+    const meta = resolvedMetadata[order];
+    const id = resolvedIds[order]!;
+    const tableColumnCount = source.tables.reduce(
+      (maximum, table) => Math.max(maximum, table.range.end.col + 1),
+      0,
+    );
+    const columnCount = Math.max(
+      1,
+      source.columnCount,
+      tableColumnCount,
+      meta?.columns.length ?? 0,
+    );
     assertResource(context, "maxColumnsPerSheet", columnCount);
     const columns: Column[] = [];
     const keys = new Set<string>();
@@ -1414,7 +1914,10 @@ export function readWorkbook(
       column.key = key;
       columns.push(column);
     }
-    const rowCount = source.rowCount;
+    const rowCount = Math.max(
+      source.rowCount,
+      source.tables.reduce((maximum, table) => Math.max(maximum, table.range.end.row + 1), 0),
+    );
     assertResource(context, "maxRowsPerSheet", rowCount);
     const snapshotCells: SnapshotCell[] = source.cells.map((cell) => ({
       rowOffset: cell.row,
@@ -1450,6 +1953,43 @@ export function readWorkbook(
       text: note.text,
     }));
     const notes = source.hasComments ? nativeNotes : (structuredClone(meta?.notes) ?? []);
+    const nativeHyperlinks = reconcileHyperlinks(
+      source.hyperlinks.flatMap((link, linkIndex): CellHyperlink[] => {
+        let target: CellHyperlink["target"] | null;
+        if (link.target.kind === "external") {
+          target = structuredClone(link.target);
+        } else {
+          const internal = link.target;
+          const targetSheet = sheetIds.get(sheetNameKey(internal.sheetName));
+          if (!targetSheet) {
+            emitWarning(context, {
+              code: "hyperlink",
+              message: "Hyperlink internal target references a missing worksheet and was dropped",
+              sheet: source.name,
+            });
+            target = null;
+          } else {
+            target = {
+              kind: "internal",
+              range: { sheet: targetSheet, ...structuredClone(internal.range) },
+            };
+          }
+        }
+        if (!target) return [];
+        return [
+          {
+            id: `xlsx-hyperlink-${order + 1}-${linkIndex + 1}`,
+            range: { sheet: id, ...structuredClone(link.range) },
+            target,
+            ...(link.display !== undefined ? { display: link.display } : {}),
+          },
+        ];
+      }),
+      meta?.hyperlinks,
+    );
+    const hyperlinks = source.hasHyperlinks
+      ? nativeHyperlinks
+      : (structuredClone(meta?.hyperlinks) ?? []);
     const nativeConditionalFormats = reconcileConditionalFormats(
       source.conditionalFormats.map((rule) => ({
         ...structuredClone(rule),
@@ -1463,6 +2003,34 @@ export function readWorkbook(
     const sortKeys = source.hasSortState
       ? structuredClone(source.sortKeys)
       : (structuredClone(meta?.sortKeys) ?? []);
+    const tables: WorkbookTable[] = source.tables.map((nativeTable, tableIndex) => {
+      const metaTable =
+        meta?.tables?.find(
+          (candidate) =>
+            candidate.name.normalize("NFC").toUpperCase() ===
+            nativeTable.name.normalize("NFC").toUpperCase(),
+        ) ?? meta?.tables?.[tableIndex];
+      const tableId = metaTable?.id ?? nativeTable.id;
+      const tableNameKey = nativeTable.name.normalize("NFC").toUpperCase();
+      if (usedTableIds.has(tableId) || usedTableNames.has(tableNameKey)) {
+        return readerFailure(`workbook table ${nativeTable.name} has a duplicate identity or name`);
+      }
+      usedTableIds.add(tableId);
+      usedTableNames.add(tableNameKey);
+      return {
+        ...structuredClone(nativeTable),
+        id: tableId,
+        range: { sheet: id, ...structuredClone(nativeTable.range) },
+        columns: nativeTable.columns.map((column, columnIndex) => ({
+          ...structuredClone(column),
+          id: metaTable?.columns[columnIndex]?.id ?? column.id,
+        })),
+        ...(metaTable?.style !== undefined ? { style: structuredClone(metaTable.style) } : {}),
+        ...(metaTable?.unsupportedFeatures !== undefined
+          ? { unsupportedFeatures: structuredClone(metaTable.unsupportedFeatures) }
+          : {}),
+      };
+    });
     if (source.hasUnsupportedValidation && validations.length === 0) {
       emitWarning(context, {
         code: "validation-loss",
@@ -1515,6 +2083,7 @@ export function readWorkbook(
       ...(source.rowMeta.length > 0 ? { rowMeta: source.rowMeta } : {}),
       ...(source.merges.length > 0 ? { merges: source.merges } : {}),
       ...(conditionalFormats.length > 0 ? { conditionalFormats } : {}),
+      ...(hyperlinks.length > 0 ? { hyperlinks } : {}),
       ...(source.hasRowOutlines
         ? { rowGroups: source.rowGroups }
         : meta?.rowGroups
@@ -1527,11 +2096,31 @@ export function readWorkbook(
       ...(notes.length > 0 ? { notes } : {}),
       ...(sortKeys.length > 0 ? { sortKeys } : {}),
       ...(!source.hasAutoFilter && meta?.filters ? { filters: structuredClone(meta.filters) } : {}),
+      ...(tables.length > 0 ? { tables } : {}),
       cells:
         snapshotCells.length > 0
           ? [{ startRow: 0, startCol: 0, rowCount, colCount: columns.length, cells: snapshotCells }]
           : [],
     });
+  }
+  for (const owner of sheets) {
+    for (const hyperlink of owner.hyperlinks ?? []) {
+      if (hyperlink.target.kind !== "internal") continue;
+      const targetRange = hyperlink.target.range;
+      const target = sheets.find((candidate) => candidate.id === targetRange.sheet);
+      if (!target) continue;
+      target.rowCount = Math.max(target.rowCount, targetRange.end.row + 1);
+      const keys = new Set(target.columns.map((column) => column.key));
+      while (target.columns.length <= targetRange.end.col) {
+        const col = target.columns.length;
+        const stem = `column${col + 1}`;
+        let key = stem;
+        let suffix = 2;
+        while (keys.has(key)) key = `${stem}_${suffix++}`;
+        keys.add(key);
+        target.columns.push({ key, header: colToA1(col), width: 75, type: "text" });
+      }
+    }
   }
   if ([...packageFile.archive.entries.keys()].some((name) => /vbaProject\.bin$/i.test(name)))
     emitWarning(context, {
@@ -1543,13 +2132,68 @@ export function readWorkbook(
     "workbookView",
   );
   const activeTab = Number(xmlAttribute(workbookViews.at(-1) ?? workbookRoot, "activeTab") ?? 0);
-  const activeSheet =
-    sheets[Number.isInteger(activeTab) ? Math.min(Math.max(activeTab, 0), sheets.length - 1) : 0]!
-      .id;
+  const requestedReference =
+    Number.isInteger(activeTab) && activeTab >= 0 && activeTab < references.length
+      ? references[activeTab]
+      : undefined;
+  const requestedActive = requestedReference ? sourceReferences.indexOf(requestedReference) : -1;
+  const activeIndex =
+    requestedActive >= 0 &&
+    sourceReferences[requestedActive]!.state !== "hidden" &&
+    sourceReferences[requestedActive]!.state !== "veryHidden"
+      ? requestedActive
+      : sourceReferences.findIndex(
+          (reference) => reference.state !== "hidden" && reference.state !== "veryHidden",
+        );
+  const activeSheet = sheets[activeIndex]!.id;
   const nativeNamedRanges = externalNamedRanges(workbookRoot, sheetIds, sourceReferences, context);
   const namedRanges = xmlChild(workbookRoot, "definedNames")
     ? nativeNamedRanges
     : metadata?.workbook.namedRanges;
+  const definedNameKeys = new Map(
+    (namedRanges ?? []).map((named) => [named.name.normalize("NFC").toUpperCase(), named.name]),
+  );
+  for (const sheet of sheets) {
+    const tables = sheet.tables?.filter((table) => {
+      const collision = definedNameKeys.get(table.name.normalize("NFC").toUpperCase());
+      if (collision === undefined) return true;
+      emitWarning(context, {
+        code: "invalid-metadata",
+        message: `Excel table ${table.name} was dropped because its name conflicts case-insensitively with workbook defined name ${collision}; the defined name was retained to keep formula resolution unambiguous`,
+        sheet: sheet.name,
+      });
+      return false;
+    });
+    if (tables?.length) sheet.tables = tables;
+    else delete sheet.tables;
+  }
+  for (const namedRange of namedRanges ?? []) {
+    const sheet = sheets.find((candidate) => candidate.id === namedRange.range.sheet);
+    if (!sheet) continue;
+    sheet.rowCount = Math.max(sheet.rowCount, namedRange.range.end.row + 1);
+    if (sheet.columns.length <= namedRange.range.end.col) {
+      const keys = new Set(sheet.columns.map((column) => column.key));
+      while (sheet.columns.length <= namedRange.range.end.col) {
+        const col = sheet.columns.length;
+        const stem = `column${col + 1}`;
+        let key = stem;
+        let suffix = 2;
+        while (keys.has(key)) key = `${stem}_${suffix++}`;
+        keys.add(key);
+        sheet.columns.push({
+          key,
+          header: colToA1(col),
+          width: 75,
+          type: "text",
+        });
+      }
+    }
+    const block = sheet.cells[0];
+    if (block) {
+      block.rowCount = Math.max(block.rowCount, sheet.rowCount);
+      block.colCount = Math.max(block.colCount, sheet.columns.length);
+    }
+  }
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),

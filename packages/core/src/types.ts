@@ -8,4 +8,5 @@ export type * from "./types/document.js";
 export type * from "./types/grid.js";
 export type * from "./types/render.js";
 export type * from "./types/store.js";
+export type * from "./types/table.js";
 export type * from "./types/transaction.js";

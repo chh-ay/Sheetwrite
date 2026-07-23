@@ -1,6 +1,9 @@
 import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { chromium } from "@playwright/test";
 import { readReleaseManifestDigest, verifyReleaseArtifacts } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
@@ -418,6 +421,64 @@ async function auditRuntimeLicenses(consumerRoot: string): Promise<number> {
   return visited.size;
 }
 
+async function verifyMountedFrameworkConsumers(consumerRoot: string): Promise<void> {
+  const requireFromConsumer = createRequire(join(consumerRoot, "package.json"));
+  const viteEntry = requireFromConsumer.resolve("vite");
+  // Vite is intentionally resolved from the freshly installed tarball consumer,
+  // not the repository dependency graph, so this module path is runtime-selected.
+  const { preview } = await import(pathToFileURL(viteEntry).href);
+  const server = await preview({
+    root: consumerRoot,
+    configFile: join(consumerRoot, "vite.config.ts"),
+    preview: { host: "127.0.0.1", port: 0, strictPort: false },
+  });
+  const address = server.httpServer.address();
+  if (address === null || typeof address === "string") {
+    await server.close();
+    throw new Error("Packed consumer preview did not publish a TCP port");
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const framework of ["react", "vue", "svelte"] as const) {
+      const page = await browser.newPage();
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      const path = framework === "svelte" ? "/" : `/${framework}.html`;
+      await page.goto(`http://127.0.0.1:${address.port}${path}`, {
+        waitUntil: "domcontentloaded",
+      });
+      try {
+        await page.waitForFunction(
+          () => document.documentElement.dataset.sheetwriteLifecycle === "passed",
+          undefined,
+          { timeout: 15_000 },
+        );
+      } catch (error) {
+        const body = await page.locator("body").innerText();
+        throw new Error(
+          `${framework} packed consumer did not complete\n${errors.join("\n")}\nbody: ${body}`,
+          { cause: error },
+        );
+      }
+      const marker = await page.locator(`[data-packed-status="${framework}"]`).textContent();
+      if (marker !== `${framework} ready/edit/reset/unmount passed`) {
+        throw new Error(`${framework} packed consumer published an invalid lifecycle marker`);
+      }
+      if (errors.length > 0) {
+        throw new Error(`${framework} packed consumer browser errors:\n${errors.join("\n")}`);
+      }
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+}
+
 function optionValue(name: string): string | undefined {
   const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
   if (inline !== undefined) return inline.slice(name.length + 1);
@@ -538,23 +599,22 @@ try {
   const auditedLicenseCount = await auditRuntimeLicenses(consumerRoot);
   await run(["npm", "run", "typecheck"], consumerRoot);
   await run(["npm", "run", "bundle"], consumerRoot);
-  await run(["npm", "run", "bundle:svelte"], consumerRoot);
+  await run(["npm", "run", "bundle:frameworks"], consumerRoot);
+  await verifyMountedFrameworkConsumers(consumerRoot);
   await run(["npm", "run", "runtime"], consumerRoot);
 
-  // The Vite build must have COMPILED the Svelte adapter from the tarball's
-  // raw source (svelte export condition) and linked the shared controller —
-  // not tree-shaken it away. Function names are minified, so probe for a
-  // handler PROPERTY name (esbuild never mangles property accesses).
+  // The Vite build must have compiled the packed Svelte adapter and retained
+  // its operational-event wiring, in addition to the mounted browser proof.
   const viteAssets = join(consumerRoot, "dist-vite/assets");
   const assetFiles = await readdir(viteAssets);
   let adapterCompiled = false;
   for (const name of assetFiles) {
     if (!name.endsWith(".js")) continue;
     const content = await readFile(join(viteAssets, name), "utf8");
-    if (content.includes("onActiveSheetChange")) adapterCompiled = true;
+    if (content.includes("onMutationRejected")) adapterCompiled = true;
   }
   if (!adapterCompiled) {
-    throw new Error("Vite consumer bundle does not contain the compiled Svelte adapter");
+    throw new Error("Vite consumer bundle does not contain packed adapter event wiring");
   }
 
   for (const [name, size] of packageSizes) {

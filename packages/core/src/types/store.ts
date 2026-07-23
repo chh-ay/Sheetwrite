@@ -17,6 +17,22 @@ import type {
   TransactionApplicationOptions,
 } from "./transaction.js";
 
+/** Retained logical payload and allocated capacity attributed to one exclusive owner. */
+export interface ResourceOwnerBytes {
+  readonly owner: string;
+  /** Bytes containing live logical payload. Never includes runtime observations. */
+  readonly logicalBytes: number;
+  /** Container capacity owned exclusively by this owner. */
+  readonly allocatedBytes: number;
+  readonly entries: number;
+  readonly measurement:
+    | "exact-capacity"
+    | "hash-capacity-v1"
+    | "typed-array-byte-length"
+    | "utf16-upper-bound"
+    | "entry-count-only";
+}
+
 /**
  * One rectangular window of resolved cells, returned by `Store.getVisibleWindow`
  * in a single call. The renderer paints from this view and MUST NOT call
@@ -54,6 +70,14 @@ export interface VisibleWindowView {
   localStrings?: readonly string[];
   /** Internal count of WASM boundary calls used to produce this window. */
   ffiCalls?: number;
+  /** Every wasm-bindgen method/accessor/free crossing used by diagnostics. */
+  ffiBoundaryCalls?: number;
+  /** Exact copied input bytes for this packed boundary operation. */
+  ffiInputBytes?: number;
+  /** Exact copied output bytes for this packed boundary operation. */
+  ffiOutputBytes?: number;
+  /** Largest individual copied buffer/string payload in this operation. */
+  ffiLargestTransferBytes?: number;
 }
 
 export interface ClipboardFormulaEntry {
@@ -75,6 +99,8 @@ export interface ClipboardWindowView {
   readonly values: ArrayLike<CellScalar>;
   readonly styleIds: Uint32Array;
   readonly styles: readonly CellStyle[];
+  /** `1` for runtime spill children that have no independent clipboard identity. */
+  readonly spillDerived: Uint8Array;
   readonly formulas: readonly ClipboardFormulaEntry[];
   readonly refs: readonly ClipboardRefEntry[];
   readonly ffiCalls: number;
@@ -96,6 +122,8 @@ export interface PagedStoreStats {
   loadedCells: number;
   dirtyCells: number;
   allocatedBytes: number;
+  /** Sparse local-edit overlay bytes, excluded from the clean chunk cache budget. */
+  dirtyAllocatedBytes: number;
   fullyLoaded: boolean;
 }
 
@@ -114,6 +142,8 @@ export interface Store {
   getCell(addr: CellAddress): ResolvedCell;
   /** Formula source at `addr`, or null when the cell is not a formula. */
   getFormula(addr: CellAddress): string | null;
+  /** Owning dynamic-array formula cell, or null when `addr` is not spilled. */
+  getSpillAnchor(addr: CellAddress): CellAddress | null;
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null;
   /**
@@ -167,12 +197,14 @@ export interface Store {
    */
   setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
+  /** Opt in to per-cell before/after capture for packed and clear operations. */
+  setDetailedChangeCapture?(enabled: boolean): void;
   /** Explicit partial-data state for paged datasource stores. */
   queryCapability?(sheet: SheetId): QueryCapability;
   /** Loaded/empty/local state; dense stores always return a loaded state. */
   getCellLoadState?(addr: CellAddress): CellLoadState;
-  /** Release paged dirty pins after server acknowledgement. */
-  acknowledgeOperations?(operations: readonly DocumentOp[]): void;
+  /** Release sparse paged edits after server acknowledgement. */
+  acknowledgeOperations?(operations: readonly DocumentOp[], storageRevision?: bigint): void;
   /** Deterministic, JSON-safe authoritative runtime document. */
   exportSnapshot?(): WorkbookSnapshot;
   /** Displayed row count after any active sort/filter view. */

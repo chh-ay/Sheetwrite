@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CONTROLLED_COMPARISON_POLICY,
   type ControlledRenderBaseline,
   parseControlledBaseline,
   samplesByControlledCell,
+  validateControlledBaselineProvenance,
 } from "./controlled-baseline.js";
 import {
   type ControlledRunnerFingerprint,
@@ -17,6 +19,7 @@ import type { RenderBenchmarkArtifact } from "./render-protocol.js";
 import { ms, summarizeFinite } from "./stats.js";
 
 const BENCH_ROOT = new URL("..", import.meta.url).pathname;
+const REPOSITORY_ROOT = resolve(BENCH_ROOT, "..");
 const DEFAULT_BASELINE_PATH = resolve(BENCH_ROOT, "results/render-baseline.json");
 const DEFAULT_FRESH_PATH = resolve(BENCH_ROOT, "results/render-fresh.json");
 const FRESH_RESULT_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
@@ -33,8 +36,7 @@ export interface ControlledComparisonRow {
   readonly freshMad: number;
   readonly absoluteDelta: number;
   readonly ratio: number;
-  readonly ratioLimit: number;
-  readonly absoluteFloorMs: number;
+  readonly lowerConfidenceBoundMs: number;
   readonly regression: boolean;
 }
 
@@ -45,6 +47,77 @@ export interface ControlledComparisonInput {
   readonly runner: ControlledRunnerFingerprint;
 }
 
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+
+function seedForKey(key: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index++) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function sampleMedian(source: readonly number[], random: () => number, scratch: number[]): number {
+  for (let index = 0; index < source.length; index++) {
+    scratch[index] = source[Math.floor(random() * source.length)]!;
+  }
+  scratch.sort((left, right) => left - right);
+  const middle = Math.floor(scratch.length / 2);
+  return scratch.length % 2 === 0
+    ? (scratch[middle - 1]! + scratch[middle]!) / 2
+    : scratch[middle]!;
+}
+
+/**
+ * Deterministic percentile-bootstrap lower confidence bound for the
+ * independent-sample median delta (fresh minus baseline). The samples come
+ * from separate captures, so each side is resampled independently rather than
+ * pretending observations at equal array positions are paired.
+ */
+export function independentMedianDeltaLowerBound(
+  baseline: readonly number[],
+  fresh: readonly number[],
+  key: string,
+  familySize: number,
+): number {
+  if (baseline.length < 2 || fresh.length < 2) {
+    throw new Error(`${key} requires repeated baseline and fresh raw samples`);
+  }
+  if (!Number.isInteger(familySize) || familySize <= 0) {
+    throw new Error("controlled comparison family size must be a positive integer");
+  }
+  const baselineFirst = baseline[0]!;
+  const freshFirst = fresh[0]!;
+  if (
+    baseline.every((sample) => sample === baselineFirst) &&
+    fresh.every((sample) => sample === freshFirst)
+  ) {
+    return freshFirst - baselineFirst;
+  }
+  const random = seededRandom(seedForKey(key));
+  const baselineScratch = new Array<number>(baseline.length);
+  const freshScratch = new Array<number>(fresh.length);
+  const deltas = new Array<number>(CONTROLLED_COMPARISON_POLICY.resamples);
+  for (let index = 0; index < deltas.length; index++) {
+    deltas[index] =
+      sampleMedian(fresh, random, freshScratch) - sampleMedian(baseline, random, baselineScratch);
+  }
+  deltas.sort((left, right) => left - right);
+  const perCellLowerTail =
+    (1 - CONTROLLED_COMPARISON_POLICY.familywiseConfidenceLevel) / familySize;
+  const lowerIndex = Math.ceil(perCellLowerTail * deltas.length) - 1;
+  return deltas[Math.max(0, Math.min(deltas.length - 1, lowerIndex))]!;
+}
+
 export function compareControlledRender(
   input: ControlledComparisonInput,
 ): ControlledComparisonRow[] {
@@ -52,6 +125,11 @@ export function compareControlledRender(
   const freshArtifact = validateRenderGateArtifact(input.fresh, "full", {
     rounds: input.fresh.metadata.rounds,
   });
+  if (freshArtifact.metadata.rounds !== baselineArtifact.source.rounds) {
+    throw new Error(
+      `controlled fresh rounds must match baseline: expected ${baselineArtifact.source.rounds}, observed ${freshArtifact.metadata.rounds}`,
+    );
+  }
   const harnessMismatches = fingerprintMismatches(
     baselineArtifact.harness,
     input.harness,
@@ -77,6 +155,12 @@ export function compareControlledRender(
     }
     const absoluteDelta = fresh.median - baseline.medianMs;
     const ratio = fresh.median / baseline.medianMs;
+    const lowerConfidenceBoundMs = independentMedianDeltaLowerBound(
+      baseline.samplesMs,
+      samples,
+      key,
+      baselineArtifact.cells.length,
+    );
     rows.push({
       key,
       baselineMedian: baseline.medianMs,
@@ -87,9 +171,8 @@ export function compareControlledRender(
       freshMad: fresh.mad,
       absoluteDelta,
       ratio,
-      ratioLimit: baseline.ratioLimit,
-      absoluteFloorMs: baseline.absoluteFloorMs,
-      regression: ratio > baseline.ratioLimit && absoluteDelta > baseline.absoluteFloorMs,
+      lowerConfidenceBoundMs,
+      regression: lowerConfidenceBoundMs > CONTROLLED_COMPARISON_POLICY.maximumRegressionMs,
     });
   }
   return rows.sort((left, right) => left.key.localeCompare(right.key));
@@ -122,13 +205,14 @@ function controlledRunner(
 }
 
 function printTable(rows: readonly ControlledComparisonRow[]): void {
+  const confidence = `${(CONTROLLED_COMPARISON_POLICY.familywiseConfidenceLevel * 100).toFixed(0)}%`;
   const lines = [
-    "| cell | baseline median | baseline p95 | baseline MAD | fresh median | fresh p95 | fresh MAD | absolute Δ | ratio | limits | status |",
-    "|:--|--:|--:|--:|--:|--:|--:|--:|--:|:--|:--|",
+    `| cell | baseline median | baseline p95 | baseline MAD | fresh median | fresh p95 | fresh MAD | median Δ | ratio | ${confidence} familywise lower Δ | status |`,
+    "|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|:--|",
   ];
   for (const row of rows) {
     lines.push(
-      `| ${row.key} | ${ms(row.baselineMedian)} | ${ms(row.baselineP95)} | ${ms(row.baselineMad)} | ${ms(row.freshMedian)} | ${ms(row.freshP95)} | ${ms(row.freshMad)} | ${ms(row.absoluteDelta)} | ${row.ratio.toFixed(3)}× | >${row.ratioLimit.toFixed(3)}× and >${ms(row.absoluteFloorMs)} | ${row.regression ? "REGRESSION" : "ok"} |`,
+      `| ${row.key} | ${ms(row.baselineMedian)} | ${ms(row.baselineP95)} | ${ms(row.baselineMad)} | ${ms(row.freshMedian)} | ${ms(row.freshP95)} | ${ms(row.freshMad)} | ${ms(row.absoluteDelta)} | ${row.ratio.toFixed(3)}× | ${ms(row.lowerConfidenceBoundMs)} | ${row.regression ? "REGRESSION" : "no detected regression"} |`,
     );
   }
   console.log(lines.join("\n"));
@@ -136,7 +220,7 @@ function printTable(rows: readonly ControlledComparisonRow[]): void {
 
 function gitHead(): string {
   const result = Bun.spawnSync(["git", "rev-parse", "HEAD"], {
-    cwd: resolve(BENCH_ROOT, ".."),
+    cwd: REPOSITORY_ROOT,
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -165,7 +249,9 @@ export async function runCheck(args: readonly string[]): Promise<number> {
     const baselineJson = readFileSync(baselinePath, "utf8");
     const freshJson = readFileSync(freshPath, "utf8");
     const baseline = parseControlledBaseline(JSON.parse(baselineJson) as unknown);
+    validateControlledBaselineProvenance(baseline, REPOSITORY_ROOT);
     const fresh = validateRenderGateArtifact(JSON.parse(freshJson) as unknown, "full", {
+      rounds: baseline.source.rounds,
       nowMs: Date.now(),
       maxAgeMs: FRESH_RESULT_MAX_AGE_MS,
     });
@@ -190,10 +276,14 @@ export async function runCheck(args: readonly string[]): Promise<number> {
     printTable(rows);
     const regressions = rows.filter((row) => row.regression);
     if (regressions.length > 0) {
-      process.stderr.write(`\n✖ ${regressions.length} controlled performance regression(s)\n`);
+      process.stderr.write(
+        `\n✖ ${regressions.length} statistically significant slowdown(s) at a zero-millisecond regression threshold and ${(CONTROLLED_COMPARISON_POLICY.familywiseConfidenceLevel * 100).toFixed(0)}% familywise confidence\n`,
+      );
       return reportOnly ? 0 : 1;
     }
-    process.stderr.write("\n✔ complete controlled performance result passed\n");
+    process.stderr.write(
+      "\n✔ complete matched comparison found no statistically detected regression\n",
+    );
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -88,8 +88,9 @@ const operation: DocumentOp = {
   value: { kind: "literal", value: 1 },
 };
 const datasource: DataSource = {
+  capabilities: { protocol: 2, columns: "windowed" },
   async getRows(request: DataSourceRequest) {
-    return { start: request.start, rows: [] };
+    return { protocol: 2, start: request.start, columns: request.columns, rows: [] };
   },
 };
 const tableExportBackend: XlsxTableExportBackend = {
@@ -113,6 +114,7 @@ void operation;
 void Xlsx.registerXlsxBackends;
 
 const positionalDatasource: DataSource = {
+  capabilities: { protocol: 2, columns: "windowed" },
   // @ts-expect-error positional datasource implementations are not accepted.
   getRows: async (_sheet: string, _start: number, _end: number) => [],
 };

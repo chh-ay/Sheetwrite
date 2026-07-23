@@ -1,5 +1,11 @@
 <script lang="ts">
-import { initSheetwrite, isSheetwriteReady, type GridOptions } from "@sheetwrite/core";
+import {
+  initSheetwrite,
+  isSheetwriteError,
+  isSheetwriteReady,
+  SheetwriteError,
+  type GridOptions,
+} from "@sheetwrite/core";
 import {
   createGridController,
   getGridResetReason,
@@ -18,25 +24,35 @@ let {
   renderer = "canvas",
   workerUrl,
   theme,
+  presentation,
   readOnly,
   protectionResolver,
   mutationPolicy,
   transactionResourceLimits,
+  hyperlinkActivation,
   renderers,
+  editors,
   overscan,
   minColumns,
   config,
   wasmSource,
   height,
   fill,
+  rowBridge,
   fallback,
   onGridChange,
+  onRowDelta,
   onSelectionChange,
   onViewportChange,
   onEditBegin,
   onEditCommit,
   onSearch,
   onActiveSheetChange,
+  onCommandStateChange,
+  onMutationRejected,
+  onRendererFallback,
+  onDatasourceError,
+  onExportError,
   onReady,
   onInitializationError,
   grid = $bindable(),
@@ -50,6 +66,7 @@ let generation = 0;
 
 const handlers = {
   onGridChange: (event: Parameters<NonNullable<typeof onGridChange>>[0]) => onGridChange?.(event),
+  onRowDelta: (event: Parameters<NonNullable<typeof onRowDelta>>[0]) => onRowDelta?.(event),
   onSelectionChange: (event: Parameters<NonNullable<typeof onSelectionChange>>[0]) =>
     onSelectionChange?.(event),
   onViewportChange: (event: Parameters<NonNullable<typeof onViewportChange>>[0]) =>
@@ -59,14 +76,42 @@ const handlers = {
   onSearch: (event: Parameters<NonNullable<typeof onSearch>>[0]) => onSearch?.(event),
   onActiveSheetChange: (event: Parameters<NonNullable<typeof onActiveSheetChange>>[0]) =>
     onActiveSheetChange?.(event),
+  onCommandStateChange: (event: Parameters<NonNullable<typeof onCommandStateChange>>[0]) =>
+    onCommandStateChange?.(event),
+  onMutationRejected: (event: Parameters<NonNullable<typeof onMutationRejected>>[0]) =>
+    onMutationRejected?.(event),
+  onRendererFallback: (event: Parameters<NonNullable<typeof onRendererFallback>>[0]) =>
+    onRendererFallback?.(event),
+  onDatasourceError: (event: Parameters<NonNullable<typeof onDatasourceError>>[0]) =>
+    onDatasourceError?.(event),
+  onExportError: (event: Parameters<NonNullable<typeof onExportError>>[0]) =>
+    onExportError?.(event),
 };
 
 const UNSET_WASM_SOURCE = Symbol("unset-wasm-source");
 let previousOptions: GridOptions | null = null;
 let lastRequestedOptions: GridOptions | null = null;
+let previousRowBridge: Props["rowBridge"] | undefined;
 let previousWasmSource: Props["wasmSource"] | typeof UNSET_WASM_SOURCE = UNSET_WASM_SOURCE;
 let initializationToken = 0;
 let disposed = false;
+
+function normalizeInitializationError(error: unknown): SheetwriteError {
+  if (error instanceof SheetwriteError) return error;
+  if (isSheetwriteError(error)) {
+    return new SheetwriteError(error.code, error.operation, error.message, {
+      cause: error,
+      context: error.context,
+      retryable: error.retryable,
+    });
+  }
+  return new SheetwriteError(
+    "initialization-failed",
+    "initialize",
+    error instanceof Error ? error.message : "Sheetwrite initialize failed",
+    { cause: error },
+  );
+}
 
 function teardownGrid(): void {
   const active = untrack(() => controller);
@@ -82,11 +127,12 @@ function publishReadyGrid(): void {
     generation === 0
       ? "initial"
       : (previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset";
-  const active = untrack(() => createGridController(host, options, handlers));
+  const active = untrack(() => createGridController(host, options, handlers, rowBridge));
   controller = active;
   grid = active.grid;
   previousOptions = options;
   generation += 1;
+  previousRowBridge = rowBridge;
   loading = false;
   untrack(() => onReady?.({ grid: active.grid, generation, reason }));
 }
@@ -99,10 +145,14 @@ $effect(() => {
     datasourceStorage,
     renderer,
     workerUrl,
+    presentation,
     protectionResolver,
     mutationPolicy,
     transactionResourceLimits,
+    hyperlinkActivation,
     renderers,
+    editors,
+    rowBridge,
     wasmSource,
   };
   const currentOptions = (): GridOptions =>
@@ -113,10 +163,13 @@ $effect(() => {
       datasourceStorage: resetInputs.datasourceStorage,
       renderer: resetInputs.renderer,
       workerUrl: resetInputs.workerUrl,
+      presentation: resetInputs.presentation,
       protectionResolver: resetInputs.protectionResolver,
       mutationPolicy: resetInputs.mutationPolicy,
       transactionResourceLimits: resetInputs.transactionResourceLimits,
+      hyperlinkActivation: resetInputs.hyperlinkActivation,
       renderers: resetInputs.renderers,
+      editors: resetInputs.editors,
       theme,
       readOnly,
       overscan,
@@ -128,7 +181,8 @@ $effect(() => {
   const wasmChanged =
     previousWasmSource === UNSET_WASM_SOURCE || previousWasmSource !== resetInputs.wasmSource;
   const resetReason =
-    lastRequestedOptions && getGridResetReason(lastRequestedOptions, requestedOptions);
+    (lastRequestedOptions && getGridResetReason(lastRequestedOptions, requestedOptions)) ??
+    (previousRowBridge !== rowBridge ? "input-reset" : null);
   const sourceOnlyChange = wasmChanged && resetReason === null && activeController !== undefined;
   const needsNewGeneration =
     lastRequestedOptions === null ||
@@ -139,9 +193,10 @@ $effect(() => {
   lastRequestedOptions = requestedOptions;
   const token = ++initializationToken;
   if (sourceOnlyChange) {
-    void initSheetwrite(resetInputs.wasmSource).catch((error: unknown) => {
+    void initSheetwrite(resetInputs.wasmSource).then(undefined, (error: unknown) => {
       if (!disposed && token === initializationToken) {
-        untrack(() => onInitializationError?.(error));
+        const initializationError = normalizeInitializationError(error);
+        untrack(() => onInitializationError?.(initializationError));
       }
     });
     return;
@@ -151,19 +206,26 @@ $effect(() => {
   teardownGrid();
   loading = !isSheetwriteReady();
 
-  void (async () => {
-    const alreadyReady = isSheetwriteReady();
-    try {
-      const initialization = initSheetwrite(resetInputs.wasmSource);
-      if (alreadyReady) publishReadyGrid();
-      await initialization;
-      if (!alreadyReady && !disposed && isSheetwriteReady()) publishReadyGrid();
-    } catch (error) {
+  const alreadyReady = isSheetwriteReady();
+  const initialization = initSheetwrite(resetInputs.wasmSource);
+  if (alreadyReady) publishReadyGrid();
+  void initialization.then(
+    () => {
+      if (!alreadyReady && !disposed && isSheetwriteReady()) {
+        try {
+          publishReadyGrid();
+        } catch (error) {
+          reportError(error);
+        }
+      }
+    },
+    (error: unknown) => {
       if (disposed || token !== initializationToken) return;
       loading = true;
-      untrack(() => onInitializationError?.(error));
-    }
-  })();
+      const initializationError = normalizeInitializationError(error);
+      untrack(() => onInitializationError?.(initializationError));
+    },
+  );
 });
 
 $effect(() => {

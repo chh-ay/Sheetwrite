@@ -5,8 +5,17 @@ import {
   SnapshotResourceError,
   type SnapshotResourceLimits,
   SnapshotValidationError,
+  validateDocumentOperationShape,
   validateTransactionResources,
 } from "./document-protocol.js";
+import type {
+  RuntimeMemoryObservation,
+  RuntimeResourceOperation,
+  RuntimeResourcePhase,
+  RuntimeResourceSnapshot,
+  TransientResourcePeak,
+} from "./resource-accounting.js";
+import { applySheetLifecycleOperation, createSheetLifecycleState } from "./sheet-lifecycle.js";
 import {
   type CompactRangeHistory,
   IncompleteDataError,
@@ -15,10 +24,12 @@ import {
   type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
+import { patchSheetId } from "./store/ranges.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
+import { setTransactionStorageRevision } from "./transaction-admission.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
-import type { AggregateOp, ColumnarData, RowData } from "./types/data.js";
+import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
 import type {
   ColumnFilter,
   CommitReason,
@@ -27,6 +38,7 @@ import type {
   MutationPolicyMode,
   ProtectionResolver,
   RowGroup,
+  SheetLifecycleIssueCode,
   SortKey,
   Workbook,
   WorkbookSnapshot,
@@ -60,6 +72,18 @@ export interface SheetwriteStoreOptions extends StoreDataEngineOptions {
 }
 
 type ChangeListener = (event: ChangeEvent) => void;
+const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
+  blank: "Sheet name cannot be blank",
+  "too-long": "Sheet name exceeds 31 UTF-16 code units",
+  "forbidden-character": "Sheet name contains a forbidden character",
+  "edge-apostrophe": "Sheet name cannot begin or end with an apostrophe",
+  duplicate: "Sheet name duplicates another sheet case-insensitively",
+  "duplicate-sheet-id": "Sheet ID already exists",
+  "sheet-not-found": "Sheet does not exist",
+  "invalid-sheet": "Sheet snapshot is invalid",
+  "invalid-position": "Sheet position is out of bounds",
+  "last-visible-sheet": "Workbook must retain at least one visible sheet",
+};
 
 function isSnapshotAllocationFailure(error: unknown): boolean {
   if (error instanceof SnapshotResourceError || error instanceof RangeError) return true;
@@ -80,6 +104,7 @@ export class SheetwriteStore implements Store {
   private readonly engine: StoreDataEngine;
   private readonly listeners = new Set<ChangeListener>();
   private epoch = 0;
+  private detailedChangeCapture = false;
   private protectionResolver: ProtectionResolver | undefined;
   private mutationPolicy: MutationPolicyMode;
   private readonly policy: StoreMutationPolicy;
@@ -163,6 +188,30 @@ export class SheetwriteStore implements Store {
     this.engine.resetRangeMutationAllocationStats();
   }
 
+  getRuntimeResourceSnapshot(
+    operation: RuntimeResourceOperation,
+    phase: RuntimeResourcePhase,
+    runtime?: RuntimeMemoryObservation,
+  ): RuntimeResourceSnapshot {
+    return this.engine.getRuntimeResourceSnapshot(operation, phase, runtime);
+  }
+
+  resetRuntimeResourceAccounting(): void {
+    this.engine.resetRuntimeResourceAccounting();
+  }
+
+  getFormulaMatrixResourcePeak(): TransientResourcePeak {
+    return this.engine.getFormulaMatrixResourcePeak();
+  }
+
+  resetFormulaMatrixResourcePeak(): void {
+    this.engine.resetFormulaMatrixResourcePeak();
+  }
+
+  withResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
+    return this.engine.withResourceOperation(operation, run);
+  }
+
   isPaged(sheet: SheetId): boolean {
     return this.engine.isPaged(sheet);
   }
@@ -177,6 +226,15 @@ export class SheetwriteStore implements Store {
 
   getCellLoadState(addr: CellAddress): CellLoadState {
     return this.engine.getCellLoadState(addr);
+  }
+
+  areColumnsFullyLoaded(
+    sheet: SheetId,
+    startRow: number,
+    endRow: number,
+    columns: readonly number[],
+  ): boolean {
+    return this.engine.areColumnsFullyLoaded(sheet, startRow, endRow, columns);
   }
 
   isRangeFullyLoaded(input: Range): boolean {
@@ -201,6 +259,10 @@ export class SheetwriteStore implements Store {
 
   getFormula(addr: CellAddress): string | null {
     return this.engine.getFormula(addr);
+  }
+  /** Owning dynamic-array formula cell, or null when `addr` is not spilled. */
+  getSpillAnchor(addr: CellAddress): CellAddress | null {
+    return this.engine.getSpillAnchor(addr);
   }
 
   getRefTarget(addr: CellAddress): CellAddress | null {
@@ -428,15 +490,128 @@ export class SheetwriteStore implements Store {
     if (!resourceValidation.ok) {
       return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
     }
+    const sheetLifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
+    for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
+      const operationPath = `transaction.patches[${operationIndex}]`;
+      const unsafeError = validateDocumentOperationShape(
+        tx.patches[operationIndex],
+        operationPath,
+      ).find((error) => error.code !== "out-of-bounds");
+      if (unsafeError) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "invalid-operation",
+              severity: "error",
+              operationIndex,
+              message: unsafeError.message,
+            },
+          ],
+        };
+      }
+      const operation = tx.patches[operationIndex]!;
+      const lifecycle = applySheetLifecycleOperation(sheetLifecycle, operation);
+      if (lifecycle && !lifecycle.ok) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "sheet-lifecycle",
+              severity: "error",
+              code: lifecycle.code,
+              sheet:
+                operation.op === "addSheet"
+                  ? operation.sheet.id
+                  : (patchSheetId(operation) ?? undefined),
+              operationIndex,
+              message: SHEET_LIFECYCLE_MESSAGES[lifecycle.code],
+            },
+          ],
+        };
+      }
+      const requiredSheets: SheetId[] = [];
+      if (operation.op === "addSheet") {
+        for (const block of operation.sheet.cells) {
+          for (const cell of block.cells) {
+            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+          }
+        }
+        for (const rule of operation.sheet.conditionalFormats ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const hyperlink of operation.sheet.hyperlinks ?? []) {
+          requiredSheets.push(hyperlink.range.sheet);
+          if (hyperlink.target.kind === "internal") {
+            requiredSheets.push(hyperlink.target.range.sheet);
+          }
+        }
+        for (const rule of operation.sheet.validationRules ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const entry of operation.sheet.protectedRanges ?? []) {
+          requiredSheets.push(entry.range.sheet);
+        }
+        for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+      } else {
+        const primarySheet = patchSheetId(operation);
+        if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
+        if (operation.op === "set" && operation.value.kind === "ref") {
+          requiredSheets.push(operation.value.target.sheet);
+        } else if (operation.op === "setRange") {
+          for (const cell of operation.cells) {
+            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+          }
+        } else if (operation.op === "setBlock") {
+          for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+        } else if (operation.op === "setNamedRange") {
+          requiredSheets.push(operation.namedRange.range.sheet);
+          if (operation.namedRange.scope !== undefined) {
+            requiredSheets.push(operation.namedRange.scope);
+          }
+        } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
+          requiredSheets.push(operation.scope);
+        } else if (operation.op === "setHyperlink") {
+          requiredSheets.push(operation.hyperlink.range.sheet);
+          if (operation.hyperlink.target.kind === "internal") {
+            requiredSheets.push(operation.hyperlink.target.range.sheet);
+          }
+        } else if (operation.op === "setValidationRule") {
+          requiredSheets.push(operation.rule.range.sheet);
+        } else if (operation.op === "setProtectedRange") {
+          requiredSheets.push(operation.protectedRange.range.sheet);
+        } else if (operation.op === "setSheetMeta") {
+          for (const rule of operation.patch.conditionalFormats ?? []) {
+            requiredSheets.push(rule.range.sheet);
+          }
+        }
+      }
+      const missingSheet = requiredSheets.find(
+        (sheet) => !sheetLifecycle.sheets.some((candidate) => candidate.id === sheet),
+      );
+      if (missingSheet !== undefined) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "invalid-operation",
+              severity: "error",
+              operationIndex,
+              message: `Sheet ${missingSheet} does not exist`,
+            },
+          ],
+        };
+      }
+    }
     const options =
       typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
     const commitReason = options.commitReason ?? "api";
     const source = options.source ?? "local";
     if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
       return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
-    }
-    if (source === "local" && tx.patches.some((patch) => !this.engine.canApplyLocally(patch))) {
-      return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
     }
 
     let effectiveTx = tx;
@@ -459,11 +634,24 @@ export class SheetwriteStore implements Store {
       }
     }
 
+    if (source === "local" || options.localReplay === true) {
+      const dirtyCapacityIssue = this.engine.pagedDirtyCapacityIssue(effectiveTx.patches);
+      if (dirtyCapacityIssue) {
+        return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
+      }
+    }
+    if (
+      source === "local" &&
+      effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
+    ) {
+      return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
+    }
     const hasListeners = this.listeners.size > 0;
     const effects = this.engine.applyPatches(
       effectiveTx.patches,
-      source === "remote",
+      source === "remote" && options.localReplay !== true,
       hasListeners,
+      this.detailedChangeCapture,
     );
     if (effects.appliedPatches.length === 0) {
       return {
@@ -478,6 +666,7 @@ export class SheetwriteStore implements Store {
       effects.appliedPatches.length === effectiveTx.patches.length
         ? effectiveTx
         : { ...effectiveTx, patches: effects.appliedPatches };
+    setTransactionStorageRevision(transaction, effects.storageRevision);
     if (!hasListeners) {
       return {
         status: "applied",
@@ -510,8 +699,12 @@ export class SheetwriteStore implements Store {
     return () => this.listeners.delete(fn);
   }
 
-  acknowledgeOperations(operations: readonly DocumentOp[]): void {
-    this.engine.acknowledgeOperations(operations);
+  setDetailedChangeCapture(enabled: boolean): void {
+    this.detailedChangeCapture = enabled;
+  }
+
+  acknowledgeOperations(operations: readonly DocumentOp[], storageRevision?: bigint): void {
+    this.engine.acknowledgeOperations(operations, storageRevision);
   }
 
   exportSnapshot(): WorkbookSnapshot {
@@ -526,13 +719,14 @@ export class SheetwriteStore implements Store {
     return this.engine.removeSheetFormulaIdentity(sheet);
   }
 
-  loadRows(
+  loadPage(
     sheet: SheetId,
     start: number,
+    columns: readonly DataSourceColumnBand[],
     rows: readonly RowData[],
     protect?: (addr: CellAddress) => boolean,
   ): void {
-    this.engine.loadRows(sheet, start, rows, protect);
+    this.engine.loadPage(sheet, start, columns, rows, protect);
   }
 
   dispose(): void {

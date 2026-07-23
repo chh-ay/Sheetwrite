@@ -2,9 +2,11 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { COMPATIBILITY_FIXTURES } from "../docs/src/showcases/compatibility.js";
 import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
+  collectCompatibilityDigestIssues,
   contentPathForRoute,
   entrySlug,
   expectedGeneratedFiles,
@@ -12,11 +14,13 @@ import {
   MIGRATION_ROUTES,
   parseFences,
   renderEntryPage,
+  renderEvidencePage,
   renderSymbolPage,
   runCompletionSummary,
   unresolvedCssTokens,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
+import type { SizeHistory } from "./size-report.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const coreEntry: ApiEntryPoint = {
@@ -81,6 +85,102 @@ describe("documentation generation", () => {
     expect(files.some((file) => file.path.endsWith("/api/core/grid.md"))).toBe(true);
     const inventory = files.find((file) => file.path.endsWith("package-entry-points.md"));
     expect(inventory?.content).toContain("supported");
+  });
+
+  it("generates the complete formula contract from the versioned inventory", async () => {
+    const files = await expectedGeneratedFiles(manifest);
+    const reference = files.find((file) => file.path.endsWith("formula-functions.md"));
+    expect(reference?.content).toContain("**100 required-supported target functions**");
+    expect(reference?.content).toContain("**54 incumbent functions**");
+    expect(reference?.content).toContain("| `LET` | required target |");
+    expect(reference?.content).toContain("| `SUMPRODUCT` | required target |");
+    expect(reference?.content).toContain("Google Sheets and OpenFormula behavior is unverified");
+    expect(reference?.content).toContain("No formula throughput or latency number is published");
+  });
+
+  it("generates a public compatibility projection without executable test paths", async () => {
+    const files = await expectedGeneratedFiles(manifest);
+    const reference = files.find((file) => file.path.endsWith("compatibility-results.md"));
+    const data = files.find((file) => file.path.endsWith("/compatibility.json"));
+    const results = files.find((file) => file.path.endsWith("/compatibility-results.json"));
+    if (!reference || !data || !results) {
+      throw new Error("generated compatibility outputs are missing");
+    }
+    expect(reference.content).toContain("Detailed compatibility results");
+    expect(reference.content).toContain("<code>formula-engine-vectors</code>");
+    expect(reference.content).not.toContain("packages/wasm/src/tests.rs");
+    expect(reference.content).not.toContain("test/browser/showcase-interoperability.spec.ts");
+    expect(
+      await readFile(
+        resolve(import.meta.dir, "../docs/src/content/docs/reference/compatibility-results.md"),
+        "utf8",
+      ),
+    ).toBe(reference.content);
+    expect(
+      await readFile(resolve(import.meta.dir, "../docs/src/generated/compatibility.json"), "utf8"),
+    ).toBe(data.content);
+    expect(
+      await readFile(
+        resolve(import.meta.dir, "../docs/src/generated/compatibility-results.json"),
+        "utf8",
+      ),
+    ).toBe(results.content);
+    const projected = JSON.parse(data.content) as {
+      records: Array<Record<string, unknown>>;
+      fixtures: Array<Record<string, unknown>>;
+    };
+    expect(projected.records[0]).not.toHaveProperty("evidence");
+    expect(projected.fixtures[0]).not.toHaveProperty("path");
+    expect(data.content).not.toContain("/test/");
+    expect(data.content).not.toContain("packages/wasm/src/tests");
+    const publishedResults = JSON.parse(results.content) as {
+      testSet: {
+        version: number;
+        checksum: string;
+        totalTests: number;
+        publishedExamples: number;
+        formulaTests: number;
+        editSequenceTests: number;
+        workbookTests: number;
+        localPassed: number;
+        reviewedResults: number;
+        missingReviewedResults: number;
+        unsupported: number;
+        regressions: number;
+      };
+      cases: Array<{ testChecksum: string; observations: unknown[] }>;
+    };
+    expect(publishedResults.testSet).toMatchObject({
+      version: 1,
+      checksum: "bdf94c76df81ea1fa2e1bf96a557c41b21a0f11ea11ae612fcccc35157d7275a",
+      totalTests: 2350,
+      formulaTests: 2000,
+      editSequenceTests: 250,
+      workbookTests: 100,
+      localPassed: 2290,
+      reviewedResults: 0,
+      missingReviewedResults: 2290,
+      unsupported: 60,
+      regressions: 0,
+    });
+    expect(publishedResults.cases).toHaveLength(publishedResults.testSet.publishedExamples);
+    expect(publishedResults.testSet.publishedExamples).toBeLessThan(
+      publishedResults.testSet.totalTests,
+    );
+    expect(
+      publishedResults.cases.every((entry) => /^[a-f0-9]{64}$/u.test(entry.testChecksum)),
+    ).toBe(true);
+    expect(publishedResults.cases.every((entry) => entry.observations.length === 0)).toBe(true);
+    expect(results.content.length).toBeLessThan(300_000);
+  });
+
+  it("fails closed when a compatibility fixture digest drifts", async () => {
+    const fixtures = COMPATIBILITY_FIXTURES.map((fixture, index) =>
+      index === 0 || !fixture.sha256 ? fixture : { ...fixture, sha256: "0".repeat(64) },
+    );
+    expect(await collectCompatibilityDigestIssues(undefined, fixtures)).toContainEqual(
+      expect.stringContaining("compatibility fixture digest mismatch:"),
+    );
   });
 
   it("resolves every moved guide to generated content with one named installation consolidation", async () => {
@@ -474,5 +574,44 @@ describe("adapter documentation contract", () => {
     reason.signature = 'export type GridReadyReason = "initial" | "reset";';
     const issues = adapterContractIssues(manifest);
     expect(issues.some((issue) => issue.startsWith("GridReadyReason documents"))).toBe(true);
+  });
+});
+
+describe("published size history rendering", () => {
+  it("appends a third release, compares adjacent versions, and opens only the latest", async () => {
+    const release = (version: string, actual: number, capturedAt: string) => ({
+      version,
+      capturedAt,
+      source: "npm registry published artifacts",
+      metrics: {
+        "package.@sheetwrite/core.tarballBytes": { actual, unit: "bytes" as const },
+        "package.@sheetwrite/core.unpackedBytes": {
+          actual: actual * 2,
+          unit: "bytes" as const,
+        },
+      },
+    });
+    const history: SizeHistory = {
+      schemaVersion: 1,
+      releases: [
+        release("0.1.0", 100, "2026-01-01T00:00:00.000Z"),
+        release("0.2.0", 120, "2026-02-01T00:00:00.000Z"),
+        release("0.3.0", 150, "2026-03-01T00:00:00.000Z"),
+      ],
+    };
+
+    const output = await renderEvidencePage(history);
+
+    expect(output.match(/class="size-history__release"/g)).toHaveLength(3);
+    expect(output.match(/data-current="true" open/g)).toHaveLength(1);
+    expect(output).toContain("<span>v0.2.0</span>");
+    expect(output).toContain("<strong>v0.3.0</strong>");
+    expect(output.indexOf("<strong>v0.3.0</strong>")).toBeLessThan(
+      output.indexOf("<strong>v0.2.0</strong>"),
+    );
+    expect(output.indexOf("<strong>v0.2.0</strong>")).toBeLessThan(
+      output.indexOf("<strong>v0.1.0</strong>"),
+    );
+    expect(output).toContain("Measured Mar 1, 2026");
   });
 });

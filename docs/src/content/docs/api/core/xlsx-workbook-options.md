@@ -9,7 +9,7 @@ Shared options passed to every registered table and workbook XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L357</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L407</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -26,17 +26,16 @@ signal?: AbortSignal;
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-max-cells" data-pagefind-weight="1">
-<summary><code>maxCells</code> <span class="api-member-summary">Maximum logical cells processed.</span></summary>
+<summary><code>maxCells</code> <span class="api-member-summary">Cells accounted by the active conversion path; defaults to 1,000,000.</span></summary>
 
 ```ts generated
 maxCells?: number;
 ```
 
-<p class="api-member-doc">Maximum logical cells processed. Defaults to 1,000,000.</p>
 </details>
 
 <details class="api-member" id="xlsx-workbook-options-resource-limits" data-pagefind-weight="1">
-<summary><code>resourceLimits</code> <span class="api-member-summary">Overrides for all other XLSX resource dimensions.</span></summary>
+<summary><code>resourceLimits</code> <span class="api-member-summary">Positive overrides for every XLSX resource dimension except maxCells.</span></summary>
 
 ```ts generated
 resourceLimits?: Partial<Omit<XlsxResourceLimits, "maxCells">>;

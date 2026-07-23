@@ -9,10 +9,10 @@ Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L108</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L136</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>19</span>
 
 <div class="api-member-list">
 
@@ -41,6 +41,15 @@ NOT for the render hot path — renderers use `getVisibleWindow`.</p>
 
 ```ts generated
 getFormula(addr: CellAddress): string | null;
+```
+
+</details>
+
+<details class="api-member" id="store-get-spill-anchor" data-pagefind-weight="1">
+<summary><code>getSpillAnchor</code> <span class="api-member-summary">Owning dynamic-array formula cell, or null when addr is not spilled.</span></summary>
+
+```ts generated
+getSpillAnchor(addr: CellAddress): CellAddress | null;
 ```
 
 </details>
@@ -141,6 +150,15 @@ on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
 
 </details>
 
+<details class="api-member" id="store-set-detailed-change-capture" data-pagefind-weight="1">
+<summary><code>setDetailedChangeCapture</code> <span class="api-member-summary">Opt in to per-cell before/after capture for packed and clear operations.</span></summary>
+
+```ts generated
+setDetailedChangeCapture?(enabled: boolean): void;
+```
+
+</details>
+
 <details class="api-member" id="store-query-capability" data-pagefind-weight="1">
 <summary><code>queryCapability</code> <span class="api-member-summary">Explicit partial-data state for paged datasource stores.</span></summary>
 
@@ -160,10 +178,10 @@ getCellLoadState?(addr: CellAddress): CellLoadState;
 </details>
 
 <details class="api-member" id="store-acknowledge-operations" data-pagefind-weight="1">
-<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release paged dirty pins after server acknowledgement.</span></summary>
+<summary><code>acknowledgeOperations</code> <span class="api-member-summary">Release sparse paged edits after server acknowledgement.</span></summary>
 
 ```ts generated
-acknowledgeOperations?(operations: readonly DocumentOp[]): void;
+acknowledgeOperations?(operations: readonly DocumentOp[], storageRevision?: bigint): void;
 ```
 
 </details>
@@ -197,6 +215,7 @@ export interface Store {
   getWorkbook(): Workbook;
   getCell(addr: CellAddress): ResolvedCell;
   getFormula(addr: CellAddress): string | null;
+  getSpillAnchor(addr: CellAddress): CellAddress | null;
   getRefTarget(addr: CellAddress): CellAddress | null;
   recalculateVolatile(now?: Date): void;
   getVisibleWindow(
@@ -233,9 +252,13 @@ export interface Store {
     mode?: MutationPolicyMode,
   ): void;
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
+  setDetailedChangeCapture?(enabled: boolean): void;
   queryCapability?(sheet: SheetId): QueryCapability;
   getCellLoadState?(addr: CellAddress): CellLoadState;
-  acknowledgeOperations?(operations: readonly DocumentOp[]): void;
+  acknowledgeOperations?(
+    operations: readonly DocumentOp[],
+    storageRevision?: bigint,
+  ): void;
   exportSnapshot?(): WorkbookSnapshot;
   viewRowCount(sheet: SheetId): number;
 }

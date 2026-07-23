@@ -11,18 +11,23 @@ import {
   initSheetwrite,
   isSheetwriteReady,
   type Selection,
+  type SheetwriteError,
   type Theme,
   type Workbook,
 } from "@sheetwrite/core";
 import {
   createGridController,
   createSimpleGridInput,
+  createSimpleRowBridge,
   type GridController,
   type GridControllerHandlers,
   type GridReadyEvent,
   type GridReadyReason,
   getGridResetReason,
   gridSizeStyle,
+  type RowBridge,
+  type RowBridgeHandler,
+  type RowBridgeId,
   type SheetwriteInitializationProps,
   type SimpleColumn,
   type SimpleGridInput,
@@ -48,7 +53,7 @@ export interface SheetwriteGridExpose {
   grid: Grid | null;
 }
 /** Advanced Vue adapter props for workbook data or datasource ownership. */
-export interface SheetwriteGridProps {
+export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   /** Live workbook schema adopted by the Grid. */
   workbook: Workbook;
   /** Eager column-major values for the active sheet. */
@@ -57,10 +62,14 @@ export interface SheetwriteGridProps {
   datasource?: DataSource;
   /** Allocation and cache policy for datasource storage. */
   datasourceStorage?: DataSourceStorageOptions;
+  /** Optional projection from canonical data-space operations to host row IDs. */
+  rowBridge?: RowBridge<Id>;
   /** Paint backend; defaults to main-thread canvas. */
   renderer?: GridOptions["renderer"];
   /** Browser-fetchable worker module URL. */
   workerUrl?: GridOptions["workerUrl"];
+  /** Positional spreadsheet or semantic data-grid headers. */
+  presentation?: GridOptions["presentation"];
   /** Live overrides merged into the resolved Grid theme. */
   theme?: Partial<Theme>;
   /** Disables mutation while preserving navigation and selection. */
@@ -71,8 +80,12 @@ export interface SheetwriteGridProps {
   mutationPolicy?: GridOptions["mutationPolicy"];
   /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
+  /** Controls link activation: emit an event, also navigate internally, or disable it. */
+  hyperlinkActivation?: GridOptions["hyperlinkActivation"];
   /** Named custom renderers registered when the Grid is created. */
   renderers?: Record<string, CellRenderer>;
+  /** Named custom editors registered when the Grid is created. */
+  editors?: GridOptions["editors"];
   /** Extra rows painted above and below the viewport. */
   overscan?: number;
   /** Minimum rendered column count, including empty padding columns. */
@@ -88,18 +101,26 @@ export interface SheetwriteGridProps {
 }
 
 /** Simple Vue adapter props for columns and default row objects. */
-export interface SheetwriteProps
-  extends Omit<SheetwriteGridProps, "workbook" | "data" | "datasource"> {
+export interface SheetwriteProps<
+  Row extends Record<string, CellScalar> = Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> extends Omit<SheetwriteGridProps<Id>, "workbook" | "data" | "datasource" | "rowBridge"> {
   /** Ordered schema used to derive the component-owned sheet. */
-  columns: readonly SimpleColumn<Record<string, CellScalar>>[];
+  columns: readonly SimpleColumn<Row>[];
   /** Rows converted to initial columnar data; missing keys become `null`. */
-  defaultRows: readonly Record<string, CellScalar>[];
+  defaultRows: readonly Row[];
   /** Generated sheet name; defaults to `Sheet 1`. */
   sheetName?: string;
+  /** Opt-in stable identity for each host row. */
+  getRowId?: (row: Row, index: number) => Id;
+  /** Creates stable identities for Grid-inserted rows. */
+  createRowId?: Parameters<typeof createSimpleRowBridge<Row, Id>>[0]["createRowId"];
 }
 
 /** Event payloads emitted by the Vue components, keyed by template event name. */
-export interface SheetwriteGridEmits {
+export interface SheetwriteGridEmits<Id extends RowBridgeId = RowBridgeId> {
+  /** Projected host-row changes. */
+  "row-delta": Parameters<RowBridgeHandler<Id>>[0];
   /** Committed Grid change, including its applied transaction. */
   "grid-change": ChangeEvent;
   /** Current selection, or `null` after it is cleared. */
@@ -112,12 +133,22 @@ export interface SheetwriteGridEmits {
   "edit-commit": GridEvents["edit-commit"];
   /** Refreshed search matches and active-match index. */
   search: GridEvents["search"];
+  /** Command availability or formatting activity changed. */
+  "command-state-change": GridEvents["command-state-change"];
   /** The visible sheet changed. */
   "active-sheet-change": GridEvents["active-sheet"];
+  /** A Grid mutation was rejected. */
+  "mutation-rejected": GridEvents["mutation-rejected"];
+  /** Worker rendering fell back to the main-thread canvas renderer. */
+  "renderer-fallback": GridEvents["renderer-fallback"];
+  /** A datasource request failed. */
+  "datasource-error": GridEvents["datasource-error"];
+  /** A built-in XLSX export action failed. */
+  "export-error": GridEvents["export-error"];
   /** The adapter published a ready Grid generation. */
   ready: GridReadyEvent;
   /** WASM initialization failed while the component stayed mounted. */
-  "initialization-error": unknown;
+  "initialization-error": SheetwriteError;
 }
 
 /**
@@ -148,6 +179,8 @@ const gridProps = {
     type: Object as PropType<DataSourceStorageOptions>,
     default: undefined,
   },
+  /** Optional stable host-row projection. */
+  rowBridge: { type: Object as PropType<RowBridge>, default: undefined },
   /** Paint backend; defaults to main-thread canvas. */
   renderer: { type: String as PropType<GridOptions["renderer"]>, default: undefined },
   /** Browser-fetchable worker module URL. */
@@ -155,6 +188,8 @@ const gridProps = {
     type: [String, URL] as unknown as PropType<GridOptions["workerUrl"]>,
     default: undefined,
   },
+  /** Positional spreadsheet or semantic data-grid headers. */
+  presentation: { type: String as PropType<GridOptions["presentation"]>, default: undefined },
   /** Live overrides merged into the resolved Grid theme. */
   theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
   /** Disables mutation while preserving navigation and selection. */
@@ -174,8 +209,15 @@ const gridProps = {
     type: Object as PropType<GridOptions["transactionResourceLimits"]>,
     default: undefined,
   },
+  /** Controls link activation: emit an event, also navigate internally, or disable it. */
+  hyperlinkActivation: {
+    type: String as PropType<GridOptions["hyperlinkActivation"]>,
+    default: undefined,
+  },
   /** Named custom renderers registered when the Grid is created. */
   renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
+  /** Named custom editors registered when the Grid is created. */
+  editors: { type: Object as PropType<GridOptions["editors"]>, default: undefined },
   /** Extra rows painted above and below the viewport. */
   overscan: { type: Number, default: undefined },
   /** Minimum rendered column count, including empty padding columns. */
@@ -195,14 +237,20 @@ const gridProps = {
 
 const gridEmits = {
   "grid-change": (_event: ChangeEvent) => true,
+  "row-delta": (_projection: Parameters<RowBridgeHandler>[0]) => true,
   "selection-change": (_selection: Selection | null) => true,
   "viewport-change": (_event: GridEvents["scroll"]) => true,
   "edit-begin": (_event: GridEvents["edit-begin"]) => true,
   "edit-commit": (_event: GridEvents["edit-commit"]) => true,
   search: (_result: GridEvents["search"]) => true,
+  "command-state-change": (_event: GridEvents["command-state-change"]) => true,
   "active-sheet-change": (_event: GridEvents["active-sheet"]) => true,
+  "mutation-rejected": (_event: GridEvents["mutation-rejected"]) => true,
+  "renderer-fallback": (_event: GridEvents["renderer-fallback"]) => true,
+  "datasource-error": (_event: GridEvents["datasource-error"]) => true,
+  "export-error": (_event: GridEvents["export-error"]) => true,
   ready: (_event: GridReadyEvent) => true,
-  "initialization-error": (_error: unknown) => true,
+  "initialization-error": (_error: SheetwriteError) => true,
 };
 
 const SheetwriteGridComponent = defineComponent({
@@ -221,12 +269,18 @@ const SheetwriteGridComponent = defineComponent({
 
     const handlers: GridControllerHandlers = {
       onGridChange: (event) => emit("grid-change", event),
+      onRowDelta: (projection) => emit("row-delta", projection),
       onSelectionChange: (selection) => emit("selection-change", selection),
       onViewportChange: (event) => emit("viewport-change", event),
       onEditBegin: (event) => emit("edit-begin", event),
       onEditCommit: (event) => emit("edit-commit", event),
       onSearch: (result) => emit("search", result),
+      onCommandStateChange: (event) => emit("command-state-change", event),
       onActiveSheetChange: (event) => emit("active-sheet-change", event),
+      onMutationRejected: (event) => emit("mutation-rejected", event),
+      onRendererFallback: (event) => emit("renderer-fallback", event),
+      onDatasourceError: (event) => emit("datasource-error", event),
+      onExportError: (event) => emit("export-error", event),
     };
 
     function currentOptions(): GridOptions {
@@ -237,12 +291,15 @@ const SheetwriteGridComponent = defineComponent({
         datasourceStorage: props.datasourceStorage,
         renderer: props.renderer,
         workerUrl: props.workerUrl,
+        presentation: props.presentation,
         theme: props.theme,
         readOnly: props.readOnly,
         protectionResolver: props.protectionResolver,
         mutationPolicy: props.mutationPolicy,
         transactionResourceLimits: props.transactionResourceLimits,
+        hyperlinkActivation: props.hyperlinkActivation,
         renderers: props.renderers,
+        editors: props.editors,
         overscan: props.overscan,
         minColumns: props.minColumns,
         config: props.config,
@@ -263,7 +320,7 @@ const SheetwriteGridComponent = defineComponent({
           ? "initial"
           : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
       teardownGrid();
-      const created = createGridController(host.value, options, handlers);
+      const created = createGridController(host.value, options, handlers, props.rowBridge);
       controller = created;
       generation += 1;
       previousOptions = options;
@@ -284,7 +341,9 @@ const SheetwriteGridComponent = defineComponent({
           await createCurrentGrid();
         }
       } catch (error) {
-        if (mounted && token === initializationToken) emit("initialization-error", error);
+        if (mounted && token === initializationToken) {
+          emit("initialization-error", error as SheetwriteError);
+        }
       }
     }
 
@@ -310,12 +369,16 @@ const SheetwriteGridComponent = defineComponent({
         props.data,
         props.datasource,
         props.datasourceStorage,
+        props.rowBridge,
         props.renderer,
         props.workerUrl,
+        props.presentation,
         props.protectionResolver,
         props.mutationPolicy,
         props.transactionResourceLimits,
+        props.hyperlinkActivation,
         props.renderers,
+        props.editors,
       ],
       () => {
         if (isSheetwriteReady()) void createCurrentGrid();
@@ -375,6 +438,22 @@ const SheetwriteSimpleComponent = defineComponent({
     defaultRows: { type: Array as PropType<readonly Record<string, CellScalar>[]>, required: true },
     /** Generated sheet name; defaults to `Sheet 1`. */
     sheetName: { type: String, default: undefined },
+    /** Opt-in stable identity for host rows. */
+    getRowId: {
+      type: Function as PropType<(row: Record<string, CellScalar>, index: number) => RowBridgeId>,
+      default: undefined,
+    },
+    /** Creates identities for inserted rows. */
+    createRowId: {
+      type: Function as PropType<
+        NonNullable<
+          Parameters<
+            typeof createSimpleRowBridge<Record<string, CellScalar>, RowBridgeId>
+          >[0]["createRowId"]
+        >
+      >,
+      default: undefined,
+    },
     /** Host height in CSS pixels for numbers or any CSS length string. */
     height: { type: [Number, String], default: undefined },
     /** Fills the parent; exactly one of `fill` or `height` is required. */
@@ -385,6 +464,9 @@ const SheetwriteSimpleComponent = defineComponent({
     let inputColumns: typeof props.columns | null = null;
     let inputRows: typeof props.defaultRows | null = null;
     let inputSheetName: string | undefined;
+    let rowBridge: RowBridge | undefined;
+    let inputGetRowId: typeof props.getRowId;
+    let inputCreateRowId: typeof props.createRowId;
 
     return () => {
       if (
@@ -397,18 +479,32 @@ const SheetwriteSimpleComponent = defineComponent({
         input === null ||
         inputColumns !== props.columns ||
         inputRows !== props.defaultRows ||
-        inputSheetName !== props.sheetName
+        inputSheetName !== props.sheetName ||
+        inputGetRowId !== props.getRowId ||
+        inputCreateRowId !== props.createRowId
       ) {
         input = createSimpleGridInput({
           columns: props.columns,
           defaultRows: props.defaultRows,
           sheetName: props.sheetName,
         });
+        rowBridge = createSimpleRowBridge({
+          columns: props.columns,
+          defaultRows: props.defaultRows,
+          ...(props.getRowId === undefined ? {} : { getRowId: props.getRowId }),
+          ...(props.createRowId === undefined ? {} : { createRowId: props.createRowId }),
+        });
         inputColumns = props.columns;
         inputRows = props.defaultRows;
         inputSheetName = props.sheetName;
+        inputGetRowId = props.getRowId;
+        inputCreateRowId = props.createRowId;
       }
-      return h(SheetwriteGrid, { ...attrs, ...props, ...input }, slots);
+      return h(
+        SheetwriteGrid,
+        { ...attrs, height: props.height, fill: props.fill, ...input, rowBridge },
+        slots,
+      );
     };
   },
 });
@@ -419,5 +515,22 @@ export const Sheetwrite = SheetwriteSimpleComponent as unknown as SheetwriteComp
   SheetwriteGridEmits
 >;
 
-export type { CellScalar, Grid } from "@sheetwrite/core";
-export type { GridReadyEvent, SimpleColumn } from "@sheetwrite/core/adapter";
+export type {
+  CellEditor,
+  CellEditorContext,
+  CellEditorInstance,
+  CellEditorNavigation,
+  CellScalar,
+  Grid,
+  GridCommandName,
+  GridCommandState,
+} from "@sheetwrite/core";
+export type {
+  GridReadyEvent,
+  RowBridge,
+  RowBridgeDelta,
+  RowBridgeHandler,
+  RowBridgeId,
+  RowBridgeProjection,
+  SimpleColumn,
+} from "@sheetwrite/core/adapter";

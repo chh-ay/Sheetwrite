@@ -10,7 +10,7 @@ caller-owned object. Every ceiling is an inclusive non-negative safe integer.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L46</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L66</code></dd></div>
 </dl>
 
 ## Declaration

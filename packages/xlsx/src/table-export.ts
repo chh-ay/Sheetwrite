@@ -7,7 +7,7 @@ import type {
   XlsxTableExportBackend,
   XlsxWorkbookOptions,
 } from "@sheetwrite/core";
-import { assertResource, createCodecContext } from "./resources.js";
+import { assertResource, createCodecContext, xlsxFailure } from "./resources.js";
 import { writeWorkbook } from "./writer.js";
 
 /** Implementation-neutral cell in the first-sheet table export model. */
@@ -187,8 +187,12 @@ function snapshotFromModel(model: XlsxModel): WorkbookSnapshot {
 export const sheetwriteTableExportBackend: XlsxTableExportBackend = {
   name: "sheetwrite-ooxml-table",
   async toXlsxTable(workbook, store, options) {
-    const model = buildXlsxModel(workbook, store, options);
-    if (!model) return new Uint8Array();
-    return writeWorkbook(snapshotFromModel(model), createCodecContext("export", options));
+    try {
+      const model = buildXlsxModel(workbook, store, options);
+      if (!model) return new Uint8Array();
+      return writeWorkbook(snapshotFromModel(model), createCodecContext("export", options));
+    } catch (error) {
+      throw xlsxFailure(error, "export", "sheetwrite-ooxml-table");
+    }
   },
 };

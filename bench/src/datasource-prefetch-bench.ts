@@ -1,0 +1,552 @@
+import {
+  DATASOURCE_MAX_ACTIVE_REQUESTS,
+  DATASOURCE_PREFETCH_MAX_BYTES,
+  DATASOURCE_PREFETCH_MAX_ROWS,
+  DatasourceController,
+} from "../../packages/core/src/datasource-controller.js";
+import { initSheetwrite } from "../../packages/core/src/grid.js";
+import { SheetwriteStore } from "../../packages/core/src/store.js";
+import type {
+  DataSource,
+  DataSourceColumnBand,
+  DataSourcePage,
+  RowData,
+  Workbook,
+} from "../../packages/core/src/types.js";
+
+const FRAME_MS = 16.7;
+const SOURCE_LATENCY_MS = 90;
+const VIEWPORT_ROWS = 20;
+const TRACE_BANDS = 10;
+const REVERSE_BANDS = 2;
+const REPETITIONS = 5;
+const ROW_COUNT = 5_000;
+const COLUMN_COUNT = 6;
+const CHUNK_ROWS = 20;
+const CACHE_BYTES = 12 * 1024;
+const REQUEST_MULTIPLIER_LIMIT = 3;
+const TRACE_COLUMN_KEYS = Array.from({ length: COLUMN_COUNT }, (_, column) => `c${column}`);
+const TRACE_COLUMNS = TRACE_COLUMN_KEYS.map((key, column) => ({
+  key,
+  header: `C${column}`,
+  width: 96,
+  type: column === 0 ? ("number" as const) : ("text" as const),
+}));
+const TRACE_COLUMN_INDICES = TRACE_COLUMNS.map((_, column) => column);
+const FULL_TRACE_BANDS: readonly DataSourceColumnBand[] = [
+  { start: 0, end: COLUMN_COUNT, keys: TRACE_COLUMN_KEYS },
+];
+
+interface ScheduledTask {
+  readonly id: number;
+  readonly at: number;
+  readonly run: () => void;
+  cancelled: boolean;
+}
+
+class LogicalClock {
+  now = 0;
+  private nextId = 1;
+  private readonly tasks: ScheduledTask[] = [];
+
+  schedule(delay: number, run: () => void): () => void {
+    const task: ScheduledTask = {
+      id: this.nextId++,
+      at: this.now + delay,
+      run,
+      cancelled: false,
+    };
+    this.tasks.push(task);
+    this.tasks.sort((a, b) => a.at - b.at || a.id - b.id);
+    return () => {
+      task.cancelled = true;
+    };
+  }
+
+  async advance(milliseconds: number): Promise<void> {
+    const target = this.now + milliseconds;
+    for (;;) {
+      const task = this.tasks.find((candidate) => !candidate.cancelled && candidate.at <= target);
+      if (!task) break;
+      task.cancelled = true;
+      this.now = task.at;
+      task.run();
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+    this.now = target;
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+}
+
+interface SourceTelemetry {
+  requests: number;
+  requestedRows: number;
+  rowsServed: number;
+  bytesServed: number;
+  aborts: number;
+}
+
+export interface PrefetchTraceRepetition {
+  readonly repetition: number;
+  readonly residencyRatio: number;
+  readonly p95VisibleWaitMs: number;
+  readonly measuredFrames: number;
+  readonly residentFrames: number;
+  readonly requests: number;
+  readonly requestedRows: number;
+  readonly rowsServed: number;
+  readonly bytesServed: number;
+  readonly requestedRowMultiplier: number;
+  readonly servedByteMultiplier: number;
+  readonly aborts: number;
+  readonly reversalAborts: number;
+  readonly jumpAborts: number;
+  readonly promotions: number;
+  readonly cacheAllocatedBytes: number;
+  readonly cacheChunks: number;
+  readonly peakActiveRequests: number;
+  readonly peakActiveSpeculativeRows: number;
+  readonly jumpVisibleResidentBeforeResponse: boolean;
+  readonly jumpVisibleResidentAfterResponse: boolean;
+}
+
+export interface SparseDatasourceBookkeepingEvidence {
+  readonly logicalRows: number;
+  readonly visibleRows: number;
+  readonly loadedBands: number;
+  readonly ownedBands: number;
+  readonly visibleWaitingBands: number;
+  readonly visibleWaitingRows: number;
+  /** Numeric interval payload only; JS object/container overhead is runtime-dependent. */
+  readonly modeledNumericPayloadBytes: number;
+}
+
+export interface PrefetchBenchmarkReport {
+  readonly policy: {
+    readonly sourceLatencyMs: number;
+    readonly frameMs: number;
+    readonly viewportRows: number;
+    readonly lookaheadRowsLimit: number;
+    readonly lookaheadBytesLimit: number;
+    readonly requestMultiplierLimit: number;
+    readonly activeRequestLimit: number;
+    readonly cacheBytes: number;
+  };
+  readonly repetitions: readonly PrefetchTraceRepetition[];
+  readonly sparseBookkeeping: SparseDatasourceBookkeepingEvidence;
+  readonly medianResidencyRatio: number;
+  readonly p95ResidencyRatio: number;
+  readonly medianP95VisibleWaitMs: number;
+  readonly p95VisibleWaitMs: number;
+}
+
+function workbook(): Workbook {
+  return {
+    activeSheet: "trace",
+    sheets: [
+      {
+        id: "trace",
+        name: "Trace",
+        rowCount: ROW_COUNT,
+        columns: TRACE_COLUMNS.map((column) => ({ ...column })),
+      },
+    ],
+  };
+}
+
+function traceValue(key: string, row: number): RowData[string] {
+  switch (key) {
+    case "c0":
+      return row;
+    case "c1":
+      return `sensor-${row % 97}`;
+    case "c2":
+      return `region-${row % 5}`;
+    case "c3":
+      return `status-${row % 3}`;
+    case "c4":
+      return `payload-${row}`;
+    case "c5":
+      return `checksum-${Math.imul(row + 1, 2654435761) >>> 0}`;
+    default:
+      return null;
+  }
+}
+
+function traceRows(
+  start: number,
+  end: number,
+  columns: readonly DataSourceColumnBand[],
+): RowData[] {
+  const keys = columns.flatMap((band) => band.keys);
+  return Array.from({ length: end - start }, (_, offset) => {
+    const row = start + offset;
+    const pageRow: RowData = {};
+    for (const key of keys) pageRow[key] = traceValue(key, row);
+    return pageRow;
+  });
+}
+
+async function flushRequests(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+function percentile(values: readonly number[], quantile: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(sorted.length * quantile) - 1)]!;
+}
+
+async function runRepetition(repetition: number): Promise<PrefetchTraceRepetition> {
+  const clock = new LogicalClock();
+  const store = new SheetwriteStore(workbook(), undefined, {
+    storage: "paged",
+    chunkRows: CHUNK_ROWS,
+    cacheBytes: CACHE_BYTES,
+  });
+  const source: SourceTelemetry = {
+    requests: 0,
+    requestedRows: 0,
+    rowsServed: 0,
+    bytesServed: 0,
+    aborts: 0,
+  };
+  const datasource: DataSource = {
+    capabilities: { protocol: 2, columns: "windowed" },
+    getRows({ start, end, columns, signal }) {
+      source.requests += 1;
+      source.requestedRows += end - start;
+      pendingSignals.add(signal);
+      const result = Promise.withResolvers<DataSourcePage>();
+      const cancel = clock.schedule(SOURCE_LATENCY_MS, () => {
+        pendingSignals.delete(signal);
+        const rows = traceRows(start, end, columns);
+        source.rowsServed += rows.length;
+        source.bytesServed += new TextEncoder().encode(JSON.stringify(rows)).byteLength;
+        result.resolve({ protocol: 2, start, columns, rows });
+      });
+      signal.addEventListener(
+        "abort",
+        () => {
+          cancel();
+          pendingSignals.delete(signal);
+          source.aborts += 1;
+          result.reject(new DOMException("Logical datasource request aborted", "AbortError"));
+        },
+        { once: true },
+      );
+      return result.promise;
+    },
+  };
+  const pendingSignals = new Set<AbortSignal>();
+  let visibleStart = VIEWPORT_ROWS / 2;
+  const controller = new DatasourceController(
+    {
+      datasource,
+      loadable: store,
+      activeSheet: () => "trace",
+      rowCount: () => ROW_COUNT,
+      columns: () => TRACE_COLUMNS,
+      revision: () => 0,
+      isCellNewerThan: () => false,
+      retainRevision: () => () => {},
+      onRowsLoaded: () => {},
+      onError: (_request, error) => {
+        throw error;
+      },
+      now: () => clock.now,
+    },
+    ROW_COUNT,
+  );
+  let peakActiveRequests = 0;
+  let peakActiveSpeculativeRows = 0;
+  const sampleActiveResources = () => {
+    const telemetry = controller.getTelemetry();
+    peakActiveRequests = Math.max(peakActiveRequests, telemetry.activeRequests);
+    peakActiveSpeculativeRows = Math.max(
+      peakActiveSpeculativeRows,
+      telemetry.activeSpeculativeRows,
+    );
+  };
+
+  // Declared warm-up: visible demand plus the two aligned look-ahead bands.
+  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sampleActiveResources();
+  await clock.advance(SOURCE_LATENCY_MS);
+  await flushRequests();
+  controller.resetTelemetry();
+  const warmSource = { ...source };
+
+  const demandedRows = new Set<number>();
+  const recordDemand = () => {
+    for (let row = visibleStart; row < visibleStart + VIEWPORT_ROWS; row++) demandedRows.add(row);
+  };
+
+  const steadyFrames = TRACE_BANDS * 4;
+  for (let frame = 0; frame < steadyFrames; frame++) {
+    await clock.advance(FRAME_MS);
+    visibleStart += VIEWPORT_ROWS / 4;
+    recordDemand();
+    controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+    sampleActiveResources();
+  }
+
+  // Hold the final window for one complete measured logical frame.
+  await clock.advance(FRAME_MS);
+  recordDemand();
+  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sampleActiveResources();
+
+  for (let frame = 0; frame < REVERSE_BANDS * 4; frame++) {
+    await clock.advance(FRAME_MS);
+    visibleStart -= VIEWPORT_ROWS / 4;
+    recordDemand();
+    controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+    sampleActiveResources();
+  }
+  await flushRequests();
+
+  const steady = controller.getTelemetry();
+  const sourceAfterSteady = { ...source };
+  const demandedBytes = new TextEncoder().encode(
+    JSON.stringify(traceRows(0, demandedRows.size, FULL_TRACE_BANDS)),
+  ).byteLength;
+  // Repeated non-jump band steps create fresh visible/speculative ownership so
+  // the immediate distant jump deterministically proves both cancellation paths.
+  for (let step = 0; step < 3; step++) {
+    visibleStart += VIEWPORT_ROWS * 2;
+    controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+    sampleActiveResources();
+  }
+
+  // The distant jump must expose unloaded state until its real 90 ms response.
+  visibleStart = 3_000;
+  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sampleActiveResources();
+  const jumpVisibleResidentBeforeResponse = store.isRangeFullyLoaded({
+    sheet: "trace",
+    start: { row: visibleStart, col: 0 },
+    end: { row: visibleStart + VIEWPORT_ROWS - 1, col: COLUMN_COUNT - 1 },
+  });
+  await clock.advance(SOURCE_LATENCY_MS);
+  await flushRequests();
+  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  sampleActiveResources();
+  const jumpVisibleResidentAfterResponse = store.isRangeFullyLoaded({
+    sheet: "trace",
+    start: { row: visibleStart, col: 0 },
+    end: { row: visibleStart + VIEWPORT_ROWS - 1, col: COLUMN_COUNT - 1 },
+  });
+  const complete = controller.getTelemetry();
+  const cache = store.getPagedStats("trace");
+  const measuredRequestedRows = sourceAfterSteady.requestedRows - warmSource.requestedRows;
+  const measuredRowsServed = sourceAfterSteady.rowsServed - warmSource.rowsServed;
+  const measuredBytesServed = sourceAfterSteady.bytesServed - warmSource.bytesServed;
+
+  const result: PrefetchTraceRepetition = {
+    repetition,
+    residencyRatio: steady.residencyRatio,
+    p95VisibleWaitMs: steady.p95VisibleWaitMs,
+    measuredFrames: steady.measuredFrames,
+    residentFrames: steady.residentFrames,
+    requests: sourceAfterSteady.requests - warmSource.requests,
+    requestedRows: measuredRequestedRows,
+    rowsServed: measuredRowsServed,
+    bytesServed: measuredBytesServed,
+    requestedRowMultiplier: measuredRequestedRows / demandedRows.size,
+    servedByteMultiplier: demandedBytes === 0 ? 0 : measuredBytesServed / demandedBytes,
+    aborts: source.aborts - warmSource.aborts,
+    reversalAborts: complete.reversalAborts,
+    jumpAborts: complete.jumpAborts,
+    promotions: complete.promotions,
+    cacheAllocatedBytes: cache.allocatedBytes,
+    cacheChunks: cache.chunks,
+    peakActiveRequests,
+    peakActiveSpeculativeRows,
+    jumpVisibleResidentBeforeResponse,
+    jumpVisibleResidentAfterResponse,
+  };
+
+  controller.destroy();
+  store.dispose();
+  if (pendingSignals.size !== 0) throw new Error("Prefetch trace leaked datasource requests");
+  return result;
+}
+
+function assertRepetition(result: PrefetchTraceRepetition): void {
+  if (result.residencyRatio < 0.95) {
+    throw new Error(`repetition ${result.repetition}: residency ${result.residencyRatio} < 0.95`);
+  }
+  if (result.p95VisibleWaitMs >= FRAME_MS) {
+    throw new Error(
+      `repetition ${result.repetition}: p95 visible wait ${result.p95VisibleWaitMs} >= ${FRAME_MS}`,
+    );
+  }
+  if (result.requestedRowMultiplier > REQUEST_MULTIPLIER_LIMIT) {
+    throw new Error(
+      `repetition ${result.repetition}: row multiplier ${result.requestedRowMultiplier} > ${REQUEST_MULTIPLIER_LIMIT}`,
+    );
+  }
+  if (result.servedByteMultiplier > REQUEST_MULTIPLIER_LIMIT) {
+    throw new Error(
+      `repetition ${result.repetition}: byte multiplier ${result.servedByteMultiplier} > ${REQUEST_MULTIPLIER_LIMIT}`,
+    );
+  }
+  if (result.reversalAborts === 0 || result.jumpAborts === 0) {
+    throw new Error(
+      `repetition ${result.repetition}: reversal/jump aborts ${result.reversalAborts}/${result.jumpAborts}`,
+    );
+  }
+  if (result.peakActiveRequests > DATASOURCE_MAX_ACTIVE_REQUESTS) {
+    throw new Error(
+      `repetition ${result.repetition}: peak active requests ${result.peakActiveRequests} > ${DATASOURCE_MAX_ACTIVE_REQUESTS}`,
+    );
+  }
+  if (result.peakActiveSpeculativeRows > DATASOURCE_PREFETCH_MAX_ROWS) {
+    throw new Error(
+      `repetition ${result.repetition}: peak speculative rows ${result.peakActiveSpeculativeRows} > ${DATASOURCE_PREFETCH_MAX_ROWS}`,
+    );
+  }
+  if (result.cacheAllocatedBytes > CACHE_BYTES) {
+    throw new Error(
+      `repetition ${result.repetition}: cache ${result.cacheAllocatedBytes} > ${CACHE_BYTES}`,
+    );
+  }
+  if (result.jumpVisibleResidentBeforeResponse || !result.jumpVisibleResidentAfterResponse) {
+    throw new Error(`repetition ${result.repetition}: jump violated unloaded/loaded semantics`);
+  }
+}
+
+export function validateDatasourcePrefetchReport(value: PrefetchBenchmarkReport): void {
+  if (
+    value.policy.sourceLatencyMs !== SOURCE_LATENCY_MS ||
+    value.policy.frameMs !== FRAME_MS ||
+    value.policy.viewportRows !== VIEWPORT_ROWS ||
+    value.policy.lookaheadRowsLimit !== DATASOURCE_PREFETCH_MAX_ROWS ||
+    value.policy.lookaheadBytesLimit !== DATASOURCE_PREFETCH_MAX_BYTES ||
+    value.policy.requestMultiplierLimit !== REQUEST_MULTIPLIER_LIMIT ||
+    value.policy.activeRequestLimit !== DATASOURCE_MAX_ACTIVE_REQUESTS ||
+    value.policy.cacheBytes !== CACHE_BYTES
+  ) {
+    throw new Error("Datasource prefetch report policy changed");
+  }
+  if (value.repetitions.length !== REPETITIONS) {
+    throw new Error(`Datasource prefetch report requires ${REPETITIONS} repetitions`);
+  }
+  for (const [index, repetition] of value.repetitions.entries()) {
+    if (repetition.repetition !== index + 1) {
+      throw new Error("Datasource prefetch repetition identity is incomplete");
+    }
+    assertRepetition(repetition);
+  }
+  const residency = value.repetitions.map((result) => result.residencyRatio);
+  const waits = value.repetitions.map((result) => result.p95VisibleWaitMs);
+  for (const [field, observed, expected] of [
+    ["medianResidencyRatio", value.medianResidencyRatio, percentile(residency, 0.5)],
+    ["p95ResidencyRatio", value.p95ResidencyRatio, percentile(residency, 0.95)],
+    ["medianP95VisibleWaitMs", value.medianP95VisibleWaitMs, percentile(waits, 0.5)],
+    ["p95VisibleWaitMs", value.p95VisibleWaitMs, percentile(waits, 0.95)],
+  ] as const) {
+    if (observed !== expected) {
+      throw new Error(`Datasource prefetch ${field} does not match raw repetitions`);
+    }
+  }
+  const sparse = value.sparseBookkeeping;
+  if (
+    sparse.logicalRows !== 1_000_000_000 ||
+    sparse.visibleRows !== VIEWPORT_ROWS ||
+    sparse.loadedBands !== 0 ||
+    sparse.ownedBands !== 0 ||
+    sparse.visibleWaitingBands !== 1 ||
+    sparse.visibleWaitingRows !== VIEWPORT_ROWS ||
+    sparse.modeledNumericPayloadBytes > 128
+  ) {
+    throw new Error("Datasource prefetch sparse bookkeeping evidence is invalid");
+  }
+}
+
+function sparseBookkeepingEvidence(): SparseDatasourceBookkeepingEvidence {
+  const logicalRows = 1_000_000_000;
+  const visibleStart = 900_000_000;
+  const controller = new DatasourceController(
+    {
+      loadable: null,
+      activeSheet: () => "trace",
+      rowCount: () => logicalRows,
+      columns: () => TRACE_COLUMNS,
+      revision: () => 0,
+      isCellNewerThan: () => false,
+      retainRevision: () => () => {},
+      onRowsLoaded: () => {},
+      onError: () => {},
+      now: () => 0,
+    },
+    logicalRows,
+  );
+  controller.updateViewport(visibleStart, visibleStart + VIEWPORT_ROWS, TRACE_COLUMN_INDICES);
+  const telemetry = controller.getTelemetry();
+  const evidence: SparseDatasourceBookkeepingEvidence = {
+    logicalRows,
+    visibleRows: VIEWPORT_ROWS,
+    loadedBands: telemetry.loadedBands,
+    ownedBands: telemetry.ownedBands,
+    visibleWaitingBands: telemetry.visibleWaitingBands,
+    visibleWaitingRows: telemetry.visibleWaitingRows,
+    modeledNumericPayloadBytes:
+      8 +
+      telemetry.loadedBands * 2 * 8 +
+      telemetry.ownedBands * 3 * 8 +
+      telemetry.visibleWaitingBands * 3 * 8,
+  };
+  controller.destroy();
+  if (
+    evidence.loadedBands !== 0 ||
+    evidence.ownedBands !== 0 ||
+    evidence.visibleWaitingBands !== 1 ||
+    evidence.visibleWaitingRows !== VIEWPORT_ROWS
+  ) {
+    throw new Error("Billion-row datasource bookkeeping did not remain sparse");
+  }
+  return evidence;
+}
+
+export async function runDatasourcePrefetchBenchmark(): Promise<PrefetchBenchmarkReport> {
+  await initSheetwrite();
+  const repetitions: PrefetchTraceRepetition[] = [];
+  for (let repetition = 1; repetition <= REPETITIONS; repetition++) {
+    const result = await runRepetition(repetition);
+    assertRepetition(result);
+    repetitions.push(result);
+  }
+  const residency = repetitions.map((result) => result.residencyRatio);
+  const waits = repetitions.map((result) => result.p95VisibleWaitMs);
+  const report: PrefetchBenchmarkReport = {
+    policy: {
+      sourceLatencyMs: SOURCE_LATENCY_MS,
+      frameMs: FRAME_MS,
+      viewportRows: VIEWPORT_ROWS,
+      lookaheadRowsLimit: DATASOURCE_PREFETCH_MAX_ROWS,
+      lookaheadBytesLimit: DATASOURCE_PREFETCH_MAX_BYTES,
+      requestMultiplierLimit: REQUEST_MULTIPLIER_LIMIT,
+      activeRequestLimit: DATASOURCE_MAX_ACTIVE_REQUESTS,
+      cacheBytes: CACHE_BYTES,
+    },
+    repetitions,
+    sparseBookkeeping: sparseBookkeepingEvidence(),
+    medianResidencyRatio: percentile(residency, 0.5),
+    p95ResidencyRatio: percentile(residency, 0.95),
+    medianP95VisibleWaitMs: percentile(waits, 0.5),
+    p95VisibleWaitMs: percentile(waits, 0.95),
+  };
+  validateDatasourcePrefetchReport(report);
+  return report;
+}
+
+if (import.meta.main) {
+  const report = await runDatasourcePrefetchBenchmark();
+  console.log(JSON.stringify(report, null, 2));
+}

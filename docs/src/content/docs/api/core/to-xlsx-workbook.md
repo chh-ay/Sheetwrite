@@ -9,7 +9,7 @@ Formula-preserving, multi-sheet workbook export through the optional XLSX backen
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L391</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L441</code></dd></div>
 </dl>
 
 ## Declaration

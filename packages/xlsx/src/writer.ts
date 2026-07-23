@@ -2,11 +2,12 @@ import type {
   CellStyle,
   ConditionalFormatRule,
   DataValidationRule,
+  Range,
   SheetSnapshot,
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { colToA1 } from "@sheetwrite/core";
+import { colToA1, sheetNameKey, validateSheetName } from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import {
@@ -17,7 +18,7 @@ import {
   type XlsxCodecContext,
 } from "./resources.js";
 import { StylesRegistry } from "./styles.js";
-import { encodeXstring, escapeXml, isValidXlsxWorksheetName, XmlBuffer } from "./xml.js";
+import { encodeXstring, escapeXml, XmlBuffer } from "./xml.js";
 import { writeZip } from "./zip.js";
 
 const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -27,6 +28,8 @@ const WORKSHEET_REL = `${REL_NS}/worksheet`;
 const STYLES_REL = `${REL_NS}/styles`;
 const COMMENTS_REL = `${REL_NS}/comments`;
 const VML_REL = `${REL_NS}/vmlDrawing`;
+const TABLE_REL = `${REL_NS}/table`;
+const HYPERLINK_REL = `${REL_NS}/hyperlink`;
 const WORKBOOK_CONTENT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
 const WORKSHEET_CONTENT =
@@ -34,6 +37,7 @@ const WORKSHEET_CONTENT =
 const STYLES_CONTENT = "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml";
 const COMMENTS_CONTENT = "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml";
 const VML_CONTENT = "application/vnd.openxmlformats-officedocument.vmlDrawing";
+const TABLE_CONTENT = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
 const META_MARKER = "sheetwrite-workbook-metadata-v1";
 const META_STEM = "__sheetwrite_meta__";
 const META_CHUNK = 30_000;
@@ -49,10 +53,24 @@ interface SheetWriteResult {
   readonly relationships?: Uint8Array;
   readonly comments?: Uint8Array;
   readonly vml?: Uint8Array;
+  readonly tables: {
+    readonly part: string;
+    readonly xml: Uint8Array;
+  }[];
 }
 
 function quotedSheet(name: string): string {
   return `'${name.replaceAll("'", "''")}'`;
+}
+
+function rangeReference(range: Range): string {
+  const row0 = Math.min(range.start.row, range.end.row);
+  const row1 = Math.max(range.start.row, range.end.row);
+  const col0 = Math.min(range.start.col, range.end.col);
+  const col1 = Math.max(range.start.col, range.end.col);
+  const start = `${colToA1(col0)}${row0 + 1}`;
+  const end = `${colToA1(col1)}${row1 + 1}`;
+  return start === end ? start : `${start}:${end}`;
 }
 
 function formulaForReference(snapshot: WorkbookSnapshot, source: SnapshotCell["value"]): string {
@@ -104,26 +122,30 @@ function metadataSnapshot(snapshot: WorkbookSnapshot): WorkbookSnapshot {
 }
 
 function metadataSheetName(snapshot: WorkbookSnapshot): string {
-  const names = new Set(snapshot.sheets.map((sheet) => sheet.name.normalize("NFC").toLowerCase()));
+  const names = new Set(snapshot.sheets.map((sheet) => sheetNameKey(sheet.name)));
   let name = META_STEM;
   let suffix = 2;
-  while (names.has(name.normalize("NFC").toLowerCase())) {
+  while (names.has(sheetNameKey(name))) {
     name = `${META_STEM.slice(0, 27)}_${suffix++}`;
   }
   return name;
 }
 
 function validateNames(snapshot: WorkbookSnapshot): void {
-  const names = new Set<string>();
+  const names: string[] = [];
   for (const sheet of snapshot.sheets) {
-    const folded = sheet.name.normalize("NFC").toLowerCase();
-    if (names.has(folded)) {
-      throw new RangeError(`Sheetwrite: duplicate case-insensitive XLSX sheet name: ${sheet.name}`);
+    const validated = validateSheetName(sheet.name, names);
+    if (!validated.ok) {
+      const prefix =
+        validated.code === "duplicate"
+          ? "duplicate case-insensitive XLSX sheet name"
+          : "invalid XLSX sheet name";
+      throw new RangeError(`Sheetwrite: ${prefix}: ${sheet.name} (${validated.code})`);
     }
-    if (!isValidXlsxWorksheetName(sheet.name)) {
-      throw new RangeError(`Sheetwrite: invalid XLSX sheet name: ${sheet.name}`);
+    if (validated.name !== sheet.name) {
+      throw new RangeError(`Sheetwrite: non-canonical NFC XLSX sheet name: ${sheet.name}`);
     }
-    names.add(folded);
+    names.push(validated.name);
   }
   if (
     snapshot.sheets.every(
@@ -255,18 +277,23 @@ function conditionalFormatXml(
   const startCol = Math.min(rule.range.start.col, rule.range.end.col);
   const startRow = Math.min(rule.range.start.row, rule.range.end.row);
   const range = `${colToA1(startCol)}${startRow + 1}:${colToA1(Math.max(rule.range.start.col, rule.range.end.col))}${Math.max(rule.range.start.row, rule.range.end.row) + 1}`;
+  const stopIfTrue = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
+  if (rule.when.kind === "formula") {
+    const source = rule.when.source.startsWith("=") ? rule.when.source.slice(1) : rule.when.source;
+    return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>${escapeXml(encodeXstring(source))}</formula></cfRule></conditionalFormatting>`;
+  }
   if (rule.when.kind === "contains") {
     const text = rule.when.text;
     const formulaText = text.replaceAll('"', '""');
     const anchor = `${colToA1(startCol)}${startRow + 1}`;
     if (rule.when.matchCase) {
-      return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"><formula>ISNUMBER(FIND("${escapeXml(encodeXstring(formulaText))}",${anchor}))</formula></cfRule></conditionalFormatting>`;
+      return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>ISNUMBER(FIND("${escapeXml(encodeXstring(formulaText))}",${anchor}))</formula></cfRule></conditionalFormatting>`;
     }
-    return `<conditionalFormatting sqref="${range}"><cfRule type="containsText" dxfId="${dxfId}" priority="${priority}" operator="containsText" text="${escapeXml(encodeXstring(text))}"><formula>NOT(ISERROR(SEARCH("${escapeXml(encodeXstring(formulaText))}",${anchor})))</formula></cfRule></conditionalFormatting>`;
+    return `<conditionalFormatting sqref="${range}"><cfRule type="containsText" dxfId="${dxfId}" priority="${priority}"${stopIfTrue} operator="containsText" text="${escapeXml(encodeXstring(text))}"><formula>NOT(ISERROR(SEARCH("${escapeXml(encodeXstring(formulaText))}",${anchor})))</formula></cfRule></conditionalFormatting>`;
   }
   if (rule.when.kind === "equal" && rule.when.value === null) {
     const anchor = `${colToA1(startCol)}${startRow + 1}`;
-    return `<conditionalFormatting sqref="${range}"><cfRule type="containsBlanks" dxfId="${dxfId}" priority="${priority}"><formula>LEN(TRIM(${anchor}))=0</formula></cfRule></conditionalFormatting>`;
+    return `<conditionalFormatting sqref="${range}"><cfRule type="containsBlanks" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>LEN(TRIM(${anchor}))=0</formula></cfRule></conditionalFormatting>`;
   }
   const formula = conditionalScalar(rule.when.value);
   if (formula === null) return null;
@@ -276,7 +303,7 @@ function conditionalFormatXml(
       : rule.when.kind === "lessThan"
         ? "lessThan"
         : "equal";
-  return `<conditionalFormatting sqref="${range}"><cfRule type="cellIs" dxfId="${dxfId}" priority="${priority}" operator="${operator}"><formula>${escapeXml(formula)}</formula></cfRule></conditionalFormatting>`;
+  return `<conditionalFormatting sqref="${range}"><cfRule type="cellIs" dxfId="${dxfId}" priority="${priority}"${stopIfTrue} operator="${operator}"><formula>${escapeXml(formula)}</formula></cfRule></conditionalFormatting>`;
 }
 
 function cellXml(
@@ -356,12 +383,55 @@ function commentsVml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Arra
   return xml.finish();
 }
 
+function tableXml(
+  table: NonNullable<SheetSnapshot["tables"]>[number],
+  nativeId: number,
+  sheetName: string,
+  context: XlsxCodecContext,
+): Uint8Array {
+  const ref = `${colToA1(table.range.start.col)}${table.range.start.row + 1}:${colToA1(table.range.end.col)}${table.range.end.row + 1}`;
+  const xml = new XmlBuffer(context);
+  xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
+  xml.append(
+    `<table xmlns="${MAIN_NS}" id="${nativeId}" name="${escapeXml(encodeXstring(table.name))}" displayName="${escapeXml(encodeXstring(table.name))}" ref="${ref}" headerRowCount="${table.headerRow ? 1 : 0}" totalsRowCount="${table.totalsRow ? 1 : 0}">`,
+  );
+  xml.append(`<tableColumns count="${table.columns.length}">`);
+  for (let index = 0; index < table.columns.length; index++) {
+    const column = table.columns[index]!;
+    xml.append(
+      `<tableColumn id="${index + 1}" name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}/>`,
+    );
+  }
+  xml.append("</tableColumns>");
+  if (table.style?.name) {
+    xml.append(
+      `<tableStyleInfo name="${escapeXml(encodeXstring(table.style.name))}" showFirstColumn="${table.style.showFirstColumn ? 1 : 0}" showLastColumn="${table.style.showLastColumn ? 1 : 0}" showRowStripes="${table.style.showRowStripes ? 1 : 0}" showColumnStripes="${table.style.showColumnStripes ? 1 : 0}"/>`,
+    );
+  } else if (table.style) {
+    emitWarning(context, {
+      code: "format-loss",
+      message: `Workbook table ${table.name} style flags require a named Excel table style and remain only in Sheetwrite metadata`,
+      sheet: sheetName,
+    });
+  }
+  for (const feature of table.unsupportedFeatures ?? []) {
+    emitWarning(context, {
+      code: "unsupported-feature",
+      message: `Workbook table ${table.name} declares unsupported feature ${feature}; it remains in Sheetwrite metadata and was not emitted`,
+      sheet: sheetName,
+    });
+  }
+  xml.append("</table>");
+  return xml.finish();
+}
+
 function writeSheet(
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
   styles: StylesRegistry,
   context: XlsxCodecContext,
   sheetNumber: number,
+  tableStartId: number,
 ): SheetWriteResult {
   const byRow = new Map<number, AbsoluteCell[]>();
   for (const block of sheet.cells) {
@@ -442,7 +512,7 @@ function writeSheet(
     );
     for (const cell of (byRow.get(row) ?? []).sort((left, right) => left.col - right.col)) {
       processed += 1;
-      if ((processed & 4_095) === 0) checkAbort(context.options);
+      if ((processed & 4_095) === 0) checkAbort(context);
       xml.append(cellXml(snapshot, sheet, cell, styles, context));
     }
     xml.append("</row>");
@@ -518,23 +588,93 @@ function writeSheet(
       sheet: sheet.name,
     });
   }
-  let relationships: Uint8Array | undefined;
   let comments: Uint8Array | undefined;
   let vml: Uint8Array | undefined;
+  const relationshipEntries: {
+    id: string;
+    type: string;
+    target: string;
+    external?: boolean;
+  }[] = [];
+  let nextRelationshipId = 1;
+  let legacyDrawingId: string | undefined;
   if (sheet.notes?.length) {
-    xml.append('<legacyDrawing r:id="rId2"/>');
-    relationships = relationshipsXml(
-      [
-        { id: "rId1", type: COMMENTS_REL, target: `../comments${sheetNumber}.xml` },
-        { id: "rId2", type: VML_REL, target: `../drawings/vmlDrawing${sheetNumber}.vml` },
-      ],
-      context,
+    const commentsId = `rId${nextRelationshipId++}`;
+    legacyDrawingId = `rId${nextRelationshipId++}`;
+    relationshipEntries.push(
+      { id: commentsId, type: COMMENTS_REL, target: `../comments${sheetNumber}.xml` },
+      {
+        id: legacyDrawingId,
+        type: VML_REL,
+        target: `../drawings/vmlDrawing${sheetNumber}.vml`,
+      },
     );
     comments = commentsXml(sheet, context);
     vml = commentsVml(sheet, context);
   }
+  const hyperlinkElements: string[] = [];
+  for (const hyperlink of sheet.hyperlinks ?? []) {
+    const source = rangeReference(hyperlink.range);
+    const display =
+      hyperlink.display === undefined
+        ? ""
+        : ` display="${escapeXml(encodeXstring(hyperlink.display))}"`;
+    if (hyperlink.target.kind === "external") {
+      const relationshipId = `rId${nextRelationshipId++}`;
+      relationshipEntries.push({
+        id: relationshipId,
+        type: HYPERLINK_REL,
+        target: hyperlink.target.url,
+        external: true,
+      });
+      hyperlinkElements.push(`<hyperlink ref="${source}" r:id="${relationshipId}"${display}/>`);
+      continue;
+    }
+    const internalTarget = hyperlink.target;
+    const targetSheet = snapshot.sheets.find(
+      (candidate) => candidate.id === internalTarget.range.sheet,
+    );
+    if (!targetSheet) {
+      throw new TypeError(
+        `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internalTarget.range.sheet}`,
+      );
+    }
+    const location = `${quotedSheet(targetSheet.name)}!${rangeReference(internalTarget.range)}`;
+    hyperlinkElements.push(
+      `<hyperlink ref="${source}" location="${escapeXml(encodeXstring(location))}"${display}/>`,
+    );
+  }
+  if (hyperlinkElements.length > 0) {
+    xml.append(`<hyperlinks>${hyperlinkElements.join("")}</hyperlinks>`);
+  }
+  if (legacyDrawingId) xml.append(`<legacyDrawing r:id="${legacyDrawingId}"/>`);
+  nextRelationshipId = Math.max(nextRelationshipId, 3);
+  const tableRelationshipIds: string[] = [];
+  const tables = (sheet.tables ?? []).map((table, index) => {
+    const nativeId = tableStartId + index;
+    const relationshipId = `rId${nextRelationshipId++}`;
+    tableRelationshipIds.push(relationshipId);
+    relationshipEntries.push({
+      id: relationshipId,
+      type: TABLE_REL,
+      target: `../tables/table${nativeId}.xml`,
+    });
+    return {
+      part: `xl/tables/table${nativeId}.xml`,
+      xml: tableXml(table, nativeId, sheet.name, context),
+    };
+  });
+  if (tables.length > 0) {
+    xml.append(`<tableParts count="${tables.length}">`);
+    for (const relationshipId of tableRelationshipIds) {
+      xml.append(`<tablePart r:id="${relationshipId}"/>`);
+    }
+    xml.append("</tableParts>");
+  }
+  const relationships =
+    relationshipEntries.length > 0 ? relationshipsXml(relationshipEntries, context) : undefined;
   xml.append("</worksheet>");
-  return { xml: xml.finish(), relationships, comments, vml };
+  return { xml: xml.finish(), relationships, comments, vml, tables };
 }
 
 function metadataSheetXml(snapshot: WorkbookSnapshot, context: XlsxCodecContext): Uint8Array {
@@ -643,6 +783,9 @@ function workbookXml(
 /** Write a deterministic, bounded OOXML workbook package. */
 export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecContext): Uint8Array {
   preflightSnapshot(snapshot, context);
+  if (snapshot.sheets.length === 0)
+    throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
+  validateNames(snapshot);
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(
@@ -650,9 +793,6 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
     );
   }
   snapshot = checked.value;
-  if (snapshot.sheets.length === 0)
-    throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
-  validateNames(snapshot);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
   const metadataName = metadataSheetName(snapshot);
   const styles = new StylesRegistry(context);
@@ -662,11 +802,12 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
     { part: "xl/styles.xml", contentType: STYLES_CONTENT },
   ];
   const workbookRelationships = [];
+  let nextTableId = 1;
   for (let index = 0; index < ordered.length; index++) {
-    checkAbort(context.options);
+    checkAbort(context);
     const number = index + 1;
     const part = `xl/worksheets/sheet${number}.xml`;
-    const result = writeSheet(snapshot, ordered[index]!, styles, context, number);
+    const result = writeSheet(snapshot, ordered[index]!, styles, context, number, nextTableId);
     parts.set(part, result.xml);
     overrides.push({ part, contentType: WORKSHEET_CONTENT });
     workbookRelationships.push({
@@ -674,13 +815,20 @@ export function writeWorkbook(snapshot: WorkbookSnapshot, context: XlsxCodecCont
       type: WORKSHEET_REL,
       target: `worksheets/sheet${number}.xml`,
     });
-    if (result.relationships && result.comments && result.vml) {
+    if (result.relationships) {
       parts.set(`xl/worksheets/_rels/sheet${number}.xml.rels`, result.relationships);
+    }
+    if (result.comments && result.vml) {
       parts.set(`xl/comments${number}.xml`, result.comments);
       parts.set(`xl/drawings/vmlDrawing${number}.vml`, result.vml);
       overrides.push({ part: `xl/comments${number}.xml`, contentType: COMMENTS_CONTENT });
       overrides.push({ part: `xl/drawings/vmlDrawing${number}.vml`, contentType: VML_CONTENT });
     }
+    for (const table of result.tables) {
+      parts.set(table.part, table.xml);
+      overrides.push({ part: table.part, contentType: TABLE_CONTENT });
+    }
+    nextTableId += result.tables.length;
   }
   const metadataNumber = ordered.length + 1;
   const metadataPart = `xl/worksheets/sheet${metadataNumber}.xml`;

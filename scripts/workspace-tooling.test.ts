@@ -135,7 +135,7 @@ describe("canonical workspace graph", () => {
     ).toBeFalse();
     expect(
       RELEASE_QUALITY_NODES.some((node) =>
-        ["verify:packed", "verify:bundlers", "verify:delivery-size"].includes(node.id),
+        ["verify:packed", "verify:bundlers", "report:delivery-size"].includes(node.id),
       ),
     ).toBeFalse();
     for (const id of [
@@ -153,14 +153,14 @@ describe("canonical workspace graph", () => {
     }
   });
 
-  it("checks delivery size after reusable package and bundler evidence", () => {
+  it("records delivery size after reusable package and bundler evidence", () => {
     const benchmark = VERIFY_CI_NODES.findIndex((node) => node.id === "verify:benchmarks");
-    const size = VERIFY_CI_NODES.findIndex((node) => node.id === "verify:delivery-size");
+    const size = VERIFY_CI_NODES.findIndex((node) => node.id === "report:delivery-size");
     expect(size).toBe(benchmark + 1);
     expect(VERIFY_CI_NODES[size]?.command).toEqual([
       "bun",
       "scripts/size-report.ts",
-      "check",
+      "report",
       "--reuse-bundlers",
     ]);
     expect(VERIFY_CI_NODES.slice(size).some((node) => node.id.startsWith("build:"))).toBe(false);

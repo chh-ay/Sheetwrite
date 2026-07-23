@@ -15,10 +15,10 @@ Every field is optional; a missing callback simply drops that event.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L16</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/grid-controller.ts#L17</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>7</span>
+## Members <span class="api-count" data-pagefind-ignore>13</span>
 
 <div class="api-member-list">
 
@@ -27,6 +27,15 @@ Every field is optional; a missing callback simply drops that event.
 
 ```ts generated
 onGridChange?(event: ChangeEvent): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-row-delta" data-pagefind-weight="1">
+<summary><code>onRowDelta</code> <span class="api-member-summary">Forwarded as a typed host-row projection when a bridge is attached.</span></summary>
+
+```ts generated
+onRowDelta?(projection: Parameters<RowBridgeHandler<Id>>[0]): void;
 ```
 
 </details>
@@ -76,11 +85,56 @@ onSearch?(result: GridEvents["search"]): void;
 
 </details>
 
+<details class="api-member" id="grid-controller-handlers-on-command-state-change" data-pagefind-weight="1">
+<summary><code>onCommandStateChange</code> <span class="api-member-summary">Forwarded whenever command availability or formatting activity changes.</span></summary>
+
+```ts generated
+onCommandStateChange?(event: GridEvents["command-state-change"]): void;
+```
+
+</details>
+
 <details class="api-member" id="grid-controller-handlers-on-active-sheet-change" data-pagefind-weight="1">
 <summary><code>onActiveSheetChange</code> <span class="api-member-summary">Forwarded after the visible sheet changes.</span></summary>
 
 ```ts generated
 onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-mutation-rejected" data-pagefind-weight="1">
+<summary><code>onMutationRejected</code> <span class="api-member-summary">Forwarded when a Grid mutation is rejected.</span></summary>
+
+```ts generated
+onMutationRejected?(event: GridEvents["mutation-rejected"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-renderer-fallback" data-pagefind-weight="1">
+<summary><code>onRendererFallback</code> <span class="api-member-summary">Forwarded when worker rendering falls back to the main-thread canvas renderer.</span></summary>
+
+```ts generated
+onRendererFallback?(event: GridEvents["renderer-fallback"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-datasource-error" data-pagefind-weight="1">
+<summary><code>onDatasourceError</code> <span class="api-member-summary">Forwarded when a datasource request fails.</span></summary>
+
+```ts generated
+onDatasourceError?(event: GridEvents["datasource-error"]): void;
+```
+
+</details>
+
+<details class="api-member" id="grid-controller-handlers-on-export-error" data-pagefind-weight="1">
+<summary><code>onExportError</code> <span class="api-member-summary">Forwarded when a built-in XLSX export action fails.</span></summary>
+
+```ts generated
+onExportError?(event: GridEvents["export-error"]): void;
 ```
 
 </details>
@@ -92,14 +146,22 @@ onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface GridControllerHandlers {
+export interface GridControllerHandlers<
+  Id extends RowBridgeId = RowBridgeId,
+> {
   onGridChange?(event: ChangeEvent): void;
+  onRowDelta?(projection: Parameters<RowBridgeHandler<Id>>[0]): void;
   onSelectionChange?(selection: Selection | null): void;
   onViewportChange?(event: GridEvents["scroll"]): void;
   onEditBegin?(event: GridEvents["edit-begin"]): void;
   onEditCommit?(event: GridEvents["edit-commit"]): void;
   onSearch?(result: GridEvents["search"]): void;
+  onCommandStateChange?(event: GridEvents["command-state-change"]): void;
   onActiveSheetChange?(event: GridEvents["active-sheet"]): void;
+  onMutationRejected?(event: GridEvents["mutation-rejected"]): void;
+  onRendererFallback?(event: GridEvents["renderer-fallback"]): void;
+  onDatasourceError?(event: GridEvents["datasource-error"]): void;
+  onExportError?(event: GridEvents["export-error"]): void;
 }
 ```
 

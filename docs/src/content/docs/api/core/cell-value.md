@@ -11,7 +11,7 @@ the WASM calculation engine.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L80</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L101</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>

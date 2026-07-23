@@ -2,21 +2,26 @@ import type { CellScalar, Grid, GridOptions } from "@sheetwrite/core";
 import type {
   GridAdapterEventHandlers,
   GridSizeProps,
+  RowBridge,
+  RowBridgeId,
+  RowBridgeInsertContext,
   SheetwriteInitializationProps,
   SimpleColumn,
 } from "@sheetwrite/core/adapter";
 import type { Snippet } from "svelte";
 import type { HTMLAttributes } from "svelte/elements";
 
-/** Advanced framework adapter props for workbook data or datasource ownership. */
-export interface SheetwriteGridProps
-  extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers | "children">,
-    GridAdapterEventHandlers,
+/** Advanced Svelte adapter props with inferred host row identity. */
+export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
+  extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers<Id> | "children">,
+    GridAdapterEventHandlers<Id>,
     SheetwriteInitializationProps {
   /** Live workbook schema adopted by the Grid. */
   workbook: GridOptions["workbook"];
   /** Eager values for the active sheet. */
   data?: GridOptions["data"];
+  /** Optional canonical-to-host row projection. */
+  rowBridge?: RowBridge<Id>;
   /** Lazy visible-row provider. */
   datasource?: GridOptions["datasource"];
   /** Datasource storage policy. */
@@ -25,6 +30,8 @@ export interface SheetwriteGridProps
   renderer?: GridOptions["renderer"];
   /** Browser-fetchable worker module URL. */
   workerUrl?: GridOptions["workerUrl"];
+  /** Positional spreadsheet or semantic data-grid headers. */
+  presentation?: GridOptions["presentation"];
   /** Live resolved-theme overrides. */
   theme?: GridOptions["theme"];
   /** Disables mutations, not navigation. */
@@ -35,8 +42,12 @@ export interface SheetwriteGridProps
   mutationPolicy?: GridOptions["mutationPolicy"];
   /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
   transactionResourceLimits?: GridOptions["transactionResourceLimits"];
+  /** Controls link activation: emit an event, also navigate internally, or disable it. */
+  hyperlinkActivation?: GridOptions["hyperlinkActivation"];
   /** Named custom cell renderers. */
   renderers?: GridOptions["renderers"];
+  /** Named custom cell editors. */
+  editors?: GridOptions["editors"];
   /** Extra rows painted around the viewport. */
   overscan?: GridOptions["overscan"];
   /** Minimum column count with padding. */
@@ -54,9 +65,12 @@ export interface SheetwriteGridProps
 }
 
 /** Simple framework adapter props for columns and default row objects. */
-export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
-  SheetwriteGridProps,
-  "workbook" | "data" | "datasource" | "height" | "fill"
+export type SheetwriteProps<
+  Row extends Record<string, CellScalar>,
+  Id extends RowBridgeId = RowBridgeId,
+> = Omit<
+  SheetwriteGridProps<Id>,
+  "workbook" | "data" | "datasource" | "height" | "fill" | "rowBridge"
 > &
   GridSizeProps & {
     /** Ordered schema for the owned sheet. */
@@ -65,4 +79,8 @@ export type SheetwriteProps<Row extends Record<string, CellScalar>> = Omit<
     defaultRows: readonly Row[];
     /** Sheet name; defaults to `Sheet 1`. */
     sheetName?: string;
+    /** Opt-in stable identity for each host row. */
+    getRowId?: (row: Row, index: number) => Id;
+    /** Creates stable identities for Grid-inserted rows. */
+    createRowId?: (context: RowBridgeInsertContext) => Id;
   };

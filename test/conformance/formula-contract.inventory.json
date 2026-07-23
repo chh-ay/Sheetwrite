@@ -1,0 +1,4032 @@
+{
+  "$schema": "./formula-contract.schema.json",
+  "contract": "sheetwrite.formula-capabilities",
+  "version": 1,
+  "parserRules": {
+    "sourcePath": "packages/wasm/src/calc.rs",
+    "dispatch": "lookup_func(name.as_ref())",
+    "caseSensitive": false,
+    "spellingPattern": "^[A-Z][A-Z0-9.]*$"
+  },
+  "sources": {
+    "microsoft-excel-functions": {
+      "title": "Excel functions (by category)",
+      "link": "https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb"
+    },
+    "microsoft-excel-operators": {
+      "title": "Calculation operators and precedence in Excel",
+      "link": "https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a"
+    }
+  },
+  "families": {
+    "array": {
+      "title": "Dynamic array",
+      "source": "microsoft-excel-functions",
+      "section": "Lookup and reference functions"
+    },
+    "date-time": {
+      "title": "Date and time",
+      "source": "microsoft-excel-functions",
+      "section": "Date and time functions"
+    },
+    "financial": {
+      "title": "Financial",
+      "source": "microsoft-excel-functions",
+      "section": "Financial functions"
+    },
+    "information-error": {
+      "title": "Information and error",
+      "source": "microsoft-excel-functions",
+      "section": "Information functions"
+    },
+    "logical-control": {
+      "title": "Logical and control flow",
+      "source": "microsoft-excel-functions",
+      "section": "Logical functions"
+    },
+    "lookup-reference": {
+      "title": "Lookup and reference",
+      "source": "microsoft-excel-functions",
+      "section": "Lookup and reference functions"
+    },
+    "math": {
+      "title": "Math and trigonometry",
+      "source": "microsoft-excel-functions",
+      "section": "Math and trigonometry functions"
+    },
+    "statistical": {
+      "title": "Statistical",
+      "source": "microsoft-excel-functions",
+      "section": "Statistical functions"
+    },
+    "text": {
+      "title": "Text",
+      "source": "microsoft-excel-functions",
+      "section": "Text functions"
+    },
+    "operator": {
+      "title": "Formula operators",
+      "source": "microsoft-excel-operators",
+      "section": "Types of operators"
+    }
+  },
+  "signatureProfiles": {
+    "zero": { "arguments": [], "returns": "scalar" },
+    "unary-value": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "unary-number": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "binary-number": {
+      "arguments": [
+        {
+          "name": "number1",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "number2",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "variadic-values": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "optional-variadic-values": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "zero-or-more"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "logical-variadic": {
+      "arguments": [
+        {
+          "name": "logical",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "if": {
+      "arguments": [
+        {
+          "name": "logicalTest",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "valueIfTrue",
+          "required": false,
+          "default": true,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "valueIfFalse",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "if-error": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "valueIfError",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "ifs": {
+      "arguments": [
+        {
+          "name": "testAndValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "paired"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "switch": {
+      "arguments": [
+        {
+          "name": "expression",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "valueAndResult",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "paired"
+        },
+        {
+          "name": "defaultValue",
+          "required": false,
+          "default": "#N/A",
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "let": {
+      "arguments": [
+        {
+          "name": "nameAndValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "name", "reference"],
+          "repeat": "paired"
+        },
+        {
+          "name": "calculation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "name", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "round": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "digits",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "trunc": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "digits",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "log": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "base",
+          "required": false,
+          "default": 10,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "subtotal": {
+      "arguments": [
+        {
+          "name": "functionNumber",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "reference",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "left-right": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "count",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "mid": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "start",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "count",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "text-format": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "formatText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "text-join": {
+      "arguments": [
+        {
+          "name": "delimiter",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "ignoreEmpty",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "substitute": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "oldText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "newText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "instance",
+          "required": false,
+          "default": "all",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "replace": {
+      "arguments": [
+        {
+          "name": "oldText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "start",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "count",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "newText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "find-search": {
+      "arguments": [
+        {
+          "name": "findText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "withinText",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "start",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "repeat-text": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "count",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "number-value": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "decimalSeparator",
+          "required": false,
+          "default": ".",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "groupSeparator",
+          "required": false,
+          "default": ",",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "date-three": {
+      "arguments": [
+        {
+          "name": "part1",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "part2",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "part3",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "date-pair": {
+      "arguments": [
+        {
+          "name": "endDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "startDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "date-offset": {
+      "arguments": [
+        {
+          "name": "startDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "offset",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "weekday-weeknum": {
+      "arguments": [
+        {
+          "name": "serialNumber",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "returnType",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "workday": {
+      "arguments": [
+        {
+          "name": "startDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "days",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "holidays",
+          "required": false,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "networkdays": {
+      "arguments": [
+        {
+          "name": "startDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "endDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "holidays",
+          "required": false,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "yearfrac-days360": {
+      "arguments": [
+        {
+          "name": "startDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "endDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "basisOrMethod",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "value-k": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "k",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "rank": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "reference",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "order",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "percentile": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fraction",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "pair-arrays": {
+      "arguments": [
+        {
+          "name": "array1",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "array2",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "criteria-one": {
+      "arguments": [
+        {
+          "name": "range",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "criteria",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "criteria-many": {
+      "arguments": [
+        {
+          "name": "rangeAndCriteria",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "paired"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "sumif": {
+      "arguments": [
+        {
+          "name": "range",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "criteria",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "sumRange",
+          "required": false,
+          "default": "range",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "sumifs": {
+      "arguments": [
+        {
+          "name": "sumRange",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rangeAndCriteria",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "paired"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "match": {
+      "arguments": [
+        {
+          "name": "lookupValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lookupArray",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "matchMode",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "xmatch": {
+      "arguments": [
+        {
+          "name": "lookupValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lookupArray",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "matchMode",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "searchMode",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "index": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "row",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "column",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "xlookup": {
+      "arguments": [
+        {
+          "name": "lookupValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lookupArray",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "returnArray",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "ifNotFound",
+          "required": false,
+          "default": "#N/A",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "matchMode",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "searchMode",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "table-lookup": {
+      "arguments": [
+        {
+          "name": "lookupValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "table",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "index",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "approximate",
+          "required": false,
+          "default": true,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "filter": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "include",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "ifEmpty",
+          "required": false,
+          "default": "#CALC!",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "sort": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "sortIndex",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "sortOrder",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "byColumn",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "unique": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "byColumn",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "exactlyOnce",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "choose": {
+      "arguments": [
+        {
+          "name": "index",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "optional-reference": {
+      "arguments": [
+        {
+          "name": "reference",
+          "required": false,
+          "default": "formula-cell",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "address": {
+      "arguments": [
+        {
+          "name": "row",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "column",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "absNumber",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "a1",
+          "required": false,
+          "default": true,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "sheetText",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "array-unary": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "sequence": {
+      "arguments": [
+        {
+          "name": "rows",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "columns",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "start",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "step",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "take-drop": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rows",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "columns",
+          "required": false,
+          "default": "all",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "choose-axis": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "index",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "array"
+    },
+    "pv-fv-pmt": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "nper",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "paymentOrPresentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "futureValue",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "type",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "npv": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "irr": {
+      "arguments": [
+        {
+          "name": "values",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "guess",
+          "required": false,
+          "default": 0.1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "rate": {
+      "arguments": [
+        {
+          "name": "nper",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "payment",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "presentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "futureValue",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "type",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "guess",
+          "required": false,
+          "default": 0.1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "period-payment": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "period",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "nper",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "presentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "futureValue",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "type",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    }
+  },
+  "semanticsProfiles": {
+    "scalar": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "zero",
+        "text": "number-if-parseable",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "aggregate": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "ignored",
+        "text": "ignored-in-ranges",
+        "boolean": "ignored-in-ranges",
+        "error": "propagate"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "information": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "preserved",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "function-defined"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "exact",
+        "domain": "all-inputs",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "logical": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "false",
+        "text": "function-defined",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": { "case": "insensitive", "wildcard": "literal" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "exact",
+        "domain": "all-inputs",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "lazy-control": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "contextual"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "trap-selected"
+      },
+      "text": { "case": "insensitive", "wildcard": "literal" },
+      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "numeric": {
+        "tolerance": "function-defined",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "contextual",
+        "lazy": "lazy-branches",
+        "spill": "contextual",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "let-binding": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "function-defined",
+        "result": "contextual"
+      },
+      "coercion": {
+        "blank": "preserved",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": { "case": "insensitive", "wildcard": "literal" },
+      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "numeric": {
+        "tolerance": "function-defined",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "contextual",
+        "lazy": "lazy-bindings",
+        "spill": "contextual",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "text": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "empty-text",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": { "case": "function-defined", "wildcard": "literal" },
+      "environment": { "locale": "function-defined", "dateSystem": "function-defined" },
+      "numeric": {
+        "tolerance": "not-applicable",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "text-sensitive": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "empty-text",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": { "case": "sensitive", "wildcard": "literal" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "not-applicable",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "text-search": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "empty-text",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": { "case": "insensitive", "wildcard": "supported" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "not-applicable",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "criteria": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "pairwise",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": { "case": "insensitive", "wildcard": "supported" },
+      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "date-time": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "zero",
+        "text": "number-if-parseable",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": { "case": "insensitive", "wildcard": "literal" },
+      "environment": { "locale": "invariant", "dateSystem": "excel-1900" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "bounded",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "volatile-date": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "rejected",
+        "array": "rejected",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "preserved",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "not-applicable", "dateSystem": "host-clock" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "bounded",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "none",
+        "lazy": "not-applicable",
+        "spill": "scalar",
+        "fill": "source-preserved",
+        "copy": "source-preserved",
+        "structuralRewrite": "source-preserved"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "lookup": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "function-defined",
+        "result": "contextual"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": { "case": "insensitive", "wildcard": "function-defined" },
+      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "numeric": {
+        "tolerance": "exact",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "contextual",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "array": {
+      "shape": {
+        "scalar": "contextual",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "function-defined",
+        "result": "array"
+      },
+      "coercion": {
+        "blank": "preserved",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": { "case": "function-defined", "wildcard": "function-defined" },
+      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "numeric": {
+        "tolerance": "function-defined",
+        "domain": "bounded",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "array",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "financial": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "function-defined",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "zero",
+        "text": "number-if-parseable",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "bounded",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "financial-iterative": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "zero",
+        "text": "number-if-parseable",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "bounded",
+        "iteration": { "kind": "bounded", "maximum": 100 }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    }
+  },
+  "dialectProfiles": {
+    "excel-documented": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
+      ]
+    }
+  },
+  "implementationProfiles": {
+    "implemented-assisted": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
+      },
+      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
+      }
+    },
+    "parser-assisted-evaluator-declared": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "evaluator": { "status": "declared", "paths": [] },
+      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
+      "evidence": { "status": "source-linked", "paths": ["packages/core/src/formula-assist.ts"] }
+    },
+    "parser-declared-target": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "evaluator": { "status": "declared", "paths": [] },
+      "assist": { "status": "missing", "paths": ["packages/core/src/formula-assist.ts"] },
+      "evidence": { "status": "registration-tested", "paths": ["scripts/formula-contract.test.ts"] }
+    }
+  },
+  "unsupportedCategories": [
+    {
+      "id": "volatile",
+      "title": "Volatile recalculation",
+      "status": "unsupported",
+      "scope": "Automatic volatility semantics beyond the existing clock functions are outside the supported contract.",
+      "examples": ["INDIRECT", "OFFSET", "RAND", "RANDBETWEEN", "RANDARRAY"],
+      "source": "microsoft-excel-functions",
+      "section": "Math and trigonometry functions",
+      "implementation": { "status": "missing", "paths": [] },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "network",
+      "title": "Network functions",
+      "status": "unsupported",
+      "scope": "Formula evaluation never performs network requests.",
+      "examples": ["ENCODEURL", "FILTERXML", "IMAGE", "WEBSERVICE"],
+      "source": "microsoft-excel-functions",
+      "section": "Web functions",
+      "implementation": { "status": "missing", "paths": [] },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "external",
+      "title": "External data functions",
+      "status": "unsupported",
+      "scope": "Functions that query external providers or live data connections are not evaluated.",
+      "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD"],
+      "source": "microsoft-excel-functions",
+      "section": "Add-in and Automation functions",
+      "implementation": { "status": "missing", "paths": [] },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "database",
+      "title": "Database functions",
+      "status": "unsupported",
+      "scope": "D-prefixed database aggregation functions are not evaluated.",
+      "examples": ["DAVERAGE", "DCOUNT", "DGET", "DSUM", "DVAR"],
+      "source": "microsoft-excel-functions",
+      "section": "Database functions",
+      "implementation": { "status": "missing", "paths": [] },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "cube",
+      "title": "Cube functions",
+      "status": "unsupported",
+      "scope": "OLAP cube members, sets, and values are not resolved.",
+      "examples": ["CUBEMEMBER", "CUBESET", "CUBEVALUE"],
+      "source": "microsoft-excel-functions",
+      "section": "Cube functions",
+      "implementation": { "status": "missing", "paths": [] },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "lambda",
+      "title": "LAMBDA and higher-order functions",
+      "status": "unsupported",
+      "scope": "User-defined lambdas and higher-order array execution are not evaluated.",
+      "examples": ["BYCOL", "BYROW", "LAMBDA", "MAKEARRAY", "MAP", "REDUCE", "SCAN"],
+      "source": "microsoft-excel-functions",
+      "section": "Logical functions",
+      "implementation": { "status": "missing", "paths": [] },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    },
+    {
+      "id": "external-workbook",
+      "title": "Arbitrary external workbook references",
+      "status": "unsupported",
+      "scope": "References to arbitrary workbook files are not loaded or dereferenced.",
+      "examples": ["'[Book.xlsx]Sheet1'!A1"],
+      "source": "microsoft-excel-functions",
+      "section": "Lookup and reference functions",
+      "implementation": { "status": "missing", "paths": [] },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      },
+      "version": 1
+    }
+  ],
+  "functions": [
+    {
+      "canonical": "SUM",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "optional-variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "AVERAGE",
+      "aliases": ["AVG"],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "optional-variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MIN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "optional-variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MAX",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "optional-variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COUNT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "optional-variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "IF",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "if",
+      "semantics": "lazy-control",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ABS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ROUND",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "round",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SQRT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MOD",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "POW",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "parser-assisted-evaluator-declared",
+      "version": 1
+    },
+    {
+      "canonical": "AND",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "logical-variadic",
+      "semantics": "logical",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "OR",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "logical-variadic",
+      "semantics": "logical",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "NOT",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "logical",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "FLOOR",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CEILING",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "INT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TRUNC",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "trunc",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SIGN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "PI",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "zero",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "IFERROR",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "if-error",
+      "semantics": "lazy-control",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "IFNA",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "if-error",
+      "semantics": "lazy-control",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "IFS",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "required-supported",
+      "signature": "ifs",
+      "semantics": "lazy-control",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SWITCH",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "required-supported",
+      "signature": "switch",
+      "semantics": "lazy-control",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "XOR",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "required-supported",
+      "signature": "logical-variadic",
+      "semantics": "logical",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TRUE",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "required-supported",
+      "signature": "zero",
+      "semantics": "logical",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "FALSE",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "required-supported",
+      "signature": "zero",
+      "semantics": "logical",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ISBLANK",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ISNUMBER",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ISTEXT",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ISLOGICAL",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ISERROR",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ISERR",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ISNA",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TYPE",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "N",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "T",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COUNTA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "optional-variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LEN",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LEFT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "RIGHT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "left-right",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MID",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "mid",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CONCAT",
+      "aliases": ["CONCATENATE"],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "UPPER",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LOWER",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TRIM",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TEXT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "text-format",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "EXACT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "text-sensitive",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "DATE",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "date-three",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "DATEVALUE",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "unary-value",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "DAY",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MONTH",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "YEAR",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TODAY",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "zero",
+      "semantics": "volatile-date",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "NOW",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "zero",
+      "semantics": "volatile-date",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COUNTIF",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "criteria-one",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COUNTIFS",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "criteria-many",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SUMIF",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "sumif",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SUMIFS",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "sumifs",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "AVERAGEIF",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "sumif",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "AVERAGEIFS",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "sumifs",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "INDEX",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "index",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MATCH",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "match",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "VLOOKUP",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "table-lookup",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "HLOOKUP",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "table-lookup",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "XLOOKUP",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "xlookup",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "NA",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "zero",
+      "semantics": "information",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "FILTER",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "filter",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SORT",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "sort",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "UNIQUE",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "unique",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LET",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "required-supported",
+      "signature": "let",
+      "semantics": "let-binding",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "PRODUCT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SUMPRODUCT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "POWER",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "binary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "EXP",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LOG",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "log",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LOG10",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ROUNDUP",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "round",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ROUNDDOWN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "round",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MROUND",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "binary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "EVEN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ODD",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "unary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "QUOTIENT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "binary-number",
+      "semantics": "scalar",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "GCD",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LCM",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SUBTOTAL",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "required-supported",
+      "signature": "subtotal",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TEXTJOIN",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "text-join",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SUBSTITUTE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "substitute",
+      "semantics": "text-sensitive",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "REPLACE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "replace",
+      "semantics": "text-sensitive",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "FIND",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "find-search",
+      "semantics": "text-sensitive",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SEARCH",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "find-search",
+      "semantics": "text-search",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "VALUE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CLEAN",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "REPT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "repeat-text",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CHAR",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "unary-number",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CODE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "UNICHAR",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "unary-number",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "UNICODE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "PROPER",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "NUMBERVALUE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "required-supported",
+      "signature": "number-value",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TIME",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "date-three",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TIMEVALUE",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "HOUR",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MINUTE",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SECOND",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "DAYS",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "date-pair",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "EDATE",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "date-offset",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "EOMONTH",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "date-offset",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "WEEKDAY",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "weekday-weeknum",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "WEEKNUM",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "weekday-weeknum",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "WORKDAY",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "workday",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "NETWORKDAYS",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "networkdays",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "YEARFRAC",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "yearfrac-days360",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "DAYS360",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "required-supported",
+      "signature": "yearfrac-days360",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MEDIAN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MODE.SNGL",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "LARGE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "value-k",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SMALL",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "value-k",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "RANK.EQ",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "rank",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "PERCENTILE.INC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "percentile",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "QUARTILE.INC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "percentile",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "STDEV.S",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "STDEV.P",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "VAR.S",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "VAR.P",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "GEOMEAN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "variadic-values",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CORREL",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "pair-arrays",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COVARIANCE.S",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "pair-arrays",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COVARIANCE.P",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "pair-arrays",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COUNTBLANK",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "aggregate",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MAXIFS",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "sumifs",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "MINIFS",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "required-supported",
+      "signature": "sumifs",
+      "semantics": "criteria",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "XMATCH",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "required-supported",
+      "signature": "xmatch",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CHOOSE",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "required-supported",
+      "signature": "choose",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ROW",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "required-supported",
+      "signature": "optional-reference",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ROWS",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COLUMN",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "required-supported",
+      "signature": "optional-reference",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "COLUMNS",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "required-supported",
+      "signature": "unary-value",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "ADDRESS",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "required-supported",
+      "signature": "address",
+      "semantics": "lookup",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TRANSPOSE",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "required-supported",
+      "signature": "array-unary",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "SEQUENCE",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "required-supported",
+      "signature": "sequence",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "TAKE",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "required-supported",
+      "signature": "take-drop",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "DROP",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "required-supported",
+      "signature": "take-drop",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CHOOSECOLS",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "required-supported",
+      "signature": "choose-axis",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "CHOOSEROWS",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "required-supported",
+      "signature": "choose-axis",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "PV",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "pv-fv-pmt",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "FV",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "pv-fv-pmt",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "PMT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "pv-fv-pmt",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "NPV",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "npv",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "IRR",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "irr",
+      "semantics": "financial-iterative",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "RATE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "rate",
+      "semantics": "financial-iterative",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "IPMT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "period-payment",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    },
+    {
+      "canonical": "PPMT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "required-supported",
+      "signature": "period-payment",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "implemented-assisted",
+      "version": 1
+    }
+  ],
+  "operators": [
+    {
+      "canonical": "add",
+      "token": "+",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "subtract",
+      "token": "-",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "multiply",
+      "token": "*",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "divide",
+      "token": "/",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "power",
+      "token": "^",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "concatenate",
+      "token": "&",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Text concatenation operator",
+      "version": 1
+    },
+    {
+      "canonical": "equal",
+      "token": "=",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "not-equal",
+      "token": "<>",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "less-than",
+      "token": "<",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "less-than-or-equal",
+      "token": "<=",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "greater-than",
+      "token": ">",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "greater-than-or-equal",
+      "token": ">=",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Comparison operators",
+      "version": 1
+    },
+    {
+      "canonical": "percent",
+      "token": "%",
+      "fixity": "postfix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "unary-plus",
+      "token": "+",
+      "fixity": "prefix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "unary-minus",
+      "token": "-",
+      "fixity": "prefix",
+      "family": "operator",
+      "contractStatus": "required-supported",
+      "source": "microsoft-excel-operators",
+      "section": "Arithmetic operators",
+      "version": 1
+    }
+  ]
+}

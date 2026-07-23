@@ -13,7 +13,7 @@ API returns one in-memory string, but fetches at most
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L56</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L57</code></dd></div>
 </dl>
 
 ## Declaration

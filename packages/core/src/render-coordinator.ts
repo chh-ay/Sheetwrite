@@ -1,5 +1,6 @@
 import type { AriaMirror } from "./aria-mirror.js";
 import type { DatasourceController } from "./datasource-controller.js";
+import type { DomMergeAnchorRequest, DomOverlay } from "./dom-overlay.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
 import type { CellScalar } from "./types/cell.js";
@@ -9,6 +10,7 @@ import type { Store, VisibleWindowView } from "./types/store.js";
 
 export interface RenderCoordinatorOptions {
   renderer: () => Renderer;
+  domOverlay: DomOverlay;
   overlayPainter: OverlayPainter;
   ariaMirror: AriaMirror;
   geometry: GeometryLayoutController;
@@ -21,10 +23,18 @@ export interface RenderCoordinatorOptions {
   storeEpoch: () => number;
   viewportHeight: () => number;
   viewportWidth: () => number;
+  datasourceColumnCount?: () => number;
   scrollTop: () => number;
   scrollLeft: () => number;
   repositionEditor: (contentTop: number, scrollLeft: number) => void;
-  emitScroll: (event: { scrollTop: number; firstRow: number; lastRow: number }) => void;
+  emitScroll: (event: {
+    scrollTop: number;
+    scrollLeft: number;
+    firstRow: number;
+    lastRow: number;
+    firstVisibleColumn: number | null;
+    lastVisibleColumn: number | null;
+  }) => void;
 }
 
 /** Sole owner of frame scheduling, paint-window caches, and renderer/overlay updates. */
@@ -35,12 +45,19 @@ export class RenderCoordinator {
   private columnWindowStart = -1;
   private columnWindowEnd = -1;
   private windowedColumnIndices: readonly number[] = [];
+  private datasourceColumnIndices: readonly number[] = [];
+  private datasourceFrozenColumns = -1;
   private columnWindowSignature = "";
   private lastDataSignature = "";
   private lastPaintSignature = "";
   private lastPaintView: VisibleWindowView | null = null;
   private cachedPaneViews: VisibleWindowView[] = [];
   private readonly paneValuePools: CellScalar[][] = [];
+  private cachedDomMergeAnchorViews: VisibleWindowView[] = [];
+  private readonly domMergeAnchorValuePools: CellScalar[][] = [];
+  private readonly domMergeSourceViews: VisibleWindowView[] = [];
+  private mainViewValuePool: CellScalar[] = [];
+  private domMergeAnchorSignature = "";
   private destroyed = false;
 
   constructor(private readonly options: RenderCoordinatorOptions) {}
@@ -63,7 +80,8 @@ export class RenderCoordinator {
   invalidateColumns(): void {
     this.columnWindowStart = -1;
     this.columnWindowEnd = -1;
-    this.windowedColumnIndices = [];
+    this.datasourceColumnIndices = [];
+    this.datasourceFrozenColumns = -1;
     this.columnWindowSignature = "";
     this.invalidateData();
   }
@@ -97,8 +115,11 @@ export class RenderCoordinator {
     }
     this.lastPaintView = null;
     this.cachedPaneViews = [];
+    this.cachedDomMergeAnchorViews = [];
+    this.domMergeSourceViews.length = 0;
     this.lastDataSignature = "";
     this.lastPaintSignature = "";
+    this.domMergeAnchorSignature = "";
   }
 
   private render(): void {
@@ -123,19 +144,70 @@ export class RenderCoordinator {
     const frozenColumns = paintWindow.frozenColumns;
     const frozenHeight = paintWindow.frozenHeight;
     const frozenWidth = paintWindow.frozenWidth;
+    const visibleColumns = geometry.columnWindow(scrollLeft, cellViewportWidth, 0);
+    const firstBodyVisibleColumn = geometry.columnIndices[visibleColumns.start] ?? null;
+    const lastBodyVisibleColumn = geometry.columnIndices[visibleColumns.end - 1] ?? null;
+    const firstVisibleColumn =
+      frozenColumns > 0
+        ? (geometry.columnIndices[0] ?? firstBodyVisibleColumn)
+        : firstBodyVisibleColumn;
+    const lastVisibleColumn =
+      lastBodyVisibleColumn ??
+      (frozenColumns > 0 ? (geometry.columnIndices[frozenColumns - 1] ?? null) : null);
+    const rawVisibleRows = geometry.visibleRowWindow(
+      contentTop + frozenHeight,
+      Math.max(0, bodyHeight - frozenHeight) + theme.headerHeight,
+      0,
+    );
+    const visibleRows =
+      frozenRows > 0
+        ? {
+            start: Math.max(rawVisibleRows.start, frozenRows),
+            end: Math.max(rawVisibleRows.end, frozenRows),
+          }
+        : rawVisibleRows;
     const usePanes =
       (frozenRows > 0 || frozenColumns > 0) && this.options.renderer().paintPanes !== undefined;
     const rowGeometry = geometry.rowGeometry(rows);
-    if (frozenRows > 0) this.options.datasource.ensureLoaded(0, frozenRows);
-    this.options.datasource.ensureLoaded(rows.start, rows.end);
-
-    if (columns.start !== this.columnWindowStart || columns.end !== this.columnWindowEnd) {
+    const columnWindowChanged =
+      columns.start !== this.columnWindowStart || columns.end !== this.columnWindowEnd;
+    if (columnWindowChanged) {
       this.columnWindowStart = columns.start;
       this.columnWindowEnd = columns.end;
       this.windowedColumnIndices = geometry.columnIndices.slice(columns.start, columns.end);
       this.columnWindowSignature = this.windowedColumnIndices.join(",");
       this.options.ariaMirror.bumpVersion();
     }
+    if (columnWindowChanged || frozenColumns !== this.datasourceFrozenColumns) {
+      const frozenColumnIndices =
+        frozenColumns > 0 ? geometry.columnIndices.slice(0, frozenColumns) : [];
+      const demanded = [...frozenColumnIndices, ...this.windowedColumnIndices].sort(
+        (left, right) => left - right,
+      );
+      const datasourceColumnCount =
+        this.options.datasourceColumnCount?.() ?? Number.MAX_SAFE_INTEGER;
+      let write = 0;
+      for (const column of demanded) {
+        if (
+          column >= 0 &&
+          column < datasourceColumnCount &&
+          (write === 0 || demanded[write - 1] !== column)
+        ) {
+          demanded[write++] = column;
+        }
+      }
+      demanded.length = write;
+      this.datasourceColumnIndices = demanded;
+      this.datasourceFrozenColumns = frozenColumns;
+    }
+    if (frozenRows > 0) {
+      this.options.datasource.ensureLoaded(0, frozenRows, this.datasourceColumnIndices);
+    }
+    this.options.datasource.updateViewport(
+      visibleRows.start,
+      visibleRows.end,
+      this.datasourceColumnIndices,
+    );
 
     const storeEpoch = this.options.storeEpoch();
     const viewport: Viewport = {
@@ -187,7 +259,20 @@ export class RenderCoordinator {
         );
       }
       view = this.lastPaintView!;
-      if (repaint) this.options.renderer().paint(view);
+      if (repaint) {
+        this.domMergeSourceViews[0] = view;
+        this.domMergeSourceViews.length = 1;
+        const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
+        const refreshAnchors = this.domMergeAnchorsNeedRefresh(requests, refreshData);
+        if (refreshAnchors && requests.length > 0) {
+          view = this.retainMainView(view);
+          this.lastPaintView = view;
+          this.domMergeSourceViews[0] = view;
+        }
+        if (refreshAnchors) this.loadDomMergeAnchorViews(requests);
+        this.options.domOverlay.paint(view, viewport, this.cachedDomMergeAnchorViews);
+        this.options.renderer().paint(view);
+      }
     }
     this.lastPaintView = view;
     this.lastDataSignature = dataSignature;
@@ -197,8 +282,11 @@ export class RenderCoordinator {
     this.options.repositionEditor(contentTop, scrollLeft);
     this.options.emitScroll({
       scrollTop: contentTop,
+      scrollLeft,
       firstRow: rows.start,
       lastRow: Math.max(rows.start, rows.end - 1),
+      firstVisibleColumn,
+      lastVisibleColumn,
     });
   }
 
@@ -291,12 +379,66 @@ export class RenderCoordinator {
     });
     this.cachedPaneViews.length = panes.length;
     if (repaint) {
+      this.domMergeSourceViews.length = panes.length;
+      for (let slot = 0; slot < panes.length; slot++) {
+        this.domMergeSourceViews[slot] = panes[slot]!.view;
+      }
+      const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
+      if (this.domMergeAnchorsNeedRefresh(requests, refreshData)) {
+        this.loadDomMergeAnchorViews(requests);
+      }
+      this.options.domOverlay.paintPanes(panes, this.cachedDomMergeAnchorViews);
       this.options.renderer().paintPanes?.(panes, {
         x: frozenColumns > 0 ? xSplit - 0.5 : null,
         y: frozenRows > 0 ? ySplit - 0.5 : null,
       });
     }
     return bodyView;
+  }
+
+  private domMergeAnchorsNeedRefresh(
+    requests: readonly DomMergeAnchorRequest[],
+    refreshData: boolean,
+  ): boolean {
+    let signature = String(requests.length);
+    for (const request of requests) {
+      signature += `|${request.sheet}\u0000${request.row}`;
+      for (const col of request.cols) signature += `,${col}`;
+    }
+    const refresh = refreshData || signature !== this.domMergeAnchorSignature;
+    this.domMergeAnchorSignature = signature;
+    return refresh;
+  }
+
+  private loadDomMergeAnchorViews(requests: readonly DomMergeAnchorRequest[]): void {
+    this.cachedDomMergeAnchorViews.length = requests.length;
+    for (let slot = 0; slot < requests.length; slot++) {
+      const request = requests[slot]!;
+      this.options.datasource.ensureLoaded(request.row, request.row + 1, request.cols);
+      const view = this.options.store.getVisibleWindow(
+        request.sheet,
+        { start: request.row, end: request.row + 1 },
+        request.cols,
+      );
+      let values = this.domMergeAnchorValuePools[slot];
+      if (!values || values.length !== view.values.length) {
+        values = new Array<CellScalar>(view.values.length);
+        this.domMergeAnchorValuePools[slot] = values;
+      }
+      for (let index = 0; index < values.length; index++)
+        values[index] = view.values[index] ?? null;
+      this.cachedDomMergeAnchorViews[slot] = { ...view, values };
+    }
+  }
+
+  private retainMainView(view: VisibleWindowView): VisibleWindowView {
+    if (this.mainViewValuePool.length !== view.values.length) {
+      this.mainViewValuePool = new Array<CellScalar>(view.values.length);
+    }
+    for (let index = 0; index < this.mainViewValuePool.length; index++) {
+      this.mainViewValuePool[index] = view.values[index] ?? null;
+    }
+    return { ...view, values: this.mainViewValuePool };
   }
 
   private retainPaneView(view: VisibleWindowView, slot: number): VisibleWindowView {

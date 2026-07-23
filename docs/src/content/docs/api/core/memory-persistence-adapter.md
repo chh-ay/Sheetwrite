@@ -9,7 +9,7 @@ Executable database-neutral reference adapter for tests, demos, and local workfl
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L87</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/persistence.ts#L86</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

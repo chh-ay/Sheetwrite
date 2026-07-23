@@ -9,10 +9,10 @@ Error thrown when an operation requires datasource cells that are not loaded.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store/data-engine.ts#L109</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/store/data-engine.ts#L245</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -29,7 +29,16 @@ constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "inco
 <summary><code>capability</code></summary>
 
 ```ts generated
-capability: { status: "incomplete"; loadedCells: number; totalCells: number; }
+capability: { status: "incomplete"; loadedCells: number; totalCells: number; };
+```
+
+</details>
+
+<details class="api-member" id="incomplete-data-error-name" data-pagefind-weight="1">
+<summary><code>name</code></summary>
+
+```ts generated
+name: "IncompleteDataError"
 ```
 
 </details>
@@ -41,7 +50,7 @@ capability: { status: "incomplete"; loadedCells: number; totalCells: number; }
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-class IncompleteDataError extends Error {
+class IncompleteDataError extends SheetwriteError {
   constructor(
     sheet: SheetId,
     capability: Extract<
@@ -56,6 +65,7 @@ class IncompleteDataError extends Error {
     loadedCells: number;
     totalCells: number;
   };
+  name: "IncompleteDataError";
 }
 ```
 

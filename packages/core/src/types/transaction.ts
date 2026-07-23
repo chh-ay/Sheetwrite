@@ -11,9 +11,9 @@ import type { CommitReason, DocumentOp, MutationIssue, WorkbookSnapshot } from "
  * logical cell area covered by compact operations.
  */
 export interface TransactionResourceLimits {
-  /** Maximum number of DocumentOp objects in one atomic transaction. */
+  /** DocumentOp objects in one atomic transaction; defaults to 10,000. */
   maxOperations: number;
-  /** Maximum UTF-8 bytes in the JSON-encoded DocumentOp array. */
+  /** UTF-8 bytes in the JSON-encoded DocumentOp array; defaults to 8 MiB. */
   maxEncodedBytes: number;
 }
 
@@ -61,11 +61,15 @@ export interface TransactionApplicationOptions {
   source?: OperationSource;
   /** Event classification; defaults to `api`. */
   commitReason?: CommitReason;
+  /** Internal durable-queue replay: bypass remote hydration while retaining remote event semantics. */
+  localReplay?: boolean;
 }
 
 /** Classification metadata for host-supplied remote operations. */
 export interface RemoteOperationOptions {
   commitReason?: CommitReason;
+  /** Reapply a durable local mutation as dirty pending state rather than authoritative remote data. */
+  localReplay?: boolean;
 }
 
 /** Immutable local operation batch awaiting a host acknowledgement. */

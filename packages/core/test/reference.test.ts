@@ -1,68 +1,61 @@
 import { describe, expect, it } from "bun:test";
-import { cellKey, REF_CYCLE, ReferenceGraph } from "../src/reference.js";
-import type { CellAddress, CellScalar } from "../src/types.js";
+import type { SourceSnapshot } from "@sheetwrite/wasm";
+import {
+  consumeSourceSnapshot,
+  RangeSourceProjection,
+  REF_CYCLE,
+  referenceTargetFromPacked,
+} from "../src/reference.js";
 
-function makeLiterals() {
-  const m = new Map<string, CellScalar>();
-  const at = (a: CellAddress): CellScalar => m.get(cellKey(a)) ?? null;
-  return { m, at };
-}
+describe("Rust-owned reference source projections", () => {
+  it("performs sorted compact formula/reference lookups without a document graph replica", () => {
+    const projection = new RangeSourceProjection(
+      Uint32Array.of(1, 8),
+      ["=A1", "=B2"],
+      Uint32Array.of(3, 9),
+      Uint32Array.of(0, 4, 5, 1, 6, 7),
+      ["left", "right"],
+    );
 
-const A = (row: number, col: number, sheet = "A"): CellAddress => ({ sheet, row, col });
-
-describe("ReferenceGraph", () => {
-  it("resolves a plain reference to the target literal", () => {
-    const { m, at } = makeLiterals();
-    m.set(cellKey(A(0, 0)), 42);
-    const g = new ReferenceGraph();
-    g.setRef(A(1, 1, "B"), A(0, 0, "A"), at);
-    expect(g.resolved(cellKey(A(1, 1, "B")))).toBe(42);
+    expect(projection.formulaAt(1)).toBe("=A1");
+    expect(projection.formulaAt(2)).toBeNull();
+    expect(projection.referenceAt(3)).toEqual({ sheet: "left", row: 4, col: 5 });
+    expect(projection.referenceAt(9)).toEqual({ sheet: "right", row: 6, col: 7 });
+    expect([...projection.formulas()]).toEqual([
+      [1, "=A1"],
+      [8, "=B2"],
+    ]);
+    expect([...projection.references()]).toEqual([
+      [3, { sheet: "left", row: 4, col: 5 }],
+      [9, { sheet: "right", row: 6, col: 7 }],
+    ]);
   });
 
-  it("propagates a cross-sheet target edit to dependents", () => {
-    const { m, at } = makeLiterals();
-    m.set(cellKey(A(0, 0, "A")), "old");
-    const g = new ReferenceGraph();
-    g.setRef(A(1, 1, "B"), A(0, 0, "A"), at);
-    expect(g.resolved(cellKey(A(1, 1, "B")))).toBe("old");
+  it("copies and frees opaque WASM source snapshots exactly once", () => {
+    let frees = 0;
+    const snapshot = {
+      formulaOffsets: () => Uint32Array.of(2),
+      formulaSources: () => ["=C3"],
+      referenceOffsets: () => Uint32Array.of(4),
+      referenceTargets: () => Uint32Array.of(0, 1, 2),
+      free: () => {
+        frees += 1;
+      },
+    } as unknown as SourceSnapshot;
 
-    m.set(cellKey(A(0, 0, "A")), "new");
-    g.onLiteralChanged(cellKey(A(0, 0, "A")), at);
-    expect(g.resolved(cellKey(A(1, 1, "B")))).toBe("new");
+    const projection = consumeSourceSnapshot(snapshot, ["s1"]);
+    expect(projection.formulaAt(2)).toBe("=C3");
+    expect(projection.referenceAt(4)).toEqual({ sheet: "s1", row: 1, col: 2 });
+    expect(frees).toBe(1);
   });
 
-  it("follows reference chains and propagates through them", () => {
-    const { m, at } = makeLiterals();
-    m.set(cellKey(A(0, 0)), 7);
-    const g = new ReferenceGraph();
-    g.setRef(A(1, 0), A(0, 0), at); // B -> A
-    g.setRef(A(2, 0), A(1, 0), at); // C -> B
-    expect(g.resolved(cellKey(A(2, 0)))).toBe(7);
-
-    m.set(cellKey(A(0, 0)), 9);
-    g.onLiteralChanged(cellKey(A(0, 0)), at);
-    expect(g.resolved(cellKey(A(2, 0)))).toBe(9);
-  });
-
-  it("detects cycles and resolves them to the cycle sentinel", () => {
-    const { at } = makeLiterals();
-    const g = new ReferenceGraph();
-    g.setRef(A(0, 0), A(1, 0), at); // X -> Y
-    g.setRef(A(1, 0), A(0, 0), at); // Y -> X
-    expect(g.resolved(cellKey(A(0, 0)))).toBe(REF_CYCLE);
-    expect(g.resolved(cellKey(A(1, 0)))).toBe(REF_CYCLE);
-  });
-
-  it("tears down edges when a ref is removed", () => {
-    const { m, at } = makeLiterals();
-    m.set(cellKey(A(0, 0)), 1);
-    const g = new ReferenceGraph();
-    g.setRef(A(1, 0), A(0, 0), at);
-    g.removeRef(cellKey(A(1, 0)));
-    expect(g.isRef(cellKey(A(1, 0)))).toBe(false);
-    // a later target change must not resurrect the removed dependent
-    m.set(cellKey(A(0, 0)), 2);
-    g.onLiteralChanged(cellKey(A(0, 0)), at);
-    expect(g.resolved(cellKey(A(1, 0)))).toBeNull();
+  it("rejects unknown handles and retains the public cycle sentinel", () => {
+    expect(referenceTargetFromPacked(Uint32Array.of(8, 1, 2), ["s1"])).toBeNull();
+    expect(() =>
+      new RangeSourceProjection(new Uint32Array(), [], Uint32Array.of(0), Uint32Array.of(8, 1, 2), [
+        "s1",
+      ]).referenceAt(0),
+    ).toThrow("unknown sheet");
+    expect(REF_CYCLE).toBe("#CYCLE!");
   });
 });

@@ -19,4 +19,11 @@ export const LIFECYCLE_DATA: ColumnarData = {
   columns: { value: [LIFECYCLE_CELL, "Retry ready", "Canvas painted"] },
 };
 
+export const LIFECYCLE_RESET_CELL = "Lifecycle Reset Cell";
+
+export const LIFECYCLE_RESET_DATA: ColumnarData = {
+  rowCount: 3,
+  columns: { value: [LIFECYCLE_RESET_CELL, "Input reset", "Canvas repainted"] },
+};
+
 export const INVALID_WASM_SOURCE = new Uint8Array([0]);

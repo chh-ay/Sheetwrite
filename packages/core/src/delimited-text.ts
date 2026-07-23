@@ -1,35 +1,47 @@
+import { SheetwriteError } from "./errors.js";
 /** Resource ceilings shared by synchronous CSV and TSV parsing and encoding. */
 export interface DelimitedTextResourceLimits {
-  /** Maximum UTF-8 bytes accepted from one input string. */
+  /** Input string size in UTF-8 bytes; defaults to 32 MiB. */
   maxInputBytes: number;
-  /** Maximum UTF-8 bytes produced by one output string, including a BOM when present. */
+  /** Output string size in UTF-8 bytes, including a BOM; defaults to 64 MiB. */
   maxOutputBytes: number;
-  /** Maximum syntactically present records. */
+  /** Syntactically present records; defaults to 1,000,000. */
   maxRows: number;
-  /** Maximum fields in any record. */
+  /** Fields in any one record; defaults to 16,384. */
   maxColumns: number;
-  /** Maximum fields across all records. */
+  /** Aggregate fields across all records; defaults to 1,000,000. */
   maxCells: number;
-  /** Maximum decoded UTF-8 bytes in one field. */
+  /** Decoded UTF-8 bytes in one field; defaults to 1 MiB. */
   maxFieldBytes: number;
-  /** Maximum rows fetched by an export writer in one packed store read. */
+  /** Rows fetched by an export writer in one packed store read; defaults to 4,096. */
   maxWriterWindowRows: number;
 }
 
 /** Optional resource ceilings for an in-memory delimited-text operation. */
 export interface DelimitedTextOptions {
+  /** Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`. */
   resourceLimits?: Partial<DelimitedTextResourceLimits>;
 }
 
-/** Conservative defaults for synchronous, in-memory CSV and TSV operations. */
+/**
+ * Synchronous operations return one in-memory string, so byte/cell ceilings
+ * bound allocation while sheet-compatible dimensions remain independently valid.
+ */
 export const DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS: Readonly<DelimitedTextResourceLimits> =
   Object.freeze({
+    // Bound the caller-owned string before parser field/row allocations begin.
     maxInputBytes: 32 * 1024 * 1024,
+    // Bound the single returned string; exports cannot stream partial output.
     maxOutputBytes: 64 * 1024 * 1024,
+    // Preserve the million-row Sheetwrite data contract.
     maxRows: 1_000_000,
+    // Preserve the XLSX-compatible worksheet width.
     maxColumns: 16_384,
+    // Bound aggregate parser arrays and encoder field work.
     maxCells: 1_000_000,
+    // Prevent one quoted field from dominating synchronous memory.
     maxFieldBytes: 1 * 1024 * 1024,
+    // Bound each store read even though the final export remains in memory.
     maxWriterWindowRows: 4_096,
   });
 
@@ -37,32 +49,44 @@ export const DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS: Readonly<DelimitedTextResou
 export type DelimitedTextOperation = "parse" | "import" | "encode" | "export";
 
 /** Stable resource-limit failure raised before the next oversized parse or encode allocation. */
-export class DelimitedTextResourceError extends RangeError {
+export class DelimitedTextResourceError extends SheetwriteError {
   override readonly name = "DelimitedTextResourceError";
-  readonly code = "DELIMITED_TEXT_RESOURCE_LIMIT";
 
   constructor(
     readonly resource: keyof DelimitedTextResourceLimits,
     readonly limit: number,
     readonly actual: number,
-    readonly operation: DelimitedTextOperation,
+    operation: DelimitedTextOperation,
   ) {
     super(
+      "delimited-text-resource-limit",
+      `delimited-${operation}`,
       `Sheetwrite: delimited-text ${operation} ${resource} limit is ${limit}; observed ${actual}`,
+      { context: { format: "delimited-text", resource, limit, actual } },
     );
   }
 }
 
 /** Stable invalid-option failure for a delimited-text resource ceiling. */
-export class DelimitedTextOptionsError extends TypeError {
+export class DelimitedTextOptionsError extends SheetwriteError {
   override readonly name = "DelimitedTextOptionsError";
-  readonly code = "DELIMITED_TEXT_INVALID_LIMIT";
 
   constructor(
     readonly resource: keyof DelimitedTextResourceLimits,
     readonly value: unknown,
   ) {
-    super(`Sheetwrite: delimited-text ${resource} must be a positive safe integer`);
+    super(
+      "delimited-text-invalid-limit",
+      "delimited-options",
+      `Sheetwrite: delimited-text ${resource} must be a positive safe integer`,
+      {
+        context: {
+          format: "delimited-text",
+          resource,
+          value: typeof value === "number" && Number.isFinite(value) ? value : String(value),
+        },
+      },
+    );
   }
 }
 

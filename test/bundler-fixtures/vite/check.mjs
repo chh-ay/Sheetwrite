@@ -163,7 +163,7 @@ const evidence = {
   version: packageManifest.dependencies.vite,
   assets,
 };
-const evidencePath = resolve(repositoryRoot, "test-results/delivery-size/bundlers/vite.json");
+const evidencePath = resolve(repositoryRoot, "test-results/bundlers/vite.json");
 await mkdir(resolve(evidencePath, ".."), { recursive: true });
 await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 console.log("Vite size manifest:", relative(process.cwd(), evidencePath));

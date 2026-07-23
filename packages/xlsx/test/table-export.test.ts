@@ -121,11 +121,11 @@ describe("table XLSX export", () => {
       buildXlsxModel(store.getWorkbook(), store, { maxCells: 10 });
     } catch (error) {
       expect(error).toMatchObject({
-        code: "XLSX_RESOURCE_LIMIT",
+        code: "xlsx-resource-limit",
         resource: "maxCells",
         actual: 22,
         limit: 10,
-        operation: "export",
+        operation: "xlsx-export",
       });
     }
     store.dispose();

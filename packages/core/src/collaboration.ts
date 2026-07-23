@@ -1,3 +1,4 @@
+import { normalizeSheetwriteError, type SheetwriteError } from "./errors.js";
 import { createGridFromSnapshot, type SnapshotGridOptions } from "./persistence.js";
 import type { PresenceOverlay, Range, Selection } from "./types/coordinates.js";
 import type { Sheet, WorkbookSnapshot } from "./types/document.js";
@@ -39,9 +40,13 @@ export interface PresencePrivacyOptions {
 export interface PresenceCoordinatorOptions {
   actor: PresenceActor;
   privacy?: PresencePrivacyOptions;
+  /** Publish/prune interval in milliseconds; defaults to 15,000. Use 0 to disable the timer. */
   heartbeatMs?: number;
+  /** Idle receipt time before a remote actor expires; defaults to 45,000 milliseconds. */
   timeoutMs?: number;
+  /** Remote actors retained at once; defaults to 32 and is clamped to at least 1. */
   maxActors?: number;
+  /** Selection ranges sent or accepted per actor; defaults to 8 and is clamped to at least 1. */
   maxRangesPerActor?: number;
   now?: () => number;
 }
@@ -51,7 +56,7 @@ export type PresenceCoordinatorEvent =
   | { type: "published"; message: PresenceMessage }
   | { type: "updated"; actorId: string }
   | { type: "expired"; actorId: string }
-  | { type: "error"; error: unknown };
+  | { type: "error"; error: SheetwriteError };
 
 type PresenceListener = (event: PresenceCoordinatorEvent) => void;
 
@@ -59,6 +64,15 @@ interface ReceivedPresence {
   message: PresenceMessage;
   receivedAt: number;
 }
+
+/** Keeps presence current without coupling publication to animation frames. */
+const DEFAULT_PRESENCE_HEARTBEAT_MS = 15_000;
+/** Allows three default heartbeat intervals before a silent actor expires. */
+const DEFAULT_PRESENCE_TIMEOUT_MS = 45_000;
+/** Bounds retained remote overlay state for one coordinator. */
+const DEFAULT_PRESENCE_ACTORS = 32;
+/** Bounds selection payload and overlay work for each actor. */
+const DEFAULT_PRESENCE_RANGES_PER_ACTOR = 8;
 
 /** Ephemeral presence lifecycle; it never calls a document mutation API. */
 export class PresenceCoordinator {
@@ -83,10 +97,10 @@ export class PresenceCoordinator {
   ) {
     if (!options.actor.id) throw new Error("Presence actor ID is required");
     this.now = options.now ?? Date.now;
-    this.heartbeatMs = options.heartbeatMs ?? 15_000;
-    this.timeoutMs = options.timeoutMs ?? 45_000;
-    this.maxActors = Math.max(1, options.maxActors ?? 32);
-    this.maxRanges = Math.max(1, options.maxRangesPerActor ?? 8);
+    this.heartbeatMs = options.heartbeatMs ?? DEFAULT_PRESENCE_HEARTBEAT_MS;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_PRESENCE_TIMEOUT_MS;
+    this.maxActors = Math.max(1, options.maxActors ?? DEFAULT_PRESENCE_ACTORS);
+    this.maxRanges = Math.max(1, options.maxRangesPerActor ?? DEFAULT_PRESENCE_RANGES_PER_ACTOR);
     this.disposeSelection = grid.on("selection", () => this.queuePublish());
     this.disposeActiveSheet = grid.on("active-sheet", () => this.queuePublish());
     this.disposeTransport = transport.subscribe(
@@ -135,7 +149,14 @@ export class PresenceCoordinator {
       await this.transport.publish(clonePresenceMessage(message), this.abortController.signal);
       if (!this.destroyed) this.emit({ type: "published", message: clonePresenceMessage(message) });
     } catch (error) {
-      if (!this.destroyed) this.emit({ type: "error", error });
+      if (!this.destroyed) {
+        this.emit({
+          type: "error",
+          error: normalizeSheetwriteError(error, "presence-failed", "presence", {
+            action: "publish",
+          }),
+        });
+      }
     }
   }
 
@@ -266,7 +287,7 @@ export interface RevisionCoordinatorOptions {
 export type RevisionCoordinatorEvent =
   | { type: "restored"; targetVersion: number; version: number }
   | { type: "conflict"; targetVersion: number; currentVersion: number }
-  | { type: "error"; error: unknown };
+  | { type: "error"; error: SheetwriteError };
 
 type RevisionListener = (event: RevisionCoordinatorEvent) => void;
 
@@ -292,8 +313,16 @@ export class RevisionCoordinator {
     return () => this.listeners.delete(listener);
   }
 
-  list(): Promise<readonly RevisionSummary[]> {
-    return this.adapter.listRevisions(this.options.documentId, this.abortController.signal);
+  async list(): Promise<readonly RevisionSummary[]> {
+    try {
+      return await this.adapter.listRevisions(this.options.documentId, this.abortController.signal);
+    } catch (error) {
+      const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
+        action: "list",
+      });
+      this.emit({ type: "error", error: failure });
+      throw failure;
+    }
   }
 
   async preview(
@@ -301,13 +330,22 @@ export class RevisionCoordinator {
     version: number,
     options: SnapshotGridOptions = {},
   ): Promise<Grid> {
-    const input = await this.adapter.loadRevision(
-      this.options.documentId,
-      version,
-      this.abortController.signal,
-    );
-    const snapshot = this.options.migrateSnapshot ? this.options.migrateSnapshot(input) : input;
-    return createGridFromSnapshot(host, snapshot, { ...options, readOnly: true });
+    try {
+      const input = await this.adapter.loadRevision(
+        this.options.documentId,
+        version,
+        this.abortController.signal,
+      );
+      const snapshot = this.options.migrateSnapshot ? this.options.migrateSnapshot(input) : input;
+      return createGridFromSnapshot(host, snapshot, { ...options, readOnly: true });
+    } catch (error) {
+      const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
+        action: "preview",
+        version,
+      });
+      this.emit({ type: "error", error: failure });
+      throw failure;
+    }
   }
 
   async restore(targetVersion: number, clientMutationId: string): Promise<RevisionRestoreResponse> {
@@ -334,8 +372,12 @@ export class RevisionCoordinator {
       }
       return response;
     } catch (error) {
-      this.emit({ type: "error", error });
-      throw error;
+      const failure = normalizeSheetwriteError(error, "revision-failed", "revision", {
+        action: "restore",
+        targetVersion,
+      });
+      this.emit({ type: "error", error: failure });
+      throw failure;
     }
   }
 
@@ -450,7 +492,7 @@ export type CommentCoordinatorEvent =
   | { type: "changed"; version: number; thread: CommentThread }
   | { type: "conflict"; currentVersion: number }
   | { type: "gap"; expectedVersion: number; receivedVersion: number }
-  | { type: "error"; error: unknown };
+  | { type: "error"; error: SheetwriteError };
 
 type CommentListener = (event: CommentCoordinatorEvent) => void;
 
@@ -510,8 +552,11 @@ export class CommentCoordinator {
       this.emit({ type: "loaded", version: this.version, threads });
       return threads;
     } catch (error) {
-      if (!this.destroyed) this.emit({ type: "error", error });
-      throw error;
+      const failure = normalizeSheetwriteError(error, "comment-failed", "comments", {
+        action: "load",
+      });
+      if (!this.destroyed) this.emit({ type: "error", error: failure });
+      throw failure;
     }
   }
 
@@ -582,8 +627,12 @@ export class CommentCoordinator {
       }
       return response;
     } catch (error) {
-      if (!this.destroyed) this.emit({ type: "error", error });
-      throw error;
+      const failure = normalizeSheetwriteError(error, "comment-failed", "comments", {
+        action: "mutate",
+        mutation: mutation.kind,
+      });
+      if (!this.destroyed) this.emit({ type: "error", error: failure });
+      throw failure;
     }
   }
 
@@ -613,7 +662,12 @@ export class CommentCoordinator {
       this.version = event.version;
       this.emit({ type: "changed", version: event.version, thread: cloneCommentThread(thread) });
     } catch (error) {
-      this.emit({ type: "error", error });
+      this.emit({
+        type: "error",
+        error: normalizeSheetwriteError(error, "comment-failed", "comments", {
+          action: "receive",
+        }),
+      });
     }
   }
 

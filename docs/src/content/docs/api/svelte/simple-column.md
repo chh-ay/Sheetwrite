@@ -9,10 +9,10 @@ Column definition accepted by the adapters’ simple row-object API.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L91</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L110</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>8</span>
+## Members <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-member-list">
 
@@ -26,7 +26,7 @@ key: keyof Row & string;
 </details>
 
 <details class="api-member" id="simple-column-title" data-pagefind-weight="1">
-<summary><code>title</code> <span class="api-member-summary">Schema header label used by exports.</span></summary>
+<summary><code>title</code> <span class="api-member-summary">Semantic title painted in data-grid mode and written by table exports.</span></summary>
 
 ```ts generated
 title: string;
@@ -62,10 +62,19 @@ numberFormat?: string;
 </details>
 
 <details class="api-member" id="simple-column-header-style" data-pagefind-weight="1">
-<summary><code>headerStyle</code> <span class="api-member-summary">Style applied to the painted column-letter header.</span></summary>
+<summary><code>headerStyle</code> <span class="api-member-summary">Style applied to the painted column header.</span></summary>
 
 ```ts generated
 headerStyle?: CellStyle;
+```
+
+</details>
+
+<details class="api-member" id="simple-column-editor" data-pagefind-weight="1">
+<summary><code>editor</code> <span class="api-member-summary">Name of a custom editor registered through GridOptions.editors.</span></summary>
+
+```ts generated
+editor?: string;
 ```
 
 </details>
@@ -102,6 +111,7 @@ export interface SimpleColumn<Row extends Record<string, CellScalar>> {
   type?: CellFormat;
   numberFormat?: string;
   headerStyle?: CellStyle;
+  editor?: string;
   cellStyle?: CellStyle;
   visible?: boolean;
 }

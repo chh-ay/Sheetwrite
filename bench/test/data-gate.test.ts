@@ -1,14 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import {
   type DataBenchmarkResult,
+  type DataStat,
   type EngineResult,
   expectedDataMatrixKeys,
+  HANDSONTABLE_ROWS,
+  renderDataBenchmarkMarkdown,
   SHEETWRITE_ROWS,
   validateDataBenchmark,
   WORKLOADS,
 } from "../src/data-bench.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
-import { type Stat, summarize } from "../src/stats.js";
+import { summarize } from "../src/stats.js";
 
 interface FixtureOptions {
   readonly omitWorkload?: string;
@@ -18,20 +21,22 @@ interface FixtureOptions {
   readonly impossibleSummary?: boolean;
   readonly omitMemory?: boolean;
   readonly invalidQueryResources?: boolean;
+  readonly omitSamples?: boolean;
 }
 
 function engineResult(rows: number, options: FixtureOptions = {}): EngineResult {
   const base = summarize([1, 2, 3]);
-  const statsByKey: Record<string, Stat> = {};
+  const statsByKey: Record<string, DataStat> = {};
   for (const workload of WORKLOADS) {
     if (workload === options.omitWorkload) continue;
     statsByKey[workload] = {
       ...base,
       p95: options.invalidP95 && workload === "ingest" ? Number.POSITIVE_INFINITY : base.p95,
       median: options.impossibleSummary && workload === "ingest" ? 4 : base.median,
+      samples: options.omitSamples && workload === "ingest" ? undefined! : [1, 2, 3],
     };
   }
-  if (options.unexpectedWorkload) statsByKey.notDeclared = summarize([1]);
+  if (options.unexpectedWorkload) statsByKey.notDeclared = { ...summarize([1]), samples: [1] };
   const stats = statsByKey as EngineResult["stats"];
   const rowWithoutMemory = {
     rows,
@@ -76,6 +81,42 @@ function smokeFixture(options: FixtureOptions = {}): DataBenchmarkResult {
   };
 }
 
+function fullFixture(): DataBenchmarkResult {
+  const sheetwrite = Object.fromEntries(
+    SHEETWRITE_ROWS.map((rows) => [String(rows), engineResult(rows)]),
+  );
+  const handsontable = Object.fromEntries(
+    HANDSONTABLE_ROWS.map((rows) => {
+      const result = engineResult(rows);
+      return [
+        String(rows),
+        {
+          ...result,
+          queryResources: null,
+          memory: { heapDeltaBytes: 1024, wasmDeltaBytes: null },
+        },
+      ];
+    }),
+  );
+  return {
+    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
+    mode: "full",
+    matrixId: MATRIX_IDS.data.full,
+    meta: {
+      bun: "test",
+      platform: "linux",
+      arch: "x64",
+      commit: "0".repeat(40),
+      dirty: false,
+      timestamp: new Date(0).toISOString(),
+      sheetwriteRows: [...SHEETWRITE_ROWS],
+      handsontableRows: [...HANDSONTABLE_ROWS],
+    },
+    sheetwrite,
+    handsontable,
+  };
+}
+
 describe("data benchmark exact matrix", () => {
   test("accepts only the complete smoke matrix", () => {
     expect(() => validateDataBenchmark(smokeFixture(), "smoke")).not.toThrow();
@@ -100,6 +141,9 @@ describe("data benchmark exact matrix", () => {
     expect(() => validateDataBenchmark(smokeFixture({ impossibleSummary: true }), "smoke")).toThrow(
       "engine=sheetwrite;rows=1000;metric=ingest.stat contains an impossible finite summary",
     );
+    expect(() => validateDataBenchmark(smokeFixture({ omitSamples: true }), "smoke")).toThrow(
+      "engine=sheetwrite;rows=1000;metric=ingest.samples are missing",
+    );
   });
 
   test("requires bounded query resources and exact distinct sentinels", () => {
@@ -123,5 +167,12 @@ describe("data benchmark exact matrix", () => {
       SHEETWRITE_ROWS.length * WORKLOADS.length,
     );
     expect(() => validateDataBenchmark(smokeFixture(), "full")).toThrow("data mode mismatch");
+  });
+  test("regenerates the Markdown view byte-for-byte from validated raw data", () => {
+    const fixture = fullFixture();
+    const first = renderDataBenchmarkMarkdown(fixture);
+    const second = renderDataBenchmarkMarkdown(structuredClone(fixture));
+    expect(second).toBe(first);
+    expect(first).toContain("**1.0× faster**");
   });
 });

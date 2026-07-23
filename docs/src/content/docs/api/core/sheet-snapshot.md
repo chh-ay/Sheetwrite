@@ -9,10 +9,10 @@ Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L277</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L336</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>20</span>
 
 <div class="api-member-list">
 
@@ -115,6 +115,15 @@ conditionalFormats?: ConditionalFormatRule[];
 
 </details>
 
+<details class="api-member" id="sheet-snapshot-hyperlinks" data-pagefind-weight="1">
+<summary><code>hyperlinks</code></summary>
+
+```ts generated
+hyperlinks?: CellHyperlink[];
+```
+
+</details>
+
 <details class="api-member" id="sheet-snapshot-validation-rules" data-pagefind-weight="1">
 <summary><code>validationRules</code></summary>
 
@@ -169,6 +178,15 @@ rowGroups?: RowGroup[];
 
 </details>
 
+<details class="api-member" id="sheet-snapshot-tables" data-pagefind-weight="1">
+<summary><code>tables</code></summary>
+
+```ts generated
+tables?: WorkbookTable[];
+```
+
+</details>
+
 <details class="api-member" id="sheet-snapshot-cells" data-pagefind-weight="1">
 <summary><code>cells</code></summary>
 
@@ -197,12 +215,14 @@ export interface SheetSnapshot {
   rowMeta?: Array<[row: number, meta: RowMetadata]>;
   merges?: MergeRange[];
   conditionalFormats?: ConditionalFormatRule[];
+  hyperlinks?: CellHyperlink[];
   validationRules?: DataValidationRule[];
   protectedRanges?: ProtectedRange[];
   notes?: CellNote[];
   sortKeys?: SortKey[];
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
+  tables?: WorkbookTable[];
   cells: CellBlock[];
 }
 ```

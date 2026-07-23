@@ -9,7 +9,7 @@ Successful byte/count inspection or one structured transaction rejection.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L26</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L46</code></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
@@ -27,7 +27,10 @@ Successful byte/count inspection or one structured transaction rejection.
 ```ts generated
 {
   ok: false;
-  issue: Extract<MutationIssue, { kind: "resource-limit" }>;
+  issue: Extract<
+    MutationIssue,
+    { kind: "resource-limit" } | { kind: "invalid-operation" }
+  >;
 }
 ```
 
@@ -50,9 +53,12 @@ export type TransactionResourceValidationResult =
       ok: false;
       issue: Extract<
         MutationIssue,
-        {
-          kind: "resource-limit";
-        }
+        | {
+            kind: "resource-limit";
+          }
+        | {
+            kind: "invalid-operation";
+          }
       >;
     };
 ```
