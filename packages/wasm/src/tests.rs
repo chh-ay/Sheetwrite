@@ -628,6 +628,32 @@ fn aggregate_functions_distinguish_direct_values_from_range_values() {
 }
 
 #[test]
+fn shared_sum_cache_is_scoped_to_one_recompute() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 10);
+    for row in 0..10 {
+        store.set_number(sheet, row, 0, 1.0, 0);
+    }
+    store.set_formula(sheet, 0, 1, "=SUM(A1:A10)", 0);
+    store.set_formula(sheet, 1, 1, "=SUM(A1:A10)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 10.0);
+    assert_close(number(&store, sheet, 1, 1), 10.0);
+
+    store.set_number(sheet, 0, 0, 2.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 11.0);
+    assert_close(number(&store, sheet, 1, 1), 11.0);
+
+    let mut next = CellStore::new();
+    let next_sheet = next.add_sheet(2, 1);
+    next.set_number(next_sheet, 0, 0, 3.0, 0);
+    next.set_formula(next_sheet, 0, 1, "=SUM(A1:A1)", 0);
+    next.recompute(next_sheet);
+    assert_close(number(&next, next_sheet, 0, 1), 3.0);
+}
+
+#[test]
 fn value_results_feed_dependencies_and_windows() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(4, 1);

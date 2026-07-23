@@ -44,6 +44,8 @@ const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
 thread_local! {
     static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
+    static RANGE_SUM_CACHE: RefCell<HashMap<CellRange, EvalResult>> =
+        RefCell::new(HashMap::new());
 }
 
 struct FormulaOriginGuard;
@@ -260,6 +262,7 @@ impl CellStore {
         if seeds.is_empty() {
             return;
         }
+        RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
             for &sheet in seeds {
                 if let Some(data) = self.sheets.get_mut(sheet) {
@@ -1972,10 +1975,18 @@ impl CellStore {
         if total > RANGE_CELL_LIMIT {
             return Value::Error(FormulaError::Num);
         }
+        if let Some(cached) = RANGE_SUM_CACHE.with(|cache| cache.borrow().get(&range).cloned()) {
+            return cached;
+        }
 
         let mut sum: f64 = 0.0;
+        let mut cacheable = true;
         for row in row_start..=row_end {
             for col in col_start..=col_end {
+                let cell = (row as u32, col as u32);
+                if data.formulas.contains_key(&cell) || data.spill_owner(cell).is_some() {
+                    cacheable = false;
+                }
                 if !data.is_loaded(row, col) {
                     return Value::Error(FormulaError::Loading);
                 }
@@ -1992,11 +2003,17 @@ impl CellStore {
                 }
             }
         }
-        if sum.is_finite() {
+        let result = if sum.is_finite() {
             Value::Number(sum)
         } else {
             Value::Error(FormulaError::Num)
+        };
+        if cacheable {
+            RANGE_SUM_CACHE.with(|cache| {
+                cache.borrow_mut().insert(range, result.clone());
+            });
         }
+        result
     }
 
     fn eval_range_values(
