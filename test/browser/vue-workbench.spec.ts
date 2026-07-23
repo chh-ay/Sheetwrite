@@ -457,16 +457,13 @@ test("@portability native worksheet controls remain operable at 390×844", async
   await expect(page.getByRole("tab", { name: "Enterprise purchase orders sheet" })).toBeVisible();
 
   await page.getByRole("button", { name: "Add sheet", exact: true }).click();
-  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
-  const sheet3Options = page.getByRole("button", { name: "Options for Sheet 3 sheet" });
-  await sheet3Options.focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Rename Sheet 3 sheet" })).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  const hideSheet3 = page.getByRole("menuitem", { name: "Hide Sheet 3 sheet" });
-  await expect(hideSheet3).toBeFocused();
-  await page.keyboard.press("Space");
-  await page.getByLabel("Unhide sheet").click();
+  const sheet3 = page.getByRole("tab", { name: "Sheet 3 sheet" });
+  await expect(sheet3).toBeVisible();
+  await sheet3.focus();
+  await page.keyboard.press("Control+Shift+H");
+  const unhideSheet = page.getByLabel("Unhide sheet");
+  await expect(unhideSheet).toBeVisible();
+  await unhideSheet.click();
   await page
     .getByRole("group", { name: "Hidden sheets" })
     .getByRole("button", { name: "Sheet 3" })

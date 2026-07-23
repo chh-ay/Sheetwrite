@@ -156,7 +156,7 @@ test("example pages cross-link through the capability hub", async ({ page }) => 
   await showcasesLink.click();
   await expect(page).toHaveURL(siteUrl("/showcases/"));
   await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
-  await expect(page.locator("main h1")).toHaveText("Every capability, live and verified.");
+  await expect(page.locator("main h1")).toHaveText("Eight real experiences. Pick your proof.");
   // Framework deep links stay reachable from the hub's workbench cards.
   await page.locator(`main a[href="${SITE_BASE}/react/"]`).first().click();
   await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });

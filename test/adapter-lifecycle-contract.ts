@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import { setXlsxTableExportBackend } from "../packages/core/dist/index.js";
 import type {
   GridAdapterEventHandlers,
   GridReadyEvent,
   GridReadyReason,
 } from "../packages/core/src/adapter.js";
-import { setXlsxTableExportBackend } from "../packages/core/src/export.js";
 import type {
   CellEditor,
   ColumnarData,
@@ -359,6 +359,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const datasourceEvents: Array<GridEvents["datasource-error"]> = [];
       const exportDelivery = Promise.withResolvers<GridEvents["export-error"]>();
       const datasourceFailure = new Error("adapter datasource failure");
+      const exportFailure = new Error("adapter export failure");
       const datasource: DataSource = {
         capabilities: { protocol: 2, columns: "windowed" },
         async getRows() {
@@ -380,10 +381,16 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const grid = mounted.getPublishedGrid()!;
 
       rejectProtectedEdit(grid);
-      setXlsxTableExportBackend(null as never);
+      setXlsxTableExportBackend({
+        name: "adapter-rejecting-export",
+        async toXlsxTable() {
+          throw exportFailure;
+        },
+      });
       grid.actions.exportXlsx();
       await waitFor(() => fallbackEvents.length === 1 && datasourceEvents.length === 1);
       const exportEvent = await waitForDelivery(exportDelivery.promise, "export error event");
+      setXlsxTableExportBackend(null as never);
 
       expect(mutationEvents).toHaveLength(1);
       expect(mutationEvents[0]!.issues.map((issue) => issue.kind)).toEqual(["protection"]);
@@ -403,7 +410,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect("signal" in datasourceEvents[0]!.request).toBe(false);
       expect(exportEvent).toMatchObject({
         format: "xlsx",
-        error: { code: "optional-backend-unavailable", operation: "xlsx-export" },
+        error: { code: "export-failed", operation: "xlsx-export", cause: exportFailure },
       });
 
       const swapped: Array<GridEvents["mutation-rejected"]> = [];

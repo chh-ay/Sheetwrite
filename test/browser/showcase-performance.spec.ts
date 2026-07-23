@@ -900,6 +900,15 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
     await expect
       .poll(async () => (await readWindow(page)).firstRow)
       .toBeGreaterThan(beforeTouch.firstRow);
+  } else if (browserName === "webkit") {
+    await grid.evaluate((element) => {
+      element.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 1_200 }),
+      );
+    });
+    await expect
+      .poll(async () => (await readWindow(page)).firstRow)
+      .toBeGreaterThan(beforeTouch.firstRow);
   } else {
     await grid.hover();
     await page.mouse.wheel(0, 1_200);

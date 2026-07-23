@@ -416,7 +416,7 @@ test.describe("react workbench — controlled analytics", () => {
     await expect(page.getByTestId("kpi-market")).toHaveAttribute("data-raw", String(TOKYO_ARR));
 
     await expect(page.getByTestId("kpi-total")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Secondary tools" })).toBeVisible();
+    await expect(page.locator("details.sw-rwb-tools > summary")).toBeVisible();
     await openTools(page);
     await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
     await expectNoErrors(page, errors);

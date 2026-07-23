@@ -47,19 +47,20 @@ test("logical-clock directional prefetch stays resident and bounded", async ({ p
 });
 
 test("native wheel scrolling drives the real 90 ms scale datasource", async ({ page }) => {
-  await page.goto("/showcases/performance");
-  const grid = page.getByLabel("Million-row telemetry grid");
+  await page.goto("/showcases/performance/");
+  const grid = page.getByRole("grid", { name: /Million-row financial operations grid/ });
   await expect(grid).toBeVisible();
-  await expect(page.getByTestId("scale-requests")).not.toHaveText("0");
-  const before = Number(
-    (await page.getByTestId("scale-requests").textContent())?.replaceAll(",", ""),
-  );
+  const requestCount = async () =>
+    Number(
+      (await page.getByTestId("scale-requests").textContent())
+        ?.split("/", 1)[0]
+        ?.replaceAll(",", "")
+        .trim(),
+    );
+  await expect.poll(requestCount).toBeGreaterThan(0);
+  const before = await requestCount();
 
   await grid.hover();
   await page.mouse.wheel(0, 2_400);
-  await expect
-    .poll(async () =>
-      Number((await page.getByTestId("scale-requests").textContent())?.replaceAll(",", "")),
-    )
-    .toBeGreaterThan(before);
+  await expect.poll(requestCount).toBeGreaterThan(before);
 });
