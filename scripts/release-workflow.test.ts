@@ -93,6 +93,8 @@ describe("CI-completion package release workflow", () => {
       (step) => step.name === "Generate published package size history",
     );
     expect(generateSizes?.if).toBe("steps.publish.outputs.verified != '[]'");
+    expect(generateSizes?.run).toContain(`require('./packages/core/package.json').version`);
+    expect(generateSizes?.run).not.toContain(`require('./package.json').version`);
     expect(generateSizes?.run).toContain('bun run size:record --version="$VERSION"');
     expect(generateSizes?.run).toContain("bun run docs:generate");
     const openPullRequest = parsed.jobs.publish?.steps?.find(

@@ -28,7 +28,7 @@ readonly grid: Grid;
 </details>
 
 <details class="api-member" id="grid-controller-set-theme" data-pagefind-weight="1">
-<summary><code>setTheme</code> <span class="api-member-summary">Apply the host's declarative theme prop: option-level replacement via <code>Grid.replaceTheme</code>; undefined restores CSS/default resolution.</span></summary>
+<summary><code>setTheme</code> <span class="api-member-summary">Apply the host's declarative theme prop: option-level replacement via <a href="/docs/api/core/grid/#grid-replace-theme"><code>Grid.replaceTheme</code></a>; undefined restores CSS/default resolution.</span></summary>
 
 ```ts generated
 setTheme(theme: Partial<Theme> | undefined): void;

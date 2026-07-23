@@ -10,6 +10,7 @@ import {
   contentPathForRoute,
   entrySlug,
   expectedGeneratedFiles,
+  headingAnchors,
   landingBenchPayload,
   MIGRATION_ROUTES,
   parseFences,
@@ -18,6 +19,7 @@ import {
   renderSymbolPage,
   runCompletionSummary,
   unresolvedCssTokens,
+  unresolvedDocumentationLinks,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
 import type { SizeHistory } from "./size-report.js";
@@ -46,6 +48,31 @@ const coreEntry: ApiEntryPoint = {
         },
       ],
     },
+    {
+      name: "CommitReason",
+      kind: "type",
+      signature: 'type CommitReason = "api" | "edit-enter";',
+      owners: ["src/types/document.ts"],
+      source: "src/types/document.ts#L207",
+      jsDocTags: [],
+      documentation: "Classifies the producer of a committed transaction.",
+      memberDocs: [],
+    },
+    {
+      name: "ChangeEvent",
+      kind: "interface",
+      signature: "interface ChangeEvent { commitReason: CommitReason; }",
+      owners: ["src/types/transaction.ts"],
+      source: "src/types/transaction.ts#L160",
+      jsDocTags: [],
+      documentation: "Committed transaction event.",
+      memberDocs: [
+        {
+          name: "commitReason",
+          documentation: "What produced this commit — see {@link CommitReason}.",
+        },
+      ],
+    },
   ],
 };
 const corePackage: ApiPackage = {
@@ -64,6 +91,24 @@ describe("documentation generation", () => {
     expect(entrySlug("@sheetwrite/core", "./styles.css")).toBe("core-styles-css");
   });
 
+  it("matches rendered heading anchors without collapsing punctuation gaps", () => {
+    expect([...headingAnchors("## Canvas rendering + the WASM columnar store")]).toEqual([
+      "canvas-rendering--the-wasm-columnar-store",
+    ]);
+  });
+
+  it("fails closed when a JSDoc link has no unique API route", () => {
+    expect(unresolvedDocumentationLinks(manifest)).toEqual([]);
+    const broken = structuredClone(manifest);
+    broken.packages[0]!.entryPoints[0]!.exports[0]!.documentation =
+      "Broken {@link MissingSymbol}, {@link Grid.typo}, and {@link Grid.applyTransaction.typo}.";
+    expect(unresolvedDocumentationLinks(broken)).toEqual([
+      "@sheetwrite/core . Grid has unresolved documentation link MissingSymbol",
+      "@sheetwrite/core . Grid has unresolved documentation link Grid.typo",
+      "@sheetwrite/core . Grid has unresolved documentation link Grid.applyTransaction.typo",
+    ]);
+  });
+
   it("links entry indexes to documented symbols with unique member anchors", async () => {
     const entryPage = renderEntryPage(corePackage, coreEntry);
     const symbolPage = await renderSymbolPage(corePackage, coreEntry, coreEntry.exports[0]!);
@@ -76,6 +121,11 @@ describe("documentation generation", () => {
     expect(symbolPage).toContain("Applies a committed transaction to the");
     expect(symbolPage).toContain("Bypasses history.");
     expect(symbolPage).toContain('<a href="/docs/api/core/grid/"><code>Grid</code></a>');
+    const changeEvent = coreEntry.exports.find((item) => item.name === "ChangeEvent")!;
+    const changeEventPage = await renderSymbolPage(corePackage, coreEntry, changeEvent);
+    expect(changeEventPage).toContain(
+      '<a href="/docs/api/core/commit-reason/"><code>CommitReason</code></a>',
+    );
   });
 
   it("generates an index and focused page for every classified symbol", async () => {

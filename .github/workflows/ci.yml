@@ -61,7 +61,7 @@ jobs:
           test "$(npm --version)" = "$NPM_VERSION"
           test "$(rustc --version | cut -d' ' -f2)" = "$RUST_VERSION"
       - name: Changeset status
-        run: bun run changeset:status -- --since=origin/develop
+        run: bun run changeset:ci
       - name: Install checksum-pinned wasm-pack
         run: bun scripts/install-wasm-pack.ts
       - name: Tooling contracts

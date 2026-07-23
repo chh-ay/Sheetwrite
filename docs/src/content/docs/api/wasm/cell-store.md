@@ -12,7 +12,7 @@ The workbook-wide store: every sheet, one string pool.
 <div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>91</span>
+## Members <span class="api-count" data-pagefind-ignore>90</span>
 
 <div class="api-member-list">
 
@@ -121,14 +121,15 @@ returned opaque object is compact in source cardinality, not cell count.</p>
 </details>
 
 <details class="api-member" id="cell-store-capture-sources-for-rows" data-pagefind-weight="1">
-<summary><code>captureSourcesForRows</code> <span class="api-member-summary">Capture persisted formula/reference sources for arbitrary row/column coordinates.</span></summary>
+<summary><code>captureSourcesForRows</code> <span class="api-member-summary">Capture persisted formula/reference sources and derived-spill identity for arbitrary row/column coordinates in one boundary crossing.</span></summary>
 
 ```ts generated
 captureSourcesForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => SourceSnapshot | undefined;
 ```
 
-<p class="api-member-doc">Capture persisted formula/reference sources for arbitrary row/column
-coordinates. Offsets follow the caller's row-major coordinate order.</p>
+<p class="api-member-doc">Capture persisted formula/reference sources and derived-spill identity
+for arbitrary row/column coordinates in one boundary crossing. Offsets
+follow the caller's row-major coordinate order.</p>
 </details>
 
 <details class="api-member" id="cell-store-cell-state" data-pagefind-weight="1">
@@ -873,15 +874,6 @@ spillDerivedMask: (sheet: number, row_start: number, row_end: number, cols: Uint
 
 </details>
 
-<details class="api-member" id="cell-store-spill-derived-mask-for-rows" data-pagefind-weight="1">
-<summary><code>spillDerivedMaskForRows</code> <span class="api-member-summary">Row-major derived-cell mask for an explicit view-row order.</span></summary>
-
-```ts generated
-spillDerivedMaskForRows: (sheet: number, rows: Uint32Array, cols: Uint32Array) => Uint8Array;
-```
-
-</details>
-
 <details class="api-member" id="cell-store-spill-owner-coordinates" data-pagefind-weight="1">
 <summary><code>spillOwnerCoordinates</code> <span class="api-member-summary">Packed row-major [anchorrow, anchorcol, ...] owner coordinates.</span></summary>
 
@@ -1262,11 +1254,6 @@ class CellStore {
     sheet: number,
     row_start: number,
     row_end: number,
-    cols: Uint32Array,
-  ) => Uint8Array;
-  spillDerivedMaskForRows: (
-    sheet: number,
-    rows: Uint32Array,
     cols: Uint32Array,
   ) => Uint8Array;
   spillOwnerCoordinates: (

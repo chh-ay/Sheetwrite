@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>313</dd></div>
+<div><dt>Exports</dt><dd>314</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -245,7 +245,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>76</span>
+### Types <span class="api-count" data-pagefind-ignore>77</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -263,6 +263,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/comment-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentCoordinatorEvent</code></span><span class="api-symbol-card__desc">State transition emitted by the comment coordinator.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-mutation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentMutation</code></span><span class="api-symbol-card__desc">Serializable operation that creates or updates comment state.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/comment-mutation-response/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommentMutationResponse</code></span><span class="api-symbol-card__desc">Applied, duplicate, or conflict acknowledgement for a comment mutation.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/commit-reason/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>CommitReason</code></span><span class="api-symbol-card__desc">The gesture/operation that produced a committed transaction.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/conditional-format-predicate/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ConditionalFormatPredicate</code></span><span class="api-symbol-card__desc">Predicate used to decide whether a conditional format applies.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-action-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ContextMenuActionName</code></span><span class="api-symbol-card__desc">Built-in action names accepted by custom context-menu rows.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/context-menu-items/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ContextMenuItems</code></span><span class="api-symbol-card__desc">Static rows or a context-aware factory evaluated each time the menu opens.</span></a>

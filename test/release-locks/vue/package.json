@@ -3,9 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "dependencies": {
-    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.3.0.tgz",
-    "@sheetwrite/vue": "file:artifacts/sheetwrite-vue-0.3.0.tgz",
-    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.3.0.tgz",
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.3.1.tgz",
+    "@sheetwrite/vue": "file:artifacts/sheetwrite-vue-0.3.1.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.3.1.tgz",
     "vue": "3.5.39"
   }
 }

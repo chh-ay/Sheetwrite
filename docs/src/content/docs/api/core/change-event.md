@@ -35,7 +35,7 @@ changes: CellChange[];
 </details>
 
 <details class="api-member" id="change-event-commit-reason" data-pagefind-weight="1">
-<summary><code>commitReason</code> <span class="api-member-summary">What produced this commit — see <code>CommitReason</code>.</span></summary>
+<summary><code>commitReason</code> <span class="api-member-summary">What produced this commit — see <a href="/docs/api/core/commit-reason/"><code>CommitReason</code></a>.</span></summary>
 
 ```ts generated
 commitReason: CommitReason;

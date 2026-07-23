@@ -1,5 +1,24 @@
 # @sheetwrite/vue
 
+## 0.3.1
+
+### Patch Changes
+
+- Correct the Vue adapter release metadata and package-specific changelog without changing runtime behavior.
+- Updated dependencies
+  - @sheetwrite/core@0.3.1
+
+## 0.3.0
+
+### Minor Changes
+
+- e551eb0: Emit typed `SheetwriteError` failures through the `initialization-error` event while preserving Vue grid readiness and input-reset lifecycle behavior.
+
+### Patch Changes
+
+- Updated dependencies [e551eb0]
+  - @sheetwrite/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

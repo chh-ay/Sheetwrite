@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { releaseVersionFromHeadRef, validateReleasePackageVersions } from "./changeset-ci.js";
 import {
   assertUniqueOrderedNodes,
   PACKAGE_BUILD_NODES,
@@ -242,16 +243,21 @@ describe("changeset workspace contract", () => {
     }
   });
 
-  it("runs the canonical Changesets status command", () => {
-    const root = resolve(import.meta.dir, "..");
-    const result = Bun.spawnSync(
-      ["bun", "run", "changeset:status", "--", "--since=origin/develop"],
-      {
-        cwd: root,
-        stderr: "pipe",
-        stdout: "pipe",
-      },
+  it("runs the release-aware Changesets status command", () => {
+    expect(releaseVersionFromHeadRef("0.3.1")).toBe("0.3.1");
+    expect(releaseVersionFromHeadRef("feature/docs")).toBeUndefined();
+    expect(() => validateReleasePackageVersions("0.3.1")).not.toThrow();
+    expect(() => validateReleasePackageVersions("0.3.2")).toThrow(
+      "Release branch 0.3.2 requires @sheetwrite/wasm@0.3.2",
     );
+    const root = resolve(import.meta.dir, "..");
+    const result = Bun.spawnSync(["bun", "run", "changeset:ci"], {
+      cwd: root,
+      env: { ...process.env, GITHUB_HEAD_REF: "0.3.1" },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
     expect(result.exitCode, result.stderr.toString()).toBe(0);
+    expect(result.stdout.toString()).toContain("Release package versions match branch 0.3.1");
   });
 });

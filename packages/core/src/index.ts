@@ -242,6 +242,7 @@ export type {
   Column,
   ColumnarData,
   ColumnFilter,
+  CommitReason,
   ConditionalFormatPredicate,
   ConditionalFormatRule,
   ContextMenuActionName,

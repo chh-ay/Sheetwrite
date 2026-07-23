@@ -9,12 +9,12 @@
     "bundle:frameworks": "vite build"
   },
   "dependencies": {
-    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.3.0.tgz",
-    "@sheetwrite/react": "file:artifacts/sheetwrite-react-0.3.0.tgz",
-    "@sheetwrite/svelte": "file:artifacts/sheetwrite-svelte-0.3.0.tgz",
-    "@sheetwrite/vue": "file:artifacts/sheetwrite-vue-0.3.0.tgz",
-    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.3.0.tgz",
-    "@sheetwrite/xlsx": "file:artifacts/sheetwrite-xlsx-0.3.0.tgz",
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.3.1.tgz",
+    "@sheetwrite/react": "file:artifacts/sheetwrite-react-0.3.1.tgz",
+    "@sheetwrite/svelte": "file:artifacts/sheetwrite-svelte-0.3.1.tgz",
+    "@sheetwrite/vue": "file:artifacts/sheetwrite-vue-0.3.1.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.3.1.tgz",
+    "@sheetwrite/xlsx": "file:artifacts/sheetwrite-xlsx-0.3.1.tgz",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "svelte": "5.56.4",

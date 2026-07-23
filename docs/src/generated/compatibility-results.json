@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "testSet": {
     "version": 1,
-    "libraryVersion": "0.3.0",
+    "libraryVersion": "0.3.1",
     "checksum": "bdf94c76df81ea1fa2e1bf96a557c41b21a0f11ea11ae612fcccc35157d7275a",
     "totalTests": 2350,
     "publishedExamples": 177,

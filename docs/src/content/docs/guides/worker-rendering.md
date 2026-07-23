@@ -106,4 +106,4 @@ use the main-thread `canvas` renderer.
 ## See also
 
 - [Configuration](/docs/guides/configuration/#gridoptions) for `renderer` and `workerUrl`.
-- [Concepts](/docs/concepts/runtime-ownership/#canvas-rendering-the-wasm-columnar-store) for the transferable window snapshot.
+- [Concepts](/docs/concepts/runtime-ownership/#canvas-rendering-and-the-wasm-columnar-store) for the transferable window snapshot.

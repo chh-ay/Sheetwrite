@@ -9,7 +9,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L413</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L411</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>134</span>
@@ -898,15 +898,6 @@ readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number
 
 </details>
 
-<details class="api-member" id="init-output-cellstore-spill-derived-mask-for-rows" data-pagefind-weight="1">
-<summary><code>cellstore_spillDerivedMaskForRows</code></summary>
-
-```ts generated
-readonly cellstore_spillDerivedMaskForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
-```
-
-</details>
-
 <details class="api-member" id="init-output-cellstore-spill-owner-coordinates" data-pagefind-weight="1">
 <summary><code>cellstore_spillOwnerCoordinates</code></summary>
 
@@ -1065,6 +1056,15 @@ readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number];
 
 ```ts generated
 readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-sourcesnapshot-spill-derived" data-pagefind-weight="1">
+<summary><code>sourcesnapshot_spillDerived</code></summary>
+
+```ts generated
+readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
 ```
 
 </details>
@@ -1800,14 +1800,6 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => [number, number];
-  readonly cellstore_spillDerivedMaskForRows: (
-    a: number,
-    b: number,
-    c: number,
-    d: number,
-    e: number,
-    f: number,
-  ) => [number, number];
   readonly cellstore_spillOwnerCoordinates: (
     a: number,
     b: number,
@@ -1838,6 +1830,7 @@ export interface InitOutput {
   readonly sourcesnapshot_formulaSources: (a: number) => [number, number];
   readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number];
   readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
+  readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
   readonly windowview_nCols: (a: number) => number;
   readonly windowview_nRows: (a: number) => number;
   readonly windowview_takeCondMatches: (a: number) => [number, number];

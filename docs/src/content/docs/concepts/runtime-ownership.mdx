@@ -27,7 +27,7 @@ the sole animation-frame and paint-cache owner. Interaction-specific controllers
 remain separate. These are internal ownership boundaries; the public API stays
 the `Grid` and `Store` contracts.
 
-## Canvas rendering + the WASM columnar store
+## Canvas rendering and the WASM columnar store
 
 Cells live in the WASM module as typed columns, not as objects. Each cell has a
 kind—`EMPTY=0`, `NUMBER=1`, `STRING=2`, `BOOLEAN=3`, or `FORMULA=4`—and

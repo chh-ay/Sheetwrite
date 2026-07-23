@@ -626,6 +626,21 @@ export function collectReferenceLinks(
   return links;
 }
 
+export function referenceRouteForHover(
+  target: string,
+  signature: string,
+  routes: ReadonlyMap<string, string>,
+): string | undefined {
+  const direct = routes.get(target);
+  if (direct !== undefined) return direct;
+  const referencedRoutes = new Set<string>();
+  for (const match of signature.matchAll(/[A-Za-z_$][\w$]*/g)) {
+    const route = routes.get(match[0]);
+    if (route !== undefined) referencedRoutes.add(route);
+  }
+  return referencedRoutes.size === 1 ? referencedRoutes.values().next().value : undefined;
+}
+
 class SheetwriteReferenceLinkAnnotation extends ExpressiveCodeAnnotation {
   override readonly name = "sheetwrite-code-ref";
 
@@ -775,11 +790,16 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           if (!accessibleSignature) continue;
           // Import aliases and self-restating declarations waste the reader's hover.
           if (/^import\s/.test(accessibleSignature)) continue;
-          const hasDetails = Boolean(hover.docs) || (hover.tags?.length ?? 0) > 0;
+          const memberReference = memberDocsFor(hover.target, accessibleSignature, members);
+          const hasDetails =
+            Boolean(hover.docs ?? memberReference?.docs) || (hover.tags?.length ?? 0) > 0;
           if (!hasDetails) {
             const restated = accessibleSignature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
             if (line.text.replace(/\s+/g, " ").includes(restated)) continue;
           }
+          const referenceRoute =
+            referenceRouteForHover(hover.target, accessibleSignature, routes) ??
+            memberReference?.route;
           const [wideSignature, narrowSignature] = await Promise.all([
             formatSignature(accessibleSignature, 68),
             formatSignature(accessibleSignature, 34),
@@ -804,11 +824,10 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 accessibleSignature,
                 wideSignature: codeLineContents(renderedWideSignature.renderedGroupAst),
                 narrowSignature: codeLineContents(renderedNarrowSignature.renderedGroupAst),
-                docs: hover.docs ?? memberDocsFor(hover.target, accessibleSignature, members)?.docs,
+                docs: hover.docs ?? memberReference?.docs,
                 tags: hover.tags ?? [],
-                referenceRoute:
-                  routes.get(hover.target) ??
-                  memberDocsFor(hover.target, accessibleSignature, members)?.route,
+                referenceRoute,
+                navigable: referenceRoute !== undefined,
               },
               popoverId,
             ),

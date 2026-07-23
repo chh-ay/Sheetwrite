@@ -9,7 +9,7 @@ View-aware editable snapshot of one cell, for hosts building a detached
 formula bar or cell inspector. `address` is the translated *data* address —
 the correct target for `Grid.applyTransaction` even under an active
 sort/filter view — while the `(row, col)` inputs of
-`Grid.getCellInput` are active-sheet view coordinates.
+[`Grid.getCellInput`](/docs/api/core/grid/#grid-get-cell-input) are active-sheet view coordinates.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>

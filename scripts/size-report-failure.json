@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "sheetwrite-delivery-size",
+    "version": "1.0.0"
+  },
+  "error": "Artifact-only size reporting requires --artifacts",
+  "reproduction": "bun run size:report"
+}

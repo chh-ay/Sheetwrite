@@ -1,5 +1,19 @@
 # @sheetwrite/core
 
+## 0.3.1
+
+### Patch Changes
+
+- Correct the core package release metadata and package-specific changelog without changing runtime behavior.
+- Updated dependencies
+  - @sheetwrite/wasm@0.3.1
+
+## 0.3.0
+
+### Minor Changes
+
+- e551eb0: Introduce the canonical `SheetwriteError` envelope and stable error codes across initialization, data sources, rendering, persistence, synchronization, collaboration, and import/export boundaries, with serialization-safe context and explicit retryability.
+
 ## 0.2.0
 
 ### Minor Changes

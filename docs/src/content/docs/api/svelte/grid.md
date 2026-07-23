@@ -98,7 +98,7 @@ getCellInput(row: number, col: number): CellInputSnapshot | null;
 ```
 
 <p class="api-member-doc">Editable snapshot of the cell at a view position on the active sheet, or
-null when out of bounds. See <code>CellInputSnapshot</code>.</p>
+null when out of bounds. See <a href="/docs/api/core/cell-input-snapshot/"><code>CellInputSnapshot</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-get-selection" data-pagefind-weight="1">
@@ -139,7 +139,7 @@ replaceTheme(theme: Partial<Theme> | undefined): void;
 (`DEFAULT_THEME &lt; CSS custom properties &lt; theme`) with the new partial.
 `undefined` restores the CSS-variable/default resolution. Adapters call
 this for their declarative `theme` prop; imperative patching stays on
-<code>setTheme</code>.</p>
+<a href="/docs/api/svelte/grid/#grid-set-theme"><code>setTheme</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-get-effective-theme" data-pagefind-weight="1">
@@ -470,7 +470,7 @@ replaceCurrent(replacement: string): SearchResult;
 <p class="api-member-doc">Replace the active match with `replacement`, then advance to the next match
 (re-scanning against the new data). Only literal text/number cells are
 eligible; formula and ref cells are skipped (formula source is never
-rewritten). Honors the active <code>SearchOptions</code> (matchCase; `wholeCell`
+rewritten). Honors the active <a href="/docs/api/core/search-options/"><code>SearchOptions</code></a> (matchCase; `wholeCell`
 swaps the entire cell). The write flows through the grid's commit path as
 one undoable step. No-op when read-only or when there is no active match.</p>
 </details>
@@ -726,7 +726,7 @@ styleRange(range: Range, style: Partial<CellStyle> | null): void;
 
 <p class="api-member-doc">Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
-unlike <code>highlightCells</code>, which draws a translucent overlay above it.</p>
+unlike <a href="/docs/api/svelte/grid/#grid-highlight-cells"><code>highlightCells</code></a>, which draws a translucent overlay above it.</p>
 </details>
 
 <details class="api-member" id="grid-begin-edit" data-pagefind-weight="1">
