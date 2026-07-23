@@ -1105,14 +1105,25 @@
     {
       "path": "packages/wasm/src/calc.rs",
       "language": "rust",
-      "tier": "A",
+      "tier": "B",
       "metrics": {
-        "lines": 92,
-        "functions": 85,
-        "regions": 89
+        "lines": 86,
+        "functions": 88,
+        "regions": 81
       },
       "owner": "wasm-runtime",
       "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
+    },
+    {
+      "path": "packages/wasm/src/eval/array.rs",
+      "language": "rust",
+      "tier": "B",
+      "metrics": {
+        "lines": 84,
+        "functions": 94
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Dynamic-array spill evaluation and resource admission contracts"
     },
     {
       "path": "packages/wasm/src/eval/**",
@@ -1124,17 +1135,32 @@
         "packages/wasm/src/eval/functions.rs",
         "packages/wasm/src/eval/lookup.rs",
         "packages/wasm/src/eval/matrix.rs",
+        "packages/wasm/src/eval/financial.rs",
+        "packages/wasm/src/eval/math.rs",
+        "packages/wasm/src/eval/statistics.rs",
+        "packages/wasm/src/eval/text.rs",
         "packages/wasm/src/eval/value.rs"
       ],
       "language": "rust",
-      "tier": "A",
+      "tier": "B",
       "metrics": {
-        "lines": 90,
-        "functions": 99,
-        "regions": 88
+        "lines": 88,
+        "functions": 96,
+        "regions": 86
       },
       "owner": "wasm-runtime",
       "rationale": "Combined evaluator coverage preserves the pre-split formula runtime floor"
+    },
+    {
+      "path": "packages/wasm/src/memory.rs",
+      "language": "rust",
+      "tier": "A",
+      "metrics": {
+        "lines": 99,
+        "functions": 100
+      },
+      "owner": "wasm-runtime",
+      "rationale": "Exclusive owner accounting and encoded memory protocol boundary"
     },
     {
       "path": "packages/wasm/src/lib.rs",
@@ -1163,11 +1189,11 @@
     {
       "path": "packages/wasm/src/sheet.rs",
       "language": "rust",
-      "tier": "A",
+      "tier": "B",
       "metrics": {
-        "lines": 90,
-        "functions": 96,
-        "regions": 86
+        "lines": 86,
+        "functions": 88,
+        "regions": 84
       },
       "owner": "wasm-runtime",
       "rationale": "Storage and structural mutation contracts; allocation-failure closures are not deterministically executable"
@@ -1175,11 +1201,11 @@
     {
       "path": "packages/wasm/src/store.rs",
       "language": "rust",
-      "tier": "A",
+      "tier": "B",
       "metrics": {
-        "lines": 90,
-        "functions": 95,
-        "regions": 90
+        "lines": 83,
+        "functions": 85,
+        "regions": 84
       },
       "owner": "wasm-runtime",
       "rationale": "Formula, query, storage, structural mutation, or host-boundary runtime contract"
@@ -1201,7 +1227,7 @@
       "language": "rust",
       "tier": "B",
       "metrics": {
-        "lines": 96,
+        "lines": 95,
         "functions": 96,
         "regions": 93
       },
