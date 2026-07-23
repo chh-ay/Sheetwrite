@@ -51,6 +51,7 @@ function result(workload: RangeStructuralResult["workload"]): RangeStructuralRes
       ...base,
       documentOperationCount: 0,
       jsPatchObjectCount: 10_000,
+      ffiCalls: 4,
       maxTransferredArrayLength: 30_001,
       outputSentinel: '["first",null]',
     };
@@ -115,6 +116,16 @@ describe("range structural gate", () => {
         validateRangeArtifact(candidate as unknown as RangeGateArtifact, "smoke"),
       ).toThrow(message);
     }
+  });
+
+  it("requires the exact bounded clipboard FFI protocol", () => {
+    const candidate = artifact();
+    const results = candidate.results.map((entry) =>
+      entry.workload === "clipboard bulk read" ? { ...entry, ffiCalls: 5 } : entry,
+    );
+    expect(() => validateRangeArtifact({ ...candidate, results }, "smoke")).toThrow(
+      /bounded bulk clipboard evidence/,
+    );
   });
 
   it("fails closed on incomplete matrices, retained revisions, and oversized auto-fit windows", () => {

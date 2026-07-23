@@ -15,7 +15,6 @@ export type RecomputingCellStore = CellStore & {
   spillAnchorRow(sheet: number, row: number, col: number): number;
   spillAnchorCol(sheet: number, row: number, col: number): number;
   spillDerivedMask(sheet: number, rowStart: number, rowEnd: number, cols: Uint32Array): Uint8Array;
-  spillDerivedMaskForRows(sheet: number, rows: Uint32Array, cols: Uint32Array): Uint8Array;
   spillOwnerCoordinates(
     sheet: number,
     rowStart: number,

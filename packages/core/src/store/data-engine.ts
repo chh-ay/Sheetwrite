@@ -1632,10 +1632,10 @@ export class StoreDataEngine {
       false,
     );
     this.recordWindowBoundary(window, "export");
-    const spillDerived = this.windowReader.spillDerivedMaskForRows(sheet, dataRows, cols);
     const formulas: Array<{ offset: number; source: string }> = [];
     const refs: Array<{ offset: number; target: CellAddress }> = [];
     const sourceSnapshot = this.windowReader.captureSourcesForRows(sheet, dataRows, cols);
+    const spillDerived = sourceSnapshot?.spillDerived() ?? new Uint8Array();
     if (sourceSnapshot) {
       const sources = consumeSourceSnapshot(sourceSnapshot, this.sheetIdsByHandle);
       for (let index = 0; index < sources.formulaOffsets.length; index++) {

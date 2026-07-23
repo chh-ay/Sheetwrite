@@ -52,9 +52,6 @@ export class StoreWindowReader {
       this.colsU32For(cols),
     );
   }
-  spillDerivedMaskForRows(sheet: SheetId, rows: Uint32Array, cols: readonly number[]): Uint8Array {
-    return this.wasm.spillDerivedMaskForRows(this.handleOf(sheet), rows, this.colsU32For(cols));
-  }
   captureSourcesForRows(
     sheet: SheetId,
     rows: Uint32Array,

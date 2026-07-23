@@ -7,8 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{
     parse, resolve_named_ranges, resolve_sheet_refs, resolve_structured_refs, sheet_name_key,
-    shift_range, NamedRangeRef, StructuredRef, TableSection,
-    UnresolvedStructuredRef,
+    shift_range, NamedRangeRef, StructuredRef, TableSection, UnresolvedStructuredRef,
 };
 use crate::eval::DepIndex;
 use crate::memory::{
@@ -78,15 +77,16 @@ impl Hasher for IdentityHasher {
     }
 }
 
-/// Compact serializable projection of persisted derived-cell sources in one
-/// range. Offsets are row-major and sorted; reference targets are packed
-/// `[sheet_handle, row, col]` triples.
+/// Compact serializable projection of persisted derived-cell sources and spill
+/// identity in one range. Offsets are row-major and sorted; reference targets
+/// are packed `[sheet_handle, row, col]` triples.
 #[wasm_bindgen]
 pub struct SourceSnapshot {
     formula_offsets: Vec<u32>,
     formula_sources: Vec<String>,
     reference_offsets: Vec<u32>,
     reference_targets: Vec<u32>,
+    spill_derived: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -111,11 +111,17 @@ impl SourceSnapshot {
         self.reference_targets.clone()
     }
 
+    #[wasm_bindgen(js_name = spillDerived)]
+    pub fn spill_derived(&self) -> Vec<u8> {
+        self.spill_derived.clone()
+    }
+
     #[wasm_bindgen(js_name = byteLength)]
     pub fn byte_length(&self) -> usize {
         (self.formula_offsets.len() + self.reference_offsets.len()) * std::mem::size_of::<u32>()
             + self.reference_targets.len() * std::mem::size_of::<u32>()
             + self.formula_sources.iter().map(String::len).sum::<usize>()
+            + self.spill_derived.len()
     }
 }
 
@@ -1418,11 +1424,13 @@ impl CellStore {
             formula_sources,
             reference_offsets,
             reference_targets,
+            spill_derived: Vec::new(),
         })
     }
 
-    /// Capture persisted formula/reference sources for arbitrary row/column
-    /// coordinates. Offsets follow the caller's row-major coordinate order.
+    /// Capture persisted formula/reference sources and derived-spill identity
+    /// for arbitrary row/column coordinates in one boundary crossing. Offsets
+    /// follow the caller's row-major coordinate order.
     #[wasm_bindgen(js_name = captureSourcesForRows)]
     pub fn capture_sources_for_rows(
         &self,
@@ -1445,26 +1453,39 @@ impl CellStore {
         let mut formula_sources = Vec::new();
         let mut reference_offsets = Vec::new();
         let mut reference_targets = Vec::new();
+        let mut spill_derived = Vec::new();
         for (row_index, &row) in rows.iter().enumerate() {
             for (col_index, &col) in cols.iter().enumerate() {
-                let Some(entry) = data.formulas.get(&(row, col)) else {
+                let offset = row_index * cols.len() + col_index;
+                let cell = (row, col);
+                if data.spill_owner(cell).is_some_and(|anchor| anchor != cell) {
+                    if spill_derived.is_empty() {
+                        spill_derived.resize(cell_count, 0);
+                    }
+                    spill_derived[offset] = 1;
+                }
+                let Some(entry) = data.formulas.get(&cell) else {
                     continue;
                 };
-                let offset = (row_index * cols.len() + col_index) as u32;
                 if entry.is_formula() {
-                    formula_offsets.push(offset);
+                    formula_offsets.push(offset as u32);
                     formula_sources.push(entry.source.clone());
                 } else if let Some(target) = entry.reference_target(sheet as u32) {
-                    reference_offsets.push(offset);
+                    reference_offsets.push(offset as u32);
                     reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
                 }
             }
         }
+        if formula_offsets.is_empty() && reference_offsets.is_empty() && spill_derived.is_empty() {
+            return None;
+        }
+
         Some(SourceSnapshot {
             formula_offsets,
             formula_sources,
             reference_offsets,
             reference_targets,
+            spill_derived,
         })
     }
 
@@ -1502,6 +1523,7 @@ impl CellStore {
             formula_sources: Vec::new(),
             reference_offsets,
             reference_targets,
+            spill_derived: Vec::new(),
         })
     }
 
@@ -2382,7 +2404,6 @@ impl CellStore {
         true
     }
 
-
     /// Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
     /// the 1899-12-30 epoch; only TODAY/NOW formulas and their dependents dirty.
     #[wasm_bindgen(js_name = recomputeVolatile)]
@@ -2558,32 +2579,6 @@ impl CellStore {
             }
             for row_index in 0..row_end.saturating_sub(row_start) {
                 let cell = ((row_start + row_index) as u32, col);
-                if data.spill_owner(cell).is_some_and(|anchor| anchor != cell) {
-                    mask[row_index * cols.len() + col_index] = 1;
-                }
-            }
-        }
-        mask
-    }
-    /// Row-major derived-cell mask for an explicit view-row order.
-    #[wasm_bindgen(js_name = spillDerivedMaskForRows)]
-    pub fn spill_derived_mask_for_rows(&self, sheet: usize, rows: &[u32], cols: &[u32]) -> Vec<u8> {
-        let Some(data) = self.sheets.get(sheet) else {
-            return Vec::new();
-        };
-        let Some(len) = rows.len().checked_mul(cols.len()) else {
-            return Vec::new();
-        };
-        let mut mask = vec![0; len];
-        for (row_index, &row) in rows.iter().enumerate() {
-            if row as usize >= data.row_count {
-                continue;
-            }
-            for (col_index, &col) in cols.iter().enumerate() {
-                if col as usize >= data.n_cols {
-                    continue;
-                }
-                let cell = (row, col);
                 if data.spill_owner(cell).is_some_and(|anchor| anchor != cell) {
                     mask[row_index * cols.len() + col_index] = 1;
                 }
@@ -3168,12 +3163,7 @@ impl CellStore {
                 .map(|(key, source)| {
                     (
                         key,
-                        self.parse_formula_entry(
-                            &source,
-                            formula_sheet as u32,
-                            key.0,
-                            key.1,
-                        ),
+                        self.parse_formula_entry(&source, formula_sheet as u32, key.0, key.1),
                     )
                 })
                 .collect();

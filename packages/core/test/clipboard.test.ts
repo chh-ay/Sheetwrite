@@ -891,8 +891,15 @@ describe("SheetwriteStore clipboard bulk reads", () => {
       expect(single.values.length).toBe(1);
       expect(large.values.length).toBe(10_000);
       expect(single.ffiCalls).toBe(large.ffiCalls);
-      expect(large.ffiCalls).toBe(4);
+      expect(large.ffiCalls).toBe(3);
       expect(large.transferredElements).toBeGreaterThanOrEqual(20_000);
+      expect(large.spillDerived).toHaveLength(0);
+      expect(large.transferredElements).toBeLessThanOrEqual(30_032);
+
+      const pooledStrings = store.getClipboardWindow("s1", { start: 0, end: 10_000 }, [0]);
+      expect(pooledStrings.ffiCalls).toBe(4);
+      expect(pooledStrings.spillDerived).toHaveLength(0);
+      expect(pooledStrings.transferredElements).toBeLessThanOrEqual(30_032);
     } finally {
       store.dispose();
     }
