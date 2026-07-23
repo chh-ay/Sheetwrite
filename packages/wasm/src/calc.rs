@@ -496,7 +496,7 @@ pub enum Ast {
     Name(String),
     NamedRange(NamedRangeRef),
     UnresolvedStructured(UnresolvedStructuredRef),
-    Structured(StructuredRef),
+    Structured(Box<StructuredRef>),
     Cell(u32, u32, RefFlags),
     SheetCell(UnresolvedSheetRef, u32, u32, RefFlags),
     AbsCell(SheetRef, u32, u32, RefFlags),
@@ -526,6 +526,8 @@ impl Ast {
                 add_string_memory(&value.column_name, out);
             }
             Ast::Structured(value) => {
+                let bytes = std::mem::size_of::<StructuredRef>();
+                out.add_payload(bytes, bytes);
                 add_string_memory(&value.table_id, out);
                 add_string_memory(&value.table_name, out);
                 add_string_memory(&value.column_id, out);
@@ -1380,7 +1382,9 @@ where
             formula_row,
             formula_col,
         )
-        .map_or(Ast::UnresolvedStructured(reference), Ast::Structured),
+        .map_or(Ast::UnresolvedStructured(reference), |reference| {
+            Ast::Structured(Box::new(reference))
+        }),
         Ast::Func(func, args) => Ast::Func(
             func,
             args.into_iter()
@@ -1774,7 +1778,9 @@ where
 {
     if let Ast::Structured(reference) = ast {
         if reference.table_id == table_id {
-            *ast = resolve(reference).map_or(Ast::InvalidRef, Ast::Structured);
+            *ast = resolve(reference).map_or(Ast::InvalidRef, |reference| {
+                Ast::Structured(Box::new(reference))
+            });
             return true;
         }
     }

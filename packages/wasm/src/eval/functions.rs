@@ -53,6 +53,15 @@ impl FuncAccumulator {
 }
 
 impl FuncAccumulator {
+    pub(super) fn reserve(&mut self, additional: usize) -> Result<(), FormulaError> {
+        if self.values.len().saturating_add(additional) > RANGE_CELL_LIMIT as usize {
+            return Err(FormulaError::Num);
+        }
+        self.values
+            .try_reserve(additional)
+            .map_err(|_| FormulaError::Num)
+    }
+
     pub(super) fn push_scalar(&mut self, value: Value) -> Result<(), FormulaError> {
         self.push(value, false)
     }

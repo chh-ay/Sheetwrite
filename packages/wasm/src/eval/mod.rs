@@ -1949,6 +1949,8 @@ impl CellStore {
             return Err(FormulaError::Num);
         }
 
+        values.reserve(total as usize)?;
+
         for row in row_start..=row_end {
             for col in col_start..=col_end {
                 if !s.is_loaded(row, col) {
