@@ -229,6 +229,8 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install Chromium
+        run: bun run browser:install:chromium
       - name: Download canonical tarballs
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
@@ -263,6 +265,8 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install Chromium
+        run: bun run browser:install:chromium
       - name: Download canonical tarballs
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
@@ -297,6 +301,8 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install Chromium
+        run: bun run browser:install:chromium
       - name: Download canonical tarballs
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:

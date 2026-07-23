@@ -164,6 +164,13 @@ describe("CI and release workflow contracts", () => {
     );
     expect(packageManifest.scripts?.["test:browser:portability"]).toContain("--grep @portability");
 
+    expect(packageManifest.scripts?.["browser:install:chromium"]).toBe(
+      "playwright install --with-deps chromium",
+    );
+    for (const jobName of ["packed-consumers", "bundler-consumers", "delivery-size"]) {
+      expect(commands(workflows().ci.jobs[jobName]!)).toContain("bun run browser:install:chromium");
+    }
+
     const projectByName = Object.fromEntries(
       (playwrightConfig.projects ?? []).map((project) => [project.name, project]),
     );

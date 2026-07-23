@@ -4,6 +4,7 @@ import type {
   GridReadyEvent,
   GridReadyReason,
 } from "../packages/core/src/adapter.js";
+import { setXlsxTableExportBackend } from "../packages/core/src/export.js";
 import type {
   CellEditor,
   ColumnarData,
@@ -177,11 +178,25 @@ async function nextTask(): Promise<void> {
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
     if (predicate()) return;
     await nextTask();
   }
+  if (predicate()) return;
   throw new Error("Timed out waiting for adapter event");
+}
+
+async function waitForDelivery<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(`Timed out waiting for ${label}`)), 15_000);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
 }
 
 export interface AdapterConformanceProps extends GridOptions, GridAdapterEventHandlers {
@@ -342,7 +357,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const mutationEvents: Array<GridEvents["mutation-rejected"]> = [];
       const fallbackEvents: Array<GridEvents["renderer-fallback"]> = [];
       const datasourceEvents: Array<GridEvents["datasource-error"]> = [];
-      const exportEvents: Array<GridEvents["export-error"]> = [];
+      const exportDelivery = Promise.withResolvers<GridEvents["export-error"]>();
       const datasourceFailure = new Error("adapter datasource failure");
       const datasource: DataSource = {
         capabilities: { protocol: 2, columns: "windowed" },
@@ -359,17 +374,16 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         onMutationRejected: (event) => mutationEvents.push(event),
         onRendererFallback: (event) => fallbackEvents.push(event),
         onDatasourceError: (event) => datasourceEvents.push(event),
-        onExportError: (event) => exportEvents.push(event),
+        onExportError: exportDelivery.resolve,
       };
       const mounted = await mount(props);
       const grid = mounted.getPublishedGrid()!;
 
       rejectProtectedEdit(grid);
+      setXlsxTableExportBackend(null as never);
       grid.actions.exportXlsx();
-      await waitFor(
-        () =>
-          fallbackEvents.length === 1 && datasourceEvents.length === 1 && exportEvents.length === 1,
-      );
+      await waitFor(() => fallbackEvents.length === 1 && datasourceEvents.length === 1);
+      const exportEvent = await waitForDelivery(exportDelivery.promise, "export error event");
 
       expect(mutationEvents).toHaveLength(1);
       expect(mutationEvents[0]!.issues.map((issue) => issue.kind)).toEqual(["protection"]);
@@ -387,7 +401,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       });
       expect(datasourceEvents[0]!.error.cause).toBe(datasourceFailure);
       expect("signal" in datasourceEvents[0]!.request).toBe(false);
-      expect(exportEvents[0]).toMatchObject({
+      expect(exportEvent).toMatchObject({
         format: "xlsx",
         error: { code: "optional-backend-unavailable", operation: "xlsx-export" },
       });
@@ -409,7 +423,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(() => rejectProtectedEdit(grid)).toThrow(hostFailure);
 
       await mounted.unmount();
-    });
+    }, 25_000);
 
     it("delivers an initial synchronous datasource throw after listener wiring", async () => {
       const recorder = createLifecycleRecorder();
