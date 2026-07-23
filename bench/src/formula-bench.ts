@@ -231,6 +231,26 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
   return keys;
 }
 
+const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
+  "spill-filter-resize",
+  "sumproduct-vector-edit",
+  "sumproduct-matrix-edit",
+  "criteria-multi-range-edit",
+  "unicode-text-date-edit",
+  "percentile-covariance",
+  "let-reuse-edit",
+  "iterative-finance",
+  "incremental-dependency-closure-edit",
+  "spill-sequence-admission",
+]);
+
+function legacyFormulaBaselineWorkloadKeys(): string[] {
+  return expectedFormulaWorkloadKeys("full").filter((key) => {
+    const id = key.slice("workload=".length, key.indexOf(";size="));
+    return !EXPANDED_FORMULA_WORKLOAD_IDS.has(id);
+  });
+}
+
 export function expectedFormulaBlockedWorkloadKeys(): string[] {
   return [];
 }
@@ -1365,6 +1385,7 @@ function validateFormulaEvidence(
   result: FormulaBenchmarkResult,
   expectedMode: BenchmarkMode,
   requirePassedGate: boolean,
+  expectedWorkloadKeys = expectedFormulaWorkloadKeys(expectedMode),
 ): asserts result is CompleteFormulaBenchmarkResult {
   validateArtifactBound(result);
   assertGateIdentity("formula", expectedMode, result);
@@ -1381,7 +1402,7 @@ function validateFormulaEvidence(
   }
   validateExactMatrix(
     "formula workload",
-    expectedFormulaWorkloadKeys(expectedMode),
+    expectedWorkloadKeys,
     result.workloads.map(formulaWorkloadKey),
   );
 
@@ -1533,7 +1554,8 @@ function validateFormulaEvidence(
       "spill-sequence-admission",
     ]) {
       const key = formulaWorkloadKey({ id, size: 100_000 });
-      const workload = result.workloads.find((candidate) => formulaWorkloadKey(candidate) === key)!;
+      const workload = result.workloads.find((candidate) => formulaWorkloadKey(candidate) === key);
+      if (workload === undefined) continue;
       if (workload.stat.p95 >= 5_000) {
         throw new Error(`${key} exceeded the 5 second 100K safety ceiling`);
       }
@@ -1556,25 +1578,110 @@ function timingRegressionLimit(baseline: number): number {
   return Math.max(baseline * TIMING_REGRESSION_RATIO, baseline + TIMING_REGRESSION_FLOOR_MS);
 }
 
+function validateLegacyFormulaBaseline(result: FormulaBenchmarkResult): void {
+  validateArtifactBound(result);
+  assertGateIdentity("formula", "full", result);
+  exactObjectKeys(
+    result,
+    ["protocolVersion", "mode", "matrixId", "meta", "workloads", "memory", "gates"],
+    "legacy formula artifact",
+  );
+  exactObjectKeys(
+    result.meta,
+    ["bun", "platform", "arch", "commit", "dirty", "timestamp"],
+    "legacy formula metadata",
+  );
+  if (!/^[0-9a-f]{40}$/u.test(result.meta.commit) || typeof result.meta.dirty !== "boolean") {
+    throw new Error("legacy formula metadata is malformed");
+  }
+  if (!Number.isFinite(Date.parse(result.meta.timestamp))) {
+    throw new Error("legacy formula metadata timestamp is malformed");
+  }
+  validateExactMatrix(
+    "legacy formula workload",
+    legacyFormulaBaselineWorkloadKeys(),
+    result.workloads.map(formulaWorkloadKey),
+  );
+  for (const workload of result.workloads) {
+    const key = formulaWorkloadKey(workload);
+    exactObjectKeys(workload, ["id", "size", "samplesMs", "stat"], key);
+    if (!Array.isArray(workload.samplesMs) || workload.samplesMs.length !== DEFAULT_SAMPLES) {
+      throw new Error(`${key}.samplesMs must contain ${DEFAULT_SAMPLES} post-warmup raw samples`);
+    }
+    validateStatShape(workload.stat, `${key}.stat`);
+    validateRawStat(workload.samplesMs, workload.stat, key);
+    if (workload.stat.p95 >= 30_000) {
+      throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
+    }
+  }
+  validateExactMatrix(
+    "legacy formula memory",
+    expectedFormulaMemoryKeys("full"),
+    result.memory.map((memory) => `memory=formulas=${memory.formulas}`),
+  );
+  for (const memory of result.memory) {
+    exactObjectKeys(memory, ["formulas", "wasmDeltaBytes"], "legacy formula memory");
+    assertFiniteNonNegative(
+      memory.wasmDeltaBytes,
+      `memory=formulas=${memory.formulas}.wasmDeltaBytes`,
+    );
+  }
+  exactObjectKeys(result.gates, ["passed", "tolerance"], "legacy formula gates");
+  if (result.gates.passed !== true || typeof result.gates.tolerance !== "string") {
+    throw new Error("legacy formula baseline does not contain a successful gate");
+  }
+}
+
+export function formulaRegressionBaselineIdentity(baseline: FormulaBenchmarkResult): {
+  commit: string;
+  sourceDigest: string;
+} {
+  return {
+    commit: baseline.meta.commit,
+    sourceDigest:
+      baseline.source?.digest ??
+      createHash("sha256").update(JSON.stringify(baseline)).digest("hex"),
+  };
+}
+
+function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): string[] {
+  const observed = baseline.workloads.map(formulaWorkloadKey);
+  const candidates = [expectedFormulaWorkloadKeys("full"), legacyFormulaBaselineWorkloadKeys()];
+  for (const expected of candidates) {
+    if (expected.length === observed.length && expected.every((key) => observed.includes(key))) {
+      return expected;
+    }
+  }
+  throw new Error("formula regression baseline does not match the current or legacy full matrix");
+}
+
 export function validateFormulaRegression(
   candidate: FormulaBenchmarkResult,
   baseline: FormulaBenchmarkResult,
 ): void {
-  validateFormulaBenchmark(baseline, candidate.mode);
+  if (baseline.schemaVersion === FORMULA_BENCHMARK_SCHEMA_VERSION) {
+    validateFormulaEvidence(baseline, "full", true, regressionBaselineWorkloadKeys(baseline));
+  } else {
+    validateLegacyFormulaBaseline(baseline);
+  }
   validateFormulaBenchmark(candidate, candidate.mode);
+  const baselineIdentity = formulaRegressionBaselineIdentity(baseline);
   const regression = candidate.gates.regression as PassedRegressionGate;
   if (
-    regression.baselineCommit !== baseline.meta.commit ||
-    regression.baselineSourceDigest !== baseline.source.digest
+    regression.baselineCommit !== baselineIdentity.commit ||
+    regression.baselineSourceDigest !== baselineIdentity.sourceDigest
   ) {
     throw new Error("formula regression gate is not bound to the supplied baseline provenance");
   }
   const baselineWorkloads = new Map(
     baseline.workloads.map((workload) => [formulaWorkloadKey(workload), workload]),
   );
+  let comparedWorkloads = 0;
   for (const workload of candidate.workloads) {
     const key = formulaWorkloadKey(workload);
-    const previous = baselineWorkloads.get(key)!;
+    const previous = baselineWorkloads.get(key);
+    if (previous === undefined) continue;
+    comparedWorkloads += 1;
     for (const field of ["median", "p95"] as const) {
       const limit = timingRegressionLimit(previous.stat[field]);
       if (workload.stat[field] > limit) {
@@ -1583,27 +1690,33 @@ export function validateFormulaRegression(
         );
       }
     }
-    for (const allocation of [
-      "retainedBytes",
-      "peakTransientBytes",
-      "transientAllocations",
-    ] as const) {
-      for (const field of ["median", "p95"] as const) {
-        const before = previous.allocationStat[allocation][field];
-        const after = workload.allocationStat[allocation][field];
-        if (after > before) {
-          throw new Error(
-            `${key}.allocation.${allocation}.${field} regression: baseline ${before}, candidate ${after}`,
-          );
+    if (previous.allocationStat !== undefined) {
+      for (const allocation of [
+        "retainedBytes",
+        "peakTransientBytes",
+        "transientAllocations",
+      ] as const) {
+        for (const field of ["median", "p95"] as const) {
+          const before = previous.allocationStat[allocation][field];
+          const after = workload.allocationStat[allocation][field];
+          if (after > before) {
+            throw new Error(
+              `${key}.allocation.${allocation}.${field} regression: baseline ${before}, candidate ${after}`,
+            );
+          }
         }
       }
     }
+  }
+  if (comparedWorkloads === 0) {
+    throw new Error("formula regression baseline has no workloads compatible with the candidate");
   }
   const baselineMemory = new Map(
     baseline.memory.map((entry) => [entry.formulas, entry.wasmDeltaBytes]),
   );
   for (const memory of candidate.memory) {
-    const before = baselineMemory.get(memory.formulas)!;
+    const before = baselineMemory.get(memory.formulas);
+    if (before === undefined) continue;
     if (memory.wasmDeltaBytes > before) {
       throw new Error(
         `memory=formulas=${memory.formulas}.wasmDeltaBytes regression: baseline ${before}, candidate ${memory.wasmDeltaBytes}`,
@@ -1664,7 +1777,7 @@ function markdown(result: CompleteFormulaBenchmarkResult): string {
 
 async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void> {
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
-  let baseline: CompleteFormulaBenchmarkResult | undefined;
+  let baseline: FormulaBenchmarkResult | undefined;
   if (!preliminary) {
     const rawBaseline = readFileSync(
       new URL("../results/formula-results.json", import.meta.url),
@@ -1677,7 +1790,16 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
       );
     }
     const parsedBaseline = JSON.parse(rawBaseline) as FormulaBenchmarkResult;
-    validateFormulaBenchmark(parsedBaseline, mode);
+    if (parsedBaseline.schemaVersion === FORMULA_BENCHMARK_SCHEMA_VERSION) {
+      validateFormulaEvidence(
+        parsedBaseline,
+        "full",
+        true,
+        regressionBaselineWorkloadKeys(parsedBaseline),
+      );
+    } else {
+      validateLegacyFormulaBaseline(parsedBaseline);
+    }
     baseline = parsedBaseline;
   }
 
@@ -1685,11 +1807,12 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
   const capture = protocolCaptureMeta();
   const workloads = runWorkloads(smoke);
   const memory = smoke ? [probeMemory(1_000)] : FORMULA_SIZES.map(probeMemory);
-  const regression: PassedRegressionGate | BlockedRegressionGate = baseline
+  const baselineIdentity = baseline ? formulaRegressionBaselineIdentity(baseline) : undefined;
+  const regression: PassedRegressionGate | BlockedRegressionGate = baselineIdentity
     ? {
         status: "passed",
-        baselineCommit: baseline.meta.commit,
-        baselineSourceDigest: baseline.source.digest,
+        baselineCommit: baselineIdentity.commit,
+        baselineSourceDigest: baselineIdentity.sourceDigest,
       }
     : { status: "blocked", blocker: PRELIMINARY_BLOCKER };
   const result: CompleteFormulaBenchmarkResult = {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
   ALLOCATION_METHOD,
-  type CompleteFormulaBenchmarkResult,
   CORRECTNESS_METHOD,
+  type CompleteFormulaBenchmarkResult,
   expectedFormulaBlockedWorkloadKeys,
   expectedFormulaMemoryKeys,
   expectedFormulaOutput,
@@ -310,7 +310,7 @@ describe("formula benchmark schema", () => {
     expect(() => validateFormulaBenchmark(digest)).toThrow("digest does not match");
 
     const extraFile = formulaFixture();
-    extraFile.source.files["unbounded"] = SOURCE_HASH;
+    extraFile.source.files.unbounded = SOURCE_HASH;
     expect(() => validateFormulaBenchmark(extraFile)).toThrow("must contain exactly");
   });
 
@@ -367,7 +367,7 @@ describe("formula regression gate", () => {
   });
 
   it("gates attributed per-workload allocation and aggregate WASM allocation", () => {
-    const baseline = formulaFixture();
+    const baseline = formulaFixture("full");
 
     const attributed = formulaFixture();
     for (const sample of attributed.workloads[0]!.allocationSamples) sample.retainedBytes++;
@@ -386,12 +386,32 @@ describe("formula regression gate", () => {
   });
 
   it("binds a candidate to the exact baseline source provenance", () => {
-    const baseline = formulaFixture();
+    const baseline = formulaFixture("full");
     const candidate = formulaFixture();
     (candidate.gates.regression as { baselineSourceDigest: string }).baselineSourceDigest =
       "b".repeat(64);
     expect(() => validateFormulaRegression(candidate, baseline)).toThrow(
       "not bound to the supplied baseline provenance",
     );
+  });
+
+  it("compares a smoke candidate with the compatible workloads in the legacy full baseline", () => {
+    const expanded = new Set([
+      "spill-filter-resize",
+      "sumproduct-vector-edit",
+      "sumproduct-matrix-edit",
+      "criteria-multi-range-edit",
+      "unicode-text-date-edit",
+      "percentile-covariance",
+      "let-reuse-edit",
+      "iterative-finance",
+      "incremental-dependency-closure-edit",
+      "spill-sequence-admission",
+    ]);
+    const baseline = formulaFixture("full");
+    baseline.workloads = baseline.workloads.filter((workload) => !expanded.has(workload.id));
+    const candidate = formulaFixture("smoke");
+
+    expect(() => validateFormulaRegression(candidate, baseline)).not.toThrow();
   });
 });
