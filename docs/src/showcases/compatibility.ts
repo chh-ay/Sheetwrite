@@ -210,9 +210,9 @@ export const COMPATIBILITY_FIXTURES: readonly CompatibilityFixture[] = [
     id: "external-producer-manifest",
     kind: "manifest",
     path: "packages/xlsx/test/fixtures/external-corpus.json",
-    producer: "Apache POI corpus and public Google Sheets export",
+    producer: "Apache POI test fixtures and public Google Sheets export",
     producerVersion: "POI commit 913c78891bd0cd20945b050c63abfb8c66c88009",
-    license: "Apache-2.0 for POI corpus metadata; Google workbook is not redistributed",
+    license: "Apache-2.0 for POI fixture metadata; Google workbook is not redistributed",
     provenance:
       "Pinned producer/version/checksum records; byte execution is scheduled or supplied through SHEETWRITE_EXTERNAL_XLSX_DIR.",
     expected: [

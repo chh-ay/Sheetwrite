@@ -2,10 +2,10 @@ import { describe, expect, it } from "bun:test";
 import {
   type CaptureArtifact,
   type ConformanceCorpus,
-  type GoogleCaptureDependencies,
-  MAX_GOOGLE_CASES_PER_WORKBOOK,
   captureGoogleWithDependencies,
+  type GoogleCaptureDependencies,
   loadCorpus,
+  MAX_GOOGLE_CASES_PER_WORKBOOK,
   validateGoogleCaptureArtifact,
 } from "./conformance.js";
 

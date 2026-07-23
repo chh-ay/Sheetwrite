@@ -1,7 +1,7 @@
 import { verifyCaptureArtifacts } from "./capture.js";
 import {
-  MANIFEST_PATH,
   INVENTORY_PATH,
+  MANIFEST_PATH,
   readConformanceManifest,
   readFormulaInventory,
 } from "./generate.js";

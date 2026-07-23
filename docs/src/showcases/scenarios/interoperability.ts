@@ -433,8 +433,8 @@ const GOOGLE_TEST_FILES = externalCorpus.googleFixtures;
 
 /**
  * Honest producer compatibility: only claims backed by real bytes. Every row
- * derives from the checked-in corpus records, so a producer's status changes
- * here exactly when its evidence changes there.
+ * derives from the checked-in compatibility records, so a producer's status
+ * changes here exactly when its evidence changes there.
  */
 export const PRODUCER_MATRIX: readonly ProducerVerification[] = [
   {

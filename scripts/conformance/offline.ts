@@ -1,6 +1,6 @@
+import { runSheetwriteCase } from "./adapters/sheetwrite.js";
 import { verifyCaptureArtifacts } from "./capture.js";
 import { compareResults, compareReviewedObservation } from "./compare.js";
-import { runSheetwriteCase } from "./adapters/sheetwrite.js";
 import { readConformanceManifest, readFormulaInventory } from "./generate.js";
 import { validateCorpus } from "./schema.js";
 import type { ConformanceCorpus, OfflineConformanceResult } from "./types.js";

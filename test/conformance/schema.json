@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sheetwrite.vercel.app/schemas/conformance-v1.json",
-  "title": "Sheetwrite original-evidence conformance corpus",
+  "title": "Sheetwrite original-evidence compatibility test set",
   "type": "object",
   "required": ["protocol", "license", "cases"],
   "additionalProperties": false,

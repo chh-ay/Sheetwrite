@@ -15,7 +15,7 @@ description: Explicit compatibility boundaries, resource ceilings, tuning defaul
 
 Compatibility statements are feature contracts, not claims of Excel or Google Sheets parity.
 
-The [detailed compatibility results](/docs/reference/compatibility-matrix/) link each formula, workbook, clipboard, and XLSX status to its evidence record and exact difference.
+The [detailed compatibility results](/docs/reference/compatibility-results/) link each formula, workbook, clipboard, and XLSX status to its evidence record and exact difference.
 
 The [generated formula function contract](/docs/reference/formula-functions/) publishes names, families, signatures, behavior profiles, source links, implementation evidence, and unsupported categories directly from the checked versioned inventory.
 

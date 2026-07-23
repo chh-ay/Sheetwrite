@@ -1123,7 +1123,7 @@ function InteroperabilityRoute() {
           >
             <summary id="contract-summary">
               <span>Evidence vault</span>
-              <strong>Compatibility corpus and raw tested-app results</strong>
+              <strong>Compatibility test set and raw app results</strong>
               <small>Filters, expected values, checksums, and explicit nonclaims</small>
             </summary>
             <div className="sw-si-disclosure__body">
@@ -1132,7 +1132,7 @@ function InteroperabilityRoute() {
                 This page publishes a fixed, checked test set and the product&apos;s declared
                 feature boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice, or
                 OpenFormula compatibility.{" "}
-                <a href="/docs/reference/compatibility-matrix/">
+                <a href="/docs/reference/compatibility-results/">
                   Read the detailed checked results →
                 </a>
               </p>

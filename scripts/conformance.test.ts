@@ -2,28 +2,28 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readBoundedResponse } from "./conformance/capture.js";
 import {
   type ConformanceCorpus,
-  type ConformanceResult,
   type ConformanceManifest,
-  type FormulaInventory,
-  type SemanticCategory,
+  type ConformanceResult,
   canonicalJson,
   compareResults,
   compareReviewedObservation,
+  type FormulaInventory,
   generateConformanceEvidence,
   loadCorpus,
-  runSheetwriteCase,
-  runOffline,
-  sha256,
   readConformanceManifest,
   readFormulaInventory,
+  runOffline,
+  runSheetwriteCase,
+  type SemanticCategory,
+  sha256,
   sha256Bytes,
   validateCorpus,
   validateExcelCapture,
   verifyCaptureArtifacts,
 } from "./conformance.js";
-import { readBoundedResponse } from "./conformance/capture.js";
 
 const [CHECKED_MANIFEST, CHECKED_INVENTORY] = await Promise.all([
   readConformanceManifest(),

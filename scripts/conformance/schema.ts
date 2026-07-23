@@ -1,11 +1,11 @@
 import { open } from "node:fs/promises";
 import {
-  MAX_CORPUS_BYTES,
   FEATURE_MINIMUM,
+  generateConformanceEvidence,
+  MAX_CORPUS_BYTES,
   MUTATION_FEATURES,
   REQUIRED_CATEGORIES,
   REQUIRED_COUNTS,
-  generateConformanceEvidence,
   supportedNamesChecksum,
   WORKBOOK_FEATURES,
 } from "./generate.js";
@@ -187,7 +187,9 @@ export function rejectUnknownKeys(
 
 export function scanSecrets(value: unknown, path: string, issues: string[]): void {
   if (Array.isArray(value)) {
-    value.forEach((child, index) => scanSecrets(child, `${path}[${index}]`, issues));
+    value.forEach((child, index) => {
+      scanSecrets(child, `${path}[${index}]`, issues);
+    });
     return;
   }
   if (!isObject(value)) {
@@ -975,9 +977,10 @@ export async function readCorpusJson(path: string): Promise<unknown> {
   const handle = await open(path, "r");
   try {
     const info = await handle.stat();
-    if (!info.isFile()) throw new TypeError(`Conformance corpus is not a regular file: ${path}`);
+    if (!info.isFile())
+      throw new TypeError(`Compatibility test set is not a regular file: ${path}`);
     if (info.size > MAX_CORPUS_BYTES) {
-      throw new RangeError(`Conformance corpus exceeds ${MAX_CORPUS_BYTES} bytes`);
+      throw new RangeError(`Compatibility test set exceeds ${MAX_CORPUS_BYTES} bytes`);
     }
     const bytes = await handle.readFile();
     return JSON.parse(bytes.toString("utf8")) as unknown;

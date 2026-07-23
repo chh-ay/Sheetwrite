@@ -1,5 +1,5 @@
-import type { CellScalar, CellValue, Column } from "../../../packages/core/src/types/cell.js";
 import type { formatNumber as formatNumberType } from "../../../packages/core/src/number-format.js";
+import type { CellScalar, CellValue, Column } from "../../../packages/core/src/types/cell.js";
 import type { DocumentOp, Workbook } from "../../../packages/core/src/types/document.js";
 import { canonicalJson, isNonemptyString } from "../normalize.js";
 import type { ConformanceCase, ConformanceResult } from "../types.js";

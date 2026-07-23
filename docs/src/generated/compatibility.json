@@ -149,7 +149,7 @@
       "exportBehavior": "Equivalent Sheetwrite scalar cells export through the optional XLSX package.",
       "warningCode": null,
       "lastVerifiedProtocolVersion": 3,
-      "source": "/docs/reference/compatibility-matrix/#sources"
+      "source": "/docs/reference/compatibility-results/#sources"
     },
     {
       "id": "xlsx.rich-workbook",
@@ -168,7 +168,7 @@
       "exportBehavior": "Canonical supported parts export; unknown OOXML parts are not promised lossless preservation.",
       "warningCode": "unsupported-feature",
       "lastVerifiedProtocolVersion": 3,
-      "source": "/docs/reference/compatibility-matrix/#sources"
+      "source": "/docs/reference/compatibility-results/#sources"
     },
     {
       "id": "xlsx.shared-formulas",
@@ -313,7 +313,7 @@
       "exportBehavior": "No Excel resave claim is made without separately captured producer evidence.",
       "warningCode": "unverified-producer-evidence",
       "lastVerifiedProtocolVersion": 3,
-      "source": "/docs/reference/compatibility-matrix/#sources"
+      "source": "/docs/reference/compatibility-results/#sources"
     },
     {
       "id": "producer.google-sheets",
@@ -332,7 +332,7 @@
       "exportBehavior": "No Google Sheets import or resave behavior is claimed.",
       "warningCode": "unverified-producer-evidence",
       "lastVerifiedProtocolVersion": 3,
-      "source": "/docs/reference/compatibility-matrix/#sources"
+      "source": "/docs/reference/compatibility-results/#sources"
     }
   ],
   "fixtures": [
@@ -508,9 +508,9 @@
     {
       "id": "external-producer-manifest",
       "kind": "manifest",
-      "producer": "Apache POI corpus and public Google Sheets export",
+      "producer": "Apache POI test fixtures and public Google Sheets export",
       "producerVersion": "POI commit 913c78891bd0cd20945b050c63abfb8c66c88009",
-      "license": "Apache-2.0 for POI corpus metadata; Google workbook is not redistributed",
+      "license": "Apache-2.0 for POI fixture metadata; Google workbook is not redistributed",
       "provenance": "Pinned producer/version/checksum records; byte execution is scheduled or supplied through SHEETWRITE_EXTERNAL_XLSX_DIR.",
       "expected": [
         "five Excel-family records",
