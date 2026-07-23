@@ -9,7 +9,7 @@ One retained-memory owner reported by the WASM cell store.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L35</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L36</code></dd></div>
 </dl>
 
 ## Declaration

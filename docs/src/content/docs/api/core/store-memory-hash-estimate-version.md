@@ -9,7 +9,7 @@ Version of the deterministic hash-table capacity estimate used by store owners.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L9</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L10</code></dd></div>
 </dl>
 
 ## Declaration

@@ -57,6 +57,7 @@ jobs:
     permissions:
       actions: read
       contents: write
+      pull-requests: write
       id-token: write
     steps:
       - name: Checkout release commit
@@ -96,3 +97,26 @@ jobs:
           VERIFIED_PACKAGES: ${{ steps.publish.outputs.verified }}
           PUBLISHED_PACKAGES: ${{ steps.publish.outputs.published }}
         run: bun scripts/release-github.ts
+      - name: Generate published package size history
+        id: size-history
+        if: steps.publish.outputs.verified != '[]'
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          bun run size:record --version="$VERSION"
+          bun run docs:generate
+      - name: Open package size history pull request
+        if: steps.publish.outputs.verified != '[]'
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+        with:
+          token: ${{ github.token }}
+          base: develop
+          branch: automation/package-size-history-${{ steps.size-history.outputs.version }}
+          delete-branch: true
+          commit-message: "chore: record v${{ steps.size-history.outputs.version }} package sizes"
+          title: "chore: record v${{ steps.size-history.outputs.version }} package sizes"
+          body: "Automated registry size history captured after the verified npm publication."
+          add-paths: |
+            scripts/size-history.json
+            docs/src/content/docs/guides/performance-resources.md
+            docs/src/generated/docs-contract.json

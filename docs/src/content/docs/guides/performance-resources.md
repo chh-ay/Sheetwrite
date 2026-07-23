@@ -957,10 +957,95 @@ bun run --filter @sheetwrite/bench bench:formula
 
 ## Delivery size
 
-## Pending local evidence
-
-These protocols have no validated artifact in this environment yet, so no numbers are published for them.
-
-| Artifact | Status | Reproduce with |
-| --- | --- | --- |
-| `test-results/delivery-size/size-report.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run size:report` |
+<section class="size-history" aria-label="Published package size history">
+<p class="size-history__intro">Registry measurements for every published release. Each delta is measured against the release immediately before it.</p>
+<details class="size-history__release" data-current="true" open>
+<summary class="size-history__release-head">
+<span class="size-history__version-step"><span>v0.1.0</span><svg class="size-history__arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M9 4.5 12.5 8 9 11.5"/></svg><strong>v0.2.0</strong></span>
+<time datetime="2026-07-22T20:08:51.366Z">Measured Jul 22, 2026</time>
+<svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+</summary>
+<div class="size-history__table-wrap">
+<table class="size-history__table">
+<thead><tr><th scope="col">Package</th><th scope="col">Tarball</th><th scope="col">Installed</th></tr></thead>
+<tbody>
+<tr>
+<th scope="row"><code>@sheetwrite/wasm</code></th>
+<td>180.4 KiB<small data-direction="increase"><span>+8.2 KiB</span><span>+4.7%</span></small></td>
+<td>489.9 KiB<small data-direction="increase"><span>+22.3 KiB</span><span>+4.8%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/core</code></th>
+<td>372.4 KiB<small data-direction="increase"><span>+40.0 KiB</span><span>+12.0%</span></small></td>
+<td>1.91 MiB<small data-direction="increase"><span>+209.9 KiB</span><span>+12.0%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/xlsx</code></th>
+<td>75.0 KiB<small data-direction="increase"><span>+53.7 KiB</span><span>+252.2%</span></small></td>
+<td>366.1 KiB<small data-direction="increase"><span>+273.1 KiB</span><span>+293.7%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/react</code></th>
+<td>7.0 KiB<small data-direction="increase"><span>+30 B</span><span>+0.4%</span></small></td>
+<td>22.0 KiB<small data-direction="increase"><span>+134 B</span><span>+0.6%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/vue</code></th>
+<td>8.6 KiB<small data-direction="decrease"><span>-24 B</span><span>-0.3%</span></small></td>
+<td>28.5 KiB<small data-direction="decrease"><span>-5.5 KiB</span><span>-16.3%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/svelte</code></th>
+<td>5.2 KiB<small data-direction="increase"><span>+66 B</span><span>+1.2%</span></small></td>
+<td>14.5 KiB<small data-direction="increase"><span>+296 B</span><span>+2.0%</span></small></td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+<details class="size-history__release">
+<summary class="size-history__release-head">
+<span class="size-history__version-step"><strong>v0.1.0</strong></span>
+<time datetime="2026-07-22T20:08:45.607Z">Measured Jul 22, 2026</time>
+<svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+</summary>
+<div class="size-history__table-wrap">
+<table class="size-history__table">
+<thead><tr><th scope="col">Package</th><th scope="col">Tarball</th><th scope="col">Installed</th></tr></thead>
+<tbody>
+<tr>
+<th scope="row"><code>@sheetwrite/wasm</code></th>
+<td>172.3 KiB</td>
+<td>467.6 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/core</code></th>
+<td>332.5 KiB</td>
+<td>1.71 MiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/xlsx</code></th>
+<td>21.3 KiB</td>
+<td>93.0 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/react</code></th>
+<td>7.0 KiB</td>
+<td>21.9 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/vue</code></th>
+<td>8.6 KiB</td>
+<td>34.0 KiB</td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/svelte</code></th>
+<td>5.2 KiB</td>
+<td>14.2 KiB</td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+<footer class="size-history__footer"><span>Increase</span><span>Decrease</span><code>scripts/size-history.json</code></footer>
+</section>

@@ -14,11 +14,13 @@ import {
   MIGRATION_ROUTES,
   parseFences,
   renderEntryPage,
+  renderEvidencePage,
   renderSymbolPage,
   runCompletionSummary,
   unresolvedCssTokens,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
+import type { SizeHistory } from "./size-report.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const coreEntry: ApiEntryPoint = {
@@ -98,19 +100,19 @@ describe("documentation generation", () => {
 
   it("generates a public compatibility projection without executable test paths", async () => {
     const files = await expectedGeneratedFiles(manifest);
-    const reference = files.find((file) => file.path.endsWith("compatibility-matrix.md"));
+    const reference = files.find((file) => file.path.endsWith("compatibility-results.md"));
     const data = files.find((file) => file.path.endsWith("/compatibility.json"));
     const results = files.find((file) => file.path.endsWith("/compatibility-results.json"));
     if (!reference || !data || !results) {
       throw new Error("generated compatibility outputs are missing");
     }
     expect(reference.content).toContain("Detailed compatibility results");
-    expect(reference.content).toContain("`formula-engine-vectors`");
+    expect(reference.content).toContain("<code>formula-engine-vectors</code>");
     expect(reference.content).not.toContain("packages/wasm/src/tests.rs");
     expect(reference.content).not.toContain("test/browser/showcase-interoperability.spec.ts");
     expect(
       await readFile(
-        resolve(import.meta.dir, "../docs/src/content/docs/reference/compatibility-matrix.md"),
+        resolve(import.meta.dir, "../docs/src/content/docs/reference/compatibility-results.md"),
         "utf8",
       ),
     ).toBe(reference.content);
@@ -572,5 +574,44 @@ describe("adapter documentation contract", () => {
     reason.signature = 'export type GridReadyReason = "initial" | "reset";';
     const issues = adapterContractIssues(manifest);
     expect(issues.some((issue) => issue.startsWith("GridReadyReason documents"))).toBe(true);
+  });
+});
+
+describe("published size history rendering", () => {
+  it("appends a third release, compares adjacent versions, and opens only the latest", async () => {
+    const release = (version: string, actual: number, capturedAt: string) => ({
+      version,
+      capturedAt,
+      source: "npm registry published artifacts",
+      metrics: {
+        "package.@sheetwrite/core.tarballBytes": { actual, unit: "bytes" as const },
+        "package.@sheetwrite/core.unpackedBytes": {
+          actual: actual * 2,
+          unit: "bytes" as const,
+        },
+      },
+    });
+    const history: SizeHistory = {
+      schemaVersion: 1,
+      releases: [
+        release("0.1.0", 100, "2026-01-01T00:00:00.000Z"),
+        release("0.2.0", 120, "2026-02-01T00:00:00.000Z"),
+        release("0.3.0", 150, "2026-03-01T00:00:00.000Z"),
+      ],
+    };
+
+    const output = await renderEvidencePage(history);
+
+    expect(output.match(/class="size-history__release"/g)).toHaveLength(3);
+    expect(output.match(/data-current="true" open/g)).toHaveLength(1);
+    expect(output).toContain("<span>v0.2.0</span>");
+    expect(output).toContain("<strong>v0.3.0</strong>");
+    expect(output.indexOf("<strong>v0.3.0</strong>")).toBeLessThan(
+      output.indexOf("<strong>v0.2.0</strong>"),
+    );
+    expect(output.indexOf("<strong>v0.2.0</strong>")).toBeLessThan(
+      output.indexOf("<strong>v0.1.0</strong>"),
+    );
+    expect(output).toContain("Measured Mar 1, 2026");
   });
 });

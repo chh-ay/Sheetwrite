@@ -9,7 +9,7 @@ Revalidate at the final activation boundary; hosts never receive an unsafe URL.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L288</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L295</code></dd></div>
 </dl>
 
 ## Declaration

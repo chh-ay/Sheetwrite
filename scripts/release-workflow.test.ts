@@ -89,6 +89,22 @@ describe("CI-completion package release workflow", () => {
     expect(JSON.stringify(parsed.jobs?.publish)).toContain("needs.identity.outputs.ci_run_id");
     expect(source).toContain("steps.publish.outputs.verified");
     expect(source).toContain("steps.publish.outputs.published");
+    const generateSizes = parsed.jobs.publish?.steps?.find(
+      (step) => step.name === "Generate published package size history",
+    );
+    expect(generateSizes?.if).toBe("steps.publish.outputs.verified != '[]'");
+    expect(generateSizes?.run).toContain('bun run size:record --version="$VERSION"');
+    expect(generateSizes?.run).toContain("bun run docs:generate");
+    const openPullRequest = parsed.jobs.publish?.steps?.find(
+      (step) => step.name === "Open package size history pull request",
+    );
+    expect(openPullRequest?.uses).toBe(
+      "peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676",
+    );
+    expect(openPullRequest?.with?.base).toBe("develop");
+    expect(openPullRequest?.with?.branch).toContain("steps.size-history.outputs.version");
+    expect(openPullRequest?.with?.["add-paths"]).toContain("scripts/size-history.json");
+    expect(source).not.toMatch(/git config|git rebase|git push origin HEAD:develop/);
   });
 
   it("isolates OIDC and repository write access to the publishing job", async () => {
@@ -106,6 +122,7 @@ describe("CI-completion package release workflow", () => {
       actions: "read",
       contents: "write",
       "id-token": "write",
+      "pull-requests": "write",
     });
 
     const pending = [

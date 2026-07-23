@@ -9,7 +9,7 @@ Clone one validated hyperlink into an independent plain-data value.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L256</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L263</code></dd></div>
 </dl>
 
 ## Declaration

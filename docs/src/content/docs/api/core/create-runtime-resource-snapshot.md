@@ -9,7 +9,7 @@ Build and validate one operation-phase snapshot without double-counting runtime 
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L319</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L320</code></dd></div>
 </dl>
 
 ## Declaration

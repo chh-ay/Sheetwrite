@@ -6,7 +6,7 @@ import { createApp, defineComponent, h, nextTick, ref, shallowRef } from "vue";
 // bundle, so this lifecycle boundary intentionally selects Svelte's client entry.
 import { flushSync, mount, unmount } from "../node_modules/svelte/src/index-client.js";
 import type { GridReadyEvent } from "../packages/core/dist/adapter.js";
-import { SheetwriteError, type Grid } from "../packages/core/dist/index.js";
+import { type Grid, SheetwriteError } from "../packages/core/dist/index.js";
 import { installCanvasTestStubs } from "../packages/core/src/testing.js";
 import { SheetwriteGrid as ReactSheetwriteGrid } from "../packages/react/src/index.js";
 import SvelteLifecycleHarness from "../packages/svelte/test/LifecycleHarness.svelte";

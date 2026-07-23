@@ -38,7 +38,7 @@ reposition(rect: CellEditorRect): void;
 <summary><code>commit</code></summary>
 
 ```ts generated
-commit(navigation: CellEditorNavigation): string | void | Promise<string | void>;
+commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>;
 ```
 
 </details>
@@ -73,7 +73,7 @@ export interface CellEditorInstance {
   reposition(rect: CellEditorRect): void;
   commit(
     navigation: CellEditorNavigation,
-  ): string | void | Promise<string | void>;
+  ): string | undefined | Promise<string | undefined>;
   cancel(): void;
   destroy(): void;
 }

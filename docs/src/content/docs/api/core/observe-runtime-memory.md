@@ -9,7 +9,7 @@ Observe runtime memory buckets available in the current JS host without fabricat
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L427</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L428</code></dd></div>
 </dl>
 
 ## Declaration

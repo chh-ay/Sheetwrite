@@ -9,7 +9,7 @@ Return the first validated hyperlink covering an address, or null when none does
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L263</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L270</code></dd></div>
 </dl>
 
 ## Declaration

@@ -9,7 +9,7 @@ Sanitize one untrusted clipboard/snapshot value without cloning its object graph
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L225</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L232</code></dd></div>
 </dl>
 
 ## Declaration

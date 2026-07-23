@@ -55,7 +55,7 @@ const evidence = {
   version: packageManifest.dependencies.webpack,
   assets,
 };
-const evidencePath = resolve(repositoryRoot, "test-results/delivery-size/bundlers/webpack.json");
+const evidencePath = resolve(repositoryRoot, "test-results/bundlers/webpack.json");
 await mkdir(resolve(evidencePath, ".."), { recursive: true });
 await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 console.log("webpack size manifest:", relative(process.cwd(), evidencePath));

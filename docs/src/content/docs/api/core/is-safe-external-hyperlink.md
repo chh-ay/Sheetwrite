@@ -9,7 +9,7 @@ Validate, but never activate or fetch, an external hyperlink target.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L62</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/hyperlink.ts#L69</code></dd></div>
 </dl>
 
 ## Declaration

@@ -3,19 +3,17 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  type BudgetManifest,
-  candidateManifest,
   classifyPackedPath,
-  compareBudgets,
   compressedSizes,
+  formatMetricDelta,
+  formatMetricDisplay,
+  formatSizeHistory,
   type Metric,
   parsePackJson,
   SIZE_PROTOCOL_VERSION,
-  SIZE_TOOL_NAME,
-  SIZE_TOOL_VERSION,
-  type SizeReport,
   summarizePack,
   validateBundlerEvidence,
+  validateSizeHistory,
   walkLogicalBytes,
 } from "./size-report.js";
 
@@ -39,38 +37,6 @@ function packJson(overrides: Record<string, unknown> = {}): string {
       ...overrides,
     },
   ]);
-}
-
-function report(
-  metrics: Record<string, Metric>,
-): Pick<SizeReport, "protocolVersion" | "tool" | "toolchain" | "metrics"> {
-  return {
-    protocolVersion: SIZE_PROTOCOL_VERSION,
-    tool: { name: SIZE_TOOL_NAME, version: SIZE_TOOL_VERSION },
-    toolchain: {},
-    metrics,
-  };
-}
-
-function manifest(budgets: BudgetManifest["budgets"]): BudgetManifest {
-  return {
-    schemaVersion: SIZE_PROTOCOL_VERSION,
-    protocolVersion: SIZE_PROTOCOL_VERSION,
-    tool: { name: SIZE_TOOL_NAME, version: SIZE_TOOL_VERSION },
-    toolchain: {},
-    budgets,
-  };
-}
-
-function budget(maximum: number, unit: "bytes" | "count" = "bytes") {
-  return {
-    unit,
-    baseline: maximum,
-    maximum,
-    category: "test",
-    owner: "test-owner",
-    rationale: "Boundary fixture.",
-  } as const;
 }
 
 function evidence(assets: unknown[]) {
@@ -199,82 +165,38 @@ describe("manifest ownership", () => {
   });
 });
 
-describe("absolute budget comparison", () => {
+describe("release size history", () => {
   const metric: Metric = { actual: 10, unit: "bytes", category: "test", owner: "owner" };
 
-  it("passes an exact boundary and fails one byte over with diagnostics", () => {
-    expect(compareBudgets(report({ size: metric }), manifest({ size: budget(10) }))).toEqual([]);
-    expect(
-      compareBudgets(report({ size: { ...metric, actual: 11 } }), manifest({ size: budget(10) })),
-    ).toEqual([
-      {
-        key: "size",
-        message: "absolute ceiling exceeded",
-        actual: 11,
-        limit: 10,
-        delta: 1,
-        owner: "test-owner",
-      },
-    ]);
+  it("formats adaptive units and signed release deltas", () => {
+    expect(formatMetricDisplay({ ...metric, actual: 900 })).toEqual(["900", "B"]);
+    expect(formatMetricDisplay({ ...metric, actual: 1536 })).toEqual(["1.5", "KiB"]);
+    expect(formatMetricDisplay({ ...metric, actual: 5 * 1024 * 1024 })).toEqual(["5.00", "MiB"]);
+    expect(formatMetricDisplay({ ...metric, actual: 2 * 1024 ** 3 })).toEqual(["2.00", "GiB"]);
+    expect(formatMetricDelta({ ...metric, actual: 1536 }, { actual: 1024, unit: "bytes" })).toEqual(
+      ["+512 B", "+50.0%"],
+    );
   });
 
-  it("fails every incomplete or malformed budget branch", () => {
-    expect(compareBudgets(report({}), manifest({ size: budget(10) }))[0]?.message).toContain(
-      "missing from the report",
-    );
-    expect(compareBudgets(report({ size: metric }), manifest({}))[0]?.message).toContain(
-      "no reviewed",
-    );
-    expect(
-      compareBudgets(
-        report({ size: { ...metric, actual: Number.NaN } }),
-        manifest({ size: budget(10) }),
-      )[0]?.message,
-    ).toContain("non-finite");
-    expect(
-      compareBudgets(
-        report({ size: { ...metric, unit: "count" } }),
-        manifest({ size: budget(10) }),
-      )[0]?.message,
-    ).toContain("unit mismatch");
-    expect(
-      compareBudgets(report({ size: metric }), {
-        ...manifest({ size: budget(10) }),
-        protocolVersion: 2,
-      })[0]?.key,
-    ).toBe("$protocolVersion");
-    expect(
-      compareBudgets(report({ size: metric }), {
-        ...manifest({ size: budget(10) }),
-        tool: { name: "other", version: "0" },
-      })[0]?.key,
-    ).toBe("$tool");
-    expect(
-      compareBudgets(
-        { ...report({ size: metric }), toolchain: { bun: "different" } },
-        manifest({ size: budget(10) }),
-      )[0]?.key,
-    ).toBe("$toolchain.bun");
-  });
-
-  it("creates absolute candidates without reducing zero-growth isolation", () => {
-    const fullReport = {
-      ...report({
-        bytes: { ...metric, actual: 20_000 },
-        files: { ...metric, actual: 10, unit: "count" as const },
-        leakage: { ...metric, actual: 0, unit: "count" as const },
-      }),
-      schemaVersion: SIZE_PROTOCOL_VERSION,
-      meta: { commit: "a".repeat(40), dirty: false, timestamp: "2026-01-01T00:00:00.000Z" },
-      toolchain: {},
-      packages: [],
-      closures: [],
-      bundlers: [],
-      reproduction: "bun run size:check",
+  it("renders only versioned release comparisons and rejects duplicate versions", () => {
+    const history = {
+      schemaVersion: 1 as const,
+      releases: [
+        {
+          version: "0.1.0",
+          source: "npm",
+          metrics: { size: { actual: 100, unit: "bytes" as const } },
+        },
+        {
+          version: "0.2.0",
+          source: "npm",
+          metrics: { size: { actual: 90, unit: "bytes" as const } },
+        },
+      ],
     };
-    const candidate = candidateManifest(fullReport);
-    expect(candidate.budgets.bytes?.maximum).toBe(21_024);
-    expect(candidate.budgets.files?.maximum).toBe(12);
-    expect(candidate.budgets.leakage?.maximum).toBe(0);
+    expect(formatSizeHistory(validateSizeHistory(history))).toContain("-10 B\t-10.0%");
+    expect(() =>
+      validateSizeHistory({ ...history, releases: [history.releases[0], history.releases[0]] }),
+    ).toThrow("Duplicate size release");
   });
 });

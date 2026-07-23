@@ -9,7 +9,7 @@ Direction of a measured JS/WASM boundary crossing.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L52</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L53</code></dd></div>
 </dl>
 
 ## Declaration

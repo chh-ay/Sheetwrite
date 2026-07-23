@@ -6,6 +6,18 @@ import { join, resolve } from "node:path";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
+const releaseVersion = (
+  JSON.parse(readFileSync(resolve(repositoryRoot, "packages/core/package.json"), "utf8")) as {
+    version: string;
+  }
+).version;
+const escapedReleaseVersion = releaseVersion.replaceAll(".", "\\.");
+const fixtureRange = new RegExp(
+  `^(?:file:(?:artifacts|\\.\\./\\.packed)/sheetwrite-[a-z]+-${escapedReleaseVersion}\\.tgz|\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?)$`,
+);
+const fixtureTarball = new RegExp(
+  `^file:(?:artifacts|\\.\\./\\.packed)/sheetwrite-[a-z]+-${escapedReleaseVersion}\\.tgz$`,
+);
 const fixtureDirectories = [
   "test/consumer",
   "test/release-locks/core",
@@ -54,9 +66,7 @@ describe("immutable release consumer locks", () => {
       expect(lock.packages?.[""]?.dependencies ?? {}).toEqual(manifest.dependencies ?? {});
       expect(lock.packages?.[""]?.devDependencies ?? {}).toEqual(manifest.devDependencies ?? {});
       for (const [name, range] of Object.entries(dependencies(manifest))) {
-        expect(range).toMatch(
-          /^(?:file:(?:artifacts|\.\.\/\.packed)\/sheetwrite-[a-z]+-0\.1\.0\.tgz|\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/,
-        );
+        expect(range).toMatch(fixtureRange);
         if (name.startsWith("@sheetwrite/")) expect(range).toStartWith("file:");
       }
     }
@@ -71,9 +81,7 @@ describe("immutable release consumer locks", () => {
         expect(entry.version).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
         if (entry.resolved?.startsWith("https://")) expect(entry.integrity).toMatch(/^sha512-/);
         if (!path.startsWith("node_modules/@sheetwrite/")) continue;
-        expect(entry.resolved).toMatch(
-          /^file:(?:artifacts|\.\.\/\.packed)\/sheetwrite-[a-z]+-0\.1\.0\.tgz$/,
-        );
+        expect(entry.resolved).toMatch(fixtureTarball);
         expect(entry.integrity).toMatch(/^sha512-/);
         const packageName = path.slice("node_modules/".length);
         const existing = internalIntegrities.get(packageName);

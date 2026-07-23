@@ -9,7 +9,7 @@ Complete retained-resource and boundary snapshot for one operation phase.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L98</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L99</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>8</span>

@@ -12,7 +12,7 @@ const REQUIRED_TARGET_HASH = "3efef696839478b92b59a004537f9ede7fa803f9749042bb83
 const UNSUPPORTED_CATEGORY_HASH =
   "eef794e222795f2122b414d5ee9efd09802cf92ef372ae9fa12aac29fa06eb5b";
 const FORMULA_NAME = /^[A-Z][A-Z0-9.]*$/;
-const ID = /^[a-z][a-z0-9-]*$/;
+const _ID = /^[a-z][a-z0-9-]*$/;
 
 export interface FormulaContractSummary {
   functions: number;
@@ -168,7 +168,9 @@ export function validateClosedSchema(schema: unknown): string[] {
   }
   const visit = (value: unknown, path: string): void => {
     if (Array.isArray(value)) {
-      value.forEach((child, index) => visit(child, `${path}[${index}]`));
+      value.forEach((child, index) => {
+        visit(child, `${path}[${index}]`);
+      });
       return;
     }
     if (!isObject(value)) return;

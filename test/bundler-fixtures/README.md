@@ -15,7 +15,7 @@ Verified contracts:
 - webpack 5 initializes with no explicit WASM URL and builds without `IgnorePlugin`.
 - Next.js initializes from a client component and builds without `IgnorePlugin`.
 - Browser fixtures continue to verify the worker asset recipes they exercise.
-- Each build writes normalized, exact-once asset ownership to `test-results/delivery-size/bundlers/`; the delivery-size gate derives initial, Worker, XLSX, CSS, and WASM transfer metrics from those manifests rather than chunk names.
+- Each build writes normalized, exact-once asset ownership to `test-results/bundlers/`; the size report derives initial, Worker, XLSX, CSS, and WASM transfer metrics from those manifests rather than chunk names.
 - Node/Bun lifecycle tests verify zero-argument Node initialization and explicit-source retry behavior.
 
 The package export boundary selects `loader-browser.mjs` for browser-aware bundlers and `loader-node.mjs` for Node. `@sheetwrite/wasm/wasm` remains available for explicit asset-control fixtures, but it is not the ordinary startup path.

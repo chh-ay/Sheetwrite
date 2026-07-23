@@ -12,7 +12,7 @@ export function releaseConsumerCommands(
     ["bun", "scripts/release-audit.ts", "--artifacts", root],
     ["bun", "scripts/verify-packed-consumer.ts", "--artifacts", root],
     ["node", "test/bundler-fixtures/run.mjs", "--artifacts", root],
-    ["bun", "scripts/size-report.ts", "check", "--artifacts", root, "--reuse-bundlers"],
+    ["bun", "scripts/size-report.ts", "report", "--artifacts", root, "--reuse-bundlers"],
   ];
 }
 

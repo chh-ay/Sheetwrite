@@ -68,6 +68,7 @@ export const REVIEWED_ACTION_PINS: Readonly<Record<string, string>> = {
   "actions/upload-artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02",
   "actions/download-artifact": "634f93cb2916e3fdff6788551b99b062d0335ce0",
   "actions/cache": "0057852bfaa89a56745cba8c7296529d2fc39830",
+  "peter-evans/create-pull-request": "22a9089034f40e5a961c8808d113e2c98fb63676",
 };
 
 const SHA_40 = /^[0-9a-f]{40}$/;

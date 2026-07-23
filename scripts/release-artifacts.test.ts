@@ -27,7 +27,7 @@ import {
   WASM_TARGET,
 } from "./workspace-tooling.js";
 
-const TEST_RELEASE_VERSION = "0.2.0";
+const TEST_RELEASE_VERSION = "0.3.0";
 
 const temporaryRoots: string[] = [];
 
@@ -305,7 +305,7 @@ describe("canonical release artifacts", () => {
       serializeReleaseManifest(releaseManifest),
     );
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(
-      "@sheetwrite/react internal dependency @sheetwrite/core must be 0.2.0",
+      "@sheetwrite/react internal dependency @sheetwrite/core must be 0.3.0",
     );
   });
 

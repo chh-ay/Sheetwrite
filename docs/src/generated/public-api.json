@@ -42,7 +42,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L352",
+              "source": "src/resource-accounting.ts#L353",
               "jsDocTags": [],
               "documentation": "Reject overlap, negative values, and attempts to fold runtime observations into owner totals.",
               "memberDocs": []
@@ -66,7 +66,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L52",
+              "source": "src/resource-accounting.ts#L53",
               "jsDocTags": [],
               "documentation": "Direction of a measured JS/WASM boundary crossing.",
               "memberDocs": []
@@ -78,7 +78,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L71",
+              "source": "src/resource-accounting.ts#L72",
               "jsDocTags": [],
               "documentation": "Fixed-cardinality boundary crossing counters for one operation.",
               "memberDocs": []
@@ -90,7 +90,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L54",
+              "source": "src/resource-accounting.ts#L55",
               "jsDocTags": [],
               "documentation": "Whether a measured boundary crossing transfers one scalar or a packed batch.",
               "memberDocs": []
@@ -211,7 +211,7 @@
             {
               "name": "CellEditorInstance",
               "kind": "interface",
-              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | void | Promise<string | void>; cancel(): void; destroy(): void; }",
+              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>; cancel(): void; destroy(): void; }",
               "owners": [
                 "src/types/grid.ts"
               ],
@@ -496,7 +496,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L256",
+              "source": "src/hyperlink.ts#L263",
               "jsDocTags": [],
               "documentation": "Clone one validated hyperlink into an independent plain-data value.",
               "memberDocs": []
@@ -888,7 +888,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L322",
+              "source": "src/hyperlink.ts#L329",
               "jsDocTags": [],
               "documentation": "Produce a new stable identity for copied hyperlinks without trusting clipboard IDs.",
               "memberDocs": []
@@ -912,7 +912,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L319",
+              "source": "src/resource-accounting.ts#L320",
               "jsDocTags": [],
               "documentation": "Build and validate one operation-phase snapshot without double-counting runtime observations.",
               "memberDocs": []
@@ -1121,7 +1121,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L241",
+              "source": "src/resource-accounting.ts#L242",
               "jsDocTags": [],
               "documentation": "Decode the flat Rust protocol and fail closed on version/order/total drift.",
               "memberDocs": []
@@ -1311,7 +1311,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L379",
+              "source": "src/resource-accounting.ts#L380",
               "jsDocTags": [],
               "documentation": "Diff two validated phases of the same operation by exclusive resource owner.",
               "memberDocs": []
@@ -1395,7 +1395,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L310",
+              "source": "src/resource-accounting.ts#L311",
               "jsDocTags": [],
               "documentation": "Construct a zero-owner store report when no WASM store is available.",
               "memberDocs": []
@@ -2005,7 +2005,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L263",
+              "source": "src/hyperlink.ts#L270",
               "jsDocTags": [],
               "documentation": "Return the first validated hyperlink covering an address, or null when none does.",
               "memberDocs": []
@@ -2053,7 +2053,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L62",
+              "source": "src/hyperlink.ts#L69",
               "jsDocTags": [],
               "documentation": "Validate, but never activate or fetch, an external hyperlink target.",
               "memberDocs": []
@@ -2089,7 +2089,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L251",
+              "source": "src/hyperlink.ts#L258",
               "jsDocTags": [],
               "documentation": "Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers.",
               "memberDocs": []
@@ -2101,7 +2101,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L92",
+              "source": "src/hyperlink.ts#L99",
               "jsDocTags": [],
               "documentation": "Whether an identifier is bounded, non-empty, trimmed, and free of control characters.",
               "memberDocs": []
@@ -2298,7 +2298,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L427",
+              "source": "src/resource-accounting.ts#L428",
               "jsDocTags": [],
               "documentation": "Observe runtime memory buckets available in the current JS host without fabricating missing data.",
               "memberDocs": []
@@ -2820,7 +2820,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L283",
+              "source": "src/hyperlink.ts#L290",
               "jsDocTags": [],
               "documentation": "Host-safe target resolved immediately before hyperlink activation.",
               "memberDocs": []
@@ -2832,7 +2832,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L288",
+              "source": "src/hyperlink.ts#L295",
               "jsDocTags": [],
               "documentation": "Revalidate at the final activation boundary; hosts never receive an unsafe URL.",
               "memberDocs": []
@@ -3301,7 +3301,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L5",
+              "source": "src/resource-accounting.ts#L6",
               "jsDocTags": [],
               "documentation": "Stable protocol for runtime ownership and operation-cost reports.",
               "memberDocs": []
@@ -3313,7 +3313,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L82",
+              "source": "src/resource-accounting.ts#L83",
               "jsDocTags": [],
               "documentation": "Available runtime-level memory observations, kept separate from retained owner totals.",
               "memberDocs": []
@@ -3325,7 +3325,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L37",
+              "source": "src/resource-accounting.ts#L38",
               "jsDocTags": [],
               "documentation": "User-visible operation whose retained and transient resource costs are measured.",
               "memberDocs": []
@@ -3337,7 +3337,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L50",
+              "source": "src/resource-accounting.ts#L51",
               "jsDocTags": [],
               "documentation": "Measurement point within one resource-accounted operation.",
               "memberDocs": []
@@ -3349,7 +3349,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L122",
+              "source": "src/resource-accounting.ts#L123",
               "jsDocTags": [],
               "documentation": "Owner and runtime deltas between two phases of the same operation.",
               "memberDocs": []
@@ -3361,7 +3361,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L98",
+              "source": "src/resource-accounting.ts#L99",
               "jsDocTags": [],
               "documentation": "Complete retained-resource and boundary snapshot for one operation phase.",
               "memberDocs": []
@@ -3373,7 +3373,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L225",
+              "source": "src/hyperlink.ts#L232",
               "jsDocTags": [],
               "documentation": "Sanitize one untrusted clipboard/snapshot value without cloning its object graph.",
               "memberDocs": []
@@ -3385,7 +3385,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L163",
+              "source": "src/hyperlink.ts#L170",
               "jsDocTags": [],
               "documentation": "Convert an untrusted style into one bounded, plain renderer-safe value.",
               "memberDocs": []
@@ -4179,7 +4179,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L9",
+              "source": "src/resource-accounting.ts#L10",
               "jsDocTags": [],
               "documentation": "Version of the deterministic hash-table capacity estimate used by store owners.",
               "memberDocs": []
@@ -4191,7 +4191,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L7",
+              "source": "src/resource-accounting.ts#L8",
               "jsDocTags": [],
               "documentation": "Flat WASM store-memory protocol version; decoders reject any mismatch.",
               "memberDocs": []
@@ -4203,7 +4203,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L57",
+              "source": "src/resource-accounting.ts#L58",
               "jsDocTags": [],
               "documentation": "Decoded, fail-closed retained-memory ownership report from the WASM store.",
               "memberDocs": [
@@ -4768,7 +4768,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L90",
+              "source": "src/resource-accounting.ts#L91",
               "jsDocTags": [],
               "documentation": "Operation-scoped transient peak, excluded from retained owner totals.",
               "memberDocs": []
@@ -4957,7 +4957,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L12",
+              "source": "src/resource-accounting.ts#L13",
               "jsDocTags": [],
               "documentation": "Stable ordered owner list encoded by the WASM store-memory protocol.",
               "memberDocs": []
@@ -4969,7 +4969,7 @@
               "owners": [
                 "src/resource-accounting.ts"
               ],
-              "source": "src/resource-accounting.ts#L35",
+              "source": "src/resource-accounting.ts#L36",
               "jsDocTags": [],
               "documentation": "One retained-memory owner reported by the WASM cell store.",
               "memberDocs": []
@@ -6656,7 +6656,7 @@
             {
               "name": "CellEditorInstance",
               "kind": "interface",
-              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | void | Promise<string | void>; cancel(): void; destroy(): void; }",
+              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>; cancel(): void; destroy(): void; }",
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
@@ -7586,7 +7586,7 @@
             {
               "name": "CellEditorInstance",
               "kind": "interface",
-              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | void | Promise<string | void>; cancel(): void; destroy(): void; }",
+              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>; cancel(): void; destroy(): void; }",
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
@@ -8508,7 +8508,7 @@
             {
               "name": "CellEditorInstance",
               "kind": "interface",
-              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | void | Promise<string | void>; cancel(): void; destroy(): void; }",
+              "signature": "export interface CellEditorInstance { update(context: CellEditorContext): void; reposition(rect: CellEditorRect): void; commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>; cancel(): void; destroy(): void; }",
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],

@@ -202,8 +202,8 @@ export const VERIFY_CI_NODES: readonly CommandNode[] = [
   },
   ...PUBLIC_API_AND_BENCHMARK_NODES,
   {
-    id: "verify:delivery-size",
-    command: ["bun", "scripts/size-report.ts", "check", "--reuse-bundlers"],
+    id: "report:delivery-size",
+    command: ["bun", "scripts/size-report.ts", "report", "--reuse-bundlers"],
   },
 ];
 

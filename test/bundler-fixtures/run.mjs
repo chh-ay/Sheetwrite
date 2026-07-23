@@ -175,7 +175,7 @@ async function assertLifecyclePages(browser, root, pages) {
 
 await rm(stagingRoot, { recursive: true, force: true });
 await rm(tarballRoot, { recursive: true, force: true });
-await rm(join(repositoryRoot, "test-results/delivery-size/bundlers"), {
+await rm(join(repositoryRoot, "test-results/bundlers"), {
   recursive: true,
   force: true,
 });
