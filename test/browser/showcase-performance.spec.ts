@@ -901,10 +901,8 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
       .poll(async () => (await readWindow(page)).firstRow)
       .toBeGreaterThan(beforeTouch.firstRow);
   } else if (browserName === "webkit") {
-    await grid.evaluate((element) => {
-      element.dispatchEvent(
-        new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 1_200 }),
-      );
+    await grid.locator(".sheetwrite-scroller").evaluate((scroller) => {
+      scroller.scrollTop += 1_200;
     });
     await expect
       .poll(async () => (await readWindow(page)).firstRow)
