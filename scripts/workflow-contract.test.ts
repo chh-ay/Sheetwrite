@@ -180,6 +180,7 @@ describe("CI and release workflow contracts", () => {
       actions: "read",
       contents: "write",
       "id-token": "write",
+      "pull-requests": "write",
     });
     expect(setupStep(publish, "actions/setup-node")?.with?.["node-version"]).toBe(
       WORKFLOW_NODE_VERSION,

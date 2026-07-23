@@ -29,12 +29,10 @@ import {
   collectCompatibilityIssues,
   collectMissingCompatibilityFiles,
 } from "../docs/src/showcases/compatibility-validation.js";
-import {
-  compareReviewedObservation,
-  loadCorpus,
-  readConformanceManifest,
-  runOffline,
-} from "./conformance.js";
+import { compareReviewedObservation } from "./conformance/compare.js";
+import { loadCorpus } from "./conformance/corpus.js";
+import { readConformanceManifest } from "./conformance/generate.js";
+import { runOffline } from "./conformance/offline.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
   type ApiEntryPoint,
