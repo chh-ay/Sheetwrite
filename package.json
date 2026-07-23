@@ -20,7 +20,7 @@
     "api:report": "bun scripts/public-api.ts report",
     "api:check": "bun scripts/public-api.ts check",
     "api:baseline": "bun scripts/public-api.ts baseline",
-    "compatibility:validate": "bun scripts/conformance.ts validate",
+    "compatibility:validate": "bun scripts/conformance/validate-cli.ts",
     "compatibility:check": "bun scripts/conformance.ts offline",
     "compatibility:capture:excel": "bun scripts/conformance.ts capture-excel",
     "compatibility:capture:google": "bun scripts/conformance.ts capture-google",
