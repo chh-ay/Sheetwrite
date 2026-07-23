@@ -3,12 +3,12 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type {
-  CellScalar,
   CellRenderer,
+  CellScalar,
   DataSourcePage,
   DataSourceRequest,
-  Renderer,
   GridEvents,
+  Renderer,
   RenderLayout,
   RowData,
   Viewport,

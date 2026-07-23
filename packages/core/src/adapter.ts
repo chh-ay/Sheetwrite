@@ -14,10 +14,9 @@ export {
 export {
   createRowBridge,
   RowBridge,
-  rowBridgeTransactionId,
   type RowBridgeCell,
-  type RowBridgeColumn,
   type RowBridgeClearDelta,
+  type RowBridgeColumn,
   type RowBridgeDelta,
   type RowBridgeFillDelta,
   type RowBridgeHandler,
@@ -34,13 +33,14 @@ export {
   type RowBridgeRowStructureDelta,
   type RowBridgeTransaction,
   type RowBridgeUnprojectableDelta,
+  rowBridgeTransactionId,
 } from "./row-bridge.js";
 
 import {
   createRowBridge,
-  type RowBridge as RowBridgeInstance,
   type RowBridgeHandler,
   type RowBridgeId,
+  type RowBridge as RowBridgeInstance,
   type RowBridgeOptions,
 } from "./row-bridge.js";
 

@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
 import { describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
-  validateMatchedEvidence,
   type MatchedFormulaEvidence,
+  validateMatchedEvidence,
 } from "../src/matched-formula-evidence.js";
 
 function sha256(path: URL): string {

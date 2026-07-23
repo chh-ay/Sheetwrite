@@ -1,10 +1,10 @@
-import { SheetwriteError } from "./errors.js";
 import {
   SnapshotResourceError,
   type SnapshotResourceLimits,
   SnapshotValidationError,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
+import { SheetwriteError } from "./errors.js";
 import { GridImpl } from "./grid.js";
 import { SheetwriteStore } from "./store.js";
 import type { WorkbookSnapshot } from "./types/document.js";

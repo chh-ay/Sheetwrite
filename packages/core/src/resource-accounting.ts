@@ -1,4 +1,5 @@
 import type { ResourceOwnerBytes } from "./types/store.js";
+
 export type { ResourceOwnerBytes } from "./types/store.js";
 
 /** Stable protocol for runtime ownership and operation-cost reports. */

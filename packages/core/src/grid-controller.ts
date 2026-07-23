@@ -1,9 +1,9 @@
 import { createGrid } from "./grid.js";
+import type { RowBridge, RowBridgeHandler, RowBridgeId } from "./row-bridge.js";
 import type { Selection } from "./types/coordinates.js";
 import type { Grid, GridConfig, GridEvents, GridOptions } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { ChangeEvent } from "./types/transaction.js";
-import type { RowBridge, RowBridgeHandler, RowBridgeId } from "./row-bridge.js";
 
 /**
  * Event callbacks a host (a framework adapter, or any plain app) hangs off a

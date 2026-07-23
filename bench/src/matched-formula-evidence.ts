@@ -300,11 +300,7 @@ export function validateMatchedEvidence(
     throw new Error("allocation equality is not established");
   for (const workload of WORKLOADS) {
     const observed = evidence.workloads[workload];
-    if (
-      !observed ||
-      observed.raw.baselineMs.length !== 20 ||
-      observed.raw.candidateMs.length !== 20
-    )
+    if (observed?.raw.baselineMs.length !== 20 || observed.raw.candidateMs.length !== 20)
       throw new Error(`${workload} raw matrix drift`);
     const expectedBaseline = evidence.rounds.map((round) => round.samples[workload].baseline.ms);
     const expectedCandidate = evidence.rounds.map((round) => round.samples[workload].post94.ms);

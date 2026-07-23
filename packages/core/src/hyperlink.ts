@@ -12,9 +12,16 @@ export const MAX_HYPERLINK_TARGET_LENGTH = 2_048;
 /** Optional display text ceiling used by SpreadsheetML shared-string implementations. */
 export const MAX_HYPERLINK_DISPLAY_LENGTH = 32_767;
 
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u;
 const ENCODED_CONTROL_CHARACTERS = /%(?:0[0-9a-f]|1[0-9a-f]|7f)/iu;
-const NUL_CHARACTER = /\u0000/u;
+const NUL_CHARACTER = String.fromCharCode(0);
+
+function hasControlCharacters(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
 
 const STYLE_KEYS = new Set([
   "bold",
@@ -64,7 +71,7 @@ export function isSafeExternalHyperlink(url: string): boolean {
     url.length === 0 ||
     url.length > MAX_HYPERLINK_TARGET_LENGTH ||
     url !== url.trim() ||
-    CONTROL_CHARACTERS.test(url) ||
+    hasControlCharacters(url) ||
     ENCODED_CONTROL_CHARACTERS.test(url)
   ) {
     return false;
@@ -94,7 +101,7 @@ export function isValidHyperlinkId(id: string): boolean {
     id.length > 0 &&
     id.length <= MAX_HYPERLINK_ID_LENGTH &&
     id === id.trim() &&
-    !CONTROL_CHARACTERS.test(id)
+    !hasControlCharacters(id)
   );
 }
 
@@ -232,7 +239,7 @@ export function sanitizeCellHyperlink(value: unknown): CellHyperlink | null {
     link.display !== undefined &&
     (typeof link.display !== "string" ||
       link.display.length > MAX_HYPERLINK_DISPLAY_LENGTH ||
-      NUL_CHARACTER.test(link.display))
+      link.display.includes(NUL_CHARACTER))
   ) {
     return null;
   }

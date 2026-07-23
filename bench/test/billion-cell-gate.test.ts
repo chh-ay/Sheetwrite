@@ -2,10 +2,11 @@ import { describe, expect, it } from "bun:test";
 import {
   BILLION_CELL_SCALE_CONFIGS,
   BILLION_CELL_SCENARIOS,
+  type BillionCellBenchmarkArtifact,
   CLEAN_ALLOCATION_LIMIT_BYTES,
   CONTROLLER_TILE_METADATA_LIMIT_BYTES,
-  deriveBillionCellGateChecks,
   DIRTY_EDIT_COUNT,
+  deriveBillionCellGateChecks,
   FFI_CROSSINGS_PER_REQUEST_LIMIT,
   FIXED_WINDOW_SLOPE_LIMIT,
   HORIZONTAL_TILE_AMPLIFICATION_LIMIT,
@@ -15,7 +16,6 @@ import {
   STARTUP_MEDIAN_LIMIT_MS,
   STARTUP_METADATA_LIMIT_BYTES,
   validateBillionCellBenchmark,
-  type BillionCellBenchmarkArtifact,
 } from "../src/billion-cell-bench.js";
 
 const RESULT_URL = new URL("../results/billion-cell-results.json", import.meta.url);

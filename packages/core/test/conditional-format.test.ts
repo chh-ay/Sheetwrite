@@ -3,8 +3,8 @@ import { MAX_CONDITIONAL_FORMAT_RULES } from "../src/conditional-format.js";
 import { validateWorkbookSnapshot } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
-import { WorkerRenderer } from "../src/worker-renderer.js";
 import type { ConditionalFormatRule, WorkbookSnapshot } from "../src/types.js";
+import { WorkerRenderer } from "../src/worker-renderer.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {

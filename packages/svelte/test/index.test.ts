@@ -7,9 +7,9 @@ import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { flushSync, mount, unmount } from "../../../node_modules/svelte/src/index-client.js";
 import {
   type AdapterConformanceProps,
+  type MountedAdapter,
   makeConformanceData,
   makeConformanceWorkbook,
-  type MountedAdapter,
   runSharedAdapterLifecycleContract,
 } from "../../../test/adapter-lifecycle-contract.js";
 import SvelteLifecycleHarness from "./LifecycleHarness.svelte";

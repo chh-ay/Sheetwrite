@@ -1,10 +1,8 @@
-import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import {
-  assertWorkbookTables,
-  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
-  validWorkbookTable,
-  workbookTableNameKey,
-} from "./workbook-table.js";
+  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
+  MAX_CONDITIONAL_FORMAT_RULES,
+} from "./conditional-format.js";
+import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import {
   cloneCellHyperlink,
   isSafeExternalHyperlink,
@@ -13,10 +11,6 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
-import {
-  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
-  MAX_CONDITIONAL_FORMAT_RULES,
-} from "./conditional-format.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
   DocumentOp,
@@ -27,6 +21,12 @@ import type {
 } from "./types/document.js";
 import type { WorkbookTable } from "./types/table.js";
 import type { TransactionResourceLimits } from "./types/transaction.js";
+import {
+  assertWorkbookTables,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  validWorkbookTable,
+  workbookTableNameKey,
+} from "./workbook-table.js";
 
 /** Current workbook snapshot schema version accepted by Sheetwrite. */
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;

@@ -2,8 +2,8 @@ import "./dom-setup.js";
 import { readFileSync } from "node:fs";
 import {
   createGrid,
-  type DataSourceColumnBand,
   createRuntimeResourceSnapshot,
+  type DataSourceColumnBand,
   diffRuntimeResourcePhases,
   emptyStoreMemoryStats,
   type Grid,

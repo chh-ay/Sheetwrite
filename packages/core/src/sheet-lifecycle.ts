@@ -1,13 +1,5 @@
 import { validConditionalRules } from "./conditional-format.js";
 import { validateSheetName } from "./sheet-name.js";
-import type { SheetId } from "./types/coordinates.js";
-import type {
-  DocumentOp,
-  Sheet,
-  SheetLifecycleIssueCode,
-  SheetSnapshot,
-  SheetVisibility,
-} from "./types/document.js";
 import {
   integerAt,
   mergeCrossesFreeze,
@@ -21,6 +13,14 @@ import {
   validSortAndFilters,
   validValidationRules,
 } from "./store/ranges.js";
+import type { SheetId } from "./types/coordinates.js";
+import type {
+  DocumentOp,
+  Sheet,
+  SheetLifecycleIssueCode,
+  SheetSnapshot,
+  SheetVisibility,
+} from "./types/document.js";
 
 export interface SheetLifecycleState {
   readonly sheets: Array<{

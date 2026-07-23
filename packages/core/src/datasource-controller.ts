@@ -1395,7 +1395,7 @@ export class DatasourceController {
   }
 
   private validatePage(page: DataSourcePage, request: ActiveRequest): readonly number[] {
-    if (!page || page.protocol !== 2 || !Array.isArray(page.rows) || !Array.isArray(page.columns)) {
+    if (page?.protocol !== 2 || !Array.isArray(page.rows) || !Array.isArray(page.columns)) {
       throw new RangeError("Datasource page must use protocol 2 arrays");
     }
     if (!Number.isSafeInteger(page.start)) {
@@ -1469,7 +1469,7 @@ export class DatasourceController {
         }
       }
       for (const key of declaredKeys) {
-        if (!Object.prototype.hasOwnProperty.call(row, key)) {
+        if (!Object.hasOwn(row, key)) {
           throw new RangeError("Datasource page row is missing a declared key");
         }
       }

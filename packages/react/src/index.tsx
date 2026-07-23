@@ -2,9 +2,9 @@ import {
   type CellScalar,
   type Grid,
   type GridOptions,
-  type SheetwriteError,
   initSheetwrite,
   isSheetwriteReady,
+  type SheetwriteError,
 } from "@sheetwrite/core";
 import {
   createGridController,

@@ -130,13 +130,13 @@ function isPlainContextObject(value: object): boolean {
   if (Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   if (prototype === null) return true;
-  const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor");
+  const constructorDescriptor = Object.getOwnPropertyDescriptor(prototype, "constructor");
   return (
     Object.getPrototypeOf(prototype) === null &&
-    constructor !== undefined &&
-    "value" in constructor &&
-    typeof constructor.value === "function" &&
-    constructor.value.name === "Object"
+    constructorDescriptor !== undefined &&
+    "value" in constructorDescriptor &&
+    typeof constructorDescriptor.value === "function" &&
+    constructorDescriptor.value.name === "Object"
   );
 }
 

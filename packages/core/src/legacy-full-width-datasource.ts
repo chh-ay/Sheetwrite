@@ -34,7 +34,7 @@ export function legacyFullWidthDataSource(loadRows: LegacyRowLoader): DataSource
           }
           const normalized: RowData = Object.create(null) as RowData;
           for (const key of declaredKeys) {
-            normalized[key] = Object.prototype.hasOwnProperty.call(row, key) ? row[key]! : null;
+            normalized[key] = Object.hasOwn(row, key) ? row[key]! : null;
           }
           return normalized;
         });

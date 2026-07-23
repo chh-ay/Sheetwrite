@@ -7,21 +7,21 @@ import {
   DatasourceController,
   type DatasourceControllerOptions,
 } from "../src/datasource-controller.js";
+import { initSheetwrite } from "../src/grid.js";
 import {
-  legacyFullWidthDataSource,
   type LegacyRowLoader,
   type LegacyRowPage,
+  legacyFullWidthDataSource,
 } from "../src/legacy-full-width-datasource.js";
-import { initSheetwrite } from "../src/grid.js";
 import { MutationRevisionIndex } from "../src/mutation-revision-index.js";
 import { SheetwriteStore } from "../src/store.js";
 import type {
   Column,
   DataSource,
   DataSourceColumnBand,
-  DataSourcePage as ProtocolPage,
   DataSourceRequest,
   DocumentOp,
+  DataSourcePage as ProtocolPage,
   RowData,
 } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";

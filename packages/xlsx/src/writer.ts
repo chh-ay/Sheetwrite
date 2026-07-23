@@ -2,8 +2,8 @@ import type {
   CellStyle,
   ConditionalFormatRule,
   DataValidationRule,
-  SheetSnapshot,
   Range,
+  SheetSnapshot,
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";

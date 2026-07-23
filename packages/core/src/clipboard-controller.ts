@@ -10,8 +10,8 @@ import {
 import {
   cloneCellHyperlink,
   createHyperlinkId,
-  sanitizeCellHyperlink,
   MAX_HYPERLINKS_PER_SHEET,
+  sanitizeCellHyperlink,
 } from "./hyperlink.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";

@@ -6,8 +6,8 @@ import { dateToSerial } from "../date-serial.js";
 import { SheetwriteError } from "../errors.js";
 import {
   cloneCellHyperlink,
-  sanitizeCellHyperlink,
   MAX_HYPERLINKS_PER_SHEET,
+  sanitizeCellHyperlink,
 } from "../hyperlink.js";
 import {
   consumeSourceSnapshot,
@@ -33,15 +33,9 @@ import {
 } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
-import {
-  assertWorkbookTables,
-  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
-  validWorkbookTable,
-  workbookTableNameKey,
-} from "../workbook-table.js";
 import type {
-  CellHyperlink,
   CellFormat,
+  CellHyperlink,
   CellScalar,
   CellStyle,
   CellValue,
@@ -72,7 +66,6 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
-import type { WorkbookTable, WorkbookTableColumn } from "../types/table.js";
 import type {
   CellLoadState,
   ClipboardWindowView,
@@ -82,7 +75,14 @@ import type {
   ResourceOwnerBytes,
   VisibleWindowView,
 } from "../types/store.js";
+import type { WorkbookTable, WorkbookTableColumn } from "../types/table.js";
 import type { ChangeEvent } from "../types/transaction.js";
+import {
+  assertWorkbookTables,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  validWorkbookTable,
+  workbookTableNameKey,
+} from "../workbook-table.js";
 import {
   integerAt,
   mergeCrossesFreeze,

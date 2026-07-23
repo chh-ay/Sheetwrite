@@ -18,16 +18,16 @@ import type {
 } from "@sheetwrite/core";
 import {
   colToA1,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   dateToSerial,
   isSafeExternalHyperlink,
+  labelToCol,
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
-  labelToCol,
   sheetNameKey,
   validateSheetName,
-  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validateWorkbookTableName,
 } from "@sheetwrite/core";
 import { formulaContainsExternalReference } from "./formula.js";

@@ -3,9 +3,9 @@ import { DatasourceController } from "../../packages/core/src/datasource-control
 import { initSheetwrite } from "../../packages/core/src/grid.js";
 import {
   RUNTIME_RESOURCE_SCHEMA_VERSION,
-  STORE_MEMORY_PROTOCOL_VERSION,
   type RuntimeMemoryObservation,
   type RuntimeResourceOperation,
+  STORE_MEMORY_PROTOCOL_VERSION,
 } from "../../packages/core/src/resource-accounting.js";
 import { SheetwriteStore } from "../../packages/core/src/store.js";
 import type {
@@ -1341,7 +1341,9 @@ function finiteNumbers(value: unknown, path = "artifact"): void {
     return;
   }
   if (Array.isArray(value)) {
-    value.forEach((child, index) => finiteNumbers(child, `${path}[${index}]`));
+    value.forEach((child, index) => {
+      finiteNumbers(child, `${path}[${index}]`);
+    });
     return;
   }
   if (typeof value === "object" && value !== null) {

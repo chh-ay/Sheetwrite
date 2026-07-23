@@ -1,7 +1,7 @@
-import type { CellScalar, CellValue, Column } from "./types/cell.js";
+import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
-import type { CommitReason, DocumentOp, RowMetadata, SheetSnapshot } from "./types/document.js";
-import type { ChangeEvent, CellChange, OperationSource, Transaction } from "./types/transaction.js";
+import type { CommitReason, DocumentOp, SheetSnapshot } from "./types/document.js";
+import type { CellChange, ChangeEvent, OperationSource, Transaction } from "./types/transaction.js";
 
 /** A stable host identity for one data-space row. */
 export type RowBridgeId = string | number;
@@ -267,7 +267,7 @@ function cellAddressKey(addr: CellAddress): string {
   return `${addr.sheet}\u0000${addr.row}\u0000${addr.col}`;
 }
 
-function rangeContains(range: Range, addr: CellAddress): boolean {
+function _rangeContains(range: Range, addr: CellAddress): boolean {
   return (
     range.sheet === addr.sheet &&
     addr.row >= Math.min(range.start.row, range.end.row) &&
@@ -844,7 +844,7 @@ export class RowBridge<
     transaction: RowBridgeTransaction,
     operation: DocumentOp,
     metadata: RowBridgeMetadataDelta["metadata"],
-    sheet: SheetId | null,
+    _sheet: SheetId | null,
     rowIds: readonly (Id | null)[] = [],
   ): RowBridgeMetadataDelta<Id> {
     return {

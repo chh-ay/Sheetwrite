@@ -2,6 +2,7 @@
 // No runtime values live here.
 
 import type { SheetwriteError } from "../errors.js";
+import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
 import type {
   RuntimeMemoryObservation,
   RuntimeResourceOperation,
@@ -9,16 +10,15 @@ import type {
   RuntimeResourceSnapshot,
 } from "../resource-accounting.js";
 import type {
-  CellHyperlink,
   CellAlign,
   CellFormat,
+  CellHyperlink,
   CellScalar,
   CellStyle,
   CellValue,
   Column,
   ConditionalFormatRule,
 } from "./cell.js";
-import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -90,7 +90,7 @@ export interface CellEditorContext {
 export interface CellEditorInstance {
   update(context: CellEditorContext): void;
   reposition(rect: CellEditorRect): void;
-  commit(navigation: CellEditorNavigation): string | void | Promise<string | void>;
+  commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>;
   cancel(): void;
   destroy(): void;
 }

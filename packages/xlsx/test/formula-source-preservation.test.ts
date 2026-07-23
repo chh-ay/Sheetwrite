@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import {
   fromXlsxWorkbook,
   initSheetwrite,
-  type WorkbookSnapshot,
   toXlsxWorkbook,
+  type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { registerXlsxBackends } from "../src/index.js";
 

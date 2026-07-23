@@ -7,10 +7,6 @@ export {
 } from "./cell-input.js";
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 export {
-  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
-  MAX_CONDITIONAL_FORMAT_RULES,
-} from "./conditional-format.js";
-export {
   type CommentAdapter,
   type CommentAnchor,
   type CommentAuthorRef,
@@ -39,6 +35,10 @@ export {
   type RevisionSummary,
   type VersionedCommentEvent,
 } from "./collaboration.js";
+export {
+  MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
+  MAX_CONDITIONAL_FORMAT_RULES,
+} from "./conditional-format.js";
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
 export {
   DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
@@ -78,22 +78,6 @@ export {
   type SheetwriteErrorOptions,
 } from "./errors.js";
 export {
-  cloneCellHyperlink,
-  createHyperlinkId,
-  hyperlinkAt,
-  isSafeExternalHyperlink,
-  isValidCellHyperlink,
-  isValidHyperlinkId,
-  MAX_HYPERLINK_DISPLAY_LENGTH,
-  MAX_HYPERLINK_ID_LENGTH,
-  MAX_HYPERLINK_TARGET_LENGTH,
-  MAX_HYPERLINKS_PER_SHEET,
-  resolveHyperlinkTarget,
-  sanitizeCellHyperlink,
-  sanitizeHyperlinkStyle,
-  type ResolvedHyperlinkTarget,
-} from "./hyperlink.js";
-export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   downloadBytes,
   fromCsv,
@@ -122,6 +106,27 @@ export {
   isSheetwriteReady,
   resolveThemeFromCss,
 } from "./grid.js";
+export {
+  cloneCellHyperlink,
+  createHyperlinkId,
+  hyperlinkAt,
+  isSafeExternalHyperlink,
+  isValidCellHyperlink,
+  isValidHyperlinkId,
+  MAX_HYPERLINK_DISPLAY_LENGTH,
+  MAX_HYPERLINK_ID_LENGTH,
+  MAX_HYPERLINK_TARGET_LENGTH,
+  MAX_HYPERLINKS_PER_SHEET,
+  type ResolvedHyperlinkTarget,
+  resolveHyperlinkTarget,
+  sanitizeCellHyperlink,
+  sanitizeHyperlinkStyle,
+} from "./hyperlink.js";
+export {
+  type LegacyRowLoader,
+  type LegacyRowPage,
+  legacyFullWidthDataSource,
+} from "./legacy-full-width-datasource.js";
 export { formatNumber } from "./number-format.js";
 export {
   createGridFromSnapshot,
@@ -136,30 +141,6 @@ export {
   type RebaseConflictCode,
   rebaseDocumentOperations,
 } from "./rebase.js";
-export {
-  createRowBridge,
-  RowBridge,
-  rowBridgeTransactionId,
-  type RowBridgeCell,
-  type RowBridgeColumn,
-  type RowBridgeClearDelta,
-  type RowBridgeDelta,
-  type RowBridgeFillDelta,
-  type RowBridgeHandler,
-  type RowBridgeHostActionDelta,
-  type RowBridgeId,
-  type RowBridgeInsertContext,
-  type RowBridgeMetadataDelta,
-  type RowBridgeOptions,
-  type RowBridgePasteDelta,
-  type RowBridgeProjection,
-  type RowBridgeRangeDelta,
-  type RowBridgeReconciliationInput,
-  type RowBridgeReconciliationStatus,
-  type RowBridgeRowStructureDelta,
-  type RowBridgeTransaction,
-  type RowBridgeUnprojectableDelta,
-} from "./row-bridge.js";
 export { REF_CYCLE } from "./reference.js";
 export {
   assertRuntimeResourceSnapshot,
@@ -185,26 +166,35 @@ export {
   type WasmMemoryOwner,
 } from "./resource-accounting.js";
 export {
+  createRowBridge,
+  RowBridge,
+  type RowBridgeCell,
+  type RowBridgeClearDelta,
+  type RowBridgeColumn,
+  type RowBridgeDelta,
+  type RowBridgeFillDelta,
+  type RowBridgeHandler,
+  type RowBridgeHostActionDelta,
+  type RowBridgeId,
+  type RowBridgeInsertContext,
+  type RowBridgeMetadataDelta,
+  type RowBridgeOptions,
+  type RowBridgePasteDelta,
+  type RowBridgeProjection,
+  type RowBridgeRangeDelta,
+  type RowBridgeReconciliationInput,
+  type RowBridgeReconciliationStatus,
+  type RowBridgeRowStructureDelta,
+  type RowBridgeTransaction,
+  type RowBridgeUnprojectableDelta,
+  rowBridgeTransactionId,
+} from "./row-bridge.js";
+export {
   type SheetNameIssueCode,
   type SheetNameValidationResult,
   sheetNameKey,
   validateSheetName,
 } from "./sheet-name.js";
-export {
-  assertWorkbookTables,
-  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
-  type WorkbookTableNameIssueCode,
-  type WorkbookTableNameValidationResult,
-  type WorkbookTableResourceLimits,
-  validateWorkbookTableName,
-  validWorkbookTable,
-  workbookTableNameKey,
-} from "./workbook-table.js";
-export {
-  legacyFullWidthDataSource,
-  type LegacyRowLoader,
-  type LegacyRowPage,
-} from "./legacy-full-width-datasource.js";
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 export {
   DEFAULT_SYNC_COORDINATOR_LIMITS,
@@ -302,6 +292,7 @@ export type {
   RemoteOperationSource,
   ReplaceResult,
   ResolvedCell,
+  ResourceOwnerBytes,
   RowData,
   RowGroup,
   RowMetadata,
@@ -314,7 +305,6 @@ export type {
   SheetLifecycleResult,
   SheetSnapshot,
   SheetVisibility,
-  ResourceOwnerBytes,
   SnapshotCell,
   SortKey,
   Store,
@@ -339,3 +329,13 @@ export type {
   WorkbookTableStyle,
   WorkbookTableUnsupportedFeature,
 } from "./types.js";
+export {
+  assertWorkbookTables,
+  DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
+  validateWorkbookTableName,
+  validWorkbookTable,
+  type WorkbookTableNameIssueCode,
+  type WorkbookTableNameValidationResult,
+  type WorkbookTableResourceLimits,
+  workbookTableNameKey,
+} from "./workbook-table.js";
