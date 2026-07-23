@@ -1655,10 +1655,10 @@ function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): strin
   throw new Error("formula regression baseline does not match the current or legacy full matrix");
 }
 
-export function validateFormulaRegression(
+function validateFormulaBaselineBinding(
   candidate: FormulaBenchmarkResult,
   baseline: FormulaBenchmarkResult,
-): void {
+): asserts candidate is CompleteFormulaBenchmarkResult {
   if (baseline.schemaVersion === FORMULA_BENCHMARK_SCHEMA_VERSION) {
     validateFormulaEvidence(baseline, "full", true, regressionBaselineWorkloadKeys(baseline));
   } else {
@@ -1673,6 +1673,13 @@ export function validateFormulaRegression(
   ) {
     throw new Error("formula regression gate is not bound to the supplied baseline provenance");
   }
+}
+
+export function validateFormulaRegression(
+  candidate: FormulaBenchmarkResult,
+  baseline: FormulaBenchmarkResult,
+): void {
+  validateFormulaBaselineBinding(candidate, baseline);
   const baselineWorkloads = new Map(
     baseline.workloads.map((workload) => [formulaWorkloadKey(workload), workload]),
   );
@@ -1722,6 +1729,19 @@ export function validateFormulaRegression(
         `memory=formulas=${memory.formulas}.wasmDeltaBytes regression: baseline ${before}, candidate ${memory.wasmDeltaBytes}`,
       );
     }
+  }
+}
+
+export function validateFormulaCapture(
+  candidate: FormulaBenchmarkResult,
+  baseline?: FormulaBenchmarkResult,
+): void {
+  if (baseline === undefined) {
+    validateFormulaEvidence(candidate, candidate.mode, false);
+  } else if (candidate.mode === "smoke") {
+    validateFormulaBaselineBinding(candidate, baseline);
+  } else {
+    validateFormulaRegression(candidate, baseline);
   }
 }
 
@@ -1845,8 +1865,7 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
     },
   };
   validateCurrentCaptureProvenance(result, preliminary);
-  if (baseline) validateFormulaRegression(result, baseline);
-  else validateFormulaEvidence(result, mode, false);
+  validateFormulaCapture(result, baseline);
   if (!smoke) {
     await Bun.write(
       new URL("../results/formula-results.json", import.meta.url),

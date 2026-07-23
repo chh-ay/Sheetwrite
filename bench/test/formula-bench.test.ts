@@ -16,6 +16,7 @@ import {
   PRELIMINARY_BLOCKER,
   TIMING_METHOD,
   validateFormulaBenchmark,
+  validateFormulaCapture,
   validateFormulaRegression,
 } from "../src/formula-bench.js";
 import {
@@ -393,6 +394,19 @@ describe("formula regression gate", () => {
     expect(() => validateFormulaRegression(candidate, baseline)).toThrow(
       "not bound to the supplied baseline provenance",
     );
+    expect(() => validateFormulaCapture(candidate, baseline)).toThrow(
+      "not bound to the supplied baseline provenance",
+    );
+  });
+
+  it("keeps smoke captures out of timing regression evidence", () => {
+    const baseline = formulaFixture("full");
+    const smoke = formulaFixture("smoke");
+    smoke.workloads[0]!.samplesMs = [100, 100];
+    smoke.workloads[0]!.stat = summarize(smoke.workloads[0]!.samplesMs);
+
+    expect(() => validateFormulaRegression(smoke, baseline)).toThrow(".median regression");
+    expect(() => validateFormulaCapture(smoke, baseline)).not.toThrow();
   });
 
   it("compares a smoke candidate with the compatible workloads in the legacy full baseline", () => {
