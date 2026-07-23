@@ -35,7 +35,8 @@ use lookup::{find_match_index, integer_arg, positive_index};
 pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 use value::{
-    bool_from_value, cached_formula_value, compare_values, number_from_value, text_from_value,
+    aggregate_number, bool_from_value, cached_formula_value, compare_values, number_from_value,
+    text_from_value,
 };
 
 const LET_BINDING_LIMIT: usize = 126;
@@ -310,12 +311,10 @@ impl CellStore {
             for key in &affected {
                 let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
             }
-            let results: Vec<(AbsCellKey, EvalResult)> = affected
-                .iter()
-                .filter_map(|key| memo.get(key).cloned().map(|result| (*key, result)))
-                .collect();
-            for (key, result) in results {
-                self.store_formula_result(key, result);
+            for key in &affected {
+                if let Some(result) = memo.remove(key) {
+                    self.store_formula_result(*key, result);
+                }
             }
             for &sheet in seeds {
                 self.sheets[sheet].clear_dirty();
@@ -429,12 +428,10 @@ impl CellStore {
         for key in &affected {
             let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
         }
-        let results: Vec<(AbsCellKey, EvalResult)> = affected
-            .iter()
-            .filter_map(|key| memo.get(key).cloned().map(|result| (*key, result)))
-            .collect();
-        for (key, result) in results {
-            self.store_formula_result(key, result);
+        for key in &affected {
+            if let Some(result) = memo.remove(key) {
+                self.store_formula_result(*key, result);
+            }
         }
         for seeded_sheet in seeded_sheets {
             self.sheets[seeded_sheet].clear_dirty();
@@ -1264,6 +1261,39 @@ impl CellStore {
             return self.eval_lookup_func(func, args, sheet, affected, memo, visiting, depth + 1);
         }
 
+        if func == Func::Sum && args.len() == 1 {
+            let range = match &args[0] {
+                Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
+                    sheet as u32,
+                    *row_start,
+                    *col_start,
+                    *row_end,
+                    *col_end,
+                )),
+                Ast::AbsRange(sheet_ref, row_start, col_start, row_end, col_end, _) => Some(
+                    CellRange::new(sheet_ref.handle, *row_start, *col_start, *row_end, *col_end),
+                ),
+                Ast::NamedRange(named) => Some(CellRange::new(
+                    named.sheet,
+                    named.row_start,
+                    named.col_start,
+                    named.row_end,
+                    named.col_end,
+                )),
+                Ast::Structured(reference) => Some(CellRange::new(
+                    reference.sheet,
+                    reference.row_start,
+                    reference.col,
+                    reference.row_end,
+                    reference.col,
+                )),
+                _ => None,
+            };
+            if let Some(range) = range {
+                return self.eval_sum_range(range, affected, memo, visiting, depth + 1);
+            }
+        }
+
         let mut values = FuncAccumulator::default();
         for arg in args {
             let range = match arg {
@@ -1909,6 +1939,63 @@ impl CellStore {
                 }
             }
             _ => Value::Error(FormulaError::Value),
+        }
+    }
+
+    fn eval_sum_range(
+        &self,
+        range: CellRange,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> EvalResult {
+        if depth > FORMULA_RECURSION_LIMIT {
+            return Value::Error(FormulaError::Num);
+        }
+        let sheet = range.sheet as usize;
+        let Some(data) = self.sheets.get(sheet) else {
+            return Value::Error(FormulaError::Ref);
+        };
+        if data.row_count == 0
+            || data.n_cols == 0
+            || range.row_start as usize >= data.row_count
+            || range.col_start as usize >= data.n_cols
+        {
+            return Value::Error(FormulaError::Ref);
+        }
+        let row_start = range.row_start as usize;
+        let col_start = range.col_start as usize;
+        let row_end = (range.row_end as usize).min(data.row_count - 1);
+        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let total = (row_end - row_start + 1) as u64 * (col_end - col_start + 1) as u64;
+        if total > RANGE_CELL_LIMIT {
+            return Value::Error(FormulaError::Num);
+        }
+
+        let mut sum: f64 = 0.0;
+        for row in row_start..=row_end {
+            for col in col_start..=col_end {
+                if !data.is_loaded(row, col) {
+                    return Value::Error(FormulaError::Loading);
+                }
+                let index = data.idx(row, col);
+                let value = if data.kind_at(index) == KIND_EMPTY {
+                    Value::Blank
+                } else {
+                    self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
+                };
+                match aggregate_number(&value, true) {
+                    Ok(Some(number)) => sum += number,
+                    Ok(None) => {}
+                    Err(error) => return Value::Error(error),
+                }
+            }
+        }
+        if sum.is_finite() {
+            Value::Number(sum)
+        } else {
+            Value::Error(FormulaError::Num)
         }
     }
 

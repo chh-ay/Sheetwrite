@@ -593,11 +593,12 @@ fn value_coercion_logic_iferror_and_comparisons() {
 #[test]
 fn aggregate_functions_distinguish_direct_values_from_range_values() {
     let mut store = CellStore::new();
-    let sheet = store.add_sheet(3, 8);
+    let sheet = store.add_sheet(3, 9);
     store.set_number(sheet, 0, 0, 2.0, 0);
     store.set_string(sheet, 1, 0, "3", 0);
     store.set_string(sheet, 2, 0, "x", 0);
     store.set_formula(sheet, 3, 0, "=TRUE", 0);
+    store.set_formula(sheet, 5, 0, "=1/0", 0);
 
     let formulas = [
         (0, "=SUM(A1:A4)"),
@@ -608,6 +609,7 @@ fn aggregate_functions_distinguish_direct_values_from_range_values() {
         (5, "=COUNTA(A5)"),
         (6, "=LEN(A5)"),
         (7, "=A5+1"),
+        (8, "=SUM(A6:A6)"),
     ];
     for (row, src) in formulas {
         store.set_formula(sheet, row, 1, src, 0);
@@ -622,6 +624,7 @@ fn aggregate_functions_distinguish_direct_values_from_range_values() {
     assert_close(number(&store, sheet, 5, 1), 0.0);
     assert_close(number(&store, sheet, 6, 1), 0.0);
     assert_close(number(&store, sheet, 7, 1), 1.0);
+    assert_eq!(string(&store, sheet, 8, 1).as_deref(), Some("#DIV/0!"));
 }
 
 #[test]

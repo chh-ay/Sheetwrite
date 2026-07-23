@@ -204,6 +204,22 @@ pub(super) fn aggregate_if(
 ) -> Result<(f64, u64), FormulaError> {
     let mut sum = 0.0;
     let mut count = 0;
+    if let [(range, criterion)] = criteria {
+        for (value, candidate) in sum_range.values.iter().zip(&range.values) {
+            if !criterion.matches(candidate) {
+                continue;
+            }
+            match value {
+                Value::Number(value) => {
+                    sum += value;
+                    count += 1;
+                }
+                Value::Error(error) => return Err(*error),
+                Value::Text(_) | Value::Bool(_) | Value::Blank => {}
+            }
+        }
+        return Ok((sum, count));
+    }
     for (index, value) in sum_range.values.iter().enumerate() {
         if !criteria
             .iter()
