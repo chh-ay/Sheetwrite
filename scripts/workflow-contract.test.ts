@@ -113,6 +113,14 @@ describe("CI and release workflow contracts", () => {
     ).toThrow("action is not reviewed");
   });
 
+  it("routes ordinary changes through Changesets and validates semver release branches", () => {
+    const changesetStatus = workflows().ci.jobs.preflight?.steps?.find(
+      (step) => step.name === "Changeset status",
+    );
+    expect(changesetStatus?.run).toBe("bun run changeset:ci");
+    expect(changesetStatus?.if).toBeUndefined();
+  });
+
   it("keeps each workflow's required toolchain versions in parity", () => {
     const parsed = workflows();
     for (const [name, workflow] of Object.entries(parsed)) {

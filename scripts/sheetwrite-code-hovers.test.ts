@@ -6,6 +6,7 @@ import {
   formatHoverSignature,
   hoverPopoverId,
   isHighQualityHover,
+  referenceRouteForHover,
 } from "../docs/src/lib/sheetwrite-code-hovers.js";
 import {
   SheetwriteTypeEngine,
@@ -313,5 +314,26 @@ describe("Generated fence reference links", () => {
     expect(collectReferenceLinks('const x: options.Theme = "Theme";', routes)).toEqual([]);
     expect(collectReferenceLinks("const y: Unknown;", routes)).toEqual([]);
     expect(collectReferenceLinks("const z: Theme;", new Map())).toEqual([]);
+  });
+
+  it("links inferred local values when their type resolves to one public API symbol", () => {
+    const inferredRoutes = new Map([
+      ["DataSourceRequest", "/docs/api/core/data-source-request/"],
+      ["SheetwriteError", "/docs/api/core/sheetwrite-error/"],
+      ["Theme", "/docs/api/core/theme/"],
+    ]);
+    expect(
+      referenceRouteForHover(
+        "request",
+        'let request: Omit<DataSourceRequest, "signal">',
+        inferredRoutes,
+      ),
+    ).toBe("/docs/api/core/data-source-request/");
+    expect(referenceRouteForHover("error", "let error: SheetwriteError", inferredRoutes)).toBe(
+      "/docs/api/core/sheetwrite-error/",
+    );
+    expect(
+      referenceRouteForHover("value", "let value: Theme | SheetwriteError", inferredRoutes),
+    ).toBeUndefined();
   });
 });

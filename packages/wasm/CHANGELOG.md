@@ -1,5 +1,17 @@
 # @sheetwrite/wasm
 
+## 0.3.1
+
+### Patch Changes
+
+- Align the published WASM artifact with the corrected v0.3.1 release set.
+
+## 0.3.0
+
+### Minor Changes
+
+- e551eb0: Expand the WASM formula engine with bounded array, criteria, date, financial, matrix, statistical, and text evaluation while preserving deterministic dependency and recomputation behavior.
+
 ## 0.2.0
 
 ### Minor Changes

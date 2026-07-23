@@ -139,7 +139,7 @@ replaceTheme(theme: Partial<Theme> | undefined): void;
 (`DEFAULT_THEME &lt; CSS custom properties &lt; theme`) with the new partial.
 `undefined` restores the CSS-variable/default resolution. Adapters call
 this for their declarative `theme` prop; imperative patching stays on
-<code>setTheme</code>.</p>
+<a href="/docs/api/core/grid/#grid-set-theme"><code>setTheme</code></a>.</p>
 </details>
 
 <details class="api-member" id="grid-get-effective-theme" data-pagefind-weight="1">
@@ -726,7 +726,7 @@ styleRange(range: Range, style: Partial<CellStyle> | null): void;
 
 <p class="api-member-doc">Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
-unlike <code>highlightCells</code>, which draws a translucent overlay above it.</p>
+unlike <a href="/docs/api/core/grid/#grid-highlight-cells"><code>highlightCells</code></a>, which draws a translucent overlay above it.</p>
 </details>
 
 <details class="api-member" id="grid-begin-edit" data-pagefind-weight="1">

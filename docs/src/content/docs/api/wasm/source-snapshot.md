@@ -1,20 +1,20 @@
 ---
 title: "SourceSnapshot | @sheetwrite/wasm"
-description: "Compact serializable projection of persisted derived-cell sources in one range."
+description: "Compact serializable projection of persisted derived-cell sources and spill identity in one range."
 ---
 <!-- api-export:@sheetwrite/wasm|.|SourceSnapshot -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
 
-Compact serializable projection of persisted derived-cell sources in one
-range. Offsets are row-major and sorted; reference targets are packed
-`[sheet_handle, row, col]` triples.
+Compact serializable projection of persisted derived-cell sources and spill
+identity in one range. Offsets are row-major and sorted; reference targets
+are packed `[sheet_handle, row, col]` triples.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L355</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L352</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>6</span>
+## Members <span class="api-count" data-pagefind-ignore>7</span>
 
 <div class="api-member-list">
 
@@ -67,7 +67,16 @@ referenceOffsets: () => Uint32Array;
 <summary><code>referenceTargets</code></summary>
 
 ```ts generated
-referenceTargets: () => Uint32Array
+referenceTargets: () => Uint32Array;
+```
+
+</details>
+
+<details class="api-member" id="source-snapshot-spill-derived" data-pagefind-weight="1">
+<summary><code>spillDerived</code></summary>
+
+```ts generated
+spillDerived: () => Uint8Array
 ```
 
 </details>
@@ -86,6 +95,7 @@ class SourceSnapshot {
   free: () => void;
   referenceOffsets: () => Uint32Array;
   referenceTargets: () => Uint32Array;
+  spillDerived: () => Uint8Array;
 }
 ```
 

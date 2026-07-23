@@ -1,5 +1,24 @@
 # @sheetwrite/xlsx
 
+## 0.3.1
+
+### Patch Changes
+
+- Correct the XLSX package release metadata and package-specific changelog without changing runtime behavior.
+- Updated dependencies
+  - @sheetwrite/core@0.3.1
+
+## 0.3.0
+
+### Minor Changes
+
+- e551eb0: Normalize XLSX import, export, option, and resource-limit failures into canonical `SheetwriteError` values, and preserve each `AbortSignal` reason as the cancellation cause.
+
+### Patch Changes
+
+- Updated dependencies [e551eb0]
+  - @sheetwrite/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

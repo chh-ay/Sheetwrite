@@ -1,5 +1,24 @@
 # @sheetwrite/svelte
 
+## 0.3.1
+
+### Patch Changes
+
+- Correct the Svelte adapter release metadata and package-specific changelog without changing runtime behavior.
+- Updated dependencies
+  - @sheetwrite/core@0.3.1
+
+## 0.3.0
+
+### Minor Changes
+
+- e551eb0: Normalize initialization failures into canonical `SheetwriteError` values for `onInitializationError`, including cross-realm error envelopes and retained causes.
+
+### Patch Changes
+
+- Updated dependencies [e551eb0]
+  - @sheetwrite/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

@@ -252,7 +252,7 @@
   .sw-sp-stage-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--sw-sp-instrument-width);
-    align-items: start;
+    align-items: stretch;
     min-width: 0;
     background: var(--sw-surface-1);
   }

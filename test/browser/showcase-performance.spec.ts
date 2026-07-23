@@ -155,24 +155,32 @@ async function assertLoadedPeriodWithoutStaleFlash(page: Page, row: number): Pro
 }
 
 async function gridBodyPoint(page: Page, row: number, column: number) {
-  const point = await page.evaluate(
-    ({ targetRow, targetColumn }) => {
-      const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
-      const grid = window.__sheetwriteScaleGrid;
-      if (!host || !grid) return null;
-      const rect = host.getBoundingClientRect();
-      for (let y = rect.top + 36; y < rect.bottom; y += 8) {
-        for (let x = rect.left + 72; x < rect.right; x += 8) {
-          const address = grid.getCellAtPoint(x, y);
-          if (address?.row === targetRow && address.col === targetColumn) return { x, y };
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const point = await page.evaluate(
+      ({ targetRow, targetColumn }) => {
+        const host = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
+        const grid = window.__sheetwriteScaleGrid;
+        if (!host || !grid) return null;
+        const rect = host.getBoundingClientRect();
+        for (let y = rect.top + 36; y < rect.bottom; y += 8) {
+          for (let x = rect.left + 72; x < rect.right; x += 8) {
+            const address = grid.getCellAtPoint(x, y);
+            if (address?.row === targetRow && address.col === targetColumn) return { x, y };
+          }
         }
-      }
-      return null;
-    },
-    { targetRow: row, targetColumn: column },
-  );
-  if (!point) throw new Error(`Could not locate visible cell r${row} c${column}`);
-  return point;
+        return null;
+      },
+      { targetRow: row, targetColumn: column },
+    );
+    if (!point) throw new Error(`Could not locate visible cell r${row} c${column}`);
+    const viewport = page.viewportSize();
+    if (viewport === null || (point.y >= 0 && point.y < viewport.height)) return point;
+    await page.evaluate(
+      ({ targetY, viewportHeight }) => window.scrollBy(0, targetY - viewportHeight / 2),
+      { targetY: point.y, viewportHeight: viewport.height },
+    );
+  }
+  throw new Error(`Could not bring cell r${row} c${column} into the viewport`);
 }
 
 test("cold production route has no Sheetwrite-attributed task over 50 ms", async ({ browser }) => {

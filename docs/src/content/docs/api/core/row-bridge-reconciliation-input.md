@@ -5,7 +5,7 @@ description: "Input to RowBridge.reconcile."
 <!-- api-export:@sheetwrite/core|.|RowBridgeReconciliationInput -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
 
-Input to `RowBridge.reconcile`.
+Input to [`RowBridge.reconcile`](/docs/api/core/row-bridge/#row-bridge-reconcile).
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>

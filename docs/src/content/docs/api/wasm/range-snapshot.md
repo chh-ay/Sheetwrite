@@ -13,7 +13,7 @@ the owning `CellStore`, so snapshots must only be restored into that store.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L337</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L334</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>8</span>

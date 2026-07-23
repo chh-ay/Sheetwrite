@@ -9,7 +9,7 @@ Create a grid and wire its lifecycle once, so the React/Vue/Svelte adapters
 (and any plain host) share a single, drift-free implementation instead of
 each re-deriving the same create → subscribe → teardown behavior.
 
-`initSheetwrite()` MUST already have been awaited; `createGrid` throws
+`initSheetwrite()` MUST already have been awaited; [`createGrid`](/docs/api/core/create-grid/) throws
 otherwise.
 
 ### Live handlers

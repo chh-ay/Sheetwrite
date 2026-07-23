@@ -361,17 +361,121 @@ function html(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 }
-function documentationMarkdown(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
+interface DocumentationLinkCandidate {
+  readonly packageName: string;
+  readonly route: string;
+  readonly item: ApiExport;
+}
+
+type DocumentationLinkRoutes = ReadonlyMap<string, readonly DocumentationLinkCandidate[]>;
+
+function documentationLinkRoutes(manifest: PublicApiManifest): DocumentationLinkRoutes {
+  const routes = new Map<string, DocumentationLinkCandidate[]>();
+  for (const pkg of manifest.packages) {
+    for (const entry of pkg.entryPoints) {
+      for (const item of entry.exports) {
+        const candidates = routes.get(item.name) ?? [];
+        candidates.push({
+          packageName: pkg.name,
+          route: symbolRoute(pkg, entry, item),
+          item,
+        });
+        routes.set(item.name, candidates);
+      }
+    }
+  }
+  return routes;
+}
+
+function uniqueDocumentationCandidate(
+  routes: DocumentationLinkRoutes,
+  packageName: string,
+  target: string,
+): DocumentationLinkCandidate | undefined {
+  const candidates = routes.get(target) ?? [];
+  const packageCandidates = candidates.filter((candidate) => candidate.packageName === packageName);
+  if (packageCandidates.length === 1) return packageCandidates[0];
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+function hasRenderedMember(item: ApiExport, memberName: string): boolean {
+  return declarationShape(parseableDeclaration(item)).members.some(
+    (member) => member.name === memberName,
+  );
+}
+
+function documentationLinkRoute(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  target: string,
+  routes: DocumentationLinkRoutes,
+): string | undefined {
+  const targetParts = target.split(".");
+  if (targetParts.length > 2) return undefined;
+  const [ownerName, memberName] = targetParts;
+  if (memberName !== undefined) {
+    const localOwner = entry.exports.find((candidate) => candidate.name === ownerName);
+    const owner =
+      localOwner === undefined
+        ? uniqueDocumentationCandidate(routes, pkg.name, ownerName ?? "")
+        : {
+            packageName: pkg.name,
+            route: symbolRoute(pkg, entry, localOwner),
+            item: localOwner,
+          };
+    return owner === undefined || !hasRenderedMember(owner.item, memberName)
+      ? undefined
+      : `${owner.route}#${anchor(ownerName ?? "")}-${anchor(memberName)}`;
+  }
+  const local = entry.exports.find((candidate) => candidate.name === target);
+  if (local !== undefined) return symbolRoute(pkg, entry, local);
+  if (hasRenderedMember(item, target)) {
+    return `${symbolRoute(pkg, entry, item)}#${anchor(item.name)}-${anchor(target)}`;
+  }
+  return uniqueDocumentationCandidate(routes, pkg.name, target)?.route;
+}
+
+export function unresolvedDocumentationLinks(manifest: PublicApiManifest): string[] {
+  const routes = documentationLinkRoutes(manifest);
+  const issues: string[] = [];
+  for (const pkg of manifest.packages) {
+    for (const entry of pkg.entryPoints) {
+      for (const item of entry.exports) {
+        const documentation = [
+          item.documentation,
+          ...item.memberDocs.map((member) => member.documentation),
+        ];
+        for (const source of documentation) {
+          for (const match of source.matchAll(/\{@link\s+([^\s|}]+)/g)) {
+            const target = match[1] ?? "";
+            if (documentationLinkRoute(pkg, entry, item, target, routes) === undefined) {
+              issues.push(
+                `${pkg.name} ${entry.subpath} ${item.name} has unresolved documentation link ${target}`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function documentationMarkdown(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes = new Map(),
+): string {
   const documentation =
     item.documentation.trim() || "Source summary unavailable; docs:check rejects this omission.";
   return documentation.replace(
     /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
     (_match, target: string, label: string | undefined) => {
       const text = label?.trim() || target;
-      const linked = entry.exports.find((candidate) => candidate.name === target);
-      return linked === undefined
-        ? `\`${text}\``
-        : `[\`${text}\`](${symbolRoute(pkg, entry, linked)})`;
+      const route = documentationLinkRoute(pkg, entry, item, target, routes);
+      return route === undefined ? `\`${text}\`` : `[\`${text}\`](${route})`;
     },
   );
 }
@@ -379,16 +483,18 @@ function documentationMarkdown(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiE
 function memberDocumentationHtml(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
+  item: ApiExport,
   documentation: string,
+  routes: DocumentationLinkRoutes,
 ): string {
   return html(documentation).replace(
     /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
     (_match, target: string, label: string | undefined) => {
       const text = label?.trim() || target;
-      const linked = entry.exports.find((candidate) => candidate.name === target);
-      return linked === undefined
+      const route = documentationLinkRoute(pkg, entry, item, target, routes);
+      return route === undefined
         ? `<code>${text}</code>`
-        : `<a href="${symbolRoute(pkg, entry, linked)}"><code>${text}</code></a>`;
+        : `<a href="${route}"><code>${text}</code></a>`;
     },
   );
 }
@@ -514,6 +620,7 @@ function renderMembers(
   entry: ApiEntryPoint,
   item: ApiExport,
   members: readonly DeclarationMember[],
+  routes: DocumentationLinkRoutes,
 ): string {
   const searchTargets = new Set<string>(
     REQUIRED_SEARCH_TARGETS.filter(
@@ -539,7 +646,7 @@ function renderMembers(
     const summaryDoc =
       documentation === undefined
         ? ""
-        : ` <span class="api-member-summary">${memberDocumentationHtml(pkg, entry, summary)}</span>`;
+        : ` <span class="api-member-summary">${memberDocumentationHtml(pkg, entry, item, summary, routes)}</span>`;
     return [
       searchAnchor,
       `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
@@ -554,7 +661,9 @@ function renderMembers(
       ...(documentation === undefined ||
       documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary
         ? []
-        : [`<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, documentation)}</p>`]),
+        : [
+            `<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
+          ]),
       "</details>",
     ].join("\n");
   });
@@ -575,10 +684,11 @@ export async function renderSymbolPage(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
+  routes: DocumentationLinkRoutes = new Map(),
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
   const source = packageSourcePath(pkg.name, item.source);
-  const summary = documentationMarkdown(pkg, entry, item);
+  const summary = documentationMarkdown(pkg, entry, item, routes);
   const description = compactSummary(summary);
   const shape = declarationShape(parseableDeclaration(item));
   const body = [
@@ -595,7 +705,7 @@ export async function renderSymbolPage(
     "",
   ];
   if (shape.members.length > 0) {
-    body.push(renderMembers(pkg, entry, item, shape.members), "");
+    body.push(renderMembers(pkg, entry, item, shape.members, routes), "");
   }
   // A variants section earns its space only for structured unions; scalar
   // unions read best inline in the (expanded) declaration, where identifiers
@@ -638,7 +748,11 @@ export async function renderSymbolPage(
   return `${body.join("\n").trimEnd()}\n`;
 }
 
-export function renderEntryPage(pkg: ApiPackage, entry: ApiEntryPoint): string {
+export function renderEntryPage(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  routes: DocumentationLinkRoutes = new Map(),
+): string {
   const label = entryLabel(pkg, entry);
   const status =
     entry.classification === "supported"
@@ -679,7 +793,7 @@ export function renderEntryPage(pkg: ApiPackage, entry: ApiEntryPoint): string {
         "",
         '<div class="api-symbol-grid">',
         ...items.map((item) => {
-          const summary = compactSummary(documentationMarkdown(pkg, entry, item));
+          const summary = compactSummary(documentationMarkdown(pkg, entry, item, routes));
           return [
             `<a class="api-symbol-card" href="${symbolRoute(pkg, entry, item)}">`,
             `<span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="${item.kind}" aria-hidden="true">${item.kind.charAt(0).toUpperCase()}</span><code>${html(item.name)}</code></span>`,
@@ -1985,6 +2099,9 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     loadFormulaContractInventory(repositoryRoot),
     compatibilityResults(),
   ]);
+  const documentationLinkIssues = unresolvedDocumentationLinks(manifest);
+  if (documentationLinkIssues.length > 0) throw new Error(documentationLinkIssues.join("\n"));
+  const linkRoutes = documentationLinkRoutes(manifest);
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
@@ -1994,7 +2111,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     for (const entry of pkg.entryPoints) {
       apiFiles.push({
         path: join(contentRoot, `api/${entrySlug(pkg.name, entry.subpath)}.md`),
-        content: renderEntryPage(pkg, entry),
+        content: renderEntryPage(pkg, entry, linkRoutes),
       });
       for (const item of entry.exports) {
         const symbolPath = join(
@@ -2009,7 +2126,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
         symbolOwners.set(symbolPath, owner);
         apiFiles.push({
           path: symbolPath,
-          content: await renderSymbolPage(pkg, entry, item),
+          content: await renderSymbolPage(pkg, entry, item, linkRoutes),
         });
       }
     }
@@ -2210,7 +2327,7 @@ export function contentPathForRoute(
   return documents.find((document) => routeForContentPath(document.path) === normalizedRoute)?.path;
 }
 
-function headingAnchors(content: string): Set<string> {
+export function headingAnchors(content: string): Set<string> {
   const anchors = new Set<string>();
   const masked = content.replace(/```[\s\S]*?```/g, (block) => block.replace(/[^\n]/g, " "));
   for (const line of masked.split("\n")) {
@@ -2225,8 +2342,7 @@ function headingAnchors(content: string): Set<string> {
       .trim()
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s-]/gu, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-");
+      .replace(/\s/g, "-");
     if (slug.length > 0) anchors.add(slug);
   }
   return anchors;
@@ -2426,8 +2542,12 @@ async function validateMarkdown(
     }
 
     const masked = maskCode(document.content);
-    for (const match of masked.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
-      const rawTarget = match[1]?.trim() ?? "";
+    const linkTargets = [
+      ...[...masked.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]),
+      ...[...masked.matchAll(/\shref=["']([^"']+)["']/gi)].map((match) => match[1]),
+    ];
+    for (const target of linkTargets) {
+      const rawTarget = target?.trim() ?? "";
       if (
         rawTarget.length === 0 ||
         /^(?:https?:|mailto:|tel:)/.test(rawTarget) ||

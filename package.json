@@ -36,6 +36,7 @@
     "build": "bun run build:packages",
     "build:docs:production": "rm -rf docs/dist docs/.tanstack packages/*/dist packages/wasm/pkg packages/wasm/target && bun scripts/install-wasm-pack.ts && rustup target add wasm32-unknown-unknown && bun run build:packages && bun run docs:generate && bun run docs:check && bun run --filter '@sheetwrite/docs-start' build",
     "changeset:status": "changeset status",
+    "changeset:ci": "bun scripts/changeset-ci.ts",
     "typecheck:packages": "bun scripts/workspace-tooling.ts typecheck-packages",
     "typecheck:examples": "bun scripts/workspace-tooling.ts typecheck-examples",
     "typecheck:verification": "tsc --noEmit -p tsconfig.verification.json",
