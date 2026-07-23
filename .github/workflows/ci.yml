@@ -424,7 +424,7 @@ jobs:
       - name: Install exact dependencies and benchmark browser
         run: |
           bun install --frozen-lockfile
-          bun run browser:install
+          bunx playwright install chromium
       - name: Build controlled render harness
         run: bun run --filter '@sheetwrite/bench' bench:render:prepare
       - name: Capture repeated full matched samples

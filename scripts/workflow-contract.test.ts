@@ -171,6 +171,10 @@ describe("CI and release workflow contracts", () => {
       expect(commands(workflows().ci.jobs[jobName]!)).toContain("bun run browser:install:chromium");
     }
 
+    const controlledPerformance = workflows().ci.jobs["controlled-performance"]!;
+    expect(controlledPerformance["runs-on"]).toBe("sheetwrite-perf-i9-12900h-cachyos");
+    expect(commands(controlledPerformance)).toContain("bunx playwright install chromium");
+
     const projectByName = Object.fromEntries(
       (playwrightConfig.projects ?? []).map((project) => [project.name, project]),
     );
