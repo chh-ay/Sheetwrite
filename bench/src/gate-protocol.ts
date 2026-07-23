@@ -186,6 +186,44 @@ function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function dependencyFingerprint(value: unknown, field: string): Record<string, string> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError(`bench/package.json ${field} must be an object`);
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([name, version]) => {
+        if (typeof version !== "string") {
+          throw new TypeError(`bench/package.json ${field}.${name} must be a string`);
+        }
+        return [name, version] as const;
+      })
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+export function fingerprintRenderHarnessManifest(manifest: unknown): string {
+  if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
+    throw new TypeError("bench/package.json must be an object");
+  }
+  const packageManifest = manifest as {
+    readonly scripts?: Readonly<Record<string, unknown>>;
+    readonly dependencies?: unknown;
+    readonly devDependencies?: unknown;
+  };
+  const prepare = packageManifest.scripts?.["bench:render:prepare"];
+  if (typeof prepare !== "string") {
+    throw new TypeError("bench/package.json scripts.bench:render:prepare must be a string");
+  }
+  return sha256(
+    JSON.stringify({
+      scripts: { "bench:render:prepare": prepare },
+      dependencies: dependencyFingerprint(packageManifest.dependencies, "dependencies"),
+      devDependencies: dependencyFingerprint(packageManifest.devDependencies, "devDependencies"),
+    }),
+  );
+}
+
 export function computeHarnessFingerprint(
   matrix: string,
   sampling: string,
@@ -193,7 +231,11 @@ export function computeHarnessFingerprint(
 ): HarnessFingerprint {
   const sources: Record<string, string> = {};
   for (const relativePath of HARNESS_SOURCE_FILES) {
-    sources[relativePath] = sha256(readFileSync(resolve(root, relativePath)));
+    const bytes = readFileSync(resolve(root, relativePath));
+    sources[relativePath] =
+      relativePath === "bench/package.json"
+        ? fingerprintRenderHarnessManifest(JSON.parse(bytes.toString("utf8")) as unknown)
+        : sha256(bytes);
   }
   const protocol = `performance=${PERFORMANCE_GATE_PROTOCOL_VERSION};render=${RENDER_PROTOCOL_VERSION}`;
   const dataset = `seed=0x${DEFAULT_SEED.toString(16)};schema=id,date,customer,city,amount`;

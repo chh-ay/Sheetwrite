@@ -14,6 +14,7 @@ import {
 import {
   computeHarnessFingerprint,
   fingerprintMismatches,
+  fingerprintRenderHarnessManifest,
   MATRIX_IDS,
 } from "../src/gate-protocol.js";
 import {
@@ -155,6 +156,49 @@ describe("controlled zero-regression comparison", () => {
     for (const { observed, mismatch } of cases) {
       expect(fingerprintMismatches(expected, observed, "fingerprint")).toEqual([mismatch]);
     }
+  });
+  test("ignores unrelated benchmark scripts while binding render preparation and dependencies", () => {
+    const manifest = {
+      scripts: {
+        "bench:data": "bun run src/data-bench.ts",
+        "bench:render:prepare": "bun run build:wasm",
+      },
+      dependencies: {
+        "@sheetwrite/core": "workspace:*",
+        handsontable: "^18.0.0",
+      },
+      devDependencies: {
+        "@playwright/test": "^1.61.1",
+      },
+    };
+    const expected = fingerprintRenderHarnessManifest(manifest);
+    expect(
+      fingerprintRenderHarnessManifest({
+        ...manifest,
+        scripts: {
+          ...manifest.scripts,
+          "bench:resource": "bun run src/resource-bench.ts",
+        },
+      }),
+    ).toBe(expected);
+    expect(
+      fingerprintRenderHarnessManifest({
+        ...manifest,
+        scripts: {
+          ...manifest.scripts,
+          "bench:render:prepare": "bun run build:wasm && bun run build:core",
+        },
+      }),
+    ).not.toBe(expected);
+    expect(
+      fingerprintRenderHarnessManifest({
+        ...manifest,
+        dependencies: {
+          ...manifest.dependencies,
+          handsontable: "^19.0.0",
+        },
+      }),
+    ).not.toBe(expected);
   });
 });
 

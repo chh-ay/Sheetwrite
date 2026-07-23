@@ -15,14 +15,14 @@
     "rounds": 10
   },
   "harness": {
-    "digest": "d014ce4b3d4b3b5c53d810b84d3b9e3d3fe7f9ff25fb3b028416f8fe9bb2a881",
+    "digest": "334a31c26726655a62c3f85c9988fad64e812b7eed074cb0916f7e4c748b975d",
     "protocol": "performance=1;render=1",
     "matrix": "render-full-v1",
     "dataset": "seed=0x5eedc0de;schema=id,date,customer,city,amount",
     "sampling": "measured=3;warmup=1;minimum-sample-ms=100;order-seed=0x51c0ffee",
     "schema": "typed-render-artifact-v1;controlled-baseline-v2",
     "sources": {
-      "bench/package.json": "7c125cbe7ec6c286aaa892ae3beaacc2c45c8b6a7b5e17d9313b4f5927ae6cda",
+      "bench/package.json": "6ce3789df9ca30334048e5ce870b76da4b168ea44876c36c7e3716030b716852",
       "bench/src/dataset.ts": "2b72d98f81b70eaf8b77f8f4ed3f951740436040401cb943fd7ff31f5e24073f",
       "bench/src/dom-setup.ts": "5e41e0b2ccc37039feba6551cc7bab4beb7ecd6028d87fe15b681d2112ddc617",
       "bench/src/handsontable-runtime.ts": "b9851cbb879b8ff9b56c04a07a5a6a4ff798a659a9ee090822b38f84d33582ba",
