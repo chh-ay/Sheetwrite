@@ -530,7 +530,7 @@ test.describe("documentation site", () => {
     expect(light?.tokenColors.length ?? 0).toBeGreaterThanOrEqual(4);
     expect(light?.triggerDecoration).toContain("underline");
     expect(light?.triggerDecorationStyle).toBe("wavy");
-    expect(light?.triggerCursor).toBe("help");
+    expect(light?.triggerCursor).toBe("pointer");
 
     const trigger = block.locator("[data-sw-code-popover-trigger]").first();
     await trigger.focus();
