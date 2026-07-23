@@ -16,6 +16,7 @@ pub(crate) struct DepIndex {
     range_sheets: Vec<RangeSheetIndex>,
     pub(super) epoch: u64,
     pub(super) has_dynamic_arrays: bool,
+    has_formula_dependencies: bool,
 }
 
 impl DepIndex {
@@ -135,6 +136,16 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
     let mut exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>> = HashMap::new();
     let mut range_dependents: HashMap<CellRange, Vec<AbsCellKey>> = HashMap::new();
     let mut has_dynamic_arrays = false;
+    let formula_cells: HashSet<AbsCellKey> = sheets
+        .iter()
+        .enumerate()
+        .flat_map(|(sheet, data)| {
+            data.formulas
+                .keys()
+                .map(move |&cell| AbsCellKey::from_local(sheet, cell))
+        })
+        .collect();
+    let mut has_formula_dependencies = false;
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         for (&formula_cell, entry) in &sheet.formulas {
@@ -146,6 +157,12 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
             for &range in &entry.reads.ranges {
                 range_dependents.entry(range).or_default().push(formula_abs);
             }
+            has_formula_dependencies |= entry
+                .reads
+                .cells
+                .iter()
+                .any(|cell| formula_cells.contains(cell));
+            has_formula_dependencies |= !entry.reads.ranges.is_empty();
         }
     }
 
@@ -175,6 +192,7 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
         range_sheets,
         epoch,
         has_dynamic_arrays,
+        has_formula_dependencies,
     }
 }
 
@@ -223,13 +241,19 @@ pub(super) fn collect_affected_formulas(
     index: &DepIndex,
 ) -> HashSet<AbsCellKey> {
     let mut affected: HashSet<AbsCellKey> = HashSet::new();
-    let mut seen_dirty: HashSet<AbsCellKey> = HashSet::new();
     let mut queue: VecDeque<AbsCellKey> = VecDeque::new();
     let mut range_matches: Vec<usize> = Vec::new();
     let mut row_matches: Vec<usize> = Vec::new();
     let mut range_marks = vec![0; index.range_groups.len()];
     let mut range_stamp = 1;
     if let Some(sheet) = sheets.get(seed_sheet) {
+        for &cell in &sheet.dirty_cells {
+            let abs = AbsCellKey::from_local(seed_sheet, cell);
+            if formula_exists(sheets, abs) {
+                affected.insert(abs);
+            }
+            queue.push_back(abs);
+        }
         if sheet.all_dirty {
             // A bulk load or structural rewrite touched (potentially) every
             // cell on this sheet. Seed every formula on the sheet plus every
@@ -239,7 +263,7 @@ pub(super) fn collect_affected_formulas(
             let seed = seed_sheet as u32;
             for &cell in sheet.formulas.keys() {
                 let abs = AbsCellKey::from_local(seed_sheet, cell);
-                if seen_dirty.insert(abs) {
+                if affected.insert(abs) {
                     queue.push_back(abs);
                 }
             }
@@ -248,7 +272,7 @@ pub(super) fn collect_affected_formulas(
                     continue;
                 }
                 for &dependent in dependents {
-                    if affected.insert(dependent) && seen_dirty.insert(dependent) {
+                    if affected.insert(dependent) {
                         queue.push_back(dependent);
                     }
                 }
@@ -258,16 +282,11 @@ pub(super) fn collect_affected_formulas(
                     continue;
                 }
                 for &dependent in &group.dependents {
-                    if affected.insert(dependent) && seen_dirty.insert(dependent) {
+                    if affected.insert(dependent) {
                         queue.push_back(dependent);
                     }
                 }
             }
-        }
-        for &cell in &sheet.dirty_cells {
-            let abs = AbsCellKey::from_local(seed_sheet, cell);
-            seen_dirty.insert(abs);
-            queue.push_back(abs);
         }
     }
 
@@ -278,7 +297,7 @@ pub(super) fn collect_affected_formulas(
 
         if let Some(dependents) = index.exact_dependents.get(&cell) {
             for &dependent in dependents {
-                if affected.insert(dependent) && seen_dirty.insert(dependent) {
+                if affected.insert(dependent) {
                     queue.push_back(dependent);
                 }
             }
@@ -295,7 +314,7 @@ pub(super) fn collect_affected_formulas(
             let range_group = &index.range_groups[group];
             debug_assert!(range_group.range.contains(cell));
             for &dependent in &range_group.dependents {
-                if affected.insert(dependent) && seen_dirty.insert(dependent) {
+                if affected.insert(dependent) {
                     queue.push_back(dependent);
                 }
             }
@@ -317,6 +336,9 @@ pub(super) fn seed_dependency_depth_errors(
     index: &DepIndex,
     memo: &mut HashMap<AbsCellKey, EvalResult>,
 ) {
+    if !index.has_formula_dependencies {
+        return;
+    }
     let dependencies = collect_formula_dependencies(sheets, affected, index);
     let mut depth_memo: HashMap<AbsCellKey, Result<usize, FormulaError>> =
         HashMap::with_capacity(affected.len());
