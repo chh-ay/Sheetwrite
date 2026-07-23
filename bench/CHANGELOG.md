@@ -1,5 +1,12 @@
 # @sheetwrite/bench
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [e551eb0]
+  - @sheetwrite/core@0.4.0
+
 ## 0.0.1
 
 ### Patch Changes
