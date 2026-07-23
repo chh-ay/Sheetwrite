@@ -961,6 +961,50 @@ bun run --filter @sheetwrite/bench bench:formula
 <p class="size-history__intro">Registry measurements for every published release. Each delta is measured against the release immediately before it.</p>
 <details class="size-history__release" data-current="true" open>
 <summary class="size-history__release-head">
+<span class="size-history__version-step"><span>v0.3.0</span><svg class="size-history__arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M9 4.5 12.5 8 9 11.5"/></svg><strong>v0.3.1</strong></span>
+<time datetime="2026-07-23T17:11:35.485Z">Measured Jul 23, 2026</time>
+<svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+</summary>
+<div class="size-history__table-wrap">
+<table class="size-history__table">
+<thead><tr><th scope="col">Package</th><th scope="col">Tarball</th><th scope="col">Installed</th></tr></thead>
+<tbody>
+<tr>
+<th scope="row"><code>@sheetwrite/wasm</code></th>
+<td>287.6 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+<td>795.6 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/core</code></th>
+<td>517.4 KiB<small data-direction="increase"><span>+11 B</span><span>+0.0%</span></small></td>
+<td>2.71 MiB<small data-direction="increase"><span>+24 B</span><span>+0.0%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/xlsx</code></th>
+<td>85.5 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+<td>429.6 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/react</code></th>
+<td>9.2 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+<td>31.9 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/vue</code></th>
+<td>10.1 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+<td>35.7 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+</tr>
+<tr>
+<th scope="row"><code>@sheetwrite/svelte</code></th>
+<td>6.2 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+<td>18.5 KiB<small data-direction="flat"><span>0 B</span><span>+0.0%</span></small></td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+<details class="size-history__release">
+<summary class="size-history__release-head">
 <span class="size-history__version-step"><span>v0.2.0</span><svg class="size-history__arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M9 4.5 12.5 8 9 11.5"/></svg><strong>v0.3.0</strong></span>
 <time datetime="2026-07-23T15:20:59.199Z">Measured Jul 23, 2026</time>
 <svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
