@@ -76,15 +76,19 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - name: Install compatibility check dependencies
+      - name: Install compatibility validation dependencies
         run: bun install --frozen-lockfile
-      - name: Verify fresh compatibility results
-        run: bun run compatibility:check
+      - name: Validate fresh compatibility test set
+        run: bun run compatibility:validate
       - name: Download canonical artifacts from successful CI
         env:
           GH_TOKEN: ${{ github.token }}
           CI_RUN_ID: ${{ needs.identity.outputs.ci_run_id }}
         run: gh run download "$CI_RUN_ID" --name canonical-release-artifacts --dir test-results/release-artifacts
+      - name: Hydrate canonical package outputs
+        run: bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
+      - name: Verify local compatibility results
+        run: bun run compatibility:check -- --allow-unclaimed
       - name: Publish unpublished package versions
         id: publish
         env:

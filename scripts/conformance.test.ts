@@ -8,6 +8,7 @@ import {
   type ConformanceManifest,
   type ConformanceResult,
   canonicalJson,
+  compatibilityCheckSummary,
   compareResults,
   compareReviewedObservation,
   type FormulaInventory,
@@ -551,5 +552,9 @@ describe("offline typed comparison", () => {
     expect(result.unsupported).toEqual(unsupported.map((entry) => entry.id));
     expect(result.deferred).toBe(corpus.cases.length - unsupported.length);
     expect(result.status).toBe("blocked");
+    expect(() => compatibilityCheckSummary(result)).toThrow("Compatibility release check BLOCKED");
+    expect(compatibilityCheckSummary(result, true)).toContain(
+      "Excel and Google Sheets compatibility remains unclaimed",
+    );
   });
 });

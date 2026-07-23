@@ -115,7 +115,10 @@ describe("contributor and CI toolchain contract", () => {
     );
     expect(artifactBuilders).toHaveLength(1);
     const artifactBuild = artifactBuilders[0]!;
-    expect(commandsFor(artifactBuild)).toContain("bun run conformance:offline");
+    expect(commandsFor(artifactBuild)).toContain("bun run compatibility:validate");
+    expect(commandsFor(artifactBuild)).toContain(
+      "bun run compatibility:check -- --allow-unclaimed",
+    );
 
     const requiredNeeds = needsOf("required");
     expect(new Set(requiredNeeds)).toEqual(

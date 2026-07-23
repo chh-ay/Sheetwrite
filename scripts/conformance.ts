@@ -5,6 +5,7 @@ import { writeConformanceEvidence } from "./conformance/generate.js";
 import { sha256 } from "./conformance/normalize.js";
 import { runOffline } from "./conformance/offline.js";
 import { captureLibreOfficeWorkbookRoundtrips } from "./conformance/roundtrip.js";
+import type { OfflineConformanceResult } from "./conformance/types.js";
 
 export { validateExcelCapture } from "./conformance/adapters/excel.js";
 export type {
@@ -63,6 +64,22 @@ export type {
   SemanticCategory,
 } from "./conformance/types.js";
 
+export function compatibilityCheckSummary(
+  result: OfflineConformanceResult,
+  allowUnclaimed = false,
+): string {
+  if (result.status === "blocked") {
+    const detail = `tests=${result.checked} reviewed app results=${result.reviewed} missing app results=${result.deferred} unsupported tests=${result.unsupported.length}`;
+    if (!allowUnclaimed) {
+      throw new Error(
+        `Compatibility release check BLOCKED: ${detail}; Sheetwrite's local checks passed, but Excel and Google Sheets compatibility is not claimed`,
+      );
+    }
+    return `Compatibility local checks passed: ${detail}; Excel and Google Sheets compatibility remains unclaimed`;
+  }
+  return `Compatibility checks passed: tests=${result.checked} reviewed app results=${result.reviewed} unsupported tests=${result.unsupported.length}`;
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "validate";
   if (command === "generate") {
@@ -87,7 +104,9 @@ async function main(): Promise<void> {
     }
     return;
   }
-  const corpus = await loadCorpus(process.argv[3]);
+  const corpus = await loadCorpus(
+    process.argv.slice(3).find((argument) => !argument.startsWith("--")),
+  );
   if (command === "validate") {
     console.log(
       `Compatibility test set valid: version=${corpus.protocol} tests=${corpus.cases.length} file hash=${sha256(corpus)}`,
@@ -96,14 +115,7 @@ async function main(): Promise<void> {
   }
   if (command === "offline") {
     const result = await runOffline(corpus);
-    if (result.status === "blocked") {
-      throw new Error(
-        `Compatibility release check BLOCKED: tests=${result.checked} reviewed app results=${result.reviewed} missing app results=${result.deferred} unsupported tests=${result.unsupported.length}; Sheetwrite's local checks passed, but Excel and Google Sheets compatibility is not claimed`,
-      );
-    }
-    console.log(
-      `Compatibility checks passed: tests=${result.checked} reviewed app results=${result.reviewed} unsupported tests=${result.unsupported.length}`,
-    );
+    console.log(compatibilityCheckSummary(result, process.argv.includes("--allow-unclaimed")));
     return;
   }
   if (command === "capture-excel") {

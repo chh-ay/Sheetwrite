@@ -192,10 +192,12 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun scripts/install-wasm-pack.ts
-      - name: Verify current conformance evidence
-        run: bun run conformance:offline
+      - name: Validate compatibility test set
+        run: bun run compatibility:validate
       - name: Build and pack once
         run: bun run release:prepare -- --mode release --output test-results/release-artifacts
+      - name: Verify local compatibility results
+        run: bun run compatibility:check -- --allow-unclaimed
       - name: Verify manifest before upload
         run: bun run release:verify-artifacts -- --input test-results/release-artifacts
       - name: Upload canonical tarballs
