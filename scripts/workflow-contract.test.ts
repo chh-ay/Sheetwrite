@@ -121,6 +121,65 @@ describe("CI and release workflow contracts", () => {
     expect(changesetStatus?.if).toBeUndefined();
   });
 
+  it("never grants a workflow write-scoped secrets against untrusted pull-request code", () => {
+    // `pull_request_target` runs with the base repository's token and secrets while
+    // checking out attacker-controllable head code. It is the trigger behind a
+    // well-known class of supply-chain compromises and has no use in this repo.
+    for (const [name, workflow] of Object.entries(workflows())) {
+      expect(workflow.on?.pull_request_target, `${name} pull_request_target`).toBeUndefined();
+    }
+  });
+
+  it("never executes fork pull-request code on a non-ephemeral runner", () => {
+    // GitHub-hosted runners are destroyed after each job; a self-hosted runner is
+    // a persistent machine whose filesystem, caches, and network position survive.
+    // Checking out fork code there is a host-compromise vector that a read-only
+    // token does not mitigate, so every self-hosted job must be gated to
+    // same-repository events.
+    for (const [workflowName, workflow] of Object.entries(workflows())) {
+      for (const [jobName, job] of Object.entries(workflow.jobs)) {
+        const runsOn = job["runs-on"];
+        const hosted = typeof runsOn === "string" && /^(?:ubuntu|windows|macos)-/.test(runsOn);
+        if (hosted) continue;
+        const condition = typeof job.if === "string" ? job.if : "";
+        expect(
+          condition.replace(/\s+/g, " "),
+          `${workflowName}.${jobName} runs on ${String(runsOn)} and must reject fork pull requests`,
+        ).toContain("github.event.pull_request.head.repo.full_name == github.repository");
+      }
+    }
+  });
+
+  it("pins the CI trigger branches so release branches are an explicit decision", () => {
+    const triggers = workflows().ci.on;
+    expect((triggers?.push as { branches?: string[] } | undefined)?.branches).toEqual(["develop"]);
+    expect((triggers?.pull_request as { branches?: string[] } | undefined)?.branches).toEqual([
+      "develop",
+    ]);
+  });
+
+  it("declares every job whose condition reads another job's outputs as a direct dependency", () => {
+    // `needs` exposes DIRECT dependencies only. A job that reads
+    // `needs.<other>.outputs` without listing `<other>` evaluates against an
+    // undefined context, so the condition is always false and the job silently
+    // never runs.
+    for (const [workflowName, workflow] of Object.entries(workflows())) {
+      for (const [jobName, job] of Object.entries(workflow.jobs)) {
+        const condition = typeof job.if === "string" ? job.if : "";
+        const referenced = [...condition.matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs/g)].map(
+          (match) => match[1]!,
+        );
+        if (referenced.length === 0) continue;
+        const needs = job.needs === undefined ? [] : [job.needs].flat();
+        for (const dependency of referenced) {
+          expect(needs, `${workflowName}.${jobName} reads needs.${dependency}.outputs`).toContain(
+            dependency,
+          );
+        }
+      }
+    }
+  });
+
   it("keeps each workflow's required toolchain versions in parity", () => {
     const parsed = workflows();
     for (const [name, workflow] of Object.entries(parsed)) {

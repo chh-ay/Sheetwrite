@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 20
     outputs:
       docs_required: ${{ steps.paths.outputs.docs_required }}
+      perf_required: ${{ steps.paths.outputs.perf_required }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -113,8 +114,11 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install coverage toolchain
         run: cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
-      - name: Install benchmark browser
-        run: bun run browser:install
+      # `bench:verify` runs `render-driver.ts --smoke`, which launches Chromium and
+      # nothing else. Installing Firefox and WebKit here downloads two engines plus
+      # their system dependencies on every run for no consumer.
+      - name: Install Chromium for the render smoke
+        run: bun run browser:install:chromium
       - name: Download canonical tarballs
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
@@ -407,7 +411,27 @@ jobs:
 
   controlled-performance:
     name: Matched Zero-Regression Performance
-    needs: artifact-build
+    # `preflight` is in `needs` because the `if:` below reads its output. The
+    # `needs` context exposes DIRECT dependencies only, so omitting it would make
+    # the expression resolve against an undefined context and skip this job on
+    # every run. Execution order is unchanged: `artifact-build` already needs
+    # `preflight`.
+    needs: [preflight, artifact-build]
+    # Two independent conditions, both required.
+    #
+    # 1. Cost: this job occupies a single self-hosted runner for up to 90 minutes
+    #    and every other pull request queues behind it, so it runs only when the
+    #    diff could move a measurement. `requiresPerformanceRun` defaults to true.
+    # 2. Security: this is the only NON-ephemeral runner in the workflow. It must
+    #    never check out and execute code from a fork — a persistent host exposes
+    #    its filesystem, caches, and network position regardless of the read-only
+    #    token. Fork pull requests skip it; the measurement is taken instead by the
+    #    `push` run on `develop` after merge, which is same-repository by
+    #    construction.
+    if: >-
+      needs.preflight.outputs.perf_required == 'true' &&
+      (github.event_name == 'push' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: sheetwrite-perf-i9-12900h-cachyos
     timeout-minutes: 90
     steps:
@@ -482,6 +506,8 @@ jobs:
           BROWSER: ${{ needs.browser-smoke.result }}
           PERFORMANCE: ${{ needs.controlled-performance.result }}
           DOCS_REQUIRED: ${{ needs.preflight.outputs.docs_required }}
+          PERF_REQUIRED: ${{ needs.preflight.outputs.perf_required }}
+          PERF_FROM_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
           test "$PREFLIGHT" = success
           test "$UNIT_COVERAGE" = success
@@ -489,7 +515,6 @@ jobs:
           test "$PACKED" = success
           test "$BUNDLERS" = success
           test "$SIZE" = success
-          test "$PERFORMANCE" = success
           if [ "$DOCS_REQUIRED" = "true" ]; then
             test "$DOCS" = success
             test "$BROWSER" = success
@@ -497,4 +522,22 @@ jobs:
             test "$DOCS_REQUIRED" = "false"
             test "$DOCS" = skipped
             test "$BROWSER" = skipped
+          fi
+          # The self-hosted benchmark never runs fork code (see
+          # `controlled-performance`). That protects the host but must not become a
+          # way to merge perf-sensitive changes without evidence: a fork could edit
+          # `bench/results/render-baseline.json` and, if we deferred to a post-merge
+          # run, be validated against its own altered baseline. So a fork pull
+          # request is allowed through only when the diff needs no measurement.
+          if [ "$PERF_REQUIRED" != "true" ]; then
+            test "$PERF_REQUIRED" = "false"
+            test "$PERFORMANCE" = skipped
+          elif [ "$PERF_FROM_FORK" = "true" ]; then
+            echo "This pull request changes performance-sensitive paths, but the" >&2
+            echo "matched zero-regression benchmark does not run fork code on the" >&2
+            echo "self-hosted runner. A maintainer must replay these commits on a" >&2
+            echo "same-repository branch so the gate runs before merge." >&2
+            exit 1
+          else
+            test "$PERFORMANCE" = success
           fi

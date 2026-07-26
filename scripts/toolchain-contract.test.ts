@@ -162,7 +162,16 @@ describe("contributor and CI toolchain contract", () => {
     const jobs = parsedWorkflow.jobs ?? {};
     const controlled = jobs["controlled-performance"];
     expect(controlled?.["runs-on"]).toBe("sheetwrite-perf-i9-12900h-cachyos");
-    expect(controlled?.needs).toBe("artifact-build");
+    // `preflight` is required in `needs` because the job's `if:` reads
+    // `needs.preflight.outputs.perf_required`; the `needs` context exposes direct
+    // dependencies only, so omitting it would skip the gate on every run.
+    expect(controlled?.needs).toEqual(["preflight", "artifact-build"]);
+    const condition = String(controlled?.if ?? "").replace(/\s+/g, " ");
+    expect(condition).toContain("needs.preflight.outputs.perf_required == 'true'");
+    // The only non-ephemeral runner must never execute fork code.
+    expect(condition).toContain(
+      "github.event.pull_request.head.repo.full_name == github.repository",
+    );
     const commands = controlled?.steps?.flatMap((step) => (step.run ? [step.run] : [])).join("\n");
     expect(commands).toContain("--rounds 10");
     expect(commands).toContain("src/check.ts");
@@ -204,6 +213,30 @@ describe("contributor and CI toolchain contract", () => {
     expect(requiredCommand).toContain('if [ "$DOCS_REQUIRED" = "true" ]');
     expect(requiredCommand).toContain('test "$DOCS" = skipped');
     expect(requiredCommand).toContain('test "$BROWSER" = skipped');
+  });
+
+  it("gates the performance benchmark without letting fork pull requests bypass it", () => {
+    const jobs = parsedWorkflow.jobs ?? {};
+    const preflight = jobs.preflight;
+    expect(preflight?.outputs?.perf_required).toBe("$" + "{{ steps.paths.outputs.perf_required }}");
+
+    const requiredJob = jobs.required;
+    const requiredCommand = requiredJob?.steps?.find((step) =>
+      step.run?.includes('test "$PREFLIGHT" = success'),
+    )?.run;
+
+    // A diff that needs no measurement may skip, and the skip must be exact.
+    expect(requiredCommand).toContain('if [ "$PERF_REQUIRED" != "true" ]');
+    expect(requiredCommand).toContain('test "$PERFORMANCE" = skipped');
+    expect(requiredCommand).toContain('test "$PERFORMANCE" = success');
+
+    // A fork pull request touching performance-sensitive paths must FAIL, not
+    // pass on a skip. Deferring to a post-merge run would let a fork alter
+    // `bench/results/render-baseline.json` and be validated against its own
+    // baseline after the merge already happened.
+    expect(JSON.stringify(requiredJob)).toContain("PERF_FROM_FORK");
+    expect(requiredCommand).toContain('elif [ "$PERF_FROM_FORK" = "true" ]');
+    expect(requiredCommand).toContain("exit 1");
   });
 
   it("shares a source-keyed Rust compilation cache across build and test jobs", () => {
