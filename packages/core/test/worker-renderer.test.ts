@@ -27,6 +27,16 @@ class RecordingWorker extends EventTarget {
   }
 }
 
+class StructuredCloneWorker extends EventTarget {
+  readonly received: unknown[] = [];
+
+  postMessage(message: unknown, transfer?: Transferable[]): void {
+    this.received.push(structuredClone(message, { transfer: transfer ?? [] }));
+  }
+
+  terminate(): void {}
+}
+
 function latestWorker(): RecordingWorker {
   const worker = latestConstructedWorker;
   if (!worker) throw new Error("worker was not constructed");
@@ -56,8 +66,64 @@ interface SharedPaintPost {
   };
 }
 
+interface TransferablePackedArrays {
+  valueKinds: Uint8Array;
+  numberValues: Float64Array;
+  stringPoolIds: Uint32Array;
+  stringLocalIds: Int32Array;
+  styleIds: Uint32Array;
+  stringPoolUpdateIds?: Uint32Array;
+}
+
+interface GenericPaintPost {
+  type: "paint";
+  view: {
+    sheet: unknown;
+    styleIds: Uint32Array;
+  };
+}
+
+interface PanePaintPost {
+  type: "paintPanes";
+  panes: unknown[];
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
+}
+
+function isTransferablePackedArrays(value: unknown): value is TransferablePackedArrays {
+  return (
+    isRecord(value) &&
+    value.valueKinds instanceof Uint8Array &&
+    value.numberValues instanceof Float64Array &&
+    value.stringPoolIds instanceof Uint32Array &&
+    value.stringLocalIds instanceof Int32Array &&
+    value.styleIds instanceof Uint32Array &&
+    (value.stringPoolUpdateIds === undefined || value.stringPoolUpdateIds instanceof Uint32Array)
+  );
+}
+
+function isGenericPaintPost(value: unknown): value is GenericPaintPost {
+  return (
+    isRecord(value) &&
+    value.type === "paint" &&
+    isRecord(value.view) &&
+    value.view.styleIds instanceof Uint32Array
+  );
+}
+
+function isPanePaintPost(value: unknown): value is PanePaintPost {
+  return isRecord(value) && value.type === "paintPanes" && Array.isArray(value.panes);
+}
+
+function firstPackedPane(value: unknown): TransferablePackedArrays {
+  if (!isPanePaintPost(value)) throw new Error("expected pane paint message");
+  const first = value.panes[0];
+  if (!isRecord(first) || !isTransferablePackedArrays(first.packed)) {
+    throw new Error("expected packed first pane");
+  }
+  return first.packed;
 }
 
 function isSharedPaintPost(value: unknown): value is SharedPaintPost {
@@ -91,7 +157,7 @@ function makePackedView(): VisibleWindowView {
 }
 
 describe("WorkerRenderer", () => {
-  it("transfers the visible-window style id buffer when painting a generic view", () => {
+  it("transfers a renderer-owned style id buffer when painting a generic view", () => {
     const renderer = new WorkerRenderer();
     const worker = new RecordingWorker();
     Reflect.set(renderer, "worker", worker);
@@ -110,8 +176,12 @@ describe("WorkerRenderer", () => {
 
     expect(worker.messages).toHaveLength(1);
     const posted = worker.messages[0]!;
-    expect(posted.message).toEqual({ type: "paint", view });
-    expect(posted.transfer).toEqual([styleIds.buffer]);
+    if (!isGenericPaintPost(posted.message)) throw new Error("expected generic paint message");
+    const postedView = posted.message.view;
+    expect(posted.message).toMatchObject({ type: "paint", view: { sheet: "s1" } });
+    expect(postedView.styleIds).toEqual(styleIds);
+    expect(postedView.styleIds).not.toBe(styleIds);
+    expect(posted.transfer).toEqual([postedView.styleIds.buffer]);
   });
 
   it("keeps the packed transfer path by default", () => {
@@ -124,15 +194,71 @@ describe("WorkerRenderer", () => {
 
     expect(worker.messages).toHaveLength(1);
     const posted = worker.messages[0]!;
+    if (!isTransferablePackedArrays(posted.message)) {
+      throw new Error("expected packed paint message");
+    }
+    const payload = posted.message;
     expect(posted.message).toMatchObject({ type: "paintPacked", sheet: "s1" });
     expect(posted.transfer).toEqual([
-      view.valueKinds!.buffer,
-      view.numberValues!.buffer,
-      view.stringPoolIds!.buffer,
-      view.stringLocalIds!.buffer,
-      view.styleIds.buffer,
-      view.stringPoolUpdateIds!.buffer,
+      payload.valueKinds.buffer,
+      payload.numberValues.buffer,
+      payload.stringPoolIds.buffer,
+      payload.stringLocalIds.buffer,
+      payload.styleIds.buffer,
+      payload.stringPoolUpdateIds!.buffer,
     ]);
+    expect(payload.valueKinds).not.toBe(view.valueKinds);
+    expect(payload.numberValues).not.toBe(view.numberValues);
+    expect(payload.stringPoolIds).not.toBe(view.stringPoolIds);
+    expect(payload.stringLocalIds).not.toBe(view.stringLocalIds);
+    expect(payload.styleIds).not.toBe(view.styleIds);
+    expect(payload.stringPoolUpdateIds).not.toBe(view.stringPoolUpdateIds);
+  });
+
+  it("keeps cached packed view buffers intact across repeated paints", () => {
+    const renderer = new WorkerRenderer();
+    const worker = new StructuredCloneWorker();
+    Reflect.set(renderer, "worker", worker);
+    const view = makePackedView();
+
+    renderer.paint(view);
+    renderer.paint(view);
+
+    expect(worker.received).toHaveLength(2);
+    const second = worker.received[1];
+    if (!isTransferablePackedArrays(second)) throw new Error("expected packed paint message");
+    expect(second.valueKinds).toHaveLength(2);
+    expect(second.numberValues).toHaveLength(2);
+    expect(second.stringPoolIds).toHaveLength(2);
+    expect(second.stringLocalIds).toHaveLength(2);
+    expect(second.styleIds).toHaveLength(2);
+    expect(view.valueKinds).toHaveLength(2);
+    expect(view.numberValues).toHaveLength(2);
+    expect(view.stringPoolIds).toHaveLength(2);
+    expect(view.stringLocalIds).toHaveLength(2);
+    expect(view.styleIds).toHaveLength(2);
+  });
+
+  it("keeps cached generic view buffers intact across repeated paints", () => {
+    const renderer = new WorkerRenderer();
+    const worker = new StructuredCloneWorker();
+    Reflect.set(renderer, "worker", worker);
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      rows: { start: 0, end: 1 },
+      cols: [0, 1],
+      values: ["alpha", 42],
+      styleIds: new Uint32Array([0, 1]),
+      styles: [{}, { bold: true }],
+    };
+
+    renderer.paint(view);
+    renderer.paint(view);
+
+    const second = worker.received[1];
+    if (!isGenericPaintPost(second)) throw new Error("expected generic paint message");
+    expect(second.view.styleIds).toHaveLength(2);
+    expect(view.styleIds).toHaveLength(2);
   });
 
   it("preserves resolved hyperlink and conditional styles through the Worker payload", () => {
@@ -263,14 +389,51 @@ describe("WorkerRenderer", () => {
         },
       ],
     });
-    expect(worker.messages[0]!.transfer).toEqual([
-      packed.valueKinds!.buffer,
-      packed.numberValues!.buffer,
-      packed.stringPoolIds!.buffer,
-      packed.stringLocalIds!.buffer,
-      packed.styleIds.buffer,
-      packed.stringPoolUpdateIds!.buffer,
+    const posted = worker.messages[0]!;
+    const postedPacked = firstPackedPane(posted.message);
+    expect(posted.transfer).toEqual([
+      postedPacked.valueKinds.buffer,
+      postedPacked.numberValues.buffer,
+      postedPacked.stringPoolIds.buffer,
+      postedPacked.stringLocalIds.buffer,
+      postedPacked.styleIds.buffer,
+      postedPacked.stringPoolUpdateIds!.buffer,
     ]);
+    expect(postedPacked.valueKinds).not.toBe(packed.valueKinds);
+    expect(postedPacked.styleIds).not.toBe(packed.styleIds);
+  });
+
+  it("keeps cached packed pane buffers intact across repeated paints", () => {
+    const renderer = new WorkerRenderer();
+    const worker = new StructuredCloneWorker();
+    Reflect.set(renderer, "worker", worker);
+    const view = makePackedView();
+    const panes: PanePaint[] = [
+      {
+        view,
+        clip: { x: 0, y: 0, w: 100, h: 40 },
+        scrollTop: 0,
+        scrollLeft: 0,
+      },
+    ];
+
+    renderer.paintPanes(panes, { x: null, y: null });
+    renderer.paintPanes(panes, { x: null, y: null });
+
+    expect(worker.received).toHaveLength(2);
+    const second = firstPackedPane(worker.received[1]);
+    expect(second.valueKinds).toHaveLength(2);
+    expect(second.numberValues).toHaveLength(2);
+    expect(second.stringPoolIds).toHaveLength(2);
+    expect(second.stringLocalIds).toHaveLength(2);
+    expect(second.styleIds).toHaveLength(2);
+    expect(second.stringPoolUpdateIds).toHaveLength(1);
+    expect(view.valueKinds).toHaveLength(2);
+    expect(view.numberValues).toHaveLength(2);
+    expect(view.stringPoolIds).toHaveLength(2);
+    expect(view.stringLocalIds).toHaveLength(2);
+    expect(view.styleIds).toHaveLength(2);
+    expect(view.stringPoolUpdateIds).toHaveLength(1);
   });
 
   it("round-trips sender lifecycle payloads through the worker handler before acknowledging", () => {

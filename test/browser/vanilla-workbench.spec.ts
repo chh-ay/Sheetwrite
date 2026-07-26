@@ -299,6 +299,64 @@ test("renderer selection is construction-bound and deep-linked", {
   expect(errors.console).toEqual([]);
 });
 
+test("worker repaint keeps a cached non-shared view painted after a sub-row scroll", {
+  tag: "@portability",
+}, async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto(`${VANILLA_URL}?renderer=worker`);
+  await waitForLive(page);
+  await expect(page.getByTestId("renderer")).toContainText(
+    "Requested: Web Worker · Active: Web Worker",
+    { timeout: 20_000 },
+  );
+  await expect(page.getByTestId("renderer")).toHaveAttribute("data-fallback-count", "0");
+  await expect
+    .poll(async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker never acknowledged the initial frame",
+    })
+    .toBeGreaterThan(0);
+  await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
+  expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(false);
+
+  const scroller = page.locator(`${GRID} .sheetwrite-scroller`);
+  await scroller.hover();
+  const initialFrame = Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0);
+  await page.mouse.wheel(0, 8);
+  await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect
+    .poll(async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not paint the first sub-row scroll",
+    })
+    .toBeGreaterThan(initialFrame);
+
+  const frameBeforeCachedPaint = Number(
+    (await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0,
+  );
+  const cellsBeforeCachedPaint = await gridCellTexts(page);
+  const scrollBeforeCachedPaint = await scroller.evaluate((element) => element.scrollTop);
+  await page.mouse.wheel(0, 8);
+  await expect
+    .poll(() => scroller.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(scrollBeforeCachedPaint);
+  const scrollAfterCachedPaint = await scroller.evaluate((element) => element.scrollTop);
+  expect(scrollAfterCachedPaint - scrollBeforeCachedPaint).toBeLessThan(20);
+  // The second fractional scroll stays inside the same row window, so the data
+  // signature and visible cells stay fixed while another Worker frame paints.
+  expect(await gridCellTexts(page)).toEqual(cellsBeforeCachedPaint);
+  await expect
+    .poll(async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not repaint the cached view after a sub-row scroll",
+    })
+    .toBeGreaterThan(frameBeforeCachedPaint);
+  await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
+  expect(errors.page).toEqual([]);
+  expect(errors.worker).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("a failed Worker boot falls back honestly to the main thread", {
   tag: "@portability",
 }, async ({ page }) => {
