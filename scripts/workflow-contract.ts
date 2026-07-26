@@ -34,6 +34,12 @@ export interface WorkflowJob {
 }
 
 export interface WorkflowTriggers {
+  readonly push?: {
+    readonly branches?: readonly string[];
+  };
+  readonly pull_request?: {
+    readonly branches?: readonly string[];
+  };
   readonly workflow_dispatch?: {
     readonly inputs?: Readonly<Record<string, { readonly required?: boolean }>>;
   };
