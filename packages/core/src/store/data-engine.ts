@@ -107,12 +107,12 @@ import { StoreSnapshotCodec } from "./snapshot-codec.js";
 import { StoreViewState } from "./view-state.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
-
-// Mirror of the WASM cell tags.
-const KIND_NUMBER = 1;
-const KIND_STRING = 2;
-const KIND_BOOL = 3;
-const KIND_FORMULA = 4;
+/**
+ * Cell kinds cross the WASM boundary in bulk paths here.
+ * Shared tags keep these encodings aligned with window reads
+ * and the paint worker.
+ */
+import { KIND_BOOL, KIND_FORMULA, KIND_NUMBER, KIND_STRING } from "./wire-tags.js";
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 

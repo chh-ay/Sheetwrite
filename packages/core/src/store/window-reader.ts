@@ -5,11 +5,10 @@ import type { SheetId } from "../types/coordinates.js";
 import type { Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.js";
+import { KIND_BOOL, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
-const KIND_NUMBER = 1;
-const KIND_STRING = 2;
-const KIND_BOOL = 3;
 const EMPTY_COND_MATCHES = new Uint32Array(0);
+// Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
 const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
@@ -264,7 +263,7 @@ export class StoreWindowReader {
 
     for (let i = 0; i < stringIds.length; i++) {
       const id = stringIds[i];
-      if (id !== undefined && id !== 0xffffffff && !this.stringCache.has(id)) {
+      if (id !== undefined && id !== NO_STRING && !this.stringCache.has(id)) {
         if (!missingIdSet) missingIdSet = new Set<number>();
         missingIdSet.add(id);
       }
@@ -284,7 +283,7 @@ export class StoreWindowReader {
         poolStringBytes,
       );
       for (let i = 0; i < stringPoolUpdateValues.length; i++) {
-        this.stringCache.set(stringPoolUpdateIds[i] ?? 0xffffffff, stringPoolUpdateValues[i] ?? "");
+        this.stringCache.set(stringPoolUpdateIds[i] ?? NO_STRING, stringPoolUpdateValues[i] ?? "");
       }
     }
 
@@ -295,8 +294,8 @@ export class StoreWindowReader {
       } else if (kinds[i] === KIND_BOOL) {
         values[i] = (numbers[i] ?? 0) !== 0;
       } else if (kinds[i] === KIND_STRING) {
-        const poolId = stringIds[i] ?? 0xffffffff;
-        if (poolId !== 0xffffffff) {
+        const poolId = stringIds[i] ?? NO_STRING;
+        if (poolId !== NO_STRING) {
           values[i] = this.stringCache.get(poolId) ?? null;
         } else {
           const stringSlot = stringIndex[i] ?? -1;

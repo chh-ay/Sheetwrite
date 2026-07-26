@@ -8,6 +8,8 @@ use crate::eval::expand_let_reachable_ast;
 use crate::memory::MemoryOwnerStats;
 use std::rc::Rc;
 
+// TypeScript mirrors these values in packages/core/src/store/wire-tags.ts;
+// packages/core/test/wire-tags.test.ts enforces the pairing.
 pub(crate) const KIND_EMPTY: u8 = 0;
 pub(crate) const KIND_NUMBER: u8 = 1;
 pub(crate) const KIND_STRING: u8 = 2;
