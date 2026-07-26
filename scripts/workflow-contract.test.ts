@@ -179,6 +179,10 @@ describe("CI and release workflow contracts", () => {
       expect(commands(workflows().ci.jobs[jobName]!)).toContain("bun run browser:install:chromium");
     }
 
+    const unitCoverageCommands = commands(workflows().ci.jobs["unit-coverage"]!).split("\n");
+    expect(unitCoverageCommands).toContain("bun run browser:install:chromium");
+    expect(unitCoverageCommands).not.toContain("bun run browser:install");
+
     const projectByName = Object.fromEntries(
       (playwrightConfig.projects ?? []).map((project) => [project.name, project]),
     );
