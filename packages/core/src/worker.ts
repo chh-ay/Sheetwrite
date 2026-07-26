@@ -3,6 +3,7 @@
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.
 import { blitVerticalScroll, paintFrame, paintFreezeDivider } from "./canvas-paint.js";
+import { KIND_NUMBER, KIND_STRING, NO_STRING } from "./store/wire-tags.js";
 import type { CellScalar } from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
@@ -85,9 +86,6 @@ type WorkerMessage =
   | { type: "destroy" };
 
 const NO_RENDERERS: ReadonlyMap<string, CellRenderer> = new Map();
-const KIND_NUMBER = 1;
-const KIND_STRING = 2;
-const NO_STRING = 0xffffffff;
 
 /**
  * Hard cap on the pool-id→string cache, mirroring `SheetwriteStore`. A full-sheet
@@ -95,6 +93,8 @@ const NO_STRING = 0xffffffff;
  * string pool on the JS heap. At the cap we drop it wholesale and re-warm from
  * this frame's `stringPoolUpdate*` payload — cheap and self-healing.
  */
+// Kept independent from the host reader's cache cap:
+// each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 
 interface WorkerRuntimeState {
