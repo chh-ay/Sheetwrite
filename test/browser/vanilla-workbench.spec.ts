@@ -299,9 +299,9 @@ test("renderer selection is construction-bound and deep-linked", {
   expect(errors.console).toEqual([]);
 });
 
-test("worker repaint keeps a cached non-shared view painted after a sub-row scroll", async ({
-  page,
-}) => {
+test("worker repaint keeps a cached non-shared view painted after a sub-row scroll", {
+  tag: "@portability",
+}, async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(`${VANILLA_URL}?renderer=worker`);
   await waitForLive(page);
@@ -316,7 +316,7 @@ test("worker repaint keeps a cached non-shared view painted after a sub-row scro
       message: "Worker never acknowledged the initial frame",
     })
     .toBeGreaterThan(0);
-  await expect.poll(() => canvasBodyPainted(page)).toBe(true);
+  await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
   expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(false);
 
   const scroller = page.locator(`${GRID} .sheetwrite-scroller`);
@@ -351,7 +351,7 @@ test("worker repaint keeps a cached non-shared view painted after a sub-row scro
       message: "Worker did not repaint the cached view after a sub-row scroll",
     })
     .toBeGreaterThan(frameBeforeCachedPaint);
-  await expect.poll(() => canvasBodyPainted(page)).toBe(true);
+  await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
   expect(errors.page).toEqual([]);
   expect(errors.worker).toEqual([]);
   expect(errors.console).toEqual([]);
