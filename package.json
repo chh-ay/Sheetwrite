@@ -65,7 +65,7 @@
     "test:browser": "playwright test --config test/browser/playwright.config.ts",
     "browser:install:chromium": "playwright install --with-deps chromium",
     "test:browser:portability": "playwright test --config test/browser/playwright.config.ts --grep @portability",
-    "test:tooling": "bun test scripts/toolchain-contract.test.ts scripts/workspace-tooling.test.ts scripts/dependency-audit.test.ts scripts/verify-clean-build.test.ts scripts/size-report.test.ts scripts/release-artifacts.test.ts scripts/consumer-lock.test.ts scripts/release-verify.test.ts scripts/release-workflow.test.ts scripts/workflow-contract.test.ts scripts/public-api.test.ts scripts/coverage-check.test.ts scripts/sheetwrite-code-hovers.test.ts scripts/normalize-sitemap.test.ts",
+    "test:tooling": "bun test scripts/toolchain-contract.test.ts scripts/workspace-tooling.test.ts scripts/dependency-audit.test.ts scripts/verify-clean-build.test.ts scripts/size-report.test.ts scripts/release-artifacts.test.ts scripts/consumer-lock.test.ts scripts/release-verify.test.ts scripts/release-workflow.test.ts scripts/changeset-ci.test.ts scripts/workflow-contract.test.ts scripts/public-api.test.ts scripts/coverage-check.test.ts scripts/sheetwrite-code-hovers.test.ts scripts/normalize-sitemap.test.ts",
     "test:coverage:ts": "bun scripts/coverage.ts ts",
     "test:coverage:rust": "bun scripts/coverage.ts rust",
     "test:coverage": "bun run test:coverage:ts && bun run test:coverage:rust",

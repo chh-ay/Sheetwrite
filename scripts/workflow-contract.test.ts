@@ -113,6 +113,12 @@ describe("CI and release workflow contracts", () => {
     ).toThrow("action is not reviewed");
   });
 
+  it("runs CI for every pull request without duplicating release-branch push work", () => {
+    const triggers = workflows().ci.on;
+    expect(triggers?.push).toEqual({ branches: ["develop"] });
+    expect(triggers?.pull_request).toEqual({});
+  });
+
   it("routes ordinary changes through Changesets and validates semver release branches", () => {
     const changesetStatus = workflows().ci.jobs.preflight?.steps?.find(
       (step) => step.name === "Changeset status",

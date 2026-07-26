@@ -14,6 +14,23 @@ const ALLOWED_PACKAGE_SIZE_HISTORY_FILES = new Set([
   "docs/src/generated/docs-contract.json",
 ]);
 
+export interface ChangesetComparison {
+  readonly baseRef: string;
+  readonly diffRange: string;
+  readonly sinceArgument: string;
+}
+
+export function changesetComparisonFromBaseRef(
+  githubBaseRef: string | undefined,
+): ChangesetComparison {
+  const baseRef = `origin/${githubBaseRef?.trim() || "develop"}`;
+  return {
+    baseRef,
+    diffRange: `${baseRef}...HEAD`,
+    sinceArgument: `--since=${baseRef}`,
+  };
+}
+
 export function releaseVersionFromHeadRef(headRef: string | undefined): string | undefined {
   return headRef !== undefined && STABLE_VERSION.test(headRef) ? headRef : undefined;
 }
@@ -33,8 +50,8 @@ export function isGeneratedPackageSizeHistoryChange(paths: readonly string[]): b
   );
 }
 
-async function changedFilesSinceDevelop(): Promise<string[]> {
-  const child = Bun.spawn(["git", "diff", "--name-only", "origin/develop...HEAD"], {
+async function changedFilesSince(comparison: ChangesetComparison): Promise<string[]> {
+  const child = Bun.spawn(["git", "diff", "--name-only", comparison.diffRange], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
     stderr: "pipe",
@@ -72,12 +89,13 @@ async function main(): Promise<void> {
     console.log(`Release package versions match branch ${releaseVersion}`);
     return;
   }
+  const comparison = changesetComparisonFromBaseRef(process.env.GITHUB_BASE_REF);
   const packageSizeHistoryVersion = packageSizeHistoryVersionFromHeadRef(
     process.env.GITHUB_HEAD_REF,
   );
   if (packageSizeHistoryVersion !== undefined) {
     validateReleasePackageVersions(packageSizeHistoryVersion);
-    if (isGeneratedPackageSizeHistoryChange(await changedFilesSinceDevelop())) {
+    if (isGeneratedPackageSizeHistoryChange(await changedFilesSince(comparison))) {
       console.log(`Package size history versions match branch ${packageSizeHistoryVersion}`);
       return;
     }
@@ -85,7 +103,7 @@ async function main(): Promise<void> {
       "Package size history branch contains non-generated changes; requiring a changeset",
     );
   }
-  const child = Bun.spawn(["bun", "run", "changeset:status", "--", "--since=origin/develop"], {
+  const child = Bun.spawn(["bun", "run", "changeset:status", "--", comparison.sinceArgument], {
     cwd: REPOSITORY_ROOT,
     stdin: "inherit",
     stdout: "inherit",
