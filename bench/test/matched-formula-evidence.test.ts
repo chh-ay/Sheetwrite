@@ -29,9 +29,11 @@ function validate(value: MatchedFormulaEvidence): void {
 }
 
 describe("matched formula evidence contract", () => {
+  // The success path validates the complete bootstrap artifact. Tamper cases
+  // below fail early, but this one deliberately traverses every sample.
   test("accepts the freshly generated canonical artifact", () => {
     expect(() => validate(copy())).not.toThrow();
-  });
+  }, 60_000);
 
   for (const [label, mutate] of [
     [
