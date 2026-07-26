@@ -1,7 +1,8 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from "bun:test";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridEvents } from "../src/types.js";
+import { createWorkerMessageHandler } from "../src/worker.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -203,6 +204,140 @@ describe("worker renderer fallback observability", () => {
       grid.destroy();
       expect(host.querySelectorAll("canvas")).toHaveLength(0);
     } finally {
+      if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
+      else Reflect.deleteProperty(globalThis, "Worker");
+      if (transferDescriptor) {
+        Object.defineProperty(
+          HTMLCanvasElement.prototype,
+          "transferControlToOffscreen",
+          transferDescriptor,
+        );
+      } else {
+        Reflect.deleteProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen");
+      }
+    }
+  });
+
+  it("falls back exactly once when the worker cannot acquire a 2D context", async () => {
+    const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+    const transferDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLCanvasElement.prototype,
+      "transferControlToOffscreen",
+    );
+    let terminations = 0;
+
+    class NullContextWorker extends EventTarget {
+      private readonly handleMessage = createWorkerMessageHandler((message) => {
+        this.dispatchEvent(new MessageEvent("message", { data: message }));
+      });
+
+      postMessage(message: unknown): void {
+        queueMicrotask(() => this.handleMessage(message));
+      }
+
+      terminate(): void {
+        terminations += 1;
+      }
+    }
+
+    const offscreen = new EventTarget();
+    Object.defineProperties(offscreen, {
+      width: { value: 0, writable: true },
+      height: { value: 0, writable: true },
+      getContext: { value: () => null },
+    });
+    Object.defineProperty(globalThis, "Worker", {
+      configurable: true,
+      value: NullContextWorker,
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
+      configurable: true,
+      value: () => offscreen,
+    });
+
+    try {
+      const host = mountHost();
+      const events: Array<GridEvents["renderer-fallback"]> = [];
+      const grid = new GridImpl(host, {
+        workbook: makeWorkbook(5),
+        data: makeColumnarData(5),
+        renderer: "worker",
+        workerUrl: "/worker-without-context.js",
+      });
+      grid.on("renderer-fallback", (event) => events.push(event));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(grid.rendererKind()).toBe("canvas");
+      expect(host.querySelectorAll("canvas")).toHaveLength(1);
+      expect(events).toHaveLength(1);
+      expect(terminations).toBe(1);
+
+      grid.destroy();
+    } finally {
+      if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
+      else Reflect.deleteProperty(globalThis, "Worker");
+      if (transferDescriptor) {
+        Object.defineProperty(
+          HTMLCanvasElement.prototype,
+          "transferControlToOffscreen",
+          transferDescriptor,
+        );
+      } else {
+        Reflect.deleteProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen");
+      }
+    }
+  });
+
+  it("falls back exactly once when the worker never acknowledges initialization", async () => {
+    jest.useFakeTimers();
+    const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+    const transferDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLCanvasElement.prototype,
+      "transferControlToOffscreen",
+    );
+    let terminations = 0;
+
+    class SilentWorker extends EventTarget {
+      postMessage(): void {}
+
+      terminate(): void {
+        terminations += 1;
+      }
+    }
+
+    Object.defineProperty(globalThis, "Worker", {
+      configurable: true,
+      value: SilentWorker,
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
+      configurable: true,
+      value: () => new EventTarget(),
+    });
+
+    try {
+      const host = mountHost();
+      const events: Array<GridEvents["renderer-fallback"]> = [];
+      const grid = new GridImpl(host, {
+        workbook: makeWorkbook(5),
+        data: makeColumnarData(5),
+        renderer: "worker",
+        workerUrl: "/worker-that-never-replies.js",
+      });
+      grid.on("renderer-fallback", (event) => events.push(event));
+      expect(grid.rendererKind()).toBe("worker");
+
+      jest.advanceTimersByTime(30_000);
+      await Promise.resolve();
+
+      expect(grid.rendererKind()).toBe("canvas");
+      expect(host.querySelectorAll("canvas")).toHaveLength(1);
+      expect(events).toHaveLength(1);
+      expect(terminations).toBe(1);
+
+      grid.destroy();
+    } finally {
+      jest.useRealTimers();
       if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
       else Reflect.deleteProperty(globalThis, "Worker");
       if (transferDescriptor) {

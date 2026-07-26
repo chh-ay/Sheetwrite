@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, jest } from "bun:test";
 import type { PanePaint, RenderLayout, Theme, VisibleWindowView } from "../src/types.js";
 import { createWorkerMessageHandler } from "../src/worker.js";
 import { WorkerRenderer } from "../src/worker-renderer.js";
@@ -42,6 +42,23 @@ function latestWorker(): RecordingWorker {
   if (!worker) throw new Error("worker was not constructed");
   return worker;
 }
+
+const TEST_THEME: Theme = {
+  font: "12px sans-serif",
+  bg: "#fff",
+  fg: "#111",
+  gridLine: "#ddd",
+  headerBg: "#eee",
+  headerFg: "#222",
+  selection: "#def",
+  selectionBorder: "#08f",
+  rowHeight: 20,
+  headerHeight: 24,
+  rowHeaderWidth: 40,
+  searchMatch: "#ff0",
+  searchActiveMatch: "#fa0",
+  highlight: "#cfc",
+};
 
 interface SharedPaintPost {
   type: "paintPackedShared";
@@ -436,17 +453,60 @@ describe("WorkerRenderer", () => {
     expect(view.stringPoolUpdateIds).toHaveLength(1);
   });
 
+  it("reports initialization failure and one fatal context-loss outcome", () => {
+    const nullContextAcknowledgements: unknown[] = [];
+    const nullContextCanvas = new EventTarget();
+    Object.defineProperties(nullContextCanvas, {
+      width: { value: 0, writable: true },
+      height: { value: 0, writable: true },
+      getContext: { value: () => null },
+    });
+    createWorkerMessageHandler((message) => nullContextAcknowledgements.push(message))({
+      type: "init",
+      canvas: nullContextCanvas,
+      theme: TEST_THEME,
+    });
+    expect(nullContextAcknowledgements).toEqual([
+      {
+        type: "fatal",
+        reason: "Sheetwrite: Paint worker could not acquire a 2D context",
+      },
+    ]);
+
+    const contextLossAcknowledgements: unknown[] = [];
+    const contextLossCanvas = new EventTarget();
+    Object.defineProperties(contextLossCanvas, {
+      width: { value: 0, writable: true },
+      height: { value: 0, writable: true },
+      getContext: { value: () => ({}) },
+    });
+    createWorkerMessageHandler((message) => contextLossAcknowledgements.push(message))({
+      type: "init",
+      canvas: contextLossCanvas,
+      theme: TEST_THEME,
+    });
+    contextLossCanvas.dispatchEvent(new Event("contextlost"));
+    contextLossCanvas.dispatchEvent(new Event("contextlost"));
+    contextLossCanvas.dispatchEvent(new Event("contextrestored"));
+    expect(contextLossAcknowledgements).toEqual([
+      { type: "ready" },
+      { type: "fatal", reason: "Sheetwrite: Paint worker lost its 2D context" },
+    ]);
+  });
+
   it("round-trips sender lifecycle payloads through the worker handler before acknowledging", () => {
+    jest.useFakeTimers();
     const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
     const transferDescriptor = Object.getOwnPropertyDescriptor(
       HTMLCanvasElement.prototype,
       "transferControlToOffscreen",
     );
-    const offscreen = {
-      width: 0,
-      height: 0,
-      getContext: () => ({}),
-    } as unknown as OffscreenCanvas;
+    const offscreen = new EventTarget();
+    Object.defineProperties(offscreen, {
+      width: { value: 0, writable: true },
+      height: { value: 0, writable: true },
+      getContext: { value: () => ({}) },
+    });
     Object.defineProperty(globalThis, "Worker", {
       configurable: true,
       value: RecordingWorker,
@@ -456,7 +516,8 @@ describe("WorkerRenderer", () => {
       value: () => offscreen,
     });
 
-    const renderer = new WorkerRenderer("/worker.js");
+    const failures: unknown[] = [];
+    const renderer = new WorkerRenderer("/worker.js", {}, (error) => failures.push(error));
     try {
       const host = document.createElement("div");
       const layout: RenderLayout = {
@@ -465,22 +526,7 @@ describe("WorkerRenderer", () => {
         headerHeight: 24,
         totalRows: 0,
       };
-      const theme: Theme = {
-        font: "12px sans-serif",
-        bg: "#fff",
-        fg: "#111",
-        gridLine: "#ddd",
-        headerBg: "#eee",
-        headerFg: "#222",
-        selection: "#def",
-        selectionBorder: "#08f",
-        rowHeight: 20,
-        headerHeight: 24,
-        rowHeaderWidth: 40,
-        searchMatch: "#ff0",
-        searchActiveMatch: "#fa0",
-        highlight: "#cfc",
-      };
+      const theme = TEST_THEME;
 
       latestConstructedWorker = null;
       renderer.mount(host, theme);
@@ -511,20 +557,80 @@ describe("WorkerRenderer", () => {
       for (const { message } of worker.messages.slice(0, -1)) {
         handleWorkerMessage(message);
       }
-      expect(acknowledgements).toEqual([]);
+      expect(acknowledgements).toEqual([{ type: "ready" }]);
+      jest.advanceTimersByTime(30_000);
+      expect(failures).toHaveLength(0);
       expect(canvas.dataset.workerFrame).toBe("0");
 
       handleWorkerMessage(paintPayload);
-      expect(acknowledgements).toEqual([{ type: "painted" }]);
+      expect(acknowledgements).toEqual([{ type: "ready" }, { type: "painted" }]);
       expect(canvas.dataset.workerFrame).toBe("1");
 
       renderer.destroy();
       handleWorkerMessage(worker.messages.at(-1)?.message);
-      expect(acknowledgements).toEqual([{ type: "painted" }]);
+      expect(acknowledgements).toEqual([{ type: "ready" }, { type: "painted" }]);
       expect(worker.terminations).toBe(1);
       expect(host.querySelector("canvas")).toBeNull();
     } finally {
       renderer.destroy();
+      jest.useRealTimers();
+      if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
+      else Reflect.deleteProperty(globalThis, "Worker");
+      if (transferDescriptor) {
+        Object.defineProperty(
+          HTMLCanvasElement.prototype,
+          "transferControlToOffscreen",
+          transferDescriptor,
+        );
+      } else {
+        Reflect.deleteProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen");
+      }
+    }
+  });
+
+  it("guards duplicate fatal signals and cancels readiness failure on destroy", () => {
+    jest.useFakeTimers();
+    const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+    const transferDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLCanvasElement.prototype,
+      "transferControlToOffscreen",
+    );
+    Object.defineProperty(globalThis, "Worker", {
+      configurable: true,
+      value: RecordingWorker,
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
+      configurable: true,
+      value: () => new EventTarget(),
+    });
+
+    const failures: unknown[] = [];
+    const renderer = new WorkerRenderer("/worker.js", {}, (error) => failures.push(error));
+    try {
+      latestConstructedWorker = null;
+      renderer.mount(document.createElement("div"), TEST_THEME);
+      const worker = latestWorker();
+      worker.emitMessage({ type: "fatal", reason: "context unavailable" });
+      worker.emitMessage({ type: "fatal", reason: "duplicate fatal" });
+      worker.dispatchEvent(new Event("error", { cancelable: true }));
+      jest.advanceTimersByTime(30_000);
+      expect(failures).toHaveLength(1);
+      expect(worker.terminations).toBe(1);
+
+      const destroyedFailures: unknown[] = [];
+      const destroyed = new WorkerRenderer("/worker.js", {}, (error) =>
+        destroyedFailures.push(error),
+      );
+      latestConstructedWorker = null;
+      destroyed.mount(document.createElement("div"), TEST_THEME);
+      const destroyedWorker = latestWorker();
+      destroyed.destroy();
+      jest.advanceTimersByTime(30_000);
+      expect(destroyedFailures).toHaveLength(0);
+      expect(destroyedWorker.terminations).toBe(1);
+    } finally {
+      renderer.destroy();
+      jest.useRealTimers();
       if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
       else Reflect.deleteProperty(globalThis, "Worker");
       if (transferDescriptor) {

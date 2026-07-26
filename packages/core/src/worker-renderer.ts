@@ -42,6 +42,9 @@ interface SharedRegion {
   generation: number;
 }
 
+// Cold module loading and OffscreenCanvas startup can take seconds on slower
+// devices; ten seconds tolerates that path without leaving a blank grid forever.
+const WORKER_READY_TIMEOUT_MS = 10_000;
 const SHARED_REGION_COUNT = 2;
 const SHARED_HEADER_INTS = 2;
 const SHARED_HEADER_BYTES = SHARED_HEADER_INTS * Int32Array.BYTES_PER_ELEMENT;
@@ -114,6 +117,7 @@ export class WorkerRenderer implements Renderer {
   private readonly sharedRegions: Array<SharedRegion | undefined> = new Array(SHARED_REGION_COUNT);
   private failed = false;
   private frameGeneration = 0;
+  private readinessTimeout: number | undefined;
 
   constructor(
     private readonly workerUrl?: string | URL,
@@ -140,6 +144,9 @@ export class WorkerRenderer implements Renderer {
 
     try {
       const offscreen = canvas.transferControlToOffscreen();
+      this.readinessTimeout = window.setTimeout(() => {
+        this.fail(new Error("Sheetwrite: Paint worker did not become ready"));
+      }, WORKER_READY_TIMEOUT_MS);
       worker.postMessage({ type: "init", canvas: offscreen, theme }, [offscreen]);
       host.appendChild(canvas);
       this.canvas = canvas;
@@ -298,6 +305,8 @@ export class WorkerRenderer implements Renderer {
   }
 
   destroy(): void {
+    window.clearTimeout(this.readinessTimeout);
+    this.readinessTimeout = undefined;
     const worker = this.worker;
     if (worker) {
       worker.removeEventListener("error", this.onWorkerError);
@@ -312,30 +321,44 @@ export class WorkerRenderer implements Renderer {
   }
 
   private readonly onWorkerError = (event: ErrorEvent): void => {
-    if (this.failed) return;
-    this.failed = true;
     event.preventDefault();
     const error =
       event.error instanceof Error
         ? event.error
         : new Error(event.message || "Sheetwrite: Worker renderer failed to load");
-    const onFailure = this.onFailure;
-    this.destroy();
-    onFailure?.(error);
+    this.fail(error);
   };
 
   private readonly onWorkerMessage = (event: MessageEvent<unknown>): void => {
-    if (
-      event.data === null ||
-      typeof event.data !== "object" ||
-      !("type" in event.data) ||
-      event.data.type !== "painted"
-    ) {
-      return;
+    const data = event.data;
+    if (data === null || typeof data !== "object" || !("type" in data)) return;
+    switch (data.type) {
+      case "ready":
+        window.clearTimeout(this.readinessTimeout);
+        this.readinessTimeout = undefined;
+        break;
+      case "fatal": {
+        const reason =
+          "reason" in data && typeof data.reason === "string"
+            ? data.reason
+            : "Sheetwrite: Paint worker reported a fatal failure";
+        this.fail(new Error(reason));
+        break;
+      }
+      case "painted":
+        this.frameGeneration++;
+        if (this.canvas) this.canvas.dataset.workerFrame = String(this.frameGeneration);
+        break;
     }
-    this.frameGeneration++;
-    if (this.canvas) this.canvas.dataset.workerFrame = String(this.frameGeneration);
   };
+
+  private fail(error: unknown): void {
+    if (this.failed) return;
+    this.failed = true;
+    const onFailure = this.onFailure;
+    this.destroy();
+    onFailure?.(error);
+  }
 
   private canUseSharedMemory(): boolean {
     return (

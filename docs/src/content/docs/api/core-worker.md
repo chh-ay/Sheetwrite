@@ -24,5 +24,5 @@ Source entry: `packages/core/src/worker.ts`
 ### Types <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-symbol-grid">
-<a class="api-symbol-card" href="/docs/api/core-worker/worker-acknowledgement/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>WorkerAcknowledgement</code></span><span class="api-symbol-card__desc">Acknowledgement posted back to the sender after a frame actually painted.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-worker/worker-acknowledgement/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>WorkerAcknowledgement</code></span><span class="api-symbol-card__desc">Lifecycle and frame acknowledgements posted back to the sender.</span></a>
 </div>
