@@ -24,7 +24,7 @@
     },
     "bench": {
       "name": "@sheetwrite/bench",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
         "@sheetwrite/wasm": "workspace:*",
@@ -39,7 +39,7 @@
     },
     "docs": {
       "name": "@sheetwrite/docs-start",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@base-ui/react": "^1.6.0",
         "@floating-ui/dom": "^1.8.0",
@@ -95,14 +95,14 @@
     },
     "packages/core": {
       "name": "@sheetwrite/core",
-      "version": "0.1.0",
+      "version": "0.3.1",
       "dependencies": {
         "@sheetwrite/wasm": "workspace:*",
       },
     },
     "packages/react": {
       "name": "@sheetwrite/react",
-      "version": "0.1.0",
+      "version": "0.3.1",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -112,7 +112,7 @@
     },
     "packages/svelte": {
       "name": "@sheetwrite/svelte",
-      "version": "0.1.0",
+      "version": "0.3.1",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -126,7 +126,7 @@
     },
     "packages/vue": {
       "name": "@sheetwrite/vue",
-      "version": "0.1.0",
+      "version": "0.3.1",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -136,11 +136,11 @@
     },
     "packages/wasm": {
       "name": "@sheetwrite/wasm",
-      "version": "0.1.0",
+      "version": "0.3.1",
     },
     "packages/xlsx": {
       "name": "@sheetwrite/xlsx",
-      "version": "0.1.0",
+      "version": "0.3.1",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
         "fflate": "0.8.3",
@@ -150,6 +150,9 @@
   "trustedDependencies": [
     "@biomejs/biome",
   ],
+  "overrides": {
+    "postcss": "^8.5.18",
+  },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.27.1", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.27.1", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg=="],
 
@@ -1105,7 +1108,7 @@
 
     "muggle-string": ["muggle-string@0.4.1", "", {}, "sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ=="],
 
-    "nanoid": ["nanoid@3.3.12", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ=="],
+    "nanoid": ["nanoid@3.3.16", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q=="],
 
     "node-releases": ["node-releases@2.0.51", "", {}, "sha512-wRNIrw4DmVLKQlbgOMdkMx27Wrpzes2hh5Jtbi2bjPd+4wJstWIqP5A+lscnqbm0xxmT5Bpg8Lec5ItEBwx6BQ=="],
 
@@ -1157,7 +1160,7 @@
 
     "playwright-core": ["playwright-core@1.61.1", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg=="],
 
-    "postcss": ["postcss@8.5.16", "", { "dependencies": { "nanoid": "^3.3.12", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-vuwillviilfKZsg0VGj5R/YwwcHx4SLsIOI/7K6mQkWx+l5cUHTjj5g0AasTBcyXsbfTgrwsUNmVUb5xVwyPwg=="],
+    "postcss": ["postcss@8.5.23", "", { "dependencies": { "nanoid": "^3.3.16", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-g50586zr4bZmwFiTlflMu8E0bDTb5I5gertgwAKmsdUlTQIhZtunzUlD1WSzwcVWPoAVpsrA6vlfCD7oXvRwgg=="],
 
     "postcss-nested": ["postcss-nested@6.2.0", "", { "dependencies": { "postcss-selector-parser": "^6.1.1" }, "peerDependencies": { "postcss": "^8.2.14" } }, "sha512-HQbt28KulC5AJzG+cZtj9kvKB93CFCdLvog1WFLf1D+xmMvPGlBstkpTEZfK5+AN9hfJocyBFCNiqyS48bpgzQ=="],
 
