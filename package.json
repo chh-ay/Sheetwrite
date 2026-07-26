@@ -92,5 +92,8 @@
   },
   "trustedDependencies": [
     "@biomejs/biome"
-  ]
+  ],
+  "overrides": {
+    "postcss": "^8.5.18"
+  }
 }
