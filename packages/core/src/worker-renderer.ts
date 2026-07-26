@@ -196,14 +196,24 @@ export class WorkerRenderer implements Renderer {
         return;
       }
 
+      // The renderer transfers only buffers it allocated: RenderCoordinator
+      // reuses view-owned buffers across repaints.
+      const ownedValueKinds = valueKinds.slice();
+      const ownedNumberValues = numberValues.slice();
+      const ownedStringPoolIds = stringPoolIds.slice();
+      const ownedStringLocalIds = stringLocalIds.slice();
+      const ownedStyleIds = view.styleIds.slice();
+      const ownedStringPoolUpdateIds = stringPoolUpdateIds?.slice();
       const transfers: Transferable[] = [
-        valueKinds.buffer as ArrayBuffer,
-        numberValues.buffer as ArrayBuffer,
-        stringPoolIds.buffer as ArrayBuffer,
-        stringLocalIds.buffer as ArrayBuffer,
-        view.styleIds.buffer as ArrayBuffer,
+        ownedValueKinds.buffer as ArrayBuffer,
+        ownedNumberValues.buffer as ArrayBuffer,
+        ownedStringPoolIds.buffer as ArrayBuffer,
+        ownedStringLocalIds.buffer as ArrayBuffer,
+        ownedStyleIds.buffer as ArrayBuffer,
       ];
-      if (stringPoolUpdateIds) transfers.push(stringPoolUpdateIds.buffer as ArrayBuffer);
+      if (ownedStringPoolUpdateIds) {
+        transfers.push(ownedStringPoolUpdateIds.buffer as ArrayBuffer);
+      }
       this.worker?.postMessage(
         {
           type: "paintPacked",
@@ -211,12 +221,12 @@ export class WorkerRenderer implements Renderer {
           rows: view.rows,
           cols: view.cols,
           styles: view.styles,
-          styleIds: view.styleIds,
-          valueKinds,
-          numberValues,
-          stringPoolIds,
-          stringLocalIds,
-          stringPoolUpdateIds,
+          styleIds: ownedStyleIds,
+          valueKinds: ownedValueKinds,
+          numberValues: ownedNumberValues,
+          stringPoolIds: ownedStringPoolIds,
+          stringLocalIds: ownedStringLocalIds,
+          stringPoolUpdateIds: ownedStringPoolUpdateIds,
           stringPoolUpdateValues,
           localStrings,
         },
@@ -226,8 +236,9 @@ export class WorkerRenderer implements Renderer {
     }
 
     // Custom Store implementations may not expose raw arrays; keep the
-    // compatibility path, still transferring the fresh style-id buffer.
-    this.worker?.postMessage({ type: "paint", view }, [view.styleIds.buffer]);
+    // compatibility path while preserving ownership of their style IDs.
+    const styleIds = view.styleIds.slice();
+    this.worker?.postMessage({ type: "paint", view: { ...view, styleIds } }, [styleIds.buffer]);
   }
 
   paintPanes(panes: readonly PanePaint[], divider: { x: number | null; y: number | null }): void {
@@ -248,12 +259,12 @@ export class WorkerRenderer implements Renderer {
               rows: view.rows,
               cols: view.cols,
               styles: view.styles,
-              styleIds: view.styleIds,
-              valueKinds,
-              numberValues,
-              stringPoolIds,
-              stringLocalIds,
-              stringPoolUpdateIds,
+              styleIds: view.styleIds.slice(),
+              valueKinds: valueKinds.slice(),
+              numberValues: numberValues.slice(),
+              stringPoolIds: stringPoolIds.slice(),
+              stringLocalIds: stringLocalIds.slice(),
+              stringPoolUpdateIds: stringPoolUpdateIds?.slice(),
               stringPoolUpdateValues: view.stringPoolUpdateValues,
               localStrings: view.localStrings,
             }
@@ -266,7 +277,9 @@ export class WorkerRenderer implements Renderer {
           packed.stringLocalIds.buffer as ArrayBuffer,
           packed.styleIds.buffer as ArrayBuffer,
         );
-        if (stringPoolUpdateIds) transfers.push(stringPoolUpdateIds.buffer as ArrayBuffer);
+        if (packed.stringPoolUpdateIds) {
+          transfers.push(packed.stringPoolUpdateIds.buffer as ArrayBuffer);
+        }
       }
 
       return {
