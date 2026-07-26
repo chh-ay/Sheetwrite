@@ -219,7 +219,7 @@ Relative wall-clock comparisons are a separate controlled operation:
 bun run bench:check -- \
   --baseline results/render-baseline.json \
   --fresh results/render-fresh.json \
-  --power-mode performance \
+  --power-mode balanced \
   --concurrency 1
 
 # Explicit local diagnosis only. This prints a conspicuous NON-GATING banner
@@ -227,7 +227,7 @@ bun run bench:check -- \
 bun run bench:check -- \
   --baseline results/render-baseline.json \
   --fresh results/render-fresh.json \
-  --power-mode performance \
+  --power-mode balanced \
   --concurrency 1 \
   --report-only
 ```
@@ -237,10 +237,10 @@ median, p95, and MAD, and never selects a fastest round. A cell regresses only
 when its reviewed ratio limit **and** its recorded absolute noise floor are both
 exceeded.
 
-No approved controlled baseline or matching controlled CI runner is configured
-in this repository, so relative numeric claims are deliberately unavailable in
-CI; `bench:check` fails closed until both exist. `ubuntu-latest` is not treated
-as a controlled runner.
+The approved baseline is machine-pinned and local; CI intentionally runs only
+deterministic smoke matrices and broad safety ceilings, not wall-clock timing
+comparisons. `bench:check` fails closed whenever the current harness, runner, or
+declared controls differ from that baseline.
 
 Generate reviewed baseline evidence separately from product optimizations:
 
@@ -249,13 +249,13 @@ Generate reviewed baseline evidence separately from product optimizations:
 # candidate and retains the typed raw-round artifact. It does not touch the
 # approved baseline.
 bun run bench:baseline:candidate -- \
-  --power-mode performance \
+  --power-mode balanced \
   --concurrency 1
 
 # Promotion is intentionally explicit and must be reviewed as a standalone
 # baseline-only diff:
 bun run bench:baseline:candidate -- \
-  --power-mode performance \
+  --power-mode balanced \
   --concurrency 1 \
   --write-baseline
 ```
