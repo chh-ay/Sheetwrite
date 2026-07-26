@@ -1,29 +1,41 @@
 ---
 title: "WorkerAcknowledgement | @sheetwrite/core/worker"
-description: "Acknowledgement posted back to the sender after a frame actually painted."
+description: "Lifecycle and frame acknowledgements posted back to the sender."
 ---
 <!-- api-export:@sheetwrite/core|./worker|WorkerAcknowledgement -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-worker/">@sheetwrite/core/worker</a><span class="api-status" data-kind="type">type</span></div>
 
-Acknowledgement posted back to the sender after a frame actually painted.
+Lifecycle and frame acknowledgements posted back to the sender.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/worker</code></dd></div>
 <div><dt>Source</dt><dd><code>packages/core/src/worker.ts#L249</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>1</span>
+## Variants <span class="api-count" data-pagefind-ignore>3</span>
 
-<div class="api-member-list">
-
-<details class="api-member" id="worker-acknowledgement-type" data-pagefind-weight="1">
-<summary><code>type</code></summary>
+<div class="api-variant-list" data-pagefind-ignore>
+<div class="api-variant">
 
 ```ts generated
-type: "painted"
+{ type: "ready" }
 ```
 
-</details>
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "fatal"; reason: string }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{ type: "painted" }
+```
+
+</div>
 </div>
 
 ## Declaration
@@ -32,9 +44,17 @@ type: "painted"
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export type WorkerAcknowledgement = {
-  type: "painted";
-};
+export type WorkerAcknowledgement =
+  | {
+      type: "ready";
+    }
+  | {
+      type: "fatal";
+      reason: string;
+    }
+  | {
+      type: "painted";
+    };
 ```
 
 </details>

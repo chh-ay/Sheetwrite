@@ -245,8 +245,11 @@ function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean 
   return true;
 }
 
-/** Acknowledgement posted back to the sender after a frame actually painted. */
-export type WorkerAcknowledgement = { type: "painted" };
+/** Lifecycle and frame acknowledgements posted back to the sender. */
+export type WorkerAcknowledgement =
+  | { type: "ready" }
+  | { type: "fatal"; reason: string }
+  | { type: "painted" };
 
 /**
  * Build the worker-side protocol handler. Keeping the mutable render state
@@ -271,17 +274,36 @@ export function createWorkerMessageHandler(
   const acknowledgeFrame = (painted: boolean): void => {
     if (painted) postAcknowledgement({ type: "painted" });
   };
+  let fatal = false;
+  const reportFatal = (reason: string): void => {
+    if (fatal) return;
+    fatal = true;
+    postAcknowledgement({ type: "fatal", reason });
+  };
 
   return (input: unknown): void => {
     if (input === null || typeof input !== "object" || !("type" in input)) return;
     const msg = input as WorkerMessage;
     switch (msg.type) {
-      case "init":
+      case "init": {
         state.canvas = msg.canvas;
         state.ctx = state.canvas.getContext("2d", { alpha: false });
         state.theme = msg.theme;
         state.lastViewport = null;
+        if (!state.ctx) {
+          reportFatal("Sheetwrite: Paint worker could not acquire a 2D context");
+          break;
+        }
+        // A lost canvas invalidates the previous frame assumed by scroll blits;
+        // falling back is safer than attempting restoration from stale pixels.
+        state.canvas.addEventListener(
+          "contextlost",
+          () => reportFatal("Sheetwrite: Paint worker lost its 2D context"),
+          { once: true },
+        );
+        postAcknowledgement({ type: "ready" });
         break;
+      }
       case "layout":
         state.layout = msg.layout;
         state.lastViewport = null;

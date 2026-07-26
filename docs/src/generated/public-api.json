@@ -6610,7 +6610,7 @@
               "owners": [
                 "src/worker.ts"
               ],
-              "source": "src/worker.ts#L256",
+              "source": "src/worker.ts#L259",
               "jsDocTags": [],
               "documentation": "Build the worker-side protocol handler. Keeping the mutable render state\ninside the returned closure lets tests exercise the real message contract\nwithout booting a browser Worker.",
               "memberDocs": []
@@ -6618,13 +6618,13 @@
             {
               "name": "WorkerAcknowledgement",
               "kind": "type",
-              "signature": "export type WorkerAcknowledgement = { type: \"painted\" };",
+              "signature": "export type WorkerAcknowledgement = | { type: \"ready\" } | { type: \"fatal\"; reason: string } | { type: \"painted\" };",
               "owners": [
                 "src/worker.ts"
               ],
               "source": "src/worker.ts#L249",
               "jsDocTags": [],
-              "documentation": "Acknowledgement posted back to the sender after a frame actually painted.",
+              "documentation": "Lifecycle and frame acknowledgements posted back to the sender.",
               "memberDocs": []
             }
           ]
