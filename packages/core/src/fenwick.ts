@@ -1,36 +1,47 @@
-// Fenwick (binary-indexed) tree over row heights: O(log n) scrollTop<->row and
-// O(log n) single-row height updates. A parallel `heights` array keeps single-row
-// reads and structural rebuilds O(1)/O(n) respectively; structural edits are rare.
+// Uniform row geometry stays arithmetic and allocation-free. The first non-default
+// height materializes parallel height/Fenwick arrays for O(log n) updates and lookups;
+// structural rebuilds remain O(n) and are rare.
 
 export class OffsetIndex {
   private n: number;
   private readonly defaultHeight: number;
-  private heights: Float64Array;
-  /** 1-indexed Fenwick tree of heights. */
-  private tree: Float64Array;
+  private heights: Float64Array | undefined;
+  /** 1-indexed Fenwick tree of heights; absent while every row has the default height. */
+  private tree: Float64Array | undefined;
   private total: number;
 
   constructor(count: number, defaultHeight: number) {
     this.n = count;
     this.defaultHeight = defaultHeight;
-    this.heights = new Float64Array(count);
-    this.heights.fill(defaultHeight);
-    this.tree = new Float64Array(count + 1);
     this.total = count * defaultHeight;
+  }
+
+  /** Allocate the dense index only when the first non-default height requires it. */
+  private materialize(): void {
+    const heights = new Float64Array(this.n);
+    heights.fill(this.defaultHeight);
+    const tree = new Float64Array(this.n + 1);
+    this.heights = heights;
+    this.tree = tree;
     this.build();
   }
 
   /** O(n) Fenwick construction from `heights`; also refreshes `total`. */
   private build(): void {
-    const { tree, heights, n } = this;
+    const heights = this.heights;
+    const tree = this.tree;
+    if (!heights || !tree) {
+      this.total = this.n * this.defaultHeight;
+      return;
+    }
     tree.fill(0);
     let total = 0;
-    for (let i = 1; i <= n; i++) {
+    for (let i = 1; i <= this.n; i++) {
       const h = heights[i - 1] ?? 0;
       total += h;
       tree[i] = (tree[i] ?? 0) + h;
       const j = i + (i & -i);
-      if (j <= n) tree[j] = (tree[j] ?? 0) + (tree[i] ?? 0);
+      if (j <= this.n) tree[j] = (tree[j] ?? 0) + (tree[i] ?? 0);
     }
     this.total = total;
   }
@@ -47,27 +58,38 @@ export class OffsetIndex {
     return this.defaultHeight;
   }
 
+  /** Bytes reserved by the optional dense typed-array backing stores. */
+  get backingStoreBytes(): number {
+    return (this.heights?.byteLength ?? 0) + (this.tree?.byteLength ?? 0);
+  }
+
   heightOf(row: number): number {
-    return this.heights[row] ?? this.defaultHeight;
+    return this.heights?.[row] ?? this.defaultHeight;
   }
 
   setHeight(row: number, h: number): void {
     if (row < 0 || row >= this.n) return;
-    const delta = h - this.heights[row]!;
+    const current = this.heights?.[row] ?? this.defaultHeight;
+    const delta = h - current;
     if (delta === 0) return;
-    this.heights[row] = h;
+    if (!this.heights || !this.tree) this.materialize();
+    const heights = this.heights!;
+    const tree = this.tree!;
+    heights[row] = h;
     this.total += delta;
     for (let i = row + 1; i <= this.n; i += i & -i) {
-      this.tree[i] = (this.tree[i] ?? 0) + delta;
+      tree[i] = (tree[i] ?? 0) + delta;
     }
   }
 
   /** Sum of heights of rows [0, row); i.e. the top Y of `row`. */
   offsetOf(row: number): number {
     let r = Math.max(0, Math.min(row, this.n));
+    const tree = this.tree;
+    if (!tree) return r * this.defaultHeight;
     let sum = 0;
     while (r > 0) {
-      sum += this.tree[r] ?? 0;
+      sum += tree[r] ?? 0;
       r -= r & -r;
     }
     return sum;
@@ -84,6 +106,11 @@ export class OffsetIndex {
       const last = this.n - 1;
       return { row: last, top: this.offsetOf(last) };
     }
+    const tree = this.tree;
+    if (!tree) {
+      const row = Math.floor(offset / this.defaultHeight);
+      return { row, top: row * this.defaultHeight };
+    }
     // Largest `pos` with prefix(pos) <= offset.
     let pos = 0;
     let remaining = offset;
@@ -91,9 +118,9 @@ export class OffsetIndex {
     while (1 << (logn + 1) <= this.n) logn++;
     for (let k = logn; k >= 0; k--) {
       const next = pos + (1 << k);
-      if (next <= this.n && (this.tree[next] ?? 0) <= remaining) {
+      if (next <= this.n && (tree[next] ?? 0) <= remaining) {
         pos = next;
-        remaining -= this.tree[pos] ?? 0;
+        remaining -= tree[pos] ?? 0;
       }
     }
     // `pos` rows fit entirely above `offset`, so `offset` is inside row `pos`.
@@ -103,10 +130,25 @@ export class OffsetIndex {
   insertRows(at: number, count: number, height = this.defaultHeight): void {
     if (count <= 0) return;
     const clamp = Math.max(0, Math.min(at, this.n));
+    const heights = this.heights;
+    if (!heights) {
+      this.n += count;
+      if (height === this.defaultHeight) {
+        this.total = this.n * this.defaultHeight;
+        return;
+      }
+      const next = new Float64Array(this.n);
+      next.fill(this.defaultHeight);
+      next.fill(height, clamp, clamp + count);
+      this.heights = next;
+      this.tree = new Float64Array(this.n + 1);
+      this.build();
+      return;
+    }
     const next = new Float64Array(this.n + count);
-    next.set(this.heights.subarray(0, clamp), 0);
+    next.set(heights.subarray(0, clamp), 0);
     next.fill(height, clamp, clamp + count);
-    next.set(this.heights.subarray(clamp), clamp + count);
+    next.set(heights.subarray(clamp), clamp + count);
     this.heights = next;
     this.n += count;
     this.tree = new Float64Array(this.n + 1);
@@ -116,9 +158,15 @@ export class OffsetIndex {
   removeRows(at: number, count: number): void {
     if (count <= 0 || at >= this.n) return;
     const c = Math.min(count, this.n - at);
+    const heights = this.heights;
+    if (!heights) {
+      this.n -= c;
+      this.total = this.n * this.defaultHeight;
+      return;
+    }
     const next = new Float64Array(this.n - c);
-    next.set(this.heights.subarray(0, at), 0);
-    next.set(this.heights.subarray(at + c), at);
+    next.set(heights.subarray(0, at), 0);
+    next.set(heights.subarray(at + c), at);
     this.heights = next;
     this.n -= c;
     this.tree = new Float64Array(this.n + 1);

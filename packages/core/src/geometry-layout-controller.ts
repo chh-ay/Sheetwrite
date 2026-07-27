@@ -46,19 +46,6 @@ function assertGeometryDimensions(rowCount: number, columnCount: number): void {
   }
 }
 
-function createRowIndex(rowCount: number, defaultHeight: number): OffsetIndex {
-  try {
-    return new OffsetIndex(rowCount, defaultHeight);
-  } catch (error) {
-    if (!(error instanceof RangeError)) throw error;
-    throw new SnapshotResourceError(
-      "maxRowsPerSheet",
-      DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
-      rowCount,
-      { cause: error },
-    );
-  }
-}
 /** Owns row/column indexes, scaled scrolling, viewport windows, and frozen-pane mapping. */
 export class GeometryLayoutController {
   private rowIndex: OffsetIndex;
@@ -79,8 +66,7 @@ export class GeometryLayoutController {
     assertGeometryDimensions(sheet.rowCount, sheet.columns.length);
     this.visibleColumnIndices = visibleColumns(sheet);
     this.columnIndex = buildColumnIndex(sheet, this.visibleColumnIndices, options.zoom());
-    this.rowIndex = createRowIndex(sheet.rowCount, options.theme().rowHeight);
-    this.applyRowHeights(sheet);
+    this.rowIndex = this.createRowIndex(sheet, sheet.rowCount);
     this.scrollScale = new ScaledScroll(
       this.rowIndex.totalHeight + options.theme().headerHeight,
       viewportHeight,
@@ -351,8 +337,7 @@ export class GeometryLayoutController {
   rebuildRows(rowCount = this.options.sheet().rowCount): void {
     const sheet = this.options.sheet();
     assertGeometryDimensions(rowCount, sheet.columns.length);
-    this.rowIndex = createRowIndex(rowCount, this.options.theme().rowHeight);
-    this.applyRowHeights(sheet);
+    this.rowIndex = this.createRowIndex(sheet, rowCount);
   }
 
   rebuildColumns(): void {
@@ -375,14 +360,27 @@ export class GeometryLayoutController {
     };
   }
 
-  private applyRowHeights(sheet: Sheet): void {
-    if (!sheet.rowHeights || sheet.rowHeights.size === 0) return;
-    for (const [dataRow, height] of sheet.rowHeights) {
-      const viewRow = this.toViewRow(dataRow);
-      if (viewRow !== null && viewRow < this.rowIndex.count) {
-        this.rowIndex.setHeight(viewRow, height * this.options.zoom());
+  private createRowIndex(sheet: Sheet, rowCount: number): OffsetIndex {
+    const index = new OffsetIndex(rowCount, this.options.theme().rowHeight);
+    try {
+      if (sheet.rowHeights) {
+        for (const [dataRow, height] of sheet.rowHeights) {
+          const viewRow = this.toViewRow(dataRow);
+          if (viewRow !== null && viewRow < index.count) {
+            index.setHeight(viewRow, height * this.options.zoom());
+          }
+        }
       }
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      throw new SnapshotResourceError(
+        "maxRowsPerSheet",
+        DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
+        rowCount,
+        { cause: error },
+      );
     }
+    return index;
   }
 }
 
