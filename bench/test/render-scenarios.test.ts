@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { makeColumnar, toAoA } from "../src/dataset.js";
+import { DIAGNOSTIC_RENDER_SCENARIOS } from "../src/render-protocol.js";
 import {
   type CellSelection,
+  measureUnresizedMillionRowGeometry,
   type RenderBenchAdapter,
   runRenderScenario,
   type ScrollObservation,
@@ -18,6 +20,7 @@ class FakeAdapter implements RenderBenchAdapter {
   readonly initialRowCount: number;
   readonly colCount = 5;
   readonly values: unknown[][];
+  private readonly originalValues: unknown[][];
   corruptNavigation = false;
   private mounted = true;
   private selected: CellSelection | null = null;
@@ -29,7 +32,8 @@ class FakeAdapter implements RenderBenchAdapter {
   constructor(rows = 200, evidence: FakeEvidence = {}) {
     const dataset = makeColumnar(rows);
     this.initialRowCount = rows;
-    this.values = toAoA(dataset);
+    this.originalValues = toAoA(dataset);
+    this.values = this.originalValues.map((row) => [...row]);
     this.evidence = evidence;
   }
 
@@ -80,6 +84,7 @@ class FakeAdapter implements RenderBenchAdapter {
       maximumTop: 1_000,
       maximumLeft: 500,
       firstVisibleRow: Math.floor(this.top / 25),
+      devicePixelRatio: 1.25,
     };
   }
 
@@ -135,6 +140,49 @@ class FakeAdapter implements RenderBenchAdapter {
       formatCacheEntries: 2,
       numberFormatterCacheEntries: 1,
       dateTimeFormatterCacheEntries: 1,
+    };
+  }
+
+  installFormulaDense(): void {
+    for (let row = 1; row <= Math.min(64, this.initialRowCount - 1); row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = Number(this.values[row]![0]) + col;
+      }
+    }
+  }
+
+  clearFormulaDense(): void {
+    for (let row = 1; row <= Math.min(64, this.initialRowCount - 1); row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = this.originalValues[row]![col];
+      }
+    }
+  }
+
+  installTextHeavy(rowCount: number): void {
+    for (let row = 1; row <= Math.min(rowCount, this.initialRowCount - 1); row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = `diagnostic-long-${row}-${col}`;
+      }
+    }
+  }
+
+  clearTextHeavy(): void {
+    for (let row = 1; row < this.initialRowCount; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = this.originalValues[row]![col];
+      }
+    }
+  }
+
+  measureUnresizedMillionRowGeometry() {
+    return {
+      count: 1_000_000,
+      totalHeight: 28_000_000,
+      middleRow: 500_000,
+      middleTop: 14_000_000,
+      lastRow: 999_999,
+      lastTop: 27_999_972,
     };
   }
 
@@ -219,6 +267,26 @@ describe("scenario correctness checkpoints", () => {
         passed: true,
       }),
     );
+  });
+
+  test("measures real million-row uniform OffsetIndex geometry", () => {
+    expect(measureUnresizedMillionRowGeometry()).toEqual({
+      count: 1_000_000,
+      totalHeight: 28_000_000,
+      middleRow: 500_000,
+      middleTop: 14_000_000,
+      lastRow: 999_999,
+      lastTop: 27_999_972,
+    });
+  });
+
+  test("records each measured-only diagnostic scenario without promoting it to the gate", () => {
+    for (const scenario of DIAGNOSTIC_RENDER_SCENARIOS) {
+      const result = runRenderScenario(new FakeAdapter(), dataset, scenario.id, options);
+      expect(result.status).toBe("success");
+      if (result.status !== "success") throw new Error(result.message);
+      expect(result.validation.every((observation) => observation.passed)).toBe(true);
+    }
   });
 
   test("rejects corrupt formatter and merge-index evidence", () => {

@@ -16,7 +16,9 @@ export type ScenarioGroup =
   | "altering"
   | "arrow-keys-navigation"
   | "formatting"
-  | "merges";
+  | "merges"
+  | "formulae"
+  | "geometry";
 
 export const RENDER_SCENARIOS = [
   { id: "scroll-down.top-left", group: "view-scrolling" },
@@ -35,7 +37,16 @@ export const RENDER_SCENARIOS = [
   { id: "merge-heavy.paint", group: "merges" },
 ] as const satisfies readonly { readonly id: string; readonly group: ScenarioGroup }[];
 
-export type ScenarioId = (typeof RENDER_SCENARIOS)[number]["id"];
+export const DIAGNOSTIC_RENDER_SCENARIOS = [
+  { id: "formula-dense.paint", group: "formulae" },
+  { id: "text-heavy.long-scroll", group: "view-scrolling" },
+  { id: "scroll-fractional.same-window", group: "view-scrolling" },
+  { id: "geometry-unresized.1m", group: "geometry" },
+] as const satisfies readonly { readonly id: string; readonly group: ScenarioGroup }[];
+
+export const ALL_RENDER_SCENARIOS = [...RENDER_SCENARIOS, ...DIAGNOSTIC_RENDER_SCENARIOS] as const;
+
+export type ScenarioId = (typeof ALL_RENDER_SCENARIOS)[number]["id"];
 export type FailureStage =
   | "build"
   | "launch"
@@ -185,7 +196,7 @@ export interface BrowserCombinationResult {
 }
 
 const SCENARIO_GROUPS = new Map<ScenarioId, ScenarioGroup>(
-  RENDER_SCENARIOS.map((scenario) => [scenario.id, scenario.group]),
+  ALL_RENDER_SCENARIOS.map((scenario) => [scenario.id, scenario.group]),
 );
 
 export function scenarioGroup(scenarioId: ScenarioId): ScenarioGroup {
@@ -386,12 +397,12 @@ function parseSample(value: unknown, path: string): MeasuredSample {
 function parseIdentity(value: Record<string, unknown>, path: string): ScenarioIdentity {
   const scenarioId = enumValue(
     value.scenarioId,
-    RENDER_SCENARIOS.map((scenario) => scenario.id),
+    ALL_RENDER_SCENARIOS.map((scenario) => scenario.id),
     `${path}.scenarioId`,
   );
   const group = enumValue(
     value.group,
-    ["view-scrolling", "editing", "altering", "arrow-keys-navigation", "formatting", "merges"],
+    ALL_RENDER_SCENARIOS.map((scenario) => scenario.group),
     `${path}.group`,
   );
   if (group !== scenarioGroup(scenarioId)) {
@@ -585,7 +596,7 @@ function parseConfig(value: unknown, path: string): RenderRunConfig {
   const scenarios = array(input.scenarios, `${path}.scenarios`).map((scenario, index) =>
     enumValue(
       scenario,
-      RENDER_SCENARIOS.map((entry) => entry.id),
+      ALL_RENDER_SCENARIOS.map((entry) => entry.id),
       `${path}.scenarios[${index}]`,
     ),
   );
