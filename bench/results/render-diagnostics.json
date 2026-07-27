@@ -1,10 +1,10 @@
 {
   "protocolVersion": 1,
-  "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+  "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
   "metadata": {
-    "commit": "572c15cb27d428d987c59f57fa69f81ebddfedcc",
+    "commit": "83d6745a98cea4eebf23a978072d89d0fffdeb06",
     "dirty": false,
-    "timestamp": "2026-07-27T14:41:01.920Z",
+    "timestamp": "2026-07-27T15:34:48.766Z",
     "bunVersion": "1.3.14",
     "nodeVersion": "24.3.0",
     "browserVersion": "149.0.7827.55",
@@ -85,37 +85,37 @@
   },
   "results": [
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 1,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "formula-dense.paint",
       "group": "formulae",
       "status": "success",
-      "operationCount": 773,
+      "operationCount": 763,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 105.3999999947846,
-          "operationCount": 205,
-          "perOperationMs": 0.5141463414379737
+          "durationMs": 100.00000000186265,
+          "operationCount": 200,
+          "perOperationMs": 0.5000000000093132
         },
         {
           "index": 1,
-          "durationMs": 128.90000000223517,
-          "operationCount": 284,
-          "perOperationMs": 0.45387323944449004
+          "durationMs": 104.90000000223517,
+          "operationCount": 279,
+          "perOperationMs": 0.3759856630904487
         },
         {
           "index": 2,
-          "durationMs": 118.90000000223517,
+          "durationMs": 107.49999999813735,
           "operationCount": 284,
-          "perOperationMs": 0.41866197183885623
+          "perOperationMs": 0.3785211267540048
         }
       ],
-      "medianMs": 0.45387323944449004,
-      "p95Ms": 0.5081190312386253,
-      "madMs": 0.03521126760563381,
+      "medianMs": 0.3785211267540048,
+      "p95Ms": 0.48785211268378237,
+      "madMs": 0.0025354636635561145,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -167,9 +167,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 20159169,
-        "afterBytes": 25154572,
-        "deltaBytes": 4995403
+        "beforeBytes": 20080377,
+        "afterBytes": 25141664,
+        "deltaBytes": 5061287
       },
       "resources": {
         "compiledFormats": 0,
@@ -185,7 +185,7 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 1,
       "engine": "sheetwrite",
       "rows": 100000,
@@ -196,26 +196,26 @@
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 4014.5999999996275,
+          "durationMs": 3969.7000000011176,
           "operationCount": 1,
-          "perOperationMs": 4014.5999999996275
+          "perOperationMs": 3969.7000000011176
         },
         {
           "index": 1,
-          "durationMs": 3920.800000000745,
+          "durationMs": 4203.9000000003725,
           "operationCount": 1,
-          "perOperationMs": 3920.800000000745
+          "perOperationMs": 4203.9000000003725
         },
         {
           "index": 2,
-          "durationMs": 4057.5999999996275,
+          "durationMs": 4022.5,
           "operationCount": 1,
-          "perOperationMs": 4057.5999999996275
+          "perOperationMs": 4022.5
         }
       ],
-      "medianMs": 4014.5999999996275,
-      "p95Ms": 4053.2999999996273,
-      "madMs": 43,
+      "medianMs": 4022.5,
+      "p95Ms": 4185.760000000335,
+      "madMs": 52.79999999888241,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -267,9 +267,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 25184892,
-        "afterBytes": 54231561,
-        "deltaBytes": 29046669
+        "beforeBytes": 20250857,
+        "afterBytes": 48982401,
+        "deltaBytes": 28731544
       },
       "resources": {
         "compiledFormats": 0,
@@ -285,37 +285,37 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 1,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "scroll-fractional.same-window",
       "group": "view-scrolling",
       "status": "success",
-      "operationCount": 450,
+      "operationCount": 424,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 100.49999998696148,
-          "operationCount": 156,
-          "perOperationMs": 0.644230769147189
+          "durationMs": 100.59999998472631,
+          "operationCount": 145,
+          "perOperationMs": 0.6937931033429401
         },
         {
           "index": 1,
-          "durationMs": 100.40000002086163,
-          "operationCount": 155,
-          "perOperationMs": 0.647741935618462
+          "durationMs": 100.20000000484288,
+          "operationCount": 139,
+          "perOperationMs": 0.7208633093873589
         },
         {
           "index": 2,
-          "durationMs": 100.1999999973923,
-          "operationCount": 139,
-          "perOperationMs": 0.7208633093337575
+          "durationMs": 100.59999999403954,
+          "operationCount": 140,
+          "perOperationMs": 0.7185714285288538
         }
       ],
-      "medianMs": 0.647741935618462,
-      "p95Ms": 0.713551171962228,
-      "madMs": 0.0035111664712730306,
+      "medianMs": 0.7185714285288538,
+      "p95Ms": 0.7206341213015084,
+      "madMs": 0.0022918808585050687,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -367,9 +367,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 54265593,
-        "afterBytes": 62823406,
-        "deltaBytes": 8557813
+        "beforeBytes": 49016445,
+        "afterBytes": 34924577,
+        "deltaBytes": -14091868
       },
       "resources": {
         "compiledFormats": 0,
@@ -385,37 +385,37 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 1,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "geometry-unresized.1m",
       "group": "geometry",
       "status": "success",
-      "operationCount": 46,
+      "operationCount": 2415151,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 103.5,
-          "operationCount": 15,
-          "perOperationMs": 6.9
+          "durationMs": 100,
+          "operationCount": 843835,
+          "perOperationMs": 0.00011850658007785883
         },
         {
           "index": 1,
-          "durationMs": 101.70000000111759,
-          "operationCount": 14,
-          "perOperationMs": 7.264285714365542
+          "durationMs": 100.00000000186265,
+          "operationCount": 801253,
+          "perOperationMs": 0.0001248045249151799
         },
         {
           "index": 2,
-          "durationMs": 103.5,
-          "operationCount": 17,
-          "perOperationMs": 6.088235294117647
+          "durationMs": 100.00000002607703,
+          "operationCount": 770063,
+          "perOperationMs": 0.00012985950503540235
         }
       ],
-      "medianMs": 6.9,
-      "p95Ms": 7.227857142928988,
-      "madMs": 0.3642857143655416,
+      "medianMs": 0.0001248045249151799,
+      "p95Ms": 0.0001293540070233801,
+      "madMs": 0.000005054980120222446,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -437,8 +437,8 @@
         },
         {
           "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
-          "expected": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
-          "observed": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "expected": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "observed": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
           "passed": true
         },
         {
@@ -461,9 +461,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 62832054,
-        "afterBytes": 107770594,
-        "deltaBytes": 44938540
+        "beforeBytes": 34934553,
+        "afterBytes": 45551173,
+        "deltaBytes": 10616620
       },
       "resources": {
         "compiledFormats": 0,
@@ -479,7 +479,7 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 2,
       "engine": "sheetwrite",
       "rows": 100000,
@@ -490,26 +490,26 @@
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 118.50000000186265,
+          "durationMs": 108.70000000111759,
           "operationCount": 284,
-          "perOperationMs": 0.41725352113331915
+          "perOperationMs": 0.3827464788771746
         },
         {
           "index": 1,
-          "durationMs": 116.59999999776483,
+          "durationMs": 119.40000000037253,
           "operationCount": 284,
-          "perOperationMs": 0.41056338027381983
+          "perOperationMs": 0.42042253521257933
         },
         {
           "index": 2,
-          "durationMs": 108.50000000372529,
+          "durationMs": 112.70000000298023,
           "operationCount": 284,
-          "perOperationMs": 0.382042253534244
+          "perOperationMs": 0.39683098592598676
         }
       ],
-      "medianMs": 0.41056338027381983,
-      "p95Ms": 0.4165845070473692,
-      "madMs": 0.006690140859499316,
+      "medianMs": 0.39683098592598676,
+      "p95Ms": 0.4180633802839201,
+      "madMs": 0.014084507048812145,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -561,9 +561,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 19939713,
-        "afterBytes": 29592592,
-        "deltaBytes": 9652879
+        "beforeBytes": 19967689,
+        "afterBytes": 29439016,
+        "deltaBytes": 9471327
       },
       "resources": {
         "compiledFormats": 0,
@@ -579,7 +579,7 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 2,
       "engine": "sheetwrite",
       "rows": 100000,
@@ -590,26 +590,26 @@
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 4226,
+          "durationMs": 3991.0999999996275,
           "operationCount": 1,
-          "perOperationMs": 4226
+          "perOperationMs": 3991.0999999996275
         },
         {
           "index": 1,
-          "durationMs": 3964.4000000003725,
+          "durationMs": 3918.7999999988824,
           "operationCount": 1,
-          "perOperationMs": 3964.4000000003725
+          "perOperationMs": 3918.7999999988824
         },
         {
           "index": 2,
-          "durationMs": 4126.799999998882,
+          "durationMs": 3731.199999999255,
           "operationCount": 1,
-          "perOperationMs": 4126.799999998882
+          "perOperationMs": 3731.199999999255
         }
       ],
-      "medianMs": 4126.799999998882,
-      "p95Ms": 4216.079999999888,
-      "madMs": 99.20000000111759,
+      "medianMs": 3918.7999999988824,
+      "p95Ms": 3983.869999999553,
+      "madMs": 72.30000000074506,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -661,9 +661,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 20251253,
-        "afterBytes": 57249885,
-        "deltaBytes": 36998632
+        "beforeBytes": 20260401,
+        "afterBytes": 52970561,
+        "deltaBytes": 32710160
       },
       "resources": {
         "compiledFormats": 0,
@@ -679,37 +679,37 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 2,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "scroll-fractional.same-window",
       "group": "view-scrolling",
       "status": "success",
-      "operationCount": 476,
+      "operationCount": 453,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 100.50000000558794,
-          "operationCount": 166,
-          "perOperationMs": 0.6054216867806502
+          "durationMs": 100.49999999627471,
+          "operationCount": 145,
+          "perOperationMs": 0.6931034482501705
         },
         {
           "index": 1,
-          "durationMs": 100.10000000707805,
-          "operationCount": 156,
-          "perOperationMs": 0.6416666667120388
+          "durationMs": 100.79999999701977,
+          "operationCount": 150,
+          "perOperationMs": 0.6719999999801318
         },
         {
           "index": 2,
-          "durationMs": 100.59999999217689,
-          "operationCount": 154,
-          "perOperationMs": 0.6532467531959538
+          "durationMs": 100.50000000558794,
+          "operationCount": 158,
+          "perOperationMs": 0.6360759494024553
         }
       ],
-      "medianMs": 0.6416666667120388,
-      "p95Ms": 0.6520887445475623,
-      "madMs": 0.011580086483915064,
+      "medianMs": 0.6719999999801318,
+      "p95Ms": 0.6909931034231666,
+      "madMs": 0.021103448270038627,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -761,9 +761,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 57283917,
-        "afterBytes": 66147714,
-        "deltaBytes": 8863797
+        "beforeBytes": 53004617,
+        "afterBytes": 61620022,
+        "deltaBytes": 8615405
       },
       "resources": {
         "compiledFormats": 0,
@@ -779,37 +779,37 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 2,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "geometry-unresized.1m",
       "group": "geometry",
       "status": "success",
-      "operationCount": 44,
+      "operationCount": 2463523,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 104.09999999962747,
-          "operationCount": 12,
-          "perOperationMs": 8.674999999968955
+          "durationMs": 100.09999998286366,
+          "operationCount": 738813,
+          "perOperationMs": 0.00013548759968065488
         },
         {
           "index": 1,
-          "durationMs": 102,
-          "operationCount": 17,
-          "perOperationMs": 6
+          "durationMs": 100.00000000372529,
+          "operationCount": 896246,
+          "perOperationMs": 0.00011157650913223076
         },
         {
           "index": 2,
-          "durationMs": 104.80000000074506,
-          "operationCount": 15,
-          "perOperationMs": 6.986666666716337
+          "durationMs": 100.00000000186265,
+          "operationCount": 828464,
+          "perOperationMs": 0.0001207053052418242
         }
       ],
-      "medianMs": 6.986666666716337,
-      "p95Ms": 8.506166666643693,
-      "madMs": 0.9866666667163368,
+      "medianMs": 0.0001207053052418242,
+      "p95Ms": 0.0001340093702367718,
+      "madMs": 0.000009128796109593435,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -831,8 +831,8 @@
         },
         {
           "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
-          "expected": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
-          "observed": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "expected": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "observed": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
           "passed": true
         },
         {
@@ -855,9 +855,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 66156374,
-        "afterBytes": 291152202,
-        "deltaBytes": 224995828
+        "beforeBytes": 61628694,
+        "afterBytes": 48585350,
+        "deltaBytes": -13043344
       },
       "resources": {
         "compiledFormats": 0,
@@ -873,37 +873,37 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 3,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "formula-dense.paint",
       "group": "formulae",
       "status": "success",
-      "operationCount": 711,
+      "operationCount": 731,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 100.09999999776483,
-          "operationCount": 225,
-          "perOperationMs": 0.4448888888789548
+          "durationMs": 106.29999999888241,
+          "operationCount": 284,
+          "perOperationMs": 0.37429577464395214
         },
         {
           "index": 1,
-          "durationMs": 100.29999999701977,
-          "operationCount": 202,
-          "perOperationMs": 0.4965346534505929
+          "durationMs": 100,
+          "operationCount": 271,
+          "perOperationMs": 0.36900369003690037
         },
         {
           "index": 2,
-          "durationMs": 131.59999999776483,
-          "operationCount": 284,
-          "perOperationMs": 0.4633802816822705
+          "durationMs": 100.00000000186265,
+          "operationCount": 176,
+          "perOperationMs": 0.5681818181924014
         }
       ],
-      "medianMs": 0.4633802816822705,
-      "p95Ms": 0.49321921627376064,
-      "madMs": 0.018491392803315743,
+      "medianMs": 0.37429577464395214,
+      "p95Ms": 0.5487932138375565,
+      "madMs": 0.005292084607051772,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -955,9 +955,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 19738833,
-        "afterBytes": 24694324,
-        "deltaBytes": 4955491
+        "beforeBytes": 20228497,
+        "afterBytes": 25818324,
+        "deltaBytes": 5589827
       },
       "resources": {
         "compiledFormats": 0,
@@ -973,7 +973,7 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 3,
       "engine": "sheetwrite",
       "rows": 100000,
@@ -984,26 +984,26 @@
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 3857.5,
+          "durationMs": 3976.60000000149,
           "operationCount": 1,
-          "perOperationMs": 3857.5
+          "perOperationMs": 3976.60000000149
         },
         {
           "index": 1,
-          "durationMs": 3959.699999999255,
+          "durationMs": 4009.5,
           "operationCount": 1,
-          "perOperationMs": 3959.699999999255
+          "perOperationMs": 4009.5
         },
         {
           "index": 2,
-          "durationMs": 4288.300000000745,
+          "durationMs": 4007.199999999255,
           "operationCount": 1,
-          "perOperationMs": 4288.300000000745
+          "perOperationMs": 4007.199999999255
         }
       ],
-      "medianMs": 3959.699999999255,
-      "p95Ms": 4255.440000000596,
-      "madMs": 102.19999999925494,
+      "medianMs": 4007.199999999255,
+      "p95Ms": 4009.2699999999254,
+      "madMs": 2.300000000745058,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -1055,9 +1055,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 20257673,
-        "afterBytes": 56376837,
-        "deltaBytes": 36119164
+        "beforeBytes": 20258453,
+        "afterBytes": 57446141,
+        "deltaBytes": 37187688
       },
       "resources": {
         "compiledFormats": 0,
@@ -1073,37 +1073,37 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 3,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "scroll-fractional.same-window",
       "group": "view-scrolling",
       "status": "success",
-      "operationCount": 371,
+      "operationCount": 485,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 100.300000006333,
-          "operationCount": 145,
-          "perOperationMs": 0.6917241379747103
+          "durationMs": 100.09999999962747,
+          "operationCount": 161,
+          "perOperationMs": 0.6217391304324688
         },
         {
           "index": 1,
-          "durationMs": 100.59999999590218,
-          "operationCount": 125,
-          "perOperationMs": 0.8047999999672174
+          "durationMs": 100.40000000223517,
+          "operationCount": 167,
+          "perOperationMs": 0.6011976048038035
         },
         {
           "index": 2,
-          "durationMs": 100.49999999627471,
-          "operationCount": 101,
-          "perOperationMs": 0.995049504913611
+          "durationMs": 100.40000000596046,
+          "operationCount": 157,
+          "perOperationMs": 0.6394904458978373
         }
       ],
-      "medianMs": 0.8047999999672174,
-      "p95Ms": 0.9760245544189716,
-      "madMs": 0.11307586199250708,
+      "medianMs": 0.6217391304324688,
+      "p95Ms": 0.6377153143513005,
+      "madMs": 0.017751315465368567,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -1155,9 +1155,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 56410885,
-        "afterBytes": 63595066,
-        "deltaBytes": 7184181
+        "beforeBytes": 57480193,
+        "afterBytes": 66643534,
+        "deltaBytes": 9163341
       },
       "resources": {
         "compiledFormats": 0,
@@ -1173,37 +1173,37 @@
       }
     },
     {
-      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
       "round": 3,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "geometry-unresized.1m",
       "group": "geometry",
       "status": "success",
-      "operationCount": 44,
+      "operationCount": 2512673,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 101.40000000037253,
-          "operationCount": 13,
-          "perOperationMs": 7.800000000028656
+          "durationMs": 100,
+          "operationCount": 861993,
+          "perOperationMs": 0.00011601022282083497
         },
         {
           "index": 1,
-          "durationMs": 106.69999999925494,
-          "operationCount": 15,
-          "perOperationMs": 7.113333333283663
+          "durationMs": 100.09999998286366,
+          "operationCount": 806832,
+          "perOperationMs": 0.00012406548077278004
         },
         {
           "index": 2,
-          "durationMs": 102.50000000186265,
-          "operationCount": 16,
-          "perOperationMs": 6.406250000116415
+          "durationMs": 100.09999997913837,
+          "operationCount": 843848,
+          "perOperationMs": 0.00011862325914043569
         }
       ],
-      "medianMs": 7.113333333283663,
-      "p95Ms": 7.731333333354157,
-      "madMs": 0.6866666667449932,
+      "medianMs": 0.00011862325914043569,
+      "p95Ms": 0.00012352125860954561,
+      "madMs": 0.0000026130363196007254,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -1225,8 +1225,8 @@
         },
         {
           "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
-          "expected": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
-          "observed": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "expected": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "observed": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
           "passed": true
         },
         {
@@ -1249,9 +1249,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 63603718,
-        "afterBytes": 75934218,
-        "deltaBytes": 12330500
+        "beforeBytes": 66652194,
+        "afterBytes": 70127578,
+        "deltaBytes": 3475384
       },
       "resources": {
         "compiledFormats": 0,

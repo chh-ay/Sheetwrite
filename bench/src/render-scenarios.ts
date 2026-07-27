@@ -39,6 +39,7 @@ export interface ScrollObservation {
 }
 export interface GeometryObservation {
   readonly count: number;
+  readonly backingStoreBytes: number;
   readonly totalHeight: number;
   readonly middleRow: number;
   readonly middleTop: number;
@@ -51,6 +52,7 @@ export function measureUnresizedMillionRowGeometry(): GeometryObservation {
   const last = index.rowAtOffset(index.totalHeight - 1);
   return {
     count: index.count,
+    backingStoreBytes: index.backingStoreBytes,
     totalHeight: index.totalHeight,
     middleRow: middle.row,
     middleTop: middle.top,
@@ -363,6 +365,7 @@ function scenarioActions(
           "geometry-unresized.1m builds exact uniform geometry",
           JSON.stringify({
             count: 1_000_000,
+            backingStoreBytes: 0,
             totalHeight: 28_000_000,
             middleRow: 500_000,
             middleTop: 14_000_000,

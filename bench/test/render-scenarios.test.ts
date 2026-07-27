@@ -178,6 +178,7 @@ class FakeAdapter implements RenderBenchAdapter {
   measureUnresizedMillionRowGeometry() {
     return {
       count: 1_000_000,
+      backingStoreBytes: 0,
       totalHeight: 28_000_000,
       middleRow: 500_000,
       middleTop: 14_000_000,
@@ -272,6 +273,7 @@ describe("scenario correctness checkpoints", () => {
   test("measures real million-row uniform OffsetIndex geometry", () => {
     expect(measureUnresizedMillionRowGeometry()).toEqual({
       count: 1_000_000,
+      backingStoreBytes: 0,
       totalHeight: 28_000_000,
       middleRow: 500_000,
       middleTop: 14_000_000,
