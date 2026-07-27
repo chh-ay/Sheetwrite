@@ -460,6 +460,14 @@ export class GridImpl implements Grid {
     committedPatches: 0,
   };
   private resizeObserver: ResizeObserver | null = null;
+  private resolutionMediaQuery: MediaQueryList | null = null;
+  private readonly onResolutionChange = (): void => {
+    if (this.destroyed) return;
+    this.armResolutionListener();
+    this.syncSizer();
+    this.renderCoordinator.invalidate();
+    this.scheduleRender();
+  };
   private readonly onScroll = () => this.scheduleRender();
   private readonly disposeStore: () => void;
 
@@ -968,6 +976,7 @@ export class GridImpl implements Grid {
       this.resizeObserver = new ResizeObserver(() => this.onResize());
       this.resizeObserver.observe(host);
     }
+    this.armResolutionListener();
     this.render();
   }
 
@@ -3057,6 +3066,21 @@ export class GridImpl implements Grid {
     this.render();
   }
 
+  /**
+   * A resolution query stops being useful after it changes, so replace it with
+   * one matching the current display. This catches DPR-only changes that do not
+   * resize the host and therefore never reach ResizeObserver.
+   */
+  private armResolutionListener(): void {
+    this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
+    this.resolutionMediaQuery = null;
+    if (typeof globalThis.matchMedia !== "function") return;
+
+    const devicePixelRatio = globalThis.devicePixelRatio ?? 1;
+    this.resolutionMediaQuery = globalThis.matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
+    this.resolutionMediaQuery.addEventListener("change", this.onResolutionChange);
+  }
+
   private onResize(): void {
     this.syncSizer();
     this.render();
@@ -3076,6 +3100,8 @@ export class GridImpl implements Grid {
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.resizeObserver?.disconnect();
+    this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
+    this.resolutionMediaQuery = null;
     this.document.destroy();
     this.disposeStore();
     // Free the WASM CellStore only when we constructed it. A caller-provided
