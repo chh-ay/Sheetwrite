@@ -1,11 +1,12 @@
+import { OffsetIndex } from "../../packages/core/src/fenwick.js";
 import type { ColumnarDataset } from "./dataset.js";
 import { logicalValueChecksum } from "./dataset.js";
 import {
+  ALL_RENDER_SCENARIOS,
   type FailedScenario,
   type MeasuredSample,
   type MemoryDelta,
   type MergeIndexResourceMetrics,
-  RENDER_SCENARIOS,
   type RenderResourceMetrics,
   type ScenarioId,
   type ScenarioIdentity,
@@ -18,6 +19,10 @@ import { summarizeFinite } from "./stats.js";
 const SCROLL_STEP = 50;
 const EDIT_VALUE = "Benchmark edit";
 const ALTER_COUNT = 5;
+const FRACTIONAL_SCROLL_STEP = 1;
+const LONG_SCROLL_STEP_PX = 448;
+const LONG_SCROLL_ROW_STRIDE = 16;
+const LONG_SCROLL_MAX_STEPS = 1_100;
 
 export interface CellSelection {
   readonly row: number;
@@ -30,6 +35,28 @@ export interface ScrollObservation {
   readonly maximumTop: number;
   readonly maximumLeft: number;
   readonly firstVisibleRow: number;
+  readonly devicePixelRatio: number;
+}
+export interface GeometryObservation {
+  readonly count: number;
+  readonly totalHeight: number;
+  readonly middleRow: number;
+  readonly middleTop: number;
+  readonly lastRow: number;
+  readonly lastTop: number;
+}
+export function measureUnresizedMillionRowGeometry(): GeometryObservation {
+  const index = new OffsetIndex(1_000_000, 28);
+  const middle = index.rowAtOffset(14_000_005);
+  const last = index.rowAtOffset(index.totalHeight - 1);
+  return {
+    count: index.count,
+    totalHeight: index.totalHeight,
+    middleRow: middle.row,
+    middleTop: middle.top,
+    lastRow: last.row,
+    lastTop: last.top,
+  };
 }
 
 /** Repository-owned structural surface shared by both browser engines. */
@@ -58,6 +85,11 @@ export interface RenderBenchAdapter {
   repaint(): void;
   formattedSentinels(): readonly [string, string];
   formatResources(): RenderResourceMetrics;
+  installFormulaDense(): void;
+  clearFormulaDense(): void;
+  installTextHeavy(rowCount: number): void;
+  clearTextHeavy(): void;
+  measureUnresizedMillionRowGeometry(): GeometryObservation;
   installMergeHeavy(): void;
   clearMergeHeavy(): void;
   resetMergeResources(): void;
@@ -79,6 +111,7 @@ export class ScenarioValidationError extends Error {
 }
 
 interface ScenarioActions {
+  readonly setup?: () => void;
   readonly prepare: () => void;
   readonly action: () => void;
   readonly cleanup: () => void;
@@ -209,6 +242,138 @@ function scenarioActions(
   const middleCol = Math.floor(adapter.colCount / 2);
   const lastRow = dataset.rowCount - 1;
   const lastCol = adapter.colCount - 1;
+
+  if (scenarioId === "formula-dense.paint") {
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => adapter.repaint();
+    return {
+      setup: () => adapter.installFormulaDense(),
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          action();
+          checkpoint(
+            observations,
+            "formula-dense.paint resolves first visible formula",
+            Number(dataset.id[1]) + 1,
+            adapter.cellValue(1, 1),
+          );
+          checkpoint(
+            observations,
+            "formula-dense.paint resolves last visible formula column",
+            Number(dataset.id[1]) + 4,
+            adapter.cellValue(1, 4),
+          );
+        } finally {
+          adapter.clearFormulaDense();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "text-heavy.long-scroll") {
+    const steps = Math.min(
+      LONG_SCROLL_MAX_STEPS,
+      Math.max(1, Math.floor(dataset.rowCount / LONG_SCROLL_ROW_STRIDE) - 1),
+    );
+    const installedRows = Math.min(dataset.rowCount - 1, steps * LONG_SCROLL_ROW_STRIDE + 64);
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => {
+      for (let step = 0; step < steps; step++) {
+        adapter.scrollBy("top", LONG_SCROLL_STEP_PX);
+      }
+    };
+    return {
+      setup: () => adapter.installTextHeavy(installedRows),
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          const before = adapter.scrollObservation();
+          action();
+          const after = adapter.scrollObservation();
+          checkpoint(
+            observations,
+            "text-heavy.long-scroll advances through multiple row windows",
+            true,
+            after.firstVisibleRow > before.firstVisibleRow,
+          );
+          const observedRow = Math.min(installedRows, Math.max(1, after.firstVisibleRow));
+          checkpoint(
+            observations,
+            "text-heavy.long-scroll retains unique long text",
+            true,
+            String(adapter.cellValue(observedRow, 2)).startsWith("diagnostic-long-"),
+          );
+        } finally {
+          adapter.clearTextHeavy();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "scroll-fractional.same-window") {
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => adapter.scrollBy("top", FRACTIONAL_SCROLL_STEP);
+    return {
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        prepare();
+        const before = adapter.scrollObservation();
+        action();
+        const after = adapter.scrollObservation();
+        const deviceDelta = (after.top - before.top) * after.devicePixelRatio;
+        checkpoint(
+          observations,
+          "scroll-fractional.same-window uses a fractional device-pixel delta",
+          true,
+          after.top === Math.min(before.maximumTop, before.top + FRACTIONAL_SCROLL_STEP) &&
+            !Number.isInteger(deviceDelta),
+        );
+        checkpoint(
+          observations,
+          "scroll-fractional.same-window keeps the logical row window",
+          before.firstVisibleRow,
+          after.firstVisibleRow,
+        );
+      },
+    };
+  }
+
+  if (scenarioId === "geometry-unresized.1m") {
+    let observed: GeometryObservation | undefined;
+    const action = (): void => {
+      observed = adapter.measureUnresizedMillionRowGeometry();
+    };
+    return {
+      prepare: () => {},
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        action();
+        checkpoint(
+          observations,
+          "geometry-unresized.1m builds exact uniform geometry",
+          JSON.stringify({
+            count: 1_000_000,
+            totalHeight: 28_000_000,
+            middleRow: 500_000,
+            middleTop: 14_000_000,
+            lastRow: 999_999,
+            lastTop: 27_999_972,
+          }),
+          JSON.stringify(observed),
+        );
+      },
+    };
+  }
 
   if (scenarioId === "formatted-paint.top-left") {
     const originalDate = dataset.date[0]!;
@@ -599,7 +764,7 @@ export function runRenderScenario(
   scenarioId: ScenarioId,
   options: ScenarioRunOptions,
 ): ScenarioResult {
-  if (!RENDER_SCENARIOS.some((scenario) => scenario.id === scenarioId)) {
+  if (!ALL_RENDER_SCENARIOS.some((scenario) => scenario.id === scenarioId)) {
     throw new RangeError(`unknown render scenario: ${scenarioId}`);
   }
   const identity: ScenarioIdentity = {
@@ -619,6 +784,7 @@ export function runRenderScenario(
   try {
     options.onStage?.("validate");
     validateCanonicalState(adapter, dataset, validation);
+    actions.setup?.();
     stage = "warmup";
     options.onStage?.("warmup");
     for (let index = 0; index < options.warmupSamples; index++) {

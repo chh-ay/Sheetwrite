@@ -1,0 +1,1309 @@
+{
+  "protocolVersion": 1,
+  "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+  "metadata": {
+    "commit": "572c15cb27d428d987c59f57fa69f81ebddfedcc",
+    "dirty": false,
+    "timestamp": "2026-07-27T14:41:01.920Z",
+    "bunVersion": "1.3.14",
+    "nodeVersion": "24.3.0",
+    "browserVersion": "149.0.7827.55",
+    "os": "linux 7.1.3-2-cachyos",
+    "arch": "x64",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "engineVersions": {
+      "sheetwrite": "0.3.1",
+      "handsontable": "18.0.0"
+    },
+    "datasetSeed": 1592639710,
+    "datasetHashes": {
+      "100000": "fnv1a32:178eac66"
+    },
+    "viewport": {
+      "width": 640,
+      "height": 480
+    },
+    "measuredSamples": 3,
+    "warmupSamples": 1,
+    "minimumSampleDurationMs": 100,
+    "rounds": 3,
+    "orderSeed": 1371602926,
+    "engineOrder": [
+      [
+        "sheetwrite"
+      ],
+      [
+        "sheetwrite"
+      ],
+      [
+        "sheetwrite"
+      ]
+    ],
+    "launchAttempts": [
+      {
+        "round": 1,
+        "engine": "sheetwrite",
+        "rows": 100000,
+        "attempt": 1,
+        "success": true,
+        "errorClass": null,
+        "message": null
+      },
+      {
+        "round": 2,
+        "engine": "sheetwrite",
+        "rows": 100000,
+        "attempt": 1,
+        "success": true,
+        "errorClass": null,
+        "message": null
+      },
+      {
+        "round": 3,
+        "engine": "sheetwrite",
+        "rows": 100000,
+        "attempt": 1,
+        "success": true,
+        "errorClass": null,
+        "message": null
+      }
+    ]
+  },
+  "config": {
+    "engines": [
+      "sheetwrite"
+    ],
+    "rows": [
+      100000
+    ],
+    "scenarios": [
+      "formula-dense.paint",
+      "text-heavy.long-scroll",
+      "scroll-fractional.same-window",
+      "geometry-unresized.1m"
+    ]
+  },
+  "results": [
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 1,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "formula-dense.paint",
+      "group": "formulae",
+      "status": "success",
+      "operationCount": 773,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 105.3999999947846,
+          "operationCount": 205,
+          "perOperationMs": 0.5141463414379737
+        },
+        {
+          "index": 1,
+          "durationMs": 128.90000000223517,
+          "operationCount": 284,
+          "perOperationMs": 0.45387323944449004
+        },
+        {
+          "index": 2,
+          "durationMs": 118.90000000223517,
+          "operationCount": 284,
+          "perOperationMs": 0.41866197183885623
+        }
+      ],
+      "medianMs": 0.45387323944449004,
+      "p95Ms": 0.5081190312386253,
+      "madMs": 0.03521126760563381,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves first visible formula",
+          "expected": "3",
+          "observed": "3",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves last visible formula column",
+          "expected": "6",
+          "observed": "6",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 20159169,
+        "afterBytes": 25154572,
+        "deltaBytes": 4995403
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 1,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "text-heavy.long-scroll",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 3,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 4014.5999999996275,
+          "operationCount": 1,
+          "perOperationMs": 4014.5999999996275
+        },
+        {
+          "index": 1,
+          "durationMs": 3920.800000000745,
+          "operationCount": 1,
+          "perOperationMs": 3920.800000000745
+        },
+        {
+          "index": 2,
+          "durationMs": 4057.5999999996275,
+          "operationCount": 1,
+          "perOperationMs": 4057.5999999996275
+        }
+      ],
+      "medianMs": 4014.5999999996275,
+      "p95Ms": 4053.2999999996273,
+      "madMs": 43,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll advances through multiple row windows",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll retains unique long text",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 25184892,
+        "afterBytes": 54231561,
+        "deltaBytes": 29046669
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 1,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "scroll-fractional.same-window",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 450,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.49999998696148,
+          "operationCount": 156,
+          "perOperationMs": 0.644230769147189
+        },
+        {
+          "index": 1,
+          "durationMs": 100.40000002086163,
+          "operationCount": 155,
+          "perOperationMs": 0.647741935618462
+        },
+        {
+          "index": 2,
+          "durationMs": 100.1999999973923,
+          "operationCount": 139,
+          "perOperationMs": 0.7208633093337575
+        }
+      ],
+      "medianMs": 0.647741935618462,
+      "p95Ms": 0.713551171962228,
+      "madMs": 0.0035111664712730306,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window uses a fractional device-pixel delta",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window keeps the logical row window",
+          "expected": "0",
+          "observed": "0",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 54265593,
+        "afterBytes": 62823406,
+        "deltaBytes": 8557813
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 1,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "geometry-unresized.1m",
+      "group": "geometry",
+      "status": "success",
+      "operationCount": 46,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 103.5,
+          "operationCount": 15,
+          "perOperationMs": 6.9
+        },
+        {
+          "index": 1,
+          "durationMs": 101.70000000111759,
+          "operationCount": 14,
+          "perOperationMs": 7.264285714365542
+        },
+        {
+          "index": 2,
+          "durationMs": 103.5,
+          "operationCount": 17,
+          "perOperationMs": 6.088235294117647
+        }
+      ],
+      "medianMs": 6.9,
+      "p95Ms": 7.227857142928988,
+      "madMs": 0.3642857143655416,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
+          "expected": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "observed": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 62832054,
+        "afterBytes": 107770594,
+        "deltaBytes": 44938540
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 2,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "formula-dense.paint",
+      "group": "formulae",
+      "status": "success",
+      "operationCount": 852,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 118.50000000186265,
+          "operationCount": 284,
+          "perOperationMs": 0.41725352113331915
+        },
+        {
+          "index": 1,
+          "durationMs": 116.59999999776483,
+          "operationCount": 284,
+          "perOperationMs": 0.41056338027381983
+        },
+        {
+          "index": 2,
+          "durationMs": 108.50000000372529,
+          "operationCount": 284,
+          "perOperationMs": 0.382042253534244
+        }
+      ],
+      "medianMs": 0.41056338027381983,
+      "p95Ms": 0.4165845070473692,
+      "madMs": 0.006690140859499316,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves first visible formula",
+          "expected": "3",
+          "observed": "3",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves last visible formula column",
+          "expected": "6",
+          "observed": "6",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 19939713,
+        "afterBytes": 29592592,
+        "deltaBytes": 9652879
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 2,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "text-heavy.long-scroll",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 3,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 4226,
+          "operationCount": 1,
+          "perOperationMs": 4226
+        },
+        {
+          "index": 1,
+          "durationMs": 3964.4000000003725,
+          "operationCount": 1,
+          "perOperationMs": 3964.4000000003725
+        },
+        {
+          "index": 2,
+          "durationMs": 4126.799999998882,
+          "operationCount": 1,
+          "perOperationMs": 4126.799999998882
+        }
+      ],
+      "medianMs": 4126.799999998882,
+      "p95Ms": 4216.079999999888,
+      "madMs": 99.20000000111759,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll advances through multiple row windows",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll retains unique long text",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 20251253,
+        "afterBytes": 57249885,
+        "deltaBytes": 36998632
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 2,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "scroll-fractional.same-window",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 476,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.50000000558794,
+          "operationCount": 166,
+          "perOperationMs": 0.6054216867806502
+        },
+        {
+          "index": 1,
+          "durationMs": 100.10000000707805,
+          "operationCount": 156,
+          "perOperationMs": 0.6416666667120388
+        },
+        {
+          "index": 2,
+          "durationMs": 100.59999999217689,
+          "operationCount": 154,
+          "perOperationMs": 0.6532467531959538
+        }
+      ],
+      "medianMs": 0.6416666667120388,
+      "p95Ms": 0.6520887445475623,
+      "madMs": 0.011580086483915064,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window uses a fractional device-pixel delta",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window keeps the logical row window",
+          "expected": "0",
+          "observed": "0",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 57283917,
+        "afterBytes": 66147714,
+        "deltaBytes": 8863797
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 2,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "geometry-unresized.1m",
+      "group": "geometry",
+      "status": "success",
+      "operationCount": 44,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 104.09999999962747,
+          "operationCount": 12,
+          "perOperationMs": 8.674999999968955
+        },
+        {
+          "index": 1,
+          "durationMs": 102,
+          "operationCount": 17,
+          "perOperationMs": 6
+        },
+        {
+          "index": 2,
+          "durationMs": 104.80000000074506,
+          "operationCount": 15,
+          "perOperationMs": 6.986666666716337
+        }
+      ],
+      "medianMs": 6.986666666716337,
+      "p95Ms": 8.506166666643693,
+      "madMs": 0.9866666667163368,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
+          "expected": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "observed": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 66156374,
+        "afterBytes": 291152202,
+        "deltaBytes": 224995828
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 3,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "formula-dense.paint",
+      "group": "formulae",
+      "status": "success",
+      "operationCount": 711,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.09999999776483,
+          "operationCount": 225,
+          "perOperationMs": 0.4448888888789548
+        },
+        {
+          "index": 1,
+          "durationMs": 100.29999999701977,
+          "operationCount": 202,
+          "perOperationMs": 0.4965346534505929
+        },
+        {
+          "index": 2,
+          "durationMs": 131.59999999776483,
+          "operationCount": 284,
+          "perOperationMs": 0.4633802816822705
+        }
+      ],
+      "medianMs": 0.4633802816822705,
+      "p95Ms": 0.49321921627376064,
+      "madMs": 0.018491392803315743,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves first visible formula",
+          "expected": "3",
+          "observed": "3",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves last visible formula column",
+          "expected": "6",
+          "observed": "6",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 19738833,
+        "afterBytes": 24694324,
+        "deltaBytes": 4955491
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 3,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "text-heavy.long-scroll",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 3,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 3857.5,
+          "operationCount": 1,
+          "perOperationMs": 3857.5
+        },
+        {
+          "index": 1,
+          "durationMs": 3959.699999999255,
+          "operationCount": 1,
+          "perOperationMs": 3959.699999999255
+        },
+        {
+          "index": 2,
+          "durationMs": 4288.300000000745,
+          "operationCount": 1,
+          "perOperationMs": 4288.300000000745
+        }
+      ],
+      "medianMs": 3959.699999999255,
+      "p95Ms": 4255.440000000596,
+      "madMs": 102.19999999925494,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll advances through multiple row windows",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll retains unique long text",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 20257673,
+        "afterBytes": 56376837,
+        "deltaBytes": 36119164
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 3,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "scroll-fractional.same-window",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 371,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.300000006333,
+          "operationCount": 145,
+          "perOperationMs": 0.6917241379747103
+        },
+        {
+          "index": 1,
+          "durationMs": 100.59999999590218,
+          "operationCount": 125,
+          "perOperationMs": 0.8047999999672174
+        },
+        {
+          "index": 2,
+          "durationMs": 100.49999999627471,
+          "operationCount": 101,
+          "perOperationMs": 0.995049504913611
+        }
+      ],
+      "medianMs": 0.8047999999672174,
+      "p95Ms": 0.9760245544189716,
+      "madMs": 0.11307586199250708,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window uses a fractional device-pixel delta",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window keeps the logical row window",
+          "expected": "0",
+          "observed": "0",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 56410885,
+        "afterBytes": 63595066,
+        "deltaBytes": 7184181
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "498ce36d-ded1-426a-bf01-66d02257fcd3",
+      "round": 3,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "geometry-unresized.1m",
+      "group": "geometry",
+      "status": "success",
+      "operationCount": 44,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 101.40000000037253,
+          "operationCount": 13,
+          "perOperationMs": 7.800000000028656
+        },
+        {
+          "index": 1,
+          "durationMs": 106.69999999925494,
+          "operationCount": 15,
+          "perOperationMs": 7.113333333283663
+        },
+        {
+          "index": 2,
+          "durationMs": 102.50000000186265,
+          "operationCount": 16,
+          "perOperationMs": 6.406250000116415
+        }
+      ],
+      "medianMs": 7.113333333283663,
+      "p95Ms": 7.731333333354157,
+      "madMs": 0.6866666667449932,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
+          "expected": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "observed": "{\"count\":1000000,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 63603718,
+        "afterBytes": 75934218,
+        "deltaBytes": 12330500
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    }
+  ],
+  "completeness": {
+    "expectedKeys": [
+      "round=1;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
+      "round=1;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
+      "round=1;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
+      "round=1;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
+      "round=2;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
+      "round=2;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
+      "round=2;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
+      "round=2;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
+      "round=3;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
+      "round=3;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
+      "round=3;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
+      "round=3;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll"
+    ],
+    "observedKeys": [
+      "round=1;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
+      "round=1;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
+      "round=1;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
+      "round=1;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
+      "round=2;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
+      "round=2;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
+      "round=2;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
+      "round=2;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
+      "round=3;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
+      "round=3;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
+      "round=3;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
+      "round=3;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll"
+    ],
+    "missingKeys": [],
+    "duplicateKeys": [],
+    "unexpectedKeys": [],
+    "failedKeys": [],
+    "complete": true,
+    "successful": true
+  },
+  "reproductionCommands": [
+    "bun run --filter '@sheetwrite/bench' bench:render:diagnostic"
+  ]
+}

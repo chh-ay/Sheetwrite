@@ -9,6 +9,7 @@ import { validateRenderGateArtifact } from "./render-gate.js";
 import {
   type BrowserCombinationResult,
   type BrowserLaunchAttempt,
+  DIAGNOSTIC_RENDER_SCENARIOS,
   ENGINE_IDS,
   type EngineId,
   type FailedScenario,
@@ -24,6 +25,7 @@ import {
   type RenderBenchmarkArtifact,
   type RenderRunConfig,
   renderBenchmarkMarkdown,
+  type ScenarioId,
   type ScenarioResult,
   scenarioGroup,
   summarizeCompleteness,
@@ -34,11 +36,15 @@ const BENCH_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const REPOSITORY_ROOT = resolve(BENCH_ROOT, "..");
 const DEFAULT_JSON_PATH = resolve(BENCH_ROOT, "results/render-results.json");
 const DEFAULT_MARKDOWN_PATH = resolve(BENCH_ROOT, "results/render-results.md");
+const DIAGNOSTIC_JSON_PATH = resolve(BENCH_ROOT, "results/render-diagnostics.json");
+const DIAGNOSTIC_MARKDOWN_PATH = resolve(BENCH_ROOT, "results/render-diagnostics.md");
 
 interface DriverConfiguration {
   readonly smoke: boolean;
   readonly engines: readonly EngineId[];
   readonly rows: readonly number[];
+  readonly scenarios: readonly ScenarioId[];
+  readonly diagnostic: boolean;
   readonly rounds: number;
   readonly measuredSamples: number;
   readonly warmupSamples: number;
@@ -55,6 +61,7 @@ interface CombinationConfiguration {
   readonly round: number;
   readonly engine: EngineId;
   readonly rows: number;
+  readonly scenarios?: readonly ScenarioId[];
   readonly measuredSamples: number;
   readonly warmupSamples: number;
   readonly minimumSampleDurationMs: number;
@@ -105,10 +112,20 @@ function nonNegativeIntegerArgument(
 
 function parseConfiguration(args: readonly string[]): DriverConfiguration {
   const smoke = args.includes("--smoke");
+  const scenarioSet = argumentValue(args, "--scenario-set") ?? "gate";
+  if (scenarioSet !== "gate" && scenarioSet !== "diagnostic") {
+    throw new TypeError("--scenario-set must be gate or diagnostic");
+  }
+  const diagnostic = scenarioSet === "diagnostic";
+  const scenarios = diagnostic
+    ? DIAGNOSTIC_RENDER_SCENARIOS.map((scenario) => scenario.id)
+    : RENDER_SCENARIOS.map((scenario) => scenario.id);
   const engineArg = argumentValue(args, "--engine");
   const engines: readonly EngineId[] =
     engineArg === undefined
-      ? ENGINE_IDS
+      ? diagnostic
+        ? ["sheetwrite"]
+        : ENGINE_IDS
       : [
           ENGINE_IDS.includes(engineArg as EngineId)
             ? (engineArg as EngineId)
@@ -116,6 +133,9 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
                 throw new TypeError(`--engine must be one of: ${ENGINE_IDS.join(", ")}`);
               })(),
         ];
+  if (diagnostic && engines.some((engine) => engine !== "sheetwrite")) {
+    throw new TypeError("the diagnostic scenario set currently supports only sheetwrite");
+  }
   const rowsArg = argumentValue(args, "--rows");
   const rows = rowsArg
     ? rowsArg.split(",").map((entry) => {
@@ -131,18 +151,23 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
   const compactSamples = args.includes("--compact-samples");
   const outputArg = argumentValue(args, "--output");
   const markdownArg = argumentValue(args, "--markdown-output");
-  const outputPath = outputArg ?? (smoke ? undefined : DEFAULT_JSON_PATH);
+  const outputPath =
+    outputArg ?? (smoke ? undefined : diagnostic ? DIAGNOSTIC_JSON_PATH : DEFAULT_JSON_PATH);
   const markdownPath =
     markdownArg ??
     (outputPath === undefined
       ? undefined
       : outputArg === undefined
-        ? DEFAULT_MARKDOWN_PATH
+        ? diagnostic
+          ? DIAGNOSTIC_MARKDOWN_PATH
+          : DEFAULT_MARKDOWN_PATH
         : outputPath.replace(/\.json$/u, ".md"));
   return {
     smoke,
     engines,
     rows,
+    scenarios,
+    diagnostic,
     rounds: positiveIntegerArgument(args, "--rounds", smoke ? 1 : 2),
     measuredSamples: positiveIntegerArgument(args, "--samples", smoke ? 1 : 3),
     warmupSamples: nonNegativeIntegerArgument(args, "--warmups", 1),
@@ -164,7 +189,7 @@ function normalizedError(error: unknown): Error {
 
 function failureForScenario(
   configuration: CombinationConfiguration,
-  scenarioId: (typeof RENDER_SCENARIOS)[number]["id"],
+  scenarioId: ScenarioId,
   stage: FailureStage,
   error: unknown,
   diagnostics: RuntimeDiagnostics,
@@ -194,6 +219,10 @@ function failureForScenario(
   };
 }
 
+function combinationScenarios(configuration: CombinationConfiguration): readonly ScenarioId[] {
+  return configuration.scenarios ?? RENDER_SCENARIOS.map((scenario) => scenario.id);
+}
+
 export function createCombinationFailures(
   configuration: CombinationConfiguration,
   stage: FailureStage,
@@ -202,8 +231,8 @@ export function createCombinationFailures(
   timeout = false,
   crash = false,
 ): FailedScenario[] {
-  return RENDER_SCENARIOS.map((scenario) =>
-    failureForScenario(configuration, scenario.id, stage, error, diagnostics, timeout, crash),
+  return combinationScenarios(configuration).map((scenarioId) =>
+    failureForScenario(configuration, scenarioId, stage, error, diagnostics, timeout, crash),
   );
 }
 
@@ -295,20 +324,20 @@ function normalizeBrowserOutput(
   }
 
   const normalized: ScenarioResult[] = [];
-  for (const scenario of RENDER_SCENARIOS) {
+  for (const scenarioId of combinationScenarios(configuration)) {
     const matches = input.results.filter(
       (entry) =>
         entry !== null &&
         typeof entry === "object" &&
         !Array.isArray(entry) &&
         "scenarioId" in entry &&
-        entry.scenarioId === scenario.id,
+        entry.scenarioId === scenarioId,
     );
     if (matches.length !== 1) {
       normalized.push(
         failureForScenario(
           configuration,
-          scenario.id,
+          scenarioId,
           "validate",
           new Error(
             matches.length === 0
@@ -338,15 +367,7 @@ function normalizeBrowserOutput(
       );
     } catch (error) {
       normalized.push(
-        failureForScenario(
-          configuration,
-          scenario.id,
-          "validate",
-          error,
-          diagnostics,
-          false,
-          false,
-        ),
+        failureForScenario(configuration, scenarioId, "validate", error, diagnostics, false, false),
       );
     }
   }
@@ -420,6 +441,11 @@ async function runCombination(
     if (!browser) throw new Error("browser launch attempts completed without a browser");
     page = await browser.newPage({
       viewport: { width: RENDER_VIEWPORT.width + 480, height: RENDER_VIEWPORT.height + 180 },
+      deviceScaleFactor: combinationScenarios(configuration).includes(
+        "scroll-fractional.same-window",
+      )
+        ? 1.25
+        : 1,
     });
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
@@ -446,6 +472,7 @@ async function runCombination(
     url.searchParams.set("round", String(configuration.round));
     url.searchParams.set("engine", configuration.engine);
     url.searchParams.set("rows", String(configuration.rows));
+    url.searchParams.set("scenarios", combinationScenarios(configuration).join(","));
     url.searchParams.set("samples", String(configuration.measuredSamples));
     url.searchParams.set("warmups", String(configuration.warmupSamples));
     url.searchParams.set("minimumSampleMs", String(configuration.minimumSampleDurationMs));
@@ -469,12 +496,12 @@ async function runCombination(
     if (state.result) {
       const partial = normalizeBrowserOutput(state.result, configuration, diagnostics);
       const byScenario = new Map(partial.map((result) => [result.scenarioId, result]));
-      const completed = RENDER_SCENARIOS.map((scenario) => {
-        const result = byScenario.get(scenario.id);
+      const completed = combinationScenarios(configuration).map((scenarioId) => {
+        const result = byScenario.get(scenarioId);
         if (result && result.status === "success") return result;
         return failureForScenario(
           configuration,
-          scenario.id,
+          scenarioId,
           observedStage,
           state.error ? new Error(state.error) : normalized,
           diagnostics,
@@ -613,6 +640,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
             round,
             engine,
             rows,
+            scenarios: configuration.scenarios,
             measuredSamples: configuration.measuredSamples,
             warmupSamples: configuration.warmupSamples,
             minimumSampleDurationMs: configuration.minimumSampleDurationMs,
@@ -633,7 +661,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
   const config: RenderRunConfig = {
     engines: configuration.engines,
     rows: configuration.rows,
-    scenarios: RENDER_SCENARIOS.map((scenario) => scenario.id),
+    scenarios: configuration.scenarios,
   };
   const timestamp = new Date().toISOString();
   const artifact: RenderBenchmarkArtifact = {
@@ -667,11 +695,13 @@ async function runDriver(args: readonly string[]): Promise<void> {
     config,
     results,
     completeness: summarizeCompleteness(config, configuration.rounds, results),
-    reproductionCommands: [
-      "bun run --filter '@sheetwrite/bench' bench:render",
-      "bun run --filter '@sheetwrite/bench' bench:render:smoke -- --engine sheetwrite",
-      "bun run --filter '@sheetwrite/bench' bench:render:smoke -- --engine handsontable",
-    ],
+    reproductionCommands: configuration.diagnostic
+      ? ["bun run --filter '@sheetwrite/bench' bench:render:diagnostic"]
+      : [
+          "bun run --filter '@sheetwrite/bench' bench:render",
+          "bun run --filter '@sheetwrite/bench' bench:render:smoke -- --engine sheetwrite",
+          "bun run --filter '@sheetwrite/bench' bench:render:smoke -- --engine handsontable",
+        ],
   };
   const json = stableJson(artifact);
   const parsed = parseRenderArtifactJson(json, { expectedRunId: runId });
