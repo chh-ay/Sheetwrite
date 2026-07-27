@@ -299,6 +299,132 @@ test("renderer selection is construction-bound and deep-linked", {
   expect(errors.console).toEqual([]);
 });
 
+test("DPR-only changes repaint both main-thread and Worker canvases", {
+  tag: "@portability",
+}, async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.addInitScript(() => {
+    const nativeMatchMedia = window.matchMedia.bind(window);
+    const resolutionQueries = new Set<MediaQueryList>();
+    let dpr = 1;
+
+    Object.defineProperty(window, "devicePixelRatio", {
+      configurable: true,
+      get: () => dpr,
+    });
+    window.matchMedia = ((media: string): MediaQueryList => {
+      if (!media.startsWith("(resolution: ")) return nativeMatchMedia(media);
+
+      const target = new EventTarget();
+      Object.defineProperties(target, {
+        matches: {
+          configurable: true,
+          get: () => media === `(resolution: ${dpr}dppx)`,
+        },
+        media: { configurable: true, value: media },
+        onchange: { configurable: true, writable: true, value: null },
+      });
+      Object.assign(target, {
+        addListener(listener: EventListener): void {
+          target.addEventListener("change", listener);
+        },
+        removeListener(listener: EventListener): void {
+          target.removeEventListener("change", listener);
+        },
+      });
+      const query = target as MediaQueryList;
+      resolutionQueries.add(query);
+      return query;
+    }) as typeof window.matchMedia;
+    Object.defineProperty(window, "__sheetwriteSetDpr", {
+      configurable: true,
+      value: (next: number): void => {
+        dpr = next;
+        for (const query of Array.from(resolutionQueries)) {
+          if (!query.matches) query.dispatchEvent(new Event("change"));
+        }
+      },
+    });
+  });
+
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+  const canvas = page.locator(CANVAS);
+  const backingScale = () =>
+    canvas.evaluate((element) => {
+      const node = element as HTMLCanvasElement;
+      return node.width / node.getBoundingClientRect().width;
+    });
+  await expect.poll(backingScale).toBeCloseTo(1, 1);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(2);
+  });
+  await expect.poll(backingScale).toBeCloseTo(2, 1);
+  await expect.poll(() => canvasBodyPainted(page)).toBe(true);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(1);
+  });
+  await expect.poll(backingScale).toBeCloseTo(1, 1);
+
+  await page.getByRole("radio", { name: "Web Worker" }).click();
+  await expect(page.getByTestId("renderer")).toContainText(
+    "Requested: Web Worker · Active: Web Worker",
+    { timeout: 20_000 },
+  );
+  await expect(page.getByTestId("renderer")).toHaveAttribute("data-fallback-count", "0");
+  await expect
+    .poll(async () => Number((await canvas.getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker never acknowledged its initial frame",
+    })
+    .toBeGreaterThan(0);
+  const firstWorkerFrame = Number((await canvas.getAttribute("data-worker-frame")) ?? 0);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(2);
+  });
+  await expect
+    .poll(async () => Number((await canvas.getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not repaint after the DPR-only change",
+    })
+    .toBeGreaterThan(firstWorkerFrame);
+  await expect.poll(() => canvasBodyPainted(page)).toBe(true);
+
+  const secondWorkerFrame = Number((await canvas.getAttribute("data-worker-frame")) ?? 0);
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(1);
+  });
+  await expect
+    .poll(async () => Number((await canvas.getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not repaint after the rearmed DPR query changed",
+    })
+    .toBeGreaterThan(secondWorkerFrame);
+
+  expect(errors.page).toEqual([]);
+  expect(errors.worker).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("worker repaint keeps a cached non-shared view painted after a sub-row scroll", {
   tag: "@portability",
 }, async ({ page }) => {
