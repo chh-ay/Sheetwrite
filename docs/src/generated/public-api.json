@@ -490,18 +490,6 @@
               ]
             },
             {
-              "name": "cloneCellHyperlink",
-              "kind": "function",
-              "signature": "(link: CellHyperlink): CellHyperlink",
-              "owners": [
-                "src/hyperlink.ts"
-              ],
-              "source": "src/hyperlink.ts#L263",
-              "jsDocTags": [],
-              "documentation": "Clone one validated hyperlink into an independent plain-data value.",
-              "memberDocs": []
-            },
-            {
               "name": "colToA1",
               "kind": "function",
               "signature": "(col: number): string",
@@ -891,18 +879,6 @@
               "source": "src/persistence.ts#L46",
               "jsDocTags": [],
               "documentation": "Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes\nthe hydrated store just like one created through `createGrid`.",
-              "memberDocs": []
-            },
-            {
-              "name": "createHyperlinkId",
-              "kind": "function",
-              "signature": "(): string",
-              "owners": [
-                "src/hyperlink.ts"
-              ],
-              "source": "src/hyperlink.ts#L329",
-              "jsDocTags": [],
-              "documentation": "Produce a new stable identity for copied hyperlinks without trusting clipboard IDs.",
               "memberDocs": []
             },
             {
@@ -2041,7 +2017,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L245",
+              "source": "src/store/data-engine.ts#L242",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
