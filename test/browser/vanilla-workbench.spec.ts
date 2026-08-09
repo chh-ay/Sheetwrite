@@ -70,6 +70,50 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
   return hasOpaqueForeground(rgba);
 }
 
+interface DprCanvasEvidence {
+  backingHeight: number;
+  backingWidth: number;
+  cssHeight: number;
+  cssWidth: number;
+  devicePixelRatio: number;
+  sample: number[];
+  sampleHeight: number;
+  sampleWidth: number;
+}
+
+async function readDprCanvasEvidence(page: Page): Promise<DprCanvasEvidence> {
+  return page.locator(CANVAS).evaluate((element) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("2d");
+    const bounds = canvas.getBoundingClientRect();
+    if (!context) throw new Error("Main-thread canvas 2D context is unavailable");
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      throw new Error("Main-thread canvas has no CSS dimensions");
+    }
+
+    const scaleX = canvas.width / bounds.width;
+    const scaleY = canvas.height / bounds.height;
+    const left = Math.ceil(64 * scaleX);
+    const top = Math.ceil(40 * scaleY);
+    const sampleWidth = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
+    const sampleHeight = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
+    if (sampleWidth <= 0 || sampleHeight <= 0) {
+      throw new Error("Main-thread canvas body sample is empty");
+    }
+
+    return {
+      backingHeight: canvas.height,
+      backingWidth: canvas.width,
+      cssHeight: bounds.height,
+      cssWidth: bounds.width,
+      devicePixelRatio: window.devicePixelRatio,
+      sample: Array.from(context.getImageData(left, top, sampleWidth, sampleHeight).data),
+      sampleHeight,
+      sampleWidth,
+    };
+  });
+}
+
 async function waitForLive(page: Page): Promise<void> {
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
     timeout: 20_000,
@@ -170,6 +214,94 @@ test("boots product-first, paints, and exposes the ownership instruments", async
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
+
+test(
+  "main-thread production canvas paints cells in a DPR 2 backing store",
+  {
+    tag: "@dpr2-render",
+  },
+  async ({ browser, browserName, page }, testInfo) => {
+    const errors = collectErrors(page);
+    await page.goto(`${VANILLA_URL}?renderer=canvas`);
+    await waitForLive(page);
+    await expect(page.getByTestId("renderer")).toContainText(
+      "Requested: Main thread · Active: Main thread",
+    );
+    await expect
+      .poll(async () => hasOpaqueForeground((await readDprCanvasEvidence(page)).sample), {
+        timeout: 15_000,
+        message: "DPR 2 main-thread canvas body never painted cell foreground",
+      })
+      .toBe(true);
+
+    const evidence = await readDprCanvasEvidence(page);
+    const visibleCells = await gridCellTexts(page);
+    const runtimeIdentity = await page.evaluate(() => ({
+      navigatorPlatform: navigator.platform,
+      userAgent: navigator.userAgent,
+      vendor: navigator.vendor,
+    }));
+    const opaqueColors = new Set<string>();
+    let opaquePixels = 0;
+    for (let offset = 0; offset + 3 < evidence.sample.length; offset += 4) {
+      if (evidence.sample[offset + 3] !== 255) continue;
+      opaquePixels += 1;
+      opaqueColors.add(
+        `${evidence.sample[offset]},${evidence.sample[offset + 1]},${evidence.sample[offset + 2]}`,
+      );
+    }
+    const expectedBackingWidth = Math.max(1, Math.round(evidence.cssWidth * 2));
+    const expectedBackingHeight = Math.max(1, Math.round(evidence.cssHeight * 2));
+    const renderEvidence = {
+      automation: {
+        browserEngine: browserName,
+        browserVersion: browser.version(),
+        hostPlatform: `${process.platform}-${process.arch}`,
+        project: testInfo.project.name,
+        projectMetadata: testInfo.project.metadata,
+        ...runtimeIdentity,
+      },
+      canvas: {
+        backingHeight: evidence.backingHeight,
+        backingWidth: evidence.backingWidth,
+        cssHeight: evidence.cssHeight,
+        cssWidth: evidence.cssWidth,
+        devicePixelRatio: evidence.devicePixelRatio,
+        expectedBackingHeight,
+        expectedBackingWidth,
+      },
+      cells: {
+        expectedVisibleValue: FIRST_ACCOUNT,
+        foregroundPainted: hasOpaqueForeground(evidence.sample),
+        opaqueColorCount: opaqueColors.size,
+        opaquePixels,
+        sampleHeight: evidence.sampleHeight,
+        sampleWidth: evidence.sampleWidth,
+      },
+    };
+    await testInfo.attach("dpr2-main-thread-render-evidence", {
+      body: Buffer.from(JSON.stringify(renderEvidence, null, 2)),
+      contentType: "application/json",
+    });
+
+    expect(["chromium", "webkit"]).toContain(browserName);
+    expect(testInfo.project.name).toBe(`${browserName}-engine-dpr2`);
+    expect(testInfo.project.metadata).toMatchObject({
+      automationEngine:
+        browserName === "chromium" ? "Playwright Chromium" : "Playwright WebKit (not macOS Safari)",
+      hostPlatform: `${process.platform}-${process.arch}`,
+      nativeMacOSSafariHardwareVerification: "external",
+    });
+    expect(evidence.devicePixelRatio).toBe(2);
+    expect(evidence.backingWidth).toBe(expectedBackingWidth);
+    expect(evidence.backingHeight).toBe(expectedBackingHeight);
+    expect(hasOpaqueForeground(evidence.sample)).toBe(true);
+    expect(visibleCells).toContain(FIRST_ACCOUNT);
+    expect(errors.page).toEqual([]);
+    expect(errors.worker).toEqual([]);
+    expect(errors.console).toEqual([]);
+  },
+);
 
 test("scenario tabs support keyboard focus and drive real construction options", async ({
   page,
