@@ -18,6 +18,14 @@ export const RELEASE_ARTIFACT_SCHEMA_VERSION = 2;
 export const RELEASE_ARTIFACT_MANIFEST = "release-artifacts.json";
 export const RELEASE_BUILD_COMMAND = "bun run build:packages";
 
+export function assertPublishedFilePolicy(packageName: string, files: readonly string[]): void {
+  if (packageName !== "@sheetwrite/core") return;
+  const sourceMap = files.find((path) => path.toLowerCase().endsWith(".map"));
+  if (sourceMap !== undefined) {
+    throw new Error(`${packageName} published files must exclude source maps; found ${sourceMap}`);
+  }
+}
+
 interface PackageManifest {
   readonly name: string;
   readonly version: string;
@@ -322,6 +330,7 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
     if ([...artifact.files].sort().some((path, fileIndex) => path !== artifact.files[fileIndex])) {
       throw new Error(`${artifact.name} packed file list must be sorted`);
     }
+    assertPublishedFilePolicy(artifact.name, artifact.files);
     assertString(artifact.shasum, `${artifact.name} shasum`);
     if (!/^[0-9a-f]{40}$/.test(artifact.shasum)) {
       throw new Error(`${artifact.name} shasum must be SHA-1 hex`);
@@ -373,7 +382,6 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "LICENSE",
     "dist/index.d.ts",
     "dist/index.js",
-    "dist/index.js.map",
     "dist/worker.d.ts",
     "dist/worker.js",
     "styles.css",

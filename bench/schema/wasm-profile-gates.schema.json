@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sheetwrite.dev/schemas/wasm-profile-gates-v1.json",
+  "title": "Sheetwrite WASM profile gate captures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "protocol", "gate", "captures"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "protocol": { "const": "wasm-post-link-gate-capture-v1" },
+    "gate": { "enum": ["formula", "render"] },
+    "captures": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "wasmOpt",
+          "status",
+          "commands",
+          "exitCode",
+          "artifactPath",
+          "evidenceSha256",
+          "wasmSha256",
+          "commit",
+          "runnerFingerprint"
+        ],
+        "properties": {
+          "wasmOpt": { "enum": ["-O3", "-Os", "-Oz"] },
+          "status": { "enum": ["passed", "failed"] },
+          "commands": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "exitCode": { "type": "integer", "minimum": 0 },
+          "artifactPath": { "type": "string", "minLength": 1 },
+          "evidenceSha256": { "$ref": "#/$defs/sha256" },
+          "wasmSha256": { "$ref": "#/$defs/sha256" },
+          "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "runnerFingerprint": { "$ref": "#/$defs/sha256" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "passed" } } },
+            "then": { "properties": { "exitCode": { "const": 0 } } }
+          },
+          {
+            "if": { "properties": { "status": { "const": "failed" } } },
+            "then": { "properties": { "exitCode": { "minimum": 1 } } }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

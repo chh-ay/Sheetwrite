@@ -1,9 +1,11 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
+import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
 const repositoryRoot = resolve("../../..");
 const root = resolve("dist");
 const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
+const packageLock = JSON.parse(await readFile("package-lock.json", "utf8"));
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -49,11 +51,31 @@ const assets = publicFiles.map((file) => {
     roles,
   };
 });
+const attribution = [
+  await attributeEntry({
+    assetFiles: ["main.js"],
+    bundler: "webpack",
+    eagerImports: ["@sheetwrite/core#initSheetwrite"],
+    entry: "src/main.js",
+    name: "core-first-paint",
+    repositoryRoot,
+    root,
+  }),
+];
+const terserVersion = packageLock.packages?.["node_modules/terser-webpack-plugin"]?.version;
+if (typeof terserVersion !== "string") {
+  throw new Error("webpack fixture lock is missing terser-webpack-plugin");
+}
 const evidence = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   bundler: "webpack",
   version: packageManifest.dependencies.webpack,
   assets,
+  provenance: attributionProvenance({
+    minifier: "terser-webpack-plugin",
+    version: terserVersion,
+  }),
+  attribution,
 };
 const evidencePath = resolve(repositoryRoot, "test-results/bundlers/webpack.json");
 await mkdir(resolve(evidencePath, ".."), { recursive: true });

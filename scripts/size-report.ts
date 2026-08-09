@@ -12,14 +12,19 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
-import { readReleaseManifestDigest, verifyReleaseArtifacts } from "./release-artifacts.js";
+import {
+  assertPublishedFilePolicy,
+  readReleaseManifestDigest,
+  verifyReleaseArtifacts,
+} from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
-export const SIZE_PROTOCOL_VERSION = 1;
+export const SIZE_PROTOCOL_VERSION = 2;
 export const SIZE_TOOL_NAME = "sheetwrite-delivery-size";
-export const SIZE_TOOL_VERSION = "1.0.0";
+export const SIZE_TOOL_VERSION = "2.0.0";
+export const BUNDLER_SOURCE_MAP_MODE = "hidden-external";
 
 export type MetricUnit = "bytes" | "count";
 export type PackedCategory =
@@ -69,12 +74,45 @@ export interface BundlerAsset {
   owner: string;
   roles: string[];
 }
+export interface BundlerProvenance {
+  buildMode: string;
+  minified: boolean;
+  minifier: { name: string; version: string };
+  externals: string[];
+  target: string;
+  sourceMaps: string;
+  attributionMethod: string;
+}
+
+export interface BundlerModuleAttribution {
+  id: string;
+  owner: string;
+  attribution: "source-map" | "opaque-asset";
+  rawBytes: number;
+  gzipBytes: number;
+  brotliBytes: number;
+}
+export interface BundlerAttributedAsset {
+  path: string;
+  sha256: string;
+}
+
+export interface BundlerEntryAttribution {
+  name: string;
+  entry: string;
+  eagerImports: string[];
+  assets: BundlerAttributedAsset[];
+  generatedBytes: number;
+  modules: BundlerModuleAttribution[];
+}
 
 export interface BundlerEvidence {
   schemaVersion: number;
   bundler: "next" | "vite" | "webpack";
   version: string;
   assets: BundlerAsset[];
+  provenance: BundlerProvenance;
+  attribution: BundlerEntryAttribution[];
 }
 
 export interface PackageReport {
@@ -98,6 +136,43 @@ export interface AssetReport extends BundlerAsset {
   brotliBytes: number;
   sha256: string;
 }
+export interface AttributionFindings {
+  comparison: {
+    entry: "core-first-paint";
+    buildMode: string;
+    minified: true;
+    externals: string[];
+    target: string;
+    sourceMaps: string;
+    attributionMethod: string;
+    minifiers: Record<"next" | "vite", { name: string; version: string }>;
+    fixtureAndConfigurationDifferences: Array<{
+      bundler: "next" | "vite";
+      eagerImports: string[];
+      nonSheetwriteRawBytes: number;
+      opaqueFrameworkRawBytes: number;
+    }>;
+  };
+  firstPaint: Array<{
+    bundler: "next" | "vite";
+    generatedBytes: number;
+    sheetwriteRawBytes: number;
+    rootBarrelRawBytes: number;
+    eagerImports: string[];
+  }>;
+  subpaths: Array<{
+    subpath: "sync" | "collaboration" | "rebase" | "persistence";
+    publicExportAdded: false;
+    decision: "retain-root-export" | "requires-isolated-subpath-proof";
+    reason: string;
+    retainedModules: Array<{
+      bundler: "next" | "vite";
+      rawBytes: number;
+      brotliBytes: number;
+    }>;
+    materialWinThreshold: { brotliBytes: 7680; percent: 10 };
+  }>;
+}
 
 export interface SizeReport {
   schemaVersion: number;
@@ -112,8 +187,11 @@ export interface SizeReport {
   bundlers: Array<{
     name: BundlerEvidence["bundler"];
     version: string;
+    provenance: BundlerProvenance;
+    attribution: BundlerEntryAttribution[];
     assets: AssetReport[];
   }>;
+  attributionFindings: AttributionFindings;
   reproduction: string;
 }
 
@@ -157,6 +235,9 @@ const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]
   webpack: ["core-initial", "worker-async"],
   next: ["core-initial"],
 };
+const ATTRIBUTION_METHOD = "source-map-generated-spans-with-explicit-opaque-assets-v2";
+const COMPARABLE_ENTRY = "core-first-paint";
+const SUBPATH_CANDIDATES = ["sync", "collaboration", "rebase", "persistence"] as const;
 
 function isNonNegativeInteger(value: unknown): value is number {
   return (
@@ -230,6 +311,10 @@ export function classifyPackedPath(path: string): PackedCategory {
 }
 
 export function summarizePack(name: string, result: PackResult): PackageReport {
+  assertPublishedFilePolicy(
+    name,
+    result.files.map((file) => file.path),
+  );
   const categories: Record<PackedCategory, number> = {
     css: 0,
     declarations: 0,
@@ -319,7 +404,11 @@ export function validateBundlerEvidence(value: unknown): BundlerEvidence {
   if (!(["next", "vite", "webpack"] as unknown[]).includes(candidate.bundler)) {
     throw new Error(`Unknown bundler evidence owner: ${String(candidate.bundler)}`);
   }
-  if (typeof candidate.version !== "string" || !Array.isArray(candidate.assets)) {
+  if (
+    typeof candidate.version !== "string" ||
+    candidate.version.length === 0 ||
+    !Array.isArray(candidate.assets)
+  ) {
     throw new Error("Bundler evidence has invalid version or assets");
   }
   const bundler = candidate.bundler as BundlerEvidence["bundler"];
@@ -368,7 +457,299 @@ export function validateBundlerEvidence(value: unknown): BundlerEvidence {
       throw new Error(`${bundler} async asset ${asset.path} leaked into an initial entry`);
     }
   }
-  return { schemaVersion: SIZE_PROTOCOL_VERSION, bundler, version: candidate.version, assets };
+
+  if (candidate.provenance === null || typeof candidate.provenance !== "object") {
+    throw new Error(`${bundler} is missing build provenance`);
+  }
+  const provenanceValue = candidate.provenance as Record<string, unknown>;
+  const minifierValue = provenanceValue.minifier;
+  if (
+    typeof provenanceValue.buildMode !== "string" ||
+    provenanceValue.buildMode.length === 0 ||
+    typeof provenanceValue.minified !== "boolean" ||
+    minifierValue === null ||
+    typeof minifierValue !== "object" ||
+    typeof (minifierValue as Record<string, unknown>).name !== "string" ||
+    (minifierValue as Record<string, unknown>).name === "" ||
+    typeof (minifierValue as Record<string, unknown>).version !== "string" ||
+    (minifierValue as Record<string, unknown>).version === "" ||
+    !Array.isArray(provenanceValue.externals) ||
+    !provenanceValue.externals.every(
+      (external) => typeof external === "string" && external.length > 0,
+    ) ||
+    typeof provenanceValue.target !== "string" ||
+    provenanceValue.target.length === 0 ||
+    provenanceValue.sourceMaps !== BUNDLER_SOURCE_MAP_MODE ||
+    provenanceValue.attributionMethod !== ATTRIBUTION_METHOD
+  ) {
+    throw new Error(`${bundler} build provenance is malformed or unsupported`);
+  }
+  const externals = provenanceValue.externals as string[];
+  if (new Set(externals).size !== externals.length) {
+    throw new Error(`${bundler} build provenance contains duplicate externals`);
+  }
+  const provenance: BundlerProvenance = {
+    buildMode: provenanceValue.buildMode,
+    minified: provenanceValue.minified,
+    minifier: {
+      name: (minifierValue as Record<string, unknown>).name as string,
+      version: (minifierValue as Record<string, unknown>).version as string,
+    },
+    externals: [...externals].sort(),
+    target: provenanceValue.target,
+    sourceMaps: provenanceValue.sourceMaps,
+    attributionMethod: provenanceValue.attributionMethod,
+  };
+
+  if (!Array.isArray(candidate.attribution) || candidate.attribution.length === 0) {
+    throw new Error(`${bundler} is missing module attribution`);
+  }
+  const assetByPath = new Map(assets.map((asset) => [asset.path, asset]));
+  const seenEntries = new Set<string>();
+  const attribution = candidate.attribution.map((value, entryIndex) => {
+    if (value === null || typeof value !== "object") {
+      throw new Error(`${bundler} attribution entry ${entryIndex} is malformed`);
+    }
+    const entry = value as Record<string, unknown>;
+    if (
+      typeof entry.name !== "string" ||
+      entry.name.length === 0 ||
+      typeof entry.entry !== "string" ||
+      entry.entry.length === 0 ||
+      !Array.isArray(entry.eagerImports) ||
+      entry.eagerImports.length === 0 ||
+      !entry.eagerImports.every(
+        (specifier) => typeof specifier === "string" && specifier.length > 0,
+      ) ||
+      !Array.isArray(entry.assets) ||
+      entry.assets.length === 0 ||
+      !entry.assets.every(
+        (asset) =>
+          asset !== null &&
+          typeof asset === "object" &&
+          typeof (asset as Record<string, unknown>).path === "string" &&
+          ((asset as Record<string, unknown>).path as string).length > 0 &&
+          typeof (asset as Record<string, unknown>).sha256 === "string" &&
+          /^[a-f0-9]{64}$/.test((asset as Record<string, unknown>).sha256 as string),
+      ) ||
+      !isNonNegativeInteger(entry.generatedBytes) ||
+      entry.generatedBytes === 0 ||
+      !Array.isArray(entry.modules) ||
+      entry.modules.length === 0
+    ) {
+      throw new Error(`${bundler} attribution entry ${entryIndex} is incomplete`);
+    }
+    if (seenEntries.has(entry.name)) {
+      throw new Error(`${bundler} contains duplicate attribution entry ${entry.name}`);
+    }
+    seenEntries.add(entry.name);
+    const attributedAssets = (entry.assets as Array<Record<string, unknown>>).map((asset) => ({
+      path: asset.path as string,
+      sha256: asset.sha256 as string,
+    }));
+    const attributedPaths = attributedAssets.map((asset) => asset.path);
+    if (new Set(attributedPaths).size !== attributedPaths.length) {
+      throw new Error(`${bundler} ${entry.name} contains duplicate attributed assets`);
+    }
+    for (const { path } of attributedAssets) {
+      const asset = assetByPath.get(path);
+      if (asset === undefined || asset.kind !== "javascript") {
+        throw new Error(`${bundler} ${entry.name} attributes unknown JavaScript asset ${path}`);
+      }
+    }
+    const seenModules = new Set<string>();
+    const modules = entry.modules.map((value, moduleIndex) => {
+      if (value === null || typeof value !== "object") {
+        throw new Error(`${bundler} ${entry.name} module ${moduleIndex} is malformed`);
+      }
+      const module = value as Record<string, unknown>;
+      if (
+        typeof module.id !== "string" ||
+        module.id.length === 0 ||
+        typeof module.owner !== "string" ||
+        module.owner.length === 0 ||
+        module.owner === "unclassified" ||
+        !(module.attribution === "source-map" || module.attribution === "opaque-asset") ||
+        !isNonNegativeInteger(module.rawBytes) ||
+        module.rawBytes === 0 ||
+        !isNonNegativeInteger(module.gzipBytes) ||
+        module.gzipBytes === 0 ||
+        !isNonNegativeInteger(module.brotliBytes) ||
+        module.brotliBytes === 0
+      ) {
+        throw new Error(`${bundler} ${entry.name} module ${moduleIndex} lacks ownership or sizes`);
+      }
+      const opaqueIdentity =
+        module.owner === `${bundler}:opaque-framework` &&
+        (module.id as string).startsWith(`${bundler}:opaque/`);
+      if ((module.attribution === "opaque-asset") !== opaqueIdentity) {
+        throw new Error(
+          `${bundler} ${entry.name} module ${moduleIndex} has invalid opaque ownership`,
+        );
+      }
+      if (seenModules.has(module.id)) {
+        throw new Error(`${bundler} ${entry.name} contains duplicate module ${module.id}`);
+      }
+      seenModules.add(module.id);
+      return {
+        id: module.id,
+        owner: module.owner,
+        attribution: module.attribution,
+        rawBytes: module.rawBytes,
+        gzipBytes: module.gzipBytes,
+        brotliBytes: module.brotliBytes,
+      } as BundlerModuleAttribution;
+    });
+    const attributedBytes = modules.reduce((sum, module) => sum + module.rawBytes, 0);
+    if (attributedBytes !== entry.generatedBytes) {
+      throw new Error(
+        `${bundler} ${entry.name} module bytes ${attributedBytes} do not equal generated bytes ${entry.generatedBytes}`,
+      );
+    }
+    return {
+      name: entry.name,
+      entry: entry.entry,
+      eagerImports: [...new Set(entry.eagerImports as string[])].sort(),
+      assets: attributedAssets.sort((left, right) => left.path.localeCompare(right.path)),
+      generatedBytes: entry.generatedBytes,
+      modules: modules.sort((left, right) => left.id.localeCompare(right.id)),
+    } as BundlerEntryAttribution;
+  });
+  if (!seenEntries.has(COMPARABLE_ENTRY)) {
+    throw new Error(`${bundler} is missing ${COMPARABLE_ENTRY} module attribution`);
+  }
+  return {
+    schemaVersion: SIZE_PROTOCOL_VERSION,
+    bundler,
+    version: candidate.version,
+    assets,
+    provenance,
+    attribution,
+  };
+}
+
+export function validateComparableAttribution(evidence: readonly BundlerEvidence[]): void {
+  const byBundler = new Map(evidence.map((entry) => [entry.bundler, entry]));
+  const next = byBundler.get("next");
+  const vite = byBundler.get("vite");
+  if (next === undefined || vite === undefined) {
+    throw new Error("Comparable attribution requires both Next.js and Vite evidence");
+  }
+  for (const entry of [next, vite]) {
+    if (
+      entry.provenance.buildMode !== "production" ||
+      entry.provenance.minified !== true ||
+      entry.provenance.target !== "browser" ||
+      entry.provenance.sourceMaps !== BUNDLER_SOURCE_MAP_MODE ||
+      entry.provenance.attributionMethod !== ATTRIBUTION_METHOD
+    ) {
+      throw new Error(`${entry.bundler} attribution is not a minified production browser build`);
+    }
+  }
+  for (const field of [
+    "buildMode",
+    "minified",
+    "target",
+    "sourceMaps",
+    "attributionMethod",
+  ] as const) {
+    if (next.provenance[field] !== vite.provenance[field]) {
+      throw new Error(`Next.js and Vite attribution differ in ${field}`);
+    }
+  }
+  if (JSON.stringify(next.provenance.externals) !== JSON.stringify(vite.provenance.externals)) {
+    throw new Error("Next.js and Vite attribution use incomparable externals");
+  }
+  const nextEntry = next.attribution.find((entry) => entry.name === COMPARABLE_ENTRY);
+  const viteEntry = vite.attribution.find((entry) => entry.name === COMPARABLE_ENTRY);
+  if (nextEntry === undefined || viteEntry === undefined) {
+    throw new Error(`Comparable attribution is missing ${COMPARABLE_ENTRY}`);
+  }
+  if (JSON.stringify(nextEntry.eagerImports) !== JSON.stringify(viteEntry.eagerImports)) {
+    throw new Error("Next.js and Vite first-paint eager imports differ");
+  }
+}
+export function buildAttributionFindings(
+  evidence: readonly BundlerEvidence[],
+): AttributionFindings {
+  validateComparableAttribution(evidence);
+  const comparable = (bundler: "next" | "vite") => {
+    const owner = evidence.find((entry) => entry.bundler === bundler);
+    const entry = owner?.attribution.find((candidate) => candidate.name === COMPARABLE_ENTRY);
+    if (owner === undefined || entry === undefined) {
+      throw new Error(`Missing ${bundler} ${COMPARABLE_ENTRY} attribution`);
+    }
+    return { owner, entry };
+  };
+  const next = comparable("next");
+  const vite = comparable("vite");
+  const pairs = [next, vite] as const;
+  const firstPaint = pairs.map(({ owner, entry }) => ({
+    bundler: owner.bundler as "next" | "vite",
+    generatedBytes: entry.generatedBytes,
+    sheetwriteRawBytes: entry.modules
+      .filter((module) => module.owner === "@sheetwrite/core")
+      .reduce((sum, module) => sum + module.rawBytes, 0),
+    rootBarrelRawBytes: entry.modules
+      .filter(
+        (module) =>
+          module.owner === "@sheetwrite/core" &&
+          /(?:^|\/)(?:dist\/index\.js|src\/index\.ts)$/.test(module.id),
+      )
+      .reduce((sum, module) => sum + module.rawBytes, 0),
+    eagerImports: entry.eagerImports,
+  }));
+  const subpaths: AttributionFindings["subpaths"] = SUBPATH_CANDIDATES.map((subpath) => {
+    const modulePattern = new RegExp(`(?:^|/)(?:dist/${subpath}\\.js|src/${subpath}\\.ts)$`);
+    const retainedModules = pairs.map(({ owner, entry }) => {
+      const modules = entry.modules.filter(
+        (module) => module.owner === "@sheetwrite/core" && modulePattern.test(module.id),
+      );
+      return {
+        bundler: owner.bundler as "next" | "vite",
+        rawBytes: modules.reduce((sum, module) => sum + module.rawBytes, 0),
+        brotliBytes: modules.reduce((sum, module) => sum + module.brotliBytes, 0),
+      };
+    });
+    const retained = retainedModules.some((measurement) => measurement.rawBytes > 0);
+    return {
+      subpath,
+      publicExportAdded: false,
+      decision: retained ? "requires-isolated-subpath-proof" : "retain-root-export",
+      reason: retained
+        ? "The module is present in a comparable first-paint graph, but attribution alone does not prove the counterfactual bundle saving required for a public subpath."
+        : "Neither comparable first-paint graph retains this module, so a dedicated public subpath has no measured initial-bundle benefit.",
+      retainedModules,
+      materialWinThreshold: { brotliBytes: 7680, percent: 10 },
+    };
+  });
+  return {
+    comparison: {
+      entry: COMPARABLE_ENTRY,
+      buildMode: next.owner.provenance.buildMode,
+      minified: true,
+      externals: next.owner.provenance.externals,
+      target: next.owner.provenance.target,
+      sourceMaps: next.owner.provenance.sourceMaps,
+      attributionMethod: next.owner.provenance.attributionMethod,
+      minifiers: {
+        next: next.owner.provenance.minifier,
+        vite: vite.owner.provenance.minifier,
+      },
+      fixtureAndConfigurationDifferences: pairs.map(({ owner, entry }) => ({
+        bundler: owner.bundler as "next" | "vite",
+        eagerImports: entry.eagerImports,
+        nonSheetwriteRawBytes: entry.modules
+          .filter((module) => module.owner !== "@sheetwrite/core")
+          .reduce((sum, module) => sum + module.rawBytes, 0),
+        opaqueFrameworkRawBytes: entry.modules
+          .filter((module) => module.attribution === "opaque-asset")
+          .reduce((sum, module) => sum + module.rawBytes, 0),
+      })),
+    },
+    firstPaint,
+    subpaths,
+  };
 }
 
 function processEnvironment(): Record<string, string> {
@@ -420,6 +801,31 @@ function rewriteWorkspaceRanges(
   );
 }
 
+async function copyManifestEntry(
+  sourceRoot: string,
+  packageRoot: string,
+  entry: string,
+): Promise<void> {
+  if (!/[*?[\]{}]/u.test(entry)) {
+    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
+    return;
+  }
+  const matches = Array.from(
+    new Bun.Glob(entry).scanSync({
+      cwd: sourceRoot,
+      dot: true,
+      onlyFiles: true,
+      followSymlinks: false,
+    }),
+  );
+  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
+  for (const path of matches) {
+    const target = join(packageRoot, path);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(join(sourceRoot, path), target);
+  }
+}
+
 async function packPackages(temporaryRoot: string): Promise<PackedPackage[]> {
   const stageRoot = join(temporaryRoot, "stage");
   const tarballRoot = join(temporaryRoot, "tarballs");
@@ -444,7 +850,7 @@ async function packPackages(temporaryRoot: string): Promise<PackedPackage[]> {
     const packageRoot = join(stageRoot, basename(directory));
     await mkdir(packageRoot, { recursive: true });
     for (const path of sourceManifest.files ?? []) {
-      await cp(join(sourceRoot, path), join(packageRoot, path), { recursive: true });
+      await copyManifestEntry(sourceRoot, packageRoot, path);
     }
     await cp(join(repositoryRoot, "LICENSE"), join(packageRoot, "LICENSE"));
     await cp(join(sourceRoot, "README.md"), join(packageRoot, "README.md"));
@@ -604,6 +1010,7 @@ async function loadBundlerEvidence(
     const path = join(bundlerEvidenceRoot, `${bundler}.json`);
     evidence.push(validateBundlerEvidence(await readJson<unknown>(path)));
   }
+  validateComparableAttribution(evidence);
   return evidence;
 }
 
@@ -620,9 +1027,80 @@ async function reportAsset(asset: BundlerAsset): Promise<AssetReport> {
     sha256: createHash("sha256").update(content).digest("hex"),
   };
 }
+export function assertAttributionAssetsFresh(
+  evidence: Pick<BundlerEvidence, "bundler" | "attribution">,
+  assets: readonly Pick<AssetReport, "path" | "rawBytes" | "sha256">[],
+): void {
+  const assetByPath = new Map(assets.map((asset) => [asset.path, asset]));
+  for (const entry of evidence.attribution) {
+    let generatedBytes = 0;
+    for (const attributed of entry.assets) {
+      const asset = assetByPath.get(attributed.path);
+      if (asset === undefined) {
+        throw new Error(
+          `${evidence.bundler} ${entry.name} attribution asset disappeared: ${attributed.path}`,
+        );
+      }
+      if (asset.sha256 !== attributed.sha256) {
+        throw new Error(
+          `${evidence.bundler} ${entry.name} attribution asset SHA-256 changed: ${attributed.path}`,
+        );
+      }
+      generatedBytes += asset.rawBytes;
+    }
+    if (generatedBytes !== entry.generatedBytes) {
+      throw new Error(
+        `${evidence.bundler} ${entry.name} generated bytes changed after attribution`,
+      );
+    }
+  }
+}
 
 function metricSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9]+(.)/g, (_, next: string) => next.toUpperCase());
+}
+
+export function addPackageSizeMetrics(
+  metrics: Record<string, Metric>,
+  report: PackageReport,
+): void {
+  const prefix = `package.${report.name}`;
+  addMetric(
+    metrics,
+    `${prefix}.tarballBytes`,
+    report.tarballBytes,
+    "bytes",
+    "package-tarball",
+    report.name,
+  );
+  addMetric(
+    metrics,
+    `${prefix}.unpackedBytes`,
+    report.unpackedBytes,
+    "bytes",
+    "package-unpacked",
+    report.name,
+  );
+  addMetric(
+    metrics,
+    `${prefix}.fileCount`,
+    report.fileCount,
+    "count",
+    "package-files",
+    report.name,
+  );
+  for (const [category, bytes] of Object.entries(report.categories).sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    addMetric(
+      metrics,
+      `${prefix}.${metricSegment(category)}Bytes`,
+      bytes,
+      "bytes",
+      `package-unpacked-${category}`,
+      report.name,
+    );
+  }
 }
 
 async function buildSizeReport(
@@ -666,54 +1144,24 @@ async function buildSizeReport(
     }
 
     const bundlerEvidence = await loadBundlerEvidence(reuseBundlers, artifactDirectory);
+    const attributionFindings = buildAttributionFindings(bundlerEvidence);
     const bundlers: SizeReport["bundlers"] = [];
     for (const evidence of bundlerEvidence) {
       const assets = await Promise.all(evidence.assets.map(reportAsset));
       assets.sort((left, right) => left.path.localeCompare(right.path));
-      bundlers.push({ name: evidence.bundler, version: evidence.version, assets });
+      assertAttributionAssetsFresh(evidence, assets);
+      bundlers.push({
+        name: evidence.bundler,
+        version: evidence.version,
+        provenance: evidence.provenance,
+        attribution: evidence.attribution,
+        assets,
+      });
     }
     bundlers.sort((left, right) => left.name.localeCompare(right.name));
 
     const metrics: Record<string, Metric> = {};
-    for (const entry of packedPackages) {
-      const prefix = `package.${entry.name}`;
-      addMetric(
-        metrics,
-        `${prefix}.tarballBytes`,
-        entry.report.tarballBytes,
-        "bytes",
-        "package",
-        entry.name,
-      );
-      addMetric(
-        metrics,
-        `${prefix}.unpackedBytes`,
-        entry.report.unpackedBytes,
-        "bytes",
-        "package",
-        entry.name,
-      );
-      addMetric(
-        metrics,
-        `${prefix}.fileCount`,
-        entry.report.fileCount,
-        "count",
-        "package",
-        entry.name,
-      );
-      for (const [category, bytes] of Object.entries(entry.report.categories).sort(
-        ([left], [right]) => left.localeCompare(right),
-      )) {
-        addMetric(
-          metrics,
-          `${prefix}.${metricSegment(category)}Bytes`,
-          bytes,
-          "bytes",
-          `package-${category}`,
-          entry.name,
-        );
-      }
-    }
+    for (const entry of packedPackages) addPackageSizeMetrics(metrics, entry.report);
     for (const closure of closures) {
       const prefix = `closure.${closure.name}`;
       addMetric(
@@ -783,6 +1231,44 @@ async function buildSizeReport(
         }
       }
     }
+    for (const entry of attributionFindings.firstPaint) {
+      addMetric(
+        metrics,
+        `attribution.${entry.bundler}.coreFirstPaint.sheetwriteRawBytes`,
+        entry.sheetwriteRawBytes,
+        "bytes",
+        "browser-module-attribution",
+        `${entry.bundler}:@sheetwrite/core`,
+      );
+      addMetric(
+        metrics,
+        `attribution.${entry.bundler}.coreFirstPaint.rootBarrelRawBytes`,
+        entry.rootBarrelRawBytes,
+        "bytes",
+        "browser-module-attribution",
+        `${entry.bundler}:@sheetwrite/core`,
+      );
+    }
+    for (const candidate of attributionFindings.subpaths) {
+      for (const retained of candidate.retainedModules) {
+        addMetric(
+          metrics,
+          `attribution.${retained.bundler}.${candidate.subpath}.rawBytes`,
+          retained.rawBytes,
+          "bytes",
+          "browser-module-attribution",
+          `${retained.bundler}:@sheetwrite/core/${candidate.subpath}`,
+        );
+        addMetric(
+          metrics,
+          `attribution.${retained.bundler}.${candidate.subpath}.brotliBytes`,
+          retained.brotliBytes,
+          "bytes",
+          "browser-module-attribution",
+          `${retained.bundler}:@sheetwrite/core/${candidate.subpath}`,
+        );
+      }
+    }
     for (const [name, path] of [
       ["styles", join(repositoryRoot, "packages/core/styles.css")],
       ["shell", join(repositoryRoot, "packages/core/shell.css")],
@@ -829,6 +1315,7 @@ async function buildSizeReport(
         .sort((left, right) => left.name.localeCompare(right.name)),
       closures: closures.sort((left, right) => left.name.localeCompare(right.name)),
       bundlers,
+      attributionFindings,
       reproduction: "bun run size:report",
     };
   } finally {

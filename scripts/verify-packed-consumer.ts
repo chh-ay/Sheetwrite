@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "@playwright/test";
-import { readReleaseManifestDigest, verifyReleaseArtifacts } from "./release-artifacts.js";
+import {
+  assertPublishedFilePolicy,
+  readReleaseManifestDigest,
+  verifyReleaseArtifacts,
+} from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 
 interface PackageManifest {
@@ -62,21 +66,13 @@ const packageSpecs: PackageSpec[] = [
       "dist/index.d.ts",
       "dist/index.js",
       "dist/types/cell.d.ts",
-      "dist/types/cell.d.ts.map",
       "dist/types/coordinates.d.ts",
-      "dist/types/coordinates.d.ts.map",
       "dist/types/data.d.ts",
-      "dist/types/data.d.ts.map",
       "dist/types/document.d.ts",
-      "dist/types/document.d.ts.map",
       "dist/types/grid.d.ts",
-      "dist/types/grid.d.ts.map",
       "dist/types/render.d.ts",
-      "dist/types/render.d.ts.map",
       "dist/types/store.d.ts",
-      "dist/types/store.d.ts.map",
       "dist/types/transaction.d.ts",
-      "dist/types/transaction.d.ts.map",
       "dist/worker.d.ts",
       "dist/worker.js",
       "dist/shell.d.ts",
@@ -262,6 +258,7 @@ async function assertTarball(
   extractRoot: string,
 ): Promise<void> {
   const packedFiles = new Set(result.files.map((file) => file.path));
+  assertPublishedFilePolicy(manifest.name, [...packedFiles]);
   for (const requiredFile of spec.requiredFiles) {
     if (!packedFiles.has(requiredFile)) {
       throw new Error(`${manifest.name} tarball is missing ${requiredFile}`);

@@ -57,7 +57,8 @@
     "./shell.css": "./shell.css"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "styles.css",
     "shell.css"
   ],
